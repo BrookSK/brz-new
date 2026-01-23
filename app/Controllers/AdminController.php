@@ -622,6 +622,43 @@ class AdminController extends Controller {
         $this->json(['success' => true, 'usuario' => $usuario]);
     }
     
+    public function usuarioPerfil(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $usuarioId = $request->getParam('id');
+        $usuario = $this->usuarioModel->find($usuarioId);
+        
+        if (!$usuario) {
+            $this->json(['error' => 'Usuário não encontrado'], 404);
+            return;
+        }
+        
+        // Obter pedidos do usuário
+        $stmt = $this->getConnection()->prepare("
+            SELECT p.*, 
+                   DATE_FORMAT(p.data_criacao, '%d/%m/%Y %H:%i') as data_formatada,
+                   (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) as itens_count,
+                   SUM(pi.quantidade * pi.valor) as valor_total
+            FROM pedidos p
+            LEFT JOIN pedido_itens pi ON p.id = pi.pedido_id
+            WHERE p.usuario_id = :usuario_id
+            GROUP BY p.id
+            ORDER BY p.data_criacao DESC
+        ");
+        $stmt->bindParam(':usuario_id', $usuarioId);
+        $stmt->execute();
+        $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Remover senha do retorno
+        unset($usuario['senha']);
+        
+        $this->json([
+            'success' => true,
+            'usuario' => $usuario,
+            'pedidos' => $pedidos
+        ]);
+    }
+    
     public function salvarUsuario(Request $request) {
         $this->authService->requerPermissao('create');
         
