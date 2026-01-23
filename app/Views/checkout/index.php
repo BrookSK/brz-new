@@ -291,7 +291,27 @@ function updatePrices(currency) {
     
     console.log('Convertendo para:', currency, 'Taxa:', rate); // Debug
     
-    // Atualizar valores do resumo
+    // Valores originais em USD (fixos)
+    const originalValues = {
+        subtotal: <?= $subtotal ?>,
+        frete: <?= $peso_total * 15 ?>,
+        taxaServico: <?= $peso_total * 39 ?>,
+        impostos: <?= $subtotal * 0.80 ?>
+    };
+    
+    // Calcular valores convertidos dos originais
+    const convertedValues = {
+        subtotal: originalValues.subtotal * rate,
+        frete: originalValues.frete * rate,
+        taxaServico: originalValues.taxaServico * rate,
+        impostos: originalValues.impostos * rate,
+        total: (originalValues.subtotal + originalValues.frete + originalValues.taxaServico + originalValues.impostos) * rate
+    };
+    
+    console.log('Valores originais:', originalValues); // Debug
+    console.log('Valores convertidos:', convertedValues); // Debug
+    
+    // Atualizar valores do resumo com os valores convertidos
     const subtotalElement = document.getElementById('subtotal');
     const freteElement = document.getElementById('frete');
     const taxaServicoElement = document.getElementById('taxa-servico');
@@ -299,41 +319,35 @@ function updatePrices(currency) {
     const totalElement = document.getElementById('total');
     
     if (subtotalElement) {
-        const subtotalText = subtotalElement.textContent.replace(/[^\d.]/g, '');
-        const subtotal = parseFloat(subtotalText) * rate;
-        subtotalElement.textContent = currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ',');
+        subtotalElement.textContent = currencySymbol + ' ' + convertedValues.subtotal.toFixed(2).replace('.', ',');
     }
     
     if (freteElement) {
-        const freteText = freteElement.textContent.replace(/[^\d.]/g, '');
-        const frete = parseFloat(freteText) * rate;
-        freteElement.textContent = currencySymbol + ' ' + frete.toFixed(2).replace('.', ',');
+        freteElement.textContent = currencySymbol + ' ' + convertedValues.frete.toFixed(2).replace('.', ',');
     }
     
     if (taxaServicoElement) {
-        const taxaServicoText = taxaServicoElement.textContent.replace(/[^\d.]/g, '');
-        const taxaServico = parseFloat(taxaServicoText) * rate;
-        taxaServicoElement.textContent = currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ',');
+        taxaServicoElement.textContent = currencySymbol + ' ' + convertedValues.taxaServico.toFixed(2).replace('.', ',');
     }
     
     if (impostosElement) {
-        const impostosText = impostosElement.textContent.replace(/[^\d.]/g, '');
-        const impostos = parseFloat(impostosText) * rate;
-        impostosElement.textContent = currencySymbol + ' ' + impostos.toFixed(2).replace('.', ',');
+        impostosElement.textContent = currencySymbol + ' ' + convertedValues.impostos.toFixed(2).replace('.', ',');
     }
     
     if (totalElement) {
-        const totalText = totalElement.textContent.replace(/[^\d.]/g, '');
-        const total = parseFloat(totalText) * rate;
-        totalElement.textContent = currencySymbol + ' ' + total.toFixed(2).replace('.', ',');
+        totalElement.textContent = currencySymbol + ' ' + convertedValues.total.toFixed(2).replace('.', ',');
     }
     
-    // Atualizar itens
+    // Atualizar itens com valores originais
+    const originalItems = <?php echo json_encode($items); ?>;
     const itemPrices = document.querySelectorAll('.item-price');
-    itemPrices.forEach(function(element) {
-        const itemText = element.textContent.replace(/[^\d.]/g, '');
-        const itemValue = parseFloat(itemText) * rate;
-        element.textContent = currencySymbol + ' ' + itemValue.toFixed(2).replace('.', ',');
+    itemPrices.forEach(function(element, index) {
+        if (originalItems[index]) {
+            const originalValue = originalItems[index]['subtotal'];
+            const convertedValue = originalValue * rate;
+            element.textContent = currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ',');
+            console.log('Item', index, 'convertido de', originalValue, 'para', convertedValue); // Debug
+        }
     });
     
     console.log('Conversão concluída para:', currency); // Debug
