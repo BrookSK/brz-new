@@ -144,6 +144,15 @@
                                                 console.log('🔍 [DEBUG] Chamando atualizarFormaPagamento()');
                                                 atualizarFormaPagamento();
                                             });
+                                            
+                                            // Verificar se já há uma forma de pagamento selecionada ao carregar
+                                            document.addEventListener('DOMContentLoaded', function() {
+                                                const formaPagamentoSelect = document.getElementById('forma_pagamento');
+                                                if (formaPagamentoSelect && formaPagamentoSelect.value) {
+                                                    console.log('🔍 [INIT] Forma de pagamento já selecionada:', formaPagamentoSelect.value);
+                                                    atualizarFormaPagamento();
+                                                }
+                                            });
                                             </script>
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
