@@ -10,6 +10,17 @@ class AuthService {
         $this->usuarioModel = new Usuario();
     }
     
+    public function login($email, $senha) {
+        $usuario = $this->usuarioModel->authenticate($email, $senha);
+        
+        if ($usuario) {
+            $this->criarSessao($usuario);
+            return $usuario;
+        }
+        
+        return false;
+    }
+    
     public function autenticar($email, $senha) {
         $usuario = $this->usuarioModel->authenticate($email, $senha);
         
