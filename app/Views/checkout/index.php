@@ -338,6 +338,7 @@ function processarPedidoDireto() {
     
     const form = document.getElementById('checkout-form');
     const botao = document.getElementById('btn-finalizar');
+    const checkbox = document.getElementById('consentimento_legal');
     
     if (!form) {
         console.error('❌ [DIRETO] Formulário não encontrado');
@@ -345,14 +346,41 @@ function processarPedidoDireto() {
         return;
     }
     
-    console.log('🔍 [DIRETO] Formulário encontrado, coletando dados...');
+    console.log('🔍 [DIRETO] Formulário encontrado, verificando checkbox...');
+    console.log('🔍 [DIRETO] Checkbox encontrado:', !!checkbox);
+    console.log('🔍 [DIRETO] Checkbox checked:', checkbox ? checkbox.checked : 'N/A');
     
-    // Coletar dados do formulário
-    const formData = new FormData(form);
-    console.log('🔍 [DIRETO] Dados coletados:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`🔍 [DIRETO] ${key}: ${value}`);
+    // Verificar se os termos foram aceitos
+    if (!checkbox || !checkbox.checked) {
+        console.error('❌ [DIRETO] Termos não aceitos');
+        alert('É necessário aceitar os termos para continuar');
+        return;
     }
+    
+    console.log('🔍 [DIRETO] Termos aceitos, coletando dados...');
+    
+    // Coletar dados do formulário manualmente
+    const formData = new FormData();
+    
+    // Adicionar todos os campos do formulário
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.type !== 'checkbox') {
+            formData.append(input.name, input.value);
+            console.log(`🔍 [DIRETO] ${input.name}: ${input.value}`);
+        } else if (input.type === 'checkbox' && input.checked) {
+            formData.append(input.name, 'on');
+            console.log(`🔍 [DIRETO] ${input.name}: on`);
+        }
+    });
+    
+    // Garantir que o consentimento_legal seja adicionado
+    if (checkbox.checked) {
+        formData.append('consentimento_legal', 'on');
+        console.log('🔍 [DIRETO] consentimento_legal: on (forçado)');
+    }
+    
+    console.log('🔍 [DIRETO] Total de campos no FormData:', [...formData.keys()].length);
     
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
