@@ -275,7 +275,8 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" onclick="processarPedidoDireto()">
+                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" 
+                                    onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
                             
@@ -283,6 +284,12 @@
                             <button type="button" class="btn btn-warning btn-sm w-100 mt-2" 
                                     onclick="console.log('🔍 [TESTE] Botão de teste clicado!'); alert('Botão de teste funciona!');">
                                 <i class="fas fa-bug"></i> Teste Inline
+                            </button>
+                            
+                            <!-- Botão de Debug -->
+                            <button type="button" class="btn btn-info btn-sm w-100 mt-2" 
+                                    onclick="debugBotaoFinalizar();">
+                                <i class="fas fa-bug"></i> Debug Botão
                             </button>
                         </div>
                     </form>
@@ -295,6 +302,35 @@
 <!-- JavaScript para processar o formulário - no final da página -->
 <script>
 console.log('🔍 [DEBUG] Script carregado - início');
+
+// Função para debug do botão
+function debugBotaoFinalizar() {
+    console.log('🔍 [DEBUG] Iniciando debug do botão finalizar');
+    
+    const botao = document.getElementById('btn-finalizar');
+    const checkbox = document.getElementById('consentimento_legal');
+    
+    console.log('🔍 [DEBUG] Botão encontrado:', !!botao);
+    console.log('🔍 [DEBUG] Botão disabled:', botao ? botao.disabled : 'N/A');
+    console.log('🔍 [DEBUG] Botão onclick:', botao ? botao.getAttribute('onclick') : 'N/A');
+    console.log('🔍 [DEBUG] Checkbox encontrado:', !!checkbox);
+    console.log('🔍 [DEBUG] Checkbox checked:', checkbox ? checkbox.checked : 'N/A');
+    
+    if (botao) {
+        // Forçar habilitar botão
+        botao.disabled = false;
+        botao.className = 'btn btn-success btn-lg w-100';
+        console.log('🔍 [DEBUG] Botão forçado a habilitar');
+        
+        // Adicionar listener adicional
+        botao.addEventListener('click', function() {
+            console.log('🔍 [DEBUG] Listener adicional acionado!');
+            alert('Listener adicional funcionou!');
+        });
+        
+        console.log('🔍 [DEBUG] Listener adicional adicionado');
+    }
+}
 
 // Função para processar pedido diretamente
 function processarPedidoDireto() {
@@ -362,7 +398,7 @@ function processarPedidoDireto() {
     });
 }
 
-// Função toggleButton
+// Função toggleButton simplificada
 function toggleButton() {
     const checkbox = document.getElementById('consentimento_legal');
     const botao = document.getElementById('btn-finalizar');
@@ -372,18 +408,18 @@ function toggleButton() {
     console.log('🔍 [BOTÃO] Botão encontrado:', !!botao);
     
     if (checkbox && botao) {
-        const isChecked = checkbox.checked;
-        botao.disabled = !isChecked;
-        
+        // NÃO desabilitar o botão - apenas mudar a cor
         if (checkbox.checked) {
             botao.className = 'btn btn-primary btn-lg w-100';
-            console.log('🔍 [BOTÃO] Botão habilitado');
+            console.log('🔍 [BOTÃO] Botão azul (termos aceitos)');
         } else {
             botao.className = 'btn btn-secondary btn-lg w-100';
-            console.log('🔍 [BOTÃO] Botão desabilitado');
+            console.log('🔍 [BOTÃO] Botão cinza (termos não aceitos)');
         }
         
-        console.log('🔍 [BOTÃO] Estado final do botão:', !botao.disabled);
+        // Garantir que o botão NUNCA seja desabilitado
+        botao.disabled = false;
+        console.log('🔍 [BOTÃO] Botão garantido como habilitado');
     } else {
         console.error('❌ [BOTÃO] Checkbox ou botão não encontrado');
     }
@@ -416,7 +452,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (botao) {
         console.log('🔍 [DEBUG] Botão estado inicial:', botao.disabled);
-        console.log('🔍 [DEBUG] Botão pronto para processamento direto');
+        console.log('🔍 [DEBUG] Garantindo que botão esteja habilitado...');
+        
+        // Forçar botão a ser habilitado
+        botao.disabled = false;
+        console.log('🔍 [DEBUG] Botão forçado a habilitado no DOMContentLoaded');
     }
     
     if (form) {
