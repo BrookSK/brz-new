@@ -256,6 +256,7 @@
                                 <option value="boleto">Boleto</option>
                                 <option value="pix">PIX</option>
                                 <option value="transferencia">Transferência Bancária</option>
+                                <option value="pagamento_entrega">Pagamento na Entrega</option>
                             </select>
                         </div>
                         <div class="col-md-6">
