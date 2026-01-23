@@ -400,7 +400,110 @@ class AdminController extends Controller {
         ]);
     }
     
-    // Métodos de Produtos
+    public function produtos(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $pagina = $request->getParam('pagina', 1);
+        $limite = 20;
+        $offset = ($pagina - 1) * $limite;
+        $status = $request->getParam('status', '');
+        $busca = $request->getParam('busca', '');
+        $categoria_id = $request->getParam('categoria_id', '');
+        
+        $produtos = $this->getProdutosComFiltros($busca, $status, $categoria_id, $limite, $offset);
+        $total = $this->getTotalProdutos($busca, $status, $categoria_id);
+        $totalPaginas = ceil($total / $limite);
+        
+        // Obter categorias para o filtro
+        $categorias = $this->getCategorias();
+        
+        $this->view('admin/produtos', [
+            'produtos' => $produtos,
+            'categorias' => $categorias,
+            'pagina' => $pagina,
+            'limite' => $limite,
+            'total' => $total,
+            'total_paginas' => $totalPaginas,
+            'filtro' => $busca,
+            'status' => $status,
+            'categoria_id' => $categoria_id,
+            'busca' => $busca
+        ]);
+    }
+    
+    private function getProdutosComFiltros($busca, $status, $categoria_id, $limite, $offset) {
+        $sql = "
+            SELECT p.*, c.nome as categoria_nome
+            FROM produtos p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            WHERE 1=1
+        ";
+        
+        $params = [];
+        
+        if (!empty($busca)) {
+            $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
+            $params[':busca'] = "%{$busca}%";
+        }
+        
+        if (!empty($status)) {
+            $sql .= " AND p.status = :status";
+            $params[':status'] = $status;
+        }
+        
+        if (!empty($categoria_id)) {
+            $sql .= " AND p.categoria_id = :categoria_id";
+            $params[':categoria_id'] = $categoria_id;
+        }
+        
+        $sql .= " ORDER BY p.nome ASC LIMIT :limite OFFSET :offset";
+        
+        $stmt = $this->produtoModel->getConnection()->prepare($sql);
+        
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    private function getTotalProdutos($busca, $status, $categoria_id) {
+        $sql = "SELECT COUNT(*) as total FROM produtos WHERE 1=1";
+        $params = [];
+        
+        if (!empty($busca)) {
+            $sql .= " AND (nome LIKE :busca OR sku LIKE :busca)";
+            $params[':busca'] = "%{$busca}%";
+        }
+        
+        if (!empty($status)) {
+            $sql .= " AND status = :status";
+            $params[':status'] = $status;
+        }
+        
+        if (!empty($categoria_id)) {
+            $sql .= " AND categoria_id = :categoria_id";
+            $params[':categoria_id'] = $categoria_id;
+        }
+        
+        $stmt = $this->produtoModel->getConnection()->prepare($sql);
+        
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        
+        $stmt->execute();
+        return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+    }
+    
+    private function getCategorias() {
+        $stmt = $this->categoriaModel->getConnection()->prepare("SELECT * FROM categorias ORDER BY nome ASC");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
     public function editarProduto(Request $request) {
         $this->authService->requerPermissao('read');
         
