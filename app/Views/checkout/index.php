@@ -359,7 +359,7 @@ function updatePrices(currency) {
     
     console.log('🔍 [MOEDA] Valores convertidos:', convertedValues);
     
-    // Atualizar elementos na página
+    // Atualizar elementos do resumo do pedido
     const elements = {
         subtotal: document.getElementById('subtotal'),
         frete: document.getElementById('frete'),
@@ -368,12 +368,12 @@ function updatePrices(currency) {
         total: document.getElementById('total')
     };
     
-    console.log('🔍 [MOEDA] Elementos encontrados:');
+    console.log('🔍 [MOEDA] Elementos do resumo encontrados:');
     for (const [key, element] of Object.entries(elements)) {
         console.log(`🔍 [MOEDA] ${key}:`, !!element);
     }
     
-    // Atualizar cada elemento
+    // Atualizar cada elemento do resumo
     for (const [key, element] of Object.entries(elements)) {
         if (element) {
             const value = convertedValues[key];
@@ -390,14 +390,73 @@ function updatePrices(currency) {
     console.log('🔍 [MOEDA] Itens do carrinho encontrados:', itemPrices.length);
     
     itemPrices.forEach((element, index) => {
-        const originalPrice = parseFloat(element.textContent.replace('$', '').replace(',', '.'));
-        const convertedPrice = originalPrice * rate;
-        const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
-        element.textContent = formattedPrice;
-        console.log(`🔍 [MOEDA] Item ${index} atualizado para:`, formattedPrice);
+        if (element) {
+            const originalPrice = parseFloat(element.textContent.replace(/[^0-9.,]/g, ''));
+            const convertedPrice = originalPrice * rate;
+            const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+            element.textContent = formattedPrice;
+            console.log(`🔍 [MOEDA] Item ${index} atualizado para:`, formattedPrice);
+        }
     });
     
-    console.log('🔍 [MOEDA] updatePrices() concluída');
+    // Atualizar elementos ocultos se existirem
+    const hiddenSubtotal = document.getElementById('subtotal_hidden');
+    const hiddenFrete = document.getElementById('frete_hidden');
+    const hiddenTotal = document.getElementById('total_hidden');
+    
+    if (hiddenSubtotal) {
+        hiddenSubtotal.value = convertedValues.subtotal.toFixed(2);
+        console.log('🔍 [MOEDA] Campo oculto subtotal atualizado para:', convertedValues.subtotal.toFixed(2));
+    }
+    
+    if (hiddenFrete) {
+        hiddenFrete.value = convertedValues.frete.toFixed(2);
+        console.log('🔍 [MOEDA] Campo oculto frete atualizado para:', convertedValues.frete.toFixed(2));
+    }
+    
+    if (hiddenTotal) {
+        hiddenTotal.value = convertedValues.total.toFixed(2);
+        console.log('🔍 [MOEDA] Campo oculto total atualizado para:', convertedValues.total.toFixed(2));
+    }
+    
+    // Atualizar botão finalizar
+    const botaoFinalizar = document.getElementById('btn-finalizar');
+    if (botaoFinalizar) {
+        switch(currency) {
+            case 'BRL':
+                botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro (R$)';
+                break;
+            case 'USD':
+                botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro ($)';
+                break;
+            default:
+                botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+        }
+        console.log('🔍 [MOEDA] Botão finalizar atualizado para moeda:', currency);
+    }
+    
+    // Atualizar selo de moeda se existir
+    const moedaSelect = document.getElementById('moeda_select');
+    if (moedaSelect) {
+        moedaSelect.value = currency;
+        console.log('🔍 [MOEDA] Select de moeda atualizado para:', currency);
+    }
+    
+    // Atualizar campo oculto de moeda
+    const moedaHidden = document.getElementById('moeda_hidden');
+    if (moedaHidden) {
+        moedaHidden.value = currency;
+        console.log('🔍 [MOEDA] Campo oculto de moeda atualizado para:', currency);
+    }
+    
+    // Atualizar símbolo da moeda no header se existir
+    const currentCurrencyElement = document.getElementById('current-currency');
+    if (currentCurrencyElement) {
+        currentCurrencyElement.textContent = currency;
+        console.log('🔍 [MOEDA] Símbolo no header atualizado para:', currency);
+    }
+    
+    console.log('🔍 [MOEDA] updatePrices() concluída com sucesso');
 }
 
 // Inicializar com a moeda do header
@@ -476,13 +535,29 @@ setInterval(function() {
     }
 }, 200);
 
-// Função simples para o botão
+// Função para habilitar/desabilitar botão finalizar
 function toggleButton() {
-    var checkbox = document.getElementById('consentimento_legal');
-    var botao = document.getElementById('btn-finalizar');
+    const checkbox = document.getElementById('consentimento_legal');
+    const botao = document.getElementById('btn-finalizar');
+    
+    console.log('🔍 [BOTÃO] toggleButton() chamada');
+    console.log('🔍 [BOTÃO] Checkbox marcado:', checkbox ? checkbox.checked : 'não');
     
     if (checkbox && botao) {
-        botao.disabled = !checkbox.checked;
+        const isChecked = checkbox.checked;
+        botao.disabled = !isChecked;
+        
+        if (isChecked) {
+            botao.className = 'btn btn-primary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão habilitado');
+        } else {
+            botao.className = 'btn btn-secondary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão desabilitado');
+        }
+        
+        console.log('🔍 [BOTÃO] Estado final do botão:', !botao.disabled);
+    } else {
+        console.error('❌ [BOTÃO] Checkbox ou botão não encontrado');
     }
 }
 </script>
