@@ -34,17 +34,45 @@ class CheckoutController extends Controller {
     }
     
     public function index(Request $request) {
-        // Obter carrinho
-        $usuario = $this->authService->getUsuarioLogado();
-        $carrinho = $this->obterCarrinho($usuario);
+        // Obter carrinho da sessão
+        $carrinho = $_SESSION['carrinho'] ?? [];
         
-        if (!$carrinho || empty($this->carrinhoModel->getItems($carrinho['id']))) {
+        // Verificar se o carrinho tem itens
+        if (empty($carrinho)) {
             $this->redirect('/produtos');
+            return;
+        }
+        
+        // Obter usuário logado
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        // Obter detalhes dos produtos no carrinho
+        $items = [];
+        $subtotal = 0;
+        $pesoTotal = 0;
+        
+        foreach ($carrinho as $produtoId => $item) {
+            // Buscar detalhes do produto (simulado por enquanto)
+            $produto = [
+                'id' => $produtoId,
+                'nome' => $item['nome'] ?? 'Produto ' . $produtoId,
+                'preco' => $item['preco_unitario'] ?? 0,
+                'quantidade' => $item['quantidade'] ?? 1,
+                'subtotal' => ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 1),
+                'peso' => 0.5, // Padrão
+                'foto_principal' => 'placeholder.jpg'
+            ];
+            
+            $items[] = $produto;
+            $subtotal += $produto['subtotal'];
+            $pesoTotal += $produto['peso'] * $produto['quantidade'];
         }
         
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
-            'items' => $this->carrinhoModel->getItems($carrinho['id']),
+            'items' => $items,
+            'subtotal' => $subtotal,
+            'peso_total' => $pesoTotal,
             'usuario' => $usuario,
             'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : []
         ]);
@@ -64,34 +92,16 @@ class CheckoutController extends Controller {
             $this->json(['error' => implode(', ', $erros)], 400);
         }
         
+        // Obter carrinho da sessão
+        $carrinho = $_SESSION['carrinho'] ?? [];
+        
+        if (empty($carrinho)) {
+            $this->json(['error' => 'Carrinho vazio'], 400);
+        }
+        
         try {
-            // Obter carrinho
+            // Obter usuário logado
             $usuario = $this->authService->getUsuarioLogado();
-            $carrinho = $this->obterCarrinho($usuario);
-            
-            if (!$carrinho || empty($this->carrinhoModel->getItems($carrinho['id']))) {
-                $this->json(['error' => 'Carrinho vazio'], 400);
-            }
-            
-            // Criar/atualizar usuário se não estiver logado
-            $usuarioId = $this->criarOuAtualizarUsuario($dados, $usuario);
-            
-            // Criar endereços
-            $enderecoEntregaId = $this->criarEndereco($usuarioId, $dados, 'entrega');
-            $enderecoCobrancaId = $this->criarEndereco($usuarioId, $dados, 'cobranca');
-            
-            // Processar pagamento
-            $dadosPagamento = [
-                'customer_name' => $dados['nome'],
-                'customer_email' => $dados['email'],
-                'customer_document' => $dados['documento'],
-                'customer_phone' => $dados['telefone'],
-                'customer_zipcode' => $dados['cep'],
-                'customer_address_number' => $dados['numero'],
-                'customer_address_complement' => $dados['complemento'] ?? '',
-                'billingType' => $dados['payment_method'],
-                'card_holder_name' => $dados['card_holder_name'] ?? '',
-                'card_number' => $dados['card_number'] ?? '',
                 'card_expiry_month' => $dados['card_expiry_month'] ?? '',
                 'card_expiry_year' => $dados['card_expiry_year'] ?? '',
                 'card_cvv' => $dados['card_cvv'] ?? ''
