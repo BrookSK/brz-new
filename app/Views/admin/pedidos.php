@@ -457,6 +457,232 @@
 </div>
 
 <script>
+function editarUsuario(id) {
+    console.log('🔍 [INÍCIO] editarUsuario() - ID recebido:', id);
+    console.log('🔍 [INÍCIO] editarUsuario() - Tipo do ID:', typeof id);
+    console.log('🔍 [INÍCIO] editarUsuario() - ID convertido para número:', Number(id));
+    console.log('🔍 [INÍCIO] editarUsuario() - isNaN(Number(id)):', isNaN(Number(id)));
+    console.log('🔍 [INÍCIO] editarUsuario() - Number(id) > 0:', Number(id) > 0);
+    
+    // Converter ID para número se for string
+    const idNumerico = Number(id);
+    console.log('🔍 [VALIDAÇÃO] ID numérico final:', idNumerico);
+    
+    if (!idNumerico || isNaN(idNumerico) || idNumerico <= 0) {
+        console.error('❌ [ERRO] ID inválido:', id, '->', idNumerico);
+        alert('ID do usuário inválido. ID recebido: ' + id + ' (tipo: ' + typeof id + ')');
+        return;
+    }
+    
+    const url = `/admin/usuario/${idNumerico}`;
+    console.log('🔍 [URL] URL da requisição:', url);
+    console.log('🔍 [URL] URL completa:', window.location.origin + url);
+    
+    console.log('🔄 [FETCH] Iniciando requisição fetch...');
+    console.time('⏱️ [FETCH] Tempo da requisição');
+    
+    fetch(url)
+        .then(response => {
+            console.timeEnd('⏱️ [FETCH] Tempo da requisição');
+            console.log('🔍 [RESPONSE] Status HTTP:', response.status);
+            console.log('🔍 [RESPONSE] Status Text:', response.statusText);
+            console.log('🔍 [RESPONSE] Headers:', [...response.headers.entries()]);
+            console.log('🔍 [RESPONSE] URL:', response.url);
+            console.log('🔍 [RESPONSE] ok:', response.ok);
+            console.log('🔍 [RESPONSE] redirected:', response.redirected);
+            console.log('🔍 [RESPONSE] type:', response.type);
+            console.log('🔍 [RESPONSE] Content-Type:', response.headers.get('content-type'));
+            
+            // Verificar se o content-type é JSON
+            const contentType = response.headers.get('content-type');
+            console.log('🔍 [RESPONSE] Content-Type:', contentType);
+            
+            if (!response.ok) {
+                console.error('❌ [ERRO] Response não ok:', response.status, response.statusText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Verificar se o content-type é JSON
+            if (contentType && contentType.includes('application/json')) {
+                console.log('🔍 [JSON] Content-Type correto, parseando como JSON...');
+                return response.json();
+            } else if (contentType && contentType.includes('text/html')) {
+                console.log('❌ [ERRORO] Content-Type é HTML, não JSON:', contentType);
+                console.log('🔍 [HTML] Primeiros 200 caracteres da resposta:');
+                return response.text().then(html => {
+                    console.log('🔍 [HTML] Conteúdo HTML recebido:', html.substring(0, 200));
+                    throw new Error('Resposta HTML recebida em vez de JSON');
+                });
+            } else {
+                console.log('🔍 [JSON] Content-Type não especificado, tentando JSON...');
+                return response.json();
+            }
+        })
+        .then(data => {
+            console.log('🔍 [JSON] Dados recebidos:', data);
+            console.log('🔍 [JSON] Tipo dos dados:', typeof data);
+            console.log('🔍 [JSON] Chaves do objeto:', Object.keys(data));
+            console.log('🔍 [JSON] data.success:', data.success);
+            console.log('🔍 [JSON] data.error:', data.error);
+            console.log('🔍 [JSON] data.usuario:', data.usuario);
+            
+            if (data.success && data.usuario) {
+                console.log('✅ [SUCESSO] Usuário encontrado, criando modal...');
+                console.log('🔍 [MODAL] Dados do usuário:', {
+                    id: data.usuario.id,
+                    nome: data.usuario.nome,
+                    email: data.usuario.email,
+                    perfil: data.usuario.perfil,
+                    status: data.usuario.status,
+                    creditos_disponiveis: data.usuario.creditos_disponiveis
+                });
+                
+                // Criar modal de edição dinamicamente
+                console.log('🔍 [MODAL] Criando HTML do modal...');
+                const modalHtml = `
+                    <div class="modal fade" id="modalEditarUsuario" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Editar Usuário</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="formEditarUsuario">
+                                        <input type="hidden" name="id" value="${data.usuario.id}">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Nome Completo *</label>
+                                                <input type="text" name="nome" class="form-control" value="${data.usuario.nome || ''}" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Email *</label>
+                                                <input type="email" name="email" class="form-control" value="${data.usuario.email || ''}" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">CPF/CNPJ</label>
+                                                <input type="text" name="documento" class="form-control" value="${data.usuario.documento || ''}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Telefone</label>
+                                                <input type="text" name="telefone" class="form-control" value="${data.usuario.telefone || ''}">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Endereço</label>
+                                                <input type="text" name="endereco" class="form-control" value="${data.usuario.endereco || ''}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Cidade</label>
+                                                <input type="text" name="cidade" class="form-control" value="${data.usuario.cidade || ''}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Estado</label>
+                                                <input type="text" name="estado" class="form-control" value="${data.usuario.estado || ''}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">CEP</label>
+                                                <input type="text" name="cep" class="form-control" value="${data.usuario.cep || ''}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Perfil</label>
+                                                <select name="perfil" class="form-select">
+                                                    <option value="cliente" ${data.usuario.perfil == 'cliente' ? 'selected' : ''}>Cliente</option>
+                                                    <option value="admin" ${data.usuario.perfil == 'admin' ? 'selected' : ''}>Administrador</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="status" id="usuario-editar-status" ${data.usuario.status == 'ativo' ? 'checked' : ''}>
+                                                    <label class="form-check-label" for="usuario-editar-status">
+                                                        Usuário Ativo
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Créditos Disponíveis</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="number" name="creditos_disponiveis" class="form-control" step="0.01" value="${data.usuario.creditos_disponiveis || 0}">
+                                                </div>
+                                                <div class="form-text">Saldo atual de créditos do usuário</div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-primary" onclick="salvarEdicaoUsuario()">Salvar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                console.log('🔍 [MODAL] HTML do modal criado, tamanho:', modalHtml.length);
+                console.log('🔍 [MODAL] Primeiros 100 caracteres:', modalHtml.substring(0, 100));
+                
+                // Remover modal anterior se existir
+                const modalAnterior = document.getElementById('modalEditarUsuario');
+                if (modalAnterior) {
+                    console.log('🔍 [DOM] Removendo modal anterior...');
+                    modalAnterior.remove();
+                }
+                
+                // Adicionar novo modal ao body
+                console.log('🔍 [DOM] Adicionando modal ao body...');
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                
+                // Verificar se o modal foi adicionado
+                const modalElement = document.getElementById('modalEditarUsuario');
+                console.log('🔍 [DOM] Modal encontrado no DOM:', !!modalElement);
+                
+                if (modalElement) {
+                    console.log('🔍 [BOOTSTRAP] Inicializando modal Bootstrap...');
+                    try {
+                        const modal = new bootstrap.Modal(modalElement);
+                        console.log('🔍 [BOOTSTRAP] Modal Bootstrap criado:', !!modal);
+                        
+                        console.log('🔍 [BOOTSTRAP] Abrindo modal...');
+                        modal.show();
+                        console.log('✅ [SUCESSO] Modal aberto com sucesso!');
+                    } catch (error) {
+                        console.error('❌ [ERRO BOOTSTRAP] Erro ao criar modal:', error);
+                        console.error('❌ [ERRO BOOTSTRAP] Stack:', error.stack);
+                        alert('Erro ao abrir modal. Verifique o console para mais detalhes.');
+                    }
+                } else {
+                    console.error('❌ [ERRO DOM] Elemento do modal não encontrado no DOM');
+                    console.log('🔍 [DOM] Elementos com ID modalEditarUsuario:', document.querySelectorAll('[id="modalEditarUsuario"]'));
+                    alert('Erro: Elemento do modal não encontrado no DOM.');
+                }
+            } else {
+                console.error('❌ [ERRO] Resposta sem sucesso:', data);
+                console.error('❌ [ERRO] Mensagem de erro:', data.error);
+                alert('Erro ao carregar usuário: ' + (data.error || 'Erro desconhecido - verifique o console'));
+            }
+        })
+        .catch(error => {
+            console.timeEnd('⏱️ [FETCH] Tempo da requisição');
+            console.error('❌ [ERRO CATCH] Erro na requisição:', error);
+            console.error('❌ [ERRO CATCH] Nome do erro:', error.name);
+            console.error('❌ [ERRO CATCH] Mensagem:', error.message);
+            console.error('❌ [ERRO CATCH] Stack completo:', error.stack);
+            console.error('❌ [ERRO CATCH] URL:', url);
+            console.error('❌ [ERRO CATCH] ID:', idNumerico);
+            
+            // Verificar se é erro de rede
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                console.error('❌ [ERRO REDE] Possível erro de rede ou CORS');
+                alert('Erro de rede. Verifique a conexão com o servidor.');
+            } else if (error.name === 'SyntaxError') {
+                console.error('❌ [ERRO SINTAX] Erro de sintaxe na resposta JSON');
+                alert('Erro de sintaxe na resposta do servidor.');
+            } else {
+                alert('Erro ao carregar usuário. Verifique o console para mais detalhes.');
+            }
+        });
+}
+
 let itensPedido = [];
 let clienteAtual = null;
 let produtosDisponiveis = [];
