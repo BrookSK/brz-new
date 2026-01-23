@@ -375,28 +375,24 @@ class AdminController extends Controller {
         $pagina = $request->getParam('pagina', 1);
         $limite = 20;
         $offset = ($pagina - 1) * $limite;
+        $status = $request->getParam('status', '');
+        $perfil = $request->getParam('perfil', '');
+        $busca = $request->getParam('busca', '');
         
-        $stmt = $this->usuarioModel->getConnection()->prepare("
-            SELECT * FROM {$this->usuarioModel->getTable()} 
-            ORDER BY created_at DESC 
-            LIMIT :limit OFFSET :offset
-        ");
-        $stmt->bindValue(':limit', $limite, \PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-        $stmt->execute();
-        $usuarios = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        // Total
-        $stmt = $this->usuarioModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->usuarioModel->getTable()}");
-        $stmt->execute();
-        $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+        // Usar o método com filtros do modelo
+        $usuarios = $this->usuarioModel->getUsuariosComFiltros($busca, $status, $perfil, $limite, $offset);
+        $total = $this->usuarioModel->getTotalUsuarios($busca, $status, $perfil);
+        $totalPaginas = ceil($total / $limite);
         
         $this->view('admin/usuarios', [
             'usuarios' => $usuarios,
             'pagina' => $pagina,
             'limite' => $limite,
             'total' => $total,
-            'total_paginas' => ceil($total / $limite)
+            'totalPaginas' => $totalPaginas,
+            'status' => $status,
+            'perfil' => $perfil,
+            'busca' => $busca
         ]);
     }
     

@@ -24,22 +24,22 @@
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">Todos</option>
-                        <option value="ativo" <?= $status == 'ativo' ? 'selected' : '' ?>>Ativo</option>
-                        <option value="inativo" <?= $status == 'inativo' ? 'selected' : '' ?>>Inativo</option>
-                        <option value="bloqueado" <?= $status == 'bloqueado' ? 'selected' : '' ?>>Bloqueado</option>
+                        <option value="ativo" <?= ($status ?? '') == 'ativo' ? 'selected' : '' ?>>Ativo</option>
+                        <option value="inativo" <?= ($status ?? '') == 'inativo' ? 'selected' : '' ?>>Inativo</option>
+                        <option value="bloqueado" <?= ($status ?? '') == 'bloqueado' ? 'selected' : '' ?>>Bloqueado</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Perfil</label>
                     <select name="perfil" class="form-select">
                         <option value="">Todos</option>
-                        <option value="admin" <?= $perfil == 'admin' ? 'selected' : '' ?>>Administrador</option>
-                        <option value="cliente" <?= $perfil == 'cliente' ? 'selected' : '' ?>>Cliente</option>
+                        <option value="admin" <?= ($perfil ?? '') == 'admin' ? 'selected' : '' ?>>Administrador</option>
+                        <option value="cliente" <?= ($perfil ?? '') == 'cliente' ? 'selected' : '' ?>>Cliente</option>
                     </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Buscar</label>
-                    <input type="text" name="busca" class="form-control" placeholder="Nome, email ou CPF" value="<?= $busca ?>">
+                    <input type="text" name="busca" class="form-control" placeholder="Nome, email ou CPF" value="<?= $busca ?? '' ?>">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">&nbsp;</label>
@@ -96,7 +96,7 @@
                                             <?= ucfirst($usuario['status']) ?>
                                         </span>
                                     </td>
-                                    <td><?= date('d/m/Y H:i', strtotime($usuario['data_criacao'])) ?></td>
+                                    <td><?= date('d/m/Y H:i', strtotime($usuario['created_at'] ?? $usuario['data_criacao'] ?? 'now')) ?></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarUsuario(<?= $usuario['id'] ?>)">
@@ -118,12 +118,12 @@
             </div>
 
             <!-- Paginação -->
-            <?php if ($totalPaginas > 1): ?>
+            <?php if (($totalPaginas ?? 0) > 1): ?>
                 <nav aria-label="Paginação">
                     <ul class="pagination justify-content-center">
                         <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                <a class="page-link" href="/admin/usuarios?pagina=<?= $i ?><?= $status ? '&status=' . $status : '' ?><?= $perfil ? '&perfil=' . $perfil : '' ?><?= $busca ? '&busca=' . urlencode($busca) : '' ?>">
+                            <li class="page-item <?= $i == ($pagina ?? 1) ? 'active' : '' ?>">
+                                <a class="page-link" href="/admin/usuarios?pagina=<?= $i ?><?= ($status ?? '') ? '&status=' . $status : '' ?><?= ($perfil ?? '') ? '&perfil=' . $perfil : '' ?><?= ($busca ?? '') ? '&busca=' . urlencode($busca) : '' ?>">
                                     <?= $i ?>
                                 </a>
                             </li>

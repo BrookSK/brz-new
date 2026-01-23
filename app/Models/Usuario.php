@@ -4,6 +4,23 @@ namespace App\Models;
 class Usuario extends Model {
     protected $table = 'usuarios';
 
+    public function __construct() {
+        parent::__construct();
+    }
+    
+    public function find($id) {
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE id = :id");
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAll() {
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} ORDER BY nome ASC");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     public function findByEmail($email) {
         $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE email = :email");
         $stmt->bindParam(':email', $email);
@@ -41,12 +58,122 @@ class Usuario extends Model {
 
     public function updatePassword($id, $novaSenha) {
         // Armazenar senha em texto plano
-        $stmt = $this->connection->prepare("UPDATE {$this->table} SET senha = :senha WHERE id = :id");
+        $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET senha = :senha WHERE id = :id");
         $stmt->bindParam(':senha', $novaSenha);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
-
+    
+    public function update($id, $data) {
+        $stmt = $this->getConnection()->prepare("
+            UPDATE {$this->table} 
+            SET nome = :nome, 
+                email = :email, 
+                documento = :documento, 
+                telefone = :telefone, 
+                endereco = :endereco, 
+                cidade = :cidade, 
+                estado = :estado, 
+                cep = :cep, 
+                perfil = :perfil, 
+                status = :status, 
+                creditos_disponiveis = :creditos_disponiveis,
+                updated_at = NOW()
+            WHERE id = :id
+        ");
+        
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':nome', $data['nome']);
+        $stmt->bindParam(':email', $data['email']);
+        $stmt->bindParam(':documento', $data['documento']);
+        $stmt->bindParam(':telefone', $data['telefone']);
+        $stmt->bindParam(':endereco', $data['endereco']);
+        $stmt->bindParam(':cidade', $data['cidade']);
+        $stmt->bindParam(':estado', $data['estado']);
+        $stmt->bindParam(':cep', $data['cep']);
+        $stmt->bindParam(':perfil', $data['perfil']);
+        $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':creditos_disponiveis', $data['creditos_disponiveis']);
+        
+        return $stmt->execute();
+    }
+    
+    public function delete($id) {
+        $stmt = $this->getConnection()->prepare("DELETE FROM {$this->table} WHERE id = :id");
+        $stmt->bindParam(':id', $id);
+        return $stmt->execute();
+    }
+    
+    public function getUsuariosComFiltros($busca = '', $status = '', $perfil = '', $limite = 20, $offset = 0) {
+        $sql = "SELECT * FROM {$this->table} WHERE 1=1";
+        $params = [];
+        
+        if ($busca) {
+            $sql .= " AND (nome LIKE :busca OR email LIKE :busca OR documento LIKE :busca)";
+            $params['busca'] = "%{$busca}%";
+        }
+        
+        if ($status) {
+            $sql .= " AND status = :status";
+            $params['status'] = $status;
+        }
+        
+        if ($perfil) {
+            $sql .= " AND perfil = :perfil";
+            $params['perfil'] = $perfil;
+        }
+        
+        $sql .= " ORDER BY nome ASC LIMIT :limite OFFSET :offset";
+        $params['limite'] = $limite;
+        $params['offset'] = $offset;
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getTotalUsuarios($busca = '', $status = '', $perfil = '') {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE 1=1";
+        $params = [];
+        
+        if ($busca) {
+            $sql .= " AND (nome LIKE :busca OR email LIKE :busca OR documento LIKE :busca)";
+            $params['busca'] = "%{$busca}%";
+        }
+        
+        if ($status) {
+            $sql .= " AND status = :status";
+            $params['status'] = $status;
+        }
+        
+        if ($perfil) {
+            $sql .= " AND perfil = :perfil";
+            $params['perfil'] = $perfil;
+        }
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->execute();
+        return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+    }
+    
+    public function getEstatisticas() {
+        $stmt = $this->getConnection()->prepare("
+            SELECT 
+                COUNT(*) as total_usuarios,
+                COUNT(CASE WHEN status = 'ativo' THEN 1 END) as usuarios_ativos,
+                COUNT(CASE WHEN MONTH(created_at) = MONTH(CURRENT_DATE) AND YEAR(created_at) = YEAR(CURRENT_DATE) THEN 1 END) as usuarios_mes
+            FROM {$this->table}
+        ");
+        $stmt->execute();
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
     public function hasPermission($usuarioId, $acao) {
         $stmt = $this->connection->prepare("SELECT perfil FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $usuarioId);
