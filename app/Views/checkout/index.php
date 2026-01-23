@@ -275,7 +275,7 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-finalizar">
+                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" onclick="processarPedidoDireto()">
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
                             
@@ -296,6 +296,72 @@
 <script>
 console.log('🔍 [DEBUG] Script carregado - início');
 
+// Função para processar pedido diretamente
+function processarPedidoDireto() {
+    console.log('🔍 [DIRETO] Processando pedido diretamente...');
+    
+    const form = document.getElementById('checkout-form');
+    const botao = document.getElementById('btn-finalizar');
+    
+    if (!form) {
+        console.error('❌ [DIRETO] Formulário não encontrado');
+        alert('Formulário não encontrado!');
+        return;
+    }
+    
+    console.log('🔍 [DIRETO] Formulário encontrado, coletando dados...');
+    
+    // Coletar dados do formulário
+    const formData = new FormData(form);
+    console.log('🔍 [DIRETO] Dados coletados:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`🔍 [DIRETO] ${key}: ${value}`);
+    }
+    
+    // Desabilitar botão e mostrar loading
+    botao.disabled = true;
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    
+    // Enviar requisição AJAX
+    fetch('/checkout/processar', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('🔍 [DIRETO] Resposta recebida:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('🔍 [DIRETO] Dados recebidos:', data);
+        
+        if (data.success) {
+            console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
+            alert('Pedido processado com sucesso! ID: ' + data.pedido_id);
+            
+            // Redirecionar para página de conclusão
+            setTimeout(function() {
+                console.log('🔍 [DIRETO] Redirecionando para:', data.redirect || '/checkout/conclusao/' + data.pedido_id);
+                window.location.href = data.redirect || '/checkout/' + data.pedido_id;
+            }, 2000);
+        } else {
+            console.error('❌ [DIRETO] Erro ao processar pedido:', data.error);
+            alert('Erro: ' + data.error);
+            
+            // Restaurar botão
+            botao.disabled = false;
+            botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+        }
+    })
+    .catch(error => {
+        console.error('❌ [DIRETO] Erro na requisição:', error);
+        alert('Erro de conexão: ' + error.message);
+        
+        // Restaurar botão
+        botao.disabled = false;
+        botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+    });
+}
+
 // Função toggleButton
 function toggleButton() {
     const checkbox = document.getElementById('consentimento_legal');
@@ -309,7 +375,7 @@ function toggleButton() {
         const isChecked = checkbox.checked;
         botao.disabled = !isChecked;
         
-        if (isChecked) {
+        if (checkbox.checked) {
             botao.className = 'btn btn-primary btn-lg w-100';
             console.log('🔍 [BOTÃO] Botão habilitado');
         } else {
@@ -350,70 +416,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (botao) {
         console.log('🔍 [DEBUG] Botão estado inicial:', botao.disabled);
-        
-        // NÃO adicionar onclick inline para evitar conflito
-        console.log('🔍 [DEBUG] Botão pronto para submit');
+        console.log('🔍 [DEBUG] Botão pronto para processamento direto');
     }
     
     if (form) {
-        console.log('🔍 [DEBUG] Adicionando listener de submit');
+        console.log('🔍 [DEBUG] Adicionando listener de submit como backup');
         
-        // Adicionar event listener de submit
+        // Adicionar event listener de submit como backup
         form.addEventListener('submit', function(e) {
-            console.log('🔍 [FORM] Event submit acionado!');
-            e.preventDefault(); // IMPORTANTE: impedir submit padrão
-            
-            const formData = new FormData(this);
-            console.log('🔍 [FORM] Dados do formulário:');
-            for (let [key, value] of formData.entries()) {
-                console.log(`🔍 [FORM] ${key}: ${value}`);
-            }
-            
-            // Desabilitar botão e mostrar loading
-            botao.disabled = true;
-            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
-            
-            // Enviar requisição AJAX
-            fetch('/checkout/processar', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                console.log('🔍 [AJAX] Resposta recebida:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('🔍 [AJAX] Dados recebidos:', data);
-                
-                if (data.success) {
-                    console.log('✅ [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
-                    alert('Pedido processado com sucesso! ID: ' + data.pedido_id);
-                    
-                    // Redirecionar para página de conclusão
-                    setTimeout(function() {
-                        console.log('🔍 [REDIRECT] Redirecionando para:', data.redirect || '/checkout/conclusao/' + data.pedido_id);
-                        window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
-                    }, 2000);
-                } else {
-                    console.error('❌ [PEDIDO] Erro ao processar pedido:', data.error);
-                    alert('Erro: ' + data.error);
-                    
-                    // Restaurar botão
-                    botao.disabled = false;
-                    botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
-                }
-            })
-            .catch(error => {
-                console.error('❌ [PEDIDO] Erro na requisição:', error);
-                alert('Erro de conexão: ' + error.message);
-                
-                // Restaurar botão
-                botao.disabled = false;
-                botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
-            });
+            console.log('🔍 [FORM] Event submit acionado (backup)!');
+            e.preventDefault();
+            console.log('🔍 [FORM] Usando método de backup...');
+            processarPedidoDireto();
         });
         
-        console.log('🔍 [DEBUG] Event listener submit adicionado com sucesso');
+        console.log('🔍 [DEBUG] Event listener submit adicionado como backup');
     } else {
         console.error('❌ [DEBUG] Formulário não encontrado!');
     }
