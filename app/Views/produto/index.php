@@ -75,7 +75,7 @@
                             <div class="price-section mb-3">
                                 <div class="current-price">
                                     <span class="currency"><?= $produto['moeda'] ?></span>
-                                    <span class="amount"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                                    <span class="amount product-price" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
                                 </div>
                                 <?php if ($produto['moeda'] === 'USD'): ?>
                                 <div class="price-conversion text-muted">
@@ -239,8 +239,20 @@ function adicionarAoCarrinho(botao) {
                         // Atualizar badge
                         atualizarBadge(response.total_itens);
                         
-                        // Abrir carrinho em nova aba
-                        window.open('/carrinho', '_blank');
+                        // Adicionar ao mini carrinho lateral
+                        if (typeof addToMiniCart === 'function') {
+                            var produtoData = {
+                                id: produtoId,
+                                nome: botao.getAttribute('data-produto-nome'),
+                                preco: botao.getAttribute('data-produto-preco'),
+                                quantidade: quantidade,
+                                imagem: botao.closest('.product-card').querySelector('.product-image').getAttribute('src')
+                            };
+                            console.log('📦 Adicionando ao mini carrinho:', produtoData);
+                            addToMiniCart(produtoData);
+                        } else {
+                            console.log('❌ Mini carrinho não disponível');
+                        }
                         
                     } else {
                         console.log('❌ Erro na resposta:', response.error);

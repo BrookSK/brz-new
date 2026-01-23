@@ -55,10 +55,11 @@ class CarrinhoController extends Controller {
             }
         }
         
-        // Calcular taxas e impostos
-        $taxaServico = $pesoTotal * 39; // US$39 por kg
-        $impostos = $subtotal * 0.80; // 80% de impostos (ICMS 60% + IPI 20%)
-        $frete = 0; // Será calculado via AJAX
+        // Calcular taxas e impostos com arredondamento
+        $pesoArredondado = ceil($pesoTotal); // Arredondar para cima
+        $taxaServico = $pesoArredondado * 39; // US$39 por kg arredondado
+        $impostos = $subtotal * 0.80; // 80% de impostos
+        $frete = $pesoArredondado * 15; // US$15 por kg arredondado
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
         
@@ -224,36 +225,50 @@ class CarrinhoController extends Controller {
     }
 
     public function calcular(Request $request) {
-        $cep = $request->getParam('cep');
-        $peso = $request->getParam('peso', 0);
-        $valor = $request->getParam('valor', 0);
+        $carrinho = $_SESSION['carrinho'] ?? [];
         
-        if (!$cep || !$peso) {
-            $this->json(['error' => 'Dados incompletos'], 400);
+        if (empty($carrinho)) {
+            $this->json(['error' => 'Carrinho vazio'], 400);
             return;
         }
         
-        // Simulação de cálculo de frete
-        $frete = [
-            'pac' => [
-                'nome' => 'PAC',
-                'valor' => max(15.00, $peso * 15.50),
-                'prazo' => 15,
-                'descricao' => 'Encomenda Econômica'
-            ],
-            'sedex' => [
-                'nome' => 'SEDEX',
-                'valor' => max(25.00, $peso * 22.50),
-                'prazo' => 8,
-                'descricao' => 'Encomenda Expressa'
-            ]
-        ];
+        // Calcular peso total
+        $pesoTotal = 0;
+        foreach ($carrinho as $item) {
+            $produto = $this->produtoModel->find($item['produto_id']);
+            if ($produto) {
+                $pesoTotal += ($produto['peso'] ?? 0.5) * $item['quantidade'];
+            }
+        }
+        
+        // Arredondar peso para cima (ex: 1.7kg → 2kg)
+        $pesoArredondado = ceil($pesoTotal);
+        
+        // Taxas fixas
+        $taxaServicoPorKg = 39; // USD por kg
+        $taxaServico = $taxaServicoPorKg * $pesoArredondado;
+        
+        // Frete baseado no peso arredondado
+        $fretePorKg = 15; // USD por kg
+        $frete = $fretePorKg * $pesoArredondado;
+        
+        // Calcular subtotal
+        $subtotal = array_sum(array_column($carrinho, 'subtotal'));
+        
+        // Impostos (80% sobre subtotal + taxa de serviço)
+        $impostos = ($subtotal + $taxaServico) * 0.8;
+        
+        // Total
+        $total = $subtotal + $taxaServico + $impostos + $frete;
         
         $this->json([
-            'success' => true,
+            'peso_total' => $pesoTotal,
+            'peso_arredondado' => $pesoArredondado,
+            'taxa_servico' => $taxaServico,
             'frete' => $frete,
-            'cep_origem' => '04538-133',
-            'cep_destino' => $cep
+            'impostos' => $impostos,
+            'subtotal' => $subtotal,
+            'total' => $total
         ]);
     }
 }

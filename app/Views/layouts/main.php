@@ -215,6 +215,22 @@
                 </ul>
                 
                 <ul class="navbar-nav align-items-center">
+                    <!-- Seletor de Moeda -->
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-coins me-1"></i>
+                            <span id="current-currency">BRL</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item currency-selector" href="#" data-currency="BRL">
+                                <i class="fas fa-dollar-sign me-2"></i> Real (BRL)
+                            </a></li>
+                            <li><a class="dropdown-item currency-selector" href="#" data-currency="USD">
+                                <i class="fas fa-dollar-sign me-2"></i> Dólar (USD)
+                            </a></li>
+                        </ul>
+                    </li>
+                    
                     <?php
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
                     $usuarioLogado = $isLoggedIn ? $_SESSION['usuario_nome'] : null;
@@ -395,6 +411,80 @@
         } else {
             console.log('Mini carrinho não encontrado');
         }
+        
+        // Seletor de Moeda
+        const currencySelectors = document.querySelectorAll('.currency-selector');
+        const currentCurrencySpan = document.getElementById('current-currency');
+        
+        // Taxa de conversão (pode ser dinâmica no futuro)
+        const exchangeRates = {
+            BRL: 1,
+            USD: 0.18 // 1 BRL = 0.18 USD (exemplo)
+        };
+        
+        // Recuperar moeda salva ou usar BRL como padrão
+        let currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+        updateCurrencyDisplay();
+        
+        currencySelectors.forEach(selector => {
+            selector.addEventListener('click', function(e) {
+                e.preventDefault();
+                const newCurrency = this.getAttribute('data-currency');
+                if (newCurrency !== currentCurrency) {
+                    currentCurrency = newCurrency;
+                    localStorage.setItem('selected_currency', currentCurrency);
+                    updateCurrencyDisplay();
+                    updateAllPrices();
+                    showCurrencyChangeNotification(newCurrency);
+                }
+            });
+        });
+        
+        function updateCurrencyDisplay() {
+            currentCurrencySpan.textContent = currentCurrency;
+            currentCurrencySpan.setAttribute('data-currency', currentCurrency);
+        }
+        
+        function updateAllPrices() {
+            // Atualizar todos os preços na página
+            const priceElements = document.querySelectorAll('[data-original-price]');
+            priceElements.forEach(element => {
+                const originalPrice = parseFloat(element.getAttribute('data-original-price'));
+                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                const symbol = currentCurrency === 'BRL' ? 'R$' : '$';
+                element.textContent = `${symbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+            });
+        }
+        
+        function showCurrencyChangeNotification(currency) {
+            const currencyName = currency === 'BRL' ? 'Real Brasileiro' : 'Dólar Americano';
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show position-fixed';
+            notification.style.cssText = 'top: 70px; right: 20px; z-index: 9999; min-width: 250px;';
+            notification.innerHTML = `
+                <i class="fas fa-coins me-2"></i>
+                Moeda alterada para ${currencyName}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        // Salvar preços originais ao carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            const priceElements = document.querySelectorAll('.current-price .amount, .product-price');
+            priceElements.forEach(element => {
+                const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
+                const price = parseFloat(priceText);
+                if (!isNaN(price)) {
+                    element.setAttribute('data-original-price', price);
+                }
+            });
+            updateAllPrices();
+        });
     </script>
 </body>
 </html>

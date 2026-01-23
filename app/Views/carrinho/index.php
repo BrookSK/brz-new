@@ -104,7 +104,7 @@
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Taxa de Serviço (<?= number_format($peso_total, 3, ',', '.') ?> kg)</span>
+                        <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
                         <span><?= $carrinho[0]['moeda'] ?> <?= number_format($taxa_servico, 2, ',', '.') ?></span>
                     </div>
                     
@@ -113,9 +113,9 @@
                         <span><?= $carrinho[0]['moeda'] ?> <?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
                     
-                    <div class="d-flex justify-content-between mb-2" id="frete-display" style="display: none;">
-                        <span>Frete</span>
-                        <span id="frete-valor">R$ 0,00</span>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Frete (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
+                        <span><?= $carrinho[0]['moeda'] ?> <?= number_format($frete, 2, ',', '.') ?></span>
                     </div>
                     
                     <hr>
@@ -146,7 +146,8 @@
                     <ul class="small text-muted mb-0">
                         <li>Prazo de entrega: 15-30 dias</li>
                         <li>Impostos inclusos no valor final</li>
-                        <li>Taxa de serviço: US$ 39/kg</li>
+                        <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
+                        <li>Frete calculado pelo peso total arredondado</li>
                         <li>Seguro contra perda/dano</li>
                     </ul>
                 </div>
