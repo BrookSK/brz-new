@@ -199,7 +199,7 @@
 
 <script>
 function editarUsuario(id) {
-    fetch(`/admin/usuarios/${id}`)
+    fetch(`/admin/usuario/${id}`)
         .then(response => response.json())
         .then(data => {
             document.getElementById('modalUsuarioTitle').textContent = 'Editar Usuário';
