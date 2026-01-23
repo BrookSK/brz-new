@@ -150,182 +150,177 @@
 </style>
 
 <script>
-// TESTE DE DEPURAÇÃO - VERIFICAR SE JAVASCRIPT ESTÁ FUNCIONANDO
-console.log('=== TESTE DE CARREGAMENTO JAVASCRIPT ===');
-console.log('jQuery carregado:', typeof $);
-console.log('Versão jQuery:', $.fn.jquery);
-console.log('Document ready:', $(document).length);
+// TESTE BÁSICO - VERIFICAR SE JAVASCRIPT ESTÁ FUNCIONANDO
+console.log('🚀 SCRIPT CARREGADO - TESTE BÁSICO');
+console.log('📄 Documento:', document);
+console.log('🌐 Window:', window);
+console.log('⏰ Hora atual:', new Date().toISOString());
 
-// Teste se os elementos existem
-console.log('=== VERIFICAÇÃO DE ELEMENTOS ===');
-console.log('Botões adicionar:', document.querySelectorAll('.btn-adicionar').length);
-console.log('Container alertas:', document.getElementById('alert-container'));
-console.log('Mini carrinho:', document.getElementById('mini-cart'));
-console.log('Container itens mini carrinho:', document.getElementById('mini-cart-items'));
+// TESTE: Verificar se os botões existem ANTES do document ready
+var botoesTeste = document.querySelectorAll('.btn-adicionar');
+console.log('🔍 Botões encontrados (antes do ready):', botoesTeste.length);
 
-// Teste se as funções existem
-console.log('=== VERIFICAÇÃO DE FUNÇÕES ===');
-console.log('addToMiniCart:', typeof addToMiniCart);
-console.log('toggleMiniCart:', typeof toggleMiniCart);
-console.log('updateCartBadge:', typeof updateCartBadge);
-console.log('showAlert:', typeof showAlert);
-
-// Teste se os eventos estão anexados
-console.log('=== VERIFICAÇÃO DE EVENTOS ===');
-console.log('Eventos em .btn-adicionar:', $._data(document.querySelectorAll('.btn-adicionar'), 'events'));
-console.log('Eventos em .btn-adicionar (length):', $._data(document.querySelectorAll('.btn-adicionar'), 'events').length);
-
-$(document).ready(function() {
-    console.log('=== DOCUMENT READY ===');
+// FORÇAR EXECUÇÃO IMEDIATA
+if (botoesTeste.length > 0) {
+    console.log('🎯 ADICIONANDO EVENTOS IMEDIATAMENTE');
     
-    // TESTE: Verificar se os botões existem
-    var botoes = document.querySelectorAll('.btn-adicionar');
-    console.log('🔍 Botões encontrados:', botoes.length);
-    
-    // TESTE: Adicionar evento de clique direto
-    botoes.forEach(function(botao, index) {
-        console.log('🔧 Adicionando evento ao botão', index + 1);
+    botoesTeste.forEach(function(botao, index) {
+        console.log('🔧 Adicionando evento ao botão', index + 1, 'IMEDIATO');
         
-        // Remover eventos anteriores
-        botao.removeEventListener('click', function() {});
-        
-        // Adicionar novo evento
-        botao.addEventListener('click', function(e) {
+        // Adicionar evento de clique
+        botao.onclick = function(e) {
             e.preventDefault();
-            console.log('🎯 CLIQUE DETECTADO NO BOTÃO', index + 1);
+            console.log('🎯 CLIQUE DETECTADO NO BOTÃO', index + 1, '(IMEDIATO)');
             console.log('📦 Botão:', this);
             console.log('🆔 Produto ID:', this.getAttribute('data-produto-id'));
             console.log('📊 Quantidade:', this.closest('.input-group').querySelector('.quantidade-input').value);
             
             // Chamar função de adicionar
             adicionarAoCarrinho(this);
-        });
-    });
-    
-    // Função para adicionar ao carrinho
-    function adicionarAoCarrinho(botao) {
-        console.log('🚀 FUNÇÃO adicionarAoCarrinho CHAMADA');
-        
-        var produtoId = botao.getAttribute('data-produto-id');
-        var quantidade = botao.closest('.input-group').querySelector('.quantidade-input').value;
-        
-        console.log('📦 Produto ID:', produtoId);
-        console.log('📊 Quantidade:', quantidade);
-        console.log('🔒 Botão desabilitado:', botao.disabled);
-        
-        if (botao.disabled) {
-            console.log('❌ Botão está desabilitado');
-            return;
-        }
-        
-        // Desabilitar botão
-        botao.disabled = true;
-        botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
-        
-        console.log('🌐 Iniciando requisição AJAX...');
-        
-        // Fazer requisição AJAX
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/carrinho/adicionar', true);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        
-        xhr.onreadystatechange = function() {
-            console.log('📡 Estado XHR:', xhr.readyState);
-            
-            if (xhr.readyState === 4) {
-                console.log('📡 Status XHR:', xhr.status);
-                console.log('📡 Resposta XHR:', xhr.responseText);
-                
-                // Reabilitar botão
-                botao.disabled = false;
-                botao.innerHTML = '<i class="fas fa-cart-plus"></i> Adicionar';
-                
-                if (xhr.status === 200) {
-                    try {
-                        var response = JSON.parse(xhr.responseText);
-                        console.log('✅ Resposta JSON:', response);
-                        
-                        if (response.success) {
-                            console.log('✅ PRODUTO ADICIONADO!');
-                            console.log('🛒 Total itens:', response.total_itens);
-                            
-                            // Mostrar alerta
-                            mostrarAlerta('success', response.message);
-                            
-                            // Atualizar badge
-                            atualizarBadge(response.total_itens);
-                            
-                            // Abrir carrinho em nova aba
-                            window.open('/carrinho', '_blank');
-                            
-                        } else {
-                            console.log('❌ Erro na resposta:', response.error);
-                            mostrarAlerta('danger', response.error);
-                        }
-                    } catch (e) {
-                        console.log('❌ Erro ao parsear JSON:', e);
-                        mostrarAlerta('danger', 'Erro na resposta do servidor');
-                    }
-                } else {
-                    console.log('❌ Erro HTTP:', xhr.status);
-                    mostrarAlerta('danger', 'Erro ao adicionar produto');
-                }
-            }
         };
         
-        var dados = 'id=' + encodeURIComponent(produtoId) + '&quantidade=' + encodeURIComponent(quantidade);
-        console.log('📤 Dados enviados:', dados);
-        
-        xhr.send(dados);
+        console.log('✅ Evento adicionado ao botão', index + 1);
+    });
+} else {
+    console.log('❌ NENHUM BOTÃO ENCONTRADO IMEDIATAMENTE');
+}
+
+// Função para adicionar ao carrinho
+function adicionarAoCarrinho(botao) {
+    console.log('🚀 FUNÇÃO adicionarAoCarrinho CHAMADA');
+    
+    var produtoId = botao.getAttribute('data-produto-id');
+    var quantidade = botao.closest('.input-group').querySelector('.quantidade-input').value;
+    
+    console.log('📦 Produto ID:', produtoId);
+    console.log('📊 Quantidade:', quantidade);
+    console.log('🔒 Botão desabilitado:', botao.disabled);
+    
+    if (botao.disabled) {
+        console.log('❌ Botão está desabilitado');
+        return;
     }
     
-    // Função para mostrar alerta
-    function mostrarAlerta(tipo, mensagem) {
-        console.log('📢 Mostrando alerta:', tipo, mensagem);
-        
-        var alertContainer = document.getElementById('alert-container');
-        if (!alertContainer) {
-            console.log('❌ Container de alertas não encontrado');
-            return;
-        }
-        
-        var alertHtml = '<div class="alert alert-' + tipo + ' alert-dismissible fade show" role="alert">' +
-                       mensagem +
-                       '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-                       '</div>';
-        
-        alertContainer.innerHTML = alertHtml;
-        
-        setTimeout(function() {
-            var alert = alertContainer.querySelector('.alert');
-            if (alert) {
-                alert.remove();
-            }
-        }, 5000);
-    }
+    // Desabilitar botão
+    botao.disabled = true;
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
     
-    // Função para atualizar badge
-    function atualizarBadge(totalItens) {
-        console.log('🏷️ Atualizando badge:', totalItens);
+    console.log('🌐 Iniciando requisição AJAX...');
+    
+    // Fazer requisição AJAX
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/carrinho/adicionar', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    
+    xhr.onreadystatechange = function() {
+        console.log('📡 Estado XHR:', xhr.readyState);
         
-        var badges = document.querySelectorAll('.cart-badge');
-        console.log('🏷️ Badges encontrados:', badges.length);
-        
-        badges.forEach(function(badge) {
-            if (totalItens > 0) {
-                badge.textContent = totalItens;
-                badge.style.display = 'inline-block';
-                console.log('✅ Badge atualizado:', totalItens);
+        if (xhr.readyState === 4) {
+            console.log('📡 Status XHR:', xhr.status);
+            console.log('📡 Resposta XHR:', xhr.responseText);
+            
+            // Reabilitar botão
+            botao.disabled = false;
+            botao.innerHTML = '<i class="fas fa-cart-plus"></i> Adicionar';
+            
+            if (xhr.status === 200) {
+                try {
+                    var response = JSON.parse(xhr.responseText);
+                    console.log('✅ Resposta JSON:', response);
+                    
+                    if (response.success) {
+                        console.log('✅ PRODUTO ADICIONADO!');
+                        console.log('🛒 Total itens:', response.total_itens);
+                        
+                        // Mostrar alerta
+                        mostrarAlerta('success', response.message);
+                        
+                        // Atualizar badge
+                        atualizarBadge(response.total_itens);
+                        
+                        // Abrir carrinho em nova aba
+                        window.open('/carrinho', '_blank');
+                        
+                    } else {
+                        console.log('❌ Erro na resposta:', response.error);
+                        mostrarAlerta('danger', response.error);
+                    }
+                } catch (e) {
+                    console.log('❌ Erro ao parsear JSON:', e);
+                    mostrarAlerta('danger', 'Erro na resposta do servidor');
+                }
             } else {
-                badge.style.display = 'none';
-                console.log('🙈 Badge ocultado');
+                console.log('❌ Erro HTTP:', xhr.status);
+                mostrarAlerta('danger', 'Erro ao adicionar produto');
             }
-        });
+        }
+    };
+    
+    var dados = 'id=' + encodeURIComponent(produtoId) + '&quantidade=' + encodeURIComponent(quantidade);
+    console.log('📤 Dados enviados:', dados);
+    
+    xhr.send(dados);
+}
+
+// Função para mostrar alerta
+function mostrarAlerta(tipo, mensagem) {
+    console.log('📢 Mostrando alerta:', tipo, mensagem);
+    
+    var alertContainer = document.getElementById('alert-container');
+    if (!alertContainer) {
+        console.log('❌ Container de alertas não encontrado');
+        return;
     }
     
-    console.log('✅ Eventos adicionados com sucesso!');
+    var alertHtml = '<div class="alert alert-' + tipo + ' alert-dismissible fade show" role="alert">' +
+                   mensagem +
+                   '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                   '</div>';
+    
+    alertContainer.innerHTML = alertHtml;
+    
+    setTimeout(function() {
+        var alert = alertContainer.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Função para atualizar badge
+function atualizarBadge(totalItens) {
+    console.log('🏷️ Atualizando badge:', totalItens);
+    
+    var badges = document.querySelectorAll('.cart-badge');
+    console.log('🏷️ Badges encontrados:', badges.length);
+    
+    badges.forEach(function(badge) {
+        if (totalItens > 0) {
+            badge.textContent = totalItens;
+            badge.style.display = 'inline-block';
+            console.log('✅ Badge atualizado:', totalItens);
+        } else {
+            badge.style.display = 'none';
+            console.log('🙈 Badge ocultado');
+        }
+    });
+}
+
+// Tentar document ready também
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 DOMContentLoaded disparado');
+    
+    var botoes = document.querySelectorAll('.btn-adicionar');
+    console.log('🔍 Botões encontrados (DOMContentLoaded):', botoes.length);
+    
+    if (botoes.length === 0) {
+        console.log('❌ NENHUM BOTÃO ENCONTRADO - VERIFICANDO HTML');
+        console.log('HTML do body:', document.body.innerHTML.substring(0, 500));
+    }
 });
+
+console.log('🏁 SCRIPT CARREGADO COMPLETAMENTE');
 </script>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
