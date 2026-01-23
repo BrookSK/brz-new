@@ -18,8 +18,6 @@ class CarrinhoController extends Controller {
     }
 
     public function index(Request $request) {
-        session_start();
-        
         $carrinho = $_SESSION['carrinho'] ?? [];
         
         if (empty($carrinho)) {
@@ -97,8 +95,6 @@ class CarrinhoController extends Controller {
             return;
         }
         
-        session_start();
-        
         if (!isset($_SESSION['carrinho'])) {
             $_SESSION['carrinho'] = [];
         }
@@ -138,8 +134,6 @@ class CarrinhoController extends Controller {
             return;
         }
         
-        session_start();
-        
         if (isset($_SESSION['carrinho'][$produtoId])) {
             unset($_SESSION['carrinho'][$produtoId]);
             
@@ -165,8 +159,6 @@ class CarrinhoController extends Controller {
             $this->json(['error' => 'Dados incompletos'], 400);
             return;
         }
-        
-        session_start();
         
         if (isset($_SESSION['carrinho'][$produtoId])) {
             $produto = $this->produtoModel->find($produtoId);
@@ -195,7 +187,6 @@ class CarrinhoController extends Controller {
     }
 
     public function limpar(Request $request) {
-        session_start();
         unset($_SESSION['carrinho']);
         
         $this->json([

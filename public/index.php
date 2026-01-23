@@ -1,4 +1,7 @@
 <?php
+// Iniciar sessão antes de qualquer output
+session_start();
+
 // Autoload manual temporário (até executar composer install)
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
