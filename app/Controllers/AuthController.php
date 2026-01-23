@@ -16,7 +16,13 @@ class AuthController extends Controller {
     
     public function login(Request $request) {
         if ($this->authService->estaLogado()) {
-            $this->redirect('/');
+            $usuario = $this->authService->getUsuarioLogado();
+            if ($usuario['perfil'] === 'admin') {
+                $this->redirect('/admin/dashboard');
+            } else {
+                $this->redirect('/minha-conta');
+            }
+            return;
         }
         
         if ($request->getMethod() === 'POST') {
@@ -42,7 +48,7 @@ class AuthController extends Controller {
                         $_SESSION['message_type'] = 'success';
                         $this->redirect('/admin/dashboard');
                     } else {
-                        $_SESSION['message'] = 'Bem-vindo de volta, ' . $usuario['nome'] . '!';
+                        $_SESSION['message'] = 'Bem-vendo de volta, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
                         $this->redirect('/minha-conta');
                     }
@@ -65,7 +71,13 @@ class AuthController extends Controller {
     
     public function register(Request $request) {
         if ($this->authService->estaLogado()) {
-            $this->redirect('/');
+            $usuario = $this->authService->getUsuarioLogado();
+            if ($usuario['perfil'] === 'admin') {
+                $this->redirect('/admin/dashboard');
+            } else {
+                $this->redirect('/minha-conta');
+            }
+            return;
         }
         
         if ($request->getMethod() === 'POST') {
@@ -99,7 +111,7 @@ class AuthController extends Controller {
                         if ($usuarioId) {
                             // Fazer login automático
                             $usuario = $this->authService->login($dados['email'], $dados['senha']);
-                            $this->redirect('/dashboard');
+                            $this->redirect('/minha-conta');
                         }
                     }
                 } catch (\Exception $e) {

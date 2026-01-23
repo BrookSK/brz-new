@@ -102,8 +102,9 @@ class AuthService {
         $usuario = $this->getUsuarioLogado();
         
         if ($usuario['perfil'] !== $perfil) {
-            header('HTTP/1.0 403 Forbidden');
-            echo 'Acesso negado';
+            $_SESSION['message'] = 'Acesso negado. Permissão de ' . $perfil . ' necessária.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /login');
             exit;
         }
     }
@@ -112,8 +113,9 @@ class AuthService {
         $this->requerAutenticacao();
         
         if (!$this->temPermissao($acao)) {
-            header('HTTP/1.0 403 Forbidden');
-            echo 'Acesso negado';
+            $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /login');
             exit;
         }
     }
