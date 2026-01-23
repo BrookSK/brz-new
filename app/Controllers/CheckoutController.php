@@ -9,6 +9,13 @@ use App\Models\Usuario;
 use App\Models\Endereco;
 use App\Models\PedidoEcommerce;
 
+// Garantir que as classes sejam carregadas
+require_once __DIR__ . '/../Models/Model.php';
+require_once __DIR__ . '/../Models/Endereco.php';
+require_once __DIR__ . '/../Models/Usuario.php';
+require_once __DIR__ . '/../Models/Carrinho.php';
+require_once __DIR__ . '/../Models/PedidoEcommerce.php';
+
 class CheckoutController extends Controller {
     private $authService;
     private $paymentService;
