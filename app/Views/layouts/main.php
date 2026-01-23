@@ -365,6 +365,9 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     
+    <!-- Incluir Mini Carrinho ANTES dos scripts principais -->
+    <?php include_once __DIR__ . '/mini-carrinho.php'; ?>
+    
     <script>
         // Inicializar AOS (Animate On Scroll)
         AOS.init({
@@ -393,8 +396,5 @@
             console.log('Mini carrinho não encontrado');
         }
     </script>
-    
-    <!-- Incluir Mini Carrinho -->
-    <?php include_once __DIR__ . '/mini-carrinho.php'; ?>
 </body>
 </html>
