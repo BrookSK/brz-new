@@ -6,6 +6,9 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
                     <form id="checkout-form">
+                        <!-- Campo oculto para moeda -->
+                        <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
+                        
                         <!-- Dados Pessoais -->
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-user"></i> Dados Pessoais</h6>
@@ -291,12 +294,16 @@ $(document).ready(function() {
         const currencySymbol = currency === 'BRL' ? 'R$' : '$';
         const rate = exchangeRates[currency];
         
+        console.log('Atualizando preços para:', currency, 'Taxa:', rate); // Debug
+        
         // Calcular valores convertidos
         const subtotal = originalValues.subtotal * rate;
         const frete = (originalValues.pesoTotal * 15) * rate;
         const taxaServico = (originalValues.pesoTotal * 39) * rate;
         const impostos = (originalValues.subtotal * 0.80) * rate;
         const total = subtotal + frete + taxaServico + impostos;
+        
+        console.log('Valores calculados:', {subtotal, frete, taxaServico, impostos, total}); // Debug
         
         // Atualizar valores no resumo
         $('#subtotal').text(currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ','));
@@ -313,33 +320,41 @@ $(document).ready(function() {
                 $(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
             }
         });
+        
+        console.log('Preços atualizados com sucesso'); // Debug
     }
     
     // Inicializar com a moeda do header
-    var currentCurrency = document.getElementById('current-currency') ? 
-                         document.getElementById('current-currency').textContent : 'BRL';
-    updatePrices(currentCurrency);
-    
-    // Adicionar campo oculto para enviar a moeda no formulário
-    $('<input>').attr({
-        type: 'hidden',
-        name: 'moeda',
-        id: 'moeda_hidden',
-        value: currentCurrency
-    }).appendTo('#checkout-form');
-    
-    // Atualizar moeda oculta quando mudar no header
-    function updateHiddenCurrency() {
+    function initCurrency() {
         var headerCurrency = document.getElementById('current-currency');
-        if (headerCurrency) {
-            var currency = headerCurrency.textContent;
-            $('#moeda_hidden').val(currency);
-            updatePrices(currency);
-        }
+        var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
+        
+        // Atualizar campo oculto
+        document.getElementById('moeda_hidden').value = currentCurrency;
+        
+        // Atualizar preços
+        updatePrices(currentCurrency);
+        
+        console.log('Moeda inicial:', currentCurrency); // Debug
     }
     
-    // Verificar mudanças na moeda do header
-    setInterval(updateHiddenCurrency, 1000);
+    // Inicializar
+    initCurrency();
+    
+    // Verificar mudanças na moeda do header a cada 500ms
+    setInterval(function() {
+        var headerCurrency = document.getElementById('current-currency');
+        if (headerCurrency) {
+            var newCurrency = headerCurrency.textContent;
+            var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
+            
+            if (newCurrency !== currentHiddenCurrency) {
+                console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
+                document.getElementById('moeda_hidden').value = newCurrency;
+                updatePrices(newCurrency);
+            }
+        }
+    }, 500);
     
     // Máscara para CEP
     $('#cep').mask('00000-000');
