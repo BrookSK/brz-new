@@ -74,14 +74,8 @@
                              
                             <div class="price-section mb-3">
                                 <div class="current-price">
-                                    <span class="currency"><?= $produto['moeda'] ?></span>
                                     <span class="amount product-price" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
                                 </div>
-                                <?php if ($produto['moeda'] === 'USD'): ?>
-                                <div class="price-conversion text-muted">
-                                    <small>≈ R$ <?= number_format($produto['preco'] * 5.5, 2, ',', '.') ?></small>
-                                </div>
-                                <?php endif; ?>
                             </div>
                         </div>
                     </a>

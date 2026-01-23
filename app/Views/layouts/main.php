@@ -453,13 +453,7 @@
             priceElements.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
                 const convertedPrice = originalPrice * exchangeRates[currentCurrency];
-                element.textContent = `${convertedPrice.toFixed(2).replace('.', ',')}`;
-                
-                // Atualizar também o símbolo de moeda adjacente se existir
-                const currencyElement = element.previousElementSibling;
-                if (currencyElement && currencyElement.classList.contains('currency')) {
-                    currencyElement.textContent = currentCurrency;
-                }
+                element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
             });
             
             // Atualizar todos os elementos .currency na página
@@ -468,7 +462,7 @@
                 element.textContent = currentCurrency;
             });
             
-            // Atualizar badges de moeda nos produtos
+            // Atualizar badges de moeda nos produtos (apenas se tiverem preços)
             const currencyBadges = document.querySelectorAll('.badge');
             currencyBadges.forEach(badge => {
                 const text = badge.textContent;
@@ -479,7 +473,7 @@
                         if (!isNaN(price)) {
                             const originalPrice = price / (currentCurrency === 'BRL' ? 1 : exchangeRates.BRL);
                             const convertedPrice = originalPrice * exchangeRates[currentCurrency];
-                            badge.textContent = `${currentCurrency} ${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                            badge.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
                         }
                     }
                 }
@@ -503,9 +497,9 @@
             }, 3000);
         }
         
-        // Salvar preços originais ao carregar
+        // Salvar preços originais ao carregar e formatar inicialmente
         document.addEventListener('DOMContentLoaded', function() {
-            const priceElements = document.querySelectorAll('.current-price .amount, .product-price');
+            const priceElements = document.querySelectorAll('.product-price');
             priceElements.forEach(element => {
                 const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
                 const price = parseFloat(priceText);
@@ -513,6 +507,8 @@
                     element.setAttribute('data-original-price', price);
                 }
             });
+            
+            // Formatar preços iniciais de acordo com a moeda atual
             updateAllPrices();
         });
     </script>
