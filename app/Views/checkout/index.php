@@ -139,7 +139,7 @@
                         </div>
 
                         <!-- Senha (se não logado) -->
-                        <?php if (!$authService->estaLogado()): ?>
+                        <?php if (empty($usuario)): ?>
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-lock"></i> Criar Conta</h6>
                             <div class="row">
@@ -188,8 +188,8 @@
                                 <div id="items-resumo">
                                     <?php foreach ($items as $item): ?>
                                     <div class="d-flex justify-content-between mb-2">
-                                        <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade ?>x)</small>
-                                        <small><?= $carrinho['moeda'] ?> <?= number_format($item['subtotal'], 2, ',', '.') ?></small>
+                                        <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
+                                        <small>USD <?= number_format($item['subtotal'], 2, ',', '.') ?></small>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -201,19 +201,19 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <span>Subtotal Produtos:</span>
-                                    <span id="subtotal"><?= $carrinho['moeda'] ?> <?= number_format($carrinho['subtotal_produtos'], 2, ',', '.') ?></span>
+                                    <span id="subtotal">USD <?= number_format($subtotal, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete"><?= $carrinho['moeda'] ?> <?= number_format($carrinho['frete_manual'], 2, ',', '.') ?></span>
+                                    <span id="frete">USD <?= number_format($peso_total * 15, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
-                                    <span id="taxa-servico"><?= $carrinho['moeda'] ?> <?= number_format($carrinho['taxa_servico'], 2, ',', '.') ?></span>
+                                    <span id="taxa-servico">USD <?= number_format($peso_total * 39, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
-                                    <span id="impostos"><?= $carrinho['moeda'] ?> <?= number_format($carrinho['valor_impostos'], 2, ',', '.') ?></span>
+                                    <span id="impostos">USD <?= number_format($subtotal * 0.80, 2, ',', '.') ?></span>
                                 </div>
                             </div>
 
@@ -221,19 +221,12 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total"><?= $carrinho['moeda'] ?> <?= number_format($carrinho['valor_total'], 2, ',', '.') ?></h6>
+                                <h6 class="text-primary" id="total">USD <?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, ',', '.') ?></h6>
                             </div>
-
-                            <?php if ($carrinho['moeda'] === 'USD'): ?>
-                            <div class="d-flex justify-content-between mb-3">
-                                <small>Equivalente em BRL:</small>
-                                <small id="total-brl">R$ <?= number_format($carrinho['valor_total'] * $carrinho['taxa_conversao'], 2, ',', '.') ?></small>
-                            </div>
-                            <?php endif; ?>
 
                             <div class="alert alert-info small">
                                 <i class="fas fa-info-circle"></i> 
-                                <strong>Peso Total:</strong> <?= number_format($carrinho['peso_total'], 3, ',', '.') ?> kg
+                                <strong>Peso Total:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
                             </div>
                         </div>
                     </div>
