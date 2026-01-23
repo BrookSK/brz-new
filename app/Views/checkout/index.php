@@ -5,7 +5,7 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
-                    <form id="checkout-form">
+                    <form id="checkout-form" method="POST">
                         <!-- Campo oculto para moeda -->
                         <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
                         
@@ -278,11 +278,6 @@
                             <button type="submit" class="btn btn-secondary btn-lg w-100" id="btn-finalizar" disabled>
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
-                            
-                            <!-- Botão de Debug -->
-                            <button type="button" class="btn btn-warning btn-sm w-100 mt-2" onclick="debugFormulario()">
-                                <i class="fas fa-bug"></i> Debug Formulário
-                            </button>
                         </div>
                     </form>
                 </div>
@@ -293,153 +288,104 @@
 
 <!-- JavaScript para processar o formulário - no final da página -->
 <script>
-// Função de debug
-function debugFormulario() {
-    console.log('🔍 [DEBUG] Iniciando debug completo');
-    
-    const form = document.getElementById('checkout-form');
-    const botao = document.getElementById('btn-finalizar');
-    
-    console.log('🔍 [DEBUG] Formulário:', !!form);
-    console.log('🔍 [DEBUG] Botão:', !!botao);
-    console.log('🔍 [DEBUG] Botão disabled:', botao ? botao.disabled : 'N/A');
-    
-    if (form) {
-        console.log('🔍 [DEBUG] Tipo do formulário:', form.tagName);
-        console.log('🔍 [DEBUG] ID do formulário:', form.id);
-        console.log('🔍 [DEBUG] Método do formulário:', form.method);
-        console.log('🔍 [DEBUG] Action do formulário:', form.action);
-        
-        // Verificar se há formulários aninhados
-        const formsAninhados = form.querySelectorAll('form');
-        console.log('🔍 [DEBUG] Formulários aninhados:', formsAninhados.length);
-        
-        // Verificar event listeners
-        const listeners = getEventListeners ? getEventListeners(form) : 'Não disponível';
-        console.log('🔍 [DEBUG] Event listeners:', listeners);
-        
-        // Tentar adicionar listener manualmente
-        console.log('🔍 [DEBUG] Tentando adicionar listener manualmente');
-        
-        // Remover listeners antigos
-        const newForm = form.cloneNode(true);
-        form.parentNode.replaceChild(newForm, form);
-        
-        // Adicionar novo listener
-        newForm.addEventListener('submit', function(e) {
-            console.log('🔍 [FORM] Listener manual acionado!');
-            e.preventDefault();
-            alert('Formulário interceptado com sucesso!');
-        });
-        
-        console.log('🔍 [DEBUG] Listener manual adicionado');
-        
-        // Habilitar botão para teste
-        if (botao) {
-            botao.disabled = false;
-            botao.className = 'btn btn-success btn-lg w-100';
-            console.log('🔍 [DEBUG] Botão habilitado para teste');
-        }
-    }
-}
-
-// Teste simples de evento
+// Garantir que o DOM está completamente carregado
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 [DEBUG] DOMContentLoaded iniciado');
     
-    const botao = document.getElementById('btn-finalizar');
-    if (botao) {
-        // Adicionar evento de clique direto no botão
-        botao.addEventListener('click', function(e) {
-            console.log('🔍 [CLICK] Botão clicado diretamente!');
-            
-            if (!this.disabled) {
-                console.log('🔍 [CLICK] Botão não está desabilitado');
-                
-                // Impedir o comportamento padrão
-                e.preventDefault();
-                
-                // Enviar formulário manualmente
-                const form = document.getElementById('checkout-form');
-                if (form) {
-                    console.log('🔍 [CLICK] Enviando formulário manualmente');
-                    
-                    // Criar FormData
-                    const formData = new FormData(form);
-                    
-                    // Debug dos dados
-                    console.log('🔍 [CLICK] Dados do formulário:');
-                    for (let [key, value] of formData.entries()) {
-                        console.log(`🔍 [CLICK] ${key}: ${value}`);
-                    }
-                    
-                    // Enviar AJAX
-                    fetch('/checkout/processar', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('🔍 [CLICK] Resposta:', data);
-                        
-                        if (data.success) {
-                            alert('Pedido processado com sucesso! ID: ' + data.pedido_id);
-                            window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
-                        } else {
-                            alert('Erro: ' + data.error);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('🔍 [CLICK] Erro:', error);
-                        alert('Erro de conexão: ' + error.message);
-                    });
-                } else {
-                    console.error('❌ [CLICK] Formulário não encontrado');
-                }
-            } else {
-                console.log('🔍 [CLICK] Botão está desabilitado');
-                alert('Por favor, preencha todos os campos e aceite os termos.');
-            }
-        });
-        
-        console.log('🔍 [DEBUG] Event listener de clique adicionado ao botão');
-    } else {
-        console.error('❌ [DEBUG] Botão não encontrado');
-    }
-});
-
-// Tentativa tradicional com submit
-document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('checkout-form');
+    const botao = document.getElementById('btn-finalizar');
+    
+    console.log('🔍 [DEBUG] Formulário encontrado:', !!form);
+    console.log('🔍 [DEBUG] Botão encontrado:', !!botao);
+    
     if (form) {
+        // Adicionar event listener de submit
         form.addEventListener('submit', function(e) {
-            console.log('🔍 [SUBMIT] Event submit acionado!');
+            console.log('🔍 [FORM] Event submit acionado!');
             e.preventDefault();
             
             const formData = new FormData(this);
-            console.log('🔍 [SUBMIT] Dados:', Object.fromEntries(formData));
+            console.log('🔍 [FORM] Dados do formulário:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`🔍 [FORM] ${key}: ${value}`);
+            }
             
-            // Enviar AJAX
+            // Desabilitar botão e mostrar loading
+            botao.disabled = true;
+            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+            
+            // Enviar requisição AJAX
             fetch('/checkout/processar', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('🔍 [AJAX] Resposta recebida:', response.status);
+                return response.json();
+            })
             .then(data => {
-                console.log('🔍 [SUBMIT] Resposta:', data);
+                console.log('🔍 [AJAX] Dados recebidos:', data);
+                
                 if (data.success) {
-                    window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
+                    console.log('✅ [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
+                    
+                    // Mostrar mensagem de sucesso
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Pedido Confirmado!',
+                        text: 'Seu pedido #' + data.pedido_id + ' foi processado com sucesso.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    
+                    // Redirecionar para página de conclusão
+                    setTimeout(function() {
+                        console.log('🔍 [REDIRECT] Redirecionando para:', data.redirect || '/checkout/conclusao/' + data.pedido_id);
+                        window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
+                    }, 2000);
                 } else {
-                    alert('Erro: ' + data.error);
+                    console.error('❌ [PEDIDO] Erro ao processar pedido:', data.error);
+                    
+                    // Mostrar mensagem de erro
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro no Processamento',
+                        text: data.error || 'Ocorreu um erro ao processar seu pedido. Tente novamente.',
+                        confirmButtonText: 'OK'
+                    });
+                    
+                    // Restaurar botão
+                    botao.disabled = false;
+                    botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
                 }
             })
             .catch(error => {
-                console.error('🔍 [SUBMIT] Erro:', error);
-                alert('Erro: ' + error.message);
+                console.error('❌ [PEDIDO] Erro na requisição:', error);
+                console.error('❌ [PEDIDO] Stack:', error.stack);
+                
+                // Mostrar mensagem de erro genérico
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro de Conexão',
+                    text: 'Ocorreu um erro ao processar seu pedido. Verifique sua conexão e tente novamente.',
+                    confirmButtonText: 'OK'
+                });
+                
+                // Restaurar botão
+                botao.disabled = false;
+                botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
             });
         });
         
-        console.log('🔍 [DEBUG] Event listener submit adicionado');
+        console.log('🔍 [DEBUG] Event listener submit adicionado com sucesso');
+    } else {
+        console.error('❌ [DEBUG] Formulário não encontrado!');
+    }
+    
+    if (botao) {
+        console.log('🔍 [DEBUG] Botão OK - Estado:', botao.disabled);
+    } else {
+        console.error('❌ [DEBUG] Botão não encontrado!');
     }
 });
 
