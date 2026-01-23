@@ -154,20 +154,6 @@
                             </div>
                         </div>
                         <?php endif; ?>
-
-                        <!-- Termos Legais -->
-                        <div class="mb-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required>
-                                <label class="form-check-label" for="consentimento_legal">
-                                    Li e aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos e condições</a> de uso e política de privacidade. *
-                                </label>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-finalizar">
-                            <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
-                        </button>
                     </form>
                 </div>
             </div>
@@ -175,7 +161,7 @@
 
         <!-- Resumo do Pedido (Fixo) -->
         <div class="col-lg-4">
-            <div class="sticky-top" style="top: 100px;">
+            <div class="checkout-sticky">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-light">
                         <h6 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h6>
@@ -228,6 +214,21 @@
                                 <i class="fas fa-info-circle"></i> 
                                 <strong>Peso Total:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
                             </div>
+
+                            <!-- Termos Legais -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required>
+                                    <label class="form-check-label small" for="consentimento_legal">
+                                        Li e aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos e condições</a> de uso e política de privacidade. *
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Botão Finalizar -->
+                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-finalizar" disabled>
+                                <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -331,6 +332,27 @@ $(document).ready(function() {
     
     // Inicializar com a moeda atual
     updatePrices($('#moeda').val());
+    
+    // Lógica para habilitar/desabilitar botão finalizar
+    function updateFinalizarButton() {
+        const consentimento = $('#consentimento_legal').is(':checked');
+        const formValido = $('#checkout-form')[0].checkValidity();
+        
+        $('#btn-finalizar').prop('disabled', !consentimento || !formValido);
+    }
+    
+    // Verificar quando o checkbox de termos mudar
+    $('#consentimento_legal').on('change', function() {
+        updateFinalizarButton();
+    });
+    
+    // Verificar quando os campos do formulário mudarem
+    $('#checkout-form input, #checkout-form select').on('input change', function() {
+        updateFinalizarButton();
+    });
+    
+    // Inicializar estado do botão
+    updateFinalizarButton();
     
     // Máscara para CEP
     $('#cep').mask('00000-000');
@@ -457,6 +479,29 @@ header {
 /* Ajustar para não interferir com o seletor de moeda */
 .currency-selector {
     z-index: 1001;
+}
+
+/* Ajuste específico para o header fixo */
+.navbar {
+    z-index: 1030 !important;
+}
+
+/* Garantir que o conteúdo principal fique abaixo do header */
+main {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Container do checkout com espaçamento correto */
+.container-fluid {
+    padding-top: 20px;
+}
+
+/* Ajustar o sticky-top do checkout para considerar o header fixo */
+.checkout-sticky {
+    position: sticky;
+    top: 100px;
+    z-index: 10;
 }
 </style>
 <?php $content = ob_get_clean(); ?>

@@ -21,10 +21,33 @@
             font-size: 1.5rem;
         }
         
+        /* Header fixo */
+        .navbar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 1030 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        }
+        
+        /* Espaçamento para o conteúdo não ficar sob o header */
+        body {
+            padding-top: 80px !important;
+        }
+        
+        /* Ajustar para elementos que devem ficar abaixo do header */
+        main {
+            margin-top: 0 !important;
+        }
+        
+        /* Hero section ajustado */
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 100px 0 80px;
+            padding: 60px 0 40px; /* Reduzido pois já tem padding-top no body */
+            margin-top: -80px; /* Compensar o padding do body */
+            padding-top: 140px; /* Espaçamento total correto */
         }
         
         .feature-card {
