@@ -219,6 +219,7 @@
                     session_start();
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
                     $usuarioLogado = $isLoggedIn ? $_SESSION['usuario_nome'] : null;
+                    $usuarioPerfil = $isLoggedIn ? ($_SESSION['usuario_perfil'] ?? 'cliente') : 'cliente';
                     $totalItens = isset($_SESSION['carrinho']) ? array_sum(array_column($_SESSION['carrinho'], 'quantidade')) : 0;
                     ?>
                     
@@ -232,9 +233,13 @@
                                 <span class="d-none d-md-inline"><?= htmlspecialchars($usuarioLogado) ?></span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-user"></i> Minha Conta</a></li>
+                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> Minha Conta</a></li>
                                 <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> Meus Pedidos</a></li>
-                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-cog"></i> Meus Dados</a></li>
+                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> Meus Dados</a></li>
+                                <?php if ($usuarioPerfil === 'admin'): ?>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> Painel Admin</a></li>
+                                <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
                             </ul>
@@ -246,6 +251,11 @@
                         </li>
                         <li class="nav-item">
                             <a class="btn btn-primary btn-sm ms-2" href="/register">Cadastrar</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-outline-danger btn-sm ms-2" href="/loginadmin">
+                                <i class="fas fa-user-shield"></i> Admin
+                            </a>
                         </li>
                     <?php endif; ?>
                     

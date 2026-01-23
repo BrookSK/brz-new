@@ -24,6 +24,8 @@ $router->get('/contato', 'ContatoController', 'index');
 // Autenticação
 $router->get('/login', 'AuthController', 'login');
 $router->post('/login', 'AuthController', 'login');
+$router->get('/loginadmin', 'AuthController', 'loginAdmin');
+$router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
 $router->get('/register', 'AuthController', 'register');
 $router->post('/register', 'AuthController', 'register');

@@ -22,25 +22,45 @@ class AuthController extends Controller {
         if ($request->getMethod() === 'POST') {
             $email = $request->getParam('email');
             $senha = $request->getParam('senha');
+            $isAdmin = $request->getParam('admin_login') === '1';
             
-            $usuario = $this->authService->login($email, $senha);
-            
-            if ($usuario) {
-                $this->redirect('/dashboard');
-            } else {
-                $this->view('auth/login', [
-                    'error' => 'E-mail ou senha inválidos',
-                    'email' => $email
-                ]);
+            try {
+                $usuario = $this->authService->autenticar($email, $senha);
+                
+                if ($usuario) {
+                    // Verificar se é login admin
+                    if ($isAdmin && $usuario['perfil'] !== 'admin') {
+                        $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                        $_SESSION['message_type'] = 'danger';
+                        $this->redirect('/login');
+                        return;
+                    }
+                    
+                    // Redirecionar baseado no perfil
+                    if ($isAdmin || $usuario['perfil'] === 'admin') {
+                        $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
+                        $_SESSION['message_type'] = 'success';
+                        $this->redirect('/admin/dashboard');
+                    } else {
+                        $_SESSION['message'] = 'Bem-vindo de volta, ' . $usuario['nome'] . '!';
+                        $_SESSION['message_type'] = 'success';
+                        $this->redirect('/minha-conta');
+                    }
+                    return;
+                } else {
+                    $_SESSION['message'] = 'E-mail ou senha incorretos';
+                    $_SESSION['message_type'] = 'danger';
+                }
+            } catch (\Exception $e) {
+                $_SESSION['message'] = 'Erro ao fazer login: ' . $e->getMessage();
+                $_SESSION['message_type'] = 'danger';
             }
-        } else {
-            $this->view('auth/login');
+            
+            $this->redirect('/login');
+            return;
         }
-    }
-    
-    public function logout(Request $request) {
-        $this->authService->logout();
-        $this->redirect('/login');
+        
+        $this->view('auth/login');
     }
     
     public function register(Request $request) {

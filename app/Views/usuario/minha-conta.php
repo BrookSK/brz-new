@@ -1,0 +1,278 @@
+<?php ob_start(); ?>
+<div class="container py-5">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-3 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <div class="user-avatar mx-auto mb-3">
+                        <?= strtoupper(substr($usuario['nome'], 0, 2)) ?>
+                    </div>
+                    <h5 class="card-title"><?= htmlspecialchars($usuario['nome']) ?></h5>
+                    <p class="text-muted"><?= htmlspecialchars($usuario['email']) ?></p>
+                    <span class="badge bg-primary"><?= ucfirst($usuario['perfil']) ?></span>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="card-title">Menu Rápido</h6>
+                    <nav class="nav flex-column">
+                        <a class="nav-link active" href="/minha-conta">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </a>
+                        <a class="nav-link" href="/meus-dados">
+                            <i class="fas fa-user me-2"></i> Meus Dados
+                        </a>
+                        <a class="nav-link" href="/meus-pedidos">
+                            <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
+                        </a>
+                        <a class="nav-link" href="/carrinho">
+                            <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
+                        </a>
+                        <hr>
+                        <a class="nav-link text-danger" href="/logout">
+                            <i class="fas fa-sign-out-alt me-2"></i> Sair
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-tachometer-alt"></i> Minha Conta</h2>
+                <span class="text-muted">
+                    Bem-vindo, <strong><?= htmlspecialchars($usuario['nome']) ?></strong>!
+                </span>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0"><?= $total_pedidos ?></h4>
+                                    <small>Total de Pedidos</small>
+                                </div>
+                                <i class="fas fa-shopping-bag fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">
+                                        <?php 
+                                        $ativos = array_filter($pedidos, fn($p) => in_array($p['status'], ['pendente', 'processando', 'enviado']));
+                                        echo count($ativos);
+                                        ?>
+                                    </h4>
+                                    <small>Pedidos Ativos</small>
+                                </div>
+                                <i class="fas fa-truck fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">
+                                        <?php 
+                                        $totalGasto = array_sum(array_column($pedidos, 'valor_total'));
+                                        echo 'R$ ' . number_format($totalGasto, 2, ',', '.');
+                                        ?>
+                                    </h4>
+                                    <small>Total Gasto</small>
+                                </div>
+                                <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0"><?= count($enderecos) ?></h4>
+                                    <small>Endereços</small>
+                                </div>
+                                <i class="fas fa-map-marker-alt fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Orders -->
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clock"></i> Pedidos Recentes</h5>
+                    <a href="/meus-pedidos" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($pedidos_recentes)): ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-shopping-bag fa-3x text-muted mb-3"></i>
+                            <h6>Nenhum pedido ainda</h6>
+                            <p class="text-muted">Comece comprando produtos incríveis!</p>
+                            <a href="/produtos" class="btn btn-primary">
+                                <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
+                            </a>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Data</th>
+                                        <th>Status</th>
+                                        <th>Valor</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($pedidos_recentes as $pedido): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($pedido['codigo_pedido']) ?></strong>
+                                        </td>
+                                        <td><?= date('d/m/Y', strtotime($pedido['created_at'])) ?></td>
+                                        <td>
+                                            <?php
+                                            $statusColors = [
+                                                'pendente' => 'warning',
+                                                'processando' => 'info',
+                                                'enviado' => 'primary',
+                                                'entregue' => 'success',
+                                                'cancelado' => 'danger'
+                                            ];
+                                            $color = $statusColors[$pedido['status']] ?? 'secondary';
+                                            ?>
+                                            <span class="badge bg-<?= $color ?>">
+                                                <?= ucfirst($pedido['status']) ?>
+                                            </span>
+                                        </td>
+                                        <td>R$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
+                                        <td>
+                                            <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-bolt"></i> Ações Rápidas</h6>
+                            <div class="d-grid gap-2">
+                                <a href="/produtos" class="btn btn-outline-primary">
+                                    <i class="fas fa-shopping-cart me-2"></i> Comprar Produtos
+                                </a>
+                                <a href="/carrinho" class="btn btn-outline-success">
+                                    <i class="fas fa-shopping-basket me-2"></i> Ver Carrinho
+                                </a>
+                                <a href="/rastreamento" class="btn btn-outline-info">
+                                    <i class="fas fa-search-location me-2"></i> Rastrear Pedido
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="fas fa-user-cog"></i> Configurações</h6>
+                            <div class="d-grid gap-2">
+                                <a href="/meus-dados" class="btn btn-outline-secondary">
+                                    <i class="fas fa-user-edit me-2"></i> Editar Perfil
+                                </a>
+                                <a href="/meus-pedidos" class="btn btn-outline-secondary">
+                                    <i class="fas fa-history me-2"></i> Histórico
+                                </a>
+                                <a href="/contato" class="btn btn-outline-secondary">
+                                    <i class="fas fa-headset me-2"></i> Suporte
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.user-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.nav-link {
+    border-radius: 8px;
+    margin-bottom: 5px;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+}
+
+.nav-link.active {
+    background-color: #007bff;
+    color: white !important;
+}
+
+.card {
+    border: none;
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+}
+</style>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>
