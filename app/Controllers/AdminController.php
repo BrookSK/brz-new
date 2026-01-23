@@ -35,12 +35,12 @@ class AdminController extends Controller {
         $stats = [];
         
         // Total de pedidos
-        $stmt = $this->pedidoModel->connection->prepare("SELECT COUNT(*) as total FROM {$this->pedidoModel->table}");
+        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->pedidoModel->table}");
         $stmt->execute();
         $stats['total_pedidos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
         
         // Pedidos por status
-        $stmt = $this->pedidoModel->connection->prepare("
+        $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT status, COUNT(*) as quantidade 
             FROM {$this->pedidoModel->table} 
             GROUP BY status
@@ -49,7 +49,7 @@ class AdminController extends Controller {
         $stats['pedidos_por_status'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         // Faturamento total
-        $stmt = $this->pedidoModel->connection->prepare("
+        $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT 
                 SUM(valor_total) as faturamento_usd,
                 SUM(valor_total_brl) as faturamento_brl,
@@ -63,7 +63,7 @@ class AdminController extends Controller {
         $stats['financeiro'] = $financeiro;
         
         // Pedidos recentes
-        $stmt = $this->pedidoModel->connection->prepare("
+        $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT p.*, u.nome as cliente_nome 
             FROM {$this->pedidoModel->table} p 
             JOIN usuarios u ON p.usuario_id = u.id 
@@ -72,6 +72,16 @@ class AdminController extends Controller {
         ");
         $stmt->execute();
         $stats['pedidos_recentes'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Total de usuários
+        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM usuarios");
+        $stmt->execute();
+        $stats['total_usuarios'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+        
+        // Total de produtos
+        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM produtos");
+        $stmt->execute();
+        $stats['total_produtos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
         
         return $stats;
     }
@@ -121,7 +131,7 @@ class AdminController extends Controller {
         
         $sql .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
         
-        $stmt = $this->pedidoModel->connection->prepare($sql);
+        $stmt = $this->pedidoModel->getConnection()->prepare($sql);
         
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value);
@@ -152,7 +162,7 @@ class AdminController extends Controller {
             $params[':status'] = $status;
         }
         
-        $stmt = $this->pedidoModel->connection->prepare($sql);
+        $stmt = $this->pedidoModel->getConnection()->prepare($sql);
         
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value);
@@ -312,8 +322,8 @@ class AdminController extends Controller {
             try {
                 foreach ($dados as $chave => $valor) {
                     // Verificar se configuração existe
-                    $stmt = $this->pedidoModel->connection->prepare("
-                        SELECT id FROM configuracoes_sistema WHERE chave = :chave
+                    $stmt = $this->pedidoModel->getConnection()->prepare("
+                        SELECT id FROM configuracoes WHERE chave = :chave
                     ");
                     $stmt->bindParam(':chave', $chave);
                     $stmt->execute();
@@ -321,8 +331,8 @@ class AdminController extends Controller {
                     
                     if ($config) {
                         // Atualizar
-                        $stmt = $this->pedidoModel->connection->prepare("
-                            UPDATE configuracoes_sistema 
+                        $stmt = $this->pedidoModel->getConnection()->prepare("
+                            UPDATE configuracoes 
                             SET valor = :valor, atualizado_por = :usuario_id, updated_at = NOW()
                             WHERE chave = :chave
                         ");
@@ -340,14 +350,14 @@ class AdminController extends Controller {
             }
         } else {
             // Obter configurações atuais
-            $stmt = $this->pedidoModel->connection->prepare("
-                SELECT chave, valor, descricao FROM configuracoes_sistema ORDER BY chave
+            $stmt = $this->pedidoModel->getConnection()->prepare("
+                SELECT chave, valor, descricao FROM configuracoes ORDER BY chave
             ");
             $stmt->execute();
             $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
             // Obter taxas de câmbio
-            $stmt = $this->pedidoModel->connection->prepare("
+            $stmt = $this->pedidoModel->getConnection()->prepare("
                 SELECT * FROM configuracoes_moeda ORDER BY moeda_origem, moeda_destino
             ");
             $stmt->execute();
@@ -367,7 +377,7 @@ class AdminController extends Controller {
         $limite = 20;
         $offset = ($pagina - 1) * $limite;
         
-        $stmt = $this->usuarioModel->connection->prepare("
+        $stmt = $this->usuarioModel->getConnection()->prepare("
             SELECT * FROM {$this->usuarioModel->table} 
             ORDER BY created_at DESC 
             LIMIT :limit OFFSET :offset
@@ -378,7 +388,7 @@ class AdminController extends Controller {
         $usuarios = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         // Total
-        $stmt = $this->usuarioModel->connection->prepare("SELECT COUNT(*) as total FROM {$this->usuarioModel->table}");
+        $stmt = $this->usuarioModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->usuarioModel->table}");
         $stmt->execute();
         $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
         

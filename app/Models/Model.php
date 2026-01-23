@@ -10,6 +10,10 @@ abstract class Model {
     public function __construct() {
         $this->connection = Database::getConnection();
     }
+    
+    public function getConnection() {
+        return $this->connection;
+    }
 
     public function all() {
         $stmt = $this->connection->prepare("SELECT * FROM {$this->table}");
