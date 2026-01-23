@@ -48,15 +48,11 @@ class AdminController extends Controller {
         $stmt->execute();
         $stats['pedidos_por_status'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        // Faturamento total
+        // Faturamento total (simplificado)
         $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT 
-                SUM(valor_total) as faturamento_usd,
-                SUM(valor_total_brl) as faturamento_brl,
-                SUM(valor_impostos) as impostos_arrecadados,
-                SUM(taxa_servico) as taxa_servico_total
-            FROM {$this->pedidoModel->getTable()} 
-            WHERE payment_status = 'approved'
+                SUM(valor_total) as faturamento_usd
+            FROM {$this->pedidoModel->getTable()}
         ");
         $stmt->execute();
         $financeiro = $stmt->fetch(\PDO::FETCH_ASSOC);
