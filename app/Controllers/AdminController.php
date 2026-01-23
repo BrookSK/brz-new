@@ -6,18 +6,21 @@ use App\Services\AuthService;
 use App\Models\PedidoEcommerce;
 use App\Models\Usuario;
 use App\Models\Produto;
+use App\Models\Categoria;
 
 class AdminController extends Controller {
     private $authService;
     private $pedidoModel;
     private $usuarioModel;
     private $produtoModel;
+    private $categoriaModel;
     
     public function __construct() {
         $this->authService = new AuthService();
         $this->pedidoModel = new PedidoEcommerce();
         $this->usuarioModel = new Usuario();
         $this->produtoModel = new Produto();
+        $this->categoriaModel = new Categoria();
     }
     
     public function dashboard(Request $request) {
