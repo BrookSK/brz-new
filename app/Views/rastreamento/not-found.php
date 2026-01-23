@@ -14,4 +14,4 @@
     </div>
 </div>
 <?php $content = ob_get_clean(); ?>
-<?php include '../layouts/main.php'; ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>
