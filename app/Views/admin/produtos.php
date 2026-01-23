@@ -316,7 +316,7 @@ function gerenciarImagens(id) {
     window.open(`/admin/gerenciar-imagens/${id}`, '_blank');
 }
 
-// Função para atualizar preços com base na moeda - MESMA LÓGICA DO CARRINHO
+// Função para atualizar preços com base na moeda - CORRIGIDO PARA USD ORIGINAL
 function updateProductPrices(currency) {
     console.log('🔍 [PRODUTOS] updateProductPrices() chamada com currency:', currency);
     
@@ -327,9 +327,10 @@ function updateProductPrices(currency) {
     console.log('🔍 [PRODUTOS] rate:', rate);
     console.log('🔍 [PRODUTOS] window.exchangeRates:', window.exchangeRates);
     
-    // DEBUG: Mostrar que estamos usando a lógica do carrinho
-    console.log('🔍 [PRODUTOS] USANDO LÓGICA DO CARRINHO');
-    console.log('🔍 [PRODUTOS] - Fórmula: valor_original × rate (igual ao carrinho)');
+    // DEBUG: Mostrar que o valor original está em USD
+    console.log('🔍 [PRODUTOS] VALOR ORIGINAL EM USD');
+    console.log('🔍 [PRODUTOS] - Se currency = BRL: USD × 5.5 = BRL');
+    console.log('🔍 [PRODUTOS] - Se currency = USD: USD × 1 = USD (sem conversão)');
     
     if (!rate) {
         console.error('❌ [PRODUTOS] Taxa de conversão não encontrada para:', currency);
@@ -346,7 +347,7 @@ function updateProductPrices(currency) {
         console.log('🔍 [PRODUTOS] Linhas na tabela:', rows.length);
     }
     
-    // Atualizar todos os preços de produtos - MESMA LÓGICA DO CARRINHO
+    // Atualizar todos os preços de produtos - VALOR ORIGINAL EM USD
     const productPrices = document.querySelectorAll('.product-price');
     console.log('🔍 [PRODUTOS] Preços de produtos encontrados:', productPrices.length);
     
@@ -362,9 +363,20 @@ function updateProductPrices(currency) {
                 const originalValue = parseFloat(span.getAttribute('data-original-value'));
                 console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text, 'data-original-value:', span.getAttribute('data-original-value'));
                 
-                // LÓGICA DO CARRINHO: sempre multiplica pela taxa
+                // LÓGICA CORRETA: valor original em USD
                 if (!isNaN(originalValue)) {
-                    const convertedPrice = originalValue * rate;
+                    let convertedPrice;
+                    
+                    if (currency === 'BRL') {
+                        // Converter USD para BRL: multiplicar pela taxa
+                        convertedPrice = originalValue * rate;
+                        console.log(`🔍 [PRODUTOS] Convertendo USD para BRL: ${originalValue} × ${rate} = ${convertedPrice}`);
+                    } else {
+                        // Manter em USD: sem conversão
+                        convertedPrice = originalValue;
+                        console.log(`🔍 [PRODUTOS] Mantendo USD: ${originalValue} (sem conversão)`);
+                    }
+                    
                     const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
                     span.textContent = formattedPrice;
                     console.log(`🔍 [PRODUTOS] Span ${index} convertido:`, formattedPrice);
@@ -375,11 +387,22 @@ function updateProductPrices(currency) {
         productPrices.forEach((element, index) => {
             if (element) {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
+                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original (USD):`, originalValue);
                 
-                // LÓGICA DO CARRINHO: sempre multiplica pela taxa
+                // LÓGICA CORRETA: valor original em USD
                 if (!isNaN(originalValue)) {
-                    const convertedPrice = originalValue * rate;
+                    let convertedPrice;
+                    
+                    if (currency === 'BRL') {
+                        // Converter USD para BRL: multiplicar pela taxa
+                        convertedPrice = originalValue * rate;
+                        console.log(`🔍 [PRODUTOS] Convertendo USD para BRL: ${originalValue} × ${rate} = ${convertedPrice}`);
+                    } else {
+                        // Manter em USD: sem conversão
+                        convertedPrice = originalValue;
+                        console.log(`🔍 [PRODUTOS] Mantendo USD: ${originalValue} (sem conversão)`);
+                    }
+                    
                     const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
                     element.textContent = formattedPrice;
                     console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
@@ -391,7 +414,7 @@ function updateProductPrices(currency) {
     }
     
     console.log('🔍 [PRODUTOS] updateProductPrices() concluída');
-    console.log('🔍 [PRODUTOS] LÓGICA: valor_original × rate (igual ao carrinho)');
+    console.log('🔍 [PRODUTOS] LÓGICA: valor_original_USD × rate (para BRL) ou valor_original_USD (para USD)');
 }
 
 // Verificar mudanças na moeda do header
