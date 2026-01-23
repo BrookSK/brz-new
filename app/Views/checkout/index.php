@@ -330,28 +330,50 @@ $(document).ready(function() {
     // Inicializar com a moeda atual
     updatePrices($('#moeda').val());
     
-    // Lógica para habilitar/desabilitar botão finalizar
+    // Lógica simplificada para habilitar/desabilitar botão finalizar
     function updateFinalizarButton() {
-        const consentimento = $('#consentimento_legal').is(':checked');
+        const checkbox = document.getElementById('consentimento_legal');
+        const botao = document.getElementById('btn-finalizar');
         
-        // Verificar apenas o checkbox, já que o formulário está no outro lado
-        $('#btn-finalizar').prop('disabled', !consentimento);
-        
-        // Adicionar feedback visual
-        if (consentimento) {
-            $('#btn-finalizar').removeClass('btn-secondary').addClass('btn-primary');
+        if (checkbox && botao) {
+            const consentimento = checkbox.checked;
+            console.log('Checkbox marcado:', consentimento); // Debug
+            
+            // Habilitar/desabilitar botão
+            botao.disabled = !consentimento;
+            console.log('Botão desabilitado:', botao.disabled); // Debug
+            
+            // Mudar cor do botão
+            if (consentimento) {
+                botao.classList.remove('btn-secondary');
+                botao.classList.add('btn-primary');
+                console.log('Botão ativado com btn-primary'); // Debug
+            } else {
+                botao.classList.remove('btn-primary');
+                botao.classList.add('btn-secondary');
+                console.log('Botão desativado com btn-secondary'); // Debug
+            }
         } else {
-            $('#btn-finalizar').removeClass('btn-primary').addClass('btn-secondary');
+            console.log('Elementos não encontrados:', !!checkbox, !!botao); // Debug
         }
     }
     
-    // Verificar quando o checkbox de termos mudar
-    $('#consentimento_legal').on('change', function() {
+    // Adicionar eventos diretamente
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkbox = document.getElementById('consentimento_legal');
+        if (checkbox) {
+            // Evento change
+            checkbox.addEventListener('change', updateFinalizarButton);
+            
+            // Evento click (backup)
+            checkbox.addEventListener('click', updateFinalizarButton);
+            
+            console.log('Eventos adicionados ao checkbox'); // Debug
+        }
+        
+        // Inicializar estado
         updateFinalizarButton();
     });
-    
-    // Inicializar estado do botão
-    updateFinalizarButton();
     
     // Máscara para CEP
     $('#cep').mask('00000-000');
