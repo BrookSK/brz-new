@@ -175,7 +175,7 @@
 
         <!-- Resumo do Pedido (Fixo) -->
         <div class="col-lg-4">
-            <div class="sticky-top" style="top: 20px;">
+            <div class="sticky-top" style="top: 100px;">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-light">
                         <h6 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h6>
@@ -283,6 +283,55 @@
 
 <script>
 $(document).ready(function() {
+    // Taxa de conversão (1 USD = 5.50 BRL)
+    const exchangeRates = {
+        'BRL': 5.50,
+        'USD': 1.00
+    };
+    
+    // Valores originais em USD
+    const originalValues = {
+        subtotal: <?= $subtotal ?>,
+        pesoTotal: <?= $peso_total ?>
+    };
+    
+    // Função para atualizar valores com base na moeda
+    function updatePrices(currency) {
+        const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+        const rate = exchangeRates[currency];
+        
+        // Calcular valores convertidos
+        const subtotal = originalValues.subtotal * rate;
+        const frete = (originalValues.pesoTotal * 15) * rate;
+        const taxaServico = (originalValues.pesoTotal * 39) * rate;
+        const impostos = (originalValues.subtotal * 0.80) * rate;
+        const total = subtotal + frete + taxaServico + impostos;
+        
+        // Atualizar valores no resumo
+        $('#subtotal').text(currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ','));
+        $('#frete').text(currencySymbol + ' ' + frete.toFixed(2).replace('.', ','));
+        $('#taxa-servico').text(currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ','));
+        $('#impostos').text(currencySymbol + ' ' + impostos.toFixed(2).replace('.', ','));
+        $('#total').text(currencySymbol + ' ' + total.toFixed(2).replace('.', ','));
+        
+        // Atualizar itens
+        $('#items-resumo small:last-child').each(function() {
+            const originalValue = parseFloat($(this).text().replace(/[^\d.]/g, ''));
+            if (!isNaN(originalValue)) {
+                const convertedValue = originalValue * rate;
+                $(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
+            }
+        });
+    }
+    
+    // Atualizar quando a moeda mudar
+    $('#moeda').on('change', function() {
+        updatePrices($(this).val());
+    });
+    
+    // Inicializar com a moeda atual
+    updatePrices($('#moeda').val());
+    
     // Máscara para CEP
     $('#cep').mask('00000-000');
     
@@ -369,6 +418,15 @@ $(document).ready(function() {
     position: sticky;
 }
 
+/* Garantir que o resumo não sobreponha o header */
+@media (min-width: 992px) {
+    .sticky-top {
+        top: 100px !important;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+    }
+}
+
 @media (max-width: 768px) {
     .container-fluid {
         padding: 0;
@@ -379,8 +437,26 @@ $(document).ready(function() {
     }
     
     .sticky-top {
-        top: 0;
+        top: 0 !important;
+        position: relative !important;
     }
+}
+
+/* Evitar sobreposição com elementos fixos */
+#resumo-pedido {
+    z-index: 10;
+    position: relative;
+}
+
+/* Garantir que o header fique acima do conteúdo */
+header {
+    z-index: 1000;
+    position: relative;
+}
+
+/* Ajustar para não interferir com o seletor de moeda */
+.currency-selector {
+    z-index: 1001;
 }
 </style>
 <?php $content = ob_get_clean(); ?>
