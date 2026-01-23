@@ -708,11 +708,13 @@ function salvarNovoCliente() {
             document.getElementById('modalNovoCliente').remove();
             
             // Adicionar o novo cliente ao select do pedido
-            const select = document.querySelector('#formCriarPedido select[name="usuario_id"]');
-            const option = document.createElement('option');
-            option.value = data.usuario.id;
-            option.textContent = `${data.usuario.nome} (${data.usuario.email})`;
-            select.appendChild(option);
+            const select = document.querySelector('form[name="formCriarPedido"] select[name="usuario_id"]');
+            if (select) {
+                const option = document.createElement('option');
+                option.value = data.usuario.id;
+                option.textContent = `${data.usuario.nome} (${data.usuario.email})`;
+                select.appendChild(option);
+            }
             
             // Selecionar automaticamente o novo cliente
             select.value = data.usuario.id;
@@ -1034,15 +1036,20 @@ function carregarUsuariosSelect() {
     fetch('/admin/usuarios-json')
         .then(response => response.json())
         .then(data => {
-            const select = document.querySelector('#formCreditos select[name="usuario_id"]');
-            select.innerHTML = '<option value="">Selecione um usuário...</option>';
-            
-            data.usuarios.forEach(usuario => {
-                const option = document.createElement('option');
-                option.value = usuario.id;
-                option.textContent = `${usuario.nome} (Saldo: R$ ${number_format(usuario.creditos_disponiveis, 2, ',', '.')})`;
-                select.appendChild(option);
-            });
+            const select = document.querySelector('form[name="formCreditos"] select[name="usuario_id"]');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um usuário...</option>';
+                
+                data.usuarios.forEach(usuario => {
+                    const option = document.createElement('option');
+                    option.value = usuario.id;
+                    option.textContent = `${usuario.nome} (${usuario.email})`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar usuários:', error);
         });
 }
 
