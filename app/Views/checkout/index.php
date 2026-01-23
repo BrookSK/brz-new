@@ -215,7 +215,7 @@
                             <!-- Termos Legais -->
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required>
+                                    <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required onchange="toggleButton()">
                                     <label class="form-check-label small" for="consentimento_legal">
                                         Li e aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos e condições</a> de uso e política de privacidade. *
                                     </label>
@@ -330,51 +330,6 @@ $(document).ready(function() {
     // Inicializar com a moeda atual
     updatePrices($('#moeda').val());
     
-    // Lógica simplificada para habilitar/desabilitar botão finalizar
-    function updateFinalizarButton() {
-        const checkbox = document.getElementById('consentimento_legal');
-        const botao = document.getElementById('btn-finalizar');
-        
-        if (checkbox && botao) {
-            const consentimento = checkbox.checked;
-            console.log('Checkbox marcado:', consentimento); // Debug
-            
-            // Habilitar/desabilitar botão
-            botao.disabled = !consentimento;
-            console.log('Botão desabilitado:', botao.disabled); // Debug
-            
-            // Mudar cor do botão
-            if (consentimento) {
-                botao.classList.remove('btn-secondary');
-                botao.classList.add('btn-primary');
-                console.log('Botão ativado com btn-primary'); // Debug
-            } else {
-                botao.classList.remove('btn-primary');
-                botao.classList.add('btn-secondary');
-                console.log('Botão desativado com btn-secondary'); // Debug
-            }
-        } else {
-            console.log('Elementos não encontrados:', !!checkbox, !!botao); // Debug
-        }
-    }
-    
-    // Adicionar eventos diretamente
-    document.addEventListener('DOMContentLoaded', function() {
-        const checkbox = document.getElementById('consentimento_legal');
-        if (checkbox) {
-            // Evento change
-            checkbox.addEventListener('change', updateFinalizarButton);
-            
-            // Evento click (backup)
-            checkbox.addEventListener('click', updateFinalizarButton);
-            
-            console.log('Eventos adicionados ao checkbox'); // Debug
-        }
-        
-        // Inicializar estado
-        updateFinalizarButton();
-    });
-    
     // Máscara para CEP
     $('#cep').mask('00000-000');
     
@@ -453,6 +408,20 @@ $(document).ready(function() {
         }, 5000);
     }
 });
+
+// Função simples para o botão
+function toggleButton() {
+    var checkbox = document.getElementById('consentimento_legal');
+    var botao = document.getElementById('btn-finalizar');
+    
+    if (checkbox.checked) {
+        botao.disabled = false;
+        botao.className = 'btn btn-primary btn-lg w-100';
+    } else {
+        botao.disabled = true;
+        botao.className = 'btn btn-secondary btn-lg w-100';
+    }
+}
 </script>
 
 <style>
