@@ -168,7 +168,7 @@
                                     <?php foreach ($items as $item): ?>
                                     <div class="d-flex justify-content-between mb-2">
                                         <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
-                                        <small>USD <?= number_format($item['subtotal'], 2, ',', '.') ?></small>
+                                        <small class="item-price">Carregando...</small>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -180,19 +180,19 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <span>Subtotal Produtos:</span>
-                                    <span id="subtotal">USD <?= number_format($subtotal, 2, ',', '.') ?></span>
+                                    <span id="subtotal">Carregando...</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete">USD <?= number_format($peso_total * 15, 2, ',', '.') ?></span>
+                                    <span id="frete">Carregando...</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
-                                    <span id="taxa-servico">USD <?= number_format($peso_total * 39, 2, ',', '.') ?></span>
+                                    <span id="taxa-servico">Carregando...</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
-                                    <span id="impostos">USD <?= number_format($subtotal * 0.80, 2, ',', '.') ?></span>
+                                    <span id="impostos">Carregando...</span>
                                 </div>
                             </div>
 
@@ -200,7 +200,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total">USD <?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, ',', '.') ?></h6>
+                                <h6 class="text-primary" id="total">Carregando...</h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -289,6 +289,18 @@ $(document).ready(function() {
         pesoTotal: <?= $peso_total ?>
     };
     
+    // Dados originais dos itens
+    const originalItems = <?php echo json_encode(array_map(function($item) {
+        return [
+            'nome' => $item['nome'],
+            'quantidade' => $item['quantidade'],
+            'subtotal_usd' => $item['subtotal']
+        ];
+    }, $items)); ?>;
+    
+    console.log('Dados originais:', originalValues); // Debug
+    console.log('Itens originais:', originalItems); // Debug
+    
     // Função para atualizar valores com base na moeda
     function updatePrices(currency) {
         const currencySymbol = currency === 'BRL' ? 'R$' : '$';
@@ -313,11 +325,12 @@ $(document).ready(function() {
         jQuery('#total').text(currencySymbol + ' ' + total.toFixed(2).replace('.', ','));
         
         // Atualizar itens
-        jQuery('#items-resumo small:last-child').each(function() {
-            const originalValue = parseFloat(jQuery(this).text().replace(/[^\d.]/g, ''));
-            if (!isNaN(originalValue)) {
+        jQuery('#items-resumo .item-price').each(function(index) {
+            if (originalItems[index]) {
+                const originalValue = originalItems[index].subtotal_usd;
                 const convertedValue = originalValue * rate;
                 jQuery(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
+                console.log('Item', index, 'convertido de', originalValue, 'para', convertedValue); // Debug
             }
         });
         
