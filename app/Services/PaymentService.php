@@ -14,7 +14,8 @@ class PaymentService {
     }
     
     private function loadConfigurations() {
-        $stmt = $this->pedidoModel->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('asaas_api_key', 'stripe_api_key')");
+        $db = \Config\Database::getConnection();
+        $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('asaas_api_key', 'stripe_api_key')");
         $stmt->execute();
         $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
@@ -133,7 +134,8 @@ class PaymentService {
     
     private function confirmarPagamento($paymentId, $gateway) {
         // Encontrar pedido pelo payment_id
-        $stmt = $this->pedidoModel->connection->prepare("
+        $db = \Config\Database::getConnection();
+        $stmt = $db->prepare("
             SELECT id FROM {$this->pedidoModel->table} 
             WHERE payment_id = :payment_id AND payment_gateway = :gateway
         ");
