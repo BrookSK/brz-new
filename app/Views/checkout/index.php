@@ -80,7 +80,7 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Moeda *</label>
-                                    <select class="form-select" name="moeda" id="moeda" required>
+                                    <select class="form-select" name="moeda" id="moeda" required onchange="syncCurrencySelectors()">
                                         <option value="USD">USD - Dólar Americano</option>
                                         <option value="BRL">BRL - Real Brasileiro</option>
                                     </select>
@@ -322,13 +322,44 @@ $(document).ready(function() {
         });
     }
     
-    // Atualizar quando a moeda mudar
+    // Atualizar quando a moeda mudar (usando função de sincronização)
     $('#moeda').on('change', function() {
-        updatePrices($(this).val());
+        syncCurrencySelectors();
     });
     
     // Inicializar com a moeda atual
     updatePrices($('#moeda').val());
+    
+    // Sincronizar com moeda do header ao carregar
+    syncWithHeaderCurrency();
+    
+    // Função para sincronizar seletores de moeda
+    function syncCurrencySelectors() {
+        var checkoutCurrency = document.getElementById('moeda').value;
+        var headerCurrency = document.getElementById('current-currency');
+        
+        // Atualizar header
+        if (headerCurrency) {
+            headerCurrency.textContent = checkoutCurrency;
+            headerCurrency.setAttribute('data-currency', checkoutCurrency);
+            localStorage.setItem('selected_currency', checkoutCurrency);
+        }
+        
+        // Atualizar preços
+        updatePrices(checkoutCurrency);
+    }
+    
+    // Sincronizar com moeda do header ao carregar página
+    function syncWithHeaderCurrency() {
+        var headerCurrency = document.getElementById('current-currency');
+        var checkoutSelect = document.getElementById('moeda');
+        
+        if (headerCurrency && checkoutSelect) {
+            var currentCurrency = headerCurrency.textContent || 'BRL';
+            checkoutSelect.value = currentCurrency;
+            updatePrices(currentCurrency);
+        }
+    }
     
     // Máscara para CEP
     $('#cep').mask('00000-000');
