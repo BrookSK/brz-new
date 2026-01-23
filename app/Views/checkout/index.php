@@ -176,6 +176,70 @@
 
                             <hr>
 
+                            <!-- Informações de Pagamento -->
+                            <div class="mb-3">
+                                <h6><i class="fas fa-credit-card"></i> Informações de Pagamento</h6>
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="row g-2">
+                                        <div class="col-12">
+                                            <label class="form-label">Forma de Pagamento</label>
+                                            <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
+                                                <option value="">Selecione...</option>
+                                                <option value="cartao_credito">Cartão de Crédito</option>
+                                                <option value="boleto">Boleto Bancário</option>
+                                                <option value="pix">PIX</option>
+                                                <option value="transferencia">Transferência Bancária</option>
+                                                <option value="pagamento_entrega">Pagamento na Entrega</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12" id="campos-cartao" style="display: none;">
+                                            <label class="form-label">Número do Cartão</label>
+                                            <input type="text" name="cartao_numero" class="form-control" placeholder="0000 0000 0000 0000">
+                                            <div class="row g-2 mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">Nome no Cartão</label>
+                                                    <input type="text" name="cartao_nome" class="form-control" placeholder="Nome como está no cartão">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">Validade</label>
+                                                    <input type="text" name="cartao_validade" class="form-control" placeholder="MM/AA">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12" id="campos-boleto" style="display: none;">
+                                            <label class="form-label">CPF/CNPJ do Titular</label>
+                                            <input type="text" name="boleto_cpf" class="form-control" placeholder="000.000.000-00">
+                                        </div>
+                                        <div class="col-12" id="campos-pix" style="display: none;">
+                                            <label class="form-label">Chave PIX (opcional)</label>
+                                            <input type="text" name="pix_chave" class="form-control" placeholder="Chave aleatória">
+                                            <div class="form-text">Deixe em branco para gerar automaticamente</div>
+                                        </div>
+                                        <div class="col-12" id="campos-transferencia" style="display: none;">
+                                            <label class="form-label">Banco</label>
+                                            <select name="banco" class="form-select">
+                                                <option value="">Selecione...</option>
+                                                <option value="001">Banco do Brasil</option>
+                                                <option value="104">Caixa Econômica Federal</option>
+                                                <option value="237">Banco Bradesco</option>
+                                                <option value="341">Itaú</option>
+                                                <option value="033">Santander</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12" id="campos-pagamento-entrega" style="display: none;">
+                                            <label class="form-label">Forma de Pagamento na Entrega</label>
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle"></i>
+                                                <strong>Pagamento na entrega:</strong> 
+                                                Você pode pagar com dinheiro, cartão ou maquininha na entrega.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr>
+
                             <!-- Valores -->
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
@@ -433,6 +497,66 @@ setInterval(function() {
 function toggleButton() {
     var checkbox = document.getElementById('consentimento_legal');
     var botao = document.getElementById('btn-finalizar');
+    
+    if (checkbox && botao) {
+        botao.disabled = !checkbox.checked;
+    }
+}
+
+// Função para atualizar campos de pagamento
+function atualizarFormaPagamento() {
+    const formaPagamento = document.getElementById('forma_pagamento').value;
+    
+    // Esconder todos os campos específicos
+    document.getElementById('campos-cartao').style.display = 'none';
+    document.getElementById('campos-boleto').style.display = 'none';
+    document.getElementById('campos-pix').style.display = 'none';
+    document.getElementById('campos-transferencia').style.display = 'none';
+    document.getElementById('campos-pagamento-entrega').style.display = 'none';
+    
+    // Mostrar campos específicos conforme a forma de pagamento
+    switch(formaPagamento) {
+        case 'cartao_credito':
+            document.getElementById('campos-cartao').style.display = 'block';
+            break;
+        case 'boleto':
+            document.getElementById('campos-boleto').style.display = 'block';
+            break;
+        case 'pix':
+            document.getElementById('campos-pix').style.display = 'block';
+            break;
+        case 'transferencia':
+            document.getElementById('campos-transferencia').style.display = 'block';
+            break;
+        case 'pagamento_entrega':
+            document.getElementById('campos-pagamento-entrega').style.display = 'block';
+            break;
+    }
+    
+    // Atualizar texto do botão conforme a forma de pagamento
+    const botaoFinalizar = document.getElementById('btn-finalizar');
+    if (botaoFinalizar) {
+        switch(formaPagamento) {
+            case 'cartao_credito':
+                botaoFinalizar.innerHTML = '<i class="fas fa-credit-card"></i> Finalizar com Cartão de Crédito';
+                break;
+            case 'boleto':
+                botaoFinalizar.innerHTML = '<i class="fas fa-barcode"></i> Gerar Boleto';
+                break;
+            case 'pix':
+                botaoFinalizar.innerHTML = '<i class="fas fa-qrcode"></i> Gerar PIX';
+                break;
+            case 'transferencia':
+                botaoFinalizar.innerHTML = '<i class="fas fa-university"></i> Finalizar com Transferência';
+                break;
+            case 'pagamento_entrega':
+                botaoFinalizar.innerHTML = '<i class="fas fa-truck"></i> Finalizar para Pagamento na Entrega';
+                break;
+            default:
+                botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+        }
+    }
+}
     
     if (checkbox.checked) {
         botao.disabled = false;
