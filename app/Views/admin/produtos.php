@@ -435,6 +435,53 @@ setInterval(function() {
 // Inicializar com a moeda atual
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 [PRODUTOS] DOMContentLoaded iniciado');
+    console.log('🔍 [PRODUTOS] Verificando estrutura do frontend...');
+    
+    // Verificar se a tabela existe
+    const table = document.querySelector('table');
+    console.log('🔍 [PRODUTOS] Tabela encontrada:', !!table);
+    
+    if (table) {
+        const rows = table.querySelectorAll('tbody tr');
+        console.log('🔍 [PRODUTOS] Linhas na tabela:', rows.length);
+        
+        // Verificar cada linha
+        rows.forEach((row, index) => {
+            const cells = row.querySelectorAll('td');
+            console.log(`🔍 [PRODUTOS] Linha ${index} - Células:`, cells.length);
+            
+            cells.forEach((cell, cellIndex) => {
+                const text = cell.textContent.trim();
+                if (text.includes('R$') || text.includes('$')) {
+                    console.log(`🔍 [PRODUTOS] Linha ${index}, Célula ${cellIndex}:`, text);
+                    console.log(`🔍 [PRODUTOS] HTML:`, cell.innerHTML);
+                    console.log(`🔍 [PRODUTOS] Classe:`, cell.querySelector('span')?.className);
+                    console.log(`🔍 [PRODUTOS] data-original-value:`, cell.querySelector('span')?.getAttribute('data-original-value'));
+                }
+            });
+        });
+    }
+    
+    // Verificar elementos com classe product-price
+    const productPrices = document.querySelectorAll('.product-price');
+    console.log('🔍 [PRODUTOS] Elementos .product-price encontrados:', productPrices.length);
+    
+    // Verificar todos os spans com preço
+    const allSpans = document.querySelectorAll('span');
+    console.log('🔍 [PRODUTOS] Total de spans na página:', allSpans.length);
+    
+    let spansComPreco = 0;
+    allSpans.forEach((span, index) => {
+        const text = span.textContent.trim();
+        if (text.includes('R$') || text.includes('$')) {
+            spansComPreco++;
+            console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text);
+            console.log(`🔍 [PRODUTOS] Classe:`, span.className);
+            console.log(`🔍 [PRODUTOS] data-original-value:`, span.getAttribute('data-original-value'));
+        }
+    });
+    
+    console.log('🔍 [PRODUTOS] Total de spans com preço:', spansComPreco);
     
     const headerCurrency = document.getElementById('current-currency');
     if (headerCurrency) {
@@ -459,6 +506,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔍 [PRODUTOS] Chamando updateProductPrices após 1 segundo...');
             updateProductPrices(currentCurrency);
         }, 1000);
+        
+        // Teste após 2 segundos
+        setTimeout(function() {
+            console.log('🔍 [PRODUTOS] Chamando updateProductPrices após 2 segundos...');
+            updateProductPrices(currentCurrency);
+        }, 2000);
     } else {
         console.error('❌ [PRODUTOS] Elemento current-currency não encontrado');
     }
