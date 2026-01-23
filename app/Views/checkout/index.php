@@ -379,8 +379,19 @@ function processarPedidoDireto() {
     formData.append('consentimento_legal', checkbox.checked ? 'on' : '');
     console.log(`🔍 [DIRETO] consentimento_legal: ${checkbox.checked ? 'on' : ''} (garantido)`);
     
+    // Garantir que a forma de pagamento seja adicionada
+    const formaPagamentoSelect = document.getElementById('forma_pagamento');
+    if (formaPagamentoSelect) {
+        const formaPagamento = formaPagamentoSelect.value;
+        formData.append('forma_pagamento', formaPagamento);
+        console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
+    } else {
+        console.error('❌ [DIRETO] Campo forma_pagamento não encontrado');
+    }
+    
     console.log('🔍 [DIRETO] Total de campos no FormData:', [...formData.keys()].length);
     console.log('🔍 [DIRETO] Verificando consentimento_legal no FormData:', formData.get('consentimento_legal'));
+    console.log('🔍 [DIRETO] Verificando forma_pagamento no FormData:', formData.get('forma_pagamento'));
     
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
