@@ -94,13 +94,13 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarUsuario(<?= $usuario['id'] ?>)">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarUsuario(<?= $pedido['usuario_id'] ?? '' ?>)">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-info" onclick="verPerfilUsuario(<?= $usuario['id'] ?>)">
+                                            <button type="button" class="btn btn-sm btn-outline-info" onclick="verPerfilUsuario(<?= $pedido['usuario_id'] ?? '' ?>)">
                                                 <i class="fas fa-user"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-success" onclick="gerenciarCreditos(<?= $usuario['id'] ?>)">
+                                            <button type="button" class="btn btn-sm btn-outline-success" onclick="gerenciarCreditos(<?= $pedido['usuario_id'] ?? '' ?>)">
                                                 <i class="fas fa-credit-card"></i>
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-success" onclick="atualizarStatus(<?= $pedido['id'] ?>)">
