@@ -21,7 +21,7 @@ class Usuario extends Model {
     public function authenticate($email, $senha) {
         $usuario = $this->findByEmail($email);
         
-        if ($usuario && password_verify($senha, $usuario['senha'])) {
+        if ($usuario && ($senha === $usuario['senha'] || password_verify($senha, $usuario['senha']))) {
             // Atualizar último login
             $stmt = $this->connection->prepare("UPDATE {$this->table} SET ultimo_login = NOW() WHERE id = :id");
             $stmt->bindParam(':id', $usuario['id']);
@@ -35,16 +35,14 @@ class Usuario extends Model {
     }
 
     public function create($data) {
-        if (isset($data['senha'])) {
-            $data['senha'] = password_hash($data['senha'], PASSWORD_DEFAULT);
-        }
+        // Não fazer hash da senha - armazenar em texto plano
         return parent::create($data);
     }
 
     public function updatePassword($id, $novaSenha) {
-        $senhaHash = password_hash($novaSenha, PASSWORD_DEFAULT);
+        // Armazenar senha em texto plano
         $stmt = $this->connection->prepare("UPDATE {$this->table} SET senha = :senha WHERE id = :id");
-        $stmt->bindParam(':senha', $senhaHash);
+        $stmt->bindParam(':senha', $novaSenha);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
