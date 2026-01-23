@@ -29,25 +29,29 @@
             right: 0 !important;
             z-index: 1030 !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         
         /* Espaçamento para o conteúdo não ficar sob o header */
         body {
-            padding-top: 80px !important;
+            padding-top: 76px !important; /* Altura do navbar */
+            margin: 0 !important;
         }
         
         /* Ajustar para elementos que devem ficar abaixo do header */
         main {
             margin-top: 0 !important;
+            padding-top: 20px !important;
         }
         
         /* Hero section ajustado */
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 60px 0 40px; /* Reduzido pois já tem padding-top no body */
-            margin-top: -80px; /* Compensar o padding do body */
-            padding-top: 140px; /* Espaçamento total correto */
+            padding: 60px 0 40px;
+            margin-top: 0 !important;
+            padding-top: 100px !important;
         }
         
         .feature-card {

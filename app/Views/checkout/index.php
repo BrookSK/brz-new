@@ -226,7 +226,7 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-finalizar" disabled>
+                            <button type="submit" class="btn btn-secondary btn-lg w-100" id="btn-finalizar" disabled>
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
                         </div>
@@ -336,18 +336,20 @@ $(document).ready(function() {
     // Lógica para habilitar/desabilitar botão finalizar
     function updateFinalizarButton() {
         const consentimento = $('#consentimento_legal').is(':checked');
-        const formValido = $('#checkout-form')[0].checkValidity();
         
-        $('#btn-finalizar').prop('disabled', !consentimento || !formValido);
+        // Verificar apenas o checkbox, já que o formulário está no outro lado
+        $('#btn-finalizar').prop('disabled', !consentimento);
+        
+        // Adicionar feedback visual
+        if (consentimento) {
+            $('#btn-finalizar').removeClass('btn-secondary').addClass('btn-primary');
+        } else {
+            $('#btn-finalizar').removeClass('btn-primary').addClass('btn-secondary');
+        }
     }
     
     // Verificar quando o checkbox de termos mudar
     $('#consentimento_legal').on('change', function() {
-        updateFinalizarButton();
-    });
-    
-    // Verificar quando os campos do formulário mudarem
-    $('#checkout-form input, #checkout-form select').on('input change', function() {
         updateFinalizarButton();
     });
     
@@ -489,18 +491,19 @@ header {
 /* Garantir que o conteúdo principal fique abaixo do header */
 main {
     margin-top: 0 !important;
-    padding-top: 0 !important;
+    padding-top: 20px !important;
 }
 
 /* Container do checkout com espaçamento correto */
 .container-fluid {
     padding-top: 20px;
+    margin: 0 !important;
 }
 
 /* Ajustar o sticky-top do checkout para considerar o header fixo */
 .checkout-sticky {
     position: sticky;
-    top: 100px;
+    top: 90px; /* Ajustado para header fixo */
     z-index: 10;
 }
 </style>
