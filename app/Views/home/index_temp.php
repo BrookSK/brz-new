@@ -1,4 +1,5 @@
 <?php ob_start(); ?>
+
 <!-- Hero Section -->
 <section class="hero-section">
     <div class="container">
