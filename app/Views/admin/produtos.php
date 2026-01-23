@@ -96,7 +96,7 @@
                                     <td><?= htmlspecialchars($produto['sku']) ?></td>
                                     <td><?= htmlspecialchars($produto['categoria_nome']) ?></td>
                                     <td>
-                                        <span class="badge bg-success">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
+                                        <span class="badge bg-success product-price" data-original-value="<?= $produto['valor'] ?>">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
                                     </td>
                                     <td>
                                         <span class="badge badge-<?= $produto['estoque'] > 0 ? 'success' : 'danger' ?>">
@@ -188,7 +188,10 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Valor *</label>
-                            <input type="number" name="valor" class="form-control" step="0.01" required>
+                            <div class="input-group">
+                                <span class="input-group-text" id="valor-currency">R$</span>
+                                <input type="number" name="valor" class="form-control" step="0.01" required>
+                            </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Moeda</label>
@@ -233,27 +236,45 @@
 
 <script>
 function editarProduto(id) {
+    console.log('🔍 [PRODUTOS] editarProduto() chamada com ID:', id);
+    
     fetch(`/admin/produto/${id}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                console.log('🔍 [PRODUTOS] Dados do produto recebidos:', data.produto);
+                
+                // Preencher o modal
                 document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
                 document.getElementById('produto_id').value = data.produto.id;
-                document.querySelector('input[name="nome"]').value = data.produto.nome;
-                document.querySelector('input[name="sku"]').value = data.produto.sku;
+                document.querySelector('input[name="nome"]').value = data.produto.nome || '';
+                document.querySelector('input[name="sku"]').value = data.produto.sku || '';
                 document.querySelector('textarea[name="descricao_curta"]').value = data.produto.descricao_curta || '';
                 document.querySelector('textarea[name="descricao_completa"]').value = data.produto.descricao_completa || '';
                 document.querySelector('select[name="categoria_id"]').value = data.produto.categoria_id;
-                document.querySelector('input[name="valor"]').value = data.produto.valor;
-                document.querySelector('select[name="moeda"]').value = data.produto.moeda;
-                document.querySelector('input[name="peso"]').value = data.produto.peso;
-                document.querySelector('input[name="estoque"]').value = data.produto.estoque;
-                document.querySelector('select[name="status"]').value = data.produto.status;
+                document.querySelector('input[name="valor"]').value = data.produto.valor || '';
+                document.querySelector('select[name="moeda"]').value = data.produto.moeda || 'BRL';
+                document.querySelector('input[name="peso"]').value = data.produto.peso || '';
+                document.querySelector('input[name="estoque"]').value = data.produto.estoque || '';
+                document.querySelector('select[name="status"]').value = data.produto.status || 'ativo';
                 
+                // Atualizar o símbolo da moeda no campo de valor
+                const valorCurrency = document.getElementById('valor-currency');
+                if (valorCurrency) {
+                    valorCurrency.textContent = data.produto.moeda === 'USD' ? '$' : 'R$';
+                    console.log('🔍 [PRODUTOS] Símbolo da moeda atualizado para:', valorCurrency.textContent);
+                }
+                
+                console.log('🔍 [PRODUTOS] Modal preenchido com sucesso');
                 new bootstrap.Modal(document.getElementById('modalProduto')).show();
             } else {
+                console.error('❌ [PRODUTOS] Erro ao carregar produto:', data.error);
                 alert('Erro ao carregar produto: ' + data.error);
             }
+        })
+        .catch(error => {
+            console.error('❌ [PRODUTOS] Erro na requisição:', error);
+            alert('Erro ao carregar produto. Verifique o console para mais detalhes.');
         });
 }
 
@@ -294,6 +315,82 @@ function excluirProduto(id) {
 function gerenciarImagens(id) {
     window.open(`/admin/gerenciar-imagens/${id}`, '_blank');
 }
+
+// Função para atualizar preços com base na moeda
+function updateProductPrices(currency) {
+    console.log('🔍 [PRODUTOS] updateProductPrices() chamada com currency:', currency);
+    
+    const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+    const rate = window.exchangeRates ? window.exchangeRates[currency] : 1;
+    
+    console.log('🔍 [PRODUTOS] currencySymbol:', currencySymbol);
+    console.log('🔍 [PRODUTOS] rate:', rate);
+    
+    if (!rate) {
+        console.error('❌ [PRODUTOS] Taxa de conversão não encontrada para:', currency);
+        return;
+    }
+    
+    // Atualizar todos os preços de produtos
+    const productPrices = document.querySelectorAll('.product-price');
+    console.log('🔍 [PRODUTOS] Preços de produtos encontrados:', productPrices.length);
+    
+    productPrices.forEach((element, index) => {
+        if (element) {
+            const originalValue = parseFloat(element.getAttribute('data-original-value'));
+            console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
+            
+            if (!isNaN(originalValue)) {
+                const convertedPrice = originalValue * rate;
+                const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+                element.textContent = formattedPrice;
+                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
+            } else {
+                console.error(`❌ [PRODUTOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
+            }
+        }
+    });
+    
+    console.log('🔍 [PRODUTOS] updateProductPrices() concluída');
+}
+
+// Verificar mudanças na moeda do header
+setInterval(function() {
+    const headerCurrency = document.getElementById('current-currency');
+    if (headerCurrency) {
+        const newCurrency = headerCurrency.textContent;
+        
+        // Verificar se a moeda mudou
+        if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
+            window.lastCurrency = newCurrency;
+            console.log('🔍 [PRODUTOS] Moeda mudou para:', newCurrency);
+            updateProductPrices(newCurrency);
+        }
+    }
+}, 200);
+
+// Inicializar com a moeda atual
+document.addEventListener('DOMContentLoaded', function() {
+    const headerCurrency = document.getElementById('current-currency');
+    if (headerCurrency) {
+        const currentCurrency = headerCurrency.textContent;
+        console.log('🔍 [PRODUTOS] Moeda inicial:', currentCurrency);
+        
+        // Definir taxas de conversão se não existirem
+        if (typeof window.exchangeRates === 'undefined') {
+            window.exchangeRates = {
+                'BRL': 5.50,
+                'USD': 1.00
+            };
+            console.log('🔍 [PRODUTOS] Taxas de conversão definidas:', window.exchangeRates);
+        }
+        
+        updateProductPrices(currentCurrency);
+    }
+});
+
+// Função global para atualizar preços de produtos
+window.updateProductPrices = updateProductPrices;
 
 function salvarProduto() {
     const form = document.getElementById('formProduto');
