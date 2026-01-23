@@ -151,15 +151,26 @@
 
 <script>
 $(document).ready(function() {
-    $('.btn-adicionar').click(function() {
+    $('.btn-adicionar').on('click', function(e) {
+        e.preventDefault();
+        
         var btn = $(this);
         var produtoId = btn.data('produto-id');
         var quantidade = btn.closest('.input-group').find('.quantidade-input').val();
         
+        // LOG DE DEPURAÇÃO
+        console.log('=== DEPURAÇÃO ADICIONAR CARRINHO ===');
+        console.log('Produto ID:', produtoId);
+        console.log('Quantidade:', quantidade);
+        console.log('Botão desabilitado:', btn.prop('disabled'));
+        console.log('Dados do botão:', btn.data());
+        
         if (btn.prop('disabled')) {
+            console.log('Botão está desabilitado, saindo...');
             return;
         }
         
+        console.log('Iniciando requisição AJAX...');
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adicionando...');
         
         $.ajax({
@@ -170,30 +181,58 @@ $(document).ready(function() {
                 quantidade: quantidade
             },
             dataType: 'json',
+            beforeSend: function(xhr) {
+                console.log('Enviando requisição para:', '/carrinho/adicionar');
+                console.log('Dados enviados:', { id: produtoId, quantidade: quantidade });
+            },
             success: function(response) {
+                console.log('=== RESPOSTA AJAX SUCESSO ===');
+                console.log('Resposta completa:', response);
+                console.log('Success:', response.success);
+                console.log('Message:', response.message);
+                console.log('Total itens:', response.total_itens);
+                
                 if (response.success) {
                     showAlert('success', response.message);
                     updateCartBadge(response.total_itens);
                     
                     // Adicionar ao mini carrinho
+                    console.log('Verificando se addToMiniCart existe...');
+                    console.log('Tipo de addToMiniCart:', typeof addToMiniCart);
+                    
                     if (typeof addToMiniCart === 'function') {
-                        addToMiniCart({
+                        console.log('Chamando addToMiniCart com dados...');
+                        var produtoData = {
                             id: produtoId,
                             nome: btn.data('produto-nome'),
                             preco: btn.data('produto-preco'),
                             quantidade: quantidade,
                             imagem: btn.closest('.product-card').find('.product-image').attr('src')
-                        });
+                        };
+                        console.log('Dados do produto para mini carrinho:', produtoData);
+                        addToMiniCart(produtoData);
+                    } else {
+                        console.log('ERRO: addToMiniCart não é uma função!');
+                        console.log('Funções disponíveis:', typeof addToMiniCart);
                     }
                 } else {
+                    console.log('ERRO: Resposta com sucesso=false');
+                    console.log('Mensagem de erro:', response.error);
                     showAlert('danger', response.error);
                 }
             },
             error: function(xhr, status, error) {
-                console.log('Erro:', xhr.responseText);
+                console.log('=== ERRO AJAX ===');
+                console.log('Status:', status);
+                console.log('Error:', error);
+                console.log('XHR Response Text:', xhr.responseText);
+                console.log('XHR Status:', xhr.status);
+                console.log('XHR Status Text:', xhr.statusText);
+                
                 showAlert('danger', 'Erro ao adicionar produto ao carrinho');
             },
             complete: function() {
+                console.log('=== AJAX COMPLETO ===');
                 btn.prop('disabled', false).html('<i class="fas fa-cart-plus"></i> Adicionar');
             }
         });

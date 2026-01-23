@@ -75,28 +75,45 @@ class CarrinhoController extends Controller {
     }
 
     public function adicionar(Request $request) {
+        // LOG DE DEPURAÇÃO
+        error_log("=== DEPURAÇÃO CARRINHO ADICIONAR ===");
+        error_log("Método: " . $request->getMethod());
+        error_log("Parâmetros recebidos: " . json_encode($request->getParams()));
+        
         $produtoId = $request->getParam('id');
         $quantidade = $request->getParam('quantidade', 1);
         
+        error_log("Produto ID: $produtoId");
+        error_log("Quantidade: $quantidade");
+        
         if (!$produtoId) {
+            error_log("ERRO: Produto não informado");
             $this->json(['error' => 'Produto não informado'], 400);
             return;
         }
         
         $produto = $this->produtoModel->find($produtoId);
         
+        error_log("Produto encontrado: " . ($produto ? 'SIM' : 'NÃO'));
+        if ($produto) {
+            error_log("Dados do produto: " . json_encode($produto));
+        }
+        
         if (!$produto) {
+            error_log("ERRO: Produto não encontrado no banco");
             $this->json(['error' => 'Produto não encontrado'], 404);
             return;
         }
         
         if ($produto['estoque'] < $quantidade) {
+            error_log("ERRO: Estoque insuficiente. Estoque: " . $produto['estoque'] . ", Quantidade: " . $quantidade);
             $this->json(['error' => 'Estoque insuficiente'], 400);
             return;
         }
         
         if (!isset($_SESSION['carrinho'])) {
             $_SESSION['carrinho'] = [];
+            error_log("Criando array de carrinho vazio");
         }
         
         $itemKey = $produtoId;
@@ -104,6 +121,7 @@ class CarrinhoController extends Controller {
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
             $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['valor'];
+            error_log("Atualizando item existente no carrinho");
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
@@ -112,18 +130,28 @@ class CarrinhoController extends Controller {
                 'quantidade' => $quantidade,
                 'subtotal' => $quantidade * $produto['valor']
             ];
+            error_log("Adicionando novo item ao carrinho");
         }
+        
+        error_log("Carrinho atual: " . json_encode($_SESSION['carrinho']));
         
         $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
         $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
         
-        $this->json([
+        error_log("Total itens: $totalItens");
+        error_log("Total valor: $totalValor");
+        
+        $response = [
             'success' => true,
             'message' => 'Produto adicionado ao carrinho',
             'carrinho' => $_SESSION['carrinho'],
             'total_itens' => $totalItens,
             'total_valor' => $totalValor
-        ]);
+        ];
+        
+        error_log("Resposta JSON: " . json_encode($response));
+        
+        $this->json($response);
     }
 
     public function remover(Request $request) {

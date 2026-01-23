@@ -266,16 +266,37 @@
 <script>
 // Função para abrir/fechar mini carrinho
 function toggleMiniCart() {
+    console.log('=== DEPURAÇÃO TOGGLE MINI CARRINHO ===');
+    console.log('Chamado toggleMiniCart()');
+    
     const miniCart = document.getElementById('mini-cart');
     const overlay = document.getElementById('mini-cart-overlay');
+    
+    console.log('Mini cart element:', miniCart);
+    console.log('Overlay element:', overlay);
+    
+    if (!miniCart) {
+        console.error('ERRO: Elemento mini-cart não encontrado!');
+        return;
+    }
+    
+    if (!overlay) {
+        console.error('ERRO: Elemento mini-cart-overlay não encontrado!');
+        return;
+    }
     
     miniCart.classList.toggle('active');
     overlay.classList.toggle('active');
     
+    console.log('Mini cart classes:', miniCart.className);
+    console.log('Overlay classes:', overlay.className);
+    
     // Auto-fechar após 5 segundos se estiver aberto
     if (miniCart.classList.contains('active')) {
+        console.log('Mini carrinho aberto, agendando auto-close em 5 segundos');
         setTimeout(() => {
             if (miniCart.classList.contains('active')) {
+                console.log('Fechando mini carrinho automaticamente');
                 toggleMiniCart();
             }
         }, 5000);
@@ -284,10 +305,21 @@ function toggleMiniCart() {
 
 // Função para adicionar item ao mini carrinho
 function addToMiniCart(product) {
+    console.log('=== DEPURAÇÃO ADD TO MINI CART ===');
+    console.log('Produto recebido:', product);
+    
     const itemsContainer = document.getElementById('mini-cart-items');
+    
+    console.log('Container de itens:', itemsContainer);
+    
+    if (!itemsContainer) {
+        console.error('ERRO: Elemento mini-cart-items não encontrado!');
+        return;
+    }
     
     // Verificar se carrinho está vazio
     if (itemsContainer.querySelector('.text-center')) {
+        console.log('Removendo mensagem de carrinho vazio');
         itemsContainer.innerHTML = '';
     }
     
@@ -310,12 +342,18 @@ function addToMiniCart(product) {
         </button>
     `;
     
+    console.log('Elemento do item criado:', itemElement);
+    
     itemsContainer.appendChild(itemElement);
     
+    console.log('Elemento adicionado ao DOM');
+    
     // Abrir mini carrinho
+    console.log('Abrindo mini carrinho...');
     toggleMiniCart();
     
     // Atualizar totais
+    console.log('Atualizando totais...');
     updateMiniCartTotals();
 }
 
