@@ -153,6 +153,15 @@
                                                     atualizarFormaPagamento();
                                                 }
                                             });
+                                            
+                                            // Fallback para garantir que a função esteja disponível
+                                            setTimeout(function() {
+                                                if (typeof atualizarFormaPagamento === 'function') {
+                                                    console.log('🔍 [VERIFY] Função atualizarFormaPagamento está disponível');
+                                                } else {
+                                                    console.error('❌ [ERROR] Função atualizarFormaPagamento não está disponível');
+                                                }
+                                            }, 100);
                                             </script>
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
@@ -287,6 +296,181 @@
         </div>
     </div>
 </div>
+
+<script>
+// Função para atualizar campos de pagamento
+function atualizarFormaPagamento() {
+    console.log('🔍 [INÍCIO] atualizarFormaPagamento() chamada');
+    
+    const formaPagamentoElement = document.getElementById('forma_pagamento');
+    console.log('🔍 [DEBUG] Elemento forma_pagamento:', !!formaPagamentoElement);
+    
+    if (!formaPagamentoElement) {
+        console.error('❌ [ERRO] Elemento forma_pagamento não encontrado');
+        return;
+    }
+    
+    const formaPagamento = formaPagamentoElement.value;
+    console.log('🔍 [DEBUG] Valor selecionado:', formaPagamento);
+    
+    // Verificar se os elementos dos campos existem
+    const camposCartao = document.getElementById('campos-cartao');
+    const camposBoleto = document.getElementById('campos-boleto');
+    const camposPix = document.getElementById('campos-pix');
+    const camposTransferencia = document.getElementById('campos-transferencia');
+    const camposPagamentoEntrega = document.getElementById('campos-pagamento-entrega');
+    
+    console.log('🔍 [DEBUG] Elementos dos campos:');
+    console.log('🔍 [DEBUG] campos-cartao:', !!camposCartao);
+    console.log('🔍 [DEBUG] campos-boleto:', !!camposBoleto);
+    console.log('🔍 [DEBUG] campos-pix:', !!camposPix);
+    console.log('🔍 [DEBUG] campos-transferencia:', !!camposTransferencia);
+    console.log('🔍 [DEBUG] campos-pagamento-entrega:', !!camposPagamentoEntrega);
+    
+    // Esconder todos os campos específicos primeiro
+    if (camposCartao) {
+        camposCartao.style.display = 'none';
+        console.log('🔍 [DEBUG] Campos de cartão escondidos');
+    }
+    if (camposBoleto) {
+        camposBoleto.style.display = 'none';
+        console.log('🔍 [DEBUG] Campos de boleto escondidos');
+    }
+    if (camposPix) {
+        camposPix.style.display = 'none';
+        console.log('🔍 [DEBUG] Campos de PIX escondidos');
+    }
+    if (camposTransferencia) {
+        camposTransferencia.style.display = 'none';
+        console.log('🔍 [DEBUG] Campos de transferência escondidos');
+    }
+    if (camposPagamentoEntrega) {
+        camposPagamentoEntrega.style.display = 'none';
+        console.log('🔍 [DEBUG] Campos de pagamento na entrega escondidos');
+    }
+    
+    console.log('🔍 [DEBUG] Todos os campos foram escondidos');
+    
+    // Mostrar campos específicos conforme a forma de pagamento
+    switch(formaPagamento) {
+        case 'cartao_credito':
+            if (camposCartao) {
+                camposCartao.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de cartão exibidos');
+                
+                // Garantir que os campos obrigatórios estejam visíveis
+                const nomeCartao = camposCartao.querySelector('input[name="card_holder_name"]');
+                const numeroCartao = camposCartao.querySelector('input[name="card_number"]');
+                const cvvCartao = camposCartao.querySelector('input[name="card_cvv"]');
+                
+                if (nomeCartao) nomeCartao.required = true;
+                if (numeroCartao) numeroCartao.required = true;
+                if (cvvCartao) cvvCartao.required = true;
+                
+                console.log('🔍 [PAGAMENTO] Campos obrigatórios do cartão marcados');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-cartao não encontrado');
+            }
+            break;
+        case 'boleto':
+            if (camposBoleto) {
+                camposBoleto.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de boleto exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-boleto não encontrado');
+            }
+            break;
+        case 'pix':
+            if (camposPix) {
+                camposPix.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de PIX exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-pix não encontrado');
+            }
+            break;
+        case 'transferencia':
+            if (camposTransferencia) {
+                camposTransferencia.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de transferência exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-transferencia não encontrado');
+            }
+            break;
+        case 'pagamento_entrega':
+            if (camposPagamentoEntrega) {
+                camposPagamentoEntrega.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de pagamento na entrega exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-pagamento-entrega não encontrado');
+            }
+            break;
+        default:
+            console.log('🔍 [PAGAMENTO] Nenhuma forma de pagamento selecionada');
+    }
+    
+    // Atualizar texto do botão conforme a forma de pagamento
+    const botaoFinalizar = document.getElementById('btn-finalizar');
+    console.log('🔍 [DEBUG] Botão btn-finalizar:', !!botaoFinalizar);
+    
+    if (botaoFinalizar) {
+        switch(formaPagamento) {
+            case 'cartao_credito':
+                botaoFinalizar.innerHTML = '<i class="fas fa-credit-card"></i> Finalizar com Cartão de Crédito';
+                console.log('🔍 [BOTÃO] Texto atualizado para cartão de crédito');
+                break;
+            case 'boleto':
+                botaoFinalizar.innerHTML = '<i class="fas fa-barcode"></i> Gerar Boleto';
+                console.log('🔍 [BOTÃO] Texto atualizado para boleto');
+                break;
+            case 'pix':
+                botaoFinalizar.innerHTML = '<i class="fas fa-qrcode"></i> Gerar PIX';
+                console.log('🔍 [BOTÃO] Texto atualizado para PIX');
+                break;
+            case 'transferencia':
+                botaoFinalizar.innerHTML = '<i class="fas fa-university"></i> Finalizar com Transferência';
+                console.log('🔍 [BOTÃO] Texto atualizado para transferência');
+                break;
+            case 'pagamento_entrega':
+                botaoFinalizar.innerHTML = '<i class="fas fa-truck"></i> Finalizar para Pagamento na Entrega';
+                console.log('🔍 [BOTÃO] Texto atualizado para pagamento na entrega');
+                break;
+            default:
+                botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+                console.log('🔍 [BOTÃO] Texto padrão definido');
+        }
+    } else {
+        console.error('❌ [ERRO] Botão btn-finalizar não encontrado');
+    }
+    
+    console.log('🔍 [FIM] atualizarFormaPagamento() concluída');
+}
+
+// Função para habilitar/desabilitar botão finalizar
+function toggleButton() {
+    const checkbox = document.getElementById('consentimento_legal');
+    const botao = document.getElementById('btn-finalizar');
+    
+    console.log('🔍 [BOTÃO] toggleButton() chamada');
+    console.log('🔍 [BOTÃO] Checkbox marcado:', checkbox ? checkbox.checked : 'não');
+    
+    if (checkbox && botao) {
+        const isChecked = checkbox.checked;
+        botao.disabled = !isChecked;
+        
+        if (isChecked) {
+            botao.className = 'btn btn-primary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão habilitado');
+        } else {
+            botao.className = 'btn btn-secondary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão desabilitado');
+        }
+        
+        console.log('🔍 [BOTÃO] Estado final do botão:', !botao.disabled);
+    } else {
+        console.error('❌ [BOTÃO] Checkbox ou botão não encontrado');
+    }
+}
+</script>
 
 <!-- Modal Termos -->
 <div class="modal fade" id="termosModal" tabindex="-1">
