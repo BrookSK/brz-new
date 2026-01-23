@@ -182,6 +182,8 @@ class CheckoutController extends Controller {
         $db = \Config\Database::getConnection();
         
         foreach ($carrinho as $item) {
+            error_log('🔍 [ITENS] Item do carrinho: ' . json_encode($item));
+            
             $sql = "INSERT INTO pedido_itens (
                 pedido_id, produto_id, nome, quantidade, preco_unitario, 
                 subtotal, created_at
@@ -190,7 +192,7 @@ class CheckoutController extends Controller {
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $pedidoId,
-                $item['id'],
+                $item['produto_id'] ?? $item['id'] ?? null,
                 $item['nome'],
                 $item['quantidade'],
                 $item['preco_unitario'],
