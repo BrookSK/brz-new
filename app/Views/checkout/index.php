@@ -276,16 +276,18 @@
 </div>
 
 <script>
-// Taxa de conversão (1 USD = 5.50 BRL)
-const exchangeRates = {
-    'BRL': 5.50,
-    'USD': 1.00
-};
+// Usar taxas de conversão globais se existirem, senão definir locais
+if (typeof exchangeRates === 'undefined') {
+    window.exchangeRates = {
+        'BRL': 5.50,
+        'USD': 1.00
+    };
+}
 
 // Função para atualizar valores com base na moeda
 function updatePrices(currency) {
     const currencySymbol = currency === 'BRL' ? 'R$' : '$';
-    const rate = exchangeRates[currency];
+    const rate = window.exchangeRates[currency];
     
     console.log('Convertendo para:', currency, 'Taxa:', rate); // Debug
     
@@ -384,11 +386,12 @@ setInterval(function() {
         if (newCurrency !== currentHiddenCurrency) {
             console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
             document.getElementById('moeda_hidden').value = newCurrency;
-            updatePrices(newCurrency);
             
-            // Forçar atualização global também
+            // Usar função global do header se existir
             if (typeof updateAllPrices === 'function') {
                 updateAllPrices();
+            } else {
+                updatePrices(newCurrency);
             }
         }
     }
@@ -402,11 +405,12 @@ setInterval(function() {
     if (storedCurrency && storedCurrency !== currentHiddenCurrency) {
         console.log('Moeda mudou no localStorage de', currentHiddenCurrency, 'para', storedCurrency); // Debug
         document.getElementById('moeda_hidden').value = storedCurrency;
-        updatePrices(storedCurrency);
         
-        // Forçar atualização global também
+        // Usar função global do header se existir
         if (typeof updateAllPrices === 'function') {
             updateAllPrices();
+        } else {
+            updatePrices(storedCurrency);
         }
     }
 }, 200);
