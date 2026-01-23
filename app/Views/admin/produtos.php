@@ -325,6 +325,7 @@ function updateProductPrices(currency) {
     
     console.log('🔍 [PRODUTOS] currencySymbol:', currencySymbol);
     console.log('🔍 [PRODUTOS] rate:', rate);
+    console.log('🔍 [PRODUTOS] window.exchangeRates:', window.exchangeRates);
     
     if (!rate) {
         console.error('❌ [PRODUTOS] Taxa de conversão não encontrada para:', currency);
@@ -334,11 +335,24 @@ function updateProductPrices(currency) {
     // Atualizar todos os preços de produtos - MESMA LÓGICA DO CHECKOUT
     const productPrices = document.querySelectorAll('.product-price');
     console.log('🔍 [PRODUTOS] Preços de produtos encontrados:', productPrices.length);
+    console.log('🔍 [PRODUTOS] Elementos encontrados:', productPrices);
+    
+    // Verificar se há algum span com preço que não tem a classe
+    const allSpans = document.querySelectorAll('span');
+    console.log('🔍 [PRODUTOS] Total de spans na página:', allSpans.length);
+    
+    allSpans.forEach((span, index) => {
+        if (span.textContent.includes('R$') || span.textContent.includes('$')) {
+            console.log(`🔍 [PRODUTOS] Span ${index} com preço encontrado:`, span.textContent, 'classe:', span.className);
+        }
+    });
     
     productPrices.forEach((element, index) => {
         if (element) {
             const originalValue = parseFloat(element.getAttribute('data-original-value'));
             console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
+            console.log(`🔍 [PRODUTOS] Produto ${index} - Elemento:`, element);
+            console.log(`🔍 [PRODUTOS] Produto ${index} - Atributos:`, element.attributes);
             
             if (!isNaN(originalValue)) {
                 // LÓGICA IDÊNTICA AO CHECKOUT: sempre multiplica pela taxa
@@ -372,6 +386,8 @@ setInterval(function() {
 
 // Inicializar com a moeda atual
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔍 [PRODUTOS] DOMContentLoaded iniciado');
+    
     const headerCurrency = document.getElementById('current-currency');
     if (headerCurrency) {
         const currentCurrency = headerCurrency.textContent;
@@ -386,7 +402,17 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔍 [PRODUTOS] Taxas de conversão definidas:', window.exchangeRates);
         }
         
+        // Teste manual da função
+        console.log('🔍 [PRODUTOS] Chamando updateProductPrices manualmente...');
         updateProductPrices(currentCurrency);
+        
+        // Teste após 1 segundo para garantir que o DOM está pronto
+        setTimeout(function() {
+            console.log('🔍 [PRODUTOS] Chamando updateProductPrices após 1 segundo...');
+            updateProductPrices(currentCurrency);
+        }, 1000);
+    } else {
+        console.error('❌ [PRODUTOS] Elemento current-currency não encontrado');
     }
 });
 
