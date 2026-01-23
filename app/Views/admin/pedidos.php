@@ -138,7 +138,7 @@
 
 <!-- Modal Criar Pedido -->
 <div class="modal fade" id="modalCriarPedido" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Criar Novo Pedido</h5>
@@ -155,18 +155,165 @@
                                     <option value="<?= $usuario['id'] ?>"><?= htmlspecialchars($usuario['nome']) ?> (<?= htmlspecialchars($usuario['email']) ?>)</option>
                                 <?php endforeach; ?>
                             </select>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="abrirModalNovoCliente()">
+                                <i class="fas fa-user-plus me-2"></i> Novo Cliente
+                            </button>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Data do Pedido</label>
                             <input type="datetime-local" name="data_pedido" class="form-control" required>
                         </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6>Dados do Cliente</h6>
+                            <div id="dados-cliente" class="alert alert-info">
+                                <p><strong>Nome:</strong> <span id="cliente-nome">Selecione um cliente...</span></p>
+                                <p><strong>Email:</strong> <span id="cliente-email">-</span></p>
+                                <p><strong>CPF/CNPJ:</strong> <span id="cliente-documento">-</span></p>
+                                <p><strong>Telefone:</strong> <span id="cliente-telefone">-</span></p>
+                                <p><strong>Créditos Disponíveis:</strong> <span id="cliente-creditos" class="text-success">R$ 0,00</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6>Adicionar Produtos</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Produto</th>
+                                            <th>Preço</th>
+                                            <th>Estoque</th>
+                                            <th>Qtd</th>
+                                            <th>Subtotal</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="itens-pedido">
+                                        <tr>
+                                            <td colspan="7" class="text-center">Nenhum item adicionado</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="4"></td>
+                                            <td><strong>Total:</strong></td>
+                                            <td id="total-pedido">R$ 0,00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            
+                            <div class="row g-3 mt-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Buscar Produto</label>
+                                    <div class="input-group">
+                                        <input type="text" id="busca-produto" class="form-control" placeholder="Nome ou SKU">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="buscarProdutos()">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Categoria</label>
+                                    <select id="filtro-categoria" class="form-select">
+                                        <option value="">Todas</option>
+                                        <?php foreach ($categorias as $categoria): ?>
+                                            <option value="<?= $categoria['id'] ?>"><?= htmlspecialchars($categoria['nome']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mt-3" id="resultados-busca" style="display: none;">
+                                <div class="col-12">
+                                    <h6>Resultados da Busca:</h6>
+                                    <div id="lista-produtos" class="row g-3">
+                                        <!-- Produtos carregados via JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Forma de Pagamento</label>
+                            <select name="forma_pagamento" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                <option value="cartao_credito">Cartão de Crédito</option>
+                                <option value="boleto">Boleto</option>
+                                <option value="pix">PIX</option>
+                                <option value="transferencia">Transferência Bancária</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Usar Créditos?</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="usar_creditos" id="usar-creditos">
+                                <label class="form-check-label" for="usar-creditos">
+                                    Usar créditos disponíveis como desconto
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Subtotal</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="subtotal-pedido" class="form-control" value="0.00" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Desconto</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="desconto-pedido" class="form-control" value="0.00" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="total-final" class="form-control" value="0.00" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total com Crédito</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="total-com-credito" class="form-control" value="0.00" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label">Observações</label>
                             <textarea name="observacoes" class="form-control" rows="3" placeholder="Observações do pedido"></textarea>
                         </div>
+                    </div>
+                    
+                    <div class="row g-3">
                         <div class="col-12">
                             <button type="button" class="btn btn-primary" onclick="criarPedido()">
                                 <i class="fas fa-shopping-cart me-2"></i> Criar Pedido
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="limparItensPedido()">
+                                <i class="fas fa-trash me-2"></i> Limpar Itens
                             </button>
                         </div>
                     </div>
@@ -174,6 +321,80 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="criarPedido()">
+                    <i class="fas fa-shopping-cart me-2"></i> Criar Pedido
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Cliente -->
+<div class="modal fade" id="modalNovoCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNovoCliente">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" name="nome" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email *</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CPF/CNPJ *</label>
+                            <input type="text" name="documento" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" name="telefone" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Endereço</label>
+                            <input type="text" name="endereco" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" name="cidade" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Estado</label>
+                            <input type="text" name="estado" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CEP</label>
+                            <input type="text" name="cep" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Senha</label>
+                            <input type="password" name="senha" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="status" id="cliente-status" checked>
+                                <label class="form-check-label" for="cliente-status">
+                                    Usuário Ativo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Créditos Iniciais</label>
+                            <input type="number" name="creditos_iniciais" class="form-control" step="0.01" value="0.00">
+                            <div class="form-text">Valor inicial na carteira digital</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarNovoCliente()">Salvar</button>
             </div>
         </div>
     </div>
@@ -235,11 +456,247 @@
 </div>
 
 <script>
+let itensPedido = [];
+let clienteAtual = null;
+let produtosDisponiveis = [];
+
+function abrirModalNovoCliente() {
+    document.getElementById('formNovoCliente').reset();
+    new bootstrap.Modal(document.getElementById('modalNovoCliente')).show();
+}
+
+function salvarNovoCliente() {
+    const form = document.getElementById('formNovoCliente');
+    const formData = new FormData(form);
+    
+    fetch('/admin/salvar-usuario', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Cliente criado com sucesso!');
+            new bootstrap.Modal(document.getElementById('modalNovoCliente')).hide();
+            document.getElementById('modalNovoCliente').remove();
+            
+            // Adicionar o novo cliente ao select do pedido
+            const select = document.querySelector('#formCriarPedido select[name="usuario_id"]');
+            const option = document.createElement('option');
+            option.value = data.usuario.id;
+            option.textContent = `${data.usuario.nome} (${data.usuario.email})`;
+            select.appendChild(option);
+            
+            // Selecionar automaticamente o novo cliente
+            select.value = data.usuario.id;
+            carregarDadosCliente(data.usuario.id);
+        } else {
+            alert('Erro ao criar cliente: ' + data.error);
+        }
+    });
+}
+
+function carregarDadosCliente(usuarioId) {
+    fetch(`/admin/usuario/${usuarioId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                clienteAtual = data.usuario;
+                document.getElementById('cliente-nome').textContent = data.usuario.nome;
+                document.getElementById('cliente-email').textContent = data.usuario.email;
+                document.getElementById('cliente-documento').textContent = data.usuario.documento;
+                document.getElementById('cliente-telefone').textContent = data.usuario.telefone;
+                document.getElementById('cliente-creditos').textContent = `R$ ${number_format(data.usuario.creditos_disponiveis, 2, ',', '.')}`;
+                
+                // Atualizar checkbox de uso de créditos
+                document.getElementById('usar-creditos').checked = data.usuario.creditos_disponiveis > 0;
+                calcularTotais();
+            }
+        });
+}
+
+function buscarProdutos() {
+    const termo = document.getElementById('busca-produto').value;
+    const categoriaId = document.getElementById('filtro-categoria').value;
+    
+    if (!termo && !categoriaId) {
+        alert('Digite um termo ou selecione uma categoria para buscar.');
+        return;
+    }
+    
+    fetch(`/admin/buscar-produtos?termo=${encodeURIComponent(termo)}&categoria_id=${categoriaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                produtosDisponiveis = data.produtos;
+                exibirResultadosBusca();
+            } else {
+                alert('Nenhum produto encontrado.');
+            }
+        });
+}
+
+function exibirResultadosBusca() {
+    const resultadosDiv = document.getElementById('resultados-busca');
+    const listaDiv = document.getElementById('lista-produtos');
+    
+    listaDiv.innerHTML = '';
+    
+    produtosDisponiveis.forEach(produto => {
+        const produtoDiv = document.createElement('div');
+        produtoDiv.className = 'col-md-4 mb-3';
+        produtoDiv.innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <h6>${produto.nome}</h6>
+                    <p><strong>SKU:</strong> ${produto.sku}</p>
+                    <p><strong>Preço:</strong> R$ ${number_format(produto.valor, 2, ',', '.')}</p>
+                    <p><strong>Estoque:</strong> ${produto.estoque}</p>
+                    <button type="button" class="btn btn-sm btn-primary btn-block" onclick="adicionarItemPedido(${produto.id}, '${produto.nome}', ${produto.valor}, ${produto.estoque})">
+                        <i class="fas fa-plus me-2"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+        `;
+        listaDiv.appendChild(produtoDiv);
+    });
+    
+    resultadosDiv.style.display = 'block';
+}
+
+function adicionarItemPedido(produtoId, nome, preco, estoque) {
+    const quantidade = 1;
+    const subtotal = preco * quantidade;
+    
+    // Verificar se o produto já está no carrinho
+    const itemExistente = itensPedido.find(item => item.produto_id === produtoId);
+    if (itemExistente) {
+        alert('Este produto já foi adicionado ao pedido.');
+        return;
+    }
+    
+    // Verificar estoque
+    if (quantidade > estoque) {
+        alert('Estoque insuficiente. Estoque disponível: ' + estoque);
+        return;
+    }
+    
+    // Adicionar ao carrinho
+    itensPedido.push({
+        produto_id: produtoId,
+        nome: nome,
+        preco: preco,
+        quantidade: quantidade,
+        subtotal: subtotal
+    });
+    
+    atualizarTabelaItens();
+    calcularTotais();
+}
+
+function atualizarTabelaItens() {
+    const tbody = document.getElementById('itens-pedido');
+    tbody.innerHTML = '';
+    
+    itensPedido.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.nome}</td>
+            <td>R$ ${number_format(item.preco, 2, ',', '.')}</td>
+            <td>${item.estoque}</td>
+            <td>
+                <input type="number" type="number" min="1" max="${item.estoque}" value="${item.quantidade}" onchange="atualizarQuantidade(${index})" class="form-control form-control-sm" style="width: 80px;">
+            </td>
+            <td>R$ <span id="subtotal-${index}">${number_format(item.subtotal, 2, ',', '.')}</span></td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger btn-sm" onclick="removerItem(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function atualizarQuantidade(index) {
+    const quantidade = parseInt(document.querySelector(`input[name="quantidade-${index}"]`).value);
+    const item = itensPedido[index];
+    const estoque = item.estoque;
+    
+    if (quantidade > estoque) {
+        alert('Quantidade maior que o estoque disponível: ' + estoque);
+        document.querySelector(`input[name="quantidade-${index}"]`).value = estoque;
+        return;
+    }
+    
+    item.quantidade = quantidade;
+    item.subtotal = item.preco * quantidade;
+    
+    document.getElementById(`subtotal-${index}`).textContent = number_format(item.subtotal, 2, ',');
+    calcularTotais();
+}
+
+function removerItem(index) {
+    itensPedido.splice(index, 1);
+    atualizarTabelaItens();
+    calcularTotais();
+}
+
+function limparItensPedido() {
+    itensPedido = [];
+    atualizarTabelaItens();
+    calcularTotais();
+}
+
+function calcularTotais() {
+    const subtotal = itensPedido.reduce((total, item) => total + item.subtotal, 0);
+    const usarCreditos = document.getElementById('usar-creditos').checked;
+    const creditosDisponiveis = clienteAtual ? clienteAtual.creditos_disponiveis : 0;
+    
+    let desconto = 0;
+    if (usarCreditos && creditosDisponiveis > 0) {
+        desconto = Math.min(creditosDisponiveis, subtotal);
+    }
+    
+    const total = subtotal - desconto;
+    
+    document.getElementById('subtotal-pedido').value = number_format(subtotal, 2, ',');
+    document.getElementById('desconto-pedido').value = number_format(desconto, 2, ',');
+    document.getElementById('total-final').value = number_format(total, 2, ',');
+    document.getElementById('total-com-credito').value = number_format(total - desconto, 2, ',');
+    
+    // Atualizar total na tabela
+    document.querySelector('#total-pedido').textContent = number_format(total, 2, ',');
+}
+
 function criarPedido() {
+    if (!clienteAtual) {
+        alert('Selecione um cliente para continuar.');
+        return;
+    }
+    
+    if (itensPedido.length === 0) {
+        alert('Adicione pelo menos um produto ao pedido.');
+        return;
+    }
+    
     const form = document.getElementById('formCriarPedido');
     const formData = new FormData(form);
     
-    fetch('/admin/criar-pedido', {
+    // Adicionar dados do cliente
+    formData.set('cliente_id', clienteAtual.id);
+    formData.set('cliente_nome', clienteAtual.nome);
+    formData.set('cliente_email', clienteAtual.email);
+    
+    // Adicionar itens do pedido
+    formData.set('itens', JSON.stringify(itensPedido));
+    formData.set('subtotal', document.getElementById('subtotal-pedido').value);
+    formData.set('desconto', document.getElementById('desconto-pedido').value);
+    formData.set('total', document.getElementById('total-final').value);
+    formData.set('total_com_credito', document.getElementById('total-com-credito').value);
+    formData.set('usar_creditos', document.getElementById('usar-creditos').checked ? '1' : '0');
+    
+    fetch('/admin/criar-pedido-completo', {
         method: 'POST',
         body: formData
     })
@@ -249,12 +706,32 @@ function criarPedido() {
             alert('Pedido criado com sucesso! ID: ' + data.pedido_id);
             new bootstrap.Modal(document.getElementById('modalCriarPedido')).hide();
             document.getElementById('formCriarPedido').reset();
+            itensPedido = [];
+            clienteAtual = null;
             location.reload();
         } else {
             alert('Erro ao criar pedido: ' + data.error);
         }
     });
 }
+
+// Event listeners
+document.getElementById('formCriarPedido').addEventListener('change', function(e) {
+    if (e.target.name === 'usuario_id') {
+        carregarDadosCliente(e.target.value);
+    }
+});
+
+document.getElementById('usar-creditos').addEventListener('change', function() {
+    calcularTotais();
+});
+
+document.getElementById('filtro-categoria').addEventListener('change', function() {
+    document.getElementById('busca-produto').value = '';
+    document.getElementById('resultados-busca').style.display = 'none';
+});
+
+function criarPedido() {
 
 function verDetalhes(pedidoId) {
     fetch(`/admin/pedido-detalhes/${pedidoId}`)
