@@ -368,19 +368,19 @@ function processarPedidoDireto() {
         if (input.name && input.type !== 'checkbox') {
             formData.append(input.name, input.value);
             console.log(`🔍 [DIRETO] ${input.name}: ${input.value}`);
-        } else if (input.type === 'checkbox' && input.checked) {
-            formData.append(input.name, 'on');
-            console.log(`🔍 [DIRETO] ${input.name}: on`);
+        } else if (input.type === 'checkbox') {
+            // Sempre adicionar checkbox, mesmo que não esteja marcado
+            formData.append(input.name, input.checked ? 'on' : '');
+            console.log(`🔍 [DIRETO] ${input.name}: ${input.checked ? 'on' : ''}`);
         }
     });
     
     // Garantir que o consentimento_legal seja adicionado
-    if (checkbox.checked) {
-        formData.append('consentimento_legal', 'on');
-        console.log('🔍 [DIRETO] consentimento_legal: on (forçado)');
-    }
+    formData.append('consentimento_legal', checkbox.checked ? 'on' : '');
+    console.log(`🔍 [DIRETO] consentimento_legal: ${checkbox.checked ? 'on' : ''} (garantido)`);
     
     console.log('🔍 [DIRETO] Total de campos no FormData:', [...formData.keys()].length);
+    console.log('🔍 [DIRETO] Verificando consentimento_legal no FormData:', formData.get('consentimento_legal'));
     
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
