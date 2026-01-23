@@ -107,13 +107,20 @@ class CheckoutController extends Controller {
             $pedidoId = $this->criarPedido($dados, $carrinho, $usuario);
             
             if ($pedidoId) {
+                // Salvar itens do pedido
+                $this->salvarItensPedido($pedidoId, $carrinho);
+                
+                // Salvar dados do cliente
+                $this->salvarDadosCliente($pedidoId, $dados, $usuario);
+                
                 // Limpar carrinho
                 unset($_SESSION['carrinho']);
                 
                 $this->json([
                     'success' => true,
                     'message' => 'Pedido criado com sucesso',
-                    'pedido_id' => $pedidoId
+                    'pedido_id' => $pedidoId,
+                    'redirect' => '/checkout/conclusao/' . $pedidoId
                 ]);
             } else {
                 $this->json(['error' => 'Erro ao criar pedido'], 500);
@@ -121,6 +128,103 @@ class CheckoutController extends Controller {
         } catch (Exception $e) {
             $this->json(['error' => 'Erro ao processar pedido: ' . $e->getMessage()], 500);
         }
+    }
+    
+    public function conclusao(Request $request) {
+        $pedidoId = $request->getParam('id');
+        
+        if (!$pedidoId) {
+            $this->redirect('/produtos');
+            return;
+        }
+        
+        // Obter dados do pedido
+        $pedido = $this->obterPedidoCompleto($pedidoId);
+        
+        if (!$pedido) {
+            $this->redirect('/produtos');
+            return;
+        }
+        
+        $this->view('checkout/conclusao', [
+            'pedido' => $pedido,
+            'itens' => $this->obterItensPedido($pedidoId)
+        ]);
+    }
+    
+    private function salvarItensPedido($pedidoId, $carrinho) {
+        $db = \Config\Database::getConnection();
+        
+        foreach ($carrinho as $item) {
+            $sql = "INSERT INTO pedido_itens (
+                pedido_id, produto_id, nome, quantidade, preco_unitario, 
+                subtotal, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute([
+                $pedidoId,
+                $item['id'],
+                $item['nome'],
+                $item['quantidade'],
+                $item['preco_unitario'],
+                $item['subtotal']
+            ]);
+        }
+    }
+    
+    private function salvarDadosCliente($pedidoId, $dados, $usuario) {
+        $db = \Config\Database::getConnection();
+        
+        $sql = "UPDATE pedidos SET 
+            cliente_nome = ?, cliente_email = ?, cliente_documento = ?, 
+            cliente_telefone = ?, cep = ?, endereco = ?, numero = ?, 
+            complemento = ?, bairro = ?, cidade = ?, estado = ?, 
+            forma_pagamento = ?, observacoes = ?, updated_at = NOW()
+        WHERE id = ?";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([
+            $dados['nome'],
+            $dados['email'],
+            $dados['documento'],
+            $dados['telefone'],
+            $dados['cep'],
+            $dados['endereco'],
+            $dados['numero'],
+            $dados['complemento'] ?? '',
+            $dados['bairro'],
+            $dados['cidade'],
+            $dados['estado'],
+            $dados['payment_method'],
+            $dados['observacoes'] ?? '',
+            $pedidoId
+        ]);
+    }
+    
+    private function obterPedidoCompleto($pedidoId) {
+        $db = \Config\Database::getConnection();
+        
+        $sql = "SELECT p.*, u.nome as usuario_nome 
+                FROM pedidos p 
+                LEFT JOIN usuarios u ON p.usuario_id = u.id 
+                WHERE p.id = ?";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$pedidoId]);
+        
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    private function obterItensPedido($pedidoId) {
+        $db = \Config\Database::getConnection();
+        
+        $sql = "SELECT * FROM pedido_itens WHERE pedido_id = ?";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$pedidoId]);
+        
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     private function obterCarrinho($usuario) {

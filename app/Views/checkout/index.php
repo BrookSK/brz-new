@@ -279,10 +279,83 @@
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-                <!-- Selos de Segurança -->
+<!-- JavaScript para processar o formulário -->
+<script>
+document.getElementById('checkout-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const botao = document.getElementById('btn-finalizar');
+    const formData = new FormData(this);
+    
+    // Desabilitar botão e mostrar loading
+    botao.disabled = true;
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    
+    // Enviar requisição AJAX
+    fetch('/checkout/processar', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log(' [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
+            
+            // Mostrar mensagem de sucesso
+            Swal.fire({
+                icon: 'success',
+                title: 'Pedido Confirmado!',
+                text: 'Seu pedido #' + data.pedido_id + ' foi processado com sucesso.',
+                showConfirmButton: false,
+                timer: 2000
+            });
+            
+            // Redirecionar para página de conclusão
+            setTimeout(function() {
+                window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
+            }, 2000);
+        } else {
+            console.error(' [PEDIDO] Erro ao processar pedido:', data.error);
+            
+            // Mostrar mensagem de erro
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro no Processamento',
+                text: data.error || 'Ocorreu um erro ao processar seu pedido. Tente novamente.',
+                confirmButtonText: 'OK'
+            });
+            
+            // Restaurar botão
+            botao.disabled = false;
+            botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+        }
+    })
+    .catch(error => {
+        console.error(' [PEDIDO] Erro na requisição:', error);
+        
+        // Mostrar mensagem de erro genérico
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro de Conexão',
+            text: 'Ocorreu um erro ao processar seu pedido. Verifique sua conexão e tente novamente.',
+            confirmButtonText: 'OK'
+        });
+        
+        // Restaurar botão
+        botao.disabled = false;
+        botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+    });
+});
+</script>
+
+<!-- Selos de Segurança -->
                 <div class="text-center mt-3">
                     <div class="d-flex justify-content-center gap-3">
                         <i class="fas fa-lock fa-2x text-success"></i>
