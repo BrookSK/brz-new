@@ -327,8 +327,18 @@ function updateProductPrices(currency) {
     console.log('🔍 [PRODUTOS] rate:', rate);
     console.log('🔍 [PRODUTOS] window.exchangeRates:', window.exchangeRates);
     
+    // DEBUG: Mostrar detalhes da conta
+    console.log('🔍 [DEBUG] CONTA DA CONVERSÃO:');
+    console.log('🔍 [DEBUG] - Moeda alvo:', currency);
+    console.log('🔍 [DEBUG] - Símbolo:', currencySymbol);
+    console.log('🔍 [DEBUG] - Taxa aplicada:', rate);
+    console.log('🔍 [DEBUG] - Taxa original (BRL):', window.exchangeRates ? window.exchangeRates.BRL : 'N/A');
+    console.log('🔍 [DEBUG] - Taxa original (USD):', window.exchangeRates ? window.exchangeRates.USD : 'N/A');
+    console.log('🔍 [DEBUG] - Fórmula: valor_original × rate = valor_convertido');
+    
     if (!rate) {
         console.error('❌ [PRODUTOS] Taxa de conversão não encontrada para:', currency);
+        console.error('❌ [DEBUG] Taxas disponíveis:', window.exchangeRates);
         return;
     }
     
@@ -367,15 +377,25 @@ function updateProductPrices(currency) {
         allSpans.forEach((span, index) => {
             const text = span.textContent.trim();
             if (text.includes('R$') || text.includes('$')) {
+                const originalValue = parseFloat(span.getAttribute('data-original-value'));
                 console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text, 'classe:', span.className, 'data-original-value:', span.getAttribute('data-original-value'));
                 
+                // DEBUG: Mostrar conta antes da conversão
+                console.log(`🔍 [DEBUG] CONTA DO PRODUTO ${index}:`);
+                console.log(`🔍 [DEBUG] - Valor original:`, originalValue);
+                console.log(`🔍 [DEBUG] - Taxa: ${rate}`);
+                console.log(`🔍 [DEBUG] - Conta: ${originalValue} × ${rate} = ${originalValue * rate}`);
+                console.log(`🔍 [DEBUG] - Moeda alvo: ${currency}`);
+                
                 // Tentar converter mesmo sem a classe
-                const originalValue = parseFloat(span.getAttribute('data-original-value'));
                 if (!isNaN(originalValue)) {
                     const convertedPrice = originalValue * rate;
                     const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
                     span.textContent = formattedPrice;
                     console.log(`🔍 [PRODUTOS] Span ${index} convertido:`, formattedPrice);
+                    console.log(`🔍 [DEBUG] RESULTADO FINAL: ${formattedPrice}`);
+                } else {
+                    console.error(`❌ [DEBUG] ERRO: Valor original inválido:`, originalValue);
                 }
             }
         });
@@ -385,20 +405,32 @@ function updateProductPrices(currency) {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
                 console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
                 
+                // DEBUG: Mostrar conta antes da conversão
+                console.log(`🔍 [DEBUG] CONTA DO PRODUTO ${index}:`);
+                console.log(`🔍 [DEBUG] - Valor original:`, originalValue);
+                console.log(`🔍 [DEBUG] - Taxa: ${rate}`);
+                console.log(`🔍 [DEBUG] - Conta: ${originalValue} × ${rate} = ${originalValue * rate}`);
+                console.log(`🔍 [DEBUG] - Moeda alvo: ${currency}`);
+                
                 if (!isNaN(originalValue)) {
                     // LÓGICA IDÊNTICA AO CHECKOUT: sempre multiplica pela taxa
                     const convertedPrice = originalValue * rate;
                     const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
                     element.textContent = formattedPrice;
                     console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
+                    console.log(`🔍 [DEBUG] RESULTADO FINAL: ${formattedPrice}`);
                 } else {
-                    console.error(`❌ [PRODUTOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
+                    console.error(`❌ [DEBUG] ERRO: Valor original inválido:`, element.getAttribute('data-original-value'));
                 }
             }
         });
     }
     
     console.log('🔍 [PRODUTOS] updateProductPrices() concluída');
+    console.log('🔍 [DEBUG] RESUMO DA CONVERSÃO:');
+    console.log(`🔍 [DEBUG] - Moeda: ${currency}`);
+    console.log(`🔍 [DEBUG] - Taxa: ${rate}`);
+    console.log(`🔍 [DEBUG] - Produtos processados: ${productPrices.length > 0 ? productPrices.length : document.querySelectorAll('span').length}`);
 }
 
 // Verificar mudanças na moeda do header
