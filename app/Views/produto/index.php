@@ -159,20 +159,29 @@ $(document).ready(function() {
         
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adicionando...');
         
-        $.post('/produtos/carrinho', {
-            id: produtoId,
-            quantidade: quantidade
-        }, function(response) {
-            if (response.success) {
-                showAlert('success', response.message);
-                updateCartBadge(response.total_itens);
-            } else {
-                showAlert('danger', response.error);
+        $.ajax({
+            url: '/api/carrinho/adicionar',
+            method: 'POST',
+            data: {
+                produto_id: produtoId,
+                quantidade: quantidade
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    updateCartBadge(response.total_itens);
+                } else {
+                    showAlert('danger', response.error);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.log('Erro:', xhr.responseText);
+                showAlert('danger', 'Erro ao adicionar produto ao carrinho');
+            },
+            complete: function() {
+                btn.prop('disabled', false).html('<i class="fas fa-cart-plus"></i> Adicionar');
             }
-        }).fail(function() {
-            showAlert('danger', 'Erro ao adicionar produto ao carrinho');
-        }).always(function() {
-            btn.prop('disabled', false).html('<i class="fas fa-cart-plus"></i> Adicionar');
         });
     });
     
