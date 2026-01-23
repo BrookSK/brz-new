@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Servir assets diretamente do /public
+RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+RewriteRule ^favicon\.ico$ public/favicon.ico [L]
+
+# Se o arquivo ou diretório existir na raiz, entrega direto
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Caso contrário, envia tudo para o front controller em /public
+RewriteRule ^ public/index.php [L]
