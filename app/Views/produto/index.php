@@ -178,161 +178,153 @@ console.log('Eventos em .btn-adicionar (length):', $._data(document.querySelecto
 $(document).ready(function() {
     console.log('=== DOCUMENT READY ===');
     
-    // Teste de clique manual
-    $('.btn-adicionar').on('click', function(e) {
-        console.log('=== CLIQUE MANUAL TESTE ===');
-        console.log('Clique detectado no botão!');
-        console.log('Botão:', $(this));
-        console.log('Produto ID:', $(this).data('produto-id'));
-        console.log('Quantidade:', $(this).closest('.input-group').find('.quantidade-input').val());
-    });
+    // TESTE: Verificar se os botões existem
+    var botoes = document.querySelectorAll('.btn-adicionar');
+    console.log('🔍 Botões encontrados:', botoes.length);
     
-    $('.btn-adicionar').on('click', function(e) {
-        e.preventDefault();
+    // TESTE: Adicionar evento de clique direto
+    botoes.forEach(function(botao, index) {
+        console.log('🔧 Adicionando evento ao botão', index + 1);
         
-        var btn = $(this);
-        var produtoId = btn.data('produto-id');
-        var quantidade = btn.closest('.input-group').find('.quantidade-input').val();
+        // Remover eventos anteriores
+        botao.removeEventListener('click', function() {});
         
-        // LOG DE DEPURAÇÃO
-        console.log('=== DEPURAÇÃO ADICIONAR CARRINHO ===');
-        console.log('Produto ID:', produtoId);
-        console.log('Quantidade:', quantidade);
-        console.log('Botão desabilitado:', btn.prop('disabled'));
-        console.log('Dados do botão:', btn.data());
-        
-        if (btn.prop('disabled')) {
-            console.log('Botão está desabilitado, saindo...');
-            return;
-        }
-        
-        console.log('Iniciando requisição AJAX...');
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adicionando...');
-        
-        $.ajax({
-            url: '/carrinho/adicionar',
-            method: 'POST',
-            data: {
-                id: produtoId,
-                quantidade: quantidade
-            },
-            dataType: 'json',
-            beforeSend: function(xhr) {
-                console.log('Enviando requisição para:', '/carrinho/adicionar');
-                console.log('Dados enviados:', { id: produtoId, quantidade: quantidade });
-            },
-            success: function(response) {
-                console.log('=== RESPOSTA AJAX SUCESSO ===');
-                console.log('Resposta completa:', response);
-                console.log('Success:', response.success);
-                console.log('Message:', response.message);
-                console.log('Total itens:', response.total_itens);
-                console.log('Total valor:', response.total_valor);
-                console.log('Carrinho:', response.carrinho);
-                
-                // LOG ESPECÍFICO PARA VERIFICAR SE FOI ADICIONADO
-                if (response.success) {
-                    console.log('✅ PRODUTO ADICIONADO COM SUCESSO!');
-                    console.log('📦 Produto ID:', produtoId);
-                    console.log('📊 Quantidade:', quantidade);
-                    console.log('🛒 Total itens no carrinho:', response.total_itens);
-                    console.log('💰 Total valor:', response.total_valor);
-                    console.log('📋 Carrinho completo:', JSON.stringify(response.carrinho, null, 2));
-                    
-                    // Verificar se o produto está no carrinho
-                    if (response.carrinho && response.carrinho[produtoId]) {
-                        console.log('✅ PRODUTO ENCONTRADO NO CARRINHO:');
-                        console.log('   - Nome:', response.carrinho[produtoId].nome);
-                        console.log('   - Quantidade:', response.carrinho[produtoId].quantidade);
-                        console.log('   - Subtotal:', response.carrinho[produtoId].subtotal);
-                    } else {
-                        console.log('❌ PRODUTO NÃO ENCONTRADO NO CARRINHO!');
-                    }
-                    
-                    showAlert('success', response.message);
-                    updateCartBadge(response.total_itens);
-                    
-                    // Adicionar ao mini carrinho
-                    console.log('🔍 Verificando se addToMiniCart existe...');
-                    console.log('Tipo de addToMiniCart:', typeof addToMiniCart);
-                    
-                    if (typeof addToMiniCart === 'function') {
-                        console.log('🚀 Chamando addToMiniCart com dados...');
-                        var produtoData = {
-                            id: produtoId,
-                            nome: btn.data('produto-nome'),
-                            preco: btn.data('produto-preco'),
-                            quantidade: quantidade,
-                            imagem: btn.closest('.product-card').find('.product-image').attr('src')
-                        };
-                        console.log('📦 Dados do produto para mini carrinho:', produtoData);
-                        addToMiniCart(produtoData);
-                    } else {
-                        console.log('❌ ERRO: addToMiniCart não é uma função!');
-                        console.log('Funções disponíveis:', typeof addToMiniCart);
-                    }
-                } else {
-                    console.log('❌ ERRO: Resposta com sucesso=false');
-                    console.log('Mensagem de erro:', response.error);
-                    showAlert('danger', response.error);
-                }
-            },
-            error: function(xhr, status, error) {
-                console.log('=== ERRO AJAX ===');
-                console.log('Status:', status);
-                console.log('Error:', error);
-                console.log('XHR Response Text:', xhr.responseText);
-                console.log('XHR Status:', xhr.status);
-                console.log('XHR Status Text:', xhr.statusText);
-                
-                showAlert('danger', 'Erro ao adicionar produto ao carrinho');
-            },
-            complete: function() {
-                console.log('=== AJAX COMPLETO ===');
-                btn.prop('disabled', false).html('<i class="fas fa-cart-plus"></i> Adicionar');
-            }
+        // Adicionar novo evento
+        botao.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🎯 CLIQUE DETECTADO NO BOTÃO', index + 1);
+            console.log('📦 Botão:', this);
+            console.log('🆔 Produto ID:', this.getAttribute('data-produto-id'));
+            console.log('📊 Quantidade:', this.closest('.input-group').querySelector('.quantidade-input').value);
+            
+            // Chamar função de adicionar
+            adicionarAoCarrinho(this);
         });
     });
     
-    function showAlert(type, message) {
-        console.log('=== FUNÇÃO showAlert CHAMADA ===');
-        console.log('Tipo:', type);
-        console.log('Mensagem:', message);
+    // Função para adicionar ao carrinho
+    function adicionarAoCarrinho(botao) {
+        console.log('🚀 FUNÇÃO adicionarAoCarrinho CHAMADA');
         
-        var alertHtml = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
-                       message +
+        var produtoId = botao.getAttribute('data-produto-id');
+        var quantidade = botao.closest('.input-group').querySelector('.quantidade-input').value;
+        
+        console.log('📦 Produto ID:', produtoId);
+        console.log('📊 Quantidade:', quantidade);
+        console.log('🔒 Botão desabilitado:', botao.disabled);
+        
+        if (botao.disabled) {
+            console.log('❌ Botão está desabilitado');
+            return;
+        }
+        
+        // Desabilitar botão
+        botao.disabled = true;
+        botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
+        
+        console.log('🌐 Iniciando requisição AJAX...');
+        
+        // Fazer requisição AJAX
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/carrinho/adicionar', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        
+        xhr.onreadystatechange = function() {
+            console.log('📡 Estado XHR:', xhr.readyState);
+            
+            if (xhr.readyState === 4) {
+                console.log('📡 Status XHR:', xhr.status);
+                console.log('📡 Resposta XHR:', xhr.responseText);
+                
+                // Reabilitar botão
+                botao.disabled = false;
+                botao.innerHTML = '<i class="fas fa-cart-plus"></i> Adicionar';
+                
+                if (xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        console.log('✅ Resposta JSON:', response);
+                        
+                        if (response.success) {
+                            console.log('✅ PRODUTO ADICIONADO!');
+                            console.log('🛒 Total itens:', response.total_itens);
+                            
+                            // Mostrar alerta
+                            mostrarAlerta('success', response.message);
+                            
+                            // Atualizar badge
+                            atualizarBadge(response.total_itens);
+                            
+                            // Abrir carrinho em nova aba
+                            window.open('/carrinho', '_blank');
+                            
+                        } else {
+                            console.log('❌ Erro na resposta:', response.error);
+                            mostrarAlerta('danger', response.error);
+                        }
+                    } catch (e) {
+                        console.log('❌ Erro ao parsear JSON:', e);
+                        mostrarAlerta('danger', 'Erro na resposta do servidor');
+                    }
+                } else {
+                    console.log('❌ Erro HTTP:', xhr.status);
+                    mostrarAlerta('danger', 'Erro ao adicionar produto');
+                }
+            }
+        };
+        
+        var dados = 'id=' + encodeURIComponent(produtoId) + '&quantidade=' + encodeURIComponent(quantidade);
+        console.log('📤 Dados enviados:', dados);
+        
+        xhr.send(dados);
+    }
+    
+    // Função para mostrar alerta
+    function mostrarAlerta(tipo, mensagem) {
+        console.log('📢 Mostrando alerta:', tipo, mensagem);
+        
+        var alertContainer = document.getElementById('alert-container');
+        if (!alertContainer) {
+            console.log('❌ Container de alertas não encontrado');
+            return;
+        }
+        
+        var alertHtml = '<div class="alert alert-' + tipo + ' alert-dismissible fade show" role="alert">' +
+                       mensagem +
                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
                        '</div>';
-        $('#alert-container').html(alertHtml);
         
-        console.log('Alerta adicionada ao DOM');
+        alertContainer.innerHTML = alertHtml;
         
         setTimeout(function() {
-            $('#alert-container .alert').alert('close');
+            var alert = alertContainer.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
         }, 5000);
     }
     
-    function updateCartBadge(totalItens) {
-        console.log('=== FUNÇÃO updateCartBadge CHAMADA ===');
-        console.log('📊 Total itens recebido:', totalItens);
+    // Função para atualizar badge
+    function atualizarBadge(totalItens) {
+        console.log('🏷️ Atualizando badge:', totalItens);
         
-        var badge = $('.navbar-nav .badge');
-        console.log('🏷️ Elemento badge encontrado:', badge.length);
+        var badges = document.querySelectorAll('.cart-badge');
+        console.log('🏷️ Badges encontrados:', badges.length);
         
-        if (totalItens > 0) {
-            badge.text(totalItens).show();
-            console.log('✅ Badge atualizado e mostrado:', totalItens);
-            console.log('🔍 Badge text:', badge.text());
-            console.log('👁️ Badge está visível:', badge.is(':visible'));
-        } else {
-            badge.hide();
-            console.log('🙈 Badge ocultado');
-        }
-        
-        // Verificar se o carrinho está acessível
-        console.log('🔗 Testando acesso ao carrinho...');
-        window.open('/carrinho', '_blank');
+        badges.forEach(function(badge) {
+            if (totalItens > 0) {
+                badge.textContent = totalItens;
+                badge.style.display = 'inline-block';
+                console.log('✅ Badge atualizado:', totalItens);
+            } else {
+                badge.style.display = 'none';
+                console.log('🙈 Badge ocultado');
+            }
+        });
     }
+    
+    console.log('✅ Eventos adicionados com sucesso!');
 });
 </script>
 <?php $content = ob_get_clean(); ?>
