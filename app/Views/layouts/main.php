@@ -21,28 +21,38 @@
             font-size: 1.5rem;
         }
         
-        /* Header fixo */
+        /* Header fixo - FORÇAR FIXO ACIMA DE TUDO */
         .navbar {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             right: 0 !important;
-            z-index: 1030 !important;
+            z-index: 9999 !important; /* Máima prioridade */
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             margin: 0 !important;
             padding: 0 !important;
+            width: 100% !important;
+            background: white !important;
         }
         
-        /* Espaçamento para o conteúdo não ficar sob o header */
+        /* Sobrescrever qualquer classe sticky do Bootstrap */
+        .navbar.sticky-top {
+            position: fixed !important;
+            top: 0 !important;
+            z-index: 9999 !important;
+        }
+        
+        /* Garantir que body tenha espaçamento correto */
         body {
             padding-top: 76px !important; /* Altura do navbar */
             margin: 0 !important;
         }
         
-        /* Ajustar para elementos que devem ficar abaixo do header */
+        /* Garantir que main fique abaixo */
         main {
             margin-top: 0 !important;
             padding-top: 20px !important;
+            position: relative !important;
         }
         
         /* Hero section ajustado */
@@ -212,7 +222,7 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">
                 <i class="fas fa-globe-americas text-primary"></i> BRZ Logistics
