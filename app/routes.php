@@ -56,6 +56,14 @@ $router->get('/admin/configuracoes', 'AdminController', 'configuracoes');
 $router->post('/admin/salvar-configuracoes', 'AdminController', 'salvarConfiguracoes');
 $router->get('/admin/testar-email', 'AdminController', 'testarEmail');
 $router->get('/admin/usuarios', 'AdminController', 'usuarios');
+$router->get('/admin/produtos', 'AdminController', 'produtos');
+$router->get('/admin/produto/{id}', 'AdminController', 'editarProduto');
+$router->post('/admin/salvar-produto', 'AdminController', 'salvarProduto');
+$router->post('/admin/atualizar-produto/{id}', 'AdminController', 'atualizarProduto');
+$router->post('/admin/alterar-status-produto/{id}', 'AdminController', 'alterarStatusProduto');
+$router->post('/admin/excluir-produto/{id}', 'AdminController', 'excluirProduto');
+$router->get('/admin/gerar-imagens/{id}', 'AdminController', 'gerarImagens');
+$router->post('/admin/consolidar-pedidos/exportar', 'AdminController', 'exportarConsolidarPedidos');
 
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
