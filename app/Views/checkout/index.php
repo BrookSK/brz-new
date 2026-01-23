@@ -78,14 +78,7 @@
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-credit-card"></i> Dados de Pagamento</h6>
                             <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Moeda *</label>
-                                    <select class="form-select" name="moeda" id="moeda" required onchange="syncCurrencySelectors()">
-                                        <option value="USD">USD - Dólar Americano</option>
-                                        <option value="BRL">BRL - Real Brasileiro</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-12 mb-3">
                                     <label class="form-label">Método de Pagamento *</label>
                                     <select class="form-select" name="payment_method" required>
                                         <option value="CREDIT_CARD">Cartão de Crédito</option>
@@ -322,44 +315,31 @@ $(document).ready(function() {
         });
     }
     
-    // Atualizar quando a moeda mudar (usando função de sincronização)
-    $('#moeda').on('change', function() {
-        syncCurrencySelectors();
-    });
+    // Inicializar com a moeda do header
+    var currentCurrency = document.getElementById('current-currency') ? 
+                         document.getElementById('current-currency').textContent : 'BRL';
+    updatePrices(currentCurrency);
     
-    // Inicializar com a moeda atual
-    updatePrices($('#moeda').val());
+    // Adicionar campo oculto para enviar a moeda no formulário
+    $('<input>').attr({
+        type: 'hidden',
+        name: 'moeda',
+        id: 'moeda_hidden',
+        value: currentCurrency
+    }).appendTo('#checkout-form');
     
-    // Sincronizar com moeda do header ao carregar
-    syncWithHeaderCurrency();
-    
-    // Função para sincronizar seletores de moeda
-    function syncCurrencySelectors() {
-        var checkoutCurrency = document.getElementById('moeda').value;
+    // Atualizar moeda oculta quando mudar no header
+    function updateHiddenCurrency() {
         var headerCurrency = document.getElementById('current-currency');
-        
-        // Atualizar header
         if (headerCurrency) {
-            headerCurrency.textContent = checkoutCurrency;
-            headerCurrency.setAttribute('data-currency', checkoutCurrency);
-            localStorage.setItem('selected_currency', checkoutCurrency);
+            var currency = headerCurrency.textContent;
+            $('#moeda_hidden').val(currency);
+            updatePrices(currency);
         }
-        
-        // Atualizar preços
-        updatePrices(checkoutCurrency);
     }
     
-    // Sincronizar com moeda do header ao carregar página
-    function syncWithHeaderCurrency() {
-        var headerCurrency = document.getElementById('current-currency');
-        var checkoutSelect = document.getElementById('moeda');
-        
-        if (headerCurrency && checkoutSelect) {
-            var currentCurrency = headerCurrency.textContent || 'BRL';
-            checkoutSelect.value = currentCurrency;
-            updatePrices(currentCurrency);
-        }
-    }
+    // Verificar mudanças na moeda do header
+    setInterval(updateHiddenCurrency, 1000);
     
     // Máscara para CEP
     $('#cep').mask('00000-000');
