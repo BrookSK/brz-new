@@ -222,7 +222,7 @@ class CheckoutController extends Controller {
             $dados['bairro'],
             $dados['cidade'],
             $dados['estado'],
-            $dados['payment_method'],
+            $dados['forma_pagamento'],
             $dados['observacoes'] ?? '',
             $pedidoId
         ]);
