@@ -291,22 +291,40 @@
 document.getElementById('checkout-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
+    console.log('🔍 [FORM] Formulário submetido');
+    
     const botao = document.getElementById('btn-finalizar');
     const formData = new FormData(this);
+    
+    // Debug: Mostrar todos os dados do formulário
+    console.log('🔍 [FORM] Dados do formulário:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`🔍 [FORM] ${key}: ${value}`);
+    }
+    
+    // Debug: Verificar se há carrinho na sessão
+    console.log('🔍 [FORM] Verificando carrinho...');
     
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
     botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
     
     // Enviar requisição AJAX
+    console.log('🔍 [AJAX] Enviando requisição para /checkout/processar');
+    
     fetch('/checkout/processar', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('🔍 [AJAX] Resposta recebida:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('🔍 [AJAX] Dados recebidos:', data);
+        
         if (data.success) {
-            console.log(' [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
+            console.log('✅ [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
             
             // Mostrar mensagem de sucesso
             Swal.fire({
@@ -319,10 +337,11 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
             
             // Redirecionar para página de conclusão
             setTimeout(function() {
+                console.log('🔍 [REDIRECT] Redirecionando para:', data.redirect || '/checkout/conclusao/' + data.pedido_id);
                 window.location.href = data.redirect || '/checkout/conclusao/' + data.pedido_id;
             }, 2000);
         } else {
-            console.error(' [PEDIDO] Erro ao processar pedido:', data.error);
+            console.error('❌ [PEDIDO] Erro ao processar pedido:', data.error);
             
             // Mostrar mensagem de erro
             Swal.fire({
@@ -338,7 +357,8 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
         }
     })
     .catch(error => {
-        console.error(' [PEDIDO] Erro na requisição:', error);
+        console.error('❌ [PEDIDO] Erro na requisição:', error);
+        console.error('❌ [PEDIDO] Stack:', error.stack);
         
         // Mostrar mensagem de erro genérico
         Swal.fire({
@@ -352,6 +372,29 @@ document.getElementById('checkout-form').addEventListener('submit', function(e) 
         botao.disabled = false;
         botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
     });
+});
+
+// Debug: Verificar se o formulário existe
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔍 [DEBUG] DOMContentLoaded - Verificando formulário');
+    
+    const form = document.getElementById('checkout-form');
+    const botao = document.getElementById('btn-finalizar');
+    
+    console.log('🔍 [DEBUG] Formulário encontrado:', !!form);
+    console.log('🔍 [DEBUG] Botão encontrado:', !!botao);
+    
+    if (form) {
+        console.log('🔍 [DEBUG] Formulário OK');
+    } else {
+        console.error('❌ [DEBUG] Formulário não encontrado!');
+    }
+    
+    if (botao) {
+        console.log('🔍 [DEBUG] Botão OK - Estado:', botao.disabled);
+    } else {
+        console.error('❌ [DEBUG] Botão não encontrado!');
+    }
 });
 </script>
 

@@ -42,6 +42,7 @@ $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
 $router->post('/checkout/processar', 'CheckoutController', 'processar');
+$router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
 // Área Administrativa

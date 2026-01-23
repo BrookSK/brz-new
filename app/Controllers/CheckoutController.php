@@ -79,53 +79,74 @@ class CheckoutController extends Controller {
     }
     
     public function processar(Request $request) {
+        error_log('🔍 [CONTROLLER] processar() chamado');
+        
         $dados = $request->getParams();
+        error_log('🔍 [CONTROLLER] Dados recebidos: ' . json_encode($dados));
         
         // Validar consentimento legal
         if (empty($dados['consentimento_legal'])) {
+            error_log('❌ [CONTROLLER] Consentimento legal não aceito');
             $this->json(['error' => 'É necessário aceitar os termos para continuar'], 400);
+            return;
         }
         
         // Validar dados obrigatórios
         $erros = $this->validarDadosCheckout($dados);
         if (!empty($erros)) {
+            error_log('❌ [CONTROLLER] Erros de validação: ' . implode(', ', $erros));
             $this->json(['error' => implode(', ', $erros)], 400);
+            return;
         }
         
         // Obter carrinho da sessão
         $carrinho = $_SESSION['carrinho'] ?? [];
+        error_log('🔍 [CONTROLLER] Carrinho: ' . json_encode($carrinho));
         
         if (empty($carrinho)) {
+            error_log('❌ [CONTROLLER] Carrinho vazio');
             $this->json(['error' => 'Carrinho vazio'], 400);
+            return;
         }
         
         try {
             // Obter usuário logado
             $usuario = $this->authService->getUsuarioLogado();
+            error_log('🔍 [CONTROLLER] Usuário: ' . ($usuario ? $usuario['email'] : 'Não logado'));
             
             // Criar pedido
             $pedidoId = $this->criarPedido($dados, $carrinho, $usuario);
+            error_log('🔍 [CONTROLLER] Pedido criado com ID: ' . $pedidoId);
             
             if ($pedidoId) {
                 // Salvar itens do pedido
                 $this->salvarItensPedido($pedidoId, $carrinho);
+                error_log('🔍 [CONTROLLER] Itens do pedido salvos');
                 
                 // Salvar dados do cliente
                 $this->salvarDadosCliente($pedidoId, $dados, $usuario);
+                error_log('🔍 [CONTROLLER] Dados do cliente salvos');
                 
                 // Limpar carrinho
                 unset($_SESSION['carrinho']);
+                error_log('🔍 [CONTROLLER] Carrinho limpo');
                 
-                $this->json([
+                $response = [
                     'success' => true,
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
                     'redirect' => '/checkout/conclusao/' . $pedidoId
-                ]);
+                ];
+                
+                error_log('✅ [CONTROLLER] Resposta sucesso: ' . json_encode($response));
+                $this->json($response);
             } else {
+                error_log('❌ [CONTROLLER] Erro ao criar pedido');
                 $this->json(['error' => 'Erro ao criar pedido'], 500);
             }
         } catch (Exception $e) {
+            error_log('❌ [CONTROLLER] Exceção: ' . $e->getMessage());
+            error_log('❌ [CONTROLLER] Stack: ' . $e->getTraceAsString());
             $this->json(['error' => 'Erro ao processar pedido: ' . $e->getMessage()], 500);
         }
     }
