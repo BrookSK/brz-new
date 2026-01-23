@@ -303,19 +303,135 @@ function editarUsuario(id) {
                 });
                 
                 // Preencher o modal existente
-                document.getElementById('modalUsuarioTitle').textContent = 'Editar Usuário';
-                document.getElementById('usuario_id').value = data.usuario.id;
-                document.querySelector('input[name="nome"]').value = data.usuario.nome || '';
-                document.querySelector('input[name="email"]').value = data.usuario.email || '';
-                document.querySelector('input[name="documento"]').value = data.usuario.documento || '';
-                document.querySelector('input[name="telefone"]').value = data.usuario.telefone || '';
-                document.querySelector('input[name="endereco"]').value = data.usuario.endereco || '';
-                document.querySelector('input[name="cidade"]').value = data.usuario.cidade || '';
-                document.querySelector('input[name="estado"]').value = data.usuario.estado || '';
-                document.querySelector('input[name="cep"]').value = data.usuario.cep || '';
-                document.querySelector('select[name="perfil"]').value = data.usuario.perfil || 'cliente';
-                document.querySelector('select[name="status"]').value = data.usuario.status || 'ativo';
-                document.querySelector('input[name="creditos_disponiveis"]').value = data.usuario.creditos_disponiveis || 0;
+                console.log('🔍 [DOM] Verificando elementos do modal...');
+                
+                const modalTitle = document.getElementById('modalUsuarioTitle');
+                console.log('🔍 [DOM] modalUsuarioTitle:', !!modalTitle);
+                
+                const usuarioId = document.getElementById('usuario_id');
+                console.log('🔍 [DOM] usuario_id:', !!usuarioId);
+                
+                const nomeInput = document.querySelector('input[name="nome"]');
+                console.log('🔍 [DOM] input[name="nome"]:', !!nomeInput);
+                
+                const emailInput = document.querySelector('input[name="email"]');
+                console.log('🔍 [DOM] input[name="email"]:', !!emailInput);
+                
+                const documentoInput = document.querySelector('input[name="documento"]');
+                console.log('🔍 [DOM] input[name="documento"]:', !!documentoInput);
+                
+                const telefoneInput = document.querySelector('input[name="telefone"]');
+                console.log('🔍 [DOM] input[name="telefone"]:', !!telefoneInput);
+                
+                const enderecoInput = document.querySelector('input[name="endereco"]');
+                console.log('🔍 [DOM] input[name="endereco"]:', !!enderecoInput);
+                
+                const cidadeInput = document.querySelector('input[name="cidade"]');
+                console.log('🔍 [DOM] input[name="cidade"]:', !!cidadeInput);
+                
+                const estadoInput = document.querySelector('input[name="estado"]');
+                console.log('🔍 [DOM] input[name="estado"]:', !!estadoInput);
+                
+                const cepInput = document.querySelector('input[name="cep"]');
+                console.log('🔍 [DOM] input[name="cep"]:', !!cepInput);
+                
+                const perfilSelect = document.querySelector('select[name="perfil"]');
+                console.log('🔍 [DOM] select[name="perfil"]:', !!perfilSelect);
+                
+                const statusSelect = document.querySelector('select[name="status"]');
+                console.log('🔍 [DOM] select[name="status"]:', !!statusSelect);
+                
+                const creditosInput = document.querySelector('input[name="creditos_disponiveis"]');
+                console.log('🔍 [DOM] input[name="creditos_disponiveis"]:', !!creditosInput);
+                
+                console.log('🔍 [MODAL] Preenchendo campos...');
+                
+                if (modalTitle) {
+                    console.log('🔍 [MODAL] Preenchendo título...');
+                    modalTitle.textContent = 'Editar Usuário';
+                }
+                
+                if (usuarioId) {
+                    console.log('🔍 [MODAL] Preenchendo ID...');
+                    usuarioId.value = data.usuario.id;
+                }
+                
+                if (nomeInput) {
+                    console.log('🔍 [MODAL] Preenchendo nome...');
+                    nomeInput.value = data.usuario.nome || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="nome"] não encontrado');
+                }
+                
+                if (emailInput) {
+                    console.log('🔍 [MODAL] Preenchendo email...');
+                    emailInput.value = data.usuario.email || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="email"] não encontrado');
+                }
+                
+                if (documentoInput) {
+                    console.log('🔍 [MODAL] Preenchendo documento...');
+                    documentoInput.value = data.usuario.documento || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="documento"] não encontrado');
+                }
+                
+                if (telefoneInput) {
+                    console.log('🔍 [MODAL] Preenchendo telefone...');
+                    telefoneInput.value = data.usuario.telefone || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="telefone"] não encontrado');
+                }
+                
+                if (enderecoInput) {
+                    console.log('🔍 [MODAL] Preenchendo endereço...');
+                    enderecoInput.value = data.usuario.endereco || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="endereco"] não encontrado');
+                }
+                
+                if (cidadeInput) {
+                    console.log('🔍 [MODAL] Preenchendo cidade...');
+                    cidadeInput.value = data.usuario.cidade || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="cidade"] não encontrado');
+                }
+                
+                if (estadoInput) {
+                    console.log('🔍 [MODAL] Preenchendo estado...');
+                    estadoInput.value = data.usuario.estado || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="estado"] não encontrado');
+                }
+                
+                if (cepInput) {
+                    console.log('🔍 [MODAL] Preenchendo CEP...');
+                    cepInput.value = data.usuario.cep || '';
+                } else {
+                    console.error('❌ [ERRO] input[name="cep"] não encontrado');
+                }
+                
+                if (perfilSelect) {
+                    console.log('🔍 [MODAL] Preenchendo perfil...');
+                    perfilSelect.value = data.usuario.perfil || 'cliente';
+                } else {
+                    console.error('❌ [ERRO] select[name="perfil"] não encontrado');
+                }
+                
+                if (statusSelect) {
+                    console.log('🔍 [MODAL] Preenchendo status...');
+                    statusSelect.value = data.usuario.status || 'ativo';
+                } else {
+                    console.error('❌ [ERRO] select[name="status"] não encontrado');
+                }
+                
+                if (creditosInput) {
+                    console.log('🔍 [MODAL] Preenchendo créditos...');
+                    creditosInput.value = data.usuario.creditos_disponiveis || 0;
+                } else {
+                    console.error('❌ [ERRO] input[name="creditos_disponiveis"] não encontrado');
+                }
                 
                 console.log('🔍 [BOOTSTRAP] Abrindo modal...');
                 new bootstrap.Modal(document.getElementById('modalUsuario')).show();
