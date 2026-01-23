@@ -227,17 +227,37 @@ $(document).ready(function() {
                 console.log('Success:', response.success);
                 console.log('Message:', response.message);
                 console.log('Total itens:', response.total_itens);
+                console.log('Total valor:', response.total_valor);
+                console.log('Carrinho:', response.carrinho);
                 
+                // LOG ESPECÍFICO PARA VERIFICAR SE FOI ADICIONADO
                 if (response.success) {
+                    console.log('✅ PRODUTO ADICIONADO COM SUCESSO!');
+                    console.log('📦 Produto ID:', produtoId);
+                    console.log('📊 Quantidade:', quantidade);
+                    console.log('🛒 Total itens no carrinho:', response.total_itens);
+                    console.log('💰 Total valor:', response.total_valor);
+                    console.log('📋 Carrinho completo:', JSON.stringify(response.carrinho, null, 2));
+                    
+                    // Verificar se o produto está no carrinho
+                    if (response.carrinho && response.carrinho[produtoId]) {
+                        console.log('✅ PRODUTO ENCONTRADO NO CARRINHO:');
+                        console.log('   - Nome:', response.carrinho[produtoId].nome);
+                        console.log('   - Quantidade:', response.carrinho[produtoId].quantidade);
+                        console.log('   - Subtotal:', response.carrinho[produtoId].subtotal);
+                    } else {
+                        console.log('❌ PRODUTO NÃO ENCONTRADO NO CARRINHO!');
+                    }
+                    
                     showAlert('success', response.message);
                     updateCartBadge(response.total_itens);
                     
                     // Adicionar ao mini carrinho
-                    console.log('Verificando se addToMiniCart existe...');
+                    console.log('🔍 Verificando se addToMiniCart existe...');
                     console.log('Tipo de addToMiniCart:', typeof addToMiniCart);
                     
                     if (typeof addToMiniCart === 'function') {
-                        console.log('Chamando addToMiniCart com dados...');
+                        console.log('🚀 Chamando addToMiniCart com dados...');
                         var produtoData = {
                             id: produtoId,
                             nome: btn.data('produto-nome'),
@@ -245,14 +265,14 @@ $(document).ready(function() {
                             quantidade: quantidade,
                             imagem: btn.closest('.product-card').find('.product-image').attr('src')
                         };
-                        console.log('Dados do produto para mini carrinho:', produtoData);
+                        console.log('📦 Dados do produto para mini carrinho:', produtoData);
                         addToMiniCart(produtoData);
                     } else {
-                        console.log('ERRO: addToMiniCart não é uma função!');
+                        console.log('❌ ERRO: addToMiniCart não é uma função!');
                         console.log('Funções disponíveis:', typeof addToMiniCart);
                     }
                 } else {
-                    console.log('ERRO: Resposta com sucesso=false');
+                    console.log('❌ ERRO: Resposta com sucesso=false');
                     console.log('Mensagem de erro:', response.error);
                     showAlert('danger', response.error);
                 }
@@ -294,16 +314,24 @@ $(document).ready(function() {
     
     function updateCartBadge(totalItens) {
         console.log('=== FUNÇÃO updateCartBadge CHAMADA ===');
-        console.log('Total itens:', totalItens);
+        console.log('📊 Total itens recebido:', totalItens);
         
         var badge = $('.navbar-nav .badge');
+        console.log('🏷️ Elemento badge encontrado:', badge.length);
+        
         if (totalItens > 0) {
             badge.text(totalItens).show();
-            console.log('Badge atualizado e mostrado');
+            console.log('✅ Badge atualizado e mostrado:', totalItens);
+            console.log('🔍 Badge text:', badge.text());
+            console.log('👁️ Badge está visível:', badge.is(':visible'));
         } else {
             badge.hide();
-            console.log('Badge ocultado');
+            console.log('🙈 Badge ocultado');
         }
+        
+        // Verificar se o carrinho está acessível
+        console.log('🔗 Testando acesso ao carrinho...');
+        window.open('/carrinho', '_blank');
     }
 });
 </script>
