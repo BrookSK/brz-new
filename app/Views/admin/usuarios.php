@@ -199,21 +199,128 @@
 
 <script>
 function editarUsuario(id) {
-    fetch(`/admin/usuario/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('modalUsuarioTitle').textContent = 'Editar Usuário';
-            document.getElementById('usuario_id').value = data.id;
-            document.querySelector('input[name="nome"]').value = data.nome;
-            document.querySelector('input[name="email"]').value = data.email;
-            document.querySelector('input[name="documento"]').value = data.documento;
-            document.querySelector('input[name="telefone"]').value = data.telefone;
-            document.querySelector('select[name="perfil"]').value = data.perfil;
-            document.querySelector('select[name="status"]').value = data.status;
-            document.querySelector('input[name="senha"]').value = '';
-            document.querySelector('input[name="senha_confirmacao"]').value = '';
+    console.log('🔍 [INÍCIO] editarUsuario() - ID recebido:', id);
+    console.log('🔍 [INÍCIO] editarUsuario() - Tipo do ID:', typeof id);
+    console.log('🔍 [INÍCIO] editarUsuario() - ID convertido para número:', Number(id));
+    console.log('🔍 [INÍCIO] editarUsuario() - isNaN(Number(id)):', isNaN(Number(id)));
+    console.log('🔍 [INÍCIO] editarUsuario() - Number(id) > 0:', Number(id) > 0);
+    
+    // Converter ID para número se for string
+    const idNumerico = Number(id);
+    console.log('🔍 [VALIDAÇÃO] ID numérico final:', idNumerico);
+    
+    if (!idNumerico || isNaN(idNumerico) || idNumerico <= 0) {
+        console.error('❌ [ERRO] ID inválido:', id, '->', idNumerico);
+        alert('ID do usuário inválido. ID recebido: ' + id + ' (tipo: ' + typeof id + ')');
+        return;
+    }
+    
+    const url = `/admin/usuario/${idNumerico}`;
+    console.log('🔍 [URL] URL da requisição:', url);
+    console.log('🔍 [URL] URL completa:', window.location.origin + url);
+    
+    console.log('🔄 [FETCH] Iniciando requisição fetch...');
+    console.time('⏱️ [FETCH] Tempo da requisição');
+    
+    fetch(url)
+        .then(response => {
+            console.timeEnd('⏱️ [FETCH] Tempo da requisição');
+            console.log('🔍 [RESPONSE] Status HTTP:', response.status);
+            console.log('🔍 [RESPONSE] Status Text:', response.statusText);
+            console.log('🔍 [RESPONSE] Headers:', [...response.headers.entries()]);
+            console.log('🔍 [RESPONSE] URL:', response.url);
+            console.log('🔍 [RESPONSE] ok:', response.ok);
+            console.log('🔍 [RESPONSE] redirected:', response.redirected);
+            console.log('🔍 [RESPONSE] type:', response.type);
+            console.log('🔍 [RESPONSE] Content-Type:', response.headers.get('content-type'));
             
-            new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+            // Verificar se o content-type é JSON
+            const contentType = response.headers.get('content-type');
+            console.log('🔍 [RESPONSE] Content-Type:', contentType);
+            
+            if (!response.ok) {
+                console.error('❌ [ERRO] Response não ok:', response.status, response.statusText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Verificar se o content-type é JSON
+            if (contentType && contentType.includes('application/json')) {
+                console.log('🔍 [JSON] Content-Type correto, parseando como JSON...');
+                return response.json();
+            } else if (contentType && contentType.includes('text/html')) {
+                console.log('❌ [ERRORO] Content-Type é HTML, não JSON:', contentType);
+                console.log('🔍 [HTML] Primeiros 200 caracteres da resposta:');
+                return response.text().then(html => {
+                    console.log('🔍 [HTML] Conteúdo HTML recebido:', html.substring(0, 200));
+                    throw new Error('Resposta HTML recebida em vez de JSON');
+                });
+            } else {
+                console.log('🔍 [JSON] Content-Type não especificado, tentando JSON...');
+                return response.json();
+            }
+        })
+        .then(data => {
+            console.log('🔍 [JSON] Dados recebidos:', data);
+            console.log('🔍 [JSON] Tipo dos dados:', typeof data);
+            console.log('🔍 [JSON] Chaves do objeto:', Object.keys(data));
+            console.log('🔍 [JSON] data.success:', data.success);
+            console.log('🔍 [JSON] data.error:', data.error);
+            console.log('🔍 [JSON] data.usuario:', data.usuario);
+            
+            if (data.success && data.usuario) {
+                console.log('✅ [SUCESSO] Usuário encontrado, preenchendo modal...');
+                console.log('🔍 [MODAL] Dados do usuário:', {
+                    id: data.usuario.id,
+                    nome: data.usuario.nome,
+                    email: data.usuario.email,
+                    perfil: data.usuario.perfil,
+                    status: data.usuario.status,
+                    creditos_disponiveis: data.usuario.creditos_disponiveis
+                });
+                
+                // Preencher o modal existente
+                document.getElementById('modalUsuarioTitle').textContent = 'Editar Usuário';
+                document.getElementById('usuario_id').value = data.usuario.id;
+                document.querySelector('input[name="nome"]').value = data.usuario.nome || '';
+                document.querySelector('input[name="email"]').value = data.usuario.email || '';
+                document.querySelector('input[name="documento"]').value = data.usuario.documento || '';
+                document.querySelector('input[name="telefone"]').value = data.usuario.telefone || '';
+                document.querySelector('input[name="endereco"]').value = data.usuario.endereco || '';
+                document.querySelector('input[name="cidade"]').value = data.usuario.cidade || '';
+                document.querySelector('input[name="estado"]').value = data.usuario.estado || '';
+                document.querySelector('input[name="cep"]').value = data.usuario.cep || '';
+                document.querySelector('select[name="perfil"]').value = data.usuario.perfil || 'cliente';
+                document.querySelector('select[name="status"]').value = data.usuario.status || 'ativo';
+                document.querySelector('input[name="creditos_disponiveis"]').value = data.usuario.creditos_disponiveis || 0;
+                
+                console.log('🔍 [BOOTSTRAP] Abrindo modal...');
+                new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+                console.log('✅ [SUCESSO] Modal aberto com sucesso!');
+            } else {
+                console.error('❌ [ERRO] Resposta sem sucesso:', data);
+                console.error('❌ [ERRO] Mensagem de erro:', data.error);
+                alert('Erro ao carregar usuário: ' + (data.error || 'Erro desconhecido - verifique o console'));
+            }
+        })
+        .catch(error => {
+            console.timeEnd('⏱️ [FETCH] Tempo da requisição');
+            console.error('❌ [ERRO CATCH] Erro na requisição:', error);
+            console.error('❌ [ERRO CATCH] Nome do erro:', error.name);
+            console.error('❌ [ERRO CATCH] Mensagem:', error.message);
+            console.error('❌ [ERRO CATCH] Stack completo:', error.stack);
+            console.error('❌ [ERRO CATCH] URL:', url);
+            console.error('❌ [ERRO CATCH] ID:', idNumerico);
+            
+            // Verificar se é erro de rede
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                console.error('❌ [ERRO REDE] Possível erro de rede ou CORS');
+                alert('Erro de rede. Verifique a conexão com o servidor.');
+            } else if (error.name === 'SyntaxError') {
+                console.error('❌ [ERRO SINTAX] Erro de sintaxe na resposta JSON');
+                alert('Erro de sintaxe na resposta do servidor.');
+            } else {
+                alert('Erro ao carregar usuário. Verifique o console para mais detalhes.');
+            }
         });
 }
 
