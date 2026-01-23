@@ -275,13 +275,12 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="submit" class="btn btn-secondary btn-lg w-100" id="btn-finalizar" disabled 
-                                    onclick="console.log('🔍 [INLINE] Botão clicado via onclick!'); alert('Botão clicado via inline!');">
+                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-finalizar">
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>
                             
                             <!-- Botão de Teste Inline -->
-                            <button type="button" class="btn btn-primary btn-sm w-100 mt-2" 
+                            <button type="button" class="btn btn-warning btn-sm w-100 mt-2" 
                                     onclick="console.log('🔍 [TESTE] Botão de teste clicado!'); alert('Botão de teste funciona!');">
                                 <i class="fas fa-bug"></i> Teste Inline
                             </button>
@@ -352,20 +351,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (botao) {
         console.log('🔍 [DEBUG] Botão estado inicial:', botao.disabled);
         
-        // Adicionar evento de clique direto no botão
-        botao.addEventListener('click', function(e) {
-            console.log('🔍 [CLICK] Botão clicado!');
-            
-            if (!this.disabled) {
-                console.log('🔍 [CLICK] Botão não está desabilitado');
-                alert('Botão principal clicado com sucesso!');
-            } else {
-                console.log('🔍 [CLICK] Botão está desabilitado');
-                alert('Botão está desabilitado. Aceite os termos primeiro.');
-            }
-        });
-        
-        console.log('🔍 [DEBUG] Event listener de clique adicionado');
+        // NÃO adicionar onclick inline para evitar conflito
+        console.log('🔍 [DEBUG] Botão pronto para submit');
     }
     
     if (form) {
@@ -374,8 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Adicionar event listener de submit
         form.addEventListener('submit', function(e) {
             console.log('🔍 [FORM] Event submit acionado!');
-            alert('Formulário submetido!');
-            e.preventDefault();
+            e.preventDefault(); // IMPORTANTE: impedir submit padrão
             
             const formData = new FormData(this);
             console.log('🔍 [FORM] Dados do formulário:');
