@@ -48,13 +48,13 @@ $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 $router->get('/admin/dashboard', 'AdminController', 'dashboard');
 $router->get('/admin/pedidos', 'AdminController', 'pedidos');
 $router->get('/admin/pedido/detalhes/{id}', 'AdminController', 'pedidoDetalhes');
-$router->post('/admin/pedido/atualizar-status', 'AdminController', 'atualizarStatus');
-$router->get('/admin/consolidar-pedidos', 'AdminController', 'consolidarPedidos');
+$router->post('/admin/atualizar-status', 'AdminController', 'atualizarStatus');
 $router->post('/admin/consolidar-pedidos', 'AdminController', 'consolidarPedidos');
-$router->post('/admin/pedido/gerar-etiqueta', 'AdminController', 'gerarEtiqueta');
-$router->post('/admin/pedido/efetivar-etiqueta', 'AdminController', 'efetivarEtiqueta');
+$router->get('/admin/gerar-etiqueta/{id}', 'AdminController', 'gerarEtiqueta');
+$router->post('/admin/efetivar-etiqueta/{id}', 'AdminController', 'efetivarEtiqueta');
 $router->get('/admin/configuracoes', 'AdminController', 'configuracoes');
-$router->post('/admin/configuracoes', 'AdminController', 'configuracoes');
+$router->post('/admin/salvar-configuracoes', 'AdminController', 'salvarConfiguracoes');
+$router->get('/admin/testar-email', 'AdminController', 'testarEmail');
 $router->get('/admin/usuarios', 'AdminController', 'usuarios');
 
 // Webhooks
