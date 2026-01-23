@@ -306,18 +306,18 @@ $(document).ready(function() {
         console.log('Valores calculados:', {subtotal, frete, taxaServico, impostos, total}); // Debug
         
         // Atualizar valores no resumo
-        $('#subtotal').text(currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ','));
-        $('#frete').text(currencySymbol + ' ' + frete.toFixed(2).replace('.', ','));
-        $('#taxa-servico').text(currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ','));
-        $('#impostos').text(currencySymbol + ' ' + impostos.toFixed(2).replace('.', ','));
-        $('#total').text(currencySymbol + ' ' + total.toFixed(2).replace('.', ','));
+        jQuery('#subtotal').text(currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ','));
+        jQuery('#frete').text(currencySymbol + ' ' + frete.toFixed(2).replace('.', ','));
+        jQuery('#taxa-servico').text(currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ','));
+        jQuery('#impostos').text(currencySymbol + ' ' + impostos.toFixed(2).replace('.', ','));
+        jQuery('#total').text(currencySymbol + ' ' + total.toFixed(2).replace('.', ','));
         
         // Atualizar itens
-        $('#items-resumo small:last-child').each(function() {
-            const originalValue = parseFloat($(this).text().replace(/[^\d.]/g, ''));
+        jQuery('#items-resumo small:last-child').each(function() {
+            const originalValue = parseFloat(jQuery(this).text().replace(/[^\d.]/g, ''));
             if (!isNaN(originalValue)) {
                 const convertedValue = originalValue * rate;
-                $(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
+                jQuery(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
             }
         });
         
@@ -329,13 +329,18 @@ $(document).ready(function() {
         var headerCurrency = document.getElementById('current-currency');
         var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
         
+        console.log('Header currency encontrado:', headerCurrency ? 'sim' : 'não'); // Debug
+        console.log('Moeda inicial:', currentCurrency); // Debug
+        
         // Atualizar campo oculto
-        document.getElementById('moeda_hidden').value = currentCurrency;
+        var hiddenField = document.getElementById('moeda_hidden');
+        if (hiddenField) {
+            hiddenField.value = currentCurrency;
+            console.log('Campo oculto atualizado para:', currentCurrency); // Debug
+        }
         
         // Atualizar preços
         updatePrices(currentCurrency);
-        
-        console.log('Moeda inicial:', currentCurrency); // Debug
     }
     
     // Inicializar
