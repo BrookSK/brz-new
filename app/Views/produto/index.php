@@ -5,8 +5,8 @@
             <h2><i class="fas fa-box"></i> Produtos Disponíveis</h2>
         </div>
         <div class="col-lg-4 text-end">
-            <a href="/cobranca" class="btn btn-success">
-                <i class="fas fa-shopping-cart"></i> Finalizar Compra
+            <a href="/carrinho" class="btn btn-success">
+                <i class="fas fa-shopping-cart"></i> Ver Carrinho
             </a>
         </div>
     </div>

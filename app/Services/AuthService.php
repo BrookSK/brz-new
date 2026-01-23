@@ -10,7 +10,7 @@ class AuthService {
         $this->usuarioModel = new Usuario();
     }
     
-    public function login($email, $senha) {
+    public function autenticar($email, $senha) {
         $usuario = $this->usuarioModel->authenticate($email, $senha);
         
         if ($usuario) {
