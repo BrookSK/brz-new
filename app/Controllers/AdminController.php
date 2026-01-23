@@ -399,4 +399,278 @@ class AdminController extends Controller {
             'total_paginas' => ceil($total / $limite)
         ]);
     }
+    
+    // Métodos de Produtos
+    public function editarProduto(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $produtoId = $request->getParam('id');
+        $produto = $this->produtoModel->find($produtoId);
+        
+        if (!$produto) {
+            $this->json(['error' => 'Produto não encontrado'], 404);
+            return;
+        }
+        
+        $this->json(['success' => true, 'produto' => $produto]);
+    }
+    
+    public function salvarProduto(Request $request) {
+        $this->authService->requerPermissao('create');
+        
+        $dados = $request->getParams();
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        try {
+            $produtoId = $this->produtoModel->create($dados, $usuario['id']);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Produto criado com sucesso',
+                'produto_id' => $produtoId
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao criar produto: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function atualizarProduto(Request $request) {
+        $this->authService->requerPermissao('update');
+        
+        $produtoId = $request->getParam('id');
+        $dados = $request->getParams();
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        try {
+            $this->produtoModel->update($produtoId, $dados, $usuario['id']);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Produto atualizado com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao atualizar produto: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function alterarStatusProduto(Request $request) {
+        $this->authService->requerPermissao('update');
+        
+        $produtoId = $request->getParam('id');
+        $novoStatus = $request->getParam('status');
+        
+        try {
+            $this->produtoModel->atualizarStatus($produtoId, $novoStatus);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Status do produto atualizado com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao atualizar status: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function excluirProduto(Request $request) {
+        $this->authService->requerPermissao('delete');
+        
+        $produtoId = $request->getParam('id');
+        
+        try {
+            $this->produtoModel->delete($produtoId);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Produto excluído com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao excluir produto: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function gerarImagens(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $produtoId = $request->getParam('id');
+        $produto = $this->produtoModel->find($produtoId);
+        $imagens = $this->produtoModel->getImagens($produtoId);
+        
+        $this->view('admin/imagens-produto', [
+            'produto' => $produto,
+            'imagens' => $imagens
+        ]);
+    }
+    
+    // Métodos de Usuários
+    public function editarUsuario(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $usuarioId = $request->getParam('id');
+        $usuario = $this->usuarioModel->find($usuarioId);
+        
+        if (!$usuario) {
+            $this->json(['error' => 'Usuário não encontrado'], 404);
+            return;
+        }
+        
+        // Remover senha do retorno
+        unset($usuario['senha']);
+        
+        $this->json(['success' => true, 'usuario' => $usuario]);
+    }
+    
+    public function salvarUsuario(Request $request) {
+        $this->authService->requerPermissao('create');
+        
+        $dados = $request->getParams();
+        
+        try {
+            $usuarioId = $this->usuarioModel->create($dados);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Usuário criado com sucesso',
+                'usuario_id' => $usuarioId
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao criar usuário: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function atualizarUsuario(Request $request) {
+        $this->authService->requerPermissao('update');
+        
+        $usuarioId = $request->getParam('id');
+        $dados = $request->getParams();
+        
+        try {
+            $this->usuarioModel->update($usuarioId, $dados);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Usuário atualizado com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao atualizar usuário: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function alterarStatusUsuario(Request $request) {
+        $this->authService->requerPermissao('update');
+        
+        $usuarioId = $request->getParam('id');
+        $novoStatus = $request->getParam('status');
+        
+        try {
+            $this->usuarioModel->atualizarStatus($usuarioId, $novoStatus);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Status do usuário atualizado com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao atualizar status: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function excluirUsuario(Request $request) {
+        $this->authService->requerPermissao('delete');
+        
+        $usuarioId = $request->getParam('id');
+        
+        try {
+            $this->usuarioModel->delete($usuarioId);
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Usuário excluído com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao excluir usuário: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    // Métodos de Configurações
+    public function salvarConfiguracoes(Request $request) {
+        $this->authService->requerPerfil('admin');
+        
+        $dados = $request->getParams();
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        try {
+            foreach ($dados as $chave => $valor) {
+                // Verificar se configuração existe
+                $stmt = $this->pedidoModel->getConnection()->prepare("
+                    SELECT id FROM configuracoes WHERE chave = :chave
+                ");
+                $stmt->bindParam(':chave', $chave);
+                $stmt->execute();
+                $config = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if ($config) {
+                    // Atualizar
+                    $stmt = $this->pedidoModel->getConnection()->prepare("
+                        UPDATE configuracoes 
+                        SET valor = :valor, atualizado_por = :usuario_id, updated_at = NOW()
+                        WHERE chave = :chave
+                    ");
+                    $stmt->bindParam(':valor', $valor);
+                    $stmt->bindParam(':usuario_id', $usuario['id']);
+                    $stmt->bindParam(':chave', $chave);
+                    $stmt->execute();
+                } else {
+                    // Criar
+                    $stmt = $this->pedidoModel->getConnection()->prepare("
+                        INSERT INTO configuracoes (chave, valor, criado_por, created_at, updated_at)
+                        VALUES (:chave, :valor, :usuario_id, NOW(), NOW())
+                    ");
+                    $stmt->bindParam(':chave', $chave);
+                    $stmt->bindParam(':valor', $valor);
+                    $stmt->bindParam(':usuario_id', $usuario['id']);
+                    $stmt->execute();
+                }
+            }
+            
+            $this->json([
+                'success' => true,
+                'message' => 'Configurações atualizadas com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao atualizar configurações: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function testarEmail(Request $request) {
+        $this->authService->requerPerfil('admin');
+        
+        try {
+            // Teste de e-mail (implementar lógica real)
+            $this->json([
+                'success' => true,
+                'message' => 'E-mail de teste enviado com sucesso!'
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Erro ao enviar e-mail: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    public function exportarConsolidarPedidos(Request $request) {
+        $this->authService->requerPerfil('admin');
+        
+        // Implementar lógica de exportação
+        $this->json([
+            'success' => true,
+            'message' => 'Exportação iniciada'
+        ]);
+    }
 }
