@@ -448,11 +448,41 @@
         function updateAllPrices() {
             // Atualizar todos os preços na página
             const priceElements = document.querySelectorAll('[data-original-price]');
+            const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            
             priceElements.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
                 const convertedPrice = originalPrice * exchangeRates[currentCurrency];
-                const symbol = currentCurrency === 'BRL' ? 'R$' : '$';
-                element.textContent = `${symbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                element.textContent = `${convertedPrice.toFixed(2).replace('.', ',')}`;
+                
+                // Atualizar também o símbolo de moeda adjacente se existir
+                const currencyElement = element.previousElementSibling;
+                if (currencyElement && currencyElement.classList.contains('currency')) {
+                    currencyElement.textContent = currentCurrency;
+                }
+            });
+            
+            // Atualizar todos os elementos .currency na página
+            const currencyElements = document.querySelectorAll('.currency');
+            currencyElements.forEach(element => {
+                element.textContent = currentCurrency;
+            });
+            
+            // Atualizar badges de moeda nos produtos
+            const currencyBadges = document.querySelectorAll('.badge');
+            currencyBadges.forEach(badge => {
+                const text = badge.textContent;
+                if (text.includes('USD') || text.includes('BRL')) {
+                    const priceMatch = text.match(/[\d.,]+/);
+                    if (priceMatch) {
+                        const price = parseFloat(priceMatch[0].replace(',', '.'));
+                        if (!isNaN(price)) {
+                            const originalPrice = price / (currentCurrency === 'BRL' ? 1 : exchangeRates.BRL);
+                            const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                            badge.textContent = `${currentCurrency} ${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                        }
+                    }
+                }
             });
         }
         

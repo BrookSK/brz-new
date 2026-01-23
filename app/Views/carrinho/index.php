@@ -2,8 +2,6 @@
 <div class="container py-5">
     <div class="row">
         <div class="col-lg-8">
-            <h2 class="mb-4"><i class="fas fa-shopping-cart"></i> Meu Carrinho</h2>
-            
             <?php if (empty($carrinho)): ?>
                 <div class="text-center py-5">
                     <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
@@ -85,17 +83,6 @@
                     <h5 class="mb-0">Resumo do Pedido</h5>
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label for="cep" class="form-label">CEP para Cálculo de Frete</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="cep" placeholder="00000-000">
-                            <button class="btn btn-outline-secondary" onclick="calcularFrete()">
-                                Calcular
-                            </button>
-                        </div>
-                        <div id="frete-opcoes" class="mt-2"></div>
-                    </div>
-                    
                     <hr>
                     
                     <div class="d-flex justify-content-between mb-2">
@@ -158,16 +145,14 @@
 </div>
 
 <script>
-let freteSelecionado = 0;
-
 function atualizarQuantidade(produtoId, quantidade) {
     if (quantidade < 1) return;
     
     $.ajax({
-        url: '/api/carrinho/atualizar',
+        url: '/carrinho/atualizar',
         method: 'POST',
         data: {
-            produto_id: produtoId,
+            id: produtoId,
             quantidade: quantidade
         },
         success: function(response) {
@@ -186,10 +171,10 @@ function atualizarQuantidade(produtoId, quantidade) {
 function removerItem(produtoId) {
     if (confirm('Deseja remover este item do carrinho?')) {
         $.ajax({
-            url: '/api/carrinho/remover',
+            url: '/carrinho/remover',
             method: 'POST',
             data: {
-                produto_id: produtoId
+                id: produtoId
             },
             success: function(response) {
                 if (response.success) {
@@ -203,77 +188,6 @@ function removerItem(produtoId) {
             }
         });
     }
-}
-
-function limparCarrinho() {
-    if (confirm('Deseja limpar todo o carrinho?')) {
-        $.ajax({
-            url: '/api/carrinho/limpar',
-            method: 'POST',
-            success: function(response) {
-                if (response.success) {
-                    location.reload();
-                }
-            }
-        });
-    }
-}
-
-function calcularFrete() {
-    const cep = $('#cep').val().replace(/\D/g, '');
-    
-    if (cep.length !== 8) {
-        alert('CEP inválido');
-        return;
-    }
-    
-    $.ajax({
-        url: '/api/frete/calcular',
-        method: 'GET',
-        data: {
-            cep: cep,
-            peso: <?= $peso_total ?>,
-            valor: <?= $subtotal ?>
-        },
-        success: function(response) {
-            if (response.success) {
-                let html = '<div class="mt-2">';
-                html += '<h6>Opções de Frete:</h6>';
-                
-                response.frete.forEach(function(opcao) {
-                    html += `
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="frete" 
-                                   id="frete-${opcao.nome}" value="${opcao.valor}" 
-                                   onchange="selecionarFrete(${opcao.valor})">
-                            <label class="form-check-label" for="frete-${opcao.nome}">
-                                <strong>${opcao.nome}</strong> - R$ ${opcao.valor.toFixed(2)} 
-                                (${opcao.prazo} dias úteis)
-                            </label>
-                        </div>
-                    `;
-                });
-                
-                html += '</div>';
-                $('#frete-opcoes').html(html);
-            } else {
-                alert(response.error);
-            }
-        },
-        error: function() {
-            alert('Erro ao calcular frete');
-        }
-    });
-}
-
-function selecionarFrete(valor) {
-    freteSelecionado = valor;
-    $('#frete-display').show();
-    $('#frete-valor').text('R$ ' + valor.toFixed(2));
-    
-    const totalAtual = <?= $total ?>;
-    const novoTotal = totalAtual + valor;
-    $('#total-valor').text('<?= $carrinho[0]["moeda"] ?> ' + novoTotal.toFixed(2).replace('.', ','));
 }
 </script>
 <?php $content = ob_get_clean(); ?>
