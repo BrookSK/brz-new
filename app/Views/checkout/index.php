@@ -168,7 +168,7 @@
                                     <?php foreach ($items as $item): ?>
                                     <div class="d-flex justify-content-between mb-2">
                                         <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
-                                        <small class="item-price">Carregando...</small>
+                                        <small class="item-price">$ <?= number_format($item['subtotal'], 2, '.', ',') ?></small>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -180,19 +180,19 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <span>Subtotal Produtos:</span>
-                                    <span id="subtotal">Carregando...</span>
+                                    <span id="subtotal">$ <?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete">Carregando...</span>
+                                    <span id="frete">$ <?= number_format($peso_total * 15, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
-                                    <span id="taxa-servico">Carregando...</span>
+                                    <span id="taxa-servico">$ <?= number_format($peso_total * 39, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
-                                    <span id="impostos">Carregando...</span>
+                                    <span id="impostos">$ <?= number_format($subtotal * 0.80, 2, '.', ',') ?></span>
                                 </div>
                             </div>
 
@@ -200,7 +200,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total">Carregando...</h6>
+                                <h6 class="text-primary" id="total">$ <?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -276,182 +276,103 @@
 </div>
 
 <script>
-$(document).ready(function() {
-    // Taxa de conversão (1 USD = 5.50 BRL)
-    const exchangeRates = {
-        'BRL': 5.50,
-        'USD': 1.00
-    };
+// Taxa de conversão (1 USD = 5.50 BRL)
+const exchangeRates = {
+    'BRL': 5.50,
+    'USD': 1.00
+};
+
+// Função para atualizar valores com base na moeda
+function updatePrices(currency) {
+    const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+    const rate = exchangeRates[currency];
     
-    // Valores originais em USD
-    const originalValues = {
-        subtotal: <?= $subtotal ?>,
-        pesoTotal: <?= $peso_total ?>
-    };
+    console.log('Convertendo para:', currency, 'Taxa:', rate); // Debug
     
-    // Dados originais dos itens
-    const originalItems = <?php echo json_encode(array_map(function($item) {
-        return [
-            'nome' => $item['nome'],
-            'quantidade' => $item['quantidade'],
-            'subtotal_usd' => $item['subtotal']
-        ];
-    }, $items)); ?>;
+    // Atualizar valores do resumo
+    const subtotalElement = document.getElementById('subtotal');
+    const freteElement = document.getElementById('frete');
+    const taxaServicoElement = document.getElementById('taxa-servico');
+    const impostosElement = document.getElementById('impostos');
+    const totalElement = document.getElementById('total');
     
-    console.log('Dados originais:', originalValues); // Debug
-    console.log('Itens originais:', originalItems); // Debug
-    
-    // Função para atualizar valores com base na moeda
-    function updatePrices(currency) {
-        const currencySymbol = currency === 'BRL' ? 'R$' : '$';
-        const rate = exchangeRates[currency];
-        
-        console.log('Atualizando preços para:', currency, 'Taxa:', rate); // Debug
-        
-        // Calcular valores convertidos
-        const subtotal = originalValues.subtotal * rate;
-        const frete = (originalValues.pesoTotal * 15) * rate;
-        const taxaServico = (originalValues.pesoTotal * 39) * rate;
-        const impostos = (originalValues.subtotal * 0.80) * rate;
-        const total = subtotal + frete + taxaServico + impostos;
-        
-        console.log('Valores calculados:', {subtotal, frete, taxaServico, impostos, total}); // Debug
-        
-        // Atualizar valores no resumo
-        jQuery('#subtotal').text(currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ','));
-        jQuery('#frete').text(currencySymbol + ' ' + frete.toFixed(2).replace('.', ','));
-        jQuery('#taxa-servico').text(currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ','));
-        jQuery('#impostos').text(currencySymbol + ' ' + impostos.toFixed(2).replace('.', ','));
-        jQuery('#total').text(currencySymbol + ' ' + total.toFixed(2).replace('.', ','));
-        
-        // Atualizar itens
-        jQuery('#items-resumo .item-price').each(function(index) {
-            if (originalItems[index]) {
-                const originalValue = originalItems[index].subtotal_usd;
-                const convertedValue = originalValue * rate;
-                jQuery(this).text(currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ','));
-                console.log('Item', index, 'convertido de', originalValue, 'para', convertedValue); // Debug
-            }
-        });
-        
-        console.log('Preços atualizados com sucesso'); // Debug
+    if (subtotalElement) {
+        const subtotalText = subtotalElement.textContent.replace(/[^\d.]/g, '');
+        const subtotal = parseFloat(subtotalText) * rate;
+        subtotalElement.textContent = currencySymbol + ' ' + subtotal.toFixed(2).replace('.', ',');
     }
     
-    // Inicializar com a moeda do header
-    function initCurrency() {
-        var headerCurrency = document.getElementById('current-currency');
-        var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
-        
-        console.log('Header currency encontrado:', headerCurrency ? 'sim' : 'não'); // Debug
-        console.log('Moeda inicial:', currentCurrency); // Debug
-        
-        // Atualizar campo oculto
-        var hiddenField = document.getElementById('moeda_hidden');
-        if (hiddenField) {
-            hiddenField.value = currentCurrency;
-            console.log('Campo oculto atualizado para:', currentCurrency); // Debug
-        }
-        
-        // Atualizar preços
-        updatePrices(currentCurrency);
+    if (freteElement) {
+        const freteText = freteElement.textContent.replace(/[^\d.]/g, '');
+        const frete = parseFloat(freteText) * rate;
+        freteElement.textContent = currencySymbol + ' ' + frete.toFixed(2).replace('.', ',');
     }
     
-    // Inicializar
-    initCurrency();
-    
-    // Verificar mudanças na moeda do header a cada 500ms
-    setInterval(function() {
-        var headerCurrency = document.getElementById('current-currency');
-        if (headerCurrency) {
-            var newCurrency = headerCurrency.textContent;
-            var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
-            
-            if (newCurrency !== currentHiddenCurrency) {
-                console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
-                document.getElementById('moeda_hidden').value = newCurrency;
-                updatePrices(newCurrency);
-            }
-        }
-    }, 500);
-    
-    // Máscara para CEP
-    $('#cep').mask('00000-000');
-    
-    // Máscara para CPF/CNPJ
-    $('input[name="documento"]').on('input', function() {
-        var value = $(this).val().replace(/\D/g, '');
-        if (value.length <= 11) {
-            $(this).mask('000.000.000-00');
-        } else {
-            $(this).mask('00.000.000/0000-00');
-        }
-    });
-    
-    // Máscara para telefone
-    $('input[name="telefone"]').mask('(00) 00000-0000');
-    
-    // Máscara para cartão
-    $('#card-number').mask('0000 0000 0000 0000');
-    
-    // Buscar CEP
-    $('#cep').on('blur', function() {
-        var cep = $(this).val().replace(/\D/g, '');
-        if (cep.length === 8) {
-            $.getJSON('https://viacep.com.br/ws/' + cep + '/json/', function(data) {
-                if (!data.erro) {
-                    $('#endereco').val(data.logradouro);
-                    $('#bairro').val(data.bairro);
-                    $('#cidade').val(data.localidade);
-                    $('#estado').val(data.uf);
-                }
-            });
-        }
-    });
-    
-    // Processar checkout
-    $('#checkout-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        var btn = $('#btn-finalizar');
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Processando...');
-        
-        $.ajax({
-            url: '/checkout/processar',
-            method: 'POST',
-            data: $(this).serialize(),
-            dataType: 'json',
-            success: function(response) {
-                if (response.success) {
-                    showAlert('success', response.message);
-                    setTimeout(function() {
-                        window.location.href = response.redirect;
-                    }, 2000);
-                } else {
-                    showAlert('danger', response.error);
-                }
-            },
-            error: function() {
-                showAlert('danger', 'Erro ao processar pedido. Tente novamente.');
-            },
-            complete: function() {
-                btn.prop('disabled', false).html('<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro');
-            }
-        });
-    });
-    
-    function showAlert(type, message) {
-        var alertHtml = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
-                       message +
-                       '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-                       '</div>';
-        
-        $('main').prepend(alertHtml);
-        
-        setTimeout(function() {
-            $('.alert').alert('close');
-        }, 5000);
+    if (taxaServicoElement) {
+        const taxaServicoText = taxaServicoElement.textContent.replace(/[^\d.]/g, '');
+        const taxaServico = parseFloat(taxaServicoText) * rate;
+        taxaServicoElement.textContent = currencySymbol + ' ' + taxaServico.toFixed(2).replace('.', ',');
     }
-});
+    
+    if (impostosElement) {
+        const impostosText = impostosElement.textContent.replace(/[^\d.]/g, '');
+        const impostos = parseFloat(impostosText) * rate;
+        impostosElement.textContent = currencySymbol + ' ' + impostos.toFixed(2).replace('.', ',');
+    }
+    
+    if (totalElement) {
+        const totalText = totalElement.textContent.replace(/[^\d.]/g, '');
+        const total = parseFloat(totalText) * rate;
+        totalElement.textContent = currencySymbol + ' ' + total.toFixed(2).replace('.', ',');
+    }
+    
+    // Atualizar itens
+    const itemPrices = document.querySelectorAll('.item-price');
+    itemPrices.forEach(function(element) {
+        const itemText = element.textContent.replace(/[^\d.]/g, '');
+        const itemValue = parseFloat(itemText) * rate;
+        element.textContent = currencySymbol + ' ' + itemValue.toFixed(2).replace('.', ',');
+    });
+    
+    console.log('Conversão concluída para:', currency); // Debug
+}
+
+// Inicializar com a moeda do header
+function initCurrency() {
+    var headerCurrency = document.getElementById('current-currency');
+    var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
+    
+    console.log('Header currency encontrado:', headerCurrency ? 'sim' : 'não'); // Debug
+    console.log('Moeda inicial:', currentCurrency); // Debug
+    
+    // Atualizar campo oculto
+    var hiddenField = document.getElementById('moeda_hidden');
+    if (hiddenField) {
+        hiddenField.value = currentCurrency;
+        console.log('Campo oculto atualizado para:', currentCurrency); // Debug
+    }
+    
+    // Atualizar preços
+    updatePrices(currentCurrency);
+}
+
+// Inicializar
+initCurrency();
+
+// Verificar mudanças na moeda do header a cada 500ms
+setInterval(function() {
+    var headerCurrency = document.getElementById('current-currency');
+    if (headerCurrency) {
+        var newCurrency = headerCurrency.textContent;
+        var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
+        
+        if (newCurrency !== currentHiddenCurrency) {
+            console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
+            document.getElementById('moeda_hidden').value = newCurrency;
+            updatePrices(newCurrency);
+        }
+    }
+}, 500);
 
 // Função simples para o botão
 function toggleButton() {
