@@ -387,5 +387,8 @@
             });
         });
     </script>
+    
+    <!-- Incluir Mini Carrinho -->
+    <?php include_once __DIR__ . '/mini-carrinho.php'; ?>
 </body>
 </html>
