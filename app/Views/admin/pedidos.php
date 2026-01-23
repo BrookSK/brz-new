@@ -219,6 +219,138 @@ function salvarStatus() {
 function gerarEtiqueta(pedidoId) {
     window.open(`/admin/gerar-etiqueta/${pedidoId}`, '_blank');
 }
+
+function excluirUsuario(id) {
+    if (confirm('Deseja realmente excluir este usuário? Esta ação não pode ser desfeita!')) {
+        fetch(`/admin/excluir-usuario/${id}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Usuário excluído com sucesso!');
+                carregarUsuarios();
+            } else {
+                alert('Erro ao excluir usuário: ' + data.error);
+            }
+        });
+    }
+}
+
+function atualizarEstatisticasUsuarios() {
+    fetch('/admin/estatisticas-usuarios')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-usuarios').textContent = data.total_usuarios;
+            document.getElementById('usuarios-ativos').textContent = data.usuarios_ativos;
+            document.getElementById('usuarios-mes').textContent = data.usuarios_mes;
+        });
+}
+
+// Funções de Créditos
+function abrirModalCreditos() {
+    carregarUsuarios();
+    new bootstrap.Modal(document.getElementById('modalCreditos')).show();
+}
+
+function carregarUsuariosSelect() {
+    fetch('/admin/usuarios-json')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.querySelector('#formCreditos select[name="usuario_id"]');
+            select.innerHTML = '<option value="">Selecione um usuário...</option>';
+            
+            data.usuarios.forEach(usuario => {
+                const option = document.createElement('option');
+                option.value = usuario.id;
+                option.textContent = `${usuario.nome} (Saldo: R$ ${number_format(usuario.creditos_disponiveis, 2, ',', '.')})`;
+                select.appendChild(option);
+            });
+        });
+}
+
+function salvarCreditos() {
+    const form = document.getElementById('formCreditos');
+    const formData = new FormData(form);
+    
+    fetch('/admin/adicionar-creditos', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Créditos adicionados com sucesso!');
+            new bootstrap.Modal(document.getElementById('modalCreditos')).hide();
+            carregarLogsCreditos();
+            carregarUsuarios();
+        } else {
+            alert('Erro ao adicionar créditos: ' + data.error);
+        }
+    });
+}
+
+function carregarLogsCreditos() {
+    fetch('/admin/logs-creditos')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('creditos-lista');
+            tbody.innerHTML = '';
+            
+            data.logs.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${log.id}</td>
+                    <td>${log.usuario_nome}</td>
+                    <td>R$ ${number_format(log.valor, 2, ',', '.')}</td>
+                    <td>${new Date(log.data_criacao).toLocaleString('pt-BR')}</td>
+                    <td><span class="badge badge-${log.status == 'ativo' ? 'success' : 'danger'}">${log.status}</span></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesCredito(${log.id})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar logs de créditos:', error);
+        });
+}
+
+function verDetalhesCredito(id) {
+    fetch(`/admin/credito-detalhes/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.log) {
+                alert(`Detalhes do Crédito #${id}:\n\n` +
+                    `Usuário: ${data.log.usuario_nome}\n` +
+                    `Valor: R$ ${number_format(data.log.valor, 2, ',', '.')}\n` +
+                    `Data: ${new Date(data.log.data_criacao).toLocaleString('pt-BR')}\n` +
+                    `Status: ${data.log.status}\n` +
+                    `Descrição: ${data.log.descricao}\n` +
+                    `Válido até: ${data.validade_dias} dias`);
+            }
+        });
+}
+
+function imprimirPedido() {
+    const pedidoId = document.getElementById('pedido-id').textContent;
+    window.open(`/admin/imprimir-pedido/${pedidoId}`, '_blank');
+}
+
+// Carregar dados ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    carregarUsuarios();
+    carregarLogsCreditos();
+    atualizarEstatisticasUsuarios();
+});
+
+// Mudar para aba de criação ao clicar em "Novo Pedido"
+document.querySelector('[data-bs-target="#criar"]').addEventListener('click', function() {
+    document.getElementById('formCriarPedido').reset();
+});
 </script>
 
 <?php $content = ob_get_clean(); ?>
