@@ -96,7 +96,7 @@
                                     <td><?= htmlspecialchars($produto['sku']) ?></td>
                                     <td><?= htmlspecialchars($produto['categoria_nome']) ?></td>
                                     <td>
-                                        <span class="badge bg-success product-price" data-original-value="<?= $produto['valor'] ?>">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
+                                        <span class="badge bg-success product-price" data-original-value="<?= $produto['valor'] ?>" data-original-currency="<?= $produto['moeda'] ?? 'USD' ?>">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
                                     </td>
                                     <td>
                                         <span class="badge badge-<?= $produto['estoque'] > 0 ? 'success' : 'danger' ?>">
@@ -338,13 +338,41 @@ function updateProductPrices(currency) {
     productPrices.forEach((element, index) => {
         if (element) {
             const originalValue = parseFloat(element.getAttribute('data-original-value'));
-            console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
+            const originalCurrency = element.getAttribute('data-original-currency') || 'USD';
+            
+            console.log(`🔍 [PRODUTOS] Produto ${index}:`);
+            console.log(`🔍 [PRODUTOS] - Valor original:`, originalValue);
+            console.log(`🔍 [PRODUTOS] - Moeda original:`, originalCurrency);
+            console.log(`🔍 [PRODUTOS] - Moeda alvo:`, currency);
             
             if (!isNaN(originalValue)) {
-                const convertedPrice = originalValue * rate;
+                let convertedPrice;
+                
+                // Se a moeda original é a mesma que a moeda alvo, não converte
+                if (originalCurrency === currency) {
+                    convertedPrice = originalValue;
+                    console.log(`🔍 [PRODUTOS] - Mesma moeda, sem conversão:`, convertedPrice);
+                } else {
+                    // Se a moeda original é USD e o alvo é BRL
+                    if (originalCurrency === 'USD' && currency === 'BRL') {
+                        convertedPrice = originalValue * rate;
+                        console.log(`🔍 [PRODUTOS] - Convertendo USD para BRL:`, originalValue, 'x', rate, '=', convertedPrice);
+                    }
+                    // Se a moeda original é BRL e o alvo é USD
+                    else if (originalCurrency === 'BRL' && currency === 'USD') {
+                        convertedPrice = originalValue / rate;
+                        console.log(`🔍 [PRODUTOS] - Convertendo BRL para USD:`, originalValue, '/', rate, '=', convertedPrice);
+                    }
+                    // Outras conversões
+                    else {
+                        convertedPrice = originalValue * rate;
+                        console.log(`🔍 [PRODUTOS] - Conversão padrão:`, originalValue, 'x', rate, '=', convertedPrice);
+                    }
+                }
+                
                 const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
                 element.textContent = formattedPrice;
-                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
+                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor final:`, formattedPrice);
             } else {
                 console.error(`❌ [PRODUTOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
             }
