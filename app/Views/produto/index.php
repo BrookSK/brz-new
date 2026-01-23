@@ -51,12 +51,12 @@
                     <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
                             <?php if ($produto['foto_principal']): ?>
-                                <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>" 
-                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                <img src="<?= base_url('uploads/produtos/' . $produto['foto_principal']) ?>" 
+                                     alt="<?= htmlspecialchars($produto['nome'])>"
                                      class="card-img-top product-image">
                             <?php else: ?>
-                                <img src="https://via.placeholder.com/300x300/6c757d/ffffff?text=Sem+Foto" 
-                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                <img src="https://via.placeholder.com/300x300/6c757d/ffffff?text=<?= urlencode($produto['nome']) ?>" 
+                                     alt="<?= htmlspecialchars($produto['nome'])>"
                                      class="card-img-top product-image">
                             <?php endif; ?>
                              
