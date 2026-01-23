@@ -27,4 +27,8 @@ class Request {
     public function getParam($key, $default = null) {
         return $this->params[$key] ?? $default;
     }
+    
+    public function setParam($key, $value) {
+        $this->params[$key] = $value;
+    }
 }

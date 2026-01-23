@@ -26,7 +26,8 @@
                         $produtosDestaque = [];
                         try {
                             // Aqui você pode buscar produtos em destaque do banco
-                            $stmt = $this->pedidoModel->getConnection()->prepare("
+                            $db = \Config\Database::getConnection();
+                            $stmt = $db->prepare("
                                 SELECT p.*, 
                                        c.nome AS categoria_nome,
                                        pf.nome_arquivo AS foto_principal

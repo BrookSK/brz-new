@@ -16,15 +16,38 @@ class Router {
         $method = $request->getMethod();
         $path = $request->getPath();
 
-        if (!isset($this->routes[$method][$path])) {
+        $matchedRoute = null;
+        $params = [];
+
+        // Procurar rota exata
+        if (isset($this->routes[$method][$path])) {
+            $matchedRoute = $this->routes[$method][$path];
+        } else {
+            // Procurar rota com parâmetros
+            foreach ($this->routes[$method] as $routePath => $route) {
+                $pattern = preg_replace('/\{[^}]+\}/', '([^/]+)', $routePath);
+                $pattern = '#^' . $pattern . '$#';
+                
+                if (preg_match($pattern, $path, $matches)) {
+                    $matchedRoute = $route;
+                    // Extrair nomes dos parâmetros
+                    preg_match_all('/\{([^}]+)\}/', $routePath, $paramNames);
+                    for ($i = 1; $i < count($matches); $i++) {
+                        $params[$paramNames[1][$i-1]] = $matches[$i];
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!$matchedRoute) {
             http_response_code(404);
             echo "Página não encontrada";
             return;
         }
 
-        $route = $this->routes[$method][$path];
-        $controllerClass = "App\\Controllers\\{$route['controller']}";
-        $controllerMethod = $route['method'];
+        $controllerClass = "App\\Controllers\\{$matchedRoute['controller']}";
+        $controllerMethod = $matchedRoute['method'];
 
         if (!class_exists($controllerClass)) {
             http_response_code(500);
@@ -38,6 +61,11 @@ class Router {
             http_response_code(500);
             echo "Método não encontrado";
             return;
+        }
+
+        // Adicionar parâmetros ao request
+        foreach ($params as $key => $value) {
+            $request->setParam($key, $value);
         }
 
         $controller->$controllerMethod($request);
