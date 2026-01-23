@@ -281,7 +281,7 @@ class CheckoutController extends Controller {
         if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
         
         // Pagamento
-        if (empty($dados['payment_method'])) $erros[] = 'Método de pagamento é obrigatório';
+        if (empty($dados['forma_pagamento'])) $erros[] = 'Método de pagamento é obrigatório';
         
         // Senha (se não estiver logado)
         if (!$this->authService->estaLogado()) {
