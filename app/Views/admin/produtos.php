@@ -332,39 +332,71 @@ function updateProductPrices(currency) {
         return;
     }
     
+    // Verificar se a tabela existe
+    const table = document.querySelector('table');
+    console.log('🔍 [PRODUTOS] Tabela encontrada:', !!table);
+    
+    if (table) {
+        const rows = table.querySelectorAll('tbody tr');
+        console.log('🔍 [PRODUTOS] Linhas na tabela:', rows.length);
+        
+        rows.forEach((row, index) => {
+            const cells = row.querySelectorAll('td');
+            console.log(`🔍 [PRODUTOS] Linha ${index} - Células:`, cells.length);
+            
+            cells.forEach((cell, cellIndex) => {
+                const text = cell.textContent.trim();
+                if (text.includes('R$') || text.includes('$')) {
+                    console.log(`🔍 [PRODUTOS] Linha ${index}, Célula ${cellIndex}:`, text, 'HTML:', cell.innerHTML);
+                }
+            });
+        });
+    }
+    
     // Atualizar todos os preços de produtos - MESMA LÓGICA DO CHECKOUT
     const productPrices = document.querySelectorAll('.product-price');
     console.log('🔍 [PRODUTOS] Preços de produtos encontrados:', productPrices.length);
     console.log('🔍 [PRODUTOS] Elementos encontrados:', productPrices);
     
-    // Verificar se há algum span com preço que não tem a classe
-    const allSpans = document.querySelectorAll('span');
-    console.log('🔍 [PRODUTOS] Total de spans na página:', allSpans.length);
-    
-    allSpans.forEach((span, index) => {
-        if (span.textContent.includes('R$') || span.textContent.includes('$')) {
-            console.log(`🔍 [PRODUTOS] Span ${index} com preço encontrado:`, span.textContent, 'classe:', span.className);
-        }
-    });
-    
-    productPrices.forEach((element, index) => {
-        if (element) {
-            const originalValue = parseFloat(element.getAttribute('data-original-value'));
-            console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
-            console.log(`🔍 [PRODUTOS] Produto ${index} - Elemento:`, element);
-            console.log(`🔍 [PRODUTOS] Produto ${index} - Atributos:`, element.attributes);
-            
-            if (!isNaN(originalValue)) {
-                // LÓGICA IDÊNTICA AO CHECKOUT: sempre multiplica pela taxa
-                const convertedPrice = originalValue * rate;
-                const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
-                element.textContent = formattedPrice;
-                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
-            } else {
-                console.error(`❌ [PRODUTOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
+    // Se não encontrar com a classe, tentar encontrar spans com preço
+    if (productPrices.length === 0) {
+        console.log('🔍 [PRODUTOS] Tentando encontrar spans com preço...');
+        const allSpans = document.querySelectorAll('span');
+        console.log('🔍 [PRODUTOS] Total de spans na página:', allSpans.length);
+        
+        allSpans.forEach((span, index) => {
+            const text = span.textContent.trim();
+            if (text.includes('R$') || text.includes('$')) {
+                console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text, 'classe:', span.className, 'data-original-value:', span.getAttribute('data-original-value'));
+                
+                // Tentar converter mesmo sem a classe
+                const originalValue = parseFloat(span.getAttribute('data-original-value'));
+                if (!isNaN(originalValue)) {
+                    const convertedPrice = originalValue * rate;
+                    const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+                    span.textContent = formattedPrice;
+                    console.log(`🔍 [PRODUTOS] Span ${index} convertido:`, formattedPrice);
+                }
             }
-        }
-    });
+        });
+    } else {
+        productPrices.forEach((element, index) => {
+            if (element) {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                console.log(`🔍 [PRODUTOS] Produto ${index} - Valor original:`, originalValue);
+                
+                if (!isNaN(originalValue)) {
+                    // LÓGICA IDÊNTICA AO CHECKOUT: sempre multiplica pela taxa
+                    const convertedPrice = originalValue * rate;
+                    const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+                    element.textContent = formattedPrice;
+                    console.log(`🔍 [PRODUTOS] Produto ${index} - Valor convertido:`, formattedPrice);
+                } else {
+                    console.error(`❌ [PRODUTOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
+                }
+            }
+        });
+    }
     
     console.log('🔍 [PRODUTOS] updateProductPrices() concluída');
 }
