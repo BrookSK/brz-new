@@ -301,7 +301,7 @@
 
 <!-- JavaScript para processar o formulário - no final da página -->
 <script>
-console.log('🔍 [DEBUG] Script carregado - início');
+console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
 
 // Função para debug do botão
 function debugBotaoFinalizar() {
@@ -466,7 +466,7 @@ function toggleButton() {
 
 // Teste simples
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔍 [DEBUG] DOMContentLoaded iniciado');
+    console.log('🔍 [DEBUG] DOMContentLoaded iniciado - VERSÃO ATUALIZADA');
     
     const form = document.getElementById('checkout-form');
     const botao = document.getElementById('btn-finalizar');
@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('🔍 [DEBUG] Script carregado - fim');
+console.log('🔍 [DEBUG] Script carregado - fim - VERSÃO ATUALIZADA');
 </script>
 
 <!-- Selos de Segurança -->
