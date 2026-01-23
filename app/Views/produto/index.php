@@ -150,7 +150,43 @@
 </style>
 
 <script>
+// TESTE DE DEPURAÇÃO - VERIFICAR SE JAVASCRIPT ESTÁ FUNCIONANDO
+console.log('=== TESTE DE CARREGAMENTO JAVASCRIPT ===');
+console.log('jQuery carregado:', typeof $);
+console.log('Versão jQuery:', $.fn.jquery);
+console.log('Document ready:', $(document).length);
+
+// Teste se os elementos existem
+console.log('=== VERIFICAÇÃO DE ELEMENTOS ===');
+console.log('Botões adicionar:', document.querySelectorAll('.btn-adicionar').length);
+console.log('Container alertas:', document.getElementById('alert-container'));
+console.log('Mini carrinho:', document.getElementById('mini-cart'));
+console.log('Container itens mini carrinho:', document.getElementById('mini-cart-items'));
+
+// Teste se as funções existem
+console.log('=== VERIFICAÇÃO DE FUNÇÕES ===');
+console.log('addToMiniCart:', typeof addToMiniCart);
+console.log('toggleMiniCart:', typeof toggleMiniCart);
+console.log('updateCartBadge:', typeof updateCartBadge);
+console.log('showAlert:', typeof showAlert);
+
+// Teste se os eventos estão anexados
+console.log('=== VERIFICAÇÃO DE EVENTOS ===');
+console.log('Eventos em .btn-adicionar:', $._data(document.querySelectorAll('.btn-adicionar'), 'events'));
+console.log('Eventos em .btn-adicionar (length):', $._data(document.querySelectorAll('.btn-adicionar'), 'events').length);
+
 $(document).ready(function() {
+    console.log('=== DOCUMENT READY ===');
+    
+    // Teste de clique manual
+    $('.btn-adicionar').on('click', function(e) {
+        console.log('=== CLIQUE MANUAL TESTE ===');
+        console.log('Clique detectado no botão!');
+        console.log('Botão:', $(this));
+        console.log('Produto ID:', $(this).data('produto-id'));
+        console.log('Quantidade:', $(this).closest('.input-group').find('.quantidade-input').val());
+    });
+    
     $('.btn-adicionar').on('click', function(e) {
         e.preventDefault();
         
@@ -239,11 +275,17 @@ $(document).ready(function() {
     });
     
     function showAlert(type, message) {
+        console.log('=== FUNÇÃO showAlert CHAMADA ===');
+        console.log('Tipo:', type);
+        console.log('Mensagem:', message);
+        
         var alertHtml = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
                        message +
                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
                        '</div>';
         $('#alert-container').html(alertHtml);
+        
+        console.log('Alerta adicionada ao DOM');
         
         setTimeout(function() {
             $('#alert-container .alert').alert('close');
@@ -251,11 +293,16 @@ $(document).ready(function() {
     }
     
     function updateCartBadge(totalItens) {
+        console.log('=== FUNÇÃO updateCartBadge CHAMADA ===');
+        console.log('Total itens:', totalItens);
+        
         var badge = $('.navbar-nav .badge');
         if (totalItens > 0) {
             badge.text(totalItens).show();
+            console.log('Badge atualizado e mostrado');
         } else {
             badge.hide();
+            console.log('Badge ocultado');
         }
     }
 });
