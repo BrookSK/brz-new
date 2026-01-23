@@ -313,6 +313,136 @@ function atualizarBadge(totalItens) {
     });
 }
 
+// Função para atualizar preços com base na moeda - PÁGINA PÚBLICA DE PRODUTOS
+function updateProductPrices(currency) {
+    console.log('🔍 [PRODUTOS PÚBLICOS] updateProductPrices() chamada com currency:', currency);
+    
+    const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+    const rate = window.exchangeRates ? window.exchangeRates[currency] : 1;
+    
+    console.log('🔍 [PRODUTOS PÚBLICOS] currencySymbol:', currencySymbol);
+    console.log('🔍 [PRODUTOS PÚBLICOS] rate:', rate);
+    console.log('🔍 [PRODUTOS PÚBLICOS] window.exchangeRates:', window.exchangeRates);
+    
+    // DEBUG: Mostrar que o valor original está em USD
+    console.log('🔍 [PRODUTOS PÚBLICOS] VALOR ORIGINAL EM USD');
+    console.log('🔍 [PRODUTOS PÚBLICOS] - Se currency = BRL: USD × 5.5 = BRL');
+    console.log('🔍 [PRODUTOS PÚBLICOS] - Se currency = USD: USD × 1 = USD (sem conversão)');
+    
+    if (!rate) {
+        console.error('❌ [PRODUTOS PÚBLICOS] Taxa de conversão não encontrada para:', currency);
+        console.error('❌ [PRODUTOS PÚBLICOS] Taxas disponíveis:', window.exchangeRates);
+        return;
+    }
+    
+    // Atualizar todos os preços de produtos - usando data-original-price
+    const productPrices = document.querySelectorAll('.product-price');
+    console.log('🔍 [PRODUTOS PÚBLICOS] Preços de produtos encontrados:', productPrices.length);
+    
+    productPrices.forEach((element, index) => {
+        if (element) {
+            const originalValue = parseFloat(element.getAttribute('data-original-price'));
+            console.log(`🔍 [PRODUTOS PÚBLICOS] Produto ${index} - Valor original (USD):`, originalValue);
+            
+            // LÓGICA CORRETA: valor original em USD
+            if (!isNaN(originalValue)) {
+                let convertedPrice;
+                
+                if (currency === 'BRL') {
+                    // Converter USD para BRL: multiplicar pela taxa
+                    convertedPrice = originalValue * rate;
+                    console.log(`🔍 [PRODUTOS PÚBLICOS] Convertendo USD para BRL: ${originalValue} × ${rate} = ${convertedPrice}`);
+                } else {
+                    // Manter em USD: sem conversão
+                    convertedPrice = originalValue;
+                    console.log(`🔍 [PRODUTOS PÚBLICOS] Mantendo USD: ${originalValue} (sem conversão)`);
+                }
+                
+                const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+                element.textContent = formattedPrice;
+                console.log(`🔍 [PRODUTOS PÚBLICOS] Produto ${index} - Valor convertido:`, formattedPrice);
+            } else {
+                console.error(`❌ [PRODUTOS PÚBLICOS] Produto ${index} - Valor original inválido:`, element.getAttribute('data-original-price'));
+            }
+        }
+    });
+    
+    console.log('🔍 [PRODUTOS PÚBLICOS] updateProductPrices() concluída');
+    console.log('🔍 [PRODUTOS PÚBLICOS] LÓGICA: valor_original_USD × rate (para BRL) ou valor_original_USD (para USD)');
+}
+
+// Inicializar com a moeda atual
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔍 [PRODUTOS PÚBLICOS] DOMContentLoaded iniciado');
+    console.log('🔍 [PRODUTOS PÚBLICOS] Verificando estrutura...');
+    
+    // Verificar elementos com preço
+    const productPrices = document.querySelectorAll('.product-price');
+    console.log('🔍 [PRODUTOS PÚBLICOS] Elementos .product-price encontrados:', productPrices.length);
+    
+    // Verificar todos os spans com preço
+    const allSpans = document.querySelectorAll('span');
+    console.log('🔍 [PRODUTOS PÚBLICOS] Total de spans na página:', allSpans.length);
+    
+    let spansComPreco = 0;
+    allSpans.forEach((span, index) => {
+        const text = span.textContent.trim();
+        if (text.includes('R$') || text.includes('$')) {
+            spansComPreco++;
+            console.log(`🔍 [PRODUTOS PÚBLICOS] Span ${index} com preço:`, text);
+            console.log(`🔍 [PRODUTOS PÚBLICOS] Classe:`, span.className);
+            console.log(`🔍 [PRODUTOS PÚBLICOS] data-original-price:`, span.getAttribute('data-original-price'));
+        }
+    });
+    
+    console.log('🔍 [PRODUTOS PÚBLICOS] Total de spans com preço:', spansComPreco);
+    
+    const headerCurrency = document.getElementById('current-currency');
+    if (headerCurrency) {
+        const currentCurrency = headerCurrency.textContent;
+        console.log('🔍 [PRODUTOS PÚBLICOS] Moeda inicial:', currentCurrency);
+        
+        // Definir taxas de conversão se não existirem
+        if (typeof window.exchangeRates === 'undefined') {
+            window.exchangeRates = {
+                'BRL': 5.50,
+                'USD': 1.00
+            };
+            console.log('🔍 [PRODUTOS PÚBLICOS] Taxas de conversão definidas:', window.exchangeRates);
+        }
+        
+        // Teste manual da função
+        console.log('🔍 [PRODUTOS PÚBLICOS] Chamando updateProductPrices manualmente...');
+        updateProductPrices(currentCurrency);
+        
+        // Teste após 1 segundo para garantir que o DOM está pronto
+        setTimeout(function() {
+            console.log('🔍 [PRODUTOS PÚBLICOS] Chamando updateProductPrices após 1 segundo...');
+            updateProductPrices(currentCurrency);
+        }, 1000);
+    } else {
+        console.error('❌ [PRODUTOS PÚBLICOS] Elemento current-currency não encontrado');
+    }
+    
+    // Verificar mudanças na moeda do header
+    setInterval(function() {
+        const headerCurrency = document.getElementById('current-currency');
+        if (headerCurrency) {
+            const newCurrency = headerCurrency.textContent;
+            
+            // Verificar se a moeda mudou
+            if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
+                window.lastCurrency = newCurrency;
+                console.log('🔍 [PRODUTOS PÚBLICOS] Moeda mudou para:', newCurrency);
+                updateProductPrices(newCurrency);
+            }
+        }
+    }, 200);
+});
+
+// Função global para atualizar preços de produtos
+window.updateProductPrices = updateProductPrices;
+
 // Tentar document ready também
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOMContentLoaded disparado');
