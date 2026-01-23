@@ -14,6 +14,10 @@ abstract class Model {
     public function getConnection() {
         return $this->connection;
     }
+    
+    public function getTable() {
+        return $this->table;
+    }
 
     public function all() {
         $stmt = $this->connection->prepare("SELECT * FROM {$this->table}");

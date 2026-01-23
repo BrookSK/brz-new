@@ -35,14 +35,14 @@ class AdminController extends Controller {
         $stats = [];
         
         // Total de pedidos
-        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->pedidoModel->table}");
+        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->pedidoModel->getTable()}");
         $stmt->execute();
         $stats['total_pedidos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
         
         // Pedidos por status
         $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT status, COUNT(*) as quantidade 
-            FROM {$this->pedidoModel->table} 
+            FROM {$this->pedidoModel->getTable()} 
             GROUP BY status
         ");
         $stmt->execute();
@@ -55,7 +55,7 @@ class AdminController extends Controller {
                 SUM(valor_total_brl) as faturamento_brl,
                 SUM(valor_impostos) as impostos_arrecadados,
                 SUM(taxa_servico) as taxa_servico_total
-            FROM {$this->pedidoModel->table} 
+            FROM {$this->pedidoModel->getTable()} 
             WHERE payment_status = 'approved'
         ");
         $stmt->execute();
@@ -65,7 +65,7 @@ class AdminController extends Controller {
         // Pedidos recentes
         $stmt = $this->pedidoModel->getConnection()->prepare("
             SELECT p.*, u.nome as cliente_nome 
-            FROM {$this->pedidoModel->table} p 
+            FROM {$this->pedidoModel->getTable()} p 
             JOIN usuarios u ON p.usuario_id = u.id 
             ORDER BY p.created_at DESC 
             LIMIT 10
@@ -113,7 +113,7 @@ class AdminController extends Controller {
     private function getPedidosComFiltros($filtro, $status, $limite, $offset) {
         $sql = "
             SELECT p.*, u.nome as cliente_nome, u.email as cliente_email
-            FROM {$this->pedidoModel->table} p
+            FROM {$this->pedidoModel->getTable()} p
             JOIN usuarios u ON p.usuario_id = u.id
             WHERE 1=1
         ";
@@ -146,7 +146,7 @@ class AdminController extends Controller {
     private function getTotalPedidosComFiltros($filtro, $status) {
         $sql = "
             SELECT COUNT(*) as total
-            FROM {$this->pedidoModel->table} p
+            FROM {$this->pedidoModel->getTable()} p
             JOIN usuarios u ON p.usuario_id = u.id
             WHERE 1=1
         ";
@@ -378,7 +378,7 @@ class AdminController extends Controller {
         $offset = ($pagina - 1) * $limite;
         
         $stmt = $this->usuarioModel->getConnection()->prepare("
-            SELECT * FROM {$this->usuarioModel->table} 
+            SELECT * FROM {$this->usuarioModel->getTable()} 
             ORDER BY created_at DESC 
             LIMIT :limit OFFSET :offset
         ");
@@ -388,7 +388,7 @@ class AdminController extends Controller {
         $usuarios = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         // Total
-        $stmt = $this->usuarioModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->usuarioModel->table}");
+        $stmt = $this->usuarioModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->usuarioModel->getTable()}");
         $stmt->execute();
         $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
         
