@@ -1,5 +1,8 @@
 <?php ob_start(); ?>
 <div class="container py-4">
+    <!-- Container para alertas -->
+    <div id="alert-container" class="mb-4"></div>
+    
     <div class="row mb-4">
         <div class="col-lg-8">
             <h2><i class="fas fa-box"></i> Produtos Disponíveis</h2>
@@ -160,10 +163,10 @@ $(document).ready(function() {
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adicionando...');
         
         $.ajax({
-            url: '/api/carrinho/adicionar',
+            url: '/carrinho/adicionar',
             method: 'POST',
             data: {
-                produto_id: produtoId,
+                id: produtoId,
                 quantidade: quantidade
             },
             dataType: 'json',
@@ -171,6 +174,17 @@ $(document).ready(function() {
                 if (response.success) {
                     showAlert('success', response.message);
                     updateCartBadge(response.total_itens);
+                    
+                    // Adicionar ao mini carrinho
+                    if (typeof addToMiniCart === 'function') {
+                        addToMiniCart({
+                            id: produtoId,
+                            nome: btn.data('produto-nome'),
+                            preco: btn.data('produto-preco'),
+                            quantidade: quantidade,
+                            imagem: btn.closest('.product-card').find('.product-image').attr('src')
+                        });
+                    }
                 } else {
                     showAlert('danger', response.error);
                 }
