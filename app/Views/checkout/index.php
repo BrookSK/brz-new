@@ -236,19 +236,19 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <span>Subtotal Produtos:</span>
-                                    <span id="subtotal">$ <?= number_format($subtotal, 2, '.', ',') ?></span>
+                                    <span id="subtotal" class="cart-currency" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete">$ <?= number_format($peso_total * 15, 2, '.', ',') ?></span>
+                                    <span id="frete" class="cart-currency" data-original-value="<?= $peso_total * 15 ?>"><?= number_format($peso_total * 15, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
-                                    <span id="taxa-servico">$ <?= number_format($peso_total * 39, 2, '.', ',') ?></span>
+                                    <span id="taxa-servico" class="cart-currency" data-original-value="<?= $peso_total * 39 ?>"><?= number_format($peso_total * 39, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
-                                    <span id="impostos">$ <?= number_format($subtotal * 0.80, 2, '.', ',') ?></span>
+                                    <span id="impostos" class="cart-currency" data-original-value="<?= $subtotal * 0.80 ?>"><?= number_format($subtotal * 0.80, 2, '.', ',') ?></span>
                                 </div>
                             </div>
 
@@ -256,7 +256,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total">$ <?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>"><?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -578,20 +578,6 @@ function updatePrices(currency) {
         }
     }
     
-    // Atualizar itens do carrinho
-    const itemPrices = document.querySelectorAll('.item-price');
-    console.log('🔍 [MOEDA] Itens do carrinho encontrados:', itemPrices.length);
-    
-    itemPrices.forEach((element, index) => {
-        if (element) {
-            const originalPrice = parseFloat(element.textContent.replace(/[^0-9.,]/g, ''));
-            const convertedPrice = originalPrice * rate;
-            const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
-            element.textContent = formattedPrice;
-            console.log(`🔍 [MOEDA] Item ${index} atualizado para:`, formattedPrice);
-        }
-    });
-    
     // Atualizar elementos ocultos se existirem
     const hiddenSubtotal = document.getElementById('subtotal_hidden');
     const hiddenFrete = document.getElementById('frete_hidden');
@@ -611,6 +597,26 @@ function updatePrices(currency) {
         hiddenTotal.value = convertedValues.total.toFixed(2);
         console.log('🔍 [MOEDA] Campo oculto total atualizado para:', convertedValues.total.toFixed(2));
     }
+    
+    // Atualizar elementos com classe cart-currency (itens do carrinho)
+    const cartCurrencyElements = document.querySelectorAll('.cart-currency');
+    console.log('🔍 [MOEDA] Elementos .cart-currency encontrados:', cartCurrencyElements.length);
+    
+    cartCurrencyElements.forEach((element, index) => {
+        if (element) {
+            const originalValue = parseFloat(element.getAttribute('data-original-value'));
+            console.log(`🔍 [MOEDA] Elemento cart-currency ${index} - Valor original:`, originalValue);
+            
+            if (!isNaN(originalValue)) {
+                const convertedPrice = originalValue * rate;
+                const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+                element.textContent = formattedPrice;
+                console.log(`🔍 [MOEDA] Elemento cart-currency ${index} atualizado para:`, formattedPrice);
+            } else {
+                console.error(`❌ [MOEDA] Elemento cart-currency ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
+            }
+        }
+    });
     
     // Atualizar botão finalizar
     const botaoFinalizar = document.getElementById('btn-finalizar');
