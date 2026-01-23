@@ -4,12 +4,12 @@ namespace App\Controllers;
 abstract class Controller {
     protected function view($view, $data = []) {
         extract($data);
-        $viewPath = "../app/Views/{$view}.php";
+        $viewPath = __DIR__ . '/../Views/' . str_replace('.', '/', $view) . '.php';
         
         if (file_exists($viewPath)) {
             require $viewPath;
         } else {
-            echo "View não encontrada: {$view}";
+            echo "View não encontrada: {$view} (caminho: {$viewPath})";
         }
     }
 
