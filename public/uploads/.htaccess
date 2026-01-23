@@ -1,0 +1,24 @@
+# Permitir acesso direto aos arquivos de upload
+Options +Indexes
+
+# Configurar tipos MIME corretos
+AddType image/jpeg .jpg .jpeg
+AddType image/png .png
+AddType image/webp .webp
+
+# Impedir execução de scripts
+<Files "*.php">
+    Deny from all
+</Files>
+
+<Files "*.phtml">
+    Deny from all
+</Files>
+
+# Cache para imagens
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+</IfModule>

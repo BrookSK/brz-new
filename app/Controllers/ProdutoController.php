@@ -3,12 +3,15 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Models\Produto;
+use App\Models\ProdutoFoto;
 
 class ProdutoController extends Controller {
     private $produtoModel;
+    private $produtoFotoModel;
 
     public function __construct() {
         $this->produtoModel = new Produto();
+        $this->produtoFotoModel = new ProdutoFoto();
     }
 
     public function index(Request $request) {
@@ -23,6 +26,12 @@ class ProdutoController extends Controller {
             $produtos = $this->produtoModel->all();
         }
         
+        // Adicionar fotos principais aos produtos
+        foreach ($produtos as &$produto) {
+            $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
+            $produto['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
+        }
+        
         $categorias = $this->produtoModel->getCategorias();
         
         $this->view('produto/index', [
@@ -30,6 +39,44 @@ class ProdutoController extends Controller {
             'categorias' => $categorias,
             'search' => $search,
             'categoriaSelecionada' => $categoria
+        ]);
+    }
+
+    public function detalhes(Request $request) {
+        $produtoId = $request->getParam('id');
+        
+        if (!$produtoId) {
+            $this->redirect('/produtos');
+        }
+        
+        $produto = $this->produtoModel->find($produtoId);
+        
+        if (!$produto) {
+            $this->view('errors/404');
+            return;
+        }
+        
+        // Obter fotos do produto
+        $fotos = $this->produtoFotoModel->getFotosProduto($produtoId);
+        $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produtoId);
+        
+        // Obter produtos relacionados (mesma categoria)
+        $produtosRelacionados = $this->produtoModel->getByCategoria($produto['categoria']);
+        $produtosRelacionados = array_filter($produtosRelacionados, function($p) use ($produtoId) {
+            return $p['id'] != $produtoId;
+        });
+        
+        // Adicionar fotos principais aos relacionados
+        foreach ($produtosRelacionados as &$relacionado) {
+            $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($relacionado['id']);
+            $relacionado['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
+        }
+        
+        $this->view('produto/detalhes', [
+            'produto' => $produto,
+            'fotos' => $fotos,
+            'fotoPrincipal' => $fotoPrincipal,
+            'produtosRelacionados' => array_slice($produtosRelacionados, 0, 4)
         ]);
     }
 
