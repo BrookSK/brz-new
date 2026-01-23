@@ -40,6 +40,6 @@ use App\Core\Request;
 $request = new Request();
 $router = new Router();
 
-require_once '../app/routes.php';
+require_once __DIR__ . '/../app/routes.php';
 
 $router->dispatch($request);
