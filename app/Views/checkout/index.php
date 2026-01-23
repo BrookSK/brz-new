@@ -77,60 +77,6 @@
                             </div>
                         </div>
 
-                        <!-- Dados de Pagamento -->
-                        <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-credit-card"></i> Dados de Pagamento</h6>
-                            <div class="row">
-                                <div class="col-md-12 mb-3">
-                                    <label class="form-label">Método de Pagamento *</label>
-                                    <select class="form-select" name="payment_method" required>
-                                        <option value="CREDIT_CARD">Cartão de Crédito</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Dados do Cartão -->
-                            <div id="cartao-dados" class="mt-3">
-                                <div class="row">
-                                    <div class="col-md-12 mb-3">
-                                        <label class="form-label">Nome no Cartão *</label>
-                                        <input type="text" class="form-control" name="card_holder_name" required>
-                                    </div>
-                                    <div class="col-md-12 mb-3">
-                                        <label class="form-label">Número do Cartão *</label>
-                                        <input type="text" class="form-control" name="card_number" required 
-                                               id="card-number" maxlength="19">
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">Validade *</label>
-                                        <div class="row g-2">
-                                            <div class="col-6">
-                                                <select class="form-select" name="card_expiry_month" required>
-                                                    <option value="">Mês</option>
-                                                    <?php for ($m = 1; $m <= 12; $m++): ?>
-                                                        <option value="<?= str_pad($m, 2, '0', STR_PAD_LEFT) ?>"><?= str_pad($m, 2, '0', STR_PAD_LEFT) ?></option>
-                                                    <?php endfor; ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-6">
-                                                <select class="form-select" name="card_expiry_year" required>
-                                                    <option value="">Ano</option>
-                                                    <?php for ($y = date('Y'); $y <= date('Y') + 10; $y++): ?>
-                                                        <option value="<?= $y ?>"><?= $y ?></option>
-                                                    <?php endfor; ?>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">CVV *</label>
-                                        <input type="text" class="form-control" name="card_cvv" required 
-                                               maxlength="4">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Senha (se não logado) -->
                         <?php if (empty($usuario)): ?>
                         <div class="mb-4">
@@ -193,16 +139,36 @@
                                             </select>
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
-                                            <label class="form-label">Número do Cartão</label>
-                                            <input type="text" name="cartao_numero" class="form-control" placeholder="0000 0000 0000 0000">
+                                            <label class="form-label">Nome no Cartão</label>
+                                            <input type="text" name="card_holder_name" class="form-control" placeholder="Nome como está no cartão" required>
                                             <div class="row g-2 mt-2">
                                                 <div class="col-6">
-                                                    <label class="form-label">Nome no Cartão</label>
-                                                    <input type="text" name="cartao_nome" class="form-control" placeholder="Nome como está no cartão">
+                                                    <label class="form-label">Número do Cartão</label>
+                                                    <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" required>
                                                 </div>
-                                                <div class="col-6">
+                                                <div class="col-3">
                                                     <label class="form-label">Validade</label>
-                                                    <input type="text" name="cartao_validade" class="form-control" placeholder="MM/AA">
+                                                    <select name="card_expiry_month" class="form-select" required>
+                                                        <option value="">Mês</option>
+                                                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                                                            <option value="<?= str_pad($m, 2, '0', STR_PAD_LEFT) ?>"><?= str_pad($m, 2, '0', STR_PAD_LEFT) ?></option>
+                                                        <?php endfor; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-3">
+                                                    <label class="form-label">&nbsp;</label>
+                                                    <select name="card_expiry_year" class="form-select" required>
+                                                        <option value="">Ano</option>
+                                                        <?php for ($y = date('Y'); $y <= date('Y') + 10; $y++): ?>
+                                                            <option value="<?= $y ?>"><?= $y ?></option>
+                                                        <?php endfor; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">CVV</label>
+                                                    <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" required>
                                                 </div>
                                             </div>
                                         </div>
@@ -518,19 +484,26 @@ function atualizarFormaPagamento() {
     switch(formaPagamento) {
         case 'cartao_credito':
             document.getElementById('campos-cartao').style.display = 'block';
+            console.log('🔍 [PAGAMENTO] Campos de cartão exibidos');
             break;
         case 'boleto':
             document.getElementById('campos-boleto').style.display = 'block';
+            console.log('🔍 [PAGAMENTO] Campos de boleto exibidos');
             break;
         case 'pix':
             document.getElementById('campos-pix').style.display = 'block';
+            console.log('🔍 [PAGAMENTO] Campos de PIX exibidos');
             break;
         case 'transferencia':
             document.getElementById('campos-transferencia').style.display = 'block';
+            console.log('🔍 [PAGAMENTO] Campos de transferência exibidos');
             break;
         case 'pagamento_entrega':
             document.getElementById('campos-pagamento-entrega').style.display = 'block';
+            console.log('🔍 [PAGAMENTO] Campos de pagamento na entrega exibidos');
             break;
+        default:
+            console.log('🔍 [PAGAMENTO] Nenhuma forma de pagamento selecionada');
     }
     
     // Atualizar texto do botão conforme a forma de pagamento
