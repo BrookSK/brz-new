@@ -137,6 +137,14 @@
                                                 <option value="transferencia">Transferência Bancária</option>
                                                 <option value="pagamento_entrega">Pagamento na Entrega</option>
                                             </select>
+                                            <script>
+                                            // Adicionar listener para debug
+                                            document.getElementById('forma_pagamento').addEventListener('change', function() {
+                                                console.log('🔍 [DEBUG] Forma de pagamento alterada para:', this.value);
+                                                console.log('🔍 [DEBUG] Chamando atualizarFormaPagamento()');
+                                                atualizarFormaPagamento();
+                                            });
+                                            </script>
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
                                             <label class="form-label">Nome no Cartão</label>
@@ -316,10 +324,19 @@ if (typeof exchangeRates === 'undefined') {
 
 // Função para atualizar valores com base na moeda
 function updatePrices(currency) {
+    console.log('🔍 [MOEDA] updatePrices() chamada com currency:', currency);
+    console.log('🔍 [MOEDA] window.exchangeRates:', window.exchangeRates);
+    
     const currencySymbol = currency === 'BRL' ? 'R$' : '$';
     const rate = window.exchangeRates[currency];
     
-    console.log('Convertendo para:', currency, 'Taxa:', rate); // Debug
+    console.log('🔍 [MOEDA] currencySymbol:', currencySymbol);
+    console.log('🔍 [MOEDA] rate:', rate);
+    
+    if (!rate) {
+        console.error('❌ [MOEDA] Taxa de conversão não encontrada para:', currency);
+        return;
+    }
     
     // Valores originais em USD (fixos)
     const originalValues = {
@@ -328,6 +345,8 @@ function updatePrices(currency) {
         taxaServico: <?= $peso_total * 39 ?>,
         impostos: <?= $subtotal * 0.80 ?>
     };
+    
+    console.log('🔍 [MOEDA] Valores originais:', originalValues);
     
     // Calcular valores convertidos dos originais
     const convertedValues = {
@@ -338,49 +357,47 @@ function updatePrices(currency) {
         total: (originalValues.subtotal + originalValues.frete + originalValues.taxaServico + originalValues.impostos) * rate
     };
     
-    console.log('Valores originais:', originalValues); // Debug
-    console.log('Valores convertidos:', convertedValues); // Debug
+    console.log('🔍 [MOEDA] Valores convertidos:', convertedValues);
     
-    // Atualizar valores do resumo com os valores convertidos
-    const subtotalElement = document.getElementById('subtotal');
-    const freteElement = document.getElementById('frete');
-    const taxaServicoElement = document.getElementById('taxa-servico');
-    const impostosElement = document.getElementById('impostos');
-    const totalElement = document.getElementById('total');
+    // Atualizar elementos na página
+    const elements = {
+        subtotal: document.getElementById('subtotal'),
+        frete: document.getElementById('frete'),
+        taxaServico: document.getElementById('taxa-servico'),
+        impostos: document.getElementById('impostos'),
+        total: document.getElementById('total')
+    };
     
-    if (subtotalElement) {
-        subtotalElement.textContent = currencySymbol + ' ' + convertedValues.subtotal.toFixed(2).replace('.', ',');
+    console.log('🔍 [MOEDA] Elementos encontrados:');
+    for (const [key, element] of Object.entries(elements)) {
+        console.log(`🔍 [MOEDA] ${key}:`, !!element);
     }
     
-    if (freteElement) {
-        freteElement.textContent = currencySymbol + ' ' + convertedValues.frete.toFixed(2).replace('.', ',');
-    }
-    
-    if (taxaServicoElement) {
-        taxaServicoElement.textContent = currencySymbol + ' ' + convertedValues.taxaServico.toFixed(2).replace('.', ',');
-    }
-    
-    if (impostosElement) {
-        impostosElement.textContent = currencySymbol + ' ' + convertedValues.impostos.toFixed(2).replace('.', ',');
-    }
-    
-    if (totalElement) {
-        totalElement.textContent = currencySymbol + ' ' + convertedValues.total.toFixed(2).replace('.', ',');
-    }
-    
-    // Atualizar itens com valores originais
-    const originalItems = <?php echo json_encode($items); ?>;
-    const itemPrices = document.querySelectorAll('.item-price');
-    itemPrices.forEach(function(element, index) {
-        if (originalItems[index]) {
-            const originalValue = originalItems[index]['subtotal'];
-            const convertedValue = originalValue * rate;
-            element.textContent = currencySymbol + ' ' + convertedValue.toFixed(2).replace('.', ',');
-            console.log('Item', index, 'convertido de', originalValue, 'para', convertedValue); // Debug
+    // Atualizar cada elemento
+    for (const [key, element] of Object.entries(elements)) {
+        if (element) {
+            const value = convertedValues[key];
+            const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
+            element.textContent = formattedValue;
+            console.log(`🔍 [MOEDA] ${key} atualizado para:`, formattedValue);
+        } else {
+            console.error(`❌ [MOEDA] Elemento ${key} não encontrado`);
         }
+    }
+    
+    // Atualizar itens do carrinho
+    const itemPrices = document.querySelectorAll('.item-price');
+    console.log('🔍 [MOEDA] Itens do carrinho encontrados:', itemPrices.length);
+    
+    itemPrices.forEach((element, index) => {
+        const originalPrice = parseFloat(element.textContent.replace('$', '').replace(',', '.'));
+        const convertedPrice = originalPrice * rate;
+        const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+        element.textContent = formattedPrice;
+        console.log(`🔍 [MOEDA] Item ${index} atualizado para:`, formattedPrice);
     });
     
-    console.log('Conversão concluída para:', currency); // Debug
+    console.log('🔍 [MOEDA] updatePrices() concluída');
 }
 
 // Inicializar com a moeda do header
@@ -471,36 +488,83 @@ function toggleButton() {
 
 // Função para atualizar campos de pagamento
 function atualizarFormaPagamento() {
-    const formaPagamento = document.getElementById('forma_pagamento').value;
+    console.log('🔍 [INÍCIO] atualizarFormaPagamento() chamada');
+    
+    const formaPagamentoElement = document.getElementById('forma_pagamento');
+    console.log('🔍 [DEBUG] Elemento forma_pagamento:', !!formaPagamentoElement);
+    
+    if (!formaPagamentoElement) {
+        console.error('❌ [ERRO] Elemento forma_pagamento não encontrado');
+        return;
+    }
+    
+    const formaPagamento = formaPagamentoElement.value;
+    console.log('🔍 [DEBUG] Valor selecionado:', formaPagamento);
+    
+    // Verificar se os elementos dos campos existem
+    const camposCartao = document.getElementById('campos-cartao');
+    const camposBoleto = document.getElementById('campos-boleto');
+    const camposPix = document.getElementById('campos-pix');
+    const camposTransferencia = document.getElementById('campos-transferencia');
+    const camposPagamentoEntrega = document.getElementById('campos-pagamento-entrega');
+    
+    console.log('🔍 [DEBUG] Elementos dos campos:');
+    console.log('🔍 [DEBUG] campos-cartao:', !!camposCartao);
+    console.log('🔍 [DEBUG] campos-boleto:', !!camposBoleto);
+    console.log('🔍 [DEBUG] campos-pix:', !!camposPix);
+    console.log('🔍 [DEBUG] campos-transferencia:', !!camposTransferencia);
+    console.log('🔍 [DEBUG] campos-pagamento-entrega:', !!camposPagamentoEntrega);
     
     // Esconder todos os campos específicos
-    document.getElementById('campos-cartao').style.display = 'none';
-    document.getElementById('campos-boleto').style.display = 'none';
-    document.getElementById('campos-pix').style.display = 'none';
-    document.getElementById('campos-transferencia').style.display = 'none';
-    document.getElementById('campos-pagamento-entrega').style.display = 'none';
+    if (camposCartao) camposCartao.style.display = 'none';
+    if (camposBoleto) camposBoleto.style.display = 'none';
+    if (camposPix) camposPix.style.display = 'none';
+    if (camposTransferencia) camposTransferencia.style.display = 'none';
+    if (camposPagamentoEntrega) camposPagamentoEntrega.style.display = 'none';
+    
+    console.log('🔍 [DEBUG] Todos os campos foram escondidos');
     
     // Mostrar campos específicos conforme a forma de pagamento
     switch(formaPagamento) {
         case 'cartao_credito':
-            document.getElementById('campos-cartao').style.display = 'block';
-            console.log('🔍 [PAGAMENTO] Campos de cartão exibidos');
+            if (camposCartao) {
+                camposCartao.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de cartão exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-cartao não encontrado');
+            }
             break;
         case 'boleto':
-            document.getElementById('campos-boleto').style.display = 'block';
-            console.log('🔍 [PAGAMENTO] Campos de boleto exibidos');
+            if (camposBoleto) {
+                camposBoleto.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de boleto exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-boleto não encontrado');
+            }
             break;
         case 'pix':
-            document.getElementById('campos-pix').style.display = 'block';
-            console.log('🔍 [PAGAMENTO] Campos de PIX exibidos');
+            if (camposPix) {
+                camposPix.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de PIX exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-pix não encontrado');
+            }
             break;
         case 'transferencia':
-            document.getElementById('campos-transferencia').style.display = 'block';
-            console.log('🔍 [PAGAMENTO] Campos de transferência exibidos');
+            if (camposTransferencia) {
+                camposTransferencia.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de transferência exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-transferencia não encontrado');
+            }
             break;
         case 'pagamento_entrega':
-            document.getElementById('campos-pagamento-entrega').style.display = 'block';
-            console.log('🔍 [PAGAMENTO] Campos de pagamento na entrega exibidos');
+            if (camposPagamentoEntrega) {
+                camposPagamentoEntrega.style.display = 'block';
+                console.log('🔍 [PAGAMENTO] Campos de pagamento na entrega exibidos');
+            } else {
+                console.error('❌ [ERRO] Elemento campos-pagamento-entrega não encontrado');
+            }
             break;
         default:
             console.log('🔍 [PAGAMENTO] Nenhuma forma de pagamento selecionada');
@@ -508,27 +572,39 @@ function atualizarFormaPagamento() {
     
     // Atualizar texto do botão conforme a forma de pagamento
     const botaoFinalizar = document.getElementById('btn-finalizar');
+    console.log('🔍 [DEBUG] Botão btn-finalizar:', !!botaoFinalizar);
+    
     if (botaoFinalizar) {
         switch(formaPagamento) {
             case 'cartao_credito':
                 botaoFinalizar.innerHTML = '<i class="fas fa-credit-card"></i> Finalizar com Cartão de Crédito';
+                console.log('🔍 [BOTÃO] Texto atualizado para cartão de crédito');
                 break;
             case 'boleto':
                 botaoFinalizar.innerHTML = '<i class="fas fa-barcode"></i> Gerar Boleto';
+                console.log('🔍 [BOTÃO] Texto atualizado para boleto');
                 break;
             case 'pix':
                 botaoFinalizar.innerHTML = '<i class="fas fa-qrcode"></i> Gerar PIX';
+                console.log('🔍 [BOTÃO] Texto atualizado para PIX');
                 break;
             case 'transferencia':
                 botaoFinalizar.innerHTML = '<i class="fas fa-university"></i> Finalizar com Transferência';
+                console.log('🔍 [BOTÃO] Texto atualizado para transferência');
                 break;
             case 'pagamento_entrega':
                 botaoFinalizar.innerHTML = '<i class="fas fa-truck"></i> Finalizar para Pagamento na Entrega';
+                console.log('🔍 [BOTÃO] Texto atualizado para pagamento na entrega');
                 break;
             default:
                 botaoFinalizar.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+                console.log('🔍 [BOTÃO] Texto padrão definido');
         }
+    } else {
+        console.error('❌ [ERRO] Botão btn-finalizar não encontrado');
     }
+    
+    console.log('🔍 [FIM] atualizarFormaPagamento() concluída');
 }
     
     if (checkbox.checked) {
