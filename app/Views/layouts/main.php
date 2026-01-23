@@ -478,6 +478,45 @@
                     }
                 }
             });
+            
+            // Atualizar valores específicos do carrinho
+            updateCartPrices();
+        }
+        
+        function updateCartPrices() {
+            const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            
+            // Atualizar preços dos itens no carrinho
+            const itemPrices = document.querySelectorAll('.cart-item-price');
+            itemPrices.forEach(element => {
+                const originalPrice = parseFloat(element.getAttribute('data-original-price'));
+                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar subtotais dos itens
+            const itemSubtotals = document.querySelectorAll('.cart-item-subtotal');
+            itemSubtotals.forEach(element => {
+                const originalPrice = parseFloat(element.getAttribute('data-original-price'));
+                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar preços unitários
+            const itemUnits = document.querySelectorAll('.cart-item-unit');
+            itemUnits.forEach(element => {
+                const originalPrice = parseFloat(element.getAttribute('data-original-price'));
+                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar valores do resumo do pedido
+            const cartValues = document.querySelectorAll('.cart-currency');
+            cartValues.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * exchangeRates[currentCurrency];
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
         }
         
         function showCurrencyChangeNotification(currency) {
