@@ -102,56 +102,23 @@ class CheckoutController extends Controller {
         try {
             // Obter usuário logado
             $usuario = $this->authService->getUsuarioLogado();
-                'card_expiry_month' => $dados['card_expiry_month'] ?? '',
-                'card_expiry_year' => $dados['card_expiry_year'] ?? '',
-                'card_cvv' => $dados['card_cvv'] ?? ''
-            ];
-            
-            // Validar dados de pagamento
-            $errosPagamento = $this->paymentService->validarDadosPagamento($dadosPagamento);
-            if (!empty($errosPagamento)) {
-                $this->json(['error' => implode(', ', $errosPagamento)], 400);
-            }
-            
-            $resultadoPagamento = $this->paymentService->processarPagamento(
-                $dadosPagamento,
-                $carrinho['valor_total'],
-                $carrinho['moeda'],
-                'Pedido BRZ Logistics'
-            );
-            
-            if (!$resultadoPagamento['success']) {
-                $this->json(['error' => 'Falha no processamento do pagamento'], 400);
-            }
             
             // Criar pedido
-            $pedidoId = $this->pedidoModel->criarPedidoAPartirDoCarrinho(
-                $carrinho['id'],
-                $usuarioId,
-                $enderecoEntregaId,
-                $enderecoCobrancaId,
-                [
-                    'gateway' => $carrinho['moeda'] === 'BRL' ? 'asaas' : 'stripe',
-                    'payment_id' => $resultadoPagamento['payment_id']
-                ]
-            );
+            $pedidoId = $this->criarPedido($dados, $carrinho, $usuario);
             
-            // Registrar consentimento legal
-            $this->registrarConsentimentoLegal($usuarioId, $dados);
-            
-            // Fazer login se não estava logado
-            if (!$usuario) {
-                $this->authService->login($dados['email'], $dados['senha']);
+            if ($pedidoId) {
+                // Limpar carrinho
+                unset($_SESSION['carrinho']);
+                
+                $this->json([
+                    'success' => true,
+                    'message' => 'Pedido criado com sucesso',
+                    'pedido_id' => $pedidoId
+                ]);
+            } else {
+                $this->json(['error' => 'Erro ao criar pedido'], 500);
             }
-            
-            $this->json([
-                'success' => true,
-                'message' => 'Pedido criado com sucesso',
-                'pedido_id' => $pedidoId,
-                'redirect' => "/pedido/detalhes/{$pedidoId}"
-            ]);
-            
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->json(['error' => 'Erro ao processar pedido: ' . $e->getMessage()], 500);
         }
     }
@@ -305,6 +272,57 @@ class CheckoutController extends Controller {
             
         } catch (\Exception $e) {
             $this->json(['error' => 'Erro ao calcular valores: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    private function criarPedido($dados, $carrinho, $usuario) {
+        try {
+            // Calcular totais
+            $subtotal = 0;
+            $pesoTotal = 0;
+            
+            foreach ($carrinho as $item) {
+                $subtotal += ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 1);
+                $pesoTotal += 0.5 * ($item['quantidade'] ?? 1); // Peso padrão
+            }
+            
+            // Taxas
+            $taxaServico = $pesoTotal * 39; // US$39 por kg
+            $impostos = $subtotal * 0.80; // 80%
+            $frete = $pesoTotal * 15; // US$15 por kg
+            $total = $subtotal + $taxaServico + $impostos + $frete;
+            
+            // Criar número do pedido
+            $numeroPedido = 'BRZ' . date('YmdHis') . rand(1000, 9999);
+            
+            // Inserir pedido
+            $db = \Config\Database::getConnection();
+            $sql = "INSERT INTO pedidos (
+                usuario_id, numero_pedido, status, subtotal, taxa_servico, 
+                impostos, frete, total, moeda, peso_total, observacoes, 
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute([
+                $usuario['id'] ?? 1,
+                $numeroPedido,
+                'pendente',
+                $subtotal,
+                $taxaServico,
+                $impostos,
+                $frete,
+                $total,
+                'USD',
+                $pesoTotal,
+                $dados['observacoes'] ?? ''
+            ]);
+            
+            return $db->lastInsertId();
+            
+        } catch (Exception $e) {
+            error_log('Erro ao criar pedido: ' . $e->getMessage());
+            return false;
         }
     }
 }
