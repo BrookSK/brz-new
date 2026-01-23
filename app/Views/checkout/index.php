@@ -275,8 +275,15 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="submit" class="btn btn-secondary btn-lg w-100" id="btn-finalizar" disabled>
+                            <button type="submit" class="btn btn-secondary btn-lg w-100" id="btn-finalizar" disabled 
+                                    onclick="console.log('🔍 [INLINE] Botão clicado via onclick!'); alert('Botão clicado via inline!');">
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
+                            </button>
+                            
+                            <!-- Botão de Teste Inline -->
+                            <button type="button" class="btn btn-primary btn-sm w-100 mt-2" 
+                                    onclick="console.log('🔍 [TESTE] Botão de teste clicado!'); alert('Botão de teste funciona!');">
+                                <i class="fas fa-bug"></i> Teste Inline
                             </button>
                         </div>
                     </form>
@@ -288,7 +295,9 @@
 
 <!-- JavaScript para processar o formulário - no final da página -->
 <script>
-// Garantir que o DOM está completamente carregado
+console.log('🔍 [DEBUG] Script carregado - início');
+
+// Teste simples
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 [DEBUG] DOMContentLoaded iniciado');
     
@@ -298,10 +307,25 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 [DEBUG] Formulário encontrado:', !!form);
     console.log('🔍 [DEBUG] Botão encontrado:', !!botao);
     
+    if (botao) {
+        console.log('🔍 [DEBUG] Botão estado inicial:', botao.disabled);
+        
+        // Adicionar evento de clique direto no botão
+        botao.addEventListener('click', function(e) {
+            console.log('🔍 [CLICK] Botão clicado!');
+            alert('Botão clicado com sucesso!');
+        });
+        
+        console.log('🔍 [DEBUG] Event listener de clique adicionado');
+    }
+    
     if (form) {
+        console.log('🔍 [DEBUG] Adicionando listener de submit');
+        
         // Adicionar event listener de submit
         form.addEventListener('submit', function(e) {
             console.log('🔍 [FORM] Event submit acionado!');
+            alert('Formulário submetido!');
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -328,15 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.success) {
                     console.log('✅ [PEDIDO] Pedido criado com sucesso:', data.pedido_id);
-                    
-                    // Mostrar mensagem de sucesso
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Pedido Confirmado!',
-                        text: 'Seu pedido #' + data.pedido_id + ' foi processado com sucesso.',
-                        showConfirmButton: false,
-                        timer: 2000
-                    });
+                    alert('Pedido processado com sucesso! ID: ' + data.pedido_id);
                     
                     // Redirecionar para página de conclusão
                     setTimeout(function() {
@@ -345,14 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 2000);
                 } else {
                     console.error('❌ [PEDIDO] Erro ao processar pedido:', data.error);
-                    
-                    // Mostrar mensagem de erro
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro no Processamento',
-                        text: data.error || 'Ocorreu um erro ao processar seu pedido. Tente novamente.',
-                        confirmButtonText: 'OK'
-                    });
+                    alert('Erro: ' + data.error);
                     
                     // Restaurar botão
                     botao.disabled = false;
@@ -361,15 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('❌ [PEDIDO] Erro na requisição:', error);
-                console.error('❌ [PEDIDO] Stack:', error.stack);
-                
-                // Mostrar mensagem de erro genérico
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro de Conexão',
-                    text: 'Ocorreu um erro ao processar seu pedido. Verifique sua conexão e tente novamente.',
-                    confirmButtonText: 'OK'
-                });
+                alert('Erro de conexão: ' + error.message);
                 
                 // Restaurar botão
                 botao.disabled = false;
@@ -381,15 +382,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('❌ [DEBUG] Formulário não encontrado!');
     }
-    
-    if (botao) {
-        console.log('🔍 [DEBUG] Botão OK - Estado:', botao.disabled);
-    } else {
-        console.error('❌ [DEBUG] Botão não encontrado!');
-    }
 });
 
-console.log('🔍 [DEBUG] Script de checkout carregado');
+console.log('🔍 [DEBUG] Script carregado - fim');
 </script>
 
 <!-- Selos de Segurança -->
