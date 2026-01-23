@@ -385,6 +385,13 @@
                 }
             });
         });
+        
+        // Verificar se mini carrinho existe
+        if (typeof addToMiniCart === 'function') {
+            console.log('Mini carrinho está disponível');
+        } else {
+            console.log('Mini carrinho não encontrado');
+        }
     </script>
     
     <!-- Incluir Mini Carrinho -->
