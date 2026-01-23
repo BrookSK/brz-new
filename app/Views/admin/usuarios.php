@@ -156,13 +156,29 @@
                             <input type="email" name="email" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">CPF/CNPJ *</label>
-                            <input type="text" name="documento" class="form-control" required>
+                            <label class="form-label">CPF/CNPJ</label>
+                            <input type="text" name="documento" class="form-control">
                         </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Telefone</label>
-                                <input type="text" name="telefone" class="form-control">
-                            </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" name="telefone" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Endereço</label>
+                            <input type="text" name="endereco" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" name="cidade" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Estado</label>
+                            <input type="text" name="estado" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CEP</label>
+                            <input type="text" name="cep" class="form-control">
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Senha</label>
                             <input type="password" name="senha" class="form-control">
@@ -185,6 +201,14 @@
                                 <option value="inativo">Inativo</option>
                                 <option value="bloqueado">Bloqueado</option>
                             </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Créditos Disponíveis</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" name="creditos_disponiveis" class="form-control" step="0.01" value="0.00">
+                            </div>
+                            <div class="form-text">Saldo atual de créditos do usuário</div>
                         </div>
                     </div>
                 </form>
