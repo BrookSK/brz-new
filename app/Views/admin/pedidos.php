@@ -10,6 +10,9 @@
             <a href="/admin" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Voltar
             </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCriarPedido">
+                <i class="fas fa-plus me-2"></i>Novo Pedido
+            </button>
         </div>
     </div>
 
@@ -91,8 +94,14 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="verDetalhes(<?= $pedido['id'] ?>)">
-                                                <i class="fas fa-eye"></i>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarUsuario(<?= $usuario['id'] ?>)">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-info" onclick="verPerfilUsuario(<?= $usuario['id'] ?>)">
+                                                <i class="fas fa-user"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-success" onclick="gerenciarCreditos(<?= $usuario['id'] ?>)">
+                                                <i class="fas fa-credit-card"></i>
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-success" onclick="atualizarStatus(<?= $pedido['id'] ?>)">
                                                 <i class="fas fa-edit"></i>
@@ -123,6 +132,49 @@
                     </ul>
                 </nav>
             <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Criar Pedido -->
+<div class="modal fade" id="modalCriarPedido" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Criar Novo Pedido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCriarPedido">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Selecionar Cliente *</label>
+                            <select name="usuario_id" class="form-select" required>
+                                <option value="">Selecione um cliente...</option>
+                                <?php foreach ($usuarios as $usuario): ?>
+                                    <option value="<?= $usuario['id'] ?>"><?= htmlspecialchars($usuario['nome']) ?> (<?= htmlspecialchars($usuario['email']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data do Pedido</label>
+                            <input type="datetime-local" name="data_pedido" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea name="observacoes" class="form-control" rows="3" placeholder="Observações do pedido"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary" onclick="criarPedido()">
+                                <i class="fas fa-shopping-cart me-2"></i> Criar Pedido
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -183,6 +235,27 @@
 </div>
 
 <script>
+function criarPedido() {
+    const form = document.getElementById('formCriarPedido');
+    const formData = new FormData(form);
+    
+    fetch('/admin/criar-pedido', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Pedido criado com sucesso! ID: ' + data.pedido_id);
+            new bootstrap.Modal(document.getElementById('modalCriarPedido')).hide();
+            document.getElementById('formCriarPedido').reset();
+            location.reload();
+        } else {
+            alert('Erro ao criar pedido: ' + data.error);
+        }
+    });
+}
+
 function verDetalhes(pedidoId) {
     fetch(`/admin/pedido-detalhes/${pedidoId}`)
         .then(response => response.text())

@@ -233,23 +233,27 @@
 
 <script>
 function editarProduto(id) {
-    fetch(`/admin/produtos/${id}`)
+    fetch(`/admin/produto/${id}`)
         .then(response => response.json())
         .then(data => {
-            document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
-            document.getElementById('produto_id').value = data.id;
-            document.querySelector('input[name="nome"]').value = data.nome;
-            document.querySelector('input[name="sku"]').value = data.sku;
-            document.querySelector('textarea[name="descricao_curta"]').value = data.descricao_curta;
-            document.querySelector('textarea[name="descricao_completa"]').value = data.descricao_completa;
-            document.querySelector('select[name="categoria_id"]').value = data.categoria_id;
-            document.querySelector('input[name="valor"]').value = data.valor;
-            document.querySelector('select[name="moeda"]').value = data.moeda;
-            document.querySelector('input[name="peso"]').value = data.peso;
-            document.querySelector('input[name="estoque"]').value = data.estoque;
-            document.querySelector('select[name="status"]').value = data.status;
-            
-            new bootstrap.Modal(document.getElementById('modalProduto')).show();
+            if (data.success) {
+                document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
+                document.getElementById('produto_id').value = data.produto.id;
+                document.querySelector('input[name="nome"]').value = data.produto.nome;
+                document.querySelector('input[name="sku"]').value = data.produto.sku;
+                document.querySelector('textarea[name="descricao_curta"]').value = data.produto.descricao_curta || '';
+                document.querySelector('textarea[name="descricao_completa"]').value = data.produto.descricao_completa || '';
+                document.querySelector('select[name="categoria_id"]').value = data.produto.categoria_id;
+                document.querySelector('input[name="valor"]').value = data.produto.valor;
+                document.querySelector('select[name="moeda"]').value = data.produto.moeda;
+                document.querySelector('input[name="peso"]').value = data.produto.peso;
+                document.querySelector('input[name="estoque"]').value = data.produto.estoque;
+                document.querySelector('select[name="status"]').value = data.produto.status;
+                
+                new bootstrap.Modal(document.getElementById('modalProduto')).show();
+            } else {
+                alert('Erro ao carregar produto: ' + data.error);
+            }
         });
 }
 
