@@ -475,6 +475,12 @@
                     localStorage.setItem('selected_currency', currentCurrency);
                     updateCurrencyDisplay();
                     updateAllPrices();
+                    
+                    // Atualizar checkout se existir
+                    if (typeof updateCheckoutCurrency === 'function') {
+                        updateCheckoutCurrency(newCurrency);
+                    }
+                    
                     showCurrencyChangeNotification(newCurrency);
                 }
             });

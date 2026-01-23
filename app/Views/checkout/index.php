@@ -356,10 +356,25 @@ function initCurrency() {
     updatePrices(currentCurrency);
 }
 
+// Função global para atualizar moeda no checkout
+window.updateCheckoutCurrency = function(currency) {
+    console.log('Atualizando checkout para:', currency); // Debug
+    
+    // Atualizar campo oculto
+    var hiddenField = document.getElementById('moeda_hidden');
+    if (hiddenField) {
+        hiddenField.value = currency;
+        console.log('Campo oculto atualizado para:', currency); // Debug
+    }
+    
+    // Atualizar preços
+    updatePrices(currency);
+};
+
 // Inicializar
 initCurrency();
 
-// Verificar mudanças na moeda do header a cada 500ms
+// Verificar mudanças na moeda do header a cada 200ms (mais rápido)
 setInterval(function() {
     var headerCurrency = document.getElementById('current-currency');
     if (headerCurrency) {
@@ -370,9 +385,31 @@ setInterval(function() {
             console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
             document.getElementById('moeda_hidden').value = newCurrency;
             updatePrices(newCurrency);
+            
+            // Forçar atualização global também
+            if (typeof updateAllPrices === 'function') {
+                updateAllPrices();
+            }
         }
     }
-}, 500);
+}, 200);
+
+// Também verificar mudanças no localStorage
+setInterval(function() {
+    var storedCurrency = localStorage.getItem('selected_currency');
+    var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
+    
+    if (storedCurrency && storedCurrency !== currentHiddenCurrency) {
+        console.log('Moeda mudou no localStorage de', currentHiddenCurrency, 'para', storedCurrency); // Debug
+        document.getElementById('moeda_hidden').value = storedCurrency;
+        updatePrices(storedCurrency);
+        
+        // Forçar atualização global também
+        if (typeof updateAllPrices === 'function') {
+            updateAllPrices();
+        }
+    }
+}, 200);
 
 // Função simples para o botão
 function toggleButton() {
