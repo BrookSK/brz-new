@@ -49,7 +49,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Faturamento BRL</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ <?= number_format($stats['financeiro']['faturamento_brl'], 2, ',', '.') ?></div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ <?= number_format($stats['financeiro']['faturamento_brl'] ?? 0, 2, ',', '.') ?></div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
@@ -65,7 +65,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Impostos Arrecadados</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ <?= number_format($stats['financeiro']['impostos_arrecadados'], 2, ',', '.') ?></div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ <?= number_format($stats['financeiro']['impostos_arrecadados'] ?? 0, 2, ',', '.') ?></div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-receipt fa-2x text-gray-300"></i>
@@ -91,8 +91,8 @@
                     <div class="mt-4 text-center small">
                         <?php foreach ($stats['pedidos_por_status'] as $status): ?>
                         <span class="mr-2">
-                            <i class="fas fa-circle" style="color: <?= $this->getStatusColor($status['status']) ?>"></i>
-                            <?= $this->getStatusLabel($status['status']) ?>: <?= $status['quantidade'] ?>
+                            <i class="fas fa-circle" style="color: <?= getStatusColor($status['status']) ?>"></i>
+                            <?= getStatusLabel($status['status']) ?>: <?= $status['quantidade'] ?>
                         </span>
                         <?php endforeach; ?>
                     </div>
@@ -136,8 +136,8 @@
                                     <td><?= htmlspecialchars($pedido['cliente_nome']) ?></td>
                                     <td>$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
                                     <td>
-                                        <span class="badge bg-<?= $this->getStatusColor($pedido['status']) ?>">
-                                            <?= $this->getStatusLabel($pedido['status']) ?>
+                                        <span class="badge bg-<?= getStatusColor($pedido['status']) ?>">
+                                            <?= getStatusLabel($pedido['status']) ?>
                                         </span>
                                     </td>
                                 </tr>
