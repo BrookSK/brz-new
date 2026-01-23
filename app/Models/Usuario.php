@@ -129,7 +129,11 @@ class Usuario extends Model {
         
         $stmt = $this->getConnection()->prepare($sql);
         foreach ($params as $key => $value) {
-            $stmt->bindValue(":$key", $value);
+            if (is_int($value)) {
+                $stmt->bindValue(":$key", $value, \PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue(":$key", $value, \PDO::PARAM_STR);
+            }
         }
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -156,7 +160,11 @@ class Usuario extends Model {
         
         $stmt = $this->getConnection()->prepare($sql);
         foreach ($params as $key => $value) {
-            $stmt->bindValue(":$key", $value);
+            if (is_int($value)) {
+                $stmt->bindValue(":$key", $value, \PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue(":$key", $value, \PDO::PARAM_STR);
+            }
         }
         $stmt->execute();
         return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
