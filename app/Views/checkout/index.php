@@ -267,7 +267,7 @@
                             <!-- Termos Legais -->
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required onchange="toggleButton()">
+                                    <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required>
                                     <label class="form-check-label small" for="consentimento_legal">
                                         Li e aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos e condições</a> de uso e política de privacidade. *
                                     </label>
@@ -297,15 +297,57 @@
 <script>
 console.log('🔍 [DEBUG] Script carregado - início');
 
+// Função toggleButton
+function toggleButton() {
+    const checkbox = document.getElementById('consentimento_legal');
+    const botao = document.getElementById('btn-finalizar');
+    
+    console.log('🔍 [BOTÃO] toggleButton() chamada');
+    console.log('🔍 [BOTÃO] Checkbox marcado:', checkbox ? checkbox.checked : 'não');
+    console.log('🔍 [BOTÃO] Botão encontrado:', !!botao);
+    
+    if (checkbox && botao) {
+        const isChecked = checkbox.checked;
+        botao.disabled = !isChecked;
+        
+        if (isChecked) {
+            botao.className = 'btn btn-primary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão habilitado');
+        } else {
+            botao.className = 'btn btn-secondary btn-lg w-100';
+            console.log('🔍 [BOTÃO] Botão desabilitado');
+        }
+        
+        console.log('🔍 [BOTÃO] Estado final do botão:', !botao.disabled);
+    } else {
+        console.error('❌ [BOTÃO] Checkbox ou botão não encontrado');
+    }
+}
+
 // Teste simples
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 [DEBUG] DOMContentLoaded iniciado');
     
     const form = document.getElementById('checkout-form');
     const botao = document.getElementById('btn-finalizar');
+    const checkbox = document.getElementById('consentimento_legal');
     
     console.log('🔍 [DEBUG] Formulário encontrado:', !!form);
     console.log('🔍 [DEBUG] Botão encontrado:', !!botao);
+    console.log('🔍 [DEBUG] Checkbox encontrado:', !!checkbox);
+    
+    if (checkbox) {
+        // Adicionar listener ao checkbox
+        checkbox.addEventListener('change', function() {
+            console.log('🔍 [CHECKBOX] Checkbox alterado:', this.checked);
+            toggleButton();
+        });
+        
+        console.log('🔍 [DEBUG] Listener adicionado ao checkbox');
+        
+        // Verificar estado inicial
+        toggleButton();
+    }
     
     if (botao) {
         console.log('🔍 [DEBUG] Botão estado inicial:', botao.disabled);
@@ -313,7 +355,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Adicionar evento de clique direto no botão
         botao.addEventListener('click', function(e) {
             console.log('🔍 [CLICK] Botão clicado!');
-            alert('Botão clicado com sucesso!');
+            
+            if (!this.disabled) {
+                console.log('🔍 [CLICK] Botão não está desabilitado');
+                alert('Botão principal clicado com sucesso!');
+            } else {
+                console.log('🔍 [CLICK] Botão está desabilitado');
+                alert('Botão está desabilitado. Aceite os termos primeiro.');
+            }
         });
         
         console.log('🔍 [DEBUG] Event listener de clique adicionado');
