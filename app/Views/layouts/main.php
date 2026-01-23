@@ -453,15 +453,18 @@
         const currencySelectors = document.querySelectorAll('.currency-selector');
         const currentCurrencySpan = document.getElementById('current-currency');
         
-        // Taxa de conversão (pode ser dinâmica no futuro)
+        // Taxa de conversão (mesma do checkout)
         const exchangeRates = {
-            BRL: 1,
-            USD: 0.18 // 1 BRL = 0.18 USD (exemplo)
+            BRL: 5.50,
+            USD: 1.00
         };
         
         // Recuperar moeda salva ou usar BRL como padrão
         let currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
         updateCurrencyDisplay();
+        
+        // Atualizar preços ao carregar a página
+        setTimeout(updateAllPrices, 100);
         
         currencySelectors.forEach(selector => {
             selector.addEventListener('click', function(e) {
@@ -483,13 +486,16 @@
         }
         
         function updateAllPrices() {
-            // Atualizar todos os preços na página
-            const priceElements = document.querySelectorAll('[data-original-price]');
-            const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            console.log('Atualizando todos os preços para:', currentCurrency, 'Taxa:', exchangeRates[currentCurrency]);
             
+            const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            const rate = exchangeRates[currentCurrency];
+            
+            // Atualizar todos os preços na página com data-original-price
+            const priceElements = document.querySelectorAll('[data-original-price]');
             priceElements.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
-                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                const convertedPrice = originalPrice * rate;
                 element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
             });
             
@@ -499,7 +505,7 @@
                 element.textContent = currentCurrency;
             });
             
-            // Atualizar badges de moeda nos produtos (apenas se tiverem preços)
+            // Atualizar badges de moeda nos produtos
             const currencyBadges = document.querySelectorAll('.badge');
             currencyBadges.forEach(badge => {
                 const text = badge.textContent;
@@ -508,26 +514,43 @@
                     if (priceMatch) {
                         const price = parseFloat(priceMatch[0].replace(',', '.'));
                         if (!isNaN(price)) {
-                            const originalPrice = price / (currentCurrency === 'BRL' ? 1 : exchangeRates.BRL);
-                            const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                            // Se o preço atual está em USD, converter para a moeda selecionada
+                            const originalPrice = price / (currentCurrency === 'BRL' ? 1 : 5.50);
+                            const convertedPrice = originalPrice * rate;
                             badge.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
                         }
                     }
                 }
             });
             
+            // Atualizar preços de produtos
+            const productPrices = document.querySelectorAll('.product-price');
+            productPrices.forEach(element => {
+                const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
+                const price = parseFloat(priceText);
+                if (!isNaN(price)) {
+                    // Converter de USD para a moeda selecionada
+                    const originalPrice = price / (currentCurrency === 'BRL' ? 1 : 5.50);
+                    const convertedPrice = originalPrice * rate;
+                    element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                }
+            });
+            
             // Atualizar valores específicos do carrinho
             updateCartPrices();
+            
+            console.log('Todos os preços atualizados para:', currentCurrency);
         }
         
         function updateCartPrices() {
             const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            const rate = exchangeRates[currentCurrency];
             
             // Atualizar preços dos itens no carrinho
             const itemPrices = document.querySelectorAll('.cart-item-price');
             itemPrices.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
-                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                const convertedPrice = originalPrice * rate;
                 element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
             });
             
@@ -535,7 +558,7 @@
             const itemSubtotals = document.querySelectorAll('.cart-item-subtotal');
             itemSubtotals.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
-                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                const convertedPrice = originalPrice * rate;
                 element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
             });
             
@@ -543,7 +566,7 @@
             const itemUnits = document.querySelectorAll('.cart-item-unit');
             itemUnits.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
-                const convertedPrice = originalPrice * exchangeRates[currentCurrency];
+                const convertedPrice = originalPrice * rate;
                 element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
             });
             
@@ -551,7 +574,7 @@
             const cartValues = document.querySelectorAll('.cart-currency');
             cartValues.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * exchangeRates[currentCurrency];
+                const convertedValue = originalValue * rate;
                 element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
             });
         }
