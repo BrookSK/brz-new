@@ -12,7 +12,32 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $id);
         $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
+        $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($produto) {
+            // Garantir que todos os campos tenham valores padrão
+            $produto = array_merge([
+                'id' => 0,
+                'nome' => '',
+                'sku' => '',
+                'descricao_curta' => '',
+                'descricao_completa' => '',
+                'categoria_id' => '',
+                'valor' => 0.00,
+                'moeda' => 'USD',
+                'peso' => 0.000,
+                'estoque' => 0,
+                'status' => 'ativo',
+                'foto_principal' => null,
+                'created_at' => null,
+                'updated_at' => null
+            ], $produto);
+            
+            // Converter valor para formato numérico
+            $produto['valor'] = floatval($produto['valor']);
+        }
+        
+        return $produto;
     }
     
     public function getAll() {

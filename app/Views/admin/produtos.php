@@ -278,12 +278,14 @@ function editarProduto(id) {
                     'descricao_curta': data.produto.descricao_curta || '',
                     'descricao_completa': data.produto.descricao_completa || '',
                     'categoria_id': data.produto.categoria_id || '',
-                    'valor': data.produto.valor || '',
+                    'valor': data.produto.valor > 0 ? data.produto.valor.toFixed(2) : '',
                     'moeda': data.produto.moeda || 'USD',
-                    'peso': data.produto.peso || '',
+                    'peso': data.produto.peso > 0 ? data.produto.peso.toFixed(3) : '',
                     'estoque': data.produto.estoque || '',
                     'status': data.produto.status || 'ativo'
                 };
+                
+                console.log('🔍 [PRODUTOS] Campos preparados:', campos);
                 
                 // Preencher cada campo
                 Object.keys(campos).forEach(campo => {
