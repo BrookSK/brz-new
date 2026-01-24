@@ -23,7 +23,8 @@ class ProdutoController extends Controller {
         } elseif ($categoria) {
             $produtos = $this->produtoModel->getByCategoria($categoria);
         } else {
-            $produtos = $this->produtoModel->all();
+            // Usar método que inclui JOIN com categorias
+            $produtos = $this->produtoModel->getAllWithCategoria();
         }
         
         // Adicionar fotos principais aos produtos

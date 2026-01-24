@@ -73,12 +73,12 @@
                         </div>
                         <div class="card-body">
                             <h5 class="card-title text-dark"><?= htmlspecialchars($produto['nome']) ?></h5>
-                            <p class="text-muted small"><?= htmlspecialchars($produto['categoria']) ?></p>
-                            <p class="card-text text-truncate"><?= htmlspecialchars(substr($produto['descricao'], 0, 80)) ?>...</p>
+                            <p class="text-muted small"><?= htmlspecialchars($produto['categoria_nome']) ?></p>
+                            <p class="card-text text-truncate"><?= htmlspecialchars(substr($produto['descricao_curta'], 0, 80)) ?>...</p>
                              
                             <div class="price-section mb-3">
                                 <div class="current-price">
-                                    <span class="amount product-price" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                                    <span class="amount product-price" data-original-price="<?= $produto['valor'] ?>"><?= number_format($produto['valor'], 2, ',', '.') ?></span>
                                 </div>
                             </div>
                         </div>
@@ -86,7 +86,7 @@
                     <div class="card-footer">
                         <div class="input-group">
                             <input type="number" class="form-control quantidade-input" value="1" min="1" max="<?= $produto['estoque'] ?>" data-produto-id="<?= $produto['id'] ?>">
-                            <button class="btn btn-primary btn-adicionar" data-produto-id="<?= $produto['id'] ?>" data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>" data-produto-preco="<?= $produto['preco'] ?>" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
+                            <button class="btn btn-primary btn-adicionar" data-produto-id="<?= $produto['id'] ?>" data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>" data-produto-preco="<?= $produto['valor'] ?>" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
                                 <?php if ($produto['estoque'] > 0): ?>
                                     <i class="fas fa-cart-plus"></i> Adicionar
                                 <?php else: ?>

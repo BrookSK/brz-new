@@ -51,6 +51,18 @@ class Produto extends Model {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
+    public function getAllWithCategoria() {
+        $stmt = $this->getConnection()->prepare("
+            SELECT p.*, c.nome as categoria_nome 
+            FROM {$this->table} p 
+            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            WHERE p.ativo = 1 
+            ORDER BY p.nome ASC
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     public function search($term) {
         $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE nome LIKE :term OR descricao LIKE :term OR categoria LIKE :term");
         $term = "%{$term}%";
