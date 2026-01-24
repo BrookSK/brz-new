@@ -252,13 +252,24 @@ class ProdutoFoto extends Model {
         
         // Salvar no banco de dados com URL completa
         $fotoData = [
-            'produto_id' => $produtoId,
+            'produto_id' => $produtoId, // Pode ser null para upload temporário
             'nome_arquivo' => $urlCompleta, // Salvar URL completa em vez de apenas nome
             'arquivo_original' => $arquivo['name'],
             'legenda' => pathinfo($arquivo['name'], PATHINFO_FILENAME),
             'principal' => 1, // Marcar como principal por padrão
             'ordem' => 0
         ];
+        
+        // Se for upload temporário (produto_id null), não salvar no banco ainda
+        if ($produtoId === null) {
+            error_log('🔍 [PRODUTO-FOTO] Upload temporário - não salvando no banco ainda');
+            return [
+                'id' => null, // ID temporário
+                'nome_arquivo' => $urlCompleta, // Retornar URL completa
+                'url' => $urlCompleta,
+                'temp' => true // Marcar como temporário
+            ];
+        }
         
         $fotoId = $this->create($fotoData);
         
@@ -271,8 +282,56 @@ class ProdutoFoto extends Model {
         ];
     }
 
+    public function moverImagemTemporaria($urlTemporaria, $produtoId) {
+        error_log('🔍 [PRODUTO-FOTO] Movendo imagem temporária para produto ID: ' . $produtoId);
+        
+        // Extrair nome do arquivo da URL
+        $nomeArquivo = basename($urlTemporaria);
+        $caminhoTemp = __DIR__ . '/../../public/uploads/produtos/' . $nomeArquivo;
+        
+        // Verificar se arquivo temporário existe
+        if (!file_exists($caminhoTemp)) {
+            error_log('❌ [PRODUTO-FOTO] Arquivo temporário não encontrado: ' . $caminhoTemp);
+            return false;
+        }
+        
+        // Gerar novo nome com produto_id
+        $extensao = pathinfo($nomeArquivo, PATHINFO_EXTENSION);
+        $novoNome = uniqid('produto_' . $produtoId . '_') . '.' . $extensao;
+        $novoCaminho = __DIR__ . '/../../public/uploads/produtos/' . $novoNome;
+        
+        // Mover arquivo
+        if (!rename($caminhoTemp, $novoCaminho)) {
+            error_log('❌ [PRODUTO-FOTO] Erro ao mover arquivo temporário');
+            return false;
+        }
+        
+        // Criar nova URL
+        $novaUrl = '/uploads/produtos/' . $novoNome;
+        
+        // Salvar no banco
+        $fotoData = [
+            'produto_id' => $produtoId,
+            'nome_arquivo' => $novaUrl,
+            'arquivo_original' => $nomeArquivo,
+            'legenda' => pathinfo($nomeArquivo, PATHINFO_FILENAME),
+            'principal' => 1,
+            'ordem' => 0
+        ];
+        
+        $fotoId = $this->create($fotoData);
+        
+        error_log('✅ [PRODUTO-FOTO] Imagem movida e salva: ' . $novaUrl);
+        
+        return [
+            'id' => $fotoId,
+            'nome_arquivo' => $novaUrl,
+            'url' => $novaUrl
+        ];
+    }
+
     public function redimensionarImagem($caminhoArquivo, $tipo) {
-        error_log(' [PRODUTO-FOTO] Iniciando redimensionamento: ' . $caminhoArquivo . ' Tipo: ' . $tipo);
+        error_log('🔍 [PRODUTO-FOTO] Iniciando redimensionamento: ' . $caminhoArquivo . ' Tipo: ' . $tipo);
 
         // Verificar se GD está disponível
         if (!extension_loaded('gd') || !function_exists('gd_info')) {

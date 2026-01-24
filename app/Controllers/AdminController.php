@@ -696,19 +696,39 @@ class AdminController extends Controller {
                 throw new \Exception('Erro ao criar produto no banco de dados');
             }
             
-            // Processar upload da imagem principal usando sistema antigo (ProdutoFoto)
-            if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
-                error_log('🔍 [SALVAR-PRODUTO] Processando upload da imagem principal com sistema antigo');
+            // Processar upload da imagem principal
+            $imagemUrl = null;
+            
+            // 1. Verificar se há upload via AJAX (campo hidden)
+            $imagemUrlTemp = $request->getParam('imagem_url');
+            if ($imagemUrlTemp) {
+                error_log('🔍 [SALVAR-PRODUTO] Movendo imagem temporária: ' . $imagemUrlTemp);
+                $fotoMovida = $this->produtoFotoModel->moverImagemTemporaria($imagemUrlTemp, $produtoId);
+                if ($fotoMovida) {
+                    $imagemUrl = $fotoMovida['nome_arquivo'];
+                    error_log('✅ [SALVAR-PRODUTO] Imagem temporária movida: ' . $imagemUrl);
+                }
+            }
+            // 2. Verificar se há upload tradicional
+            elseif (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
+                error_log('🔍 [SALVAR-PRODUTO] Processando upload tradicional da imagem principal');
                 $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
                 
-                // Marcar como principal
-                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                // Marcar como principal (se tiver ID)
+                if ($fotoPrincipal['id']) {
+                    $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                }
                 
-                // Atualizar APENAS a foto principal do produto (não limpar outros campos)
-                $this->produtoModel->updateFotoPrincipal($produtoId, $fotoPrincipal['nome_arquivo'], $usuario['id']);
-                error_log('🔍 [SALVAR-PRODUTO] Foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
+                $imagemUrl = $fotoPrincipal['nome_arquivo'];
+                error_log('🔍 [SALVAR-PRODUTO] Foto principal salva: ' . $imagemUrl);
             } else {
                 error_log('🔍 [SALVAR-PRODUTO] Nenhuma imagem principal para upload');
+            }
+            
+            // Atualizar foto principal do produto se tiver imagem
+            if ($imagemUrl) {
+                $this->produtoModel->updateFotoPrincipal($produtoId, $imagemUrl, $usuario['id']);
+                error_log('🔍 [SALVAR-PRODUTO] Foto principal atualizada no produto: ' . $imagemUrl);
             }
             
             // Processar upload das imagens adicionais
