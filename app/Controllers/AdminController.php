@@ -184,13 +184,226 @@ class AdminController extends Controller {
     }
     
     public function novoProduto(Request $request) {
-        echo '<h1>Novo Produto</h1>';
-        echo '<form method="POST" action="/admin/salvar-produto" style="max-width: 600px;">';
-        echo '<input type="text" name="nome" placeholder="Nome do Produto" required><br><br>';
-        echo '<input type="text" name="sku" placeholder="SKU" required><br><br>';
-        echo '<button type="submit">Salvar</button>';
-        echo '<a href="/admin/produtos">Cancelar</a>';
-        echo '</form>';
+        // Conexão com o banco
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        // Obter categorias
+        $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+        $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Layout Bootstrap
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Produto - BRZ Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            border-radius: 0.35rem;
+            margin: 0.2rem 0;
+        }
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .sidebar-brand {
+            color: #fff;
+            font-weight: bold;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                        <div class="sidebar-brand-icon">
+                            <i class="fas fa-shipping-fast"></i>
+                        </div>
+                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                    </a>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/dashboard">
+                                <i class="fas fa-fw fa-tachometer-alt"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/produtos">
+                                <i class="fas fa-fw fa-box"></i>
+                                <span>Produtos</span>
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="sidebar-divider">
+                    
+                    <div class="nav-item">
+                        <a class="nav-link" href="/logout">
+                            <i class="fas fa-fw fa-sign-out-alt"></i>
+                            <span>Sair</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Novo Produto</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <a href="/admin/produtos" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                
+                <form method="POST" action="/admin/salvar-produto" enctype="multipart/form-data">
+                    <div class="row">
+                        <!-- Coluna Esquerda -->
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Informações Básicas</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="nome" class="form-label">Nome do Produto *</label>
+                                        <input type="text" class="form-control" name="nome" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="sku" class="form-label">SKU *</label>
+                                        <input type="text" class="form-control" name="sku" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="descricao_curta" class="form-label">Descrição Curta</label>
+                                        <textarea class="form-control" name="descricao_curta" rows="3"></textarea>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="descricao_completa" class="form-label">Descrição Completa</label>
+                                        <textarea class="form-control" name="descricao_completa" rows="5"></textarea>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="categoria_id" class="form-label">Categoria</label>
+                                        <select class="form-select" name="categoria_id" required>
+                                            <option value="">Selecione uma categoria</option>';
+                                            foreach ($categorias as $cat) {
+                                                echo '<option value="' . $cat['id'] . '">' . htmlspecialchars($cat['nome']) . '</option>';
+                                            }
+        echo '</select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Imagens do Produto</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="imagens[]" class="form-label">Imagens do Produto</label>
+                                        <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                        <div class="form-text">Selecione várias imagens para a galeria do produto</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Coluna Direita -->
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Preço e Estoque</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="valor" class="form-label">Preço *</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            <input type="text" class="form-control" name="valor" required>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="moeda" class="form-label">Moeda</label>
+                                        <select class="form-select" name="moeda">
+                                            <option value="BRL" selected>BRL</option>
+                                            <option value="USD">USD</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="peso" class="form-label">Peso (kg)</label>
+                                        <input type="text" class="form-control" name="peso" placeholder="0.0">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="estoque" class="form-label">Estoque</label>
+                                        <input type="number" class="form-control" name="estoque" placeholder="0">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Status</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="status" class="form-label">Status</label>
+                                        <select class="form-select" name="status">
+                                            <option value="1" selected>Ativo</option>
+                                            <option value="0">Inativo</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="ativo" class="form-label">Visível no site</label>
+                                        <select class="form-select" name="ativo">
+                                            <option value="1" selected>Sim</option>
+                                            <option value="0">Não</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Salvar Produto
+                                </button>
+                                <a href="/admin/produtos" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        
         exit;
     }
     
@@ -198,13 +411,101 @@ class AdminController extends Controller {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
         try {
-            $stmt = $pdo->prepare("INSERT INTO produtos (nome, sku, created_at) VALUES (?, ?, NOW())");
-            $stmt->execute([$request->getParam('nome'), $request->getParam('sku')]);
+            $pdo->beginTransaction();
             
-            header('Location: /admin/produtos');
+            // Inserir produto com todos os campos
+            $sql = "
+                INSERT INTO produtos (
+                    nome, sku, descricao_curta, descricao_completa, categoria_id, 
+                    valor, moeda, peso, estoque, status, ativo, 
+                    created_at, updated_at
+                ) VALUES (
+                    :nome, :sku, :descricao_curta, :descricao_completa, :categoria_id,
+                    :valor, :moeda, :peso, :estoque, :status, :ativo,
+                    NOW(), NOW()
+                )
+            ";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindParam(':nome', $request->getParam('nome'));
+            $stmt->bindParam(':sku', $request->getParam('sku'));
+            $stmt->bindParam(':descricao_curta', $request->getParam('descricao_curta'));
+            $stmt->bindParam(':descricao_completa', $request->getParam('descricao_completa'));
+            $stmt->bindParam(':categoria_id', $request->getParam('categoria_id'));
+            $stmt->bindParam(':valor', str_replace(',', '.', $request->getParam('valor')));
+            $stmt->bindParam(':moeda', $request->getParam('moeda'));
+            $stmt->bindParam(':peso', $request->getParam('peso'));
+            $stmt->bindParam(':estoque', $request->getParam('estoque'));
+            $stmt->bindParam(':status', $request->getParam('status'));
+            $stmt->bindParam(':ativo', $request->getParam('ativo'));
+            
+            $stmt->execute();
+            $produtoId = $pdo->lastInsertId();
+            
+            // Processar upload de imagens (se houver)
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                $imagens = $_FILES['imagens'];
+                $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
+                
+                if (!file_exists($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+                
+                foreach ($imagens['name'] as $key => $name) {
+                    if ($imagens['error'][$key] === UPLOAD_ERR_OK) {
+                        $fileName = time() . '_' . $key . '_' . $name;
+                        $filePath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($imagens['tmp_name'][$key], $filePath)) {
+                            // Inserir no banco
+                            $sqlFoto = "
+                                INSERT INTO produto_fotos (
+                                    produto_id, nome_arquivo, legenda, principal, ordem, created_at
+                                ) VALUES (
+                                    :produto_id, :nome_arquivo, :legenda, :principal, :ordem, NOW()
+                                )
+                            ";
+                            
+                            $stmtFoto = $pdo->prepare($sqlFoto);
+                            $stmtFoto->bindParam(':produto_id', $produtoId);
+                            $stmtFoto->bindParam(':nome_arquivo', $fileName);
+                            $stmtFoto->bindValue(':legenda', '');
+                            $stmtFoto->bindValue(':principal', $key === 0 ? 1 : 0); // Primeira imagem como principal
+                            $stmtFoto->bindValue(':ordem', $key);
+                            $stmtFoto->execute();
+                        }
+                    }
+                }
+            }
+            
+            $pdo->commit();
+            
+            // Redirecionar para edição
+            header('Location: /admin/editar-produto/' . $produtoId);
             exit;
+            
         } catch (\Exception $e) {
-            echo 'Erro: ' . $e->getMessage();
+            $pdo->rollBack();
+            
+            // Exibir erro com layout Bootstrap
+            echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erro - BRZ Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="alert alert-danger">
+            <h4>Erro ao salvar produto</h4>
+            <p>' . $e->getMessage() . '</p>
+            <a href="/admin/novo-produto" class="btn btn-secondary">Voltar</a>
+        </div>
+    </div>
+</body>
+</html>';
             exit;
         }
     }
