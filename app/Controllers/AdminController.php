@@ -92,6 +92,11 @@ class AdminController extends Controller {
         // Exibir filtros
         echo '<h1>Produtos (' . $total . ' encontrados)</h1>';
         
+        // Botão Novo Produto
+        echo '<div style="margin-bottom: 20px;">';
+        echo '<a href="/admin/novo-produto" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">+ Novo Produto</a>';
+        echo '</div>';
+        
         echo '<div style="background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 5px;">';
         echo '<form method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">';
         echo '<input type="text" name="busca" placeholder="Buscar por nome ou SKU" value="' . htmlspecialchars($busca) . '" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
@@ -121,6 +126,12 @@ class AdminController extends Controller {
             echo '<p><strong>Categoria:</strong> ' . htmlspecialchars($produto['categoria_nome'] ?? 'N/A') . '</p>';
             echo '<p><strong>Preço:</strong> R$ ' . number_format($produto['valor'], 2, ',', '.') . '</p>';
             echo '<p><strong>Status:</strong> <span style="color: ' . ($produto['ativo'] ? 'green' : 'red') . ';">' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</span></p>';
+            
+            // Ações CRUD
+            echo '<div style="margin-top: 10px; display: flex; gap: 5px;">';
+            echo '<a href="/admin/editar-produto/' . $produto['id'] . '" style="padding: 5px 10px; background: #ffc107; color: #856404; text-decoration: none; border-radius: 4px;">Editar</a>';
+            echo '<a href="/admin/excluir-produto/' . $produto['id'] . '" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')" style="padding: 5px 10px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">Excluir</a>';
+            echo '</div>';
             
             // Buscar galeria de imagens
             $stmtFotos = $pdo->prepare("
