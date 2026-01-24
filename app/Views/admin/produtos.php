@@ -139,11 +139,11 @@
             </div>
 
             <!-- Paginação -->
-            <?php if ($totalPaginas > 1): ?>
+            <?php if ($total_paginas > 1): ?>
                 <nav aria-label="Paginação">
                     <ul class="pagination justify-content-center">
-                        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>>
+                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
                                 <a class="page-link" href="/admin/produtos?pagina=<?= $i ?><?= $categoria_id ? '&categoria_id=' . $categoria_id : '' ?><?= $status ? '&status=' . $status : '' ?><?= $busca ? '&busca=' . urlencode($busca) : '' ?>">
                                     <?= $i ?>
                                 </a>
