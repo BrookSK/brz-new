@@ -22,7 +22,7 @@ class AdminController extends Controller {
         include __DIR__ . '/../Views/admin/dashboard.php';
         $content = ob_get_clean();
         
-        // Incluir layout
+        // Incluir layout passando a variável $content
         include __DIR__ . '/../Views/layouts/admin.php';
     }
     
@@ -60,7 +60,7 @@ class AdminController extends Controller {
         include __DIR__ . '/../Views/admin/produtos.php';
         $content = ob_get_clean();
         
-        // Incluir layout
+        // Incluir layout passando a variável $content
         include __DIR__ . '/../Views/layouts/admin.php';
     }
     
