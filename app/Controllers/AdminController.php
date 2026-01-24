@@ -574,11 +574,34 @@ class AdminController extends Controller {
             // Validar campos obrigatórios
             $camposObrigatorios = ['nome', 'sku', 'descricao_curta', 'categoria_id', 'valor', 'moeda', 'peso', 'estoque', 'status'];
             foreach ($camposObrigatorios as $campo) {
-                if (!isset($dados[$campo]) || empty($dados[$campo])) {
-                    error_log('❌ [SALVAR-PRODUTO] ERRO: Campo obrigatório vazio: ' . $campo);
+                if (!isset($dados[$campo]) || empty(trim($dados[$campo]))) {
+                    error_log('❌ [SALVAR-PRODUTO] ERRO: Campo obrigatório vazio: ' . $campo . ' - Valor: "' . ($dados[$campo] ?? 'NULL') . '"');
                     throw new \Exception('Campo obrigatório ' . $campo . ' não pode ser vazio');
                 }
             }
+            
+            // Validar especificamente o SKU
+            $sku = trim($dados['sku']);
+            if (empty($sku)) {
+                error_log('❌ [SALVAR-PRODUTO] ERRO: SKU está vazio após trim');
+                throw new \Exception('SKU não pode ser vazio');
+            }
+            
+            // Verificar se SKU já existe
+            $stmt = $this->produtoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM produtos WHERE sku = :sku");
+            $stmt->bindParam(':sku', $sku);
+            $stmt->execute();
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($result['total'] > 0) {
+                error_log('❌ [SALVAR-PRODUTO] ERRO: SKU já existe: ' . $sku);
+                throw new \Exception('SKU "' . $sku . '" já está em uso. Por favor, escolha outro SKU.');
+            }
+            
+            // Limpar e formatar dados
+            $dados['sku'] = $sku;
+            $dados['nome'] = trim($dados['nome']);
+            $dados['descricao_curta'] = trim($dados['descricao_curta']);
             
             error_log('🔍 [SALVAR-PRODUTO] Dados finais para salvar: ' . print_r($dados, true));
             
@@ -663,10 +686,38 @@ class AdminController extends Controller {
             unset($dados['descricao_completa']);
             error_log('🔍 [ATUALIZAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
             
-            // Validar e converter valor
-            if (!isset($dados['valor']) || $dados['valor'] === '') {
-                throw new \Exception('Valor é obrigatório');
+            // Validar campos obrigatórios
+            $camposObrigatorios = ['nome', 'sku', 'descricao_curta', 'categoria_id', 'valor', 'moeda', 'peso', 'estoque', 'status'];
+            foreach ($camposObrigatorios as $campo) {
+                if (!isset($dados[$campo]) || empty(trim($dados[$campo]))) {
+                    error_log('❌ [ATUALIZAR-PRODUTO] ERRO: Campo obrigatório vazio: ' . $campo . ' - Valor: "' . ($dados[$campo] ?? 'NULL') . '"');
+                    throw new \Exception('Campo obrigatório ' . $campo . ' não pode ser vazio');
+                }
             }
+            
+            // Validar especificamente o SKU
+            $sku = trim($dados['sku']);
+            if (empty($sku)) {
+                error_log('❌ [ATUALIZAR-PRODUTO] ERRO: SKU está vazio após trim');
+                throw new \Exception('SKU não pode ser vazio');
+            }
+            
+            // Verificar se SKU já existe (exceto para o próprio produto)
+            $stmt = $this->produtoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM produtos WHERE sku = :sku AND id != :id");
+            $stmt->bindParam(':sku', $sku);
+            $stmt->bindParam(':id', $produtoId);
+            $stmt->execute();
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($result['total'] > 0) {
+                error_log('❌ [ATUALIZAR-PRODUTO] ERRO: SKU já existe: ' . $sku);
+                throw new \Exception('SKU "' . $sku . '" já está em uso. Por favor, escolha outro SKU.');
+            }
+            
+            // Limpar e formatar dados
+            $dados['sku'] = $sku;
+            $dados['nome'] = trim($dados['nome']);
+            $dados['descricao_curta'] = trim($dados['descricao_curta']);
             
             // Converter valor para formato numérico
             $valor = str_replace(',', '.', $dados['valor']);

@@ -484,9 +484,13 @@ function salvarProduto() {
     // Validar campos obrigatórios
     const nome = formData.get('nome');
     const sku = formData.get('sku');
+    const descricao_curta = formData.get('descricao_curta');
     const valor = parseFloat(formData.get('valor'));
     const categoriaId = formData.get('categoria_id');
+    const peso = parseFloat(formData.get('peso'));
+    const estoque = parseInt(formData.get('estoque'));
     
+    // Validação robusta
     if (!nome || nome.trim() === '') {
         alert('Por favor, informe o nome do produto!');
         return;
@@ -494,6 +498,16 @@ function salvarProduto() {
     
     if (!sku || sku.trim() === '') {
         alert('Por favor, informe o SKU do produto!');
+        return;
+    }
+    
+    if (sku.trim().length < 3) {
+        alert('O SKU deve ter pelo menos 3 caracteres!');
+        return;
+    }
+    
+    if (!descricao_curta || descricao_curta.trim() === '') {
+        alert('Por favor, informe a descrição do produto!');
         return;
     }
     
@@ -507,10 +521,23 @@ function salvarProduto() {
         return;
     }
     
-    // Garantir que campos numéricos sejam enviados corretamente
+    if (isNaN(peso) || peso < 0) {
+        alert('Por favor, informe um peso válido!');
+        return;
+    }
+    
+    if (isNaN(estoque) || estoque < 0) {
+        alert('Por favor, informe um estoque válido!');
+        return;
+    }
+    
+    // Limpar e formatar dados
+    formData.set('nome', nome.trim());
+    formData.set('sku', sku.trim().toUpperCase());
+    formData.set('descricao_curta', descricao_curta.trim());
     formData.set('valor', valor.toFixed(2));
-    formData.set('peso', parseFloat(formData.get('peso') || 0).toFixed(3));
-    formData.set('estoque', parseInt(formData.get('estoque') || 0));
+    formData.set('peso', peso.toFixed(3));
+    formData.set('estoque', estoque);
     
     console.log('🔍 [PRODUTOS] Dados finais antes de enviar:');
     for (let [key, value] of formData.entries()) {
