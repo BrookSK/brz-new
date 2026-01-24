@@ -89,96 +89,228 @@ class AdminController extends Controller {
         $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
         $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
         
-        // Exibir filtros
-        echo '<h1>Produtos (' . $total . ' encontrados)</h1>';
-        
-        // Botão Novo Produto
-        echo '<div style="margin-bottom: 20px;">';
-        echo '<a href="/admin/novo-produto" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">+ Novo Produto</a>';
-        echo '</div>';
-        
-        echo '<div style="background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 5px;">';
-        echo '<form method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">';
-        echo '<input type="text" name="busca" placeholder="Buscar por nome ou SKU" value="' . htmlspecialchars($busca) . '" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
-        
-        echo '<select name="status" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
-        echo '<option value="">Todos os status</option>';
-        echo '<option value="ativo" ' . ($status === 'ativo' ? 'selected' : '') . '>Ativos</option>';
-        echo '<option value="inativo" ' . ($status === 'inativo' ? 'selected' : '') . '>Inativos</option>';
-        echo '</select>';
-        
-        echo '<select name="categoria_id" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
-        echo '<option value="">Todas categorias</option>';
-        foreach ($categorias as $cat) {
-            echo '<option value="' . $cat['id'] . '" ' . ($categoria_id == $cat['id'] ? 'selected' : '') . '>' . htmlspecialchars($cat['nome']) . '</option>';
+        // Layout Bootstrap completo
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - BRZ Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
         }
-        echo '</select>';
-        
-        echo '<button type="submit" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Filtrar</button>';
-        echo '</form>';
-        echo '</div>';
-        
-        // Listagem de produtos
-        foreach ($produtos as $produto) {
-            echo '<div style="border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; background: white;">';
-            echo '<h3>' . htmlspecialchars($produto['nome']) . '</h3>';
-            echo '<p><strong>SKU:</strong> ' . htmlspecialchars($produto['sku']) . '</p>';
-            echo '<p><strong>Categoria:</strong> ' . htmlspecialchars($produto['categoria_nome'] ?? 'N/A') . '</p>';
-            echo '<p><strong>Preço:</strong> R$ ' . number_format($produto['valor'], 2, ',', '.') . '</p>';
-            echo '<p><strong>Status:</strong> <span style="color: ' . ($produto['ativo'] ? 'green' : 'red') . ';">' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</span></p>';
-            
-            // Ações CRUD
-            echo '<div style="margin-top: 10px; display: flex; gap: 5px;">';
-            echo '<a href="/admin/editar-produto/' . $produto['id'] . '" style="padding: 5px 10px; background: #ffc107; color: #856404; text-decoration: none; border-radius: 4px;">Editar</a>';
-            echo '<form method="POST" action="/admin/excluir-produto/' . $produto['id'] . '" style="display: inline;">';
-            echo '<button type="submit" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Excluir</button>';
-            echo '</form>';
-            echo '</div>';
-            
-            // Buscar galeria de imagens
-            $stmtFotos = $pdo->prepare("
-                SELECT * FROM produto_fotos 
-                WHERE produto_id = :produto_id 
-                ORDER BY principal DESC, ordem ASC
-            ");
-            $stmtFotos->bindParam(':produto_id', $produto['id']);
-            $stmtFotos->execute();
-            $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
-            
-            if (!empty($fotos)) {
-                echo '<p><strong>Galeria (' . count($fotos) . ' imagens):</strong></p>';
-                foreach ($fotos as $foto) {
-                    $url = 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'];
-                    echo '<img src="' . $url . '" alt="' . htmlspecialchars($foto['legenda'] ?? '') . '" style="width: 100px; height: 100px; margin: 2px; border: 1px solid #ddd; border-radius: 4px; object-fit: cover;">';
-                    if ($foto['principal']) {
-                        echo '<span style="color: green; font-size: 12px;">[PRINCIPAL]</span>';
-                    }
-                    echo '<br>';
-                }
-            } else {
-                echo '<p><strong>Galeria:</strong> Nenhuma imagem</p>';
-            }
-            
-            echo '</div>';
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            border-radius: 0.35rem;
+            margin: 0.2rem 0;
         }
-        
-        // Paginação
-        if ($totalPaginas > 1) {
-            echo '<div style="text-align: center; margin: 20px 0;">';
-            for ($i = 1; $i <= $totalPaginas; $i++) {
-                $url = "/admin/produtos?pagina={$i}";
-                if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
-                if (!empty($status)) $url .= "&status={$status}";
-                if (!empty($categoria_id)) $url .= "&categoria_id={$categoria_id}";
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .sidebar-brand {
+            color: #fff;
+            font-weight: bold;
+            padding: 1rem;
+        }
+        .product-card {
+            transition: transform 0.2s;
+        }
+        .product-card:hover {
+            transform: translateY(-2px);
+        }
+        .product-image {
+            height: 200px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                        <div class="sidebar-brand-icon">
+                            <i class="fas fa-shipping-fast"></i>
+                        </div>
+                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                    </a>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/dashboard">
+                                <i class="fas fa-fw fa-tachometer-alt"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/produtos">
+                                <i class="fas fa-fw fa-box"></i>
+                                <span>Produtos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/pedidos">
+                                <i class="fas fa-fw fa-shopping-cart"></i>
+                                <span>Pedidos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/usuarios">
+                                <i class="fas fa-fw fa-users"></i>
+                                <span>Usuários</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/pagamentos">
+                                <i class="fas fa-fw fa-credit-card"></i>
+                                <span>Pagamentos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/configuracoes">
+                                <i class="fas fa-fw fa-cog"></i>
+                                <span>Configurações</span>
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="sidebar-divider">
+                    
+                    <div class="nav-item">
+                        <a class="nav-link" href="/logout">
+                            <i class="fas fa-fw fa-sign-out-alt"></i>
+                            <span>Sair</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Produtos (' . $total . ' encontrados)</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <a href="/admin/novo-produto" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Novo Produto
+                        </a>
+                    </div>
+                </div>
                 
-                if ($i == $pagina) {
-                    echo '<span style="padding: 8px 12px; background: #007bff; color: white; border-radius: 4px; margin: 0 2px;">' . $i . '</span>';
-                } else {
-                    echo '<a href="' . $url . '" style="padding: 8px 12px; background: #f8f9fa; color: #333; text-decoration: none; border: 1px solid #ddd; border-radius: 4px; margin: 0 2px;">' . $i . '</a>';
+                <!-- Filtros -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <form method="GET" class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" name="busca" placeholder="Buscar por nome ou SKU" value="' . htmlspecialchars($busca) . '">
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" name="status">
+                                    <option value="">Todos os status</option>
+                                    <option value="ativo" ' . ($status === 'ativo' ? 'selected' : '') . '>Ativos</option>
+                                    <option value="inativo" ' . ($status === 'inativo' ? 'selected' : '') . '>Inativos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" name="categoria_id">
+                                    <option value="">Todas categorias</option>';
+                                    foreach ($categorias as $cat) {
+                                        echo '<option value="' . $cat['id'] . '" ' . ($categoria_id == $cat['id'] ? 'selected' : '') . '>' . htmlspecialchars($cat['nome']) . '</option>';
+                                    }
+        echo '</select>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-outline-primary">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Lista de Produtos -->
+                <div class="row">';
+                
+                foreach ($produtos as $produto) {
+                    // Buscar galeria de imagens
+                    $stmtFotos = $pdo->prepare("
+                        SELECT * FROM produto_fotos 
+                        WHERE produto_id = :produto_id 
+                        ORDER BY principal DESC, ordem ASC
+                    ");
+                    $stmtFotos->bindParam(':produto_id', $produto['id']);
+                    $stmtFotos->execute();
+                    $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
+                    
+                    $imagemPrincipal = '';
+                    if (!empty($fotos)) {
+                        $imagemPrincipal = 'https://novobr.brazilianashop.com.br' . $fotos[0]['nome_arquivo'];
+                    }
+                    
+                    echo '<div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card product-card h-100">
+                            <img src="' . ($imagemPrincipal ?: 'https://via.placeholder.com/300x200') . '" class="card-img-top product-image" alt="' . htmlspecialchars($produto['nome']) . '">
+                            <div class="card-body">
+                                <h5 class="card-title">' . htmlspecialchars($produto['nome']) . '</h5>
+                                <p class="card-text text-muted small">SKU: ' . htmlspecialchars($produto['sku']) . '</p>
+                                <p class="card-text">
+                                    <span class="badge bg-info">' . htmlspecialchars($produto['categoria_nome'] ?? 'N/A') . '</span>
+                                    <span class="badge ' . ($produto['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                </p>
+                                <p class="card-text fw-bold">R$ ' . number_format($produto['valor'], 2, ',', '.') . '</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">' . count($fotos) . ' imagens</small>
+                                    <div>
+                                        <a href="/admin/editar-produto/' . $produto['id'] . '" class="btn btn-sm btn-outline-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="/admin/excluir-produto/' . $produto['id'] . '" style="display: inline;">
+                                            <button type="submit" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
                 }
-            }
-            echo '</div>';
-        }
+                
+                echo '</div>
+                
+                <!-- Paginação -->
+                ' . ($totalPaginas > 1 ? '
+                <nav aria-label="Paginação">
+                    <ul class="pagination justify-content-center">
+                        ' . for ($i = 1; $i <= $totalPaginas; $i++) {
+                            $url = "/admin/produtos?pagina={$i}";
+                            if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
+                            if (!empty($status)) $url .= "&status={$status}";
+                            if (!empty($categoria_id)) $url .= "&categoria_id={$categoria_id}";
+                            
+                            if ($i == $pagina) {
+                                echo '<li class="page-item active"><a class="page-link" href="#">' . $i . '</a></li>';
+                            } else {
+                                echo '<li class="page-item"><a class="page-link" href="' . $url . '">' . $i . '</a></li>';
+                            }
+                        } . '
+                    </ul>
+                </nav>
+                ' : '') . '
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
         
         exit;
     }
