@@ -47,10 +47,11 @@ $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
 // Área Administrativa
 $router->get('/admin', function() {
-    echo '<h1>Área Admin</h1><p><a href="/admin/dashboard">Ir para Dashboard</a> | <a href="/admin/produtos">Gerenciar Produtos</a> | <a href="/admin/novo-produto">Novo Produto</a></p>';
+    echo '<h1>Área Admin</h1><p><a href="/admin/dashboard">Ir para Dashboard</a> | <a href="/admin/produtos">Gerenciar Produtos</a> | <a href="/admin/novo-produto">Novo Produto</a> | <a href="/admin/pedidos">Pedidos</a></p>';
 });
 $router->get('/admin/dashboard', 'AdminController', 'dashboard');
 $router->get('/admin/produtos', 'AdminController', 'produtos');
+$router->get('/admin/pedidos', 'AdminController', 'pedidos');
 $router->get('/admin/novo-produto', 'AdminController', 'novoProduto');
 $router->post('/admin/salvar-produto', 'AdminController', 'salvarProduto');
 $router->get('/admin/editar-produto/{id}', 'AdminController', 'editarProduto');
