@@ -99,13 +99,14 @@
                             <label class="form-label">Imagem Atual</label>
                             <div class="mb-3">
                                 <?php 
-                                // Estilo WordPress: usar URL direta do banco
-                                $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : '/uploads/produtos/placeholder.jpg';
+                                // Placeholder inline para evitar 404
+                                $placeholder = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wA==';
+                                $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : $placeholder;
                                 ?>
                                 <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
                                      alt="Imagem atual" 
                                      style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;"
-                                     onerror="this.src='/uploads/produtos/placeholder.jpg'">
+                                     onerror="this.src='<?= $placeholder ?>'">
                             </div>
                         </div>
                     <?php endif; ?>

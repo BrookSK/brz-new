@@ -82,14 +82,15 @@
                                     <td><?= $produto['id'] ?></td>
                                     <td>
                                         <?php 
-                                        // Estilo WordPress: usar URL direta do banco
-                                        $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : '/uploads/produtos/placeholder.jpg';
+                                        // Placeholder inline para evitar 404
+                                        $placeholder = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wA==';
+                                        $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : $placeholder;
                                         ?>
                                         <img src="<?= $fotoUrl ?>" 
                                              alt="<?= htmlspecialchars($produto['nome']) ?>"
                                              class="img-thumbnail"
                                              style="width: 60px; height: 60px; object-fit: cover;"
-                                             onerror="this.src='/uploads/produtos/placeholder.jpg'">
+                                             onerror="this.src='<?= $placeholder ?>'">
                                     </td>
                                     <td>
                                         <div>
