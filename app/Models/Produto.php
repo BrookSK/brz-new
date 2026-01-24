@@ -190,6 +190,14 @@ class Produto extends Model {
     public function updateFotoPrincipal($id, $fotoPrincipal, $usuarioId = null) {
         error_log('🔍 [PRODUTO-MODEL] Atualizando foto principal do produto ID: ' . $id . ' - Foto: ' . $fotoPrincipal);
         
+        // Se já for URL completa, usar diretamente
+        if (strpos($fotoPrincipal, '/uploads/') === 0) {
+            $urlCompleta = $fotoPrincipal;
+        } else {
+            // Se for apenas nome do arquivo, criar URL completa
+            $urlCompleta = '/uploads/produtos/' . $fotoPrincipal;
+        }
+        
         $stmt = $this->getConnection()->prepare("
             UPDATE {$this->table} 
             SET foto_principal = :foto_principal, 
@@ -198,9 +206,10 @@ class Produto extends Model {
         ");
         
         $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':foto_principal', $fotoPrincipal);
+        $stmt->bindParam(':foto_principal', $urlCompleta);
         
         $result = $stmt->execute();
+        error_log('🔍 [PRODUTO-MODEL] URL salva no banco: ' . $urlCompleta);
         error_log('🔍 [PRODUTO-MODEL] Resultado da atualização da foto principal: ' . ($result ? 'true' : 'false'));
         error_log('🔍 [PRODUTO-MODEL] SQL Error: ' . print_r($stmt->errorInfo(), true));
         

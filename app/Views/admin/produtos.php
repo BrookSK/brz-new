@@ -82,12 +82,8 @@
                                     <td><?= $produto['id'] ?></td>
                                     <td>
                                         <?php 
-                                        $fotoUrl = '';
-                                        if (!empty($produto['foto_principal'])) {
-                                            $fotoUrl = '/uploads/produtos/' . $produto['foto_principal'];
-                                        } else {
-                                            $fotoUrl = '/uploads/produtos/placeholder.jpg';
-                                        }
+                                        // Estilo WordPress: usar URL direta do banco
+                                        $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : '/uploads/produtos/placeholder.jpg';
                                         ?>
                                         <img src="<?= $fotoUrl ?>" 
                                              alt="<?= htmlspecialchars($produto['nome']) ?>"

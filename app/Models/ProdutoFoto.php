@@ -195,6 +195,8 @@ class ProdutoFoto extends Model {
     }
     
     public function uploadFoto($arquivo, $produtoId) {
+        error_log('🔍 [PRODUTO-FOTO] Iniciando upload da foto para produto ID: ' . $produtoId);
+        
         // Validar arquivo
         $tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
         $tamanhoMaximo = 5 * 1024 * 1024; // 5MB
@@ -226,10 +228,17 @@ class ProdutoFoto extends Model {
         // Opcional: redimensionar imagem
         $this->redimensionarImagem($caminhoCompleto, $arquivo['type']);
         
-        // Salvar no banco de dados
+        // Criar URL completa (estilo WordPress)
+        $urlCompleta = '/uploads/produtos/' . $nomeArquivo;
+        
+        error_log('🔍 [PRODUTO-FOTO] Arquivo salvo: ' . $nomeArquivo);
+        error_log('🔍 [PRODUTO-FOTO] URL gerada: ' . $urlCompleta);
+        
+        // Salvar no banco de dados com URL completa
         $fotoData = [
             'produto_id' => $produtoId,
-            'nome_arquivo' => $nomeArquivo,
+            'nome_arquivo' => $urlCompleta, // Salvar URL completa em vez de apenas nome
+            'arquivo_original' => $arquivo['name'],
             'legenda' => pathinfo($arquivo['name'], PATHINFO_FILENAME),
             'principal' => 1, // Marcar como principal por padrão
             'ordem' => 0
@@ -237,9 +246,12 @@ class ProdutoFoto extends Model {
         
         $fotoId = $this->create($fotoData);
         
+        error_log('🔍 [PRODUTO-FOTO] Foto salva no banco com ID: ' . $fotoId);
+        
         return [
             'id' => $fotoId,
-            'nome_arquivo' => $nomeArquivo
+            'nome_arquivo' => $urlCompleta, // Retornar URL completa
+            'url' => $urlCompleta
         ];
     }
     

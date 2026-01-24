@@ -98,7 +98,11 @@
                         <div class="col-12">
                             <label class="form-label">Imagem Atual</label>
                             <div class="mb-3">
-                                <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>?v=<?= time() ?>" 
+                                <?php 
+                                // Estilo WordPress: usar URL direta do banco
+                                $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : '/uploads/produtos/placeholder.jpg';
+                                ?>
+                                <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
                                      alt="Imagem atual" 
                                      style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;"
                                      onerror="this.src='/uploads/produtos/placeholder.jpg'">
