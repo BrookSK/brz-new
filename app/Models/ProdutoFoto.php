@@ -154,17 +154,44 @@ class ProdutoFoto extends Model {
     }
     
     public function marcarComoPrincipal($fotoId) {
-        // Primeiro, remover todas as fotos principais deste produto
-        $stmt = $this->connection->prepare("
-            UPDATE {$this->table} 
-            SET principal = FALSE 
-            WHERE produto_id = (SELECT produto_id FROM {$this->table} WHERE id = :id)
-        ");
+        error_log('🔍 [PRODUTO-FOTO] Marcando foto como principal. ID: ' . $fotoId);
+        
+        // Primeiro, obter o produto_id desta foto
+        $stmt = $this->connection->prepare("SELECT produto_id FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $fotoId);
         $stmt->execute();
+        $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        // Depois, marcar esta foto como principal
-        return $this->update($fotoId, ['principal' => TRUE]);
+        if (!$produto) {
+            error_log('❌ [PRODUTO-FOTO] Foto não encontrada: ' . $fotoId);
+            return false;
+        }
+        
+        error_log('🔍 [PRODUTO-FOTO] Produto ID: ' . $produto['produto_id']);
+        
+        // Remover todas as fotos principais deste produto
+        $stmt = $this->connection->prepare("
+            UPDATE {$this->table} 
+            SET principal = 0 
+            WHERE produto_id = :produto_id
+        ");
+        $stmt->bindParam(':produto_id', $produto['produto_id']);
+        $stmt->execute();
+        
+        error_log('🔍 [PRODUTO-FOTO] Fotos principais removidas do produto ' . $produto['produto_id']);
+        
+        // Marcar esta foto como principal
+        $stmt = $this->connection->prepare("
+            UPDATE {$this->table} 
+            SET principal = 1 
+            WHERE id = :id
+        ");
+        $stmt->bindParam(':id', $fotoId);
+        $result = $stmt->execute();
+        
+        error_log('🔍 [PRODUTO-FOTO] Foto marcada como principal. ID: ' . $fotoId . ' - Resultado: ' . ($result ? 'true' : 'false'));
+        
+        return $result;
     }
     
     public function uploadFoto($arquivo, $produtoId) {
@@ -204,7 +231,7 @@ class ProdutoFoto extends Model {
             'produto_id' => $produtoId,
             'nome_arquivo' => $nomeArquivo,
             'legenda' => pathinfo($arquivo['name'], PATHINFO_FILENAME),
-            'principal' => false,
+            'principal' => 1, // Marcar como principal por padrão
             'ordem' => 0
         ];
         
