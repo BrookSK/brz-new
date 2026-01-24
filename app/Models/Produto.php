@@ -14,6 +14,9 @@ class Produto extends Model {
         $stmt->execute();
         $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
         
+        // DEBUG TEMPORÁRIO
+        error_log('🔍 [PRODUTO-MODEL] Produto ID ' . $id . ' direto do banco: ' . print_r($produto, true));
+        
         if ($produto) {
             // Garantir que todos os campos tenham valores padrão
             $produto = array_merge([
@@ -38,6 +41,8 @@ class Produto extends Model {
             $produto['peso'] = floatval($produto['peso']);
             $produto['estoque'] = intval($produto['estoque']);
             $produto['categoria_id'] = intval($produto['categoria_id']);
+            
+            error_log('🔍 [PRODUTO-MODEL] Produto ID ' . $id . ' após normalização: ' . print_r($produto, true));
         }
         
         return $produto;

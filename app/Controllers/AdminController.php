@@ -663,6 +663,9 @@ class AdminController extends Controller {
         try {
             $produto = $this->produtoModel->find($produtoId);
             
+            // DEBUG TEMPORÁRIO
+            error_log('🔍 [PRODUTO-CONTROLLER] Produto ID ' . $produtoId . ' retornado do model: ' . print_r($produto, true));
+            
             if (!$produto) {
                 $this->json(['success' => false, 'error' => 'Produto não encontrado'], 404);
                 return;
@@ -674,6 +677,7 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
+            error_log('🔍 [PRODUTO-CONTROLLER] Erro: ' . $e->getMessage());
             $this->json(['success' => false, 'error' => 'Erro ao carregar produto: ' . $e->getMessage()], 500);
         }
     }
