@@ -227,11 +227,13 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Imagem Principal</label>
-                            <input type="file" name="imagem_principal" class="form-control" accept="image/*">
+                            <input type="file" name="imagem_principal" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp">
+                            <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB)</small>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Imagens Adicionais</label>
-                            <input type="file" name="imagens[]" class="form-control" accept="image/*" multiple>
+                            <input type="file" name="imagens[]" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp" multiple>
+                            <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB por imagem)</small>
                         </div>
                     </div>
                 </form>
@@ -248,48 +250,74 @@
 function editarProduto(id) {
     console.log('🔍 [PRODUTOS] editarProduto() chamada com ID:', id);
     
+    // Mostrar loading no modal
+    document.getElementById('modalProdutoTitle').textContent = 'Carregando...';
+    
     fetch(`/admin/produto/${id}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('🔍 [PRODUTOS] Status da resposta:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('🔍 [PRODUTOS] Dados recebidos:', data);
+            
             if (data.success) {
                 console.log('🔍 [PRODUTOS] Dados do produto recebidos:', data.produto);
                 
                 // Preencher o modal
                 document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
-                document.getElementById('produto_id').value = data.produto.id;
-                document.querySelector('input[name="nome"]').value = data.produto.nome || '';
-                document.querySelector('input[name="sku"]').value = data.produto.sku || '';
-                document.querySelector('textarea[name="descricao_curta"]').value = data.produto.descricao_curta || '';
-                document.querySelector('textarea[name="descricao_completa"]').value = data.produto.descricao_completa || '';
-                document.querySelector('select[name="categoria_id"]').value = data.produto.categoria_id;
-                document.querySelector('input[name="valor"]').value = data.produto.valor || '';
-                document.querySelector('select[name="moeda"]').value = data.produto.moeda || 'USD';
-                document.querySelector('input[name="peso"]').value = data.produto.peso || '';
-                document.querySelector('input[name="estoque"]').value = data.produto.estoque || '';
-                document.querySelector('select[name="status"]').value = data.produto.status || 'ativo';
+                document.getElementById('produto_id').value = data.produto.id || '';
                 
-                // Forçar moeda USD para novos produtos
-                if (!data.produto.id) {
-                    document.querySelector('select[name="moeda"]').value = 'USD';
+                // Preencher campos com validação
+                const campos = {
+                    'nome': data.produto.nome || '',
+                    'sku': data.produto.sku || '',
+                    'descricao_curta': data.produto.descricao_curta || '',
+                    'descricao_completa': data.produto.descricao_completa || '',
+                    'categoria_id': data.produto.categoria_id || '',
+                    'valor': data.produto.valor || '',
+                    'moeda': data.produto.moeda || 'USD',
+                    'peso': data.produto.peso || '',
+                    'estoque': data.produto.estoque || '',
+                    'status': data.produto.status || 'ativo'
+                };
+                
+                // Preencher cada campo
+                Object.keys(campos).forEach(campo => {
+                    const elemento = document.querySelector(`[name="${campo}"]`);
+                    if (elemento) {
+                        elemento.value = campos[campo];
+                        console.log(`🔍 [PRODUTOS] Campo ${campo} preenchido com:`, campos[campo]);
+                    } else {
+                        console.warn(`🔍 [PRODUTOS] Campo ${campo} não encontrado`);
+                    }
+                });
+                
+                // Forçar moeda USD
+                const moedaSelect = document.querySelector('select[name="moeda"]');
+                if (moedaSelect) {
+                    moedaSelect.value = 'USD';
                 }
                 
-                // Atualizar o símbolo da moeda no campo de valor
-                const valorCurrency = document.getElementById('valor-currency');
-                if (valorCurrency) {
-                    valorCurrency.textContent = '$';
-                    console.log('🔍 [PRODUTOS] Símbolo da moeda atualizado para:', valorCurrency.textContent);
-                }
+                // Abrir modal
+                const modal = new bootstrap.Modal(document.getElementById('modalProduto'));
+                modal.show();
                 
-                console.log('🔍 [PRODUTOS] Modal preenchido com sucesso');
-                new bootstrap.Modal(document.getElementById('modalProduto')).show();
+                console.log('🔍 [PRODUTOS] Modal preenchido e aberto com sucesso');
             } else {
                 console.error('❌ [PRODUTOS] Erro ao carregar produto:', data.error);
-                alert('Erro ao carregar produto: ' + data.error);
+                alert('Erro ao carregar produto: ' + (data.error || 'Erro desconhecido'));
             }
         })
         .catch(error => {
             console.error('❌ [PRODUTOS] Erro na requisição:', error);
             alert('Erro ao carregar produto. Verifique o console para mais detalhes.');
+            
+            // Resetar título do modal
+            document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
         });
 }
 
@@ -543,8 +571,11 @@ function salvarProduto() {
     formData.set('moeda', 'USD');
     console.log('🔍 [PRODUTOS] Moeda forçada para USD no salvamento');
     
-    const id = formData.get('id');
-    const url = id ? `/admin/atualizar-produto/${id}` : '/admin/salvar-produto';
+    // Verificar se é edição ou criação
+    const produtoId = formData.get('id');
+    const isEdicao = produtoId && produtoId !== '';
+    
+    const url = isEdicao ? `/admin/atualizar-produto/${produtoId}` : '/admin/salvar-produto';
     
     // Validar se o valor está em formato numérico
     const valor = parseFloat(formData.get('valor'));
@@ -553,7 +584,7 @@ function salvarProduto() {
         return;
     }
     
-    console.log('🔍 [PRODUTOS] Salvando produto com valor USD:', valor);
+    console.log('🔍 [PRODUTOS] Salvando produto - Edição:', isEdicao, 'ID:', produtoId, 'Valor USD:', valor);
     
     fetch(url, {
         method: 'POST',
@@ -562,11 +593,26 @@ function salvarProduto() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Produto salvo com sucesso em USD!');
+            const mensagem = isEdicao ? 
+                'Produto atualizado com sucesso em USD!' : 
+                'Produto criado com sucesso em USD!';
+            alert(mensagem);
+            
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalProduto'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Recarregar página para mostrar alterações
             location.reload();
         } else {
             alert('Erro ao salvar produto: ' + data.error);
         }
+    })
+    .catch(error => {
+        console.error('🔍 [PRODUTOS] Erro ao salvar produto:', error);
+        alert('Erro ao salvar produto. Verifique o console para mais detalhes.');
     });
 }
 

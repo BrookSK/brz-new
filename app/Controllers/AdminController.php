@@ -651,6 +651,29 @@ class AdminController extends Controller {
         }
     }
     
+    public function produto(Request $request) {
+        $this->authService->requerPermissao('read');
+        
+        $produtoId = $request->getParam('id');
+        
+        try {
+            $produto = $this->produtoModel->find($produtoId);
+            
+            if (!$produto) {
+                $this->json(['success' => false, 'error' => 'Produto não encontrado'], 404);
+                return;
+            }
+            
+            $this->json([
+                'success' => true,
+                'produto' => $produto
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao carregar produto: ' . $e->getMessage()], 500);
+        }
+    }
+    
     public function alterarStatusProduto(Request $request) {
         $this->authService->requerPermissao('update');
         
