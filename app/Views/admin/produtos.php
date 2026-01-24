@@ -82,17 +82,18 @@
                                     <td><?= $produto['id'] ?></td>
                                     <td>
                                         <?php 
-                                        $fotoPath = '/uploads/produtos/' . $produto['foto_principal'];
-                                        $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                                        $fotoUrl = '';
+                                        if (!empty($produto['foto_principal'])) {
+                                            $fotoUrl = '/uploads/produtos/' . $produto['foto_principal'];
+                                        } else {
+                                            $fotoUrl = '/uploads/produtos/placeholder.svg';
+                                        }
                                         ?>
-                                        <?php if ($fotoExists): ?>
-                                            <img src="<?= $fotoPath ?>?v=<?= time() ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\\'width: 50px; height: 50px; background-color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 4px;\\'><i class=\\'fas fa-image\\' style=\\'color: white; font-size: 20px;\\'></i></div>'">
-                                        <?php else: ?>
-                                            <!-- Ícone placeholder quando não há imagem -->
-                                            <div style="width: 50px; height: 50px; background-color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
-                                                <i class="fas fa-image" style="color: white; font-size: 20px;"></i>
-                                            </div>
-                                        <?php endif; ?>
+                                        <img src="<?= $fotoUrl ?>" 
+                                             alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                             class="img-thumbnail"
+                                             style="width: 60px; height: 60px; object-fit: cover;"
+                                             onerror="this.src='/uploads/produtos/placeholder.svg'">
                                     </td>
                                     <td>
                                         <div>

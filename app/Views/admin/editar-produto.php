@@ -98,18 +98,10 @@
                         <div class="col-12">
                             <label class="form-label">Imagem Atual</label>
                             <div class="mb-3">
-                                <?php 
-                                $fotoPath = '/uploads/produtos/' . $produto['foto_principal'];
-                                $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
-                                ?>
-                                <?php if ($fotoExists): ?>
-                                    <img src="<?= $fotoPath ?>?v=<?= time() ?>" alt="Imagem atual" style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;">
-                                <?php else: ?>
-                                    <div class="alert alert-warning">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>
-                                        Imagem não encontrada no servidor
-                                    </div>
-                                <?php endif; ?>
+                                <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>?v=<?= time() ?>" 
+                                     alt="Imagem atual" 
+                                     style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;"
+                                     onerror="this.src='/uploads/produtos/placeholder.svg'">
                             </div>
                         </div>
                     <?php endif; ?>

@@ -51,18 +51,17 @@
                     <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
                             <?php 
-                            $fotoPath = '/uploads/produtos/' . $produto['foto_principal'];
-                            $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                            $fotoUrl = '';
+                            if (!empty($produto['foto_principal'])) {
+                                $fotoUrl = '/uploads/produtos/' . $produto['foto_principal'];
+                            } else {
+                                $fotoUrl = '/uploads/produtos/placeholder.svg';
+                            }
                             ?>
-                            <?php if ($fotoExists): ?>
-                                <img src="<?= $fotoPath ?>" 
-                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                     class="card-img-top product-image">
-                            <?php else: ?>
-                                <img src="/uploads/produtos/placeholder.svg" 
-                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                     class="card-img-top product-image">
-                            <?php endif; ?>
+                            <img src="<?= $fotoUrl ?>" 
+                                 alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                 class="card-img-top product-image"
+                                 onerror="this.src='/uploads/produtos/placeholder.svg'">
                              
                             <!-- Badge de estoque -->
                             <?php if ($produto['estoque'] <= 5): ?>
