@@ -220,9 +220,16 @@
                             $relacionadoPath = '/uploads/produtos/' . ($relacionado['foto_principal'] ?? '');
                             $relacionadoExists = !empty($relacionado['foto_principal']) && file_exists(__DIR__ . '/../../public' . $relacionadoPath);
                             ?>
-                            <img src="<?= $relacionadoExists ? $relacionadoPath : '/uploads/produtos/placeholder.svg' ?>" 
-                                 alt="<?= htmlspecialchars($relacionado['nome']) ?>"
-                                 class="card-img-top product-image">
+                            <?php if ($relacionadoExists): ?>
+                                <img src="<?= 'https://novobr.brazilianashop.com.br' . $relacionadoPath ?>?v=<?= time() ?>" 
+                                     alt="<?= htmlspecialchars($relacionado['nome']) ?>"
+                                     class="card-img-top"
+                                     style="height: 150px; object-fit: cover;">
+                            <?php else: ?>
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 150px;">
+                                    <i class="fas fa-image text-muted fa-2x"></i>
+                                </div>
+                            <?php endif; ?>
                         </div>
                         <div class="card-body">
                             <h6 class="card-title text-dark"><?= htmlspecialchars($relacionado['nome']) ?></h6>

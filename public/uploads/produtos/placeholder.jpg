@@ -1,0 +1,14 @@
+<?php
+// Arquivo para capturar requisições do placeholder e redirecionar
+if (strpos($_SERVER['REQUEST_URI'], 'placeholder.jpg') !== false) {
+    error_log('🔍 [PLACEHOLDER-DEBUG] Requisição para placeholder detectada: ' . $_SERVER['REQUEST_URI']);
+    error_log('🔍 [PLACEHOLDER-DEBUG] Referer: ' . ($_SERVER['HTTP_REFERER'] ?? 'N/A'));
+    error_log('🔍 [PLACEHOLDER-DEBUG] User Agent: ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'N/A'));
+    error_log('🔍 [PLACEHOLDER-DEBUG] IP: ' . ($_SERVER['REMOTE_ADDR'] ?? 'N/A'));
+    
+    // Retornar uma imagem transparente 1x1
+    header('Content-Type: image/jpeg');
+    echo base64_decode('/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/8A8A');
+    exit;
+}
+?>
