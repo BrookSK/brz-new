@@ -581,16 +581,20 @@ class AdminController extends Controller {
                 throw new \Exception('Nenhuma imagem enviada ou erro no upload');
             }
             
-            $imagemUpload = $this->imagemModel->upload($_FILES['imagem'], 'produto');
+            // Usar sistema antigo de upload (ProdutoFoto)
+            $fotoUpload = $this->produtoFotoModel->uploadFoto($_FILES['imagem'], null); // null pois ainda não tem produto_id
+            
+            // Gerar URL completa
+            $url = '/uploads/produtos/' . $fotoUpload['nome_arquivo'];
             
             echo json_encode([
                 'success' => true,
                 'imagem' => [
-                    'id' => $imagemUpload['id'],
-                    'url' => $imagemUpload['url'],
-                    'href' => $imagemUpload['href'],  // URL para uso em href
-                    'src' => $imagemUpload['src'],   // URL para uso em src
-                    'nome_arquivo' => $imagemUpload['nome_arquivo']
+                    'id' => $fotoUpload['id'],
+                    'url' => $url,
+                    'href' => $url,  // URL para uso em href
+                    'src' => $url,   // URL para uso em src
+                    'nome_arquivo' => $fotoUpload['nome_arquivo']
                 ]
             ]);
             
@@ -692,15 +696,17 @@ class AdminController extends Controller {
                 throw new \Exception('Erro ao criar produto no banco de dados');
             }
             
-            // Processar upload da imagem principal usando novo sistema
+            // Processar upload da imagem principal usando sistema antigo (ProdutoFoto)
             if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
-                error_log('🔍 [SALVAR-PRODUTO] Processando upload da imagem principal com novo sistema');
-                $imagemUpload = $this->imagemModel->upload($_FILES['imagem_principal'], 'produto');
+                error_log('🔍 [SALVAR-PRODUTO] Processando upload da imagem principal com sistema antigo');
+                $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
                 
-                // Atualizar produto com a URL da imagem (já pronta para exibição)
-                $this->produtoModel->updateFotoPrincipal($produtoId, $imagemUpload['href'], $usuario['id']);
-                error_log('🔍 [SALVAR-PRODUTO] Imagem principal salva: ' . $imagemUpload['href']);
-                error_log('🔍 [SALVAR-PRODUTO] URL para src: ' . $imagemUpload['src']);
+                // Marcar como principal
+                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                
+                // Atualizar APENAS a foto principal do produto (não limpar outros campos)
+                $this->produtoModel->updateFotoPrincipal($produtoId, $fotoPrincipal['nome_arquivo'], $usuario['id']);
+                error_log('🔍 [SALVAR-PRODUTO] Foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
             } else {
                 error_log('🔍 [SALVAR-PRODUTO] Nenhuma imagem principal para upload');
             }

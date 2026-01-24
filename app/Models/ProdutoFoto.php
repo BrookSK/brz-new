@@ -217,7 +217,8 @@ class ProdutoFoto extends Model {
         
         // Gerar nome único
         $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
-        $nomeArquivo = uniqid('produto_' . $produtoId . '_') . '.' . $extensao;
+        $prefixo = $produtoId ? 'produto_' . $produtoId . '_' : 'produto_temp_';
+        $nomeArquivo = uniqid($prefixo) . '.' . $extensao;
         
         // Mover arquivo
         $caminhoCompleto = $diretorio . $nomeArquivo;
@@ -226,7 +227,13 @@ class ProdutoFoto extends Model {
         }
         
         // Opcional: redimensionar imagem
-        $this->redimensionarImagem($caminhoCompleto, $arquivo['type']);
+        try {
+            $this->redimensionarImagem($caminhoCompleto, $arquivo['type']);
+            error_log('✅ [PRODUTO-FOTO] Imagem redimensionada com sucesso');
+        } catch (\Exception $e) {
+            error_log('⚠️ [PRODUTO-FOTO] Erro ao redimensionar imagem: ' . $e->getMessage());
+            // Continuar mesmo se falhar o redimensionamento
+        }
         
         // Criar URL completa (estilo WordPress)
         $urlCompleta = '/uploads/produtos/' . $nomeArquivo;
@@ -263,29 +270,52 @@ class ProdutoFoto extends Model {
             'url' => $urlCompleta
         ];
     }
-    
-    private function redimensionarImagem($caminhoArquivo, $tipo) {
+
+    public function redimensionarImagem($caminhoArquivo, $tipo) {
+        error_log(' [PRODUTO-FOTO] Iniciando redimensionamento: ' . $caminhoArquivo . ' Tipo: ' . $tipo);
+
+        // Verificar se GD está disponível
+        if (!extension_loaded('gd') || !function_exists('gd_info')) {
+            error_log(' [PRODUTO-FOTO] Extensão GD não está carregada');
+            return;
+        }
+
         // Obter dimensões originais
-        list($larguraOriginal, $alturaOriginal) = getimagesize($caminhoArquivo);
-        
+        $info = getimagesize($caminhoArquivo);
+        if (!$info) {
+            error_log(' [PRODUTO-FOTO] Não foi possível obter dimensões da imagem');
+            return;
+        }
+
+        list($larguraOriginal, $alturaOriginal) = $info;
+        error_log(' [PRODUTO-FOTO] Dimensões originais: ' . $larguraOriginal . 'x' . $alturaOriginal);
+
         // Definir dimensões máximas
         $larguraMax = 1200;
         $alturaMax = 1200;
-        
+
         // Calcular novas dimensões
         $ratio = min($larguraMax / $larguraOriginal, $alturaMax / $alturaOriginal);
         $novaLargura = intval($larguraOriginal * $ratio);
         $novaAltura = intval($alturaOriginal * $ratio);
-        
+
+        error_log(' [PRODUTO-FOTO] Novas dimensões: ' . $novaLargura . 'x' . $novaAltura);
+
         // Se não precisar redimensionar
         if ($novaLargura >= $larguraOriginal && $novaAltura >= $alturaOriginal) {
+            error_log(' [PRODUTO-FOTO] Imagem não precisa ser redimensionada');
             return;
         }
-        
+
         // Criar nova imagem
         $novaImagem = imagecreatetruecolor($novaLargura, $novaAltura);
-        
+        if (!$novaImagem) {
+            error_log(' [PRODUTO-FOTO] Falha ao criar nova imagem');
+            return;
+        }
+
         // Carregar imagem original
+        $imagemOriginal = null;
         switch ($tipo) {
             case 'image/jpeg':
                 $imagemOriginal = imagecreatefromjpeg($caminhoArquivo);
@@ -299,27 +329,50 @@ class ProdutoFoto extends Model {
                 $imagemOriginal = imagecreatefromwebp($caminhoArquivo);
                 break;
             default:
+                error_log(' [PRODUTO-FOTO] Tipo de imagem não suportado: ' . $tipo);
+                imagedestroy($novaImagem);
                 return;
         }
-        
+
+        if (!$imagemOriginal) {
+            error_log(' [PRODUTO-FOTO] Falha ao carregar imagem original');
+            imagedestroy($novaImagem);
+            return;
+        }
+
         // Redimensionar
-        imagecopyresampled($novaImagem, $imagemOriginal, 0, 0, 0, 0, $novaLargura, $novaAltura, $larguraOriginal, $alturaOriginal);
-        
+        $resultado = imagecopyresampled($novaImagem, $imagemOriginal, 0, 0, 0, 0, $novaLargura, $novaAltura, $larguraOriginal, $alturaOriginal);
+
+        if (!$resultado) {
+            error_log(' [PRODUTO-FOTO] Falha no redimensionamento');
+            imagedestroy($novaImagem);
+            imagedestroy($imagemOriginal);
+            return;
+        }
+
         // Salvar nova imagem
+        $salvou = false;
         switch ($tipo) {
             case 'image/jpeg':
-                imagejpeg($novaImagem, $caminhoArquivo, 85);
+                $salvou = imagejpeg($novaImagem, $caminhoArquivo, 85);
                 break;
             case 'image/png':
-                imagepng($novaImagem, $caminhoArquivo, 8);
+                $salvou = imagepng($novaImagem, $caminhoArquivo, 8);
                 break;
             case 'image/webp':
-                imagewebp($novaImagem, $caminhoArquivo, 85);
+                $salvou = imagewebp($novaImagem, $caminhoArquivo, 85);
                 break;
         }
-        
+
         // Liberar memória
         imagedestroy($imagemOriginal);
         imagedestroy($novaImagem);
+
+        if (!$salvou) {
+            error_log(' [PRODUTO-FOTO] Falha ao salvar imagem redimensionada');
+            return;
+        }
+
+        error_log(' [PRODUTO-FOTO] Imagem redimensionada com sucesso');
     }
 }
