@@ -260,9 +260,11 @@ class ProdutoFoto extends Model {
             'ordem' => 0
         ];
         
-        // Se for upload temporário (produto_id null), não salvar no banco ainda
-        if ($produtoId === null) {
+        // Se for upload temporário (produto_id null ou vazio), não salvar no banco ainda
+        if ($produtoId === null || $produtoId === '') {
+            error_log('🔍 [PRODUTO-FOTO] Upload temporário detectado - produto_id: ' . var_export($produtoId, true));
             error_log('🔍 [PRODUTO-FOTO] Upload temporário - não salvando no banco ainda');
+            error_log('🔍 [PRODUTO-FOTO] Retornando dados temporários para: ' . $urlCompleta);
             return [
                 'id' => null, // ID temporário
                 'nome_arquivo' => $urlCompleta, // Retornar URL completa
@@ -270,6 +272,8 @@ class ProdutoFoto extends Model {
                 'temp' => true // Marcar como temporário
             ];
         }
+        
+        error_log('🔍 [PRODUTO-FOTO] Salvando no banco - produto_id: ' . $produtoId);
         
         $fotoId = $this->create($fotoData);
         

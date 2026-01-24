@@ -43,7 +43,10 @@ abstract class Model {
             $stmt->bindValue(":$key", $value);
         }
         
-        return $stmt->execute();
+        $stmt->execute();
+        
+        // Retornar o ID inserido
+        return $this->connection->lastInsertId();
     }
 
     public function update($id, $data) {
