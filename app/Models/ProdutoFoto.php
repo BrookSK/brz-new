@@ -145,9 +145,12 @@ class ProdutoFoto extends Model {
         }
         
         // Excluir arquivo físico (se existir)
-        $caminhoArquivo = __DIR__ . '/../../public/uploads/produtos/' . $foto['nome_arquivo'];
+        $caminhoArquivo = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/' . $foto['nome_arquivo'];
         if (file_exists($caminhoArquivo)) {
             unlink($caminhoArquivo);
+            error_log('🔍 [PRODUTO-FOTO] Arquivo físico excluído: ' . $caminhoArquivo);
+        } else {
+            error_log('⚠️ [PRODUTO-FOTO] Arquivo físico não encontrado para exclusão: ' . $caminhoArquivo);
         }
         
         return $this->delete($id);
@@ -210,10 +213,14 @@ class ProdutoFoto extends Model {
         }
         
         // Criar diretório se não existir
-        $diretorio = __DIR__ . '/../../public/uploads/produtos/';
+        $diretorio = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
         if (!is_dir($diretorio)) {
             mkdir($diretorio, 0755, true);
+            error_log('🔍 [PRODUTO-FOTO] Diretório criado: ' . $diretorio);
         }
+        
+        error_log('🔍 [PRODUTO-FOTO] Diretório de uploads: ' . $diretorio);
+        error_log('🔍 [PRODUTO-FOTO] DOCUMENT_ROOT: ' . $_SERVER['DOCUMENT_ROOT']);
         
         // Gerar nome único
         $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
@@ -291,7 +298,12 @@ class ProdutoFoto extends Model {
         
         // Extrair nome do arquivo da URL
         $nomeArquivo = basename($urlTemporaria);
-        $caminhoTemp = __DIR__ . '/../../public/uploads/produtos/' . $nomeArquivo;
+        
+        // Usar o mesmo caminho do upload
+        $diretorio = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
+        $caminhoTemp = $diretorio . $nomeArquivo;
+        
+        error_log('🔍 [PRODUTO-FOTO] Caminho temporário: ' . $caminhoTemp);
         
         // Verificar se arquivo temporário existe
         if (!file_exists($caminhoTemp)) {
@@ -302,7 +314,9 @@ class ProdutoFoto extends Model {
         // Gerar novo nome com produto_id
         $extensao = pathinfo($nomeArquivo, PATHINFO_EXTENSION);
         $novoNome = uniqid('produto_' . $produtoId . '_') . '.' . $extensao;
-        $novoCaminho = __DIR__ . '/../../public/uploads/produtos/' . $novoNome;
+        $novoCaminho = $diretorio . $novoNome;
+        
+        error_log('🔍 [PRODUTO-FOTO] Novo caminho: ' . $novoCaminho);
         
         // Mover arquivo
         if (!rename($caminhoTemp, $novoCaminho)) {
@@ -312,6 +326,8 @@ class ProdutoFoto extends Model {
         
         // Criar nova URL
         $novaUrl = '/uploads/produtos/' . $novoNome;
+        
+        error_log('✅ [PRODUTO-FOTO] Arquivo movido: ' . $nomeArquivo . ' → ' . $novoNome);
         
         // Salvar no banco
         $fotoData = [
