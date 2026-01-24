@@ -40,14 +40,21 @@ class ProdutoController extends Controller {
                     $produto['foto_principal'] = null;
                     error_log('⚠️ [PRODUTO-CONTROLLER] URL externa ignorada para produto ' . $produto['id'] . ': ' . $fotoUrl);
                 }
+                // Se for URL interna, verificar se arquivo existe
+                elseif (strpos($fotoUrl, '/uploads/') === 0) {
+                    $caminhoFisico = __DIR__ . '/../../public' . $fotoUrl;
+                    if (file_exists($caminhoFisico)) {
+                        $produto['foto_principal'] = $fotoUrl;
+                        error_log('✅ [PRODUTO-CONTROLLER] Arquivo encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
+                    } else {
+                        $produto['foto_principal'] = null;
+                        error_log('❌ [PRODUTO-CONTROLLER] Arquivo NÃO encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
+                    }
+                }
                 // Se não começar com /uploads/, corrigir
-                elseif (strpos($fotoUrl, '/uploads/') !== 0) {
+                else {
                     $produto['foto_principal'] = '/uploads/produtos/' . basename($fotoUrl);
                     error_log('🔧 [PRODUTO-CONTROLLER] URL corrigida para produto ' . $produto['id'] . ': ' . $fotoUrl . ' → ' . $produto['foto_principal']);
-                }
-                // Se for URL válida, usar diretamente
-                else {
-                    $produto['foto_principal'] = $fotoUrl;
                 }
             } else {
                 $produto['foto_principal'] = null;
