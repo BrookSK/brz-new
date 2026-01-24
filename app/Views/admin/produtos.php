@@ -290,19 +290,36 @@ function editarProduto(id) {
                     if (elemento) {
                         elemento.value = campos[campo];
                         console.log(`🔍 [PRODUTOS] Campo ${campo} preenchido com:`, campos[campo]);
+                        
+                        // Forçar atualização visual
+                        elemento.dispatchEvent(new Event('input', { bubbles: true }));
+                        elemento.dispatchEvent(new Event('change', { bubbles: true }));
                     } else {
                         console.warn(`🔍 [PRODUTOS] Campo ${campo} não encontrado`);
                     }
                 });
                 
                 // Forçar moeda USD
-                document.querySelector('select[name="moeda"]').value = 'USD';
+                const moedaSelect = document.querySelector('select[name="moeda"]');
+                if (moedaSelect) {
+                    moedaSelect.value = 'USD';
+                    moedaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
                 
-                // Abrir modal
-                const modal = new bootstrap.Modal(document.getElementById('modalProduto'));
-                modal.show();
+                // Pequeno delay para garantir que os campos foram preenchidos antes de abrir o modal
+                setTimeout(() => {
+                    // Abrir modal
+                    const modalElement = document.getElementById('modalProduto');
+                    const modal = new bootstrap.Modal(modalElement);
+                    
+                    // Remover aria-hidden temporariamente
+                    modalElement.removeAttribute('aria-hidden');
+                    
+                    modal.show();
+                    
+                    console.log('🔍 [PRODUTOS] Modal aberto com sucesso');
+                }, 100);
                 
-                console.log('🔍 [PRODUTOS] Modal aberto com sucesso');
             } else {
                 alert('Erro ao carregar produto: ' + (data.error || 'Dados não encontrados'));
             }
