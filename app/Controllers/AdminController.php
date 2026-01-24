@@ -17,7 +17,7 @@ class AdminController extends Controller {
             'total_usuarios' => 0
         ];
         
-        // Iniciar buffer manualmente
+        // Usar o mesmo sistema de buffer manual dos outros métodos
         ob_start();
         include __DIR__ . '/../Views/admin/dashboard.php';
         $content = ob_get_clean();
@@ -55,18 +55,13 @@ class AdminController extends Controller {
         // Obter categorias para o filtro
         $categorias = $this->getCategorias();
         
-        $this->view('admin/produtos', [
-            'produtos' => $produtos,
-            'categorias' => $categorias,
-            'pagina' => $pagina,
-            'limite' => $limite,
-            'total' => $total,
-            'total_paginas' => $totalPaginas,
-            'filtro' => $busca,
-            'status' => $status,
-            'categoria_id' => $categoria_id,
-            'busca' => $busca
-        ]);
+        // Usar buffer manual como no dashboard
+        ob_start();
+        include __DIR__ . '/../Views/admin/produtos.php';
+        $content = ob_get_clean();
+        
+        // Incluir layout
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
     
     private function getImagensProduto($produtoId) {
