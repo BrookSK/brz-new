@@ -86,7 +86,7 @@
                                         $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
                                         ?>
                                         <?php if ($fotoExists): ?>
-                                            <img src="<?= $fotoPath ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
+                                            <img src="<?= $fotoPath ?>?v=<?= time() ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\\'width: 50px; height: 50px; background-color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 4px;\\'><i class=\\'fas fa-image\\' style=\\'color: white; font-size: 20px;\\'></i></div>'">
                                         <?php else: ?>
                                             <!-- Ícone placeholder quando não há imagem -->
                                             <div style="width: 50px; height: 50px; background-color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
@@ -253,42 +253,36 @@
 function editarProduto(id) {
     console.log('🔍 [PRODUTOS] editarProduto() chamada com ID:', id);
     
-    // Mostrar loading no modal
+    // Limpar formulário
+    document.getElementById('formProduto').reset();
+    document.getElementById('produto_id').value = '';
     document.getElementById('modalProdutoTitle').textContent = 'Carregando...';
     
     fetch(`/admin/produto/${id}`)
-        .then(response => {
-            console.log('🔍 [PRODUTOS] Status da resposta:', response.status);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             console.log('🔍 [PRODUTOS] Dados recebidos:', data);
             
-            if (data.success) {
-                console.log('🔍 [PRODUTOS] Dados do produto recebidos:', data.produto);
-                
+            if (data.success && data.produto) {
                 // Preencher o modal
                 document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
                 document.getElementById('produto_id').value = data.produto.id || '';
                 
-                // Preencher campos com validação robusta
+                // Preencher campos diretamente
                 const campos = {
-                    'nome': (data.produto.nome || '').trim(),
-                    'sku': (data.produto.sku || '').trim(),
-                    'descricao_curta': (data.produto.descricao_curta || '').trim(),
-                    'descricao_completa': (data.produto.descricao_completa || '').trim(),
-                    'categoria_id': data.produto.categoria_id ? data.produto.categoria_id.toString() : '',
-                    'valor': (data.produto.valor && data.produto.valor > 0) ? parseFloat(data.produto.valor).toFixed(2) : '',
-                    'moeda': (data.produto.moeda || 'USD').toString(),
-                    'peso': (data.produto.peso && data.produto.peso > 0) ? parseFloat(data.produto.peso).toFixed(3) : '',
-                    'estoque': data.produto.estoque ? data.produto.estoque.toString() : '',
-                    'status': (data.produto.status || 'ativo').toString()
+                    'nome': data.produto.nome || '',
+                    'sku': data.produto.sku || '',
+                    'descricao_curta': data.produto.descricao_curta || '',
+                    'descricao_completa': data.produto.descricao_completa || '',
+                    'categoria_id': data.produto.categoria_id || '',
+                    'valor': data.produto.valor || '',
+                    'moeda': data.produto.moeda || 'USD',
+                    'peso': data.produto.peso || '',
+                    'estoque': data.produto.estoque || '',
+                    'status': data.produto.status || 'ativo'
                 };
                 
-                console.log('🔍 [PRODUTOS] Campos preparados:', campos);
+                console.log('🔍 [PRODUTOS] Campos a preencher:', campos);
                 
                 // Preencher cada campo
                 Object.keys(campos).forEach(campo => {
@@ -302,27 +296,20 @@ function editarProduto(id) {
                 });
                 
                 // Forçar moeda USD
-                const moedaSelect = document.querySelector('select[name="moeda"]');
-                if (moedaSelect) {
-                    moedaSelect.value = 'USD';
-                }
+                document.querySelector('select[name="moeda"]').value = 'USD';
                 
                 // Abrir modal
                 const modal = new bootstrap.Modal(document.getElementById('modalProduto'));
                 modal.show();
                 
-                console.log('🔍 [PRODUTOS] Modal preenchido e aberto com sucesso');
+                console.log('🔍 [PRODUTOS] Modal aberto com sucesso');
             } else {
-                console.error('❌ [PRODUTOS] Erro ao carregar produto:', data.error);
-                alert('Erro ao carregar produto: ' + (data.error || 'Erro desconhecido'));
+                alert('Erro ao carregar produto: ' + (data.error || 'Dados não encontrados'));
             }
         })
         .catch(error => {
-            console.error('❌ [PRODUTOS] Erro na requisição:', error);
-            alert('Erro ao carregar produto. Verifique o console para mais detalhes.');
-            
-            // Resetar título do modal
-            document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
+            console.error('❌ [PRODUTOS] Erro:', error);
+            alert('Erro ao carregar produto');
         });
 }
 

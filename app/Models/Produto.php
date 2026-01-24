@@ -70,9 +70,6 @@ class Produto extends Model {
             VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, NOW(), NOW())
         ");
         
-        // DEBUG: Log dos dados que serão inseridos
-        error_log('🔍 [PRODUTO-MODEL-CREATE] Dados para inserir: ' . print_r($data, true));
-        
         $stmt->bindParam(':nome', $data['nome']);
         $stmt->bindParam(':sku', $data['sku']);
         $stmt->bindParam(':descricao_curta', $data['descricao_curta']);
@@ -84,14 +81,8 @@ class Produto extends Model {
         $stmt->bindParam(':estoque', $data['estoque']);
         $stmt->bindParam(':status', $data['status']);
         
-        $result = $stmt->execute();
-        $lastId = $this->getConnection()->lastInsertId();
-        
-        error_log('🔍 [PRODUTO-MODEL-CREATE] Execute result: ' . ($result ? 'true' : 'false'));
-        error_log('🔍 [PRODUTO-MODEL-CREATE] Last insert ID: ' . $lastId);
-        error_log('🔍 [PRODUTO-MODEL-CREATE] SQL Error: ' . print_r($stmt->errorInfo(), true));
-        
-        return $lastId;
+        $stmt->execute();
+        return $this->getConnection()->lastInsertId();
     }
     
     public function update($id, $data, $usuarioId = null) {
