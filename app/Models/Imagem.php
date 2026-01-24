@@ -108,7 +108,7 @@ class Imagem extends Model {
             return false;
         }
         
-        list($larguraOriginal, $alturaOriginal) = $info[0], $info[1];
+        list($larguraOriginal, $alturaOriginal) = [$info[0], $info[1]];
         error_log('🔍 [IMAGEM-REDIMENSIONAR] Dimensões originais: ' . $larguraOriginal . 'x' . $alturaOriginal);
         
         // Definir tamanho máximo fixo para exibição consistente
