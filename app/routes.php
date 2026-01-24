@@ -69,6 +69,7 @@ $router->get('/admin/usuarios-json', 'AdminController', 'usuariosJson');
 $router->get('/admin/estatisticas-usuarios', 'AdminController', 'estatisticasUsuarios');
 $router->get('/admin/produtos', 'AdminController', 'produtos');
 $router->get('/admin/produto/{id}', 'AdminController', 'produto');
+$router->get('/admin/editar-produto/{id}', 'AdminController', 'editarProduto');
 $router->post('/admin/salvar-produto', 'AdminController', 'salvarProduto');
 $router->post('/admin/atualizar-produto/{id}', 'AdminController', 'atualizarProduto');
 $router->post('/admin/alterar-status-produto/{id}', 'AdminController', 'alterarStatusProduto');

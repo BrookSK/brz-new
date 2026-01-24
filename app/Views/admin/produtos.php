@@ -120,9 +120,9 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarProduto(<?= $produto['id'] ?>)">
+                                            <a href="/admin/editar-produto/<?= $produto['id'] ?>" class="btn btn-sm btn-outline-primary" target="_blank">
                                                 <i class="fas fa-edit"></i>
-                                            </button>
+                                            </a>
                                             <button type="button" class="btn btn-sm btn-outline-success" onclick="alterarStatus(<?= $produto['id'] ?>)">
                                                 <i class="fas fa-<?= $produto['status'] == 'ativo' ? 'ban' : 'check' ?>"></i>
                                             </button>
