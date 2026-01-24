@@ -26,7 +26,13 @@ class Imagem extends Model {
         }
         
         // Criar diretório do tipo se não existir
-        $diretorioTipo = $diretorioBase . $tipo . '/';
+        // Para produtos, usar sempre /uploads/produtos/ para compatibilidade
+        if ($tipo === 'produto') {
+            $diretorioTipo = $diretorioBase . 'produtos/';
+        } else {
+            $diretorioTipo = $diretorioBase . $tipo . '/';
+        }
+        
         if (!is_dir($diretorioTipo)) {
             mkdir($diretorioTipo, 0755, true);
         }
@@ -45,7 +51,7 @@ class Imagem extends Model {
         $this->redimensionarParaTamanhoMaximo($caminhoCompleto, $arquivo['type']);
         
         // Criar URL imediatamente para exibição
-        $url = '/uploads/' . $tipo . '/' . $nomeArquivo;
+        $url = '/uploads/produtos/' . $nomeArquivo; // Corrigido para produtos (plural) para compatibilidade
         
         error_log('✅ [IMAGEM] Upload concluído: ' . $url);
         error_log('✅ [IMAGEM] URL gerada para exibição: ' . $url);
