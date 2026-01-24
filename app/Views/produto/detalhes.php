@@ -16,13 +16,45 @@
                 <!-- Foto Principal -->
                 <div class="main-image-container mb-3">
                     <?php 
-                    $fotoPath = '/uploads/produtos/' . ($fotoPrincipal['nome_arquivo'] ?? '');
-                    $fotoExists = !empty($fotoPrincipal['nome_arquivo']) && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                    $fotoPrincipal = null;
+                    if (!empty($fotos)) {
+                        foreach ($fotos as $foto) {
+                            if ($foto['principal']) {
+                                $fotoPrincipal = $foto;
+                                break;
+                            }
+                        }
+                        // Se não tiver principal, usa a primeira
+                        if (!$fotoPrincipal && !empty($fotos)) {
+                            $fotoPrincipal = $fotos[0];
+                        }
+                    }
+                    
+                    if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+                        $fotoUrl = $fotoPrincipal['nome_arquivo'];
+                        $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $fotoUrl;
+                        $fotoExists = file_exists($caminhoFisico);
+                    } else {
+                        $fotoUrl = null;
+                        $fotoExists = false;
+                    }
                     ?>
-                    <img id="main-image" 
-                         src="<?= $fotoExists ? $fotoPath : '/uploads/produtos/placeholder.svg' ?>" 
-                         alt="<?= htmlspecialchars($produto['nome']) ?>"
-                         class="img-fluid rounded shadow-sm main-product-image">
+                    <?php if ($fotoUrl && $fotoExists): ?>
+                        <a href="<?= 'https://novobr.brazilianashop.com.br' . $fotoUrl ?>" target="_blank">
+                            <img id="main-image" 
+                                 src="<?= 'https://novobr.brazilianashop.com.br' . $fotoUrl ?>?v=<?= time() ?>" 
+                                 alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                 class="img-fluid rounded shadow-sm main-product-image"
+                                 style="cursor: pointer; transition: transform 0.2s;"
+                                 onmouseover="this.style.transform='scale(1.02)'"
+                                 onmouseout="this.style.transform='scale(1)'"
+                                 title="Clique para ver imagem em tamanho real">
+                        </a>
+                    <?php else: ?>
+                        <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 400px;">
+                            <i class="fas fa-image text-muted fa-3x"></i>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Miniaturas -->
@@ -31,13 +63,30 @@
                         <?php foreach ($fotos as $index => $foto): ?>
                         <div class="col-3">
                             <?php 
-                            $miniaturaPath = '/uploads/produtos/' . $foto['nome_arquivo'];
-                            $miniaturaExists = !empty($foto['nome_arquivo']) && file_exists(__DIR__ . '/../../public' . $miniaturaPath);
+                            if (!empty($foto['nome_arquivo'])) {
+                                $miniaturaUrl = $foto['nome_arquivo'];
+                                $caminhoMiniatura = $_SERVER['DOCUMENT_ROOT'] . $miniaturaUrl;
+                                $miniaturaExists = file_exists($caminhoMiniatura);
+                            } else {
+                                $miniaturaUrl = null;
+                                $miniaturaExists = false;
+                            }
                             ?>
-                            <img src="<?= $miniaturaExists ? $miniaturaPath : '/uploads/produtos/placeholder.svg' ?>" 
-                                 alt="<?= htmlspecialchars($foto['legenda'] ?? 'Foto ' . ($index + 1)) ?>"
-                                 class="img-thumbnail thumbnail-image <?= $foto['principal'] ? 'active' : '' ?>"
-                                 data-main-image="<?= $miniaturaExists ? $miniaturaPath : '/uploads/produtos/placeholder.svg' ?>">
+                            <?php if ($miniaturaUrl && $miniaturaExists): ?>
+                                <img src="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>?v=<?= time() ?>" 
+                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
+                                     class="img-thumbnail thumbnail-image cursor-pointer"
+                                     style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
+                                     onclick="changeMainImage('<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>')"
+                                     title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
+                                <?php if ($foto['principal']): ?>
+                                    <span class="position-absolute top-0 start-0 badge bg-primary" style="font-size: 0.6em;">Principal</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <div class="img-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 80px;">
+                                    <i class="fas fa-image text-muted"></i>
+                                </div>
+                            <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -70,7 +119,16 @@
                 <!-- Descrição -->
                 <div class="description mb-4">
                     <h5>Descrição</h5>
-                    <p class="text-muted"><?= nl2br(htmlspecialchars($produto['descricao'])) ?></p>
+                    <p class="text-muted"><?= nl2br(htmlspecialchars($produto['descricao_curta'] ?? $produto['descricao'] ?? '')) ?></p>
+                    
+                    <?php if (!empty($produto['descricao_completa'])): ?>
+                        <div class="mt-3">
+                            <h6>Descrição Completa</h6>
+                            <div class="text-muted">
+                                <?= nl2br(htmlspecialchars($produto['descricao_completa'])) ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Especificações -->

@@ -25,6 +25,7 @@ class Produto extends Model {
                 'nome' => $produto['nome'] ?? '',
                 'sku' => $produto['sku'] ?? '',
                 'descricao_curta' => $produto['descricao_curta'] ?? '',
+                'descricao_completa' => $produto['descricao_completa'] ?? '',
                 'categoria_id' => $produto['categoria_id'] ?? 0,
                 'valor' => floatval($produto['valor'] ?? 0),
                 'moeda' => $produto['moeda'] ?? 'USD',
@@ -87,6 +88,7 @@ class Produto extends Model {
             'nome' => $data['nome'] ?? '',
             'sku' => $data['sku'] ?? '',
             'descricao_curta' => $data['descricao_curta'] ?? '',
+            'descricao_completa' => $data['descricao_completa'] ?? '',
             'categoria_id' => $data['categoria_id'] ?? 0,
             'valor' => floatval($data['valor'] ?? 0),
             'moeda' => $data['moeda'] ?? 'USD',
@@ -101,13 +103,14 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, categoria_id, valor, moeda, peso, estoque, status, ativo, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :ativo, :created_at, :updated_at)
+            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, ativo, created_at, updated_at)
+            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :ativo, :created_at, :updated_at)
         ");
         
         $stmt->bindParam(':nome', $dadosBanco['nome']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
         $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
+        $stmt->bindParam(':descricao_completa', $dadosBanco['descricao_completa']);
         $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
         $stmt->bindParam(':valor', $dadosBanco['valor']);
         $stmt->bindParam(':moeda', $dadosBanco['moeda']);
@@ -138,6 +141,7 @@ class Produto extends Model {
             'nome' => $data['nome'] ?? '',
             'sku' => $data['sku'] ?? '',
             'descricao_curta' => $data['descricao_curta'] ?? '',
+            'descricao_completa' => $data['descricao_completa'] ?? '',
             'categoria_id' => $data['categoria_id'] ?? 0,
             'valor' => floatval($data['valor'] ?? 0),
             'moeda' => $data['moeda'] ?? 'USD',
@@ -148,13 +152,14 @@ class Produto extends Model {
             'updated_at' => date('Y-m-d H:i:s')
         ];
         
-        error_log('🔍 [PRODUTO-MODEL-UPDATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
+        error_log(' [PRODUTO-MODEL-UPDATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
             UPDATE {$this->table} 
             SET nome = :nome, 
                 sku = :sku, 
                 descricao_curta = :descricao_curta, 
+                descricao_completa = :descricao_completa, 
                 categoria_id = :categoria_id, 
                 valor = :valor, 
                 moeda = :moeda, 
@@ -170,6 +175,7 @@ class Produto extends Model {
         $stmt->bindParam(':nome', $dadosBanco['nome']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
         $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
+        $stmt->bindParam(':descricao_completa', $dadosBanco['descricao_completa']);
         $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
         $stmt->bindParam(':valor', $dadosBanco['valor']);
         $stmt->bindParam(':moeda', $dadosBanco['moeda']);
@@ -230,10 +236,34 @@ class Produto extends Model {
     }
     
     public function getImagens($produtoId) {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM produto_fotos WHERE produto_id = :produto_id ORDER BY ordem ASC");
+        error_log('🔍 [PRODUTO-MODEL] Buscando galeria de imagens do produto ID: ' . $produtoId);
+        
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM produto_fotos 
+            WHERE produto_id = :produto_id 
+            ORDER BY principal DESC, ordem ASC, created_at ASC
+        ");
         $stmt->bindParam(':produto_id', $produtoId);
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $fotos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Verificar existência dos arquivos físicos
+        foreach ($fotos as &$foto) {
+            if ($foto['nome_arquivo'] && strpos($foto['nome_arquivo'], '/uploads/') === 0) {
+                $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $foto['nome_arquivo'];
+                $foto['arquivo_existe'] = file_exists($caminhoFisico);
+                $foto['url_completa'] = 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'];
+                
+                if (!$foto['arquivo_existe']) {
+                    error_log('❌ [PRODUTO-MODEL] Arquivo não encontrado: ' . $caminhoFisico);
+                }
+            }
+        }
+        
+        error_log('🔍 [PRODUTO-MODEL] Galerias encontradas: ' . count($fotos));
+        
+        return $fotos;
     }
     
     public function getAtivos() {

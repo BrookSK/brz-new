@@ -124,10 +124,58 @@
                         <input type="file" name="imagem_principal" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp">
                         <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB). Deixe em branco para manter a imagem atual.</small>
                     </div>
+                    
+                    <!-- Galería de Imagens -->
+                    <?php if (!empty($galeria)): ?>
                     <div class="col-12">
-                        <label class="form-label">Imagens Adicionais</label>
+                        <label class="form-label">Galeria de Imagens</label>
+                        <div class="row g-3">
+                            <?php foreach ($galeria as $foto): ?>
+                                <div class="col-md-3 col-sm-4 col-6">
+                                    <div class="card border-secondary">
+                                        <?php if ($foto['arquivo_existe']): ?>
+                                            <a href="<?= $foto['url_completa'] ?>" target="_blank" class="text-decoration-none">
+                                                <img src="<?= $foto['url_completa'] ?>?v=<?= time() ?>" 
+                                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Imagem') ?>" 
+                                                     class="card-img-top img-fluid"
+                                                     style="height: 150px; object-fit: cover; cursor: pointer;"
+                                                     title="<?= $foto['principal'] ? 'Imagem Principal' : 'Imagem da Galeria' ?>">
+                                                <?php if ($foto['principal']): ?>
+                                                    <span class="position-absolute top-0 start-0 badge bg-primary">Principal</span>
+                                                <?php endif; ?>
+                                            </a>
+                                            <div class="card-body p-2">
+                                                <small class="text-muted d-block text-truncate" title="<?= htmlspecialchars($foto['arquivo_original'] ?? '') ?>">
+                                                    <?= htmlspecialchars($foto['arquivo_original'] ?? 'Imagem') ?>
+                                                </small>
+                                                <div class="btn-group btn-group-sm w-100" role="group">
+                                                    <?php if (!$foto['principal']): ?>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="marcarComoPrincipal(<?= $foto['id'] ?>)">
+                                                            <i class="fas fa-star"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="excluirImagem(<?= $foto['id'] ?>)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-image fa-3x text-muted mb-2"></i>
+                                                <small class="text-muted">Arquivo não encontrado</small>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="col-12">
+                        <label class="form-label">Adicionar Imagens à Galeria</label>
                         <input type="file" name="imagens[]" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp" multiple>
-                        <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB por imagem)</small>
+                        <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB por imagem). Selecione múltiplas imagens para adicionar à galeria.</small>
                     </div>
                 </div>
 
@@ -143,6 +191,56 @@
         </div>
     </div>
 </div>
+
+<script>
+function marcarComoPrincipal(fotoId) {
+    if (confirm('Deseja marcar esta imagem como principal?')) {
+        fetch('/admin/marcar-foto-principal/' + fotoId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao marcar imagem como principal: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao marcar imagem como principal');
+        });
+    }
+}
+
+function excluirImagem(fotoId) {
+    if (confirm('Deseja excluir esta imagem? Esta ação não pode ser desfeita.')) {
+        fetch('/admin/excluir-foto/' + fotoId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao excluir imagem: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir imagem');
+        });
+    }
+}
+</script>
 
 <?php
 $content = ob_get_clean();

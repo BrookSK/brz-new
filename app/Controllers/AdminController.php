@@ -532,11 +532,27 @@ class AdminController extends Controller {
         return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
     }
     
-    private function getCategorias() {
-        $stmt = $this->categoriaModel->getConnection()->prepare("SELECT * FROM categorias ORDER BY nome ASC");
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    public function novoProduto(Request $request) {
+        $this->authService->requerPermissao('create');
+        
+        try {
+            // Obter categorias para o formulário
+            $categorias = $this->getCategorias();
+            
+            $this->view('admin/editar-produto', [
+                'produto' => null,
+                'categorias' => $categorias,
+                'galeria' => [],
+                'modo' => 'novo'
+            ]);
+            
+        } catch (\Exception $e) {
+            // Redirecionar com erro
+            header('Location: /admin/produtos?error=' . urlencode($e->getMessage()));
+            exit;
+        }
     }
+    
     public function editarProduto(Request $request) {
         $this->authService->requerPermissao('read');
         
@@ -554,9 +570,13 @@ class AdminController extends Controller {
             // Obter categorias para o formulário
             $categorias = $this->getCategorias();
             
+            // Obter galeria de imagens do produto
+            $galeria = $this->produtoModel->getImagens($produtoId);
+            
             $this->view('admin/editar-produto', [
                 'produto' => $produto,
                 'categorias' => $categorias,
+                'galeria' => $galeria,
                 'modo' => 'editar'
             ]);
             
@@ -564,6 +584,42 @@ class AdminController extends Controller {
             // Redirecionar com erro
             header('Location: /admin/produtos?error=' . urlencode($e->getMessage()));
             exit;
+        }
+    }
+    
+    public function marcarFotoPrincipal(Request $request) {
+        $this->authService->requerPermissao('update');
+        
+        $fotoId = $request->getParam('id');
+        
+        try {
+            $resultado = $this->produtoFotoModel->marcarComoPrincipal($fotoId);
+            
+            if ($resultado) {
+                $this->json(['success' => true, 'message' => 'Imagem marcada como principal com sucesso']);
+            } else {
+                $this->json(['success' => false, 'error' => 'Erro ao marcar imagem como principal'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+    
+    public function excluirFoto(Request $request) {
+        $this->authService->requerPermissao('delete');
+        
+        $fotoId = $request->getParam('id');
+        
+        try {
+            $resultado = $this->produtoFotoModel->excluirFoto($fotoId);
+            
+            if ($resultado) {
+                $this->json(['success' => true, 'message' => 'Imagem excluída com sucesso']);
+            } else {
+                $this->json(['success' => false, 'error' => 'Erro ao excluir imagem'], 500);
+            }
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
     
@@ -609,17 +665,39 @@ class AdminController extends Controller {
                 'success' => false,
                 'error' => $e->getMessage()
             ]);
-        }
         
+        // Obter categorias para o formulário
+        $categorias = $this->getCategorias();
+        
+        // Obter galeria de imagens do produto
+        $galeria = $this->produtoModel->getImagens($produtoId);
+        
+        $this->view('admin/editar-produto', [
+            'produto' => $produto,
+            'categorias' => $categorias,
+            'galeria' => $galeria,
+            'modo' => 'editar'
+        ]);
+        
+    } catch (\Exception $e) {
+        // Redirecionar com erro
+        header('Location: /admin/produtos?error=' . urlencode($e->getMessage()));
         exit;
     }
-    
-    public function salvarProduto(Request $request) {
+}
+
+public function uploadImagem(Request $request) {
+    try {
+        // Limpar buffer de saída
+        if (ob_get_length()) ob_clean();
+        
+        // Definir cabeçalho JSON
+        header('Content-Type: application/json');
+        
         $this->authService->requerPermissao('create');
         
-        $dados = $request->getParams();
-        $usuario = $this->authService->getUsuarioLogado();
-        
+        if (!isset($_FILES['imagem']) || $_FILES['imagem']['error'] !== UPLOAD_ERR_OK) {
+            throw new \Exception('Nenhuma imagem enviada ou erro no upload');
         // Log para debug
         error_log('🔍 [SALVAR-PRODUTO] ========== INICIANDO SALVAMENTO ==========');
         error_log('🔍 [SALVAR-PRODUTO] Dados brutos recebidos: ' . print_r($dados, true));
@@ -648,12 +726,8 @@ class AdminController extends Controller {
             $dados['valor'] = $valor;
             error_log('🔍 [SALVAR-PRODUTO] Valor convertido: ' . $valor);
             
-            // Remover campos que não existem no banco
-            unset($dados['descricao_completa']);
-            error_log('🔍 [SALVAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
-            
             // Validar campos obrigatórios
-            $camposObrigatorios = ['nome', 'sku', 'descricao_curta', 'categoria_id', 'valor', 'moeda', 'peso', 'estoque', 'status'];
+            $camposObrigatorios = ['nome', 'sku', 'descricao_curta', 'descricao_completa', 'categoria_id', 'valor', 'moeda', 'peso', 'estoque', 'status'];
             foreach ($camposObrigatorios as $campo) {
                 if (!isset($dados[$campo]) || empty(trim($dados[$campo]))) {
                     error_log('❌ [SALVAR-PRODUTO] ERRO: Campo obrigatório vazio: ' . $campo . ' - Valor: "' . ($dados[$campo] ?? 'NULL') . '"');

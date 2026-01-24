@@ -86,9 +86,23 @@ class ProdutoController extends Controller {
             return;
         }
         
-        // Obter fotos do produto
-        $fotos = $this->produtoFotoModel->getFotosProduto($produtoId);
-        $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produtoId);
+        // Obter fotos do produto (galeria completa)
+        $fotos = $this->produtoModel->getImagens($produtoId);
+        $fotoPrincipal = null;
+        
+        // Encontrar foto principal
+        if (!empty($fotos)) {
+            foreach ($fotos as $foto) {
+                if ($foto['principal']) {
+                    $fotoPrincipal = $foto;
+                    break;
+                }
+            }
+            // Se não tiver principal, usa a primeira
+            if (!$fotoPrincipal && !empty($fotos)) {
+                $fotoPrincipal = $fotos[0];
+            }
+        }
         
         // Obter produtos relacionados (mesma categoria)
         $produtosRelacionados = $this->produtoModel->getByCategoria($produto['categoria']);
