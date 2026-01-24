@@ -623,8 +623,8 @@ class AdminController extends Controller {
                 // Marcar como principal
                 $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
                 
-                // Atualizar produto com a foto principal
-                $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+                // Atualizar APENAS a foto principal do produto (não limpar outros campos)
+                $this->produtoModel->updateFotoPrincipal($produtoId, $fotoPrincipal['nome_arquivo'], $usuario['id']);
                 error_log('🔍 [SALVAR-PRODUTO] Foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
             } else {
                 error_log('🔍 [SALVAR-PRODUTO] Nenhuma imagem principal para upload');
@@ -743,8 +743,8 @@ class AdminController extends Controller {
                 // Marcar como principal
                 $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
                 
-                // Atualizar produto com a nova foto principal
-                $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+                // Atualizar APENAS a foto principal (não limpar outros campos)
+                $this->produtoModel->updateFotoPrincipal($produtoId, $fotoPrincipal['nome_arquivo'], $usuario['id']);
                 error_log('🔍 [ATUALIZAR-PRODUTO] Nova foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
             } else {
                 error_log('🔍 [ATUALIZAR-PRODUTO] Nenhuma nova imagem principal para upload');

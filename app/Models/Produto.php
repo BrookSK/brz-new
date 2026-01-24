@@ -175,6 +175,26 @@ class Produto extends Model {
         return $result;
     }
     
+    public function updateFotoPrincipal($id, $fotoPrincipal, $usuarioId = null) {
+        error_log('🔍 [PRODUTO-MODEL] Atualizando foto principal do produto ID: ' . $id . ' - Foto: ' . $fotoPrincipal);
+        
+        $stmt = $this->getConnection()->prepare("
+            UPDATE {$this->table} 
+            SET foto_principal = :foto_principal, 
+                updated_at = NOW()
+            WHERE id = :id
+        ");
+        
+        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':foto_principal', $fotoPrincipal);
+        
+        $result = $stmt->execute();
+        error_log('🔍 [PRODUTO-MODEL] Resultado da atualização da foto principal: ' . ($result ? 'true' : 'false'));
+        error_log('🔍 [PRODUTO-MODEL] SQL Error: ' . print_r($stmt->errorInfo(), true));
+        
+        return $result;
+    }
+    
     public function delete($id) {
         $stmt = $this->getConnection()->prepare("DELETE FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $id);
