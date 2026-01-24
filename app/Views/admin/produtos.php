@@ -271,18 +271,18 @@ function editarProduto(id) {
                 document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
                 document.getElementById('produto_id').value = data.produto.id || '';
                 
-                // Preencher campos com validação
+                // Preencher campos com validação robusta
                 const campos = {
-                    'nome': data.produto.nome || '',
-                    'sku': data.produto.sku || '',
-                    'descricao_curta': data.produto.descricao_curta || '',
-                    'descricao_completa': data.produto.descricao_completa || '',
-                    'categoria_id': data.produto.categoria_id || '',
-                    'valor': data.produto.valor > 0 ? data.produto.valor.toFixed(2) : '',
-                    'moeda': data.produto.moeda || 'USD',
-                    'peso': data.produto.peso > 0 ? data.produto.peso.toFixed(3) : '',
-                    'estoque': data.produto.estoque || '',
-                    'status': data.produto.status || 'ativo'
+                    'nome': (data.produto.nome || '').trim(),
+                    'sku': (data.produto.sku || '').trim(),
+                    'descricao_curta': (data.produto.descricao_curta || '').trim(),
+                    'descricao_completa': (data.produto.descricao_completa || '').trim(),
+                    'categoria_id': data.produto.categoria_id ? data.produto.categoria_id.toString() : '',
+                    'valor': (data.produto.valor && data.produto.valor > 0) ? parseFloat(data.produto.valor).toFixed(2) : '',
+                    'moeda': (data.produto.moeda || 'USD').toString(),
+                    'peso': (data.produto.peso && data.produto.peso > 0) ? parseFloat(data.produto.peso).toFixed(3) : '',
+                    'estoque': data.produto.estoque ? data.produto.estoque.toString() : '',
+                    'status': (data.produto.status || 'ativo').toString()
                 };
                 
                 console.log('🔍 [PRODUTOS] Campos preparados:', campos);

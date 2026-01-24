@@ -33,8 +33,11 @@ class Produto extends Model {
                 'updated_at' => null
             ], $produto);
             
-            // Converter valor para formato numérico
+            // Converter para tipos numéricos
             $produto['valor'] = floatval($produto['valor']);
+            $produto['peso'] = floatval($produto['peso']);
+            $produto['estoque'] = intval($produto['estoque']);
+            $produto['categoria_id'] = intval($produto['categoria_id']);
         }
         
         return $produto;
