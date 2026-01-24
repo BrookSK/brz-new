@@ -43,12 +43,32 @@ class Imagem extends Model {
         
         // Mover arquivo
         $caminhoCompleto = $diretorioTipo . $nomeArquivo;
+        error_log('🔍 [IMAGEM] Tentando mover arquivo de ' . $arquivo['tmp_name'] . ' para ' . $caminhoCompleto);
+        
         if (!move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
+            error_log('❌ [IMAGEM] ERRO ao mover arquivo: ' . $arquivo['error']);
             throw new \Exception('Erro ao fazer upload do arquivo.');
         }
         
+        error_log('✅ [IMAGEM] Arquivo movido com sucesso. Tamanho: ' . filesize($caminhoCompleto) . ' bytes');
+        
+        // Verificar se o arquivo é uma imagem válida antes de redimensionar
+        $info = getimagesize($caminhoCompleto);
+        if (!$info) {
+            error_log('❌ [IMAGEM] ERRO: Arquivo não é uma imagem válida: ' . $caminhoCompleto);
+            throw new \Exception('Arquivo enviado não é uma imagem válida.');
+        }
+        
+        error_log('🔍 [IMAGEM] Informações da imagem original: ' . print_r($info, true));
+        
         // Redimensionar para tamanho máximo fixo (800x800 para exibição consistente)
-        $this->redimensionarParaTamanhoMaximo($caminhoCompleto, $arquivo['type']);
+        $resultadoRedimensionamento = $this->redimensionarParaTamanhoMaximo($caminhoCompleto, $arquivo['type']);
+        
+        if (!$resultadoRedimensionamento) {
+            error_log('❌ [IMAGEM] ERRO no redimensionamento, mantendo arquivo original');
+        } else {
+            error_log('✅ [IMAGEM] Redimensionamento concluído. Novo tamanho: ' . filesize($caminhoCompleto) . ' bytes');
+        }
         
         // Criar URL imediatamente para exibição
         $url = '/uploads/produtos/' . $nomeArquivo; // Corrigido para produtos (plural) para compatibilidade
@@ -79,8 +99,17 @@ class Imagem extends Model {
     }
     
     public function redimensionarParaTamanhoMaximo($caminhoArquivo, $tipo) {
+        error_log('🔍 [IMAGEM-REDIMENSIONAR] Iniciando redimensionamento de: ' . $caminhoArquivo . ' Tipo: ' . $tipo);
+        
         // Obter dimensões originais
-        list($larguraOriginal, $alturaOriginal) = getimagesize($caminhoArquivo);
+        $info = getimagesize($caminhoArquivo);
+        if (!$info) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Não foi possível obter dimensões da imagem');
+            return false;
+        }
+        
+        list($larguraOriginal, $alturaOriginal) = $info[0], $info[1];
+        error_log('🔍 [IMAGEM-REDIMENSIONAR] Dimensões originais: ' . $larguraOriginal . 'x' . $alturaOriginal);
         
         // Definir tamanho máximo fixo para exibição consistente
         $tamanhoMaximo = 800;
@@ -100,12 +129,23 @@ class Imagem extends Model {
         if ($larguraOriginal <= $tamanhoMaximo && $alturaOriginal <= $tamanhoMaximo) {
             $novaLargura = $larguraOriginal;
             $novaAltura = $alturaOriginal;
+            error_log('🔍 [IMAGEM-REDIMENSIONAR] Imagem já está dentro do tamanho máximo, mantendo original');
         }
         
-        error_log('🔍 [IMAGEM] Redimensionando: ' . $larguraOriginal . 'x' . $alturaOriginal . ' → ' . $novaLargura . 'x' . $novaAltura);
+        error_log('🔍 [IMAGEM-REDIMENSIONAR] Novas dimensões: ' . $novaLargura . 'x' . $novaAltura);
+        
+        // Verificar se GD está disponível
+        if (!extension_loaded('gd') || !function_exists('gd_info')) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Extensão GD não está carregada');
+            return false;
+        }
         
         // Criar nova imagem
         $novaImagem = imagecreatetruecolor($novaLargura, $novaAltura);
+        if (!$novaImagem) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Não foi possível criar nova imagem');
+            return false;
+        }
         
         // Carregar imagem original
         switch ($tipo) {
@@ -122,22 +162,38 @@ class Imagem extends Model {
                 $imagemOriginal = imagecreatefromwebp($caminhoArquivo);
                 break;
             default:
+                error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Tipo de imagem não suportado: ' . $tipo);
+                imagedestroy($novaImagem);
                 return false;
         }
         
+        if (!$imagemOriginal) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Não foi possível carregar imagem original');
+            imagedestroy($novaImagem);
+            return false;
+        }
+        
         // Redimensionar com alta qualidade
-        imagecopyresampled($novaImagem, $imagemOriginal, 0, 0, 0, 0, $novaLargura, $novaAltura, $larguraOriginal, $alturaOriginal);
+        $resultado = imagecopyresampled($novaImagem, $imagemOriginal, 0, 0, 0, 0, $novaLargura, $novaAltura, $larguraOriginal, $alturaOriginal);
+        
+        if (!$resultado) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Falha no redimensionamento');
+            imagedestroy($novaImagem);
+            imagedestroy($imagemOriginal);
+            return false;
+        }
         
         // Salvar nova imagem com alta qualidade
+        $salvou = false;
         switch ($tipo) {
             case 'image/jpeg':
-                imagejpeg($novaImagem, $caminhoArquivo, 90); // 90% de qualidade
+                $salvou = imagejpeg($novaImagem, $caminhoArquivo, 90); // 90% de qualidade
                 break;
             case 'image/png':
-                imagepng($novaImagem, $caminhoArquivo, 9); // Máxima compressão
+                $salvou = imagepng($novaImagem, $caminhoArquivo, 9); // Máxima compressão
                 break;
             case 'image/webp':
-                imagewebp($novaImagem, $caminhoArquivo, 90); // 90% de qualidade
+                $salvou = imagewebp($novaImagem, $caminhoArquivo, 90); // 90% de qualidade
                 break;
         }
         
@@ -145,6 +201,12 @@ class Imagem extends Model {
         imagedestroy($novaImagem);
         imagedestroy($imagemOriginal);
         
+        if (!$salvou) {
+            error_log('❌ [IMAGEM-REDIMENSIONAR] ERRO: Falha ao salvar imagem redimensionada');
+            return false;
+        }
+        
+        error_log('✅ [IMAGEM-REDIMENSIONAR] Redimensionamento concluído com sucesso');
         return true;
     }
     
