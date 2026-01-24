@@ -46,10 +46,7 @@ $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
 // Área Administrativa
-$router->get('/admin', function() {
-    echo "Rota /admin funcionando!";
-    exit;
-});
+$router->get('/admin', 'AdminController', 'dashboard');
 $router->get('/admin/dashboard', 'AdminController', 'dashboard');
 $router->get('/admin/pedidos', 'AdminController', 'pedidos');
 $router->get('/admin/pedido/detalhes/{id}', 'AdminController', 'pedidoDetalhes');

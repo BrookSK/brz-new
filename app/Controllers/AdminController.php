@@ -13,7 +13,7 @@ use App\Models\Imagem;
 class AdminController extends Controller {
     
     public function dashboard(Request $request) {
-        echo "Dashboard funcionando!";
+        echo '<h1>Dashboard Admin</h1><p>Sistema funcionando!</p>';
         exit;
     }
     
