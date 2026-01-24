@@ -15,7 +15,7 @@ class AdminController extends Controller {
         
         // Adicionando teste básico de banco com credenciais corretas
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr_brazilianashop', 'novobr_brz', 'Br@2024!@#$');
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos");
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
             echo '<p>Total de produtos: ' . $result['total'] . '</p>';
