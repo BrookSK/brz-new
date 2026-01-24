@@ -695,17 +695,19 @@ class AdminController extends Controller {
             
             error_log('🔍 [ATUALIZAR-PRODUTO] Produto atualizado com SUCESSO! ID: ' . $produtoId . ', Valor: $' . number_format($valor, 2));
             
-            // Redirecionar de volta para a lista com mensagem de sucesso
-            header('Location: /admin/produtos?success=Produto atualizado com sucesso em USD - Valor: $' . number_format($valor, 2));
-            exit;
+            // Retornar JSON para compatibilidade com AJAX
+            $this->json([
+                'success' => true,
+                'message' => 'Produto atualizado com sucesso em USD - Valor: $' . number_format($valor, 2),
+                'produto_id' => $produtoId
+            ]);
             
         } catch (\Exception $e) {
             error_log('❌ [ATUALIZAR-PRODUTO] ERRO ao atualizar produto: ' . $e->getMessage());
             error_log('❌ [ATUALIZAR-PRODUTO] Stack trace: ' . $e->getTraceAsString());
             
-            // Redirecionar de volta com mensagem de erro
-            header('Location: /admin/editar-produto/' . $produtoId . '?error=' . urlencode($e->getMessage()));
-            exit;
+            // Retornar JSON para compatibilidade com AJAX
+            $this->json(['error' => 'Erro ao atualizar produto: ' . $e->getMessage()], 500);
         }
     }
     

@@ -73,6 +73,9 @@ class Produto extends Model {
     }
     
     public function create($data, $usuarioId = null) {
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Iniciando criação de produto');
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Dados recebidos: ' . print_r($data, true));
+        
         $stmt = $this->getConnection()->prepare("
             INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, created_at, updated_at)
             VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, NOW(), NOW())
@@ -89,8 +92,15 @@ class Produto extends Model {
         $stmt->bindParam(':estoque', $data['estoque']);
         $stmt->bindParam(':status', $data['status']);
         
-        $stmt->execute();
-        return $this->getConnection()->lastInsertId();
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Executando INSERT no banco...');
+        $result = $stmt->execute();
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Resultado do INSERT: ' . ($result ? 'true' : 'false'));
+        error_log('🔍 [PRODUTO-MODEL-CREATE] SQL Error: ' . print_r($stmt->errorInfo(), true));
+        
+        $lastId = $this->getConnection()->lastInsertId();
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Last Insert ID: ' . $lastId);
+        
+        return $lastId;
     }
     
     public function update($id, $data, $usuarioId = null) {

@@ -486,11 +486,40 @@ function salvarProduto() {
     
     const url = isEdicao ? `/admin/atualizar-produto/${produtoId}` : '/admin/salvar-produto';
     
-    // Validar se o valor está em formato numérico
+    // Validar campos obrigatórios
+    const nome = formData.get('nome');
+    const sku = formData.get('sku');
     const valor = parseFloat(formData.get('valor'));
+    const categoriaId = formData.get('categoria_id');
+    
+    if (!nome || nome.trim() === '') {
+        alert('Por favor, informe o nome do produto!');
+        return;
+    }
+    
+    if (!sku || sku.trim() === '') {
+        alert('Por favor, informe o SKU do produto!');
+        return;
+    }
+    
+    if (!categoriaId || categoriaId === '') {
+        alert('Por favor, selecione uma categoria!');
+        return;
+    }
+    
     if (isNaN(valor) || valor <= 0) {
         alert('Por favor, informe um valor válido em USD!');
         return;
+    }
+    
+    // Garantir que campos numéricos sejam enviados corretamente
+    formData.set('valor', valor.toFixed(2));
+    formData.set('peso', parseFloat(formData.get('peso') || 0).toFixed(3));
+    formData.set('estoque', parseInt(formData.get('estoque') || 0));
+    
+    console.log('🔍 [PRODUTOS] Dados finais antes de enviar:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}: ${value}`);
     }
     
     console.log('🔍 [PRODUTOS] Salvando produto - Edição:', isEdicao, 'ID:', produtoId, 'Valor USD:', valor);
@@ -499,8 +528,13 @@ function salvarProduto() {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('🔍 [PRODUTOS] Status da resposta:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('🔍 [PRODUTOS] Resposta do servidor:', data);
+        
         if (data.success) {
             const mensagem = isEdicao ? 
                 'Produto atualizado com sucesso em USD!' : 
@@ -516,6 +550,7 @@ function salvarProduto() {
             // Recarregar página para mostrar alterações
             location.reload();
         } else {
+            console.error('❌ [PRODUTOS] Erro do servidor:', data.error);
             alert('Erro ao salvar produto: ' + data.error);
         }
     })
