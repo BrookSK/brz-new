@@ -15,8 +15,12 @@ class AdminController extends Controller {
             'total_usuarios' => 0
         ];
         
-        $this->view('admin/dashboard', [
-            'stats' => $stats
-        ]);
+        // Iniciar buffer manualmente
+        ob_start();
+        include __DIR__ . '/../Views/admin/dashboard.php';
+        $content = ob_get_clean();
+        
+        // Incluir layout
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 }
