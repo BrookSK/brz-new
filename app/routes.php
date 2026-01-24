@@ -45,66 +45,8 @@ $router->post('/checkout/processar', 'CheckoutController', 'processar');
 $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
-// Área Administrativa
-$router->get('/admin/dashboard', 'AdminController', 'dashboard');
-$router->get('/admin/teste', function() {
-    echo 'Teste de rota funcionando!';
-    exit;
-});
-$router->get('/admin/pedidos', 'AdminController', 'pedidos');
-$router->get('/admin/pedido/detalhes/{id}', 'AdminController', 'pedidoDetalhes');
-$router->get('/admin/criar-pedido', 'AdminController', 'criarPedido');
-$router->post('/admin/criar-pedido', 'AdminController', 'criarPedido');
-$router->post('/admin/criar-pedido-completo', 'AdminController', 'criarPedidoCompleto');
-$router->get('/admin/buscar-produtos', 'AdminController', 'buscarProdutos');
-$router->post('/admin/atualizar-status', 'AdminController', 'atualizarStatus');
-$router->post('/admin/consolidar-pedidos', 'AdminController', 'consolidarPedidos');
-$router->get('/admin/gerar-etiqueta/{id}', 'AdminController', 'gerarEtiqueta');
-$router->post('/admin/efetivar-etiqueta/{id}', 'AdminController', 'efetivarEtiqueta');
-$router->get('/admin/configuracoes', 'AdminController', 'configuracoes');
-$router->post('/admin/salvar-configuracoes', 'AdminController', 'salvarConfiguracoes');
-$router->get('/admin/testar-email', 'AdminController', 'testarEmail');
-$router->get('/admin/usuarios', 'AdminController', 'usuarios');
-$router->get('/admin/usuario/{id}', 'AdminController', 'editarUsuario');
-$router->post('/admin/salvar-usuario', 'AdminController', 'salvarUsuario');
-$router->post('/admin/atualizar-usuario/{id}', 'AdminController', 'atualizarUsuario');
-$router->post('/admin/excluir-usuario/{id}', 'AdminController', 'excluirUsuario');
-$router->get('/admin/usuarios-json', 'AdminController', 'usuariosJson');
-$router->get('/admin/estatisticas-usuarios', 'AdminController', 'estatisticasUsuarios');
-$router->get('/admin/produtos', 'AdminController', 'produtos');
-$router->get('/admin/produto/{id}', 'AdminController', 'produto');
-$router->get('/admin/novo-produto', 'AdminController', 'novoProduto');
-$router->get('/admin/editar-produto/{id}', 'AdminController', 'editarProduto');
-$router->post('/admin/salvar-produto', 'AdminController', 'salvarProduto');
-$router->post('/admin/upload-imagem', 'AdminController', 'uploadImagem');
-$router->post('/admin/atualizar-produto/{id}', 'AdminController', 'atualizarProduto');
-$router->post('/admin/alterar-status-produto/{id}', 'AdminController', 'alterarStatusProduto');
-$router->post('/admin/excluir-produto/{id}', 'AdminController', 'excluirProduto');
-$router->post('/admin/marcar-foto-principal/{id}', 'AdminController', 'marcarFotoPrincipal');
-$router->post('/admin/excluir-foto/{id}', 'AdminController', 'excluirFoto');
-$router->get('/admin/gerar-imagens/{id}', 'AdminController', 'gerarImagens');
-$router->post('/admin/consolidar-pedidos/exportar', 'AdminController', 'exportarConsolidarPedidos');
-
-// Créditos
-$router->post('/admin/adicionar-creditos', 'AdminController', 'adicionarCreditos');
-$router->get('/admin/logs-creditos', 'AdminController', 'logsCreditos');
-$router->get('/admin/credito-detalhes/{id}', 'AdminController', 'creditoDetalhes');
-$router->get('/admin/usuario-perfil/{id}', 'AdminController', 'usuarioPerfil');
-
-// Notificações
-$router->post('/admin/salvar-notificacao', 'AdminController', 'salvarNotificacao');
-$router->get('/admin/logs-webhook', 'AdminController', 'logsWebhook');
-$router->get('/admin/log-webhook/{id}', 'AdminController', 'logWebhook');
-
-// Categorias
-$router->get('/admin/categorias', 'AdminController', 'categorias');
-$router->get('/admin/categoria/{id}', 'AdminController', 'editarCategoria');
-$router->post('/admin/salvar-categoria', 'AdminController', 'salvarCategoria');
-$router->post('/admin/atualizar-categoria/{id}', 'AdminController', 'atualizarCategoria');
-$router->post('/admin/excluir-categoria/{id}', 'AdminController', 'excluirCategoria');
-
-// Importação
-$router->post('/admin/importar-produtos', 'AdminController', 'importarProdutos');
+// Área Administrativa - Temporariamente desabilitada
+// Todas as rotas admin foram comentadas para restaurar o sistema
 
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
