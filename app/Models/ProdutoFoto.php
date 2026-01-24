@@ -153,6 +153,20 @@ class ProdutoFoto extends Model {
         return $this->delete($id);
     }
     
+    public function marcarComoPrincipal($fotoId) {
+        // Primeiro, remover todas as fotos principais deste produto
+        $stmt = $this->connection->prepare("
+            UPDATE {$this->table} 
+            SET principal = FALSE 
+            WHERE produto_id = (SELECT produto_id FROM {$this->table} WHERE id = :id)
+        ");
+        $stmt->bindParam(':id', $fotoId);
+        $stmt->execute();
+        
+        // Depois, marcar esta foto como principal
+        return $this->update($fotoId, ['principal' => TRUE]);
+    }
+    
     public function uploadFoto($arquivo, $produtoId) {
         // Validar arquivo
         $tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];

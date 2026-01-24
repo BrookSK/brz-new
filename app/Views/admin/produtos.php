@@ -81,10 +81,14 @@
                                 <tr>
                                     <td><?= $produto['id'] ?></td>
                                     <td>
-                                        <?php if ($produto['foto_principal']): ?>
-                                            <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
+                                        <?php 
+                                        $fotoPath = '/uploads/produtos/' . $produto['foto_principal'];
+                                        $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                                        ?>
+                                        <?php if ($fotoExists): ?>
+                                            <img src="<?= $fotoPath ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
                                         <?php else: ?>
-                                            <img src="https://via.placeholder.com/50x50?text=Sem+Imagem" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
+                                            <img src="/uploads/produtos/placeholder.svg" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -96,7 +100,10 @@
                                     <td><?= htmlspecialchars($produto['sku']) ?></td>
                                     <td><?= htmlspecialchars($produto['categoria_nome']) ?></td>
                                     <td>
-                                        <span class="badge bg-success product-price" data-original-value="<?= $produto['valor'] ?>">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
+                                        <span class="badge bg-primary product-price" data-original-value="<?= $produto['valor'] ?>">$ <?= number_format($produto['valor'], 2, '.', ',') ?> USD</span>
+                                        <?php if ($produto['moeda'] === 'BRL'): ?>
+                                        <br><small class="text-warning">⚠️ Moeda incorreta: BRL</small>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <span class="badge badge-<?= $produto['estoque'] > 0 ? 'success' : 'danger' ?>">
@@ -187,18 +194,21 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Valor *</label>
+                            <label class="form-label">Valor (USD) *</label>
                             <div class="input-group">
-                                <span class="input-group-text" id="valor-currency">R$</span>
-                                <input type="number" name="valor" class="form-control" step="0.01" required>
+                                <span class="input-group-text">$</span>
+                                <input type="number" name="valor" class="form-control" step="0.01" placeholder="0.00" required>
+                                <span class="input-group-text">USD</span>
                             </div>
+                            <small class="text-muted">Todos os produtos devem ser cadastrados em Dólar Americano (USD)</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Moeda</label>
-                            <select name="moeda" class="form-select">
-                                <option value="BRL">Real Brasileiro (BRL)</option>
-                                <option value="USD">Dólar Americano (USD)</option>
+                            <select name="moeda" class="form-select" required>
+                                <option value="USD" selected>Dólar Americano (USD) - Padrão</option>
+                                <option value="BRL" disabled>Real Brasileiro (BRL) - Desativado</option>
                             </select>
+                            <small class="text-muted">Moeda padrão fixada em USD para todos os produtos</small>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Peso (kg)</label>
@@ -253,15 +263,20 @@ function editarProduto(id) {
                 document.querySelector('textarea[name="descricao_completa"]').value = data.produto.descricao_completa || '';
                 document.querySelector('select[name="categoria_id"]').value = data.produto.categoria_id;
                 document.querySelector('input[name="valor"]').value = data.produto.valor || '';
-                document.querySelector('select[name="moeda"]').value = data.produto.moeda || 'BRL';
+                document.querySelector('select[name="moeda"]').value = data.produto.moeda || 'USD';
                 document.querySelector('input[name="peso"]').value = data.produto.peso || '';
                 document.querySelector('input[name="estoque"]').value = data.produto.estoque || '';
                 document.querySelector('select[name="status"]').value = data.produto.status || 'ativo';
                 
+                // Forçar moeda USD para novos produtos
+                if (!data.produto.id) {
+                    document.querySelector('select[name="moeda"]').value = 'USD';
+                }
+                
                 // Atualizar o símbolo da moeda no campo de valor
                 const valorCurrency = document.getElementById('valor-currency');
                 if (valorCurrency) {
-                    valorCurrency.textContent = data.produto.moeda === 'USD' ? '$' : 'R$';
+                    valorCurrency.textContent = '$';
                     console.log('🔍 [PRODUTOS] Símbolo da moeda atualizado para:', valorCurrency.textContent);
                 }
                 
@@ -524,8 +539,21 @@ function salvarProduto() {
     const form = document.getElementById('formProduto');
     const formData = new FormData(form);
     
+    // FORÇAR MOEDA USD SEMPRE
+    formData.set('moeda', 'USD');
+    console.log('🔍 [PRODUTOS] Moeda forçada para USD no salvamento');
+    
     const id = formData.get('id');
     const url = id ? `/admin/atualizar-produto/${id}` : '/admin/salvar-produto';
+    
+    // Validar se o valor está em formato numérico
+    const valor = parseFloat(formData.get('valor'));
+    if (isNaN(valor) || valor <= 0) {
+        alert('Por favor, informe um valor válido em USD!');
+        return;
+    }
+    
+    console.log('🔍 [PRODUTOS] Salvando produto com valor USD:', valor);
     
     fetch(url, {
         method: 'POST',
@@ -534,13 +562,44 @@ function salvarProduto() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Produto salvo com sucesso!');
+            alert('Produto salvo com sucesso em USD!');
             location.reload();
         } else {
             alert('Erro ao salvar produto: ' + data.error);
         }
     });
 }
+
+// Função para resetar formulário e garantir USD
+function resetarFormularioProduto() {
+    document.getElementById('formProduto').reset();
+    document.getElementById('modalProdutoTitle').textContent = 'Novo Produto';
+    document.getElementById('produto_id').value = '';
+    
+    // Forçar moeda USD para novos produtos
+    const moedaSelect = document.querySelector('select[name="moeda"]');
+    if (moedaSelect) {
+        moedaSelect.value = 'USD';
+    }
+    
+    console.log('🔍 [PRODUTOS] Formulário resetado com moeda USD');
+}
+
+// Event listener para quando o modal de produto for aberto
+document.addEventListener('DOMContentLoaded', function() {
+    const modalProduto = document.getElementById('modalProduto');
+    if (modalProduto) {
+        modalProduto.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            
+            // Se não for um botão de edição, é um novo produto
+            if (!button || !button.getAttribute('onclick') || !button.getAttribute('onclick').includes('editarProduto')) {
+                resetarFormularioProduto();
+            }
+        });
+    }
+});
+
 </script>
 
 <?php $content = ob_get_clean(); ?>

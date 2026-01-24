@@ -50,12 +50,16 @@
                 <div class="card h-100 product-card">
                     <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
-                            <?php if ($produto['foto_principal']): ?>
-                                <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>" 
+                            <?php 
+                            $fotoPath = '/uploads/produtos/' . $produto['foto_principal'];
+                            $fotoExists = $produto['foto_principal'] && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                            ?>
+                            <?php if ($fotoExists): ?>
+                                <img src="<?= $fotoPath ?>" 
                                      alt="<?= htmlspecialchars($produto['nome']) ?>"
                                      class="card-img-top product-image">
                             <?php else: ?>
-                                <img src="https://via.placeholder.com/300x300/6c757d/ffffff?text=<?= urlencode($produto['nome']) ?>" 
+                                <img src="/uploads/produtos/placeholder.svg" 
                                      alt="<?= htmlspecialchars($produto['nome']) ?>"
                                      class="card-img-top product-image">
                             <?php endif; ?>

@@ -520,16 +520,71 @@ class AdminController extends Controller {
         $dados = $request->getParams();
         $usuario = $this->authService->getUsuarioLogado();
         
+        // DEBUG: Log dos dados recebidos
+        error_log('🔍 [PRODUTOS] Dados recebidos: ' . print_r($dados, true));
+        error_log('🔍 [PRODUTOS] Valor recebido: ' . ($dados['valor'] ?? 'NÃO DEFINIDO'));
+        error_log('🔍 [PRODUTOS] Tipo do valor: ' . gettype($dados['valor'] ?? 'null'));
+        
         try {
+            // FORÇAR MOEDA USD SEMPRE
+            $dados['moeda'] = 'USD';
+            
+            // Validar e converter valor
+            if (!isset($dados['valor']) || $dados['valor'] === '') {
+                throw new \Exception('Valor é obrigatório');
+            }
+            
+            // Converter valor para formato numérico
+            $valor = str_replace(',', '.', $dados['valor']);
+            $valor = floatval($valor);
+            
+            if ($valor <= 0) {
+                throw new \Exception('Valor deve ser maior que zero');
+            }
+            
+            $dados['valor'] = $valor;
+            error_log('🔍 [PRODUTOS] Valor convertido: ' . $valor);
+            
+            // Criar produto primeiro para obter o ID
             $produtoId = $this->produtoModel->create($dados, $usuario['id']);
+            error_log('🔍 [PRODUTOS] Produto criado com ID: ' . $produtoId);
+            
+            // Processar upload da imagem principal
+            if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
+                $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
+                
+                // Marcar como principal
+                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                
+                // Atualizar produto com a foto principal
+                $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+            }
+            
+            // Processar upload das imagens adicionais
+            if (isset($_FILES['imagens']) && is_array($_FILES['imagens']['name'])) {
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
+                        $arquivo = [
+                            'name' => $_FILES['imagens']['name'][$key],
+                            'type' => $_FILES['imagens']['type'][$key],
+                            'tmp_name' => $_FILES['imagens']['tmp_name'][$key],
+                            'error' => $_FILES['imagens']['error'][$key],
+                            'size' => $_FILES['imagens']['size'][$key]
+                        ];
+                        
+                        $this->produtoFotoModel->uploadFoto($arquivo, $produtoId);
+                    }
+                }
+            }
             
             $this->json([
                 'success' => true,
-                'message' => 'Produto criado com sucesso',
+                'message' => 'Produto criado com sucesso em USD - Valor: $' . number_format($valor, 2),
                 'produto_id' => $produtoId
             ]);
             
         } catch (\Exception $e) {
+            error_log('❌ [PRODUTOS] Erro ao criar produto: ' . $e->getMessage());
             $this->json(['error' => 'Erro ao criar produto: ' . $e->getMessage()], 500);
         }
     }
@@ -541,15 +596,68 @@ class AdminController extends Controller {
         $dados = $request->getParams();
         $usuario = $this->authService->getUsuarioLogado();
         
+        // DEBUG: Log dos dados recebidos
+        error_log('🔍 [PRODUTOS] Atualizar - Dados recebidos: ' . print_r($dados, true));
+        error_log('🔍 [PRODUTOS] Atualizar - Valor recebido: ' . ($dados['valor'] ?? 'NÃO DEFINIDO'));
+        
         try {
+            // FORÇAR MOEDA USD SEMPRE
+            $dados['moeda'] = 'USD';
+            
+            // Validar e converter valor
+            if (!isset($dados['valor']) || $dados['valor'] === '') {
+                throw new \Exception('Valor é obrigatório');
+            }
+            
+            // Converter valor para formato numérico
+            $valor = str_replace(',', '.', $dados['valor']);
+            $valor = floatval($valor);
+            
+            if ($valor <= 0) {
+                throw new \Exception('Valor deve ser maior que zero');
+            }
+            
+            $dados['valor'] = $valor;
+            error_log('🔍 [PRODUTOS] Atualizar - Valor convertido: ' . $valor);
+            
+            // Atualizar dados do produto
             $this->produtoModel->update($produtoId, $dados, $usuario['id']);
+            
+            // Processar upload da imagem principal
+            if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
+                $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
+                
+                // Marcar como principal
+                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                
+                // Atualizar produto com a foto principal
+                $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+            }
+            
+            // Processar upload das imagens adicionais
+            if (isset($_FILES['imagens']) && is_array($_FILES['imagens']['name'])) {
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
+                        $arquivo = [
+                            'name' => $_FILES['imagens']['name'][$key],
+                            'type' => $_FILES['imagens']['type'][$key],
+                            'tmp_name' => $_FILES['imagens']['tmp_name'][$key],
+                            'error' => $_FILES['imagens']['error'][$key],
+                            'size' => $_FILES['imagens']['size'][$key]
+                        ];
+                        
+                        $this->produtoFotoModel->uploadFoto($arquivo, $produtoId);
+                    }
+                }
+            }
             
             $this->json([
                 'success' => true,
-                'message' => 'Produto atualizado com sucesso'
+                'message' => 'Produto atualizado com sucesso em USD - Valor: $' . number_format($valor, 2)
             ]);
             
         } catch (\Exception $e) {
+            error_log('❌ [PRODUTOS] Erro ao atualizar produto: ' . $e->getMessage());
             $this->json(['error' => 'Erro ao atualizar produto: ' . $e->getMessage()], 500);
         }
     }

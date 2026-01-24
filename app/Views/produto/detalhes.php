@@ -15,25 +15,33 @@
             <div class="product-gallery">
                 <!-- Foto Principal -->
                 <div class="main-image-container mb-3">
+                    <?php 
+                    $fotoPath = '/uploads/produtos/' . ($fotoPrincipal['nome_arquivo'] ?? '');
+                    $fotoExists = !empty($fotoPrincipal['nome_arquivo']) && file_exists(__DIR__ . '/../../public' . $fotoPath);
+                    ?>
                     <img id="main-image" 
-                         src="/uploads/produtos/<?= $fotoPrincipal['nome_arquivo'] ?? 'placeholder.jpg' ?>" 
+                         src="<?= $fotoExists ? $fotoPath : '/uploads/produtos/placeholder.svg' ?>" 
                          alt="<?= htmlspecialchars($produto['nome']) ?>"
                          class="img-fluid rounded shadow-sm main-product-image">
                 </div>
                 
                 <!-- Miniaturas -->
-                <div class="thumbnails-container">
+                <?php if (!empty($fotos)): ?>
                     <div class="row g-2">
                         <?php foreach ($fotos as $index => $foto): ?>
                         <div class="col-3">
-                            <img src="/uploads/produtos/<?= $foto['nome_arquivo'] ?>" 
+                            <?php 
+                            $miniaturaPath = '/uploads/produtos/' . $foto['nome_arquivo'];
+                            $miniaturaExists = !empty($foto['nome_arquivo']) && file_exists(__DIR__ . '/../../public' . $miniaturaPath);
+                            ?>
+                            <img src="<?= $miniaturaExists ? $miniaturaPath : '/uploads/produtos/placeholder.svg' ?>" 
                                  alt="<?= htmlspecialchars($foto['legenda'] ?? 'Foto ' . ($index + 1)) ?>"
                                  class="img-thumbnail thumbnail-image <?= $foto['principal'] ? 'active' : '' ?>"
-                                 data-main-image="/uploads/produtos/<?= $foto['nome_arquivo'] ?>">
+                                 data-main-image="<?= $miniaturaExists ? $miniaturaPath : '/uploads/produtos/placeholder.svg' ?>">
                         </div>
                         <?php endforeach; ?>
                     </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -150,7 +158,11 @@
                 <div class="card h-100 product-card">
                     <a href="/produto/detalhes/<?= $relacionado['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
-                            <img src="/uploads/produtos/<?= $relacionado['foto_principal'] ?? 'placeholder.jpg' ?>" 
+                            <?php 
+                            $relacionadoPath = '/uploads/produtos/' . ($relacionado['foto_principal'] ?? '');
+                            $relacionadoExists = !empty($relacionado['foto_principal']) && file_exists(__DIR__ . '/../../public' . $relacionadoPath);
+                            ?>
+                            <img src="<?= $relacionadoExists ? $relacionadoPath : '/uploads/produtos/placeholder.svg' ?>" 
                                  alt="<?= htmlspecialchars($relacionado['nome']) ?>"
                                  class="card-img-top product-image">
                         </div>
