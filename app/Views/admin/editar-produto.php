@@ -94,19 +94,27 @@
                     </div>
                     
                     <!-- Imagem Atual -->
-                    <?php if (!empty($produto['foto_principal'])): ?>
+                    <?php 
+                    $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : null;
+                    if ($fotoUrl): 
+                    ?>
                         <div class="col-12">
                             <label class="form-label">Imagem Atual</label>
                             <div class="mb-3">
-                                <?php 
-                                // Placeholder inline para evitar 404
-                                $placeholder = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wA==';
-                                $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : $placeholder;
-                                ?>
-                                <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
-                                     alt="Imagem atual" 
-                                     style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;"
-                                     onerror="this.src='<?= $placeholder ?>'">
+                                <a href="<?= $fotoUrl ?>" target="_blank" class="text-decoration-none">
+                                    <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
+                                         alt="Imagem atual" 
+                                         style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s;"
+                                         onmouseover="this.style.transform='scale(1.05)'"
+                                         onmouseout="this.style.transform='scale(1)'"
+                                         title="Clique para ver imagem em tamanho real">
+                                </a>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-external-link-alt"></i> 
+                                        <a href="<?= $fotoUrl ?>" target="_blank">Abrir imagem em nova aba</a>
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     <?php endif; ?>

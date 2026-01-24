@@ -8,6 +8,7 @@ use App\Models\Usuario;
 use App\Models\Produto;
 use App\Models\Categoria;
 use App\Models\ProdutoFoto;
+use App\Models\Imagem;
 
 class AdminController extends Controller {
     private $authService;
@@ -16,6 +17,7 @@ class AdminController extends Controller {
     private $produtoModel;
     private $categoriaModel;
     private $produtoFotoModel;
+    private $imagemModel;
     
     public function __construct() {
         $this->authService = new AuthService();
@@ -24,6 +26,7 @@ class AdminController extends Controller {
         $this->produtoModel = new Produto();
         $this->categoriaModel = new Categoria();
         $this->produtoFotoModel = new ProdutoFoto();
+        $this->imagemModel = new Imagem();
     }
     
     public function dashboard(Request $request) {
@@ -563,6 +566,32 @@ class AdminController extends Controller {
         }
     }
     
+    public function uploadImagem(Request $request) {
+        $this->authService->requerPermissao('create');
+        
+        try {
+            if (!isset($_FILES['imagem']) || $_FILES['imagem']['error'] !== UPLOAD_ERR_OK) {
+                throw new \Exception('Nenhuma imagem enviada ou erro no upload');
+            }
+            
+            $imagemUpload = $this->imagemModel->upload($_FILES['imagem'], 'produto');
+            
+            $this->json([
+                'success' => true,
+                'imagem' => [
+                    'id' => $imagemUpload['id'],
+                    'url' => $imagemUpload['url'],
+                    'href' => $imagemUpload['href'],  // URL para uso em href
+                    'src' => $imagemUpload['src'],   // URL para uso em src
+                    'nome_arquivo' => $imagemUpload['nome_arquivo']
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+    
     public function salvarProduto(Request $request) {
         $this->authService->requerPermissao('create');
         
@@ -645,17 +674,15 @@ class AdminController extends Controller {
                 throw new \Exception('Erro ao criar produto no banco de dados');
             }
             
-            // Processar upload da imagem principal
+            // Processar upload da imagem principal usando novo sistema
             if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
-                error_log('🔍 [SALVAR-PRODUTO] Processando upload da imagem principal');
-                $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
+                error_log('🔍 [SALVAR-PRODUTO] Processando upload da imagem principal com novo sistema');
+                $imagemUpload = $this->imagemModel->upload($_FILES['imagem_principal'], 'produto');
                 
-                // Marcar como principal
-                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
-                
-                // Atualizar APENAS a foto principal do produto (não limpar outros campos)
-                $this->produtoModel->updateFotoPrincipal($produtoId, $fotoPrincipal['nome_arquivo'], $usuario['id']);
-                error_log('🔍 [SALVAR-PRODUTO] Foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
+                // Atualizar produto com a URL da imagem (já pronta para exibição)
+                $this->produtoModel->updateFotoPrincipal($produtoId, $imagemUpload['href'], $usuario['id']);
+                error_log('🔍 [SALVAR-PRODUTO] Imagem principal salva: ' . $imagemUpload['href']);
+                error_log('🔍 [SALVAR-PRODUTO] URL para src: ' . $imagemUpload['src']);
             } else {
                 error_log('🔍 [SALVAR-PRODUTO] Nenhuma imagem principal para upload');
             }

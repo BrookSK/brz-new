@@ -51,14 +51,23 @@
                     <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
                             <?php 
-                            // Placeholder inline para evitar 404
-                            $placeholder = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wA==';
-                            $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : $placeholder;
+                            // Usar apenas imagens reais, sem placeholder
+                            $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : null;
                             ?>
-                            <img src="<?= $fotoUrl ?>" 
-                                 alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                 class="card-img-top product-image"
-                                 onerror="this.src='<?= $placeholder ?>'">
+                            <?php if ($fotoUrl): ?>
+                                <a href="<?= $fotoUrl ?>" target="_blank" class="text-decoration-none">
+                                    <img src="<?= $fotoUrl ?>" 
+                                         alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                         class="card-img-top product-image"
+                                         style="cursor: pointer; transition: transform 0.2s;"
+                                         onmouseover="this.style.transform='scale(1.05)'"
+                                         onmouseout="this.style.transform='scale(1)'">
+                                </a>
+                            <?php else: ?>
+                                <div class="card-img-top product-image d-flex align-items-center justify-content-center bg-light">
+                                    <i class="fas fa-image text-muted fa-2x"></i>
+                                </div>
+                            <?php endif; ?>
                              
                             <!-- Badge de estoque -->
                             <?php if ($produto['estoque'] <= 5): ?>

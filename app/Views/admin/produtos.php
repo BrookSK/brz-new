@@ -82,15 +82,26 @@
                                     <td><?= $produto['id'] ?></td>
                                     <td>
                                         <?php 
-                                        // Placeholder inline para evitar 404
-                                        $placeholder = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wA==';
-                                        $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : $placeholder;
+                                        // Usar apenas imagens reais, sem placeholder
+                                        $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : null;
                                         ?>
-                                        <img src="<?= $fotoUrl ?>" 
-                                             alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                             class="img-thumbnail"
-                                             style="width: 60px; height: 60px; object-fit: cover;"
-                                             onerror="this.src='<?= $placeholder ?>'">
+                                        <?php if ($fotoUrl): ?>
+                                            <a href="<?= $fotoUrl ?>" target="_blank" class="text-decoration-none">
+                                                <img src="<?= $fotoUrl ?>" 
+                                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                                     class="img-thumbnail"
+                                                     style="width: 60px; height: 60px; object-fit: cover; cursor: pointer; transition: transform 0.2s;"
+                                                     onmouseover="this.style.transform='scale(1.1)'"
+                                                     onmouseout="this.style.transform='scale(1)'"
+                                                     title="Clique para ver imagem em tamanho real">
+                                            </a>
+                                        <?php else: ?>
+                                            <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" 
+                                                 style="width: 60px; height: 60px; cursor: not-allowed;"
+                                                 title="Sem imagem">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div>
@@ -224,8 +235,22 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Imagem Principal</label>
-                            <input type="file" name="imagem_principal" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp">
+                            <input type="file" name="imagem_principal" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp" id="imagem_principal">
                             <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB)</small>
+                            
+                            <!-- Preview da imagem -->
+                            <div id="imagem_preview" class="mt-2" style="display: none;">
+                                <img id="preview_img" src="" alt="Preview" style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removerImagem()">
+                                    <i class="fas fa-trash"></i> Remover
+                                </button>
+                                <div class="mt-2">
+                                    <small class="text-success">
+                                        <i class="fas fa-check-circle"></i> 
+                                        <span id="imagem_status">Imagem carregada com sucesso!</span>
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Imagens Adicionais</label>
@@ -244,6 +269,83 @@
 </div>
 
 <script>
+// Upload instantâneo com preview
+document.getElementById('imagem_principal').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const preview = document.getElementById('imagem_preview');
+    const previewImg = document.getElementById('preview_img');
+    const statusSpan = document.getElementById('imagem_status');
+    
+    if (file) {
+        // Mostrar preview imediato
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
+            statusSpan.textContent = 'Processando upload...';
+        }
+        reader.readAsDataURL(file);
+        
+        // Fazer upload via AJAX
+        const formData = new FormData();
+        formData.append('imagem', file);
+        
+        fetch('/admin/upload-imagem', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Atualizar preview com a URL do servidor
+                previewImg.src = data.imagem.src;
+                statusSpan.textContent = 'Imagem carregada com sucesso! URL: ' + data.imagem.href;
+                statusSpan.className = 'text-success';
+                
+                // Adicionar campo hidden com a URL
+                let urlField = document.getElementById('imagem_url_field');
+                if (!urlField) {
+                    urlField = document.createElement('input');
+                    urlField.type = 'hidden';
+                    urlField.name = 'imagem_url';
+                    urlField.id = 'imagem_url_field';
+                    document.getElementById('formProduto').appendChild(urlField);
+                }
+                urlField.value = data.imagem.href;
+                
+                console.log('✅ Upload instantâneo:', data.imagem);
+            } else {
+                statusSpan.textContent = 'Erro no upload: ' + data.error;
+                statusSpan.className = 'text-danger';
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro no upload:', error);
+            statusSpan.textContent = 'Erro no upload. Tente novamente.';
+            statusSpan.className = 'text-danger';
+        });
+    } else {
+        preview.style.display = 'none';
+        // Remover campo hidden se existir
+        const urlField = document.getElementById('imagem_url_field');
+        if (urlField) {
+            urlField.remove();
+        }
+    }
+});
+
+function removerImagem() {
+    document.getElementById('imagem_principal').value = '';
+    document.getElementById('imagem_preview').style.display = 'none';
+    document.getElementById('preview_img').src = '';
+    
+    // Remover campo hidden se existir
+    const urlField = document.getElementById('imagem_url_field');
+    if (urlField) {
+        urlField.remove();
+    }
+}
+
 function editarProduto(id) {
     console.log('🔍 [PRODUTOS] editarProduto() chamada com ID:', id);
     
