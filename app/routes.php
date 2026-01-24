@@ -45,8 +45,13 @@ $router->post('/checkout/processar', 'CheckoutController', 'processar');
 $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
-// Área Administrativa - Temporariamente desabilitada
-// Todas as rotas admin foram comentadas para restaurar o sistema
+// Área Administrativa - Teste simples
+$router->get('/admin', function() {
+    echo '<h1>Área Admin</h1><p>Teste básico funcionando!</p>';
+});
+$router->get('/admin/dashboard', function() {
+    echo '<h1>Dashboard Admin</h1><p>Teste básico funcionando!</p>';
+});
 
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
