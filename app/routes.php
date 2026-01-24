@@ -47,9 +47,10 @@ $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
 // Área Administrativa
 $router->get('/admin', function() {
-    echo '<h1>Área Admin</h1><p><a href="/admin/dashboard">Ir para Dashboard</a></p>';
+    echo '<h1>Área Admin</h1><p><a href="/admin/dashboard">Ir para Dashboard</a> | <a href="/admin/produtos">Gerenciar Produtos</a></p>';
 });
 $router->get('/admin/dashboard', 'AdminController', 'dashboard');
+$router->get('/admin/produtos', 'AdminController', 'produtos');
 
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
