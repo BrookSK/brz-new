@@ -7,6 +7,7 @@ use App\Models\PedidoEcommerce;
 use App\Models\Usuario;
 use App\Models\Produto;
 use App\Models\Categoria;
+use App\Models\ProdutoFoto;
 
 class AdminController extends Controller {
     private $authService;
@@ -14,6 +15,7 @@ class AdminController extends Controller {
     private $usuarioModel;
     private $produtoModel;
     private $categoriaModel;
+    private $produtoFotoModel;
     
     public function __construct() {
         $this->authService = new AuthService();
@@ -21,6 +23,7 @@ class AdminController extends Controller {
         $this->usuarioModel = new Usuario();
         $this->produtoModel = new Produto();
         $this->categoriaModel = new Categoria();
+        $this->produtoFotoModel = new ProdutoFoto();
     }
     
     public function dashboard(Request $request) {
@@ -520,11 +523,6 @@ class AdminController extends Controller {
         $dados = $request->getParams();
         $usuario = $this->authService->getUsuarioLogado();
         
-        // DEBUG: Log dos dados recebidos
-        error_log('🔍 [PRODUTOS] Dados recebidos: ' . print_r($dados, true));
-        error_log('🔍 [PRODUTOS] Valor recebido: ' . ($dados['valor'] ?? 'NÃO DEFINIDO'));
-        error_log('🔍 [PRODUTOS] Tipo do valor: ' . gettype($dados['valor'] ?? 'null'));
-        
         try {
             // FORÇAR MOEDA USD SEMPRE
             $dados['moeda'] = 'USD';
@@ -543,11 +541,9 @@ class AdminController extends Controller {
             }
             
             $dados['valor'] = $valor;
-            error_log('🔍 [PRODUTOS] Valor convertido: ' . $valor);
             
             // Criar produto primeiro para obter o ID
             $produtoId = $this->produtoModel->create($dados, $usuario['id']);
-            error_log('🔍 [PRODUTOS] Produto criado com ID: ' . $produtoId);
             
             // Processar upload da imagem principal
             if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
@@ -584,7 +580,6 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
-            error_log('❌ [PRODUTOS] Erro ao criar produto: ' . $e->getMessage());
             $this->json(['error' => 'Erro ao criar produto: ' . $e->getMessage()], 500);
         }
     }
@@ -595,10 +590,6 @@ class AdminController extends Controller {
         $produtoId = $request->getParam('id');
         $dados = $request->getParams();
         $usuario = $this->authService->getUsuarioLogado();
-        
-        // DEBUG: Log dos dados recebidos
-        error_log('🔍 [PRODUTOS] Atualizar - Dados recebidos: ' . print_r($dados, true));
-        error_log('🔍 [PRODUTOS] Atualizar - Valor recebido: ' . ($dados['valor'] ?? 'NÃO DEFINIDO'));
         
         try {
             // FORÇAR MOEDA USD SEMPRE
@@ -618,7 +609,6 @@ class AdminController extends Controller {
             }
             
             $dados['valor'] = $valor;
-            error_log('🔍 [PRODUTOS] Atualizar - Valor convertido: ' . $valor);
             
             // Atualizar dados do produto
             $this->produtoModel->update($produtoId, $dados, $usuario['id']);
@@ -657,7 +647,6 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
-            error_log('❌ [PRODUTOS] Erro ao atualizar produto: ' . $e->getMessage());
             $this->json(['error' => 'Erro ao atualizar produto: ' . $e->getMessage()], 500);
         }
     }

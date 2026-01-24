@@ -199,7 +199,21 @@ class ProdutoFoto extends Model {
         // Opcional: redimensionar imagem
         $this->redimensionarImagem($caminhoCompleto, $arquivo['type']);
         
-        return $nomeArquivo;
+        // Salvar no banco de dados
+        $fotoData = [
+            'produto_id' => $produtoId,
+            'nome_arquivo' => $nomeArquivo,
+            'legenda' => pathinfo($arquivo['name'], PATHINFO_FILENAME),
+            'principal' => false,
+            'ordem' => 0
+        ];
+        
+        $fotoId = $this->create($fotoData);
+        
+        return [
+            'id' => $fotoId,
+            'nome_arquivo' => $nomeArquivo
+        ];
     }
     
     private function redimensionarImagem($caminhoArquivo, $tipo) {
