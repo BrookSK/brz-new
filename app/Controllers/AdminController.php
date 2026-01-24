@@ -180,4 +180,96 @@ class AdminController extends Controller {
         
         exit;
     }
+    
+    public function novoProduto(Request $request) {
+        echo '<h1>Novo Produto</h1>';
+        echo '<form method="POST" action="/admin/salvar-produto" style="max-width: 600px;">';
+        echo '<input type="text" name="nome" placeholder="Nome do Produto" required><br><br>';
+        echo '<input type="text" name="sku" placeholder="SKU" required><br><br>';
+        echo '<button type="submit">Salvar</button>';
+        echo '<a href="/admin/produtos">Cancelar</a>';
+        echo '</form>';
+        exit;
+    }
+    
+    public function salvarProduto(Request $request) {
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        try {
+            $stmt = $pdo->prepare("INSERT INTO produtos (nome, sku, created_at) VALUES (?, ?, NOW())");
+            $stmt->execute([$request->getParam('nome'), $request->getParam('sku')]);
+            
+            header('Location: /admin/produtos');
+            exit;
+        } catch (\Exception $e) {
+            echo 'Erro: ' . $e->getMessage();
+            exit;
+        }
+    }
+    
+    public function editarProduto(Request $request) {
+        $produtoId = $request->getParam('id');
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        $stmt = $pdo->prepare("SELECT * FROM produtos WHERE id = ?");
+        $stmt->execute([$produtoId]);
+        $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$produto) {
+            echo 'Produto não encontrado!';
+            exit;
+        }
+        
+        echo '<h1>Editar Produto</h1>';
+        echo '<form method="POST" action="/admin/atualizar-produto/' . $produtoId . '">';
+        echo '<input type="hidden" name="id" value="' . $produtoId . '">';
+        echo '<input type="text" name="nome" value="' . htmlspecialchars($produto['nome']) . '" required><br><br>';
+        echo '<input type="text" name="sku" value="' . htmlspecialchars($produto['sku']) . '" required><br><br>';
+        echo '<button type="submit">Atualizar</button>';
+        echo '<a href="/admin/produtos">Cancelar</a>';
+        echo '</form>';
+        exit;
+    }
+    
+    public function atualizarProduto(Request $request) {
+        $produtoId = $request->getParam('id');
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        try {
+            $stmt = $pdo->prepare("UPDATE produtos SET nome = ?, sku = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$request->getParam('nome'), $request->getParam('sku'), $produtoId]);
+            
+            header('Location: /admin/editar-produto/' . $produtoId);
+            exit;
+        } catch (\Exception $e) {
+            echo 'Erro: ' . $e->getMessage();
+            exit;
+        }
+    }
+    
+    public function excluirProduto(Request $request) {
+        $produtoId = $request->getParam('id');
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        try {
+            $pdo->beginTransaction();
+            
+            // Excluir fotos
+            $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?");
+            $stmt->execute([$produtoId]);
+            
+            // Excluir produto
+            $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
+            $stmt->execute([$produtoId]);
+            
+            $pdo->commit();
+            
+            header('Location: /admin/produtos');
+            exit;
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            echo 'Erro: ' . $e->getMessage();
+            exit;
+        }
+    }
 }
