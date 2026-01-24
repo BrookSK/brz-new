@@ -233,6 +233,15 @@ class ProdutoFoto extends Model {
         
         error_log('🔍 [PRODUTO-FOTO] Arquivo salvo: ' . $nomeArquivo);
         error_log('🔍 [PRODUTO-FOTO] URL gerada: ' . $urlCompleta);
+        error_log('🔍 [PRODUTO-FOTO] Caminho físico: ' . $caminhoCompleto);
+        
+        // Verificar se arquivo físico foi criado
+        if (!file_exists($caminhoCompleto)) {
+            error_log('❌ [PRODUTO-FOTO] ERRO: Arquivo físico não foi criado: ' . $caminhoCompleto);
+            throw new \Exception('Erro ao salvar arquivo físico no servidor.');
+        }
+        
+        error_log('✅ [PRODUTO-FOTO] Arquivo físico verificado: ' . $caminhoCompleto);
         
         // Salvar no banco de dados com URL completa
         $fotoData = [

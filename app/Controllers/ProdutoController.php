@@ -30,7 +30,28 @@ class ProdutoController extends Controller {
         // Adicionar fotos principais aos produtos
         foreach ($produtos as &$produto) {
             $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
-            $produto['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
+            
+            // Validar e corrigir URL da foto
+            if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+                $fotoUrl = $fotoPrincipal['nome_arquivo'];
+                
+                // Se for URL externa, não usar
+                if (strpos($fotoUrl, 'http') === 0) {
+                    $produto['foto_principal'] = null;
+                    error_log('⚠️ [PRODUTO-CONTROLLER] URL externa ignorada para produto ' . $produto['id'] . ': ' . $fotoUrl);
+                }
+                // Se não começar com /uploads/, corrigir
+                elseif (strpos($fotoUrl, '/uploads/') !== 0) {
+                    $produto['foto_principal'] = '/uploads/produtos/' . basename($fotoUrl);
+                    error_log('🔧 [PRODUTO-CONTROLLER] URL corrigida para produto ' . $produto['id'] . ': ' . $fotoUrl . ' → ' . $produto['foto_principal']);
+                }
+                // Se for URL válida, usar diretamente
+                else {
+                    $produto['foto_principal'] = $fotoUrl;
+                }
+            } else {
+                $produto['foto_principal'] = null;
+            }
         }
         
         $categorias = $this->produtoModel->getCategorias();
