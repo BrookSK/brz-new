@@ -30,7 +30,7 @@ class AdminController extends Controller {
     }
     
     public function dashboard(Request $request) {
-        $this->authService->requerPerfil('admin');
+        $this->authService->requerPermissao('read');
         
         // Estatísticas básicas
         $stats = $this->getDashboardStats();
@@ -43,50 +43,53 @@ class AdminController extends Controller {
     private function getDashboardStats() {
         $stats = [];
         
-        // Total de pedidos
-        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM {$this->pedidoModel->getTable()}");
-        $stmt->execute();
-        $stats['total_pedidos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Pedidos por status
-        $stmt = $this->pedidoModel->getConnection()->prepare("
-            SELECT status, COUNT(*) as quantidade 
-            FROM {$this->pedidoModel->getTable()} 
-            GROUP BY status
-        ");
-        $stmt->execute();
-        $stats['pedidos_por_status'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        // Faturamento total (simplificado)
-        $stmt = $this->pedidoModel->getConnection()->prepare("
-            SELECT 
-                SUM(valor_total) as faturamento_usd
-            FROM {$this->pedidoModel->getTable()}
-        ");
-        $stmt->execute();
-        $financeiro = $stmt->fetch(\PDO::FETCH_ASSOC);
-        $stats['financeiro'] = $financeiro;
-        
-        // Pedidos recentes
-        $stmt = $this->pedidoModel->getConnection()->prepare("
-            SELECT p.*, u.nome as cliente_nome 
-            FROM {$this->pedidoModel->getTable()} p 
-            JOIN usuarios u ON p.usuario_id = u.id 
-            ORDER BY p.created_at DESC 
-            LIMIT 10
-        ");
-        $stmt->execute();
-        $stats['pedidos_recentes'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        // Total de usuários
-        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM usuarios");
-        $stmt->execute();
-        $stats['total_usuarios'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Total de produtos
-        $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM produtos");
-        $stmt->execute();
-        $stats['total_produtos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+        try {
+            // Total de pedidos
+            $stmt = $this->pedidoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM pedidos");
+            $stmt->execute();
+            $stats['total_pedidos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+            // Pedidos por status
+            $stmt = $this->pedidoModel->getConnection()->prepare("
+                SELECT status, COUNT(*) as quantidade 
+                FROM pedidos 
+                GROUP BY status
+            ");
+            $stmt->execute();
+            $stats['pedidos_por_status'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Faturamento total (simplificado)
+            $stmt = $this->pedidoModel->getConnection()->prepare("
+                SELECT 
+                    SUM(valor_total) as faturamento_usd
+                FROM pedidos
+            ");
+            $stmt->execute();
+            $financeiro = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $stats['financeiro'] = $financeiro;
+            
+            // Total de produtos
+            $stmt = $this->produtoModel->getConnection()->prepare("SELECT COUNT(*) as total FROM produtos");
+            $stmt->execute();
+            $stats['total_produtos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+            // Total de usuários
+            $stmt = $this->usuarioModel->getConnection()->prepare("SELECT COUNT(*) as total FROM usuarios");
+            $stmt->execute();
+            $stats['total_usuarios'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro em getDashboardStats: ' . $e->getMessage());
+            // Valores padrão em caso de erro
+            $stats = [
+                'total_pedidos' => 0,
+                'pedidos_por_status' => [],
+                'financeiro' => ['faturamento_usd' => 0],
+                'total_produtos' => 0,
+                'total_usuarios' => 0,
+                'pedidos_recentes' => []
+            ];
+        }
         
         return $stats;
     }
@@ -116,65 +119,77 @@ class AdminController extends Controller {
     }
     
     private function getPedidosComFiltros($filtro, $status, $limite, $offset) {
-        $sql = "
-            SELECT p.*, u.nome as cliente_nome, u.email as cliente_email
-            FROM {$this->pedidoModel->getTable()} p
-            JOIN usuarios u ON p.usuario_id = u.id
-            WHERE 1=1
-        ";
-        $params = [];
-        
-        if (!empty($filtro)) {
-            $sql .= " AND (p.codigo_pedido LIKE :filtro OR u.nome LIKE :filtro OR u.email LIKE :filtro)";
-            $params[':filtro'] = "%{$filtro}%";
+        try {
+            $sql = "
+                SELECT p.*, u.nome as cliente_nome, u.email as cliente_email
+                FROM pedidos p
+                JOIN usuarios u ON p.usuario_id = u.id
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            if (!empty($filtro)) {
+                $sql .= " AND (p.codigo_pedido LIKE :filtro OR u.nome LIKE :filtro OR u.email LIKE :filtro)";
+                $params[':filtro'] = "%{$filtro}%";
+            }
+            
+            if (!empty($status)) {
+                $sql .= " AND p.status = :status";
+                $params[':status'] = $status;
+            }
+            
+            $sql .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
+            
+            $stmt = $this->pedidoModel->getConnection()->prepare($sql);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limite, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro em getPedidosComFiltros: ' . $e->getMessage());
+            return [];
         }
-        
-        if (!empty($status)) {
-            $sql .= " AND p.ativo = :status";
-            $params[':status'] = $status === 'ativo' ? 1 : 0;
-        }
-        
-        $sql .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
-        
-        $stmt = $this->pedidoModel->getConnection()->prepare($sql);
-        
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-        $stmt->bindValue(':limit', $limite, \PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-        
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     private function getTotalPedidosComFiltros($filtro, $status) {
-        $sql = "
-            SELECT COUNT(*) as total
-            FROM {$this->pedidoModel->getTable()} p
-            JOIN usuarios u ON p.usuario_id = u.id
-            WHERE 1=1
-        ";
-        $params = [];
-        
-        if (!empty($filtro)) {
-            $sql .= " AND (p.codigo_pedido LIKE :filtro OR u.nome LIKE :filtro OR u.email LIKE :filtro)";
-            $params[':filtro'] = "%{$filtro}%";
+        try {
+            $sql = "
+                SELECT COUNT(*) as total
+                FROM pedidos p
+                JOIN usuarios u ON p.usuario_id = u.id
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            if (!empty($filtro)) {
+                $sql .= " AND (p.codigo_pedido LIKE :filtro OR u.nome LIKE :filtro OR u.email LIKE :filtro)";
+                $params[':filtro'] = "%{$filtro}%";
+            }
+            
+            if (!empty($status)) {
+                $sql .= " AND p.status = :status";
+                $params[':status'] = $status;
+            }
+            
+            $stmt = $this->pedidoModel->getConnection()->prepare($sql);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            
+            $stmt->execute();
+            return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro em getTotalPedidosComFiltros: ' . $e->getMessage());
+            return 0;
         }
-        
-        if (!empty($status)) {
-            $sql .= " AND p.ativo = :status";
-            $params[':status'] = $status === 'ativo' ? 1 : 0;
-        }
-        
-        $stmt = $this->pedidoModel->getConnection()->prepare($sql);
-        
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-        
-        $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
     }
     
     public function pedidoDetalhes(Request $request) {
