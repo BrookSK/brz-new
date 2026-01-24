@@ -523,6 +523,10 @@ class AdminController extends Controller {
         $dados = $request->getParams();
         $usuario = $this->authService->getUsuarioLogado();
         
+        // DEBUG: Log completo dos dados recebidos
+        error_log('🔍 [PRODUTOS-SALVAR] Dados recebidos: ' . print_r($dados, true));
+        error_log('🔍 [PRODUTOS-SALVAR] FILES recebidos: ' . print_r($_FILES, true));
+        
         try {
             // FORÇAR MOEDA USD SEMPRE
             $dados['moeda'] = 'USD';
@@ -541,12 +545,22 @@ class AdminController extends Controller {
             }
             
             $dados['valor'] = $valor;
+            error_log('🔍 [PRODUTOS-SALVAR] Valor convertido: ' . $valor);
+            
+            // DEBUG: Log antes de salvar no banco
+            error_log('🔍 [PRODUTOS-SALVAR] Tentando criar produto com dados: ' . print_r($dados, true));
             
             // Criar produto primeiro para obter o ID
             $produtoId = $this->produtoModel->create($dados, $usuario['id']);
+            error_log('🔍 [PRODUTOS-SALVAR] Produto criado com ID: ' . $produtoId);
+            
+            if (!$produtoId) {
+                throw new \Exception('Erro ao criar produto no banco de dados');
+            }
             
             // Processar upload da imagem principal
             if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
+                error_log('🔍 [PRODUTOS-SALVAR] Processando upload da imagem principal');
                 $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
                 
                 // Marcar como principal
@@ -554,10 +568,14 @@ class AdminController extends Controller {
                 
                 // Atualizar produto com a foto principal
                 $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+                error_log('🔍 [PRODUTOS-SALVAR] Foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
+            } else {
+                error_log('🔍 [PRODUTOS-SALVAR] Nenhuma imagem principal para upload');
             }
             
             // Processar upload das imagens adicionais
             if (isset($_FILES['imagens']) && is_array($_FILES['imagens']['name'])) {
+                error_log('🔍 [PRODUTOS-SALVAR] Processando ' . count($_FILES['imagens']['name']) . ' imagens adicionais');
                 foreach ($_FILES['imagens']['name'] as $key => $name) {
                     if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
                         $arquivo = [
@@ -580,6 +598,8 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
+            error_log('❌ [PRODUTOS-SALVAR] Erro ao criar produto: ' . $e->getMessage());
+            error_log('❌ [PRODUTOS-SALVAR] Stack trace: ' . $e->getTraceAsString());
             $this->json(['error' => 'Erro ao criar produto: ' . $e->getMessage()], 500);
         }
     }
