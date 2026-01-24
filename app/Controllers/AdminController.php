@@ -19,7 +19,7 @@ class AdminController extends Controller {
             'total_usuarios' => 0
         ];
         
-        error_log(' [ADMIN-DASHBOARD] Stats criadas: ' . json_encode($stats));
+        error_log(' [ADMIN-DASHBOARD] Stats criadas');
         
         // Verificar se a view existe
         $viewPath = __DIR__ . '/../Views/admin/dashboard.php';
