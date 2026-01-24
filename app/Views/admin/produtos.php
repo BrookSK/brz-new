@@ -88,7 +88,10 @@
                                         <?php if ($fotoExists): ?>
                                             <img src="<?= $fotoPath ?>" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
                                         <?php else: ?>
-                                            <img src="/uploads/produtos/placeholder.svg" alt="<?= htmlspecialchars($produto['nome']) ?>" style="width: 50px; height: 50px; object-fit: cover;">
+                                            <!-- Ícone placeholder quando não há imagem -->
+                                            <div style="width: 50px; height: 50px; background-color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                                                <i class="fas fa-image" style="color: white; font-size: 20px;"></i>
+                                            </div>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -461,106 +464,6 @@ function updateProductPrices(currency) {
     console.log('🔍 [PRODUTOS] updateProductPrices() concluída');
     console.log('🔍 [PRODUTOS] LÓGICA: valor_original_USD × rate (para BRL) ou valor_original_USD (para USD)');
 }
-
-// Verificar mudanças na moeda do header
-setInterval(function() {
-    const headerCurrency = document.getElementById('current-currency');
-    if (headerCurrency) {
-        const newCurrency = headerCurrency.textContent;
-        
-        // Verificar se a moeda mudou
-        if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
-            window.lastCurrency = newCurrency;
-            console.log('🔍 [PRODUTOS] Moeda mudou para:', newCurrency);
-            updateProductPrices(newCurrency);
-        }
-    }
-}, 200);
-
-// Inicializar com a moeda atual
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔍 [PRODUTOS] DOMContentLoaded iniciado');
-    console.log('🔍 [PRODUTOS] Verificando estrutura do frontend...');
-    
-    // Verificar se a tabela existe
-    const table = document.querySelector('table');
-    console.log('🔍 [PRODUTOS] Tabela encontrada:', !!table);
-    
-    if (table) {
-        const rows = table.querySelectorAll('tbody tr');
-        console.log('🔍 [PRODUTOS] Linhas na tabela:', rows.length);
-        
-        // Verificar cada linha
-        rows.forEach((row, index) => {
-            const cells = row.querySelectorAll('td');
-            console.log(`🔍 [PRODUTOS] Linha ${index} - Células:`, cells.length);
-            
-            cells.forEach((cell, cellIndex) => {
-                const text = cell.textContent.trim();
-                if (text.includes('R$') || text.includes('$')) {
-                    console.log(`🔍 [PRODUTOS] Linha ${index}, Célula ${cellIndex}:`, text);
-                    console.log(`🔍 [PRODUTOS] HTML:`, cell.innerHTML);
-                    console.log(`🔍 [PRODUTOS] Classe:`, cell.querySelector('span')?.className);
-                    console.log(`🔍 [PRODUTOS] data-original-value:`, cell.querySelector('span')?.getAttribute('data-original-value'));
-                }
-            });
-        });
-    }
-    
-    // Verificar elementos com classe product-price
-    const productPrices = document.querySelectorAll('.product-price');
-    console.log('🔍 [PRODUTOS] Elementos .product-price encontrados:', productPrices.length);
-    
-    // Verificar todos os spans com preço
-    const allSpans = document.querySelectorAll('span');
-    console.log('🔍 [PRODUTOS] Total de spans na página:', allSpans.length);
-    
-    let spansComPreco = 0;
-    allSpans.forEach((span, index) => {
-        const text = span.textContent.trim();
-        if (text.includes('R$') || text.includes('$')) {
-            spansComPreco++;
-            console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text);
-            console.log(`🔍 [PRODUTOS] Classe:`, span.className);
-            console.log(`🔍 [PRODUTOS] data-original-value:`, span.getAttribute('data-original-value'));
-        }
-    });
-    
-    console.log('🔍 [PRODUTOS] Total de spans com preço:', spansComPreco);
-    
-    const headerCurrency = document.getElementById('current-currency');
-    if (headerCurrency) {
-        const currentCurrency = headerCurrency.textContent;
-        console.log('🔍 [PRODUTOS] Moeda inicial:', currentCurrency);
-        
-        // Definir taxas de conversão se não existirem
-        if (typeof window.exchangeRates === 'undefined') {
-            window.exchangeRates = {
-                'BRL': 5.50,
-                'USD': 1.00
-            };
-            console.log('🔍 [PRODUTOS] Taxas de conversão definidas:', window.exchangeRates);
-        }
-        
-        // Teste manual da função
-        console.log('🔍 [PRODUTOS] Chamando updateProductPrices manualmente...');
-        updateProductPrices(currentCurrency);
-        
-        // Teste após 1 segundo para garantir que o DOM está pronto
-        setTimeout(function() {
-            console.log('🔍 [PRODUTOS] Chamando updateProductPrices após 1 segundo...');
-            updateProductPrices(currentCurrency);
-        }, 1000);
-        
-        // Teste após 2 segundos
-        setTimeout(function() {
-            console.log('🔍 [PRODUTOS] Chamando updateProductPrices após 2 segundos...');
-            updateProductPrices(currentCurrency);
-        }, 2000);
-    } else {
-        console.error('❌ [PRODUTOS] Elemento current-currency não encontrado');
-    }
-});
 
 // Função global para atualizar preços de produtos
 window.updateProductPrices = updateProductPrices;
