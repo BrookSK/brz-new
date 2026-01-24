@@ -11,44 +11,10 @@ use App\Models\ProdutoFoto;
 use App\Models\Imagem;
 
 class AdminController extends Controller {
-    private $authService;
-    private $pedidoModel;
-    private $usuarioModel;
-    private $produtoModel;
-    private $categoriaModel;
-    private $produtoFotoModel;
-    private $imagemModel;
-    
-    public function __construct() {
-        $this->authService = new AuthService();
-        $this->pedidoModel = new PedidoEcommerce();
-        $this->usuarioModel = new Usuario();
-        $this->produtoModel = new Produto();
-        $this->categoriaModel = new Categoria();
-        $this->produtoFotoModel = new ProdutoFoto();
-        $this->imagemModel = new Imagem();
-    }
     
     public function dashboard(Request $request) {
-        // Temporariamente removendo autenticação para teste
-        // $this->authService->requerPermissao('read');
-        
-        // Estatísticas básicas com valores fixos para teste
-        $stats = [
-            'total_pedidos' => 0,
-            'pedidos_por_status' => [],
-            'financeiro' => ['faturamento_usd' => 0],
-            'total_produtos' => 0,
-            'total_usuarios' => 0
-        ];
-        
-        // Iniciar buffer para evitar problemas de output
-        ob_start();
-        include __DIR__ . '/../Views/admin/dashboard.php';
-        $content = ob_get_clean();
-        
-        // Incluir layout
-        include __DIR__ . '/../Views/layouts/admin.php';
+        echo "Dashboard funcionando!";
+        exit;
     }
     
     private function getDashboardStats() {
