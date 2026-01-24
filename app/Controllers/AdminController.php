@@ -429,13 +429,14 @@ class AdminController extends Controller {
                 }
                 // Se for URL interna, verificar se arquivo existe
                 elseif (strpos($fotoUrl, '/uploads/') === 0) {
-                    $caminhoFisico = __DIR__ . '/../../public' . $fotoUrl;
+                    $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $fotoUrl;
                     if (file_exists($caminhoFisico)) {
                         $produto['foto_principal'] = $fotoUrl;
                         error_log('✅ [ADMIN-CONTROLLER] Arquivo encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
                     } else {
                         $produto['foto_principal'] = null;
                         error_log('❌ [ADMIN-CONTROLLER] Arquivo NÃO encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
+                        error_log('❌ [ADMIN-CONTROLLER] Caminho verificado: ' . $caminhoFisico);
                     }
                 }
                 // Se não começar com /uploads/, corrigir
@@ -507,7 +508,7 @@ class AdminController extends Controller {
         $params = [];
         
         if (!empty($busca)) {
-            $sql .= " AND (nome LIKE :busca OR sku LIKE :busca)";
+            $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
             $params[':busca'] = "%{$busca}%";
         }
         
