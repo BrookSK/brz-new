@@ -19,36 +19,30 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL] Produto bruto do banco: ' . print_r($produto, true));
         
         if ($produto) {
-            // Garantir que todos os campos tenham valores padrão
-            $produto = array_merge([
-                'id' => 0,
-                'nome' => '',
-                'sku' => '',
-                'descricao_curta' => '',
-                'descricao_completa' => '',
-                'categoria_id' => '',
-                'valor' => 0.00,
-                'moeda' => 'USD',
-                'peso' => 0.000,
-                'estoque' => 0,
-                'status' => 'ativo',
-                'foto_principal' => null,
-                'created_at' => null,
-                'updated_at' => null
-            ], $produto);
+            // Mapear campos do banco para o frontend
+            $produtoMapeado = [
+                'id' => $produto['id'],
+                'nome' => $produto['nome'] ?? '',
+                'sku' => $produto['sku'] ?? '',
+                'descricao_curta' => $produto['descricao_curta'] ?? '',
+                'categoria_id' => $produto['categoria_id'] ?? 0,
+                'valor' => floatval($produto['valor'] ?? 0),
+                'moeda' => $produto['moeda'] ?? 'USD',
+                'peso' => floatval($produto['peso'] ?? 0),
+                'estoque' => intval($produto['estoque'] ?? 0),
+                'status' => $produto['ativo'] == 1 ? 'ativo' : 'inativo',
+                'foto_principal' => $produto['foto_principal'] ?? null,
+                'created_at' => $produto['created_at'] ?? null,
+                'updated_at' => $produto['updated_at'] ?? null
+            ];
             
-            // Converter para tipos numéricos
-            $produto['valor'] = floatval($produto['valor']);
-            $produto['peso'] = floatval($produto['peso']);
-            $produto['estoque'] = intval($produto['estoque']);
-            $produto['categoria_id'] = intval($produto['categoria_id']);
-            
-            error_log('🔍 [PRODUTO-MODEL] Produto processado: ' . print_r($produto, true));
+            error_log('🔍 [PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
+            return $produtoMapeado;
         } else {
             error_log('🔍 [PRODUTO-MODEL] Produto ID ' . $id . ' não encontrado no banco');
         }
         
-        return $produto;
+        return null;
     }
     
     public function getAll() {
@@ -76,20 +70,41 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Iniciando criação de produto');
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados recebidos: ' . print_r($data, true));
         
+        // Mapear campos do formulário para o banco
+        $dadosBanco = [
+            'nome' => $data['nome'] ?? '',
+            'sku' => $data['sku'] ?? '',
+            'descricao_curta' => $data['descricao_curta'] ?? '',
+            'categoria_id' => $data['categoria_id'] ?? 0,
+            'valor' => floatval($data['valor'] ?? 0),
+            'moeda' => $data['moeda'] ?? 'USD',
+            'peso' => floatval($data['peso'] ?? 0),
+            'estoque' => intval($data['estoque'] ?? 0),
+            'status' => $data['status'] ?? 'ativo',
+            'ativo' => $data['status'] === 'ativo' ? 1 : 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        
+        error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
+        
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, categoria_id, valor, moeda, peso, estoque, status, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :categoria_id, :valor, :moeda, :peso, :estoque, :status, NOW(), NOW())
+            INSERT INTO {$this->table} (nome, sku, descricao_curta, categoria_id, valor, moeda, peso, estoque, status, ativo, created_at, updated_at)
+            VALUES (:nome, :sku, :descricao_curta, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :ativo, :created_at, :updated_at)
         ");
         
-        $stmt->bindParam(':nome', $data['nome']);
-        $stmt->bindParam(':sku', $data['sku']);
-        $stmt->bindParam(':descricao_curta', $data['descricao_curta']);
-        $stmt->bindParam(':categoria_id', $data['categoria_id']);
-        $stmt->bindParam(':valor', $data['valor']);
-        $stmt->bindParam(':moeda', $data['moeda']);
-        $stmt->bindParam(':peso', $data['peso']);
-        $stmt->bindParam(':estoque', $data['estoque']);
-        $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':nome', $dadosBanco['nome']);
+        $stmt->bindParam(':sku', $dadosBanco['sku']);
+        $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
+        $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
+        $stmt->bindParam(':valor', $dadosBanco['valor']);
+        $stmt->bindParam(':moeda', $dadosBanco['moeda']);
+        $stmt->bindParam(':peso', $dadosBanco['peso']);
+        $stmt->bindParam(':estoque', $dadosBanco['estoque']);
+        $stmt->bindParam(':status', $dadosBanco['status']);
+        $stmt->bindParam(':ativo', $dadosBanco['ativo']);
+        $stmt->bindParam(':created_at', $dadosBanco['created_at']);
+        $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
         
         error_log('🔍 [PRODUTO-MODEL-CREATE] Executando INSERT no banco...');
         $result = $stmt->execute();
@@ -103,6 +118,26 @@ class Produto extends Model {
     }
     
     public function update($id, $data, $usuarioId = null) {
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] Iniciando atualização do produto ID: ' . $id);
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] Dados recebidos: ' . print_r($data, true));
+        
+        // Mapear campos do formulário para o banco
+        $dadosBanco = [
+            'nome' => $data['nome'] ?? '',
+            'sku' => $data['sku'] ?? '',
+            'descricao_curta' => $data['descricao_curta'] ?? '',
+            'categoria_id' => $data['categoria_id'] ?? 0,
+            'valor' => floatval($data['valor'] ?? 0),
+            'moeda' => $data['moeda'] ?? 'USD',
+            'peso' => floatval($data['peso'] ?? 0),
+            'estoque' => intval($data['estoque'] ?? 0),
+            'status' => $data['status'] ?? 'ativo',
+            'ativo' => ($data['status'] ?? 'ativo') === 'ativo' ? 1 : 0,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
+        
         $stmt = $this->getConnection()->prepare("
             UPDATE {$this->table} 
             SET nome = :nome, 
@@ -114,22 +149,30 @@ class Produto extends Model {
                 peso = :peso, 
                 estoque = :estoque, 
                 status = :status, 
-                updated_at = NOW()
+                ativo = :ativo, 
+                updated_at = :updated_at
             WHERE id = :id
         ");
         
         $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':nome', $data['nome']);
-        $stmt->bindParam(':sku', $data['sku']);
-        $stmt->bindParam(':descricao_curta', $data['descricao_curta']);
-        $stmt->bindParam(':categoria_id', $data['categoria_id']);
-        $stmt->bindParam(':valor', $data['valor']);
-        $stmt->bindParam(':moeda', $data['moeda']);
-        $stmt->bindParam(':peso', $data['peso']);
-        $stmt->bindParam(':estoque', $data['estoque']);
-        $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':nome', $dadosBanco['nome']);
+        $stmt->bindParam(':sku', $dadosBanco['sku']);
+        $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
+        $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
+        $stmt->bindParam(':valor', $dadosBanco['valor']);
+        $stmt->bindParam(':moeda', $dadosBanco['moeda']);
+        $stmt->bindParam(':peso', $dadosBanco['peso']);
+        $stmt->bindParam(':estoque', $dadosBanco['estoque']);
+        $stmt->bindParam(':status', $dadosBanco['status']);
+        $stmt->bindParam(':ativo', $dadosBanco['ativo']);
+        $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
         
-        return $stmt->execute();
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] Executando UPDATE no banco...');
+        $result = $stmt->execute();
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] Resultado do UPDATE: ' . ($result ? 'true' : 'false'));
+        error_log('🔍 [PRODUTO-MODEL-UPDATE] SQL Error: ' . print_r($stmt->errorInfo(), true));
+        
+        return $result;
     }
     
     public function delete($id) {

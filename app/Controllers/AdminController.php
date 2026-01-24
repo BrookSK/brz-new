@@ -540,8 +540,8 @@ class AdminController extends Controller {
         $usuario = $this->authService->getUsuarioLogado();
         
         // Log para debug
-        error_log('🔍 [SALVAR-PRODUTO] Iniciando salvamento de novo produto');
-        error_log('🔍 [SALVAR-PRODUTO] Dados recebidos: ' . print_r($dados, true));
+        error_log('🔍 [SALVAR-PRODUTO] ========== INICIANDO SALVAMENTO ==========');
+        error_log('🔍 [SALVAR-PRODUTO] Dados brutos recebidos: ' . print_r($dados, true));
         error_log('🔍 [SALVAR-PRODUTO] FILES recebidos: ' . print_r($_FILES, true));
         
         try {
@@ -549,12 +549,9 @@ class AdminController extends Controller {
             $dados['moeda'] = 'USD';
             error_log('🔍 [SALVAR-PRODUTO] Moeda forçada para USD');
             
-            // Remover campos que não existem no banco
-            unset($dados['descricao_completa']);
-            error_log('🔍 [SALVAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
-            
             // Validar e converter valor
             if (!isset($dados['valor']) || $dados['valor'] === '') {
+                error_log('❌ [SALVAR-PRODUTO] ERRO: Valor não informado ou vazio');
                 throw new \Exception('Valor é obrigatório');
             }
             
@@ -563,11 +560,27 @@ class AdminController extends Controller {
             $valor = floatval($valor);
             
             if ($valor <= 0) {
+                error_log('❌ [SALVAR-PRODUTO] ERRO: Valor inválido: ' . $valor);
                 throw new \Exception('Valor deve ser maior que zero');
             }
             
             $dados['valor'] = $valor;
             error_log('🔍 [SALVAR-PRODUTO] Valor convertido: ' . $valor);
+            
+            // Remover campos que não existem no banco
+            unset($dados['descricao_completa']);
+            error_log('🔍 [SALVAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
+            
+            // Validar campos obrigatórios
+            $camposObrigatorios = ['nome', 'sku', 'descricao_curta', 'categoria_id', 'valor', 'moeda', 'peso', 'estoque', 'status'];
+            foreach ($camposObrigatorios as $campo) {
+                if (!isset($dados[$campo]) || empty($dados[$campo])) {
+                    error_log('❌ [SALVAR-PRODUTO] ERRO: Campo obrigatório vazio: ' . $campo);
+                    throw new \Exception('Campo obrigatório ' . $campo . ' não pode ser vazio');
+                }
+            }
+            
+            error_log('🔍 [SALVAR-PRODUTO] Dados finais para salvar: ' . print_r($dados, true));
             
             // Criar produto primeiro para obter o ID
             error_log('🔍 [SALVAR-PRODUTO] Tentando criar produto no banco...');
@@ -575,6 +588,7 @@ class AdminController extends Controller {
             error_log('🔍 [SALVAR-PRODUTO] Produto criado com ID: ' . $produtoId);
             
             if (!$produtoId) {
+                error_log('❌ [SALVAR-PRODUTO] ERRO: Falha ao criar produto - ID retornado: ' . $produtoId);
                 throw new \Exception('Erro ao criar produto no banco de dados');
             }
             
@@ -611,7 +625,8 @@ class AdminController extends Controller {
                 }
             }
             
-            error_log('🔍 [SALVAR-PRODUTO] Produto salvo com SUCESSO! ID: ' . $produtoId . ', Valor: $' . number_format($valor, 2));
+            error_log('🔍 [SALVAR-PRODUTO] ========== PRODUTO SALVO COM SUCESSO! ==========');
+            error_log('🔍 [SALVAR-PRODUTO] ID: ' . $produtoId . ', Valor: $' . number_format($valor, 2));
             
             $this->json([
                 'success' => true,
@@ -620,7 +635,8 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
-            error_log('❌ [SALVAR-PRODUTO] ERRO ao salvar produto: ' . $e->getMessage());
+            error_log('❌ [SALVAR-PRODUTO] ========== ERRO AO SALVAR PRODUTO ==========');
+            error_log('❌ [SALVAR-PRODUTO] Erro: ' . $e->getMessage());
             error_log('❌ [SALVAR-PRODUTO] Stack trace: ' . $e->getTraceAsString());
             $this->json(['error' => 'Erro ao criar produto: ' . $e->getMessage()], 500);
         }
