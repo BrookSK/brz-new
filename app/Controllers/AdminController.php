@@ -13,9 +13,9 @@ class AdminController extends Controller {
     public function produtos(Request $request) {
         echo '<h1>Produtos do Controller</h1>';
         
-        // Adicionando teste básico de banco
+        // Adicionando teste básico de banco com credenciais corretas
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr_brazilianashop', 'root', '');
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr_brazilianashop', 'novobr_brz', 'Br@2024!@#$');
             $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos");
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
             echo '<p>Total de produtos: ' . $result['total'] . '</p>';
