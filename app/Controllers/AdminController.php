@@ -663,25 +663,26 @@ class AdminController extends Controller {
                 
                 echo '</div>
                 
-                <!-- Paginação -->
-                ' . ($totalPaginas > 1 ? '
-                <nav aria-label="Paginação">
-                    <ul class="pagination justify-content-center">
-                        ' . for ($i = 1; $i <= $totalPaginas; $i++) {
-                            $url = "/admin/produtos?pagina={$i}";
-                            if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
-                            if (!empty($status)) $url .= "&status={$status}";
-                            if (!empty($categoria_id)) $url .= "&categoria_id={$categoria_id}";
-                            
-                            if ($i == $pagina) {
-                                echo '<li class="page-item active"><a class="page-link" href="#">' . $i . '</a></li>';
-                            } else {
-                                echo '<li class="page-item"><a class="page-link" href="' . $url . '">' . $i . '</a></li>';
+                <!-- Paginação -->';
+                if ($totalPaginas > 1) {
+                    echo '<nav aria-label="Paginação">
+                        <ul class="pagination justify-content-center">';
+                            for ($i = 1; $i <= $totalPaginas; $i++) {
+                                $url = "/admin/produtos?pagina={$i}";
+                                if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
+                                if (!empty($status)) $url .= "&status={$status}";
+                                if (!empty($categoria_id)) $url .= "&categoria_id={$categoria_id}";
+                                
+                                if ($i == $pagina) {
+                                    echo '<li class="page-item active"><a class="page-link" href="#">' . $i . '</a></li>';
+                                } else {
+                                    echo '<li class="page-item"><a class="page-link" href="' . $url . '">' . $i . '</a></li>';
+                                }
                             }
-                        } . '
-                    </ul>
-                </nav>
-                ' : '') . '
+                        echo '</ul>
+                    </nav>';
+                }
+                echo '
             </main>
         </div>
     </div>
