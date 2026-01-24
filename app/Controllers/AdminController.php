@@ -130,7 +130,9 @@ class AdminController extends Controller {
             // Ações CRUD
             echo '<div style="margin-top: 10px; display: flex; gap: 5px;">';
             echo '<a href="/admin/editar-produto/' . $produto['id'] . '" style="padding: 5px 10px; background: #ffc107; color: #856404; text-decoration: none; border-radius: 4px;">Editar</a>';
-            echo '<a href="/admin/excluir-produto/' . $produto['id'] . '" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')" style="padding: 5px 10px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px;">Excluir</a>';
+            echo '<form method="POST" action="/admin/excluir-produto/' . $produto['id'] . '" style="display: inline;">';
+            echo '<button type="submit" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Excluir</button>';
+            echo '</form>';
             echo '</div>';
             
             // Buscar galeria de imagens
@@ -242,34 +244,4 @@ class AdminController extends Controller {
             header('Location: /admin/editar-produto/' . $produtoId);
             exit;
         } catch (\Exception $e) {
-            echo 'Erro: ' . $e->getMessage();
-            exit;
-        }
-    }
-    
-    public function excluirProduto(Request $request) {
-        $produtoId = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-        
-        try {
-            $pdo->beginTransaction();
-            
-            // Excluir fotos
-            $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?");
-            $stmt->execute([$produtoId]);
-            
-            // Excluir produto
-            $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
-            $stmt->execute([$produtoId]);
-            
-            $pdo->commit();
-            
-            header('Location: /admin/produtos');
-            exit;
-        } catch (\Exception $e) {
-            $pdo->rollBack();
-            echo 'Erro: ' . $e->getMessage();
-            exit;
-        }
-    }
 }
