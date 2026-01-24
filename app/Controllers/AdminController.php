@@ -14,25 +14,113 @@ class AdminController extends Controller {
         // Conexão com o banco
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
-        // Listar produtos com galeria
-        $stmt = $pdo->query("
+        // Parâmetros de filtro e paginação
+        $pagina = $request->getParam('pagina', 1);
+        $limite = 10;
+        $offset = ($pagina - 1) * $limite;
+        $busca = $request->getParam('busca', '');
+        $status = $request->getParam('status', '');
+        $categoria_id = $request->getParam('categoria_id', '');
+        
+        // Construir SQL com filtros
+        $sql = "
             SELECT p.*, c.nome as categoria_nome 
             FROM produtos p 
             LEFT JOIN categorias c ON p.categoria_id = c.id 
-            ORDER BY p.nome ASC
-        ");
+            WHERE 1=1
+        ";
+        $params = [];
         
+        if (!empty($busca)) {
+            $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
+            $params[':busca'] = "%{$busca}%";
+        }
+        
+        if (!empty($status)) {
+            $sql .= " AND p.ativo = :status";
+            $params[':status'] = $status === 'ativo' ? 1 : 0;
+        }
+        
+        if (!empty($categoria_id)) {
+            $sql .= " AND p.categoria_id = :categoria_id";
+            $params[':categoria_id'] = $categoria_id;
+        }
+        
+        $sql .= " ORDER BY p.nome ASC LIMIT :limite OFFSET :offset";
+        
+        // Executar consulta principal
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
         $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        echo '<h1>Produtos (' . count($produtos) . ' encontrados)</h1>';
+        // Total para paginação
+        $sqlTotal = "SELECT COUNT(*) as total FROM produtos WHERE 1=1";
+        $paramsTotal = [];
         
+        if (!empty($busca)) {
+            $sqlTotal .= " AND (nome LIKE :busca OR sku LIKE :busca)";
+            $paramsTotal[':busca'] = "%{$busca}%";
+        }
+        
+        if (!empty($status)) {
+            $sqlTotal .= " AND ativo = :status";
+            $paramsTotal[':status'] = $status === 'ativo' ? 1 : 0;
+        }
+        
+        if (!empty($categoria_id)) {
+            $sqlTotal .= " AND categoria_id = :categoria_id";
+            $paramsTotal[':categoria_id'] = $categoria_id;
+        }
+        
+        $stmtTotal = $pdo->prepare($sqlTotal);
+        foreach ($paramsTotal as $key => $value) {
+            $stmtTotal->bindValue($key, $value);
+        }
+        $stmtTotal->execute();
+        $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
+        $totalPaginas = ceil($total / $limite);
+        
+        // Obter categorias para filtro
+        $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+        $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Exibir filtros
+        echo '<h1>Produtos (' . $total . ' encontrados)</h1>';
+        
+        echo '<div style="background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 5px;">';
+        echo '<form method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">';
+        echo '<input type="text" name="busca" placeholder="Buscar por nome ou SKU" value="' . htmlspecialchars($busca) . '" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+        
+        echo '<select name="status" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+        echo '<option value="">Todos os status</option>';
+        echo '<option value="ativo" ' . ($status === 'ativo' ? 'selected' : '') . '>Ativos</option>';
+        echo '<option value="inativo" ' . ($status === 'inativo' ? 'selected' : '') . '>Inativos</option>';
+        echo '</select>';
+        
+        echo '<select name="categoria_id" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+        echo '<option value="">Todas categorias</option>';
+        foreach ($categorias as $cat) {
+            echo '<option value="' . $cat['id'] . '" ' . ($categoria_id == $cat['id'] ? 'selected' : '') . '>' . htmlspecialchars($cat['nome']) . '</option>';
+        }
+        echo '</select>';
+        
+        echo '<button type="submit" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Filtrar</button>';
+        echo '</form>';
+        echo '</div>';
+        
+        // Listagem de produtos
         foreach ($produtos as $produto) {
-            echo '<div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">';
+            echo '<div style="border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; background: white;">';
             echo '<h3>' . htmlspecialchars($produto['nome']) . '</h3>';
             echo '<p><strong>SKU:</strong> ' . htmlspecialchars($produto['sku']) . '</p>';
             echo '<p><strong>Categoria:</strong> ' . htmlspecialchars($produto['categoria_nome'] ?? 'N/A') . '</p>';
             echo '<p><strong>Preço:</strong> R$ ' . number_format($produto['valor'], 2, ',', '.') . '</p>';
-            echo '<p><strong>Status:</strong> ' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</p>';
+            echo '<p><strong>Status:</strong> <span style="color: ' . ($produto['ativo'] ? 'green' : 'red') . ';">' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</span></p>';
             
             // Buscar galeria de imagens
             $stmtFotos = $pdo->prepare("
@@ -48,9 +136,9 @@ class AdminController extends Controller {
                 echo '<p><strong>Galeria (' . count($fotos) . ' imagens):</strong></p>';
                 foreach ($fotos as $foto) {
                     $url = 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'];
-                    echo '<img src="' . $url . '" alt="' . htmlspecialchars($foto['legenda'] ?? '') . '" style="width: 100px; height: 100px; margin: 2px; border: 1px solid #ddd;">';
+                    echo '<img src="' . $url . '" alt="' . htmlspecialchars($foto['legenda'] ?? '') . '" style="width: 100px; height: 100px; margin: 2px; border: 1px solid #ddd; border-radius: 4px; object-fit: cover;">';
                     if ($foto['principal']) {
-                        echo '<span style="color: green;">[PRINCIPAL]</span>';
+                        echo '<span style="color: green; font-size: 12px;">[PRINCIPAL]</span>';
                     }
                     echo '<br>';
                 }
@@ -58,6 +146,24 @@ class AdminController extends Controller {
                 echo '<p><strong>Galeria:</strong> Nenhuma imagem</p>';
             }
             
+            echo '</div>';
+        }
+        
+        // Paginação
+        if ($totalPaginas > 1) {
+            echo '<div style="text-align: center; margin: 20px 0;">';
+            for ($i = 1; $i <= $totalPaginas; $i++) {
+                $url = "/admin/produtos?pagina={$i}";
+                if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
+                if (!empty($status)) $url .= "&status={$status}";
+                if (!empty($categoria_id)) $url .= "&categoria_id={$categoria_id}";
+                
+                if ($i == $pagina) {
+                    echo '<span style="padding: 8px 12px; background: #007bff; color: white; border-radius: 4px; margin: 0 2px;">' . $i . '</span>';
+                } else {
+                    echo '<a href="' . $url . '" style="padding: 8px 12px; background: #f8f9fa; color: #333; text-decoration: none; border: 1px solid #ddd; border-radius: 4px; margin: 0 2px;">' . $i . '</a>';
+                }
+            }
             echo '</div>';
         }
         
