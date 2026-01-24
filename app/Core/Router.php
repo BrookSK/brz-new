@@ -4,12 +4,24 @@ namespace App\Core;
 class Router {
     private $routes = [];
 
-    public function get($path, $controller, $method) {
-        $this->routes['GET'][$path] = ['controller' => $controller, 'method' => $method];
+    public function get($path, $handler, $method = null) {
+        if ($handler instanceof \Closure) {
+            // Para closures, armazenar diretamente
+            $this->routes['GET'][$path] = ['controller' => $handler, 'method' => null];
+        } else {
+            // Para strings (nomes de controllers)
+            $this->routes['GET'][$path] = ['controller' => $handler, 'method' => $method];
+        }
     }
 
-    public function post($path, $controller, $method) {
-        $this->routes['POST'][$path] = ['controller' => $controller, 'method' => $method];
+    public function post($path, $handler, $method = null) {
+        if ($handler instanceof \Closure) {
+            // Para closures, armazenar diretamente
+            $this->routes['POST'][$path] = ['controller' => $handler, 'method' => null];
+        } else {
+            // Para strings (nomes de controllers)
+            $this->routes['POST'][$path] = ['controller' => $handler, 'method' => $method];
+        }
     }
 
     public function dispatch(Request $request) {
@@ -60,6 +72,13 @@ class Router {
         if (is_string($controllerClass) && function_exists($controllerClass)) {
             // Executar função diretamente
             call_user_func($controllerClass, $request);
+            return;
+        }
+
+        // Se não for closure e não tiver método, é um erro
+        if (!$controllerMethod) {
+            http_response_code(500);
+            echo "Método não especificado para controller";
             return;
         }
 
