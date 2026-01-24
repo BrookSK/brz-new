@@ -8,6 +8,8 @@ use App\Models\Categoria;
 class AdminController extends Controller {
     
     public function dashboard(Request $request) {
+        error_log(' [ADMIN-DASHBOARD] Iniciando método dashboard');
+        
         // Estatísticas básicas
         $stats = [
             'total_pedidos' => 0,
@@ -17,13 +19,38 @@ class AdminController extends Controller {
             'total_usuarios' => 0
         ];
         
-        // Usar o mesmo sistema de buffer manual dos outros métodos
-        ob_start();
-        include __DIR__ . '/../Views/admin/dashboard.php';
-        $content = ob_get_clean();
+        error_log(' [ADMIN-DASHBOARD] Stats criadas: ' . json_encode($stats));
         
-        // Incluir layout passando a variável $content
-        include __DIR__ . '/../Views/layouts/admin.php';
+        // Verificar se a view existe
+        $viewPath = __DIR__ . '/../Views/admin/dashboard.php';
+        error_log(' [ADMIN-DASHBOARD] Caminho da view: ' . $viewPath);
+        error_log(' [ADMIN-DASHBOARD] View existe: ' . (file_exists($viewPath) ? 'SIM' : 'NÃO'));
+        
+        // Verificar se o layout existe
+        $layoutPath = __DIR__ . '/../Views/layouts/admin.php';
+        error_log(' [ADMIN-DASHBOARD] Caminho do layout: ' . $layoutPath);
+        error_log(' [ADMIN-DASHBOARD] Layout existe: ' . (file_exists($layoutPath) ? 'SIM' : 'NÃO'));
+        
+        // Usar o mesmo sistema de buffer manual dos outros métodos
+        error_log(' [ADMIN-DASHBOARD] Iniciando buffer');
+        ob_start();
+        
+        error_log(' [ADMIN-DASHBOARD] Incluindo view');
+        include $viewPath;
+        
+        $content = ob_get_clean();
+        error_log(' [ADMIN-DASHBOARD] Buffer capturado, tamanho: ' . strlen($content) . ' bytes');
+        
+        if (empty($content)) {
+            error_log(' [ADMIN-DASHBOARD] ERRO: Content está vazio!');
+        } else {
+            error_log(' [ADMIN-DASHBOARD] Content capturado com sucesso');
+        }
+        
+        error_log(' [ADMIN-DASHBOARD] Incluindo layout');
+        include $layoutPath;
+        
+        error_log(' [ADMIN-DASHBOARD] Finalizado método dashboard');
     }
     
     public function produtos(Request $request) {
