@@ -49,10 +49,7 @@ $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 $router->get('/admin', function() {
     echo '<h1>Área Admin</h1><p><a href="/admin/dashboard">Ir para Dashboard</a> | <a href="/admin/produtos">Gerenciar Produtos</a></p>';
 });
-$router->get('/admin/dashboard', function() {
-    echo '<h1>Dashboard Teste</h1><p>Se você vê isso, a rota funciona mas o controller não.</p>';
-    error_log('🔍 [ADMIN-TESTE] Rota dashboard com função anônima funcionou!');
-});
+$router->get('/admin/dashboard', 'AdminController', 'dashboard');
 $router->get('/admin/produtos', 'AdminController', 'produtos');
 
 // Webhooks
