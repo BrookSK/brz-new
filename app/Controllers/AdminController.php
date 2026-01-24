@@ -549,6 +549,10 @@ class AdminController extends Controller {
             $dados['moeda'] = 'USD';
             error_log('🔍 [SALVAR-PRODUTO] Moeda forçada para USD');
             
+            // Remover campos que não existem no banco
+            unset($dados['descricao_completa']);
+            error_log('🔍 [SALVAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
+            
             // Validar e converter valor
             if (!isset($dados['valor']) || $dados['valor'] === '') {
                 throw new \Exception('Valor é obrigatório');
@@ -638,6 +642,10 @@ class AdminController extends Controller {
             // FORÇAR MOEDA USD SEMPRE
             $dados['moeda'] = 'USD';
             error_log('🔍 [ATUALIZAR-PRODUTO] Moeda forçada para USD');
+            
+            // Remover campos que não existem no banco
+            unset($dados['descricao_completa']);
+            error_log('🔍 [ATUALIZAR-PRODUTO] Campo descricao_completa removido (não existe no banco)');
             
             // Validar e converter valor
             if (!isset($dados['valor']) || $dados['valor'] === '') {

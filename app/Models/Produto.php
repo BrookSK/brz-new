@@ -77,14 +77,13 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados recebidos: ' . print_r($data, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, NOW(), NOW())
+            INSERT INTO {$this->table} (nome, sku, descricao_curta, categoria_id, valor, moeda, peso, estoque, status, created_at, updated_at)
+            VALUES (:nome, :sku, :descricao_curta, :categoria_id, :valor, :moeda, :peso, :estoque, :status, NOW(), NOW())
         ");
         
         $stmt->bindParam(':nome', $data['nome']);
         $stmt->bindParam(':sku', $data['sku']);
         $stmt->bindParam(':descricao_curta', $data['descricao_curta']);
-        $stmt->bindParam(':descricao_completa', $data['descricao_completa']);
         $stmt->bindParam(':categoria_id', $data['categoria_id']);
         $stmt->bindParam(':valor', $data['valor']);
         $stmt->bindParam(':moeda', $data['moeda']);
@@ -109,7 +108,6 @@ class Produto extends Model {
             SET nome = :nome, 
                 sku = :sku, 
                 descricao_curta = :descricao_curta, 
-                descricao_completa = :descricao_completa, 
                 categoria_id = :categoria_id, 
                 valor = :valor, 
                 moeda = :moeda, 
@@ -124,7 +122,6 @@ class Produto extends Model {
         $stmt->bindParam(':nome', $data['nome']);
         $stmt->bindParam(':sku', $data['sku']);
         $stmt->bindParam(':descricao_curta', $data['descricao_curta']);
-        $stmt->bindParam(':descricao_completa', $data['descricao_completa']);
         $stmt->bindParam(':categoria_id', $data['categoria_id']);
         $stmt->bindParam(':valor', $data['valor']);
         $stmt->bindParam(':moeda', $data['moeda']);

@@ -180,12 +180,8 @@
                             <input type="text" name="sku" class="form-control" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Descrição Curta *</label>
-                            <textarea name="descricao_curta" class="form-control" rows="3" required></textarea>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Descrição Completa</label>
-                            <textarea name="descricao_completa" class="form-control" rows="5"></textarea>
+                            <label class="form-label">Descrição *</label>
+                            <textarea name="descricao_curta" class="form-control" rows="3" required placeholder="Descreva o produto brevemente"></textarea>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Categoria *</label>
@@ -268,12 +264,11 @@ function editarProduto(id) {
                 document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
                 document.getElementById('produto_id').value = data.produto.id || '';
                 
-                // Preencher campos diretamente
+                // Preencher campos com validação robusta
                 const campos = {
                     'nome': data.produto.nome || '',
                     'sku': data.produto.sku || '',
                     'descricao_curta': data.produto.descricao_curta || '',
-                    'descricao_completa': data.produto.descricao_completa || '',
                     'categoria_id': data.produto.categoria_id || '',
                     'valor': data.produto.valor || '',
                     'moeda': data.produto.moeda || 'USD',
