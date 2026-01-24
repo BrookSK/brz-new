@@ -1,23 +1,23 @@
 <?php
 // Criar um placeholder.jpg válido
-$img = imagecreatetruecolor(200, 200);
-$bg = imagecolorallocate($img, 200, 200, 200);
-$text_color = imagecolorallocate($img, 100, 100, 100);
+$img = imagecreatetruecolor(400, 400);
+$bg = imagecolorallocate($img, 240, 240, 240);
+$text_color = imagecolorallocate($img, 150, 150, 150);
 
 // Preencher fundo
-imagefilledrectangle($img, 0, 0, 199, 199, $bg);
+imagefilledrectangle($img, 0, 0, 399, 399, $bg);
 
 // Adicionar texto
 $text = "Sem Imagem";
 $font = 5;
-$text_width = imagefontwidth($font, $text);
+$text_width = imagefontwidth($font) * strlen($text);
 $text_height = imagefontheight($font);
-$x = (200 - $text_width) / 2;
-$y = (200 - $text_height) / 2;
+$x = (400 - $text_width) / 2;
+$y = (400 - $text_height) / 2;
 imagestring($img, $font, $x, $y, $text, $text_color);
 
 // Salvar imagem
-imagejpeg($img, 'public/uploads/produtos/placeholder.jpg', 90);
+imagejpeg($img, 'c:\Users\Pichau\Documents\GitHub\brz-new\public\uploads\produtos\placeholder.jpg', 90);
 imagedestroy($img);
 
 echo "Placeholder criado com sucesso!";

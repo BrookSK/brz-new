@@ -19,7 +19,7 @@
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
-                                    <img src="/uploads/produtos/<?= $item['foto_principal'] ?? 'placeholder.jpg' ?>" 
+                                    <img src="/uploads/produtos/<?= $item['foto_principal'] ?? 'placeholder.svg' ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
                                 </div>

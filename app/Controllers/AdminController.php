@@ -130,8 +130,8 @@ class AdminController extends Controller {
         }
         
         if (!empty($status)) {
-            $sql .= " AND p.status = :status";
-            $params[':status'] = $status;
+            $sql .= " AND p.ativo = :status";
+            $params[':status'] = $status === 'ativo' ? 1 : 0;
         }
         
         $sql .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
@@ -163,8 +163,8 @@ class AdminController extends Controller {
         }
         
         if (!empty($status)) {
-            $sql .= " AND p.status = :status";
-            $params[':status'] = $status;
+            $sql .= " AND p.ativo = :status";
+            $params[':status'] = $status === 'ativo' ? 1 : 0;
         }
         
         $stmt = $this->pedidoModel->getConnection()->prepare($sql);
@@ -465,71 +465,95 @@ class AdminController extends Controller {
     }
     
     private function getProdutosComFiltros($busca, $status, $categoria_id, $limite, $offset) {
-        $sql = "
-            SELECT p.*, c.nome as categoria_nome
-            FROM produtos p
-            LEFT JOIN categorias c ON p.categoria_id = c.id
-            WHERE 1=1
-        ";
-        
-        $params = [];
-        
-        if (!empty($busca)) {
-            $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
-            $params[':busca'] = "%{$busca}%";
+        try {
+            $sql = "
+                SELECT p.*, c.nome as categoria_nome
+                FROM produtos p
+                LEFT JOIN categorias c ON p.categoria_id = c.id
+                WHERE 1=1
+            ";
+            
+            $params = [];
+            
+            if (!empty($busca)) {
+                $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
+                $params[':busca'] = "%{$busca}%";
+            }
+            
+            if (!empty($status)) {
+                $sql .= " AND p.ativo = :status";
+                $params[':status'] = $status === 'ativo' ? 1 : 0;
+            }
+            
+            if (!empty($categoria_id)) {
+                $sql .= " AND p.categoria_id = :categoria_id";
+                $params[':categoria_id'] = $categoria_id;
+            }
+            
+            $sql .= " ORDER BY p.nome ASC LIMIT :limite OFFSET :offset";
+            
+            $stmt = $this->produtoModel->getConnection()->prepare($sql);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro em getProdutosComFiltros: ' . $e->getMessage());
+            return [];
         }
-        
-        if (!empty($status)) {
-            $sql .= " AND p.status = :status";
-            $params[':status'] = $status;
-        }
-        
-        if (!empty($categoria_id)) {
-            $sql .= " AND p.categoria_id = :categoria_id";
-            $params[':categoria_id'] = $categoria_id;
-        }
-        
-        $sql .= " ORDER BY p.nome ASC LIMIT :limite OFFSET :offset";
-        
-        $stmt = $this->produtoModel->getConnection()->prepare($sql);
-        
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-        $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-        
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     private function getTotalProdutos($busca, $status, $categoria_id) {
-        $sql = "SELECT COUNT(*) as total FROM produtos WHERE 1=1";
-        $params = [];
-        
-        if (!empty($busca)) {
-            $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
-            $params[':busca'] = "%{$busca}%";
+        try {
+            $sql = "SELECT COUNT(*) as total FROM produtos WHERE 1=1";
+            $params = [];
+            
+            if (!empty($busca)) {
+                $sql .= " AND (nome LIKE :busca OR sku LIKE :busca)";
+                $params[':busca'] = "%{$busca}%";
+            }
+            
+            if (!empty($status)) {
+                $sql .= " AND ativo = :status";
+                $params[':status'] = $status === 'ativo' ? 1 : 0;
+            }
+            
+            if (!empty($categoria_id)) {
+                $sql .= " AND categoria_id = :categoria_id";
+                $params[':categoria_id'] = $categoria_id;
+            }
+            
+            $stmt = $this->produtoModel->getConnection()->prepare($sql);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            
+            $stmt->execute();
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $result['total'] ?? 0;
+            
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro em getTotalProdutos: ' . $e->getMessage());
+            return 0;
         }
-        
-        if (!empty($status)) {
-            $sql .= " AND status = :status";
-            $params[':status'] = $status;
+    }
+    
+    private function getCategorias() {
+        try {
+            $stmt = $this->categoriaModel->getConnection()->prepare("SELECT * FROM categorias ORDER BY nome ASC");
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log('❌ [ADMIN-CONTROLLER] Erro ao buscar categorias: ' . $e->getMessage());
+            return [];
         }
-        
-        if (!empty($categoria_id)) {
-            $sql .= " AND categoria_id = :categoria_id";
-            $params[':categoria_id'] = $categoria_id;
-        }
-        
-        $stmt = $this->produtoModel->getConnection()->prepare($sql);
-        
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-        
-        $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
     }
     
     public function novoProduto(Request $request) {
