@@ -507,14 +507,30 @@ class AdminController extends Controller {
         $this->authService->requerPermissao('read');
         
         $produtoId = $request->getParam('id');
-        $produto = $this->produtoModel->find($produtoId);
         
-        if (!$produto) {
-            $this->json(['error' => 'Produto não encontrado'], 404);
-            return;
+        try {
+            $produto = $this->produtoModel->find($produtoId);
+            
+            if (!$produto) {
+                // Redirecionar com erro
+                header('Location: /admin/produtos?error=Produto não encontrado');
+                exit;
+            }
+            
+            // Obter categorias para o formulário
+            $categorias = $this->getCategorias();
+            
+            $this->view('admin/editar-produto', [
+                'produto' => $produto,
+                'categorias' => $categorias,
+                'modo' => 'editar'
+            ]);
+            
+        } catch (\Exception $e) {
+            // Redirecionar com erro
+            header('Location: /admin/produtos?error=' . urlencode($e->getMessage()));
+            exit;
         }
-        
-        $this->json(['success' => true, 'produto' => $produto]);
     }
     
     public function salvarProduto(Request $request) {
@@ -609,37 +625,86 @@ class AdminController extends Controller {
     public function atualizarProduto(Request $request) {
         $this->authService->requerPermissao('update');
         
-        $dados['valor'] = $valor;
-        error_log(' [ATUALIZAR-PRODUTO] Valor convertido: ' . $valor);
-        
-        // Atualizar produto no banco
-        error_log(' [ATUALIZAR-PRODUTO] Tentando atualizar produto no banco...');
-        $result = $this->produtoModel->update($produtoId, $dados, $usuario['id']);
-        error_log(' [ATUALIZAR-PRODUTO] Produto atualizado. Resultado: ' . ($result ? 'true' : 'false'));
-        
         $produtoId = $request->getParam('id');
+        $dados = $request->getParams();
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        // Log para debug
+        error_log('🔍 [ATUALIZAR-PRODUTO] Iniciando atualização do produto ID: ' . $produtoId);
+        error_log('🔍 [ATUALIZAR-PRODUTO] Dados recebidos: ' . print_r($dados, true));
+        error_log('🔍 [ATUALIZAR-PRODUTO] FILES recebidos: ' . print_r($_FILES, true));
         
         try {
-            $produto = $this->produtoModel->find($produtoId);
+            // FORÇAR MOEDA USD SEMPRE
+            $dados['moeda'] = 'USD';
+            error_log('🔍 [ATUALIZAR-PRODUTO] Moeda forçada para USD');
             
-            if (!$produto) {
-                // Redirecionar com erro
-                header('Location: /admin/produtos?error=Produto não encontrado');
-                exit;
+            // Validar e converter valor
+            if (!isset($dados['valor']) || $dados['valor'] === '') {
+                throw new \Exception('Valor é obrigatório');
             }
             
-            // Obter categorias para o formulário
-            $categorias = $this->getCategorias();
+            // Converter valor para formato numérico
+            $valor = str_replace(',', '.', $dados['valor']);
+            $valor = floatval($valor);
             
-            $this->view('admin/editar-produto', [
-                'produto' => $produto,
-                'categorias' => $categorias,
-                'modo' => 'editar'
-            ]);
+            if ($valor <= 0) {
+                throw new \Exception('Valor deve ser maior que zero');
+            }
+            
+            $dados['valor'] = $valor;
+            error_log('🔍 [ATUALIZAR-PRODUTO] Valor convertido: ' . $valor);
+            
+            // Atualizar produto no banco
+            error_log('🔍 [ATUALIZAR-PRODUTO] Tentando atualizar produto no banco...');
+            $result = $this->produtoModel->update($produtoId, $dados, $usuario['id']);
+            error_log('🔍 [ATUALIZAR-PRODUTO] Produto atualizado. Resultado: ' . ($result ? 'true' : 'false'));
+            
+            // Processar upload da imagem principal (se enviada)
+            if (isset($_FILES['imagem_principal']) && $_FILES['imagem_principal']['error'] === UPLOAD_ERR_OK) {
+                error_log('🔍 [ATUALIZAR-PRODUTO] Processando upload da nova imagem principal');
+                $fotoPrincipal = $this->produtoFotoModel->uploadFoto($_FILES['imagem_principal'], $produtoId);
+                
+                // Marcar como principal
+                $this->produtoFotoModel->marcarComoPrincipal($fotoPrincipal['id']);
+                
+                // Atualizar produto com a nova foto principal
+                $this->produtoModel->update($produtoId, ['foto_principal' => $fotoPrincipal['nome_arquivo']], $usuario['id']);
+                error_log('🔍 [ATUALIZAR-PRODUTO] Nova foto principal salva: ' . $fotoPrincipal['nome_arquivo']);
+            } else {
+                error_log('🔍 [ATUALIZAR-PRODUTO] Nenhuma nova imagem principal para upload');
+            }
+            
+            // Processar upload das imagens adicionais
+            if (isset($_FILES['imagens']) && is_array($_FILES['imagens']['name'])) {
+                error_log('🔍 [ATUALIZAR-PRODUTO] Processando ' . count($_FILES['imagens']['name']) . ' imagens adicionais');
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
+                        $arquivo = [
+                            'name' => $_FILES['imagens']['name'][$key],
+                            'type' => $_FILES['imagens']['type'][$key],
+                            'tmp_name' => $_FILES['imagens']['tmp_name'][$key],
+                            'error' => $_FILES['imagens']['error'][$key],
+                            'size' => $_FILES['imagens']['size'][$key]
+                        ];
+                        
+                        $this->produtoFotoModel->uploadFoto($arquivo, $produtoId);
+                    }
+                }
+            }
+            
+            error_log('🔍 [ATUALIZAR-PRODUTO] Produto atualizado com SUCESSO! ID: ' . $produtoId . ', Valor: $' . number_format($valor, 2));
+            
+            // Redirecionar de volta para a lista com mensagem de sucesso
+            header('Location: /admin/produtos?success=Produto atualizado com sucesso em USD - Valor: $' . number_format($valor, 2));
+            exit;
             
         } catch (\Exception $e) {
-            // Redirecionar com erro
-            header('Location: /admin/produtos?error=' . urlencode($e->getMessage()));
+            error_log('❌ [ATUALIZAR-PRODUTO] ERRO ao atualizar produto: ' . $e->getMessage());
+            error_log('❌ [ATUALIZAR-PRODUTO] Stack trace: ' . $e->getTraceAsString());
+            
+            // Redirecionar de volta com mensagem de erro
+            header('Location: /admin/editar-produto/' . $produtoId . '?error=' . urlencode($e->getMessage()));
             exit;
         }
     }

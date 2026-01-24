@@ -9,10 +9,14 @@ class Produto extends Model {
     }
     
     public function find($id) {
+        error_log('🔍 [PRODUTO-MODEL] Buscando produto ID: ' . $id);
+        
         $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $id);
         $stmt->execute();
         $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        error_log('🔍 [PRODUTO-MODEL] Produto bruto do banco: ' . print_r($produto, true));
         
         if ($produto) {
             // Garantir que todos os campos tenham valores padrão
@@ -38,6 +42,10 @@ class Produto extends Model {
             $produto['peso'] = floatval($produto['peso']);
             $produto['estoque'] = intval($produto['estoque']);
             $produto['categoria_id'] = intval($produto['categoria_id']);
+            
+            error_log('🔍 [PRODUTO-MODEL] Produto processado: ' . print_r($produto, true));
+        } else {
+            error_log('🔍 [PRODUTO-MODEL] Produto ID ' . $id . ' não encontrado no banco');
         }
         
         return $produto;
