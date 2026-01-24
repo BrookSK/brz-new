@@ -567,16 +567,22 @@ class AdminController extends Controller {
     }
     
     public function uploadImagem(Request $request) {
-        $this->authService->requerPermissao('create');
-        
         try {
+            // Limpar buffer de saída
+            if (ob_get_length()) ob_clean();
+            
+            // Definir cabeçalho JSON
+            header('Content-Type: application/json');
+            
+            $this->authService->requerPermissao('create');
+            
             if (!isset($_FILES['imagem']) || $_FILES['imagem']['error'] !== UPLOAD_ERR_OK) {
                 throw new \Exception('Nenhuma imagem enviada ou erro no upload');
             }
             
             $imagemUpload = $this->imagemModel->upload($_FILES['imagem'], 'produto');
             
-            $this->json([
+            echo json_encode([
                 'success' => true,
                 'imagem' => [
                     'id' => $imagemUpload['id'],
@@ -588,8 +594,19 @@ class AdminController extends Controller {
             ]);
             
         } catch (\Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
+            // Limpar buffer de saída
+            if (ob_get_length()) ob_clean();
+            
+            // Definir cabeçalho JSON
+            header('Content-Type: application/json');
+            
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
+        
+        exit;
     }
     
     public function salvarProduto(Request $request) {
