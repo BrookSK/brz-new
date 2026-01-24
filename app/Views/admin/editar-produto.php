@@ -101,7 +101,7 @@
                                 <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>?v=<?= time() ?>" 
                                      alt="Imagem atual" 
                                      style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;"
-                                     onerror="this.src='/uploads/produtos/placeholder.svg'">
+                                     onerror="this.src='/uploads/produtos/placeholder.jpg'">
                             </div>
                         </div>
                     <?php endif; ?>

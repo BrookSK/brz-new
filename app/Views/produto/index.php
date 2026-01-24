@@ -55,13 +55,13 @@
                             if (!empty($produto['foto_principal'])) {
                                 $fotoUrl = '/uploads/produtos/' . $produto['foto_principal'];
                             } else {
-                                $fotoUrl = '/uploads/produtos/placeholder.svg';
+                                $fotoUrl = '/uploads/produtos/placeholder.jpg';
                             }
                             ?>
                             <img src="<?= $fotoUrl ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="card-img-top product-image"
-                                 onerror="this.src='/uploads/produtos/placeholder.svg'">
+                                 onerror="this.src='/uploads/produtos/placeholder.jpg'">
                              
                             <!-- Badge de estoque -->
                             <?php if ($produto['estoque'] <= 5): ?>

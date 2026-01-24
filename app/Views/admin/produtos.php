@@ -86,14 +86,14 @@
                                         if (!empty($produto['foto_principal'])) {
                                             $fotoUrl = '/uploads/produtos/' . $produto['foto_principal'];
                                         } else {
-                                            $fotoUrl = '/uploads/produtos/placeholder.svg';
+                                            $fotoUrl = '/uploads/produtos/placeholder.jpg';
                                         }
                                         ?>
                                         <img src="<?= $fotoUrl ?>" 
                                              alt="<?= htmlspecialchars($produto['nome']) ?>"
                                              class="img-thumbnail"
                                              style="width: 60px; height: 60px; object-fit: cover;"
-                                             onerror="this.src='/uploads/produtos/placeholder.svg'">
+                                             onerror="this.src='/uploads/produtos/placeholder.jpg'">
                                     </td>
                                     <td>
                                         <div>
