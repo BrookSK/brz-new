@@ -60,7 +60,7 @@ class CheckoutController extends Controller {
                 'quantidade' => $item['quantidade'] ?? 1,
                 'subtotal' => ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 1),
                 'peso' => 0.5, // Padrão
-                'foto_principal' => 'placeholder.svg'
+                'foto_principal' => $item['foto_principal'] ?? null
             ];
             
             $items[] = $produto;

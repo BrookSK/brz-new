@@ -327,7 +327,7 @@ function addToMiniCart(product) {
     const itemElement = document.createElement('div');
     itemElement.className = 'mini-cart-item new-item';
     itemElement.innerHTML = `
-        <img src="${product.imagem || '/uploads/produtos/placeholder.svg'}" alt="${product.nome}">
+        ${product.imagem ? `<img src="/uploads/produtos/${product.imagem}" alt="${product.nome}">` : '<div class="bg-light d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;"><i class="fas fa-image text-muted"></i></div>'}
         <div class="mini-cart-item-info">
             <div class="mini-cart-item-title">${product.nome}</div>
             <div class="mini-cart-item-price">R$ ${parseFloat(product.preco).toFixed(2)}</div>

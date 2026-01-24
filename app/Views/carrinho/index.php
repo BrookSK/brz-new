@@ -19,9 +19,15 @@
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
-                                    <img src="/uploads/produtos/<?= $item['foto_principal'] ?? 'placeholder.svg' ?>" 
+                                    <?php if (!empty($item['foto_principal'])): ?>
+                                    <img src="/uploads/produtos/<?= $item['foto_principal'] ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
+                                <?php else: ?>
+                                    <div class="bg-light d-flex align-items-center justify-content-center img-fluid rounded" style="height: 100px;">
+                                        <i class="fas fa-image text-muted fa-2x"></i>
+                                    </div>
+                                <?php endif; ?>
                                 </div>
                                 <div class="col-md-4">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
