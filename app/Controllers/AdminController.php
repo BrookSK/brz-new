@@ -244,4 +244,44 @@ class AdminController extends Controller {
             header('Location: /admin/editar-produto/' . $produtoId);
             exit;
         } catch (\Exception $e) {
-}
+            echo 'Erro: ' . $e->getMessage();
+            exit;
+        }
+    }
+    
+    public function excluirProduto(Request $request) {
+        error_log('🔍 [ADMIN-EXCLUIR] Método excluirProduto chamado com ID: ' . $request->getParam('id'));
+        
+        $produtoId = $request->getParam('id');
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        
+        try {
+            error_log('🔍 [ADMIN-EXCLUIR] Iniciando transação');
+            $pdo->beginTransaction();
+            
+            // Excluir fotos
+            error_log('🔍 [ADMIN-EXCLUIR] Excluindo fotos do produto ' . $produtoId);
+            $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?");
+            $stmt->execute([$produtoId]);
+            
+            // Excluir produto
+            error_log('🔍 [ADMIN-EXCLUIR] Excluindo produto ' . $produtoId);
+            $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
+            $stmt->execute([$produtoId]);
+            
+            $pdo->commit();
+            
+            error_log('🔍 [ADMIN-EXCLUIR] Produto excluído com sucesso, redirecionando...');
+            
+            // Redirecionar para lista
+            header('Location: /admin/produtos');
+            exit;
+            
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            error_log('❌ [ADMIN-EXCLUIR] Erro: ' . $e->getMessage());
+            echo '<div class="alert alert-danger">Erro ao excluir produto: ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/produtos" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
