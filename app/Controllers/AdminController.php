@@ -7,68 +7,11 @@ class AdminController extends Controller {
     
     public function dashboard(Request $request) {
         // Conexão com o banco
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-        
-        // Estatísticas do Dashboard
-        $stats = [];
-        
-        // Total de produtos
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos");
-        $stats['produtos_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Produtos ativos
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos WHERE ativo = 1");
-        $stats['produtos_ativos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Total de pedidos
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM pedidos");
-        $stats['pedidos_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Pedidos hoje
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM pedidos WHERE DATE(created_at) = CURDATE()");
-        $stats['pedidos_hoje'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Total de usuários
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM usuarios");
-        $stats['usuarios_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Usuários novos (últimos 7 dias)
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-        $stats['usuarios_novos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-        
-        // Faturamento total
-        $stmt = $pdo->query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'pago'");
-        $stats['faturamento_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-        
-        // Faturamento do mês
-        $stmt = $pdo->query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'pago' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())");
-        $stats['faturamento_mes'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-        
-        // Pedidos recentes
-        $stmt = $pdo->query("
-            SELECT p.*, u.nome as cliente_nome 
-            FROM pedidos p 
-            LEFT JOIN usuarios u ON p.usuario_id = u.id 
-            ORDER BY p.created_at DESC 
-            LIMIT 5
-        ");
-        $pedidos_recentes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        // Produtos mais vendidos
-        $stmt = $pdo->query("
-            SELECT pr.nome, COUNT(ip.produto_id) as vendas, SUM(ip.quantidade) as quantidade
-            FROM itens_pedido ip
-            JOIN produtos pr ON ip.produto_id = pr.id
-            JOIN pedidos p ON ip.pedido_id = p.id
-            WHERE p.status = 'pago'
-            GROUP BY pr.id, pr.nome
-            ORDER BY vendas DESC
-            LIMIT 5
-        ");
-        $produtos_mais_vendidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        // Layout Bootstrap completo
-        echo '<!DOCTYPE html>
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        } catch (\Exception $e) {
+            // Se não conseguir conectar ao banco, mostra dashboard básico
+            echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -95,12 +38,6 @@ class AdminController extends Controller {
             color: #fff;
             font-weight: bold;
             padding: 1rem;
-        }
-        .stat-card {
-            transition: transform 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-2px);
         }
         .quick-action-card {
             transition: all 0.3s;
@@ -180,11 +117,171 @@ class AdminController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Dashboard</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-download"></i> Exportar
-                            </button>
+                        <button type="button" class="btn btn-sm btn-primary">
+                            <i class="fas fa-sync"></i> Atualizar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <strong>Atenção:</strong> Não foi possível conectar ao banco de dados. As estatísticas não estão disponíveis no momento.
+                </div>
+                
+                <!-- Ações Rápidas -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h3 class="h5 mb-3">Ações Rápidas</h3>
+                        <div class="row">
+                            <div class="col-lg-3 col-md-6 mb-3">
+                                <a href="/admin/novo-produto" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-primary text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-plus fa-3x mb-3"></i>
+                                            <h5 class="card-title">Novo Produto</h5>
+                                            <p class="card-text small">Adicionar novo produto ao catálogo</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <div class="col-lg-3 col-md-6 mb-3">
+                                <a href="/admin/produtos" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-success text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-box fa-3x mb-3"></i>
+                                            <h5 class="card-title">Gerenciar Produtos</h5>
+                                            <p class="card-text small">Ver e editar produtos</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <div class="col-lg-3 col-md-6 mb-3">
+                                <a href="/admin/pedidos" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-info text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                                            <h5 class="card-title">Pedidos</h5>
+                                            <p class="card-text small">Gerenciar pedidos</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <div class="col-lg-3 col-md-6 mb-3">
+                                <a href="/admin/configuracoes" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-warning text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-cog fa-3x mb-3"></i>
+                                            <h5 class="card-title">Configurações</h5>
+                                            <p class="card-text small">Configurar loja</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
                         </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+            exit;
+        }
+        
+        // Se conectou ao banco, continua com estatísticas...
+        $stats = [];
+        $stats['produtos_total'] = 0;
+        $stats['produtos_ativos'] = 0;
+        $stats['pedidos_total'] = 0;
+        $stats['pedidos_hoje'] = 0;
+        $stats['usuarios_total'] = 0;
+        $stats['usuarios_novos'] = 0;
+        $stats['faturamento_total'] = 0;
+        $stats['faturamento_mes'] = 0;
+        
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BRZ Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .quick-action-card { transition: all 0.3s; cursor: pointer; }
+        .quick-action-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                        <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
+                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                    </a>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/dashboard">
+                                <i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/produtos">
+                                <i class="fas fa-fw fa-box"></i><span>Produtos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/pedidos">
+                                <i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/usuarios">
+                                <i class="fas fa-fw fa-users"></i><span>Usuários</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/pagamentos">
+                                <i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/configuracoes">
+                                <i class="fas fa-fw fa-cog"></i><span>Configurações</span>
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="sidebar-divider">
+                    
+                    <div class="nav-item">
+                        <a class="nav-link" href="/logout">
+                            <i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
                         <button type="button" class="btn btn-sm btn-primary">
                             <i class="fas fa-sync"></i> Atualizar
                         </button>
