@@ -225,6 +225,11 @@ class AdminProdutosController extends Controller {
                                         <input type="text" class="form-control" name="sku" required>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">NCM</label>
+                                        <input type="text" class="form-control" name="ncm" placeholder="Ex: 8517.12.00" maxlength="10">
+                                        <small class="text-muted">Nomenclatura Comum do Mercosul (opcional)</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Descrição Curta</label>
                                         <textarea class="form-control" name="short_description" rows="3"></textarea>
                                     </div>
@@ -325,13 +330,14 @@ class AdminProdutosController extends Controller {
             }
             
             $stmt = $pdo->prepare("
-                INSERT INTO produtos (name, sku, short_description, category_id, price, weight, stock, active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO produtos (name, sku, ncm, short_description, category_id, price, weight, stock, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             
             $stmt->execute([
                 $request->getParam('name'),
                 $request->getParam('sku'),
+                $request->getParam('ncm'),
                 $request->getParam('short_description'),
                 $categoryId,
                 $price,
@@ -570,6 +576,11 @@ class AdminProdutosController extends Controller {
                                         <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '" required>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">NCM</label>
+                                        <input type="text" class="form-control" name="ncm" value="' . htmlspecialchars($produto['ncm'] ?? '') . '" placeholder="Ex: 8517.12.00" maxlength="10">
+                                        <small class="text-muted">Nomenclatura Comum do Mercosul (opcional)</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Descrição Curta</label>
                                         <textarea class="form-control" name="short_description" rows="3">' . htmlspecialchars($produto['short_description']) . '</textarea>
                                     </div>
@@ -724,7 +735,7 @@ class AdminProdutosController extends Controller {
             
             $stmt = $pdo->prepare("
                 UPDATE produtos SET 
-                    name = ?, sku = ?, description = ?, short_description = ?, category_id = ?, 
+                    name = ?, sku = ?, ncm = ?, description = ?, short_description = ?, category_id = ?, 
                     price = ?, cost_price = ?, sale_price = ?, stock = ?, min_stock = ?, weight = ?, 
                     status = ?, active = ?, featured = ?, updated_at = NOW()
                 WHERE id = ?
@@ -733,6 +744,7 @@ class AdminProdutosController extends Controller {
             $stmt->execute([
                 $request->getParam('name'),
                 $request->getParam('sku'),
+                $request->getParam('ncm'),
                 $request->getParam('description'),
                 $request->getParam('short_description'),
                 $categoryId,
