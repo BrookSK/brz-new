@@ -143,8 +143,8 @@ class Produto extends Model {
             $slug = $this->generateSlug($data['name'] ?? '');
         }
         
-        // Garantir slug único
-        $slug = $this->ensureUniqueSlug($slug);
+        // Adicionar timestamp para garantir unicidade temporária
+        $slug = $slug . '-' . time();
         
         // Mapear campos do formulário para o banco
         $dadosBanco = [
