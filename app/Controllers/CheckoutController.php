@@ -411,39 +411,56 @@ class CheckoutController extends Controller {
         try {
             error_log('🔍 [CRIAR_PEDIDO] Iniciando criação do pedido');
             
-            // Garantir usuário válido - fluxo correto obrigatório
+            // Garantir usuário e cliente válidos - fluxo correto obrigatório
             $db = \Config\Database::getConnection();
             
             if (empty($usuario) || empty($usuario['email'])) {
                 throw new \Exception('Dados do usuário são obrigatórios para criar pedido');
             }
             
-            // 1. Buscar usuário pelo email (colunas existentes: id, name, email)
+            // 1. Buscar/criar usuário na tabela usuarios
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$usuario['email']]);
             $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($existingUser && !empty($existingUser['id'])) {
-                // 2. Se existir → usar usuarios.id
                 $usuarioId = $existingUser['id'];
-                error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado por email: ' . $usuarioId);
+                error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado: ' . $usuarioId);
             } else {
-                // 3. Se NÃO existir → CRIAR o usuário e usar o lastInsertId()
-                // INSERT com colunas EXISTENTES: name, email, password, documento
                 $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
                 $stmt->execute([
-                    $usuario['nome'] ?? 'Cliente', // formulário usa "nome"
+                    $usuario['nome'] ?? 'Cliente',
                     $usuario['email'],
                     password_hash('temp123', PASSWORD_DEFAULT),
-                    'DOC' . time() // documento temporário único
+                    'DOC' . time()
                 ]);
                 $usuarioId = $db->lastInsertId();
-                error_log('🔍 [CRIAR_PEDIDO] Novo usuário criado: ' . $usuarioId . ' para email: ' . $usuario['email']);
+                error_log('🔍 [CRIAR_PEDIDO] Usuário criado: ' . $usuarioId);
             }
             
-            // 4. usuario_id SEMPRE deve ser um ID válido existente na tabela usuarios
-            if (empty($usuarioId)) {
-                throw new \Exception('Falha ao obter ID válido do usuário');
+            // 2. Buscar/criar cliente na tabela clientes (foreign key obrigatória)
+            $stmt = $db->prepare("SELECT id FROM clientes WHERE email = ?");
+            $stmt->execute([$usuario['email']]);
+            $existingClient = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($existingClient && !empty($existingClient['id'])) {
+                $clienteId = $existingClient['id'];
+                error_log('🔍 [CRIAR_PEDIDO] Cliente encontrado: ' . $clienteId);
+            } else {
+                $stmt = $db->prepare("INSERT INTO clientes (nome, email, telefone, documento, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $stmt->execute([
+                    $usuario['nome'] ?? 'Cliente',
+                    $usuario['email'],
+                    $usuario['telefone'] ?? '',
+                    'DOC' . time()
+                ]);
+                $clienteId = $db->lastInsertId();
+                error_log('🔍 [CRIAR_PEDIDO] Cliente criado: ' . $clienteId);
+            }
+            
+            // 3. Validar IDs antes de continuar
+            if (empty($usuarioId) || empty($clienteId)) {
+                throw new \Exception('Falha ao obter IDs válidos de usuário/cliente');
             }
             
             // Calcular totais
@@ -494,7 +511,7 @@ class CheckoutController extends Controller {
                 $usuarioId,
                 $usuario['nome'] ?? 'Cliente',
                 $numeroPedido,
-                $usuarioId, // cliente_id mesmo que usuario_id
+                $clienteId, // cliente_id válido da tabela clientes
                 'pendente',
                 $subtotal,
                 $taxaServico,
@@ -519,9 +536,16 @@ class CheckoutController extends Controller {
             
             return $pedidoId;
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('❌ [CRIAR_PEDIDO] Erro ao criar pedido: ' . $e->getMessage());
             error_log('❌ [CRIAR_PEDIDO] Stack: ' . $e->getTraceAsString());
+            
+            // Retornar JSON válido em caso de erro
+            $this->json([
+                'success' => false,
+                'error' => 'Erro ao criar pedido: ' . $e->getMessage(),
+                'code' => 500
+            ], 500);
             return false;
         }
     }
