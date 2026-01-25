@@ -8,8 +8,11 @@ class AdminPedidosEditController {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
-    public function editar($id) {
+    public function editar($request) {
         try {
+            // Extrair ID do Request
+            $id = $request->getParam('id');
+            
             // Buscar pedido diretamente
             $stmt = $this->connection->prepare("
                 SELECT p.*, 
@@ -346,7 +349,7 @@ class AdminPedidosEditController {
 </html>';
     }
     
-    public function salvar() {
+    public function salvar($request) {
         try {
             $dados = json_decode(file_get_contents('php://input'), true);
             
