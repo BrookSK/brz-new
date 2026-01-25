@@ -172,17 +172,16 @@ class Produto extends Model {
         
         // Mapear campos do formulário para o banco
         $dadosBanco = [
-            'nome' => $data['nome'] ?? '',
+            'name' => $data['name'] ?? '',
             'sku' => $data['sku'] ?? '',
-            'descricao_curta' => $data['descricao_curta'] ?? '',
-            'descricao_completa' => $data['descricao_completa'] ?? '',
-            'categoria_id' => $data['categoria_id'] ?? 0,
-            'valor' => floatval($data['valor'] ?? 0),
-            'moeda' => $data['moeda'] ?? 'USD',
-            'peso' => floatval($data['peso'] ?? 0),
-            'estoque' => intval($data['estoque'] ?? 0),
-            'status' => $data['status'] ?? 'ativo',
-            'ativo' => ($data['status'] ?? 'ativo') === 'ativo' ? 1 : 0,
+            'description' => $data['description'] ?? '',
+            'category_id' => $data['category_id'] ?? 0,
+            'price' => floatval($data['price'] ?? 0),
+            'currency' => $data['currency'] ?? 'USD',
+            'weight' => floatval($data['weight'] ?? 0),
+            'stock' => intval($data['stock'] ?? 0),
+            'status' => $data['status'] ?? 'published',
+            'active' => ($data['status'] ?? 'published') === 'published' ? 1 : 0,
             'updated_at' => date('Y-m-d H:i:s')
         ];
         
@@ -190,33 +189,31 @@ class Produto extends Model {
         
         $stmt = $this->getConnection()->prepare("
             UPDATE {$this->table} 
-            SET nome = :nome, 
+            SET name = :name, 
                 sku = :sku, 
-                descricao_curta = :descricao_curta, 
-                descricao_completa = :descricao_completa, 
-                categoria_id = :categoria_id, 
-                valor = :valor, 
-                moeda = :moeda, 
-                peso = :peso, 
-                estoque = :estoque, 
+                description = :description, 
+                category_id = :category_id, 
+                price = :price, 
+                currency = :currency, 
+                weight = :weight, 
+                stock = :stock, 
                 status = :status, 
-                ativo = :ativo, 
+                active = :active, 
                 updated_at = :updated_at
             WHERE id = :id
         ");
         
         $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':nome', $dadosBanco['nome']);
+        $stmt->bindParam(':name', $dadosBanco['name']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
-        $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
-        $stmt->bindParam(':descricao_completa', $dadosBanco['descricao_completa']);
-        $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
-        $stmt->bindParam(':valor', $dadosBanco['valor']);
-        $stmt->bindParam(':moeda', $dadosBanco['moeda']);
-        $stmt->bindParam(':peso', $dadosBanco['peso']);
-        $stmt->bindParam(':estoque', $dadosBanco['estoque']);
+        $stmt->bindParam(':description', $dadosBanco['description']);
+        $stmt->bindParam(':category_id', $dadosBanco['category_id']);
+        $stmt->bindParam(':price', $dadosBanco['price']);
+        $stmt->bindParam(':currency', $dadosBanco['currency']);
+        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':stock', $dadosBanco['stock']);
         $stmt->bindParam(':status', $dadosBanco['status']);
-        $stmt->bindParam(':ativo', $dadosBanco['ativo']);
+        $stmt->bindParam(':active', $dadosBanco['active']);
         $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
         
         error_log('🔍 [PRODUTO-MODEL-UPDATE] Executando UPDATE no banco...');
@@ -323,7 +320,7 @@ class Produto extends Model {
     }
     
     public function updateEstoque($id, $quantidade) {
-        $stmt = $this->connection->prepare("UPDATE {$this->table} SET estoque = estoque - :quantidade WHERE id = :id AND estoque >= :quantidade");
+        $stmt = $this->connection->prepare("UPDATE {$this->table} SET stock = stock - :quantidade WHERE id = :id AND stock >= :quantidade");
         $stmt->bindParam(':quantidade', $quantidade);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
