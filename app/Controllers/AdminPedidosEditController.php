@@ -10,9 +10,17 @@ class AdminPedidosEditController {
 
     public function editar($id) {
         try {
-            // Obter pedido com detalhes
-            $pedidoModel = new \App\Models\PedidoEcommerce();
-            $pedido = $pedidoModel->getComDetalhes($id);
+            // Buscar pedido diretamente
+            $stmt = $this->connection->prepare("
+                SELECT p.*, 
+                       u.nome as cliente_nome, u.email as cliente_email
+                FROM pedidos p
+                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                WHERE p.id = :id
+            ");
+            $stmt->bindParam(':id', $id);
+            $stmt->execute();
+            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
@@ -20,13 +28,45 @@ class AdminPedidosEditController {
                 exit;
             }
             
+            // Buscar itens do pedido
+            $stmt = $this->connection->prepare("
+                SELECT 
+                    pi.id,
+                    pi.pedido_id,
+                    pi.produto_id,
+                    pi.quantidade,
+                    pi.preco_unitario,
+                    pi.subtotal,
+                    pi.nome_produto,
+                    pi.nome_produto_sku,
+                    pi.created_at,
+                    (SELECT pf.nome_arquivo 
+                     FROM produto_fotos pf 
+                     WHERE pf.produto_id = pi.produto_id 
+                     ORDER BY pf.principal DESC, pf.ordem ASC 
+                     LIMIT 1) as imagem_principal
+                FROM pedido_itens pi 
+                WHERE pi.pedido_id = :id 
+                ORDER BY pi.id
+            ");
+            $stmt->bindParam(':id', $id);
+            $stmt->execute();
+            $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Processar itens
+            foreach ($itens as &$item) {
+                $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+                if (empty($item['nome_produto'])) {
+                    $item['nome_produto'] = 'Produto #' . $item['produto_id'];
+                }
+            }
+            
+            $pedido['items'] = $itens;
+            
             // Obter todos os produtos para adicionar
             $stmt = $this->connection->prepare("SELECT id, name, price, sku FROM produtos WHERE active = 1 ORDER BY name");
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Obter itens do pedido
-            $itens = $pedido['items'] ?? [];
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
