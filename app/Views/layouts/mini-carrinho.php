@@ -264,6 +264,15 @@
 </style>
 
 <script>
+// Verificar se jQuery está carregado antes de usar
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof $ === 'undefined') {
+        console.error('jQuery não está carregado no mini-carrinho!');
+    } else {
+        console.log('jQuery carregado no mini-carrinho');
+    }
+});
+
 // Função para abrir/fechar mini carrinho
 function toggleMiniCart() {
     console.log('=== DEPURAÇÃO TOGGLE MINI CARRINHO ===');

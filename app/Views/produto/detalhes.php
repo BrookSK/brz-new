@@ -363,15 +363,26 @@
 </div>
 
 <script>
-// Verificar se jQuery está carregado
-if (typeof $ === 'undefined') {
-    console.error('jQuery não está carregado!');
-} else {
-    console.log('jQuery carregado com sucesso!');
-}
+// Verificar se jQuery está disponível
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof $ === 'undefined') {
+        console.error('jQuery não está carregado na página de detalhes!');
+        // Tentar carregar jQuery manualmente
+        const script = document.createElement('script');
+        script.src = 'https://code.jquery.com/jquery-3.6.0.min.js';
+        script.onload = function() {
+            console.log('jQuery carregado manualmente');
+            inicializarDetalhesProduto();
+        };
+        document.head.appendChild(script);
+    } else {
+        console.log('jQuery já está carregado na página de detalhes');
+        inicializarDetalhesProduto();
+    }
+});
 
-$(document).ready(function() {
-    console.log('Documento pronto, jQuery disponível');
+function inicializarDetalhesProduto() {
+    console.log('Inicializando detalhes do produto...');
     
     // Trocar imagem principal ao clicar na miniatura
     $('.thumbnail-image').on('click', function() {
@@ -488,7 +499,7 @@ $(document).ready(function() {
             badge.hide();
         }
     }
-});
+}
 </script>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
