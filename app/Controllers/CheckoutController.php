@@ -418,7 +418,7 @@ class CheckoutController extends Controller {
                 throw new \Exception('Dados do usuário são obrigatórios para criar pedido');
             }
             
-            // 1. Buscar usuário pelo email
+            // 1. Buscar usuário pelo email (colunas existentes: id, nome, email)
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$usuario['email']]);
             $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -429,10 +429,13 @@ class CheckoutController extends Controller {
                 error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado por email: ' . $usuarioId);
             } else {
                 // 3. Se NÃO existir → CRIAR o usuário e usar o lastInsertId()
-                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
+                // INSERT com colunas EXISTENTES: nome, email, senha, documento
+                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
                 $stmt->execute([
                     $usuario['nome'] ?? 'Cliente',
-                    $usuario['email']
+                    $usuario['email'],
+                    password_hash('temp123', PASSWORD_DEFAULT), // senha temporária
+                    'DOC' . time() // documento temporário único
                 ]);
                 $usuarioId = $db->lastInsertId();
                 error_log('🔍 [CRIAR_PEDIDO] Novo usuário criado: ' . $usuarioId . ' para email: ' . $usuario['email']);
@@ -478,9 +481,9 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
             
             $sql = "INSERT INTO pedidos (
-                usuario_id, numero_pedido, status, subtotal, 
-                impostos, frete, total, moeda, observacoes, 
-                created_at, updated_at
+                usuario_id, codigo_pedido, status, subtotal_produtos, 
+                valor_frete, taxa_servico, valor_impostos, valor_total, 
+                moeda_original, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
             
             $stmt = $db->prepare($sql);
@@ -489,13 +492,13 @@ class CheckoutController extends Controller {
             $params = [
                 $usuarioId,
                 $numeroPedido,
-                'pendente',
+                'pago',
                 $subtotal,
-                $impostos,
                 $frete,
+                $taxaServico,
+                $impostos,
                 $total,
-                'USD',
-                $dados['observacoes'] ?? ''
+                'USD'
             ];
             
             error_log('🔍 [CRIAR_PEDIDO] Parâmetros: ' . json_encode($params));
