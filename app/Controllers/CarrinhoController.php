@@ -45,24 +45,26 @@ class CarrinhoController extends Controller {
                     }
                 }
                 
-                $itemPrice = floatval($produto['price']);
+                // Usar campos mapeados do Model
+                $itemPrice = floatval($produto['valor'] ?? 0);
+                $itemStock = intval($produto['estoque'] ?? 0);
                 $itemSubtotal = $item['quantidade'] * $itemPrice;
                 
                 $produtosDetalhados[] = [
                     'produto_id' => $item['produto_id'],
                     'sku' => $produto['sku'],
-                    'name' => $produto['name'],
-                    'description' => $produto['description'],
+                    'name' => $produto['nome'],
+                    'description' => $produto['descricao'],
                     'price' => $itemPrice,
-                    'weight' => $produto['weight'],
+                    'weight' => $produto['peso'],
                     'quantidade' => $item['quantidade'],
                     'subtotal' => $itemSubtotal,
                     'foto_principal' => $fotoUrl,
-                    'stock' => $produto['stock']
+                    'stock' => $itemStock
                 ];
                 
                 $subtotal += $itemSubtotal;
-                $pesoTotal += $item['quantidade'] * floatval($produto['weight']);
+                $pesoTotal += $item['quantidade'] * floatval($produto['peso'] ?? 0.5);
             }
         }
         
@@ -117,8 +119,9 @@ class CarrinhoController extends Controller {
             return;
         }
         
-        if ($produto['stock'] < $quantidade) {
-            error_log("ERRO: Estoque insuficiente. Estoque: " . $produto['stock'] . ", Quantidade: " . $quantidade);
+        $produtoStock = intval($produto['estoque'] ?? 0);
+        if ($produtoStock < $quantidade) {
+            error_log("ERRO: Estoque insuficiente. Estoque: " . $produtoStock . ", Quantidade: " . $quantidade);
             $this->json(['error' => 'Estoque insuficiente'], 400);
             return;
         }
@@ -130,7 +133,7 @@ class CarrinhoController extends Controller {
         
         $itemKey = $produtoId;
         
-        $itemPrice = floatval($produto['price']);
+        $itemPrice = floatval($produto['valor'] ?? 0);
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
@@ -139,7 +142,7 @@ class CarrinhoController extends Controller {
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
-                'name' => $produto['name'],
+                'name' => $produto['nome'],
                 'price' => $itemPrice,
                 'quantidade' => $quantidade,
                 'subtotal' => $quantidade * $itemPrice
@@ -211,7 +214,8 @@ class CarrinhoController extends Controller {
         if (isset($_SESSION['carrinho'][$produtoId])) {
             $produto = $this->produtoModel->find($produtoId);
             
-            if ($produto['stock'] < $quantidade) {
+            $produtoStock = intval($produto['estoque'] ?? 0);
+            if ($produtoStock < $quantidade) {
                 $this->json(['error' => 'Estoque insuficiente'], 400);
                 return;
             }
@@ -259,7 +263,7 @@ class CarrinhoController extends Controller {
         foreach ($carrinho as $item) {
             $produto = $this->produtoModel->find($item['produto_id']);
             if ($produto) {
-                $pesoTotal += floatval($produto['weight'] ?? 0.5) * $item['quantidade'];
+                $pesoTotal += floatval($produto['peso'] ?? 0.5) * $item['quantidade'];
             }
         }
         
