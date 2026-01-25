@@ -25,7 +25,7 @@ class ApiController extends Controller {
         if ($search) {
             $produtos = $this->produtoModel->search($search, $limit);
         } elseif ($categoria) {
-            $produtos = $this->produtoModel->getByCategoria($categoria, $limit);
+            $produtos = $this->produtoModel->getByCategoriaId($categoria, $limit);
         } else {
             $produtos = $this->produtoModel->all($limit);
         }

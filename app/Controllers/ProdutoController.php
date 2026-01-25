@@ -21,7 +21,7 @@ class ProdutoController extends Controller {
         if ($search) {
             $produtos = $this->produtoModel->search($search);
         } elseif ($categoria) {
-            $produtos = $this->produtoModel->getByCategoria($categoria);
+            $produtos = $this->produtoModel->getByCategoriaId($categoria);
         } else {
             // Usar método que inclui JOIN com categorias
             $produtos = $this->produtoModel->getAllWithCategoria();
@@ -105,7 +105,7 @@ class ProdutoController extends Controller {
         }
         
         // Obter produtos relacionados (mesma categoria)
-        $produtosRelacionados = $this->produtoModel->getByCategoria($produto['categoria']);
+        $produtosRelacionados = $this->produtoModel->getByCategoriaId($produto['categoria_id']);
         $produtosRelacionados = array_filter($produtosRelacionados, function($p) use ($produtoId) {
             return $p['id'] != $produtoId;
         });
@@ -152,14 +152,14 @@ class ProdutoController extends Controller {
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['preco'];
+            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['valor'];
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
                 'nome' => $produto['nome'],
-                'preco_unitario' => $produto['preco'],
+                'preco_unitario' => $produto['valor'],
                 'quantidade' => $quantidade,
-                'subtotal' => $quantidade * $produto['preco']
+                'subtotal' => $quantidade * $produto['valor']
             ];
         }
         

@@ -64,17 +64,53 @@ class Produto extends Model {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function search($term) {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE nome LIKE :term OR descricao LIKE :term OR categoria LIKE :term");
+    public function getDestaque($limit = 8) {
+        $stmt = $this->getConnection()->prepare("
+            SELECT p.*, c.nome as categoria_nome 
+            FROM {$this->table} p 
+            LEFT JOIN categorias c ON p.category_id = c.id 
+            WHERE p.status = 'published' AND p.active = 1 
+            ORDER BY p.created_at DESC 
+            LIMIT :limit
+        ");
+        $stmt->bindParam(':limit', $limit);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getCategoria($categoriaId) {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM categorias WHERE id = :id
+        ");
+        $stmt->bindParam(':id', $categoriaId);
+        $stmt->execute();
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    public function search($term, $limit = 20) {
+        $stmt = $this->getConnection()->prepare("
+            SELECT p.*, c.nome as categoria_nome 
+            FROM {$this->table} p 
+            LEFT JOIN categorias c ON p.category_id = c.id 
+            WHERE (p.nome LIKE :term OR p.description LIKE :term OR c.nome LIKE :term)
+            AND p.status = 'ativo'
+            ORDER BY p.nome ASC 
+            LIMIT :limit
+        ");
         $term = "%{$term}%";
         $stmt->bindParam(':term', $term);
+        $stmt->bindParam(':limit', $limit);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    public function getByCategoria($categoria) {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE categoria = :categoria ORDER BY nome");
-        $stmt->bindParam(':categoria', $categoria);
+    public function getByCategoriaId($categoriaId) {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM {$this->table} 
+            WHERE categoria_id = :categoria_id 
+            ORDER BY nome ASC
+        ");
+        $stmt->bindParam(':categoria_id', $categoriaId);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
