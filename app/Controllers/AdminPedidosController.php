@@ -476,7 +476,7 @@ class AdminPedidosController extends Controller {
                                                 <th>Data de Criação</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody>';
                                         
                                         if (empty($itens)) {
                                             echo '<tr><td colspan="8" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
