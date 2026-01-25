@@ -240,7 +240,9 @@
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete" class="cart-currency" data-original-value="<?= $peso_total * 15 ?>"><?= number_format($peso_total * 15, 2, '.', ',') ?></span>
+                                    <span id="frete" class="cart-currency" data-original-value="<?= $peso_total * 15 ?>">
+                                        <?= ($peso_total * 15 == 0) ? 'GRÁTIS' : '$' . number_format($peso_total * 15, 2, '.', ',') ?>
+                                    </span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
@@ -256,7 +258,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>"><?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>$<?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -770,7 +772,7 @@ function updatePrices(currency) {
     // Valores originais em USD (fixos)
     const originalValues = {
         subtotal: <?= $subtotal ?>,
-        frete: <?= $peso_total * 15 ?>,
+        frete: <?= ($peso_total * 15 > 0) ? $peso_total * 15 : 0 ?>,
         taxaServico: <?= $peso_total * 39 ?>,
         impostos: <?= $subtotal * 0.80 ?>
     };
@@ -805,10 +807,14 @@ function updatePrices(currency) {
     // Atualizar cada elemento do resumo
     for (const [key, element] of Object.entries(elements)) {
         if (element) {
-            const value = convertedValues[key];
-            const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
-            element.textContent = formattedValue;
-            console.log(`🔍 [MOEDA] ${key} atualizado para:`, formattedValue);
+            if (key === 'frete' && originalValues.frete === 0) {
+                element.textContent = 'GRÁTIS';
+            } else {
+                const value = convertedValues[key];
+                const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
+                element.textContent = formattedValue;
+            }
+            console.log(`🔍 [MOEDA] ${key} atualizado para:`, element.textContent);
         } else {
             console.error(`❌ [MOEDA] Elemento ${key} não encontrado`);
         }

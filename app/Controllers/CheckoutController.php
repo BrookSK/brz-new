@@ -81,7 +81,9 @@ class CheckoutController extends Controller {
             'subtotal' => $subtotal,
             'peso_total' => $pesoTotal,
             'usuario' => $usuario,
-            'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : []
+            'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [],
+            'moeda' => 'USD', // Forçar USD
+            'frete_gratis' => ($pesoTotal * 15 == 0) // Verificar se frete é grátis
         ]);
     }
     
@@ -507,12 +509,12 @@ class CheckoutController extends Controller {
             // Taxas
             $taxaServico = $pesoTotal * 39; // US$39 por kg
             $impostos = $subtotal * 0.80; // 80%
-            $frete = $pesoTotal * 15; // US$15 por kg
+            $frete = ($pesoTotal * 15 > 0) ? $pesoTotal * 15 : 0; // US$15 por kg ou grátis se 0
             $total = $subtotal + $taxaServico + $impostos + $frete;
             
             error_log('🔍 [CRIAR_PEDIDO] Taxa de serviço: ' . $taxaServico);
             error_log('🔍 [CRIAR_PEDIDO] Impostos: ' . $impostos);
-            error_log('🔍 [CRIAR_PEDIDO] Frete: ' . $frete);
+            error_log('🔍 [CRIAR_PEDIDO] Frete: ' . $frete . ' (' . (($frete == 0) ? 'GRÁTIS' : 'PAGO') . ')');
             error_log('🔍 [CRIAR_PEDIDO] Total: ' . $total);
             
             // Criar número do pedido
