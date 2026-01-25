@@ -105,14 +105,14 @@ class PedidoEcommerce extends Model {
 
     public function adicionarHistoricoStatus($pedidoId, $statusAnterior, $statusNovo, $observacao, $usuarioId) {
         $stmt = $this->connection->prepare("
-            INSERT INTO pedido_status_history (pedido_id, status_anterior, status_novo, observacao, alterado_por) 
-            VALUES (:pedido_id, :status_anterior, :status_novo, :observacao, :alterado_por)
+            INSERT INTO pedido_status_history (pedido_id, status_anterior, status_novo, observacoes, usuario_id) 
+            VALUES (:pedido_id, :status_anterior, :status_novo, :observacoes, :usuario_id)
         ");
         $stmt->bindParam(':pedido_id', $pedidoId);
         $stmt->bindParam(':status_anterior', $statusAnterior);
         $stmt->bindParam(':status_novo', $statusNovo);
-        $stmt->bindParam(':observacao', $observacao);
-        $stmt->bindParam(':alterado_por', $usuarioId);
+        $stmt->bindParam(':observacoes', $observacao);
+        $stmt->bindParam(':usuario_id', $usuarioId);
         $stmt->execute();
     }
 
@@ -308,10 +308,11 @@ class PedidoEcommerce extends Model {
 
     public function getRastreamento($pedidoId) {
         try {
+            // Adaptar query para a estrutura correta da tabela pedido_status_historico
             $stmt = $this->connection->prepare("
                 SELECT psh.*, u.nome as usuario_alterou 
                 FROM pedido_status_history psh 
-                LEFT JOIN usuarios u ON psh.alterado_por = u.id 
+                LEFT JOIN usuarios u ON psh.usuario_id = u.id 
                 WHERE psh.pedido_id = :id 
                 ORDER BY psh.created_at DESC
             ");
@@ -320,131 +321,176 @@ class PedidoEcommerce extends Model {
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             error_log('Erro ao obter rastreamento do pedido: ' . $e->getMessage());
-            error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.alterado_por = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
+            error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
             return [];
         }
     }
+    
+    // Atualizar pedido
+    $this->update($pedidoId, [
+        'etiqueta_codigo' => $codigoEtiqueta,
+        'etiqueta_status' => 'rascunho',
+        'etiqueta_gerada_em' => date('Y-m-d H:i:s'),
+        'status' => 'rascunho_etiqueta'
+    ]);
+    
+    $this->adicionarHistoricoStatus($pedidoId, 'aguardando_processamento', 'rascunho_etiqueta', 'Rascunho de etiqueta gerado: ' . $codigoEtiqueta, $usuarioId);
+    
+    return $codigoEtiqueta;
+}
 
-    public function getComDetalhes($pedidoId) {
+public function efetivarEtiqueta($pedidoId, $usuarioId, $dadosTransporte = []) {
+    $pedido = $this->find($pedidoId);
+    
+    if (!$pedido || $pedido['etiqueta_status'] !== 'rascunho') {
+        throw new \Exception('Etiqueta não está em status de rascunho');
+    }
+    
+    // Atualizar pedido
+    $updateData = [
+        'etiqueta_status' => 'efetivada',
+        'etiqueta_efetivada_em' => date('Y-m-d H:i:s'),
+        'status' => 'etiqueta_efetivada',
+        'atualizado_por' => $usuarioId
+    ];
+    
+    if (!empty($dadosTransporte)) {
+        $updateData['tracking_code'] = $dadosTransporte['tracking_code'] ?? null;
+        $updateData['transportadora'] = $dadosTransporte['transportadora'] ?? null;
+        $updateData['peso_cobrado'] = $dadosTransporte['peso_cobrado'] ?? $pedido['peso_total'];
+    }
+    
+    $this->update($pedidoId, $updateData);
+    
+    $this->adicionarHistoricoStatus($pedidoId, 'rascunho_etiqueta', 'etiqueta_efetivada', 'Etiqueta efetivada para envio', $usuarioId);
+    
+    return true;
+}
+
+public function getPedidos($usuarioId, $limit = 50, $offset = 0) {
+    try {
         $stmt = $this->connection->prepare("
             SELECT p.*, 
-                   u.nome as cliente_nome, u.email as cliente_email,
-                   e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
-                   e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
-                   e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
-                   e_cob.cep as cep_cobranca
+                   e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega,
+                   e_cobranca.cep as cep_cobranca
             FROM {$this->table} p
-            LEFT JOIN usuarios u ON p.usuario_id = u.id
-            LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
-            LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
-            WHERE p.id = :id
+            LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id
+            LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id
+            WHERE p.usuario_id = :id 
+            ORDER BY p.created_at DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindParam(':id', $usuarioId);
+        $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    } catch (\Exception $e) {
+        error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
+        error_log('SQL executado: SELECT p.*, e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega, e_cobranca.cep as cep_cobranca FROM pedidos p LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id WHERE p.usuario_id = :id ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset');
+        return [];
+    }
+}
+
+public function getRastreamento($pedidoId) {
+    try {
+        $stmt = $this->connection->prepare("
+            SELECT psh.*, u.nome as usuario_alterou 
+            FROM pedido_status_history psh 
+            LEFT JOIN usuarios u ON psh.alterado_por = u.id 
+            WHERE psh.pedido_id = :id 
+            ORDER BY psh.created_at DESC
         ");
         $stmt->bindParam(':id', $pedidoId);
         $stmt->execute();
-        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if ($pedido) {
-            // Obter itens do pedido com dados do produto
-            try {
-                // Primeiro, verificar se a tabela produtos existe e tem as colunas necessárias
-                $checkTable = $this->connection->query("SHOW TABLES LIKE 'produtos'")->rowCount();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    } catch (\Exception $e) {
+        error_log('Erro ao obter rastreamento do pedido: ' . $e->getMessage());
+        error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.alterado_por = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
+        return [];
+    }
+}
+
+public function getComDetalhes($pedidoId) {
+    // Adaptar query para a estrutura correta das tabelas
+    $stmt = $this->connection->prepare("
+        SELECT p.*, 
+               u.nome as cliente_nome, u.email as cliente_email,
+               e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
+               e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
+               e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
+               e_cob.cep as cep_cobranca
+        FROM {$this->table} p
+        LEFT JOIN usuarios u ON p.usuario_id = u.id
+        LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
+        LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
+        WHERE p.id = :id
+    ");
+    $stmt->bindParam(':id', $pedidoId);
+    $stmt->execute();
+    $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+    
+    if ($pedido) {
+        // Obter itens do pedido com dados do produto
+        try {
+            // Primeiro, verificar se a tabela produtos existe e tem as colunas necessárias
+            $checkTable = $this->connection->query("SHOW TABLES LIKE 'produtos'")->rowCount();
+            
+            if ($checkTable > 0) {
+                // Verificar colunas da tabela produtos
+                $columns = $this->connection->query("SHOW COLUMNS FROM produtos")->fetchAll(\PDO::FETCH_COLUMN);
                 
-                if ($checkTable > 0) {
-                    // Verificar colunas da tabela produtos
-                    $columns = $this->connection->query("SHOW COLUMNS FROM produtos")->fetchAll(\PDO::FETCH_COLUMN);
-                    
-                    $sql = "SELECT pi.*";
-                    
-                    // Adicionar colunas do produto apenas se existirem
-                    if (in_array('nome', $columns)) {
-                        $sql .= ", pr.nome as nome_produto";
-                    } else {
-                        $sql .= ", CONCAT('Produto #', pi.produto_id) as nome_produto";
-                    }
-                    
-                    if (in_array('referencia', $columns)) {
-                        $sql .= ", pr.referencia";
-                    } else {
-                        $sql .= ", '' as referencia";
-                    }
-                    
-                    if (in_array('imagem', $columns)) {
-                        $sql .= ", pr.imagem";
-                    } else {
-                        $sql .= ", 'default.jpg' as imagem";
-                    }
-                    
-                    if (in_array('descricao', $columns)) {
-                        $sql .= ", pr.descricao as descricao_produto";
-                    } elseif (in_array('descricao_curta', $columns)) {
-                        $sql .= ", pr.descricao_curta as descricao_produto";
-                    } else {
-                        $sql .= ", '' as descricao_produto";
-                    }
-                    
-                    // Usar LEFT JOIN para não quebrar se não houver correspondência
-                    $sql .= " FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
-                    
-                    error_log("SQL executado: " . $sql);
-                    error_log("Colunas encontradas: " . implode(', ', $columns));
-                    
-                    $stmt = $this->connection->prepare($sql);
-                    $stmt->bindParam(':id', $pedidoId);
-                    $stmt->execute();
-                    $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                    
-                    // Garantir que os itens tenham todos os campos necessários
-                    foreach ($pedido['items'] as &$item) {
-                        $item['nome_produto'] = $item['nome_produto'] ?? 'Produto #' . $item['produto_id'];
-                        $item['referencia'] = $item['referencia'] ?? '';
-                        $item['imagem'] = $item['imagem'] ?? 'default.jpg';
-                        $item['descricao_produto'] = $item['descricao_produto'] ?? '';
-                        $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
-                    }
-                    
+                $sql = "SELECT pi.*";
+                
+                // Adicionar colunas do produto apenas se existirem
+                if (in_array('nome', $columns)) {
+                    $sql .= ", pr.nome as nome_produto";
                 } else {
-                    // Tabela produtos não existe, usar dados básicos
-                    $stmt = $this->connection->prepare("
-                        SELECT pi.*, 
-                               CONCAT('Produto #', pi.produto_id) as nome_produto, 
-                               '' as referencia,
-                               'default.jpg' as imagem,
-                               '' as descricao_produto
-                        FROM pedido_items pi
-                        WHERE pi.pedido_id = :id
-                        ORDER BY pi.id
-                    ");
-                    $stmt->bindParam(':id', $pedidoId);
-                    $stmt->execute();
-                    $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                    
-                    // Garantir que os itens tenham todos os campos necessários
-                    foreach ($pedido['items'] as &$item) {
-                        $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
-                    }
+                    $sql .= ", CONCAT('Produto #', pi.produto_id) as nome_produto";
                 }
                 
-                // Calcular totais se estiverem zerados ou não existirem
-                if (!isset($pedido['subtotal_produtos']) || $pedido['subtotal_produtos'] == 0) {
-                    $subtotal = 0;
-                    foreach ($pedido['items'] as $item) {
-                        $subtotal += ($item['preco_unitario'] * $item['quantidade']);
-                    }
-                    $pedido['subtotal_produtos'] = $subtotal;
-                    $pedido['valor_total'] = $subtotal + ($pedido['valor_frete'] ?? 0) + ($pedido['taxa_servico'] ?? 0) + ($pedido['valor_impostos'] ?? 0);
+                if (in_array('referencia', $columns)) {
+                    $sql .= ", pr.referencia";
+                } else {
+                    $sql .= ", '' as referencia";
                 }
+                
+                if (in_array('imagem', $columns)) {
+                    $sql .= ", pr.imagem";
+                } else {
+                    $sql .= ", 'default.jpg' as imagem";
+                }
+                
+                if (in_array('descricao', $columns)) {
+                    $sql .= ", pr.descricao as descricao_produto";
+                } elseif (in_array('descricao_curta', $columns)) {
+                    $sql .= ", pr.descricao_curta as descricao_produto";
+                } else {
+                    $sql .= ", '' as descricao_produto";
+                }
+                
+                // Usar LEFT JOIN para não quebrar se não houver correspondência
+                $sql .= " FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
+                
+                error_log("SQL executado: " . $sql);
+                error_log("Colunas encontradas: " . implode(', ', $columns));
+                
+                $stmt = $this->connection->prepare($sql);
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
                 // Garantir que os itens tenham todos os campos necessários
                 foreach ($pedido['items'] as &$item) {
                     $item['nome_produto'] = $item['nome_produto'] ?? 'Produto #' . $item['produto_id'];
                     $item['referencia'] = $item['referencia'] ?? '';
                     $item['imagem'] = $item['imagem'] ?? 'default.jpg';
+                    $item['descricao_produto'] = $item['descricao_produto'] ?? '';
                     $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
                 }
                 
-            } catch (\Exception $e) {
-                error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
-                error_log('SQL executado: SELECT pi.*, pr.nome as nome_produto, pr.referencia, pr.imagem, pr.descricao as descricao_produto FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id');
+            } else {
+                // Tabela produtos não existe, usar dados básicos
                 $pedido['items'] = [];
             }
             
@@ -453,7 +499,7 @@ class PedidoEcommerce extends Model {
                 $stmt = $this->connection->prepare("
                     SELECT psh.*, u.nome as usuario_alterou 
                     FROM pedido_status_history psh 
-                    LEFT JOIN usuarios u ON psh.alterado_por = u.id 
+                    LEFT JOIN usuarios u ON psh.usuario_id = u.id 
                     WHERE psh.pedido_id = :id 
                     ORDER BY psh.created_at DESC
                 ");
@@ -463,23 +509,25 @@ class PedidoEcommerce extends Model {
                 
                 // Garantir que o histórico tenha todos os campos
                 foreach ($pedido['historico'] as &$item) {
-                    $item['novo_status'] = $item['novo_status'] ?? 'Status atualizado';
-                    $item['observacao'] = $item['observacao'] ?? 'Sem observação';
+                    $item['novo_status'] = $item['status_novo'] ?? 'Status atualizado';
+                    $item['observacao'] = $item['observacoes'] ?? 'Sem observação';
                     $item['usuario_alterou'] = $item['usuario_alterou'] ?? 'Sistema';
                 }
                 
             } catch (\Exception $e) {
                 error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
-                error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.alterado_por = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
+                error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
                 $pedido['historico'] = [];
             }
             
             // Garantir que o pedido tenha todos os campos necessários
-            $pedido['codigo_pedido'] = $pedido['codigo_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
+            $pedido['codigo_pedido'] = $pedido['numero_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
             $pedido['status'] = $pedido['status'] ?? 'pendente';
-            $pedido['valor_frete'] = $pedido['valor_frete'] ?? 0;
-            $pedido['taxa_servico'] = $pedido['taxa_servico'] ?? 0;
-            $pedido['valor_impostos'] = $pedido['valor_impostos'] ?? 0;
+            $pedido['subtotal_produtos'] = $pedido['subtotal'] ?? 0;
+            $pedido['valor_frete'] = $pedido['frete'] ?? 0;
+            $pedido['taxa_servico'] = $pedido['servicos'] ?? 0;
+            $pedido['valor_impostos'] = $pedido['impostos'] ?? 0;
+            $pedido['valor_total'] = $pedido['total'] ?? 0;
             
             // Garantir que os campos de endereço tenham valores padrão
             $pedido['endereco_entrega'] = $pedido['endereco_entrega'] ?? 'Não informado';
