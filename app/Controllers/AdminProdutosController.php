@@ -343,13 +343,15 @@ class AdminProdutosController extends Controller {
             $produto_id = $pdo->lastInsertId();
             
             // Processar imagens
-            if (isset($_FILES['imagens'])) {
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
                 $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
                 $webDir = '/uploads/produtos/';
-                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
                 
                 foreach ($_FILES['imagens']['name'] as $key => $name) {
-                    if ($_FILES['imagens']['error'][$key] === 0) {
+                    if ($_FILES['imagens']['error'][$key] === UPLOAD_ERR_OK) {
                         // Limpar nome do arquivo
                         $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
                         $fileName = time() . '_' . $fileName;
@@ -359,8 +361,8 @@ class AdminProdutosController extends Controller {
                         
                         if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
                             $stmt = $pdo->prepare("
-                                INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem)
-                                VALUES (?, ?, ?, ?, ?)
+                                INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
                             ");
                             $stmt->execute([
                                 $produto_id,
@@ -369,9 +371,15 @@ class AdminProdutosController extends Controller {
                                 $key === 0 ? 1 : 0,
                                 $key
                             ]);
+                            
+                            error_log('✅ [ADMIN-PRODUTO] Foto salva: ' . $webPath);
+                        } else {
+                            error_log('❌ [ADMIN-PRODUTO] Erro ao salvar foto: ' . $name);
                         }
                     }
                 }
+            } else {
+                error_log('⚠️ [ADMIN-PRODUTO] Nenhuma imagem enviada');
             }
             
             $pdo->commit();
@@ -768,6 +776,51 @@ class AdminProdutosController extends Controller {
             }
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+    
+    public function excluir(Request $request, $id) {
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+            
+            // Buscar produto para obter imagens
+            $stmt = $pdo->prepare("SELECT * FROM produtos WHERE id = ?");
+            $stmt->execute([$id]);
+            $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$produto) {
+                throw new \Exception("Produto não encontrado");
+            }
+            
+            // Remover imagens físicas
+            $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ?");
+            $stmtFotos->execute([$id]);
+            $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
+            
+            foreach ($fotos as $foto) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+            }
+            
+            // Remover fotos do banco
+            $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?");
+            $stmt->execute([$id]);
+            
+            // Remover produto
+            $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            $pdo->commit();
+            header('Location: /admin/produtos?success=3');
+            exit;
+            
+        } catch (\Exception $e) {
+            if (isset($pdo)) $pdo->rollBack();
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
         }
     }
 }
