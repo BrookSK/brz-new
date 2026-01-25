@@ -12,8 +12,23 @@
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
-                                    <?php if (!empty($item['foto_principal'])): ?>
-                                    <img src="<?= $item['foto_principal'] ?>" 
+                                    <?php 
+                                    // Buscar foto do produto
+                                    $fotoPrincipal = null;
+                                    try {
+                                        $fotoModel = new \App\Models\ProdutoFoto();
+                                        $fotoPrincipal = $fotoModel->getFotoPrincipal($item['produto_id']);
+                                    } catch (\Exception $e) {
+                                        // Ignorar erro
+                                    }
+                                    
+                                    $fotoUrl = null;
+                                    if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+                                        $fotoUrl = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                                    }
+                                    ?>
+                                    <?php if ($fotoUrl): ?>
+                                    <img src="<?= $fotoUrl ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
                                 <?php else: ?>
@@ -31,20 +46,26 @@
                                         <input type="number" class="form-control text-center" 
                                                value="<?= $item['quantidade'] ?>" 
                                                min="1" 
-                                               max="<?= $item['stock'] ?>"
+                                               max="999"
                                                id="quantidade-<?= $item['produto_id'] ?>"
                                                onchange="atualizarQuantidade(<?= $item['produto_id'] ?>, this.value)">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= min($item['stock'], $item['quantidade'] + 1) ?>)">
+                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= $item['quantidade'] + 1 ?>)">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
-                                    <small class="text-muted">Estoque: <?= $item['stock'] ?></small>
+                                    <small class="text-muted">ID: <?= $item['produto_id'] ?></small>
                                 </div>
                                 <div class="col-md-3 text-end">
                                     <div class="fw-bold">
-                                        <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></span>
+                                        <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>">
+                                            <?= number_format($item['subtotal'], 2, ',', '.') ?>
+                                        </span>
                                     </div>
-                                    <small class="text-muted">unit: <span class="cart-item-unit" data-original-price="<?= $item['price'] ?>"><?= number_format($item['price'], 2, '.', ',') ?></span></small>
+                                    <small class="text-muted">unit: 
+                                        <span class="cart-item-unit" data-original-price="<?= $item['price'] ?? $item['preco_unitario'] ?>">
+                                            <?= number_format($item['price'] ?? $item['preco_unitario'], 2, ',', '.') ?>
+                                        </span>
+                                    </small>
                                 </div>
                                 <div class="col-md-1 text-end">
                                     <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= $item['produto_id'] ?>)">

@@ -32,9 +32,13 @@ class CarrinhoController extends Controller {
         $pesoTotal = 0;
         
         foreach ($carrinho as $item) {
+            error_log('🔍 [CARRINHO] Processando item: ' . json_encode($item));
+            
             $produto = $this->produtoModel->find($item['produto_id']);
             
             if ($produto) {
+                error_log('🔍 [CARRINHO] Produto encontrado: ' . json_encode($produto));
+                
                 $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
                 
                 // Verificar e corrigir URL da foto
@@ -51,6 +55,8 @@ class CarrinhoController extends Controller {
                 $itemStock = intval($produto['estoque'] ?? 0);
                 $itemSubtotal = $item['quantidade'] * $itemPrice;
                 
+                error_log('🔍 [CARRINHO] Preço: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
+                
                 $produtosDetalhados[] = [
                     'produto_id' => $item['produto_id'],
                     'sku' => $produto['sku'],
@@ -66,6 +72,8 @@ class CarrinhoController extends Controller {
                 
                 $subtotal += $itemSubtotal;
                 $pesoTotal += $item['quantidade'] * floatval($produto['peso'] ?? 0.5);
+            } else {
+                error_log('❌ [CARRINHO] Produto não encontrado: ' . $item['produto_id']);
             }
         }
         
@@ -108,12 +116,11 @@ class CarrinhoController extends Controller {
             return;
         }
         
+        session_start();
+        
+        // Buscar produto
         $produto = $this->produtoModel->find($produtoId);
         
-        error_log("Produto encontrado: " . ($produto ? 'SIM' : 'NÃO'));
-        if ($produto) {
-            error_log("Dados do produto: " . json_encode($produto));
-        }
         
         if (!$produto) {
             error_log("ERRO: Produto não encontrado no banco");
@@ -135,17 +142,20 @@ class CarrinhoController extends Controller {
         
         $itemKey = $produtoId;
         
-        $itemPrice = floatval($produto['valor'] ?? 0);
+        $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
             $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $itemPrice;
+            $_SESSION['carrinho'][$itemKey]['price'] = $itemPrice;
+            $_SESSION['carrinho'][$itemKey]['preco_unitario'] = $itemPrice;
             error_log("Atualizando item existente no carrinho");
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
-                'name' => $produto['nome'],
+                'nome' => $produto['nome'],
                 'price' => $itemPrice,
+                'preco_unitario' => $itemPrice,
                 'quantidade' => $quantidade,
                 'subtotal' => $quantidade * $itemPrice
             ];
