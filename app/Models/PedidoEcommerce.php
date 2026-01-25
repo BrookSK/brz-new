@@ -211,7 +211,6 @@ class PedidoEcommerce extends Model {
                             if (!empty($produto['imagem'])) {
                                 $item['imagem'] = $produto['imagem'];
                             }
-                            error_log('DEBUG: Nome e imagem encontrados para produto ' . $item['produto_id'] . ': ' . $produto['nome']);
                         }
                         
                     } catch (\Exception $e) {
@@ -233,12 +232,29 @@ class PedidoEcommerce extends Model {
                                 } elseif (!empty($produto['foto'])) {
                                     $item['imagem'] = $produto['foto'];
                                 }
-                                
-                                error_log('DEBUG: Title e imagem encontrados para produto ' . $item['produto_id'] . ': ' . $produto['title']);
                             }
                             
                         } catch (\Exception $e2) {
-                            error_log('DEBUG: Não foi possível buscar nome/imagem para produto ' . $item['produto_id'] . ': ' . $e2->getMessage());
+                            // Tentar mais colunas possíveis
+                            try {
+                                $stmtProduto = $this->connection->prepare("
+                                    SELECT product_name, product_title, descricao FROM produtos WHERE id = :produto_id LIMIT 1
+                                ");
+                                $stmtProduto->bindParam(':produto_id', $item['produto_id']);
+                                $stmtProduto->execute();
+                                $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
+                                
+                                if ($produto && !empty($produto['product_name'])) {
+                                    $item['nome_produto'] = $produto['product_name'];
+                                } elseif ($produto && !empty($produto['product_title'])) {
+                                    $item['nome_produto'] = $produto['product_title'];
+                                } elseif ($produto && !empty($produto['descricao'])) {
+                                    $item['nome_produto'] = substr($produto['descricao'], 0, 50) . '...';
+                                }
+                                
+                            } catch (\Exception $e3) {
+                                // Se todas falharem, mantém o fallback "Produto #ID"
+                            }
                         }
                     }
                     
@@ -246,10 +262,8 @@ class PedidoEcommerce extends Model {
                 }
                 
                 $pedido['items'] = $itens;
-                error_log('DEBUG: Total de itens processados: ' . count($itens));
                 
             } catch (\Exception $e) {
-                error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
                 $pedido['items'] = [];
             }
             
@@ -274,8 +288,6 @@ class PedidoEcommerce extends Model {
                 }
                 
             } catch (\Exception $e) {
-                error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
-                error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
                 $pedido['historico'] = [];
             }
             
@@ -315,8 +327,6 @@ class PedidoEcommerce extends Model {
             $stmt->execute();
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
-            error_log('Erro ao obter rastreamento do pedido: ' . $e->getMessage());
-            error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
             return [];
         }
     }

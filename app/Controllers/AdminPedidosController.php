@@ -397,11 +397,6 @@ class AdminPedidosController extends Controller {
             // Obter itens do pedido (já vem com dados do produto adaptados)
             $itens = $pedido['items'] ?? [];
             
-            // Debug: verificar o que foi retornado
-            error_log('DEBUG: Pedido retornado: ' . print_r($pedido, true));
-            error_log('DEBUG: Itens encontrados: ' . print_r($itens, true));
-            error_log('DEBUG: Total de itens: ' . count($itens));
-            
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
@@ -485,13 +480,13 @@ class AdminPedidosController extends Controller {
                                         foreach ($itens as $item) {
                                             $imagemPath = !empty($item['imagem']) && $item['imagem'] !== 'default.jpg' 
                                                 ? '/assets/images/produtos/' . htmlspecialchars($item['imagem']) 
-                                                : '/assets/images/placeholder.jpg';
+                                                : 'https://via.placeholder.com/50x50/cccccc/666666?text=Sem+Imagem';
                                             
                                             echo '<tr>
                                                 <td>
                                                     <img src="' . $imagemPath . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
                                                          style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
-                                                         onerror="this.src=\'/assets/images/placeholder.jpg\'">
+                                                         onerror="this.src=\'https://via.placeholder.com/50x50/cccccc/666666?text=Erro\'">
                                                 </td>
                                                 <td>' . htmlspecialchars($item['nome_produto'] ?? 'Produto #' . $item['produto_id']) . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
