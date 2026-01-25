@@ -411,6 +411,19 @@ class CheckoutController extends Controller {
         try {
             error_log('🔍 [CRIAR_PEDIDO] Iniciando criação do pedido');
             
+            // Garantir usuário válido
+            if (empty($usuario) || empty($usuario['id'])) {
+                // Criar usuário padrão se não existir
+                $db = \Config\Database::getConnection();
+                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
+                $stmt->execute(['Cliente Padrão', 'cliente' . time() . '@brz.com']);
+                $usuarioId = $db->lastInsertId();
+                error_log('🔍 [CRIAR_PEDIDO] Usuário padrão criado: ' . $usuarioId);
+            } else {
+                $usuarioId = $usuario['id'];
+                error_log('🔍 [CRIAR_PEDIDO] Usuário existente: ' . $usuarioId);
+            }
+            
             // Calcular totais
             $subtotal = 0;
             $pesoTotal = 0;
@@ -441,7 +454,7 @@ class CheckoutController extends Controller {
             $numeroPedido = 'BRZ' . date('YmdHis') . rand(1000, 9999);
             error_log('🔍 [CRIAR_PEDIDO] Número do pedido: ' . $numeroPedido);
             
-            // Inserir pedido
+            // Inserir pedido com todos os campos originais
             $db = \Config\Database::getConnection();
             error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
             
@@ -455,7 +468,7 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
             
             $params = [
-                $usuario['id'] ?? 1,
+                $usuarioId,
                 $numeroPedido,
                 'pendente',
                 $subtotal,
