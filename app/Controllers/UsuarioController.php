@@ -246,20 +246,26 @@ class UsuarioController extends Controller {
         $pedidoId = $request->getParam('id');
         $usuario = $this->authService->getUsuarioLogado();
         
-        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
-        
-        if (!$pedido || $pedido['usuario_id'] !== $usuario['id']) {
-            $this->view('errors/404');
-            return;
+        try {
+            $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+            
+            if (!$pedido || $pedido['usuario_id'] !== $usuario['id']) {
+                $this->view('errors/404');
+                return;
+            }
+            
+            $historico = $this->pedidoModel->getRastreamento($pedidoId);
+            
+            $this->view('usuario/pedido-detalhes', [
+                'pedido' => $pedido,
+                'historico' => $historico,
+                'usuario' => $usuario
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log('Erro ao obter detalhes do pedido: ' . $e->getMessage());
+            $this->view('errors/500');
         }
-        
-        $historico = $this->pedidoModel->getRastreamento($pedidoId);
-        
-        $this->view('usuario/pedido-detalhes', [
-            'pedido' => $pedido,
-            'historico' => $historico,
-            'usuario' => $usuario
-        ]);
     }
 
     private function validarDadosPessoais($dados) {
