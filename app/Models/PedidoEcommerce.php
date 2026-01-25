@@ -346,20 +346,83 @@ class PedidoEcommerce extends Model {
         if ($pedido) {
             // Obter itens do pedido com dados do produto
             try {
-                $stmt = $this->connection->prepare("
-                    SELECT pi.*, 
-                           pr.nome as nome_produto, 
-                           pr.referencia,
-                           pr.imagem,
-                           pr.descricao as descricao_produto
-                    FROM pedido_items pi
-                    LEFT JOIN produtos pr ON pi.produto_id = pr.id
-                    WHERE pi.pedido_id = :id
-                    ORDER BY pi.id
-                ");
-                $stmt->bindParam(':id', $pedidoId);
-                $stmt->execute();
-                $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                // Primeiro, verificar se a tabela produtos existe e tem as colunas necessárias
+                $checkTable = $this->connection->query("SHOW TABLES LIKE 'produtos'")->rowCount();
+                
+                if ($checkTable > 0) {
+                    // Verificar colunas da tabela produtos
+                    $columns = $this->connection->query("SHOW COLUMNS FROM produtos")->fetchAll(\PDO::FETCH_COLUMN);
+                    
+                    $sql = "SELECT pi.*";
+                    
+                    // Adicionar colunas do produto apenas se existirem
+                    if (in_array('nome', $columns)) {
+                        $sql .= ", pr.nome as nome_produto";
+                    } else {
+                        $sql .= ", CONCAT('Produto #', pi.produto_id) as nome_produto";
+                    }
+                    
+                    if (in_array('referencia', $columns)) {
+                        $sql .= ", pr.referencia";
+                    } else {
+                        $sql .= ", '' as referencia";
+                    }
+                    
+                    if (in_array('imagem', $columns)) {
+                        $sql .= ", pr.imagem";
+                    } else {
+                        $sql .= ", 'default.jpg' as imagem";
+                    }
+                    
+                    if (in_array('descricao', $columns)) {
+                        $sql .= ", pr.descricao as descricao_produto";
+                    } elseif (in_array('descricao_curta', $columns)) {
+                        $sql .= ", pr.descricao_curta as descricao_produto";
+                    } else {
+                        $sql .= ", '' as descricao_produto";
+                    }
+                    
+                    // Usar LEFT JOIN para não quebrar se não houver correspondência
+                    $sql .= " FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
+                    
+                    error_log("SQL executado: " . $sql);
+                    error_log("Colunas encontradas: " . implode(', ', $columns));
+                    
+                    $stmt = $this->connection->prepare($sql);
+                    $stmt->bindParam(':id', $pedidoId);
+                    $stmt->execute();
+                    $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                    
+                    // Garantir que os itens tenham todos os campos necessários
+                    foreach ($pedido['items'] as &$item) {
+                        $item['nome_produto'] = $item['nome_produto'] ?? 'Produto #' . $item['produto_id'];
+                        $item['referencia'] = $item['referencia'] ?? '';
+                        $item['imagem'] = $item['imagem'] ?? 'default.jpg';
+                        $item['descricao_produto'] = $item['descricao_produto'] ?? '';
+                        $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
+                    }
+                    
+                } else {
+                    // Tabela produtos não existe, usar dados básicos
+                    $stmt = $this->connection->prepare("
+                        SELECT pi.*, 
+                               CONCAT('Produto #', pi.produto_id) as nome_produto, 
+                               '' as referencia,
+                               'default.jpg' as imagem,
+                               '' as descricao_produto
+                        FROM pedido_items pi
+                        WHERE pi.pedido_id = :id
+                        ORDER BY pi.id
+                    ");
+                    $stmt->bindParam(':id', $pedidoId);
+                    $stmt->execute();
+                    $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                    
+                    // Garantir que os itens tenham todos os campos necessários
+                    foreach ($pedido['items'] as &$item) {
+                        $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
+                    }
+                }
                 
                 // Calcular totais se estiverem zerados ou não existirem
                 if (!isset($pedido['subtotal_produtos']) || $pedido['subtotal_produtos'] == 0) {
