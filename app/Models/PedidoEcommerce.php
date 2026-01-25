@@ -165,6 +165,17 @@ class PedidoEcommerce extends Model {
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($pedido) {
+            // Debug: verificar se há itens na tabela pedido_itens
+            try {
+                $stmt = $this->connection->prepare("SELECT COUNT(*) as total FROM pedido_itens WHERE pedido_id = :id");
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $count = $stmt->fetch(\PDO::FETCH_ASSOC);
+                error_log('DEBUG: Total de itens na tabela pedido_itens para pedido ' . $pedidoId . ': ' . $count['total']);
+            } catch (\Exception $e) {
+                error_log('DEBUG: Erro ao contar itens: ' . $e->getMessage());
+            }
+            
             // Obter itens do pedido com dados do produto
             try {
                 // Primeiro, verificar se a tabela produtos existe e tem as colunas necessárias
@@ -204,7 +215,7 @@ class PedidoEcommerce extends Model {
                     }
                     
                     // Usar LEFT JOIN para não quebrar se não houver correspondência
-                    $sql .= " FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
+                    $sql .= " FROM pedido_itens pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
                     
                     error_log("SQL executado: " . $sql);
                     error_log("Colunas encontradas: " . implode(', ', $columns));
@@ -230,6 +241,7 @@ class PedidoEcommerce extends Model {
                 
             } catch (\Exception $e) {
                 error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
+                error_log('SQL que causou erro: ' . $sql ?? 'SQL não definida');
                 $pedido['items'] = [];
             }
             
