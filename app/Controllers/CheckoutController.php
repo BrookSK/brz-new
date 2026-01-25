@@ -481,24 +481,32 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
             
             $sql = "INSERT INTO pedidos (
-                usuario_id, codigo_pedido, status, subtotal_produtos, 
-                valor_frete, taxa_servico, valor_impostos, valor_total, 
-                moeda_original, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+                usuario_id, nome, numero_pedido, cliente_id, status, 
+                subtotal, servicos, impostos, frete, desconto, total, 
+                moeda, taxa_conversao, endereco_entrega_id, endereco_cobranca_id, 
+                observacoes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
             
             $stmt = $db->prepare($sql);
             error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
             
             $params = [
                 $usuarioId,
+                $usuario['nome'] ?? 'Cliente',
                 $numeroPedido,
-                'pago',
+                $usuarioId, // cliente_id mesmo que usuario_id
+                'pendente',
                 $subtotal,
-                $frete,
                 $taxaServico,
                 $impostos,
+                $frete,
+                0, // desconto padrão 0
                 $total,
-                'USD'
+                'USD',
+                1.0, // taxa_conversao padrão
+                null, // endereco_entrega_id
+                null, // endereco_cobranca_id
+                $dados['observacoes'] ?? ''
             ];
             
             error_log('🔍 [CRIAR_PEDIDO] Parâmetros: ' . json_encode($params));
