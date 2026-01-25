@@ -447,9 +447,6 @@
                 setTimeout(() => {
                     this.updateAllPrices();
                 }, 100);
-                
-                // Adicionar botões de teste
-                this.addTestButtons();
             },
             
             initSelector: function() {
@@ -582,57 +579,6 @@
                         notification.remove();
                     }
                 }, 3000);
-            },
-            
-            addTestButtons: function() {
-                setTimeout(() => {
-                    console.log('Adicionando botões de teste...');
-                    
-                    // Botão USD
-                    const btnUSD = document.createElement('button');
-                    btnUSD.textContent = 'FORÇAR USD';
-                    btnUSD.style.cssText = 'position: fixed; top: 100px; right: 20px; z-index: 9999; background: red; color: white; padding: 10px; border: none; cursor: pointer;';
-                    btnUSD.onclick = () => {
-                        console.log('=== FORÇANDO USD ===');
-                        this.currentCurrency = 'USD';
-                        localStorage.setItem('selected_currency', 'USD');
-                        this.updateCurrencyDisplay();
-                        this.updateAllPrices();
-                        this.showNotification('USD');
-                    };
-                    
-                    // Botão BRL
-                    const btnBRL = document.createElement('button');
-                    btnBRL.textContent = 'FORÇAR BRL';
-                    btnBRL.style.cssText = 'position: fixed; top: 140px; right: 20px; z-index: 9999; background: green; color: white; padding: 10px; border: none; cursor: pointer;';
-                    btnBRL.onclick = () => {
-                        console.log('=== FORÇANDO BRL ===');
-                        this.currentCurrency = 'BRL';
-                        localStorage.setItem('selected_currency', 'BRL');
-                        this.updateCurrencyDisplay();
-                        this.updateAllPrices();
-                        this.showNotification('BRL');
-                    };
-                    
-                    // Botão Debug
-                    const btnDebug = document.createElement('button');
-                    btnDebug.textContent = 'DEBUG';
-                    btnDebug.style.cssText = 'position: fixed; top: 180px; right: 20px; z-index: 9999; background: blue; color: white; padding: 10px; border: none; cursor: pointer;';
-                    btnDebug.onclick = () => {
-                        console.log('=== DEBUG INFO ===');
-                        console.log('Moeda atual:', this.currentCurrency);
-                        console.log('LocalStorage:', localStorage.getItem('selected_currency'));
-                        console.log('Elementos com data-original-price:', document.querySelectorAll('[data-original-price]').length);
-                        console.log('Elementos .currency:', document.querySelectorAll('.currency').length);
-                        console.log('Elementos .cart-currency:', document.querySelectorAll('.cart-currency').length);
-                    };
-                    
-                    document.body.appendChild(btnUSD);
-                    document.body.appendChild(btnBRL);
-                    document.body.appendChild(btnDebug);
-                    
-                    console.log('Botões de teste adicionados');
-                }, 1000);
             },
             
             // Forçar atualização manual
