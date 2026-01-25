@@ -146,11 +146,20 @@ class Produto extends Model {
         // Adicionar timestamp para garantir unicidade temporária
         $slug = $slug . '-' . time();
         
+        // Gerar SKU automaticamente se não fornecido
+        $sku = $data['sku'] ?? '';
+        if (empty($sku)) {
+            $sku = $this->generateSKU();
+        }
+        
+        // Garantir SKU único
+        $sku = $this->ensureUniqueSKU($sku);
+        
         // Mapear campos do formulário para o banco
         $dadosBanco = [
             'name' => $data['name'] ?? '',
             'slug' => $slug,
-            'sku' => $data['sku'] ?? '',
+            'sku' => $sku,
             'description' => $data['description'] ?? '',
             'short_description' => $data['short_description'] ?? '',
             'category_id' => $data['category_id'] ?? 0,
@@ -453,6 +462,42 @@ class Produto extends Model {
     private function slugExists($slug) {
         $stmt = $this->getConnection()->prepare("SELECT COUNT(*) as count FROM {$this->table} WHERE slug = :slug");
         $stmt->bindParam(':slug', $slug);
+        $stmt->execute();
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result['count'] > 0;
+    }
+    
+    /**
+     * Gerar SKU automático
+     */
+    private function generateSKU() {
+        // Formato: PRD + timestamp + random
+        $timestamp = time();
+        $random = rand(1000, 9999);
+        return 'PRD' . $timestamp . $random;
+    }
+    
+    /**
+     * Garantir que o SKU seja único
+     */
+    private function ensureUniqueSKU($sku) {
+        $originalSKU = $sku;
+        $counter = 1;
+        
+        while ($this->skuExists($sku)) {
+            $sku = $originalSKU . '-' . $counter;
+            $counter++;
+        }
+        
+        return $sku;
+    }
+    
+    /**
+     * Verificar se SKU já existe
+     */
+    private function skuExists($sku) {
+        $stmt = $this->getConnection()->prepare("SELECT COUNT(*) as count FROM {$this->table} WHERE sku = :sku");
+        $stmt->bindParam(':sku', $sku);
         $stmt->execute();
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $result['count'] > 0;
