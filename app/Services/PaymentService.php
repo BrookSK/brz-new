@@ -15,16 +15,23 @@ class PaymentService {
     
     private function loadConfigurations() {
         $db = \Config\Database::getConnection();
-        $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('asaas_api_key', 'stripe_api_key')");
-        $stmt->execute();
-        $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        foreach ($configs as $config) {
-            if (strpos($config['valor'], 'asaas') !== false) {
-                $this->asaasApiKey = $config['valor'];
-            } else {
-                $this->stripeApiKey = $config['valor'];
+        try {
+            $stmt = $db->prepare("SELECT c.valor FROM configuracoes c WHERE c.chave IN ('asaas_api_key', 'stripe_api_key')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            foreach ($configs as $config) {
+                if (strpos($config['valor'], 'asaas') !== false) {
+                    $this->asaasApiKey = $config['valor'];
+                } else {
+                    $this->stripeApiKey = $config['valor'];
+                }
             }
+        } catch (\Exception $e) {
+            // Valores padrão em caso de falha
+            $this->asaasApiKey = '';
+            $this->stripeApiKey = '';
         }
     }
     
