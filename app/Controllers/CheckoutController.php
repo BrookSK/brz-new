@@ -238,7 +238,7 @@ class CheckoutController extends Controller {
     private function obterPedidoCompleto($pedidoId) {
         $db = \Config\Database::getConnection();
         
-        $sql = "SELECT p.*, u.nome as usuario_nome 
+        $sql = "SELECT p.*, u.name as usuario_nome 
                 FROM pedidos p 
                 LEFT JOIN usuarios u ON p.usuario_id = u.id 
                 WHERE p.id = ?";
