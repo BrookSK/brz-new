@@ -327,7 +327,7 @@ class PedidoEcommerce extends Model {
     }
 
     public function getComDetalhes($pedidoId) {
-    // Adaptar query para a estrutura correta das tabelas
+        // Adaptar query para a estrutura correta das tabelas
     $stmt = $this->connection->prepare("
         SELECT p.*, 
                u.nome as cliente_nome, u.email as cliente_email,
