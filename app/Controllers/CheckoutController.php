@@ -86,7 +86,7 @@ class CheckoutController extends Controller {
             'peso_total' => $pesoTotal,
             'usuario' => $usuario,
             'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [],
-            'moeda' => 'USD', // Forçar USD
+            'moeda' => $_GET['moeda'] ?? 'USD', // Obter moeda da URL ou padrão USD
             'frete_gratis' => ($pesoTotal * 15 == 0) // Verificar se frete é grátis
         ]);
     }
@@ -489,6 +489,10 @@ class CheckoutController extends Controller {
                 throw new \Exception('Falha ao obter IDs válidos de usuário/cliente');
             }
             
+            // Obter moeda selecionada pelo cliente
+            $moedaSelecionada = $dados['moeda'] ?? 'USD';
+            error_log('🔍 [CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
+            
             // Calcular totais
             $subtotal = 0;
             $pesoTotal = 0;
@@ -514,11 +518,26 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Subtotal: ' . $subtotal);
             error_log('🔍 [CRIAR_PEDIDO] Peso total: ' . $pesoTotal);
             
-            // Taxas
-            $taxaServico = $pesoTotal * 39; // US$39 por kg
-            $impostos = $subtotal * 0.80; // 80%
-            $frete = ($pesoTotal * 15 > 0) ? $pesoTotal * 15 : 0; // US$15 por kg ou grátis se 0
-            $total = $subtotal + $taxaServico + $impostos + $frete;
+            // Taxas baseadas na moeda selecionada
+            if ($moedaSelecionada === 'BRL') {
+                // Valores em BRL (convertidos)
+                $taxaConversao = 5.50; // Taxa de conversão USD para BRL
+                $taxaServico = ($pesoTotal * 39) * $taxaConversao; // Converter para BRL
+                $impostos = $subtotal * 0.80; // Já está em BRL
+                $frete = (($pesoTotal * 15) * $taxaConversao > 0) ? ($pesoTotal * 15) * $taxaConversao : 0; // Converter para BRL
+                $total = $subtotal + $taxaServico + $impostos + $frete;
+                
+                error_log('🔍 [CRIAR_PEDIDO] Cálculo em BRL - Taxa conversão: ' . $taxaConversao);
+            } else {
+                // Valores em USD (padrão)
+                $taxaConversao = 1.0;
+                $taxaServico = $pesoTotal * 39; // US$39 por kg
+                $impostos = $subtotal * 0.80; // 80%
+                $frete = ($pesoTotal * 15 > 0) ? $pesoTotal * 15 : 0; // US$15 por kg ou grátis se 0
+                $total = $subtotal + $taxaServico + $impostos + $frete;
+                
+                error_log('🔍 [CRIAR_PEDIDO] Cálculo em USD - Taxa conversão: ' . $taxaConversao);
+            }
             
             error_log('🔍 [CRIAR_PEDIDO] Taxa de serviço: ' . $taxaServico);
             error_log('🔍 [CRIAR_PEDIDO] Impostos: ' . $impostos);
@@ -555,8 +574,8 @@ class CheckoutController extends Controller {
                 $frete,
                 0, // desconto
                 $total,
-                'USD', // ou BRL
-                1.0, // taxa_conversao
+                $moedaSelecionada, // Usar moeda selecionada pelo cliente
+                $taxaConversao, // Taxa de conversão aplicada
                 null, // endereco_entrega_id
                 null, // endereco_cobranca_id
                 $dados['observacoes'] ?? ''
