@@ -420,13 +420,16 @@ class AdminProdutosController extends Controller {
             // Buscar estatísticas do produto
             $stmtStats = $pdo->prepare("
                 SELECT 
-                    COUNT(pi.id) as total_vendas,
-                    SUM(pi.quantidade) as total_itens_vendidos,
-                    SUM(pi.subtotal) as total_faturado,
                     p.views as visualizacoes,
-                    (SELECT COUNT(*) FROM pedido_items WHERE produto_id = ?) as numero_pedidos
+                    p.stock as estoque_atual,
+                    p.price as preco_atual,
+                    p.status as status_produto,
+                    p.active as ativo,
+                    p.featured as destaque,
+                    p.created_at as data_criacao,
+                    p.updated_at as data_atualizacao,
+                    (SELECT COUNT(*) FROM produto_fotos WHERE produto_id = ?) as total_fotos
                 FROM produtos p 
-                LEFT JOIN pedido_items pi ON p.id = pi.produto_id 
                 WHERE p.id = ?
             ");
             $stmtStats->execute([$id, $id]);
@@ -495,24 +498,59 @@ class AdminProdutosController extends Controller {
                     <div class="col-md-3">
                         <div class="card bg-success text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Vendas</h5>
-                                <h3>' . number_format($stats['total_vendas']) . '</h3>
+                                <h5 class="card-title">Estoque</h5>
+                                <h3>' . number_format($stats['estoque_atual']) . '</h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card bg-info text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Itens Vendidos</h5>
-                                <h3>' . number_format($stats['total_itens_vendidos']) . '</h3>
+                                <h5 class="card-title">Preço (USD)</h5>
+                                <h3>$' . number_format($stats['preco_atual'], 2, '.', ',') . '</h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card bg-warning text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Faturado (USD)</h5>
-                                <h3>$' . number_format($stats['total_faturado'], 2, '.', ',') . '</h3>
+                                <h5 class="card-title">Total Fotos</h5>
+                                <h3>' . number_format($stats['total_fotos']) . '</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Status do Produto -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Status do Produto</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <strong>Status:</strong> 
+                                        <span class="badge bg-' . ($stats['status_produto'] == 'published' ? 'success' : 'secondary') . '">
+                                            ' . ucfirst($stats['status_produto']) . '
+                                        </span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Ativo:</strong> 
+                                        <span class="badge bg-' . ($stats['ativo'] ? 'success' : 'danger') . '">
+                                            ' . ($stats['ativo'] ? 'Sim' : 'Não') . '
+                                        </span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Destaque:</strong> 
+                                        <span class="badge bg-' . ($stats['destaque'] ? 'warning' : 'secondary') . '">
+                                            ' . ($stats['destaque'] ? 'Sim' : 'Não') . '
+                                        </span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Criado em:</strong> 
+                                        ' . date('d/m/Y', strtotime($stats['data_criacao'])) . '
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
