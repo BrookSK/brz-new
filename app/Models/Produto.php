@@ -22,7 +22,7 @@ class Produto extends Model {
             // Mapear campos do banco para o frontend
             $produtoMapeado = [
                 'id' => $produto['id'],
-                'nome' => $produto['nome'] ?? '',
+                'nome' => $produto['name'] ?? '',
                 'sku' => $produto['sku'] ?? '',
                 'descricao_curta' => $produto['descricao_curta'] ?? '',
                 'descricao_completa' => $produto['descricao_completa'] ?? '',
@@ -47,7 +47,7 @@ class Produto extends Model {
     }
     
     public function getAll() {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} ORDER BY nome ASC");
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} ORDER BY name ASC");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -58,7 +58,7 @@ class Produto extends Model {
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.active = 1 
-            ORDER BY p.nome ASC
+            ORDER BY p.name ASC
         ");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -92,9 +92,9 @@ class Produto extends Model {
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE (p.nome LIKE :term OR p.descricao_curta LIKE :term OR c.name LIKE :term)
+            WHERE (p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)
             AND p.status = 'published' AND p.active = 1
-            ORDER BY p.nome ASC 
+            ORDER BY p.name ASC 
             LIMIT :limit
         ");
         $term = "%{$term}%";
@@ -108,7 +108,7 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("
             SELECT * FROM {$this->table} 
             WHERE category_id = :category_id 
-            ORDER BY nome ASC
+            ORDER BY name ASC
         ");
         $stmt->bindParam(':category_id', $categoriaId);
         $stmt->execute();
@@ -303,7 +303,7 @@ class Produto extends Model {
     }
     
     public function getAtivos() {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE status = 'published' AND active = 1 ORDER BY nome ASC");
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE status = 'published' AND active = 1 ORDER BY name ASC");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
