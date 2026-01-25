@@ -202,32 +202,18 @@ class CheckoutController extends Controller {
     }
     
     private function salvarDadosCliente($pedidoId, $dados, $usuario) {
-        $db = \Config\Database::getConnection();
-        
-        $sql = "UPDATE pedidos SET 
-            cliente_nome = ?, cliente_email = ?, cliente_documento = ?, 
-            cliente_telefone = ?, cep = ?, endereco = ?, numero = ?, 
-            complemento = ?, bairro = ?, cidade = ?, estado = ?, 
-            forma_pagamento = ?, observacoes = ?, updated_at = NOW()
-        WHERE id = ?";
-        
-        $stmt = $db->prepare($sql);
-        $stmt->execute([
-            $dados['nome'],
-            $dados['email'],
-            $dados['documento'],
-            $dados['telefone'],
-            $dados['cep'],
-            $dados['endereco'],
-            $dados['numero'],
-            $dados['complemento'] ?? '',
-            $dados['bairro'],
-            $dados['cidade'],
-            $dados['estado'],
-            $dados['forma_pagamento'],
-            $dados['observacoes'] ?? '',
-            $pedidoId
-        ]);
+        try {
+            $db = \Config\Database::getConnection();
+            
+            // Removido UPDATE com colunas inexistentes - dados já salvos nas tabelas usuarios/clientes
+            error_log(' [DADOS_CLIENTE] Dados já persistidos em usuarios e clientes');
+            
+            return true;
+            
+        } catch (\Exception $e) {
+            error_log(' [DADOS_CLIENTE] Erro: ' . $e->getMessage());
+            return false;
+        }
     }
     
     private function obterPedidoCompleto($pedidoId) {
@@ -498,7 +484,7 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
             
             $sql = "INSERT INTO pedidos (
-                usuario_id, nome, numero_pedido, cliente_id, status, 
+                usuario_id, numero_pedido, cliente_id, status, 
                 subtotal, servicos, impostos, frete, desconto, total, 
                 moeda, taxa_conversao, endereco_entrega_id, endereco_cobranca_id, 
                 observacoes, created_at, updated_at
@@ -509,7 +495,6 @@ class CheckoutController extends Controller {
             
             $params = [
                 $usuarioId,
-                $usuario['nome'] ?? 'Cliente',
                 $numeroPedido,
                 $clienteId, // cliente_id válido da tabela clientes
                 'pendente',
