@@ -36,22 +36,30 @@ class CarrinhoController extends Controller {
             if ($produto) {
                 $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
                 
+                // Verificar e corrigir URL da foto
+                $fotoUrl = null;
+                if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+                    $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipal['nome_arquivo'], '/');
+                    if (file_exists($filePath)) {
+                        $fotoUrl = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                    }
+                }
+                
                 $produtosDetalhados[] = [
                     'produto_id' => $item['produto_id'],
                     'sku' => $produto['sku'],
-                    'nome' => $produto['nome'],
-                    'descricao' => $produto['descricao'],
-                    'valor' => $produto['valor'],
-                    'moeda' => $produto['moeda'],
-                    'peso' => $produto['peso'],
+                    'name' => $produto['name'],
+                    'description' => $produto['description'],
+                    'price' => $produto['price'],
+                    'weight' => $produto['weight'],
                     'quantidade' => $item['quantidade'],
-                    'subtotal' => $item['quantidade'] * $produto['valor'],
-                    'foto_principal' => $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null,
-                    'estoque' => $produto['estoque']
+                    'subtotal' => $item['quantidade'] * $produto['price'],
+                    'foto_principal' => $fotoUrl,
+                    'stock' => $produto['stock']
                 ];
                 
-                $subtotal += $item['quantidade'] * $produto['valor'];
-                $pesoTotal += $item['quantidade'] * $produto['peso'];
+                $subtotal += $item['quantidade'] * $produto['price'];
+                $pesoTotal += $item['quantidade'] * $produto['weight'];
             }
         }
         
@@ -106,8 +114,8 @@ class CarrinhoController extends Controller {
             return;
         }
         
-        if ($produto['estoque'] < $quantidade) {
-            error_log("ERRO: Estoque insuficiente. Estoque: " . $produto['estoque'] . ", Quantidade: " . $quantidade);
+        if ($produto['stock'] < $quantidade) {
+            error_log("ERRO: Estoque insuficiente. Estoque: " . $produto['stock'] . ", Quantidade: " . $quantidade);
             $this->json(['error' => 'Estoque insuficiente'], 400);
             return;
         }
@@ -121,15 +129,15 @@ class CarrinhoController extends Controller {
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['valor'];
+            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['price'];
             error_log("Atualizando item existente no carrinho");
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
-                'nome' => $produto['nome'],
-                'preco_unitario' => $produto['valor'],
+                'name' => $produto['name'],
+                'price' => $produto['price'],
                 'quantidade' => $quantidade,
-                'subtotal' => $quantidade * $produto['valor']
+                'subtotal' => $quantidade * $produto['price']
             ];
             error_log("Adicionando novo item ao carrinho");
         }
@@ -192,13 +200,13 @@ class CarrinhoController extends Controller {
         if (isset($_SESSION['carrinho'][$produtoId])) {
             $produto = $this->produtoModel->find($produtoId);
             
-            if ($produto['estoque'] < $quantidade) {
+            if ($produto['stock'] < $quantidade) {
                 $this->json(['error' => 'Estoque insuficiente'], 400);
                 return;
             }
             
             $_SESSION['carrinho'][$produtoId]['quantidade'] = $quantidade;
-            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $_SESSION['carrinho'][$produtoId]['preco_unitario'];
+            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $_SESSION['carrinho'][$produtoId]['price'];
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
             $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
@@ -237,7 +245,7 @@ class CarrinhoController extends Controller {
         foreach ($carrinho as $item) {
             $produto = $this->produtoModel->find($item['produto_id']);
             if ($produto) {
-                $pesoTotal += ($produto['peso'] ?? 0.5) * $item['quantidade'];
+                $pesoTotal += ($produto['weight'] ?? 0.5) * $item['quantidade'];
             }
         }
         

@@ -20,8 +20,8 @@
                             <div class="row align-items-center">
                                 <div class="col-md-2">
                                     <?php if (!empty($item['foto_principal'])): ?>
-                                    <img src="/uploads/produtos/<?= $item['foto_principal'] ?>" 
-                                         alt="<?= htmlspecialchars($item['nome']) ?>"
+                                    <img src="<?= $item['foto_principal'] ?>" 
+                                         alt="<?= htmlspecialchars($item['name']) ?>"
                                          class="img-fluid rounded">
                                 <?php else: ?>
                                     <div class="bg-light d-flex align-items-center justify-content-center img-fluid rounded" style="height: 100px;">
@@ -30,10 +30,10 @@
                                 <?php endif; ?>
                                 </div>
                                 <div class="col-md-4">
-                                    <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
+                                    <h6 class="mb-1"><?= htmlspecialchars($item['name']) ?></h6>
                                     <small class="text-muted">SKU: <?= htmlspecialchars($item['sku']) ?></small>
                                     <div class="mt-2">
-                                        <span class="badge bg-primary cart-item-price" data-original-price="<?= $item['valor'] ?>"><?= number_format($item['valor'], 2, ',', '.') ?></span>
+                                        <span class="badge bg-primary cart-item-price" data-original-price="<?= $item['price'] ?>"><?= number_format($item['price'], 2, '.', ',') ?></span>
                                     </div>
                                 </div>
                                 <div class="col-md-2">
@@ -44,20 +44,20 @@
                                         <input type="number" class="form-control text-center" 
                                                value="<?= $item['quantidade'] ?>" 
                                                min="1" 
-                                               max="<?= $item['estoque'] ?>"
+                                               max="<?= $item['stock'] ?>"
                                                id="quantidade-<?= $item['produto_id'] ?>"
                                                onchange="atualizarQuantidade(<?= $item['produto_id'] ?>, this.value)">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= min($item['estoque'], $item['quantidade'] + 1) ?>)">
+                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= min($item['stock'], $item['quantidade'] + 1) ?>)">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
-                                    <small class="text-muted">Estoque: <?= $item['estoque'] ?></small>
+                                    <small class="text-muted">Estoque: <?= $item['stock'] ?></small>
                                 </div>
                                 <div class="col-md-2 text-end">
                                     <div class="fw-bold">
-                                        <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, ',', '.') ?></span>
+                                        <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></span>
                                     </div>
-                                    <small class="text-muted">unit: <span class="cart-item-unit" data-original-price="<?= $item['valor'] ?>"><?= number_format($item['valor'], 2, ',', '.') ?></span></small>
+                                    <small class="text-muted">unit: <span class="cart-item-unit" data-original-price="<?= $item['price'] ?>"><?= number_format($item['price'], 2, '.', ',') ?></span></small>
                                 </div>
                                 <div class="col-md-1 text-end">
                                     <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= $item['produto_id'] ?>)">
@@ -93,29 +93,29 @@
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal (<?= $total_itens ?> itens)</span>
-                        <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
+                        <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
+                        <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, '.', ',') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Impostos (80%)</span>
-                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
+                        <span>Impostos</span>
+                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, '.', ',') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Frete (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= number_format($frete, 2, ',', '.') ?></span>
+                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= number_format($frete, 2, '.', ',') ?></span>
                     </div>
                     
                     <hr>
                     
                     <div class="d-flex justify-content-between mb-3">
                         <h5>Total</h5>
-                        <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, ',', '.') ?></h5>
+                        <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, '.', ',') ?></h5>
                     </div>
                     
                     <div class="d-grid">
