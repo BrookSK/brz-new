@@ -26,7 +26,7 @@ class Produto extends Model {
                 'sku' => $produto['sku'] ?? '',
                 'descricao_curta' => $produto['descricao_curta'] ?? '',
                 'descricao_completa' => $produto['descricao_completa'] ?? '',
-                'categoria_id' => $produto['categoria_id'] ?? 0,
+                'categoria_id' => $produto['category_id'] ?? 0,
                 'valor' => floatval($produto['valor'] ?? 0),
                 'moeda' => $produto['moeda'] ?? 'USD',
                 'peso' => floatval($produto['peso'] ?? 0),
@@ -56,7 +56,7 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.active = 1 
             ORDER BY p.nome ASC
         ");
@@ -68,7 +68,7 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.status = 'published' AND p.active = 1 
             ORDER BY p.created_at DESC 
             LIMIT :limit
@@ -91,7 +91,7 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE (p.nome LIKE :term OR p.descricao_curta LIKE :term OR c.name LIKE :term)
             AND p.status = 'published' AND p.active = 1
             ORDER BY p.nome ASC 
@@ -107,10 +107,10 @@ class Produto extends Model {
     public function getByCategoriaId($categoriaId) {
         $stmt = $this->getConnection()->prepare("
             SELECT * FROM {$this->table} 
-            WHERE categoria_id = :categoria_id 
+            WHERE category_id = :category_id 
             ORDER BY nome ASC
         ");
-        $stmt->bindParam(':categoria_id', $categoriaId);
+        $stmt->bindParam(':category_id', $categoriaId);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -125,7 +125,7 @@ class Produto extends Model {
             'sku' => $data['sku'] ?? '',
             'descricao_curta' => $data['descricao_curta'] ?? '',
             'descricao_completa' => $data['descricao_completa'] ?? '',
-            'categoria_id' => $data['categoria_id'] ?? 0,
+            'category_id' => $data['category_id'] ?? 0,
             'valor' => floatval($data['valor'] ?? 0),
             'moeda' => $data['moeda'] ?? 'USD',
             'peso' => floatval($data['peso'] ?? 0),
@@ -139,8 +139,8 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, active, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :active, :created_at, :updated_at)
+            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, category_id, valor, moeda, peso, estoque, status, active, created_at, updated_at)
+            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :category_id, :valor, :moeda, :peso, :estoque, :status, :active, :created_at, :updated_at)
         ");
         
         $stmt->bindParam(':nome', $dadosBanco['nome']);
@@ -309,7 +309,7 @@ class Produto extends Model {
     }
     
     public function getCategorias() {
-        $stmt = $this->getConnection()->prepare("SELECT DISTINCT categoria_id FROM {$this->table} WHERE categoria_id IS NOT NULL ORDER BY categoria_id");
+        $stmt = $this->getConnection()->prepare("SELECT DISTINCT category_id FROM {$this->table} WHERE category_id IS NOT NULL ORDER BY category_id");
         $stmt->execute();
         $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
         
