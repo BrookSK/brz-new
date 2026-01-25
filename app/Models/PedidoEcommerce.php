@@ -282,33 +282,47 @@ class PedidoEcommerce extends Model {
     }
 
     public function getPedidos($usuarioId, $limit = 50, $offset = 0) {
-        $stmt = $this->connection->prepare("
-            SELECT p.*, 
-                   e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega,
-                   e_cobranca.cep as cep_cobranca
-            FROM {$this->table} p
-            LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id
-            LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id
-            WHERE p.usuario_id = :id 
-            ORDER BY p.created_at DESC 
-            LIMIT :limit OFFSET :offset
-        ");
-        $stmt->bindParam(':id', $usuarioId);
-        $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, \PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->connection->prepare("
+                SELECT p.*, 
+                       e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega,
+                       e_cobranca.cep as cep_cobranca
+                FROM {$this->table} p
+                LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id
+                LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id
+                WHERE p.usuario_id = :id 
+                ORDER BY p.created_at DESC 
+                LIMIT :limit OFFSET :offset
+            ");
+            $stmt->bindParam(':id', $usuarioId);
+            $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
+            $stmt->bindParam(':offset', $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
+            error_log('SQL executado: SELECT p.*, e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega, e_cobranca.cep as cep_cobranca FROM pedidos p LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id WHERE p.usuario_id = :id ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset');
+            return [];
+        }
     }
 
     public function getRastreamento($pedidoId) {
-        $stmt = $this->connection->prepare("
-            SELECT * FROM pedido_status_history 
-            WHERE pedido_id = :id 
-            ORDER BY created_at DESC
-        ");
-        $stmt->bindParam(':id', $pedidoId);
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->connection->prepare("
+                SELECT psh.*, u.nome as usuario_alterou 
+                FROM pedido_status_history psh 
+                LEFT JOIN usuarios u ON psh.alterado_por = u.id 
+                WHERE psh.pedido_id = :id 
+                ORDER BY psh.created_at DESC
+            ");
+            $stmt->bindParam(':id', $pedidoId);
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log('Erro ao obter rastreamento do pedido: ' . $e->getMessage());
+            error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.alterado_por = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
+            return [];
+        }
     }
 
     public function getComDetalhes($pedidoId) {
@@ -367,6 +381,7 @@ class PedidoEcommerce extends Model {
                 
             } catch (\Exception $e) {
                 error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
+                error_log('SQL executado: SELECT pi.*, pr.nome as nome_produto, pr.referencia, pr.imagem, pr.descricao as descricao_produto FROM pedido_items pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id');
                 $pedido['items'] = [];
             }
             
@@ -392,6 +407,7 @@ class PedidoEcommerce extends Model {
                 
             } catch (\Exception $e) {
                 error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
+                error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.alterado_por = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
                 $pedido['historico'] = [];
             }
             
