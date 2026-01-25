@@ -495,7 +495,8 @@ class AdminConfiguracoesController extends Controller {
     
     // JavaScript para o criador de e-mail
     private function getEmailCreatorJS() {
-        return '
+        ob_start();
+        ?>
         <script>
         // Variáveis disponíveis por evento
         const variaveisEvento = {
@@ -567,11 +568,10 @@ class AdminConfiguracoesController extends Controller {
             
             let html = "<div class=\"mb-2\"><strong>Variáveis disponíveis:</strong></div>";
             for (const [variavel, descricao] of Object.entries(variaveisEvento[evento])) {
-                html += `<div class="mb-1">
-                    <code class="bg-light p-1 rounded" style="cursor: pointer; font-size: 12px;" 
-                          onclick="inserirVariavelNoCursor('${variavel}')">${variavel}</code>
-                    <small class="text-muted ms-2">${descricao}</small>
-                </div>`;
+                html += "<div class=\"mb-1\">";
+                html += "<code class=\"bg-light p-1 rounded\" style=\"cursor: pointer; font-size: 12px;\" onclick=\"inserirVariavelNoCursor('" + variavel + "')\">" + variavel + "</code>";
+                html += "<small class=\"text-muted ms-2\">" + descricao + "</small>";
+                html += "</div>";
             }
             
             variaveisDiv.innerHTML = html;
@@ -667,18 +667,16 @@ class AdminConfiguracoesController extends Controller {
             let html = "<div class=\"row\">";
             for (const evento of eventos) {
                 const template = templates[evento];
-                html += `
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">${evento}</h6>
-                                <p class="card-text"><small>${template.assunto}</small></p>
-                                <p class="card-text"><small class=\"text-muted\">${new Date(template.data).toLocaleDateString()}</small></p>
-                                <button class="btn btn-sm btn-outline-primary" onclick="carregarTemplate('${evento}')">Carregar</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                html += "<div class=\"col-md-4 mb-3\">";
+                html += "<div class=\"card\">";
+                html += "<div class=\"card-body\">";
+                html += "<h6 class=\"card-title\">" + evento + "</h6>";
+                html += "<p class=\"card-text\"><small>" + template.assunto + "</small></p>";
+                html += "<p class=\"card-text\"><small class=\"text-muted\">" + new Date(template.data).toLocaleDateString() + "</small></p>";
+                html += "<button class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
+                html += "</div>";
+                html += "</div>";
+                html += "</div>";
             }
             html += "</div>";
             div.innerHTML = html;
@@ -737,7 +735,9 @@ class AdminConfiguracoesController extends Controller {
         document.addEventListener("DOMContentLoaded", function() {
             carregarTemplatesSalvos();
         });
-        </script>';
+        </script>
+        <?php
+        return ob_get_clean();
     }
     
     private function getConfigValue($config, $categoria, $chave, $default = '') {
