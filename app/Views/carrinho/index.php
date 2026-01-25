@@ -3,19 +3,12 @@
     <div class="row">
         <div class="col-lg-8">
             <?php if (empty($carrinho)): ?>
-                <div class="text-center py-5">
-                    <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
-                    <h4>Seu carrinho está vazio</h4>
-                    <p class="text-muted">Adicione produtos para continuar comprando</p>
-                    <a href="/produtos" class="btn btn-primary">
-                        <i class="fas fa-arrow-left"></i> Continuar Comprando
-                    </a>
-                </div>
+                <?php include __DIR__ . '/vazio.php'; ?>
             <?php else: ?>
                 <!-- Itens do Carrinho -->
                 <div class="card">
                     <div class="card-body">
-                        <?php foreach ($carrinho as $index => $item): ?>
+                        <?php foreach ($produtosDetalhados as $index => $item): ?>
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
@@ -29,14 +22,8 @@
                                     </div>
                                 <?php endif; ?>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['name']) ?></h6>
-                                    <small class="text-muted">SKU: <?= htmlspecialchars($item['sku']) ?></small>
-                                    <div class="mt-2">
-                                        <span class="badge bg-primary cart-item-price" data-original-price="<?= $item['price'] ?>"><?= number_format($item['price'], 2, '.', ',') ?></span>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
                                     <div class="input-group input-group-sm">
                                         <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
                                             <i class="fas fa-minus"></i>
@@ -53,7 +40,7 @@
                                     </div>
                                     <small class="text-muted">Estoque: <?= $item['stock'] ?></small>
                                 </div>
-                                <div class="col-md-2 text-end">
+                                <div class="col-md-3 text-end">
                                     <div class="fw-bold">
                                         <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></span>
                                     </div>

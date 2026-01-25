@@ -527,7 +527,7 @@
                         const price = parseFloat(priceMatch[0].replace(',', '.'));
                         if (!isNaN(price)) {
                             // Se o preço atual está em USD, converter para a moeda selecionada
-                            const originalPrice = price / (currentCurrency === 'BRL' ? 1 : 5.50);
+                            const originalPrice = price / (currentCurrency === 'BRL' ? 5.50 : 1);
                             const convertedPrice = originalPrice * rate;
                             badge.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
                         }
@@ -542,16 +542,87 @@
                 const price = parseFloat(priceText);
                 if (!isNaN(price)) {
                     // Converter de USD para a moeda selecionada
-                    const originalPrice = price / (currentCurrency === 'BRL' ? 1 : 5.50);
+                    const originalPrice = price / (currentCurrency === 'BRL' ? 5.50 : 1);
                     const convertedPrice = originalPrice * rate;
                     element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                    // Adicionar data-original-price para conversões futuras
+                    element.setAttribute('data-original-price', originalPrice);
+                }
+            });
+            
+            // Atualizar valores específicos dos produtos na página de detalhes
+            const detailPrices = document.querySelectorAll('.current-price .amount');
+            detailPrices.forEach(element => {
+                const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
+                const price = parseFloat(priceText);
+                if (!isNaN(price)) {
+                    // Converter de USD para a moeda selecionada
+                    const originalPrice = price / (currentCurrency === 'BRL' ? 5.50 : 1);
+                    const convertedPrice = originalPrice * rate;
+                    element.textContent = `${convertedPrice.toFixed(2).replace('.', ',')}`;
+                    // Adicionar data-original-price para conversões futuras
+                    element.setAttribute('data-original-price', originalPrice);
                 }
             });
             
             // Atualizar valores específicos do carrinho
             updateCartPrices();
             
+            // Atualizar resumo do carrinho
+            updateCartSummary();
+            
             console.log('Todos os preços atualizados para:', currentCurrency);
+        }
+        
+        function updateCartSummary() {
+            const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
+            const rate = exchangeRates[currentCurrency];
+            
+            // Atualizar subtotal
+            const subtotalElements = document.querySelectorAll('.subtotal-value');
+            subtotalElements.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * rate;
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar taxa de serviço
+            const taxaElements = document.querySelectorAll('.taxa-servico-value');
+            taxaElements.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * rate;
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar impostos
+            const impostosElements = document.querySelectorAll('.impostos-value');
+            impostosElements.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * rate;
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar frete
+            const freteElements = document.querySelectorAll('.frete-value');
+            freteElements.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * rate;
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar total
+            const totalElements = document.querySelectorAll('.total-value');
+            totalElements.forEach(element => {
+                const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                const convertedValue = originalValue * rate;
+                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            });
+            
+            // Atualizar símbolos de moeda
+            const currencyElements = document.querySelectorAll('.cart-currency');
+            currencyElements.forEach(element => {
+                element.textContent = currentCurrency;
+            });
         }
         
         function updateCartPrices() {

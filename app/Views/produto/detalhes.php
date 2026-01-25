@@ -107,7 +107,7 @@
                 <div class="price-section mb-4">
                     <div class="current-price">
                         <span class="currency"><?= $produto['moeda'] ?></span>
-                        <span class="amount"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                        <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
                     </div>
                     <?php if ($produto['moeda'] === 'USD'): ?>
                     <div class="price-conversion text-muted">

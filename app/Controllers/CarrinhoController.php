@@ -47,7 +47,7 @@ class CarrinhoController extends Controller {
                 }
                 
                 // Usar campos mapeados do Model
-                $itemPrice = floatval($produto['valor'] ?? 0);
+                $itemPrice = floatval($produto['preco'] ?? 0);
                 $itemStock = intval($produto['estoque'] ?? 0);
                 $itemSubtotal = $item['quantidade'] * $itemPrice;
                 
