@@ -281,6 +281,36 @@ class PedidoEcommerce extends Model {
         return true;
     }
 
+    public function getPedidos($usuarioId, $limit = 50, $offset = 0) {
+        $stmt = $this->connection->prepare("
+            SELECT p.*, 
+                   e_entrega.cep as cep_entrega, e_entrega.cidade as cidade_entrega,
+                   e_cobranca.cep as cep_cobranca
+            FROM {$this->table} p
+            LEFT JOIN enderecos e_entrega ON p.endereco_entrega_id = e_entrega.id
+            LEFT JOIN enderecos e_cobranca ON p.endereco_cobranca_id = e_cobranca.id
+            WHERE p.usuario_id = :id 
+            ORDER BY p.created_at DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindParam(':id', $usuarioId);
+        $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getRastreamento($pedidoId) {
+        $stmt = $this->connection->prepare("
+            SELECT * FROM pedido_status_history 
+            WHERE pedido_id = :id 
+            ORDER BY created_at DESC
+        ");
+        $stmt->bindParam(':id', $pedidoId);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
     public function getComDetalhes($pedidoId) {
         $stmt = $this->connection->prepare("
             SELECT p.*, 

@@ -24,7 +24,15 @@ class UsuarioController extends Controller {
         $this->authService->requerAutenticacao();
         
         $usuario = $this->authService->getUsuarioLogado();
-        $pedidos = $this->pedidoModel->getPedidos($usuario['id']);
+        
+        // Obter pedidos reais do usuário
+        try {
+            $pedidos = $this->pedidoModel->getPedidos($usuario['id']);
+        } catch (\Exception $e) {
+            // Se houver erro, usar array vazio e registrar log
+            error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
+            $pedidos = [];
+        }
         
         $this->view('usuario/dashboard', [
             'usuario' => $usuario,
@@ -39,14 +47,15 @@ class UsuarioController extends Controller {
         
         $usuario = $this->usuarioModel->find($this->authService->getUsuarioLogado()['id']);
         
-        // Obter endereços do usuário
+        // Obter enderecos do usuário
         $enderecos = $this->usuarioModel->getEnderecos($usuario['id']);
         
         // Obter pedidos reais do usuário
         try {
             $pedidos = $this->pedidoModel->getPedidos($usuario['id'], 10, 0);
         } catch (\Exception $e) {
-            // Se houver erro, usar array vazio
+            // Se houver erro, usar array vazio e registrar log
+            error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
         
@@ -154,7 +163,8 @@ class UsuarioController extends Controller {
         try {
             $pedidos = $this->pedidoModel->getPedidos($usuario['id'], $limite, $offset);
         } catch (\Exception $e) {
-            // Se houver erro, usar array vazio
+            // Se houver erro, usar array vazio e registrar log
+            error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
         
