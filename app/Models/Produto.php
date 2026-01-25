@@ -27,10 +27,10 @@ class Produto extends Model {
                 'descricao_curta' => $produto['descricao_curta'] ?? '',
                 'descricao_completa' => $produto['descricao_completa'] ?? '',
                 'categoria_id' => $produto['category_id'] ?? 0,
-                'valor' => floatval($produto['valor'] ?? 0),
-                'moeda' => $produto['moeda'] ?? 'USD',
-                'peso' => floatval($produto['peso'] ?? 0),
-                'estoque' => intval($produto['estoque'] ?? 0),
+                'valor' => floatval($produto['price'] ?? 0),
+                'moeda' => $produto['currency'] ?? 'USD',
+                'peso' => floatval($produto['weight'] ?? 0),
+                'estoque' => intval($produto['stock'] ?? 0),
                 'status' => $produto['active'] == 1 ? 'published' : 'draft',
                 'foto_principal' => $produto['foto_principal'] ?? null,
                 'created_at' => $produto['created_at'] ?? null,
@@ -121,15 +121,14 @@ class Produto extends Model {
         
         // Mapear campos do formulário para o banco
         $dadosBanco = [
-            'nome' => $data['nome'] ?? '',
+            'name' => $data['name'] ?? '',
             'sku' => $data['sku'] ?? '',
-            'descricao_curta' => $data['descricao_curta'] ?? '',
-            'descricao_completa' => $data['descricao_completa'] ?? '',
+            'description' => $data['description'] ?? '',
             'category_id' => $data['category_id'] ?? 0,
-            'valor' => floatval($data['valor'] ?? 0),
-            'moeda' => $data['moeda'] ?? 'USD',
-            'peso' => floatval($data['peso'] ?? 0),
-            'estoque' => intval($data['estoque'] ?? 0),
+            'price' => floatval($data['price'] ?? 0),
+            'currency' => $data['currency'] ?? 'USD',
+            'weight' => floatval($data['weight'] ?? 0),
+            'stock' => intval($data['stock'] ?? 0),
             'status' => $data['status'] ?? 'published',
             'active' => $data['status'] === 'published' ? 1 : 0,
             'created_at' => date('Y-m-d H:i:s'),
@@ -139,19 +138,18 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, category_id, valor, moeda, peso, estoque, status, active, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :category_id, :valor, :moeda, :peso, :estoque, :status, :active, :created_at, :updated_at)
+            INSERT INTO {$this->table} (name, sku, description, category_id, price, currency, weight, stock, status, active, created_at, updated_at)
+            VALUES (:name, :sku, :description, :category_id, :price, :currency, :weight, :stock, :status, :active, :created_at, :updated_at)
         ");
         
-        $stmt->bindParam(':nome', $dadosBanco['nome']);
+        $stmt->bindParam(':name', $dadosBanco['name']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
-        $stmt->bindParam(':descricao_curta', $dadosBanco['descricao_curta']);
-        $stmt->bindParam(':descricao_completa', $dadosBanco['descricao_completa']);
-        $stmt->bindParam(':categoria_id', $dadosBanco['categoria_id']);
-        $stmt->bindParam(':valor', $dadosBanco['valor']);
-        $stmt->bindParam(':moeda', $dadosBanco['moeda']);
-        $stmt->bindParam(':peso', $dadosBanco['peso']);
-        $stmt->bindParam(':estoque', $dadosBanco['estoque']);
+        $stmt->bindParam(':description', $dadosBanco['description']);
+        $stmt->bindParam(':category_id', $dadosBanco['category_id']);
+        $stmt->bindParam(':price', $dadosBanco['price']);
+        $stmt->bindParam(':currency', $dadosBanco['currency']);
+        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':stock', $dadosBanco['stock']);
         $stmt->bindParam(':status', $dadosBanco['status']);
         $stmt->bindParam(':active', $dadosBanco['active']);
         $stmt->bindParam(':created_at', $dadosBanco['created_at']);
