@@ -72,7 +72,7 @@ class Produto extends Model {
     
     public function getAllWithCategoria() {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria_nome 
+            SELECT p.*, c.name as categoria 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.active = 1 
@@ -84,14 +84,14 @@ class Produto extends Model {
     
     public function getDestaque($limit = 8) {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria_nome 
+            SELECT p.*, c.name as categoria 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.status = 'published' AND p.active = 1 
             ORDER BY p.created_at DESC 
             LIMIT :limit
         ");
-        $stmt->bindParam(':limit', $limit);
+        $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -107,7 +107,7 @@ class Produto extends Model {
     
     public function search($term, $limit = 20) {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria_nome 
+            SELECT p.*, c.name as categoria 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE (p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)
@@ -260,13 +260,30 @@ class Produto extends Model {
             'name' => $data['name'] ?? '',
             'sku' => $data['sku'] ?? '',
             'description' => $data['description'] ?? '',
+            'short_description' => $data['short_description'] ?? '',
             'category_id' => $data['category_id'] ?? 0,
             'price' => floatval($data['price'] ?? 0),
-            'currency' => $data['currency'] ?? 'USD',
-            'weight' => floatval($data['weight'] ?? 0),
+            'cost_price' => floatval($data['cost_price'] ?? 0),
+            'sale_price' => floatval($data['sale_price'] ?? 0),
             'stock' => intval($data['stock'] ?? 0),
-            'status' => $data['status'] ?? 'published',
-            'active' => ($data['status'] ?? 'published') === 'published' ? 1 : 0,
+            'min_stock' => intval($data['min_stock'] ?? 0),
+            'max_stock' => intval($data['max_stock'] ?? 999999),
+            'length' => floatval($data['length'] ?? 0),
+            'width' => floatval($data['width'] ?? 0),
+            'height' => floatval($data['height'] ?? 0),
+            'weight' => floatval($data['weight'] ?? 0),
+            'type' => $data['type'] ?? 'physical',
+            'status' => $data['status'] ?? 'draft',
+            'tags' => isset($data['tags']) ? json_encode($data['tags']) : null,
+            'images' => isset($data['images']) ? json_encode($data['images']) : null,
+            'variations' => isset($data['variations']) ? json_encode($data['variations']) : null,
+            'attributes' => isset($data['attributes']) ? json_encode($data['attributes']) : null,
+            'active' => ($data['status'] ?? 'draft') === 'published' ? 1 : 0,
+            'featured' => $data['featured'] ?? false,
+            'digital' => $data['digital'] ?? false,
+            'digital_file' => $data['digital_file'] ?? null,
+            'digital_downloads' => intval($data['digital_downloads'] ?? 0),
+            'views' => intval($data['views'] ?? 0),
             'updated_at' => date('Y-m-d H:i:s')
         ];
         
@@ -277,13 +294,30 @@ class Produto extends Model {
             SET name = :name, 
                 sku = :sku, 
                 description = :description, 
+                short_description = :short_description, 
                 category_id = :category_id, 
                 price = :price, 
-                currency = :currency, 
-                weight = :weight, 
+                cost_price = :cost_price, 
+                sale_price = :sale_price, 
                 stock = :stock, 
+                min_stock = :min_stock, 
+                max_stock = :max_stock, 
+                length = :length, 
+                width = :width, 
+                height = :height, 
+                weight = :weight, 
+                type = :type, 
                 status = :status, 
+                tags = :tags, 
+                images = :images, 
+                variations = :variations, 
+                attributes = :attributes, 
                 active = :active, 
+                featured = :featured, 
+                digital = :digital, 
+                digital_file = :digital_file, 
+                digital_downloads = :digital_downloads, 
+                views = :views, 
                 updated_at = :updated_at
             WHERE id = :id
         ");
@@ -292,13 +326,30 @@ class Produto extends Model {
         $stmt->bindParam(':name', $dadosBanco['name']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
         $stmt->bindParam(':description', $dadosBanco['description']);
+        $stmt->bindParam(':short_description', $dadosBanco['short_description']);
         $stmt->bindParam(':category_id', $dadosBanco['category_id']);
         $stmt->bindParam(':price', $dadosBanco['price']);
-        $stmt->bindParam(':currency', $dadosBanco['currency']);
-        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':cost_price', $dadosBanco['cost_price']);
+        $stmt->bindParam(':sale_price', $dadosBanco['sale_price']);
         $stmt->bindParam(':stock', $dadosBanco['stock']);
+        $stmt->bindParam(':min_stock', $dadosBanco['min_stock']);
+        $stmt->bindParam(':max_stock', $dadosBanco['max_stock']);
+        $stmt->bindParam(':length', $dadosBanco['length']);
+        $stmt->bindParam(':width', $dadosBanco['width']);
+        $stmt->bindParam(':height', $dadosBanco['height']);
+        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':type', $dadosBanco['type']);
         $stmt->bindParam(':status', $dadosBanco['status']);
+        $stmt->bindParam(':tags', $dadosBanco['tags']);
+        $stmt->bindParam(':images', $dadosBanco['images']);
+        $stmt->bindParam(':variations', $dadosBanco['variations']);
+        $stmt->bindParam(':attributes', $dadosBanco['attributes']);
         $stmt->bindParam(':active', $dadosBanco['active']);
+        $stmt->bindParam(':featured', $dadosBanco['featured']);
+        $stmt->bindParam(':digital', $dadosBanco['digital']);
+        $stmt->bindParam(':digital_file', $dadosBanco['digital_file']);
+        $stmt->bindParam(':digital_downloads', $dadosBanco['digital_downloads']);
+        $stmt->bindParam(':views', $dadosBanco['views']);
         $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
         
         error_log('🔍 [PRODUTO-MODEL-UPDATE] Executando UPDATE no banco...');
