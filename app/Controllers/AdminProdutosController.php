@@ -38,11 +38,12 @@ class AdminProdutosController extends Controller {
                 $foto = $stmtFotos->fetch(\PDO::FETCH_ASSOC);
                 
                 if ($foto && $foto['nome_arquivo']) {
-                    // Verificar se já é URL completa
-                    if (strpos($foto['nome_arquivo'], 'http') === 0) {
-                        $produto['imagem'] = $foto['nome_arquivo'];
+                    // Verificar se arquivo existe fisicamente
+                    $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
+                    if (file_exists($filePath)) {
+                        $produto['imagem'] = 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'];
                     } else {
-                        $produto['imagem'] = 'https://novobr.brazilianashop.com.br/' . ltrim($foto['nome_arquivo'], '/');
+                        $produto['imagem'] = 'https://via.placeholder.com/300x200?text=Arquivo+Não+Encontrado';
                     }
                 } else {
                     $produto['imagem'] = 'https://via.placeholder.com/300x200?text=Sem+Imagem';
@@ -238,7 +239,8 @@ class AdminProdutosController extends Controller {
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Imagens</label>
-                                        <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                        <input type="file" class="form-control" name="imagens[]" multiple accept="image/*" id="imagensInput">
+                                        <div id="imagePreview" class="row mt-3"></div>
                                     </div>
                                 </div>
                             </div>
@@ -278,8 +280,28 @@ class AdminProdutosController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Preview de imagens ao selecionar
+        document.getElementById(\'imagensInput\').addEventListener(\'change\', function(e) {
+            const preview = document.getElementById(\'imagePreview\');
+            preview.innerHTML = \'\';
+            
+            Array.from(e.target.files).forEach((file, index) => {
+                if (file.type.startsWith(\'image/\')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement(\'div\');
+                        div.className = \'col-md-3 mb-2\';
+                        div.innerHTML = \'<img src="\' + e.target.result + \'" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover;">\';
+                        preview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+    </script>
 </body>
-</html>';
+</html>\';
         exit;
     }
     
@@ -322,20 +344,27 @@ class AdminProdutosController extends Controller {
             
             // Processar imagens
             if (isset($_FILES['imagens'])) {
-                $uploadDir = 'uploads/produtos/';
+                $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
+                $webDir = '/uploads/produtos/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 
                 foreach ($_FILES['imagens']['name'] as $key => $name) {
                     if ($_FILES['imagens']['error'][$key] === 0) {
-                        $fileName = time() . '_' . $name;
-                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $uploadDir . $fileName)) {
+                        // Limpar nome do arquivo
+                        $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                        $fileName = time() . '_' . $fileName;
+                        
+                        $filePath = $uploadDir . $fileName;
+                        $webPath = $webDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
                             $stmt = $pdo->prepare("
                                 INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem)
                                 VALUES (?, ?, ?, ?, ?)
                             ");
                             $stmt->execute([
                                 $produto_id,
-                                $uploadDir . $fileName,
+                                $webPath,
                                 $name,
                                 $key === 0 ? 1 : 0,
                                 $key
@@ -378,6 +407,21 @@ class AdminProdutosController extends Controller {
             $stmtFotos = $pdo->prepare("SELECT * FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC");
             $stmtFotos->execute([$id]);
             $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Buscar estatísticas do produto
+            $stmtStats = $pdo->prepare("
+                SELECT 
+                    COUNT(pi.id) as total_vendas,
+                    SUM(pi.quantidade) as total_itens_vendidos,
+                    SUM(pi.subtotal) as total_faturado,
+                    p.views as visualizacoes,
+                    (SELECT COUNT(*) FROM pedido_items WHERE produto_id = ?) as numero_pedidos
+                FROM produtos p 
+                LEFT JOIN pedido_items pi ON p.id = pi.produto_id 
+                WHERE p.id = ?
+            ");
+            $stmtStats->execute([$id, $id]);
+            $stats = $stmtStats->fetch(\PDO::FETCH_ASSOC);
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
@@ -429,6 +473,42 @@ class AdminProdutosController extends Controller {
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
                 
+                <!-- Estatísticas do Produto -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Visualizações</h5>
+                                <h3>' . number_format($stats['visualizacoes']) . '</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Vendas</h5>
+                                <h3>' . number_format($stats['total_vendas']) . '</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Itens Vendidos</h5>
+                                <h3>' . number_format($stats['total_itens_vendidos']) . '</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Faturado (USD)</h5>
+                                <h3>$' . number_format($stats['total_faturado'], 2, '.', ',') . '</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <form method="POST" action="/admin/produtos/atualizar/' . $id . '" enctype="multipart/form-data">
                     <div class="row">
                         <div class="col-md-8">
@@ -464,11 +544,18 @@ class AdminProdutosController extends Controller {
                                         <label class="form-label">Galeria de Fotos</label>
                                         <div class="row mb-3">';
                                         foreach ($fotos as $foto) {
+                                            // Verificar se arquivo existe
+                                            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
+                                            $imageUrl = file_exists($filePath) ? 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'] : 'https://via.placeholder.com/100x100?text=Erro';
+                                            
                                             echo '<div class="col-md-2 foto-item">
-                                                <img src="https://novobr.brazilianashop.com.br/' . ltrim($foto['nome_arquivo'], '/') . '" alt="Foto">
+                                                <a href="' . $imageUrl . '" target="_blank">
+                                                    <img src="' . $imageUrl . '" alt="Foto" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
+                                                </a>
                                                 <button type="button" class="btn btn-sm btn-danger btn-remove-foto" onclick="removerFoto(' . $foto['id'] . ')">
                                                     <i class="fas fa-times"></i>
                                                 </button>
+                                                ' . ($foto['principal'] ? '<span class="badge bg-primary">Principal</span>' : '') . '
                                             </div>';
                                         }
                                         echo '</div>
@@ -615,20 +702,27 @@ class AdminProdutosController extends Controller {
             
             // Processar novas imagens
             if (isset($_FILES['imagens'])) {
-                $uploadDir = 'uploads/produtos/';
+                $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/';
+                $webDir = '/uploads/produtos/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 
                 foreach ($_FILES['imagens']['name'] as $key => $name) {
                     if ($_FILES['imagens']['error'][$key] === 0) {
-                        $fileName = time() . '_' . $name;
-                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $uploadDir . $fileName)) {
+                        // Limpar nome do arquivo
+                        $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                        $fileName = time() . '_' . $fileName;
+                        
+                        $filePath = $uploadDir . $fileName;
+                        $webPath = $webDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
                             $stmt = $pdo->prepare("
                                 INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem)
                                 VALUES (?, ?, ?, ?, ?)
                             ");
                             $stmt->execute([
                                 $id,
-                                $uploadDir . $fileName,
+                                $webPath,
                                 $name,
                                 0, // Não é principal por padrão
                                 $key
