@@ -5,7 +5,7 @@ class AdminPedidosEditController {
     private $connection;
 
     public function __construct() {
-        $this->connection = \App\Core\Database::getInstance()->getConnection();
+        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
     public function editar($id) {
