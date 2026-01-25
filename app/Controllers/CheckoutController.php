@@ -486,17 +486,19 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
             
             $sql = "INSERT INTO pedidos (
-                usuario_id, numero_pedido, cliente_id, status, 
+                usuario_id, nome, numero_pedido, cliente_id, status, 
                 subtotal, servicos, impostos, frete, desconto, total, 
                 moeda, taxa_conversao, endereco_entrega_id, endereco_cobranca_id, 
-                observacoes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                observacoes, rastreamento, data_aprovacao, data_envio, data_entrega, 
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
             
             $params = [
                 $usuarioId,
+                $usuario['nome'] ?? 'Cliente',
                 $numeroPedido,
                 $clienteId, // cliente_id válido da tabela clientes
                 'pendente',
@@ -511,6 +513,10 @@ class CheckoutController extends Controller {
                 null, // endereco_entrega_id
                 null, // endereco_cobranca_id
                 $dados['observacoes'] ?? '',
+                null, // rastreamento
+                null, // data_aprovacao
+                null, // data_envio
+                null, // data_entrega
                 date('Y-m-d H:i:s'), // created_at
                 date('Y-m-d H:i:s')  // updated_at
             ];
