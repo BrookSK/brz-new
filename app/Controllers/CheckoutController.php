@@ -418,7 +418,7 @@ class CheckoutController extends Controller {
                 throw new \Exception('Dados do usuário são obrigatórios para criar pedido');
             }
             
-            // 1. Buscar usuário pelo email (colunas existentes: id, nome, email)
+            // 1. Buscar usuário pelo email (colunas existentes: id, name, email)
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$usuario['email']]);
             $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -429,12 +429,12 @@ class CheckoutController extends Controller {
                 error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado por email: ' . $usuarioId);
             } else {
                 // 3. Se NÃO existir → CRIAR o usuário e usar o lastInsertId()
-                // INSERT com colunas EXISTENTES: nome, email, senha, documento
-                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
+                // INSERT com colunas EXISTENTES: name, email, password, documento
+                $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
                 $stmt->execute([
-                    $usuario['nome'] ?? 'Cliente',
+                    $usuario['nome'] ?? 'Cliente', // formulário usa "nome"
                     $usuario['email'],
-                    password_hash('temp123', PASSWORD_DEFAULT), // senha temporária
+                    password_hash('temp123', PASSWORD_DEFAULT),
                     'DOC' . time() // documento temporário único
                 ]);
                 $usuarioId = $db->lastInsertId();
