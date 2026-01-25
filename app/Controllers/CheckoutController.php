@@ -56,6 +56,10 @@ class CheckoutController extends Controller {
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
             $quantidade = $item['quantidade'] ?? 1;
             
+            // Calcular peso por item e arredondar para cima
+            $pesoItem = 0.5 * $quantidade; // Peso padrão por item
+            $pesoArredondado = ceil($pesoItem); // Arredondar para cima
+            
             // Buscar detalhes do produto (simulado por enquanto)
             $produto = [
                 'id' => $produtoId,
@@ -63,13 +67,13 @@ class CheckoutController extends Controller {
                 'preco' => $precoUnitario,
                 'quantidade' => $quantidade,
                 'subtotal' => $precoUnitario * $quantidade,
-                'peso' => 0.5, // Padrão
+                'peso' => $pesoArredondado, // Usar peso arredondado
                 'foto_principal' => $item['foto_principal'] ?? null
             ];
             
             $items[] = $produto;
             $subtotal += $produto['subtotal'];
-            $pesoTotal += $produto['peso'] * $produto['quantidade'];
+            $pesoTotal += $produto['peso'] * $quantidade;
             
             error_log('🔍 [CHECKOUT_INDEX] Item: ' . json_encode($item));
             error_log('🔍 [CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
@@ -497,10 +501,14 @@ class CheckoutController extends Controller {
                 $quantidade = $item['quantidade'] ?? 1;
                 
                 $subtotal += $precoUnitario * $quantidade;
-                $pesoTotal += 0.5 * $quantidade; // Peso padrão
+                
+                // Calcular peso por item e arredondar para cima
+                $pesoItem = 0.5 * $quantidade; // Peso padrão por item
+                $pesoArredondado = ceil($pesoItem); // Arredondar para cima
+                $pesoTotal += $pesoArredondado;
                 
                 error_log('🔍 [CRIAR_PEDIDO] Item processado: ' . json_encode($item));
-                error_log('🔍 [CRIAR_PEDIDO] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
+                error_log('🔍 [CRIAR_PEDIDO] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade . ', Peso item: ' . $pesoItem . ', Peso arredondado: ' . $pesoArredondado);
             }
             
             error_log('🔍 [CRIAR_PEDIDO] Subtotal: ' . $subtotal);

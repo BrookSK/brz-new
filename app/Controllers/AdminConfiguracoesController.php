@@ -182,22 +182,37 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Frete Grátis Acima de</label>
+                                                <label class="form-label">Moeda Padrão</label>
+                                                <select class="form-select" name="moeda_padrao">
+                                                    <option value="USD" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'USD' ? 'selected' : '') . '>USD - Dólar Americano</option>
+                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'BRL' ? 'selected' : '') . '>BRL - Real Brasileiro</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Taxa de Serviço (USD por kg)</label>
                                                 <div class="input-group">
-                                                    <span class="input-group-text">R$</span>
-                                                    <input type="text" class="form-control" name="frete_gratis_acima" value="' . $this->getConfigValue($config, 'entrega', 'frete_gratis_acima', '200') . '">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="text" class="form-control" name="taxa_servico_kg" value="' . $this->getConfigValue($config, 'entrega', 'taxa_servico_kg', '39') . '">
                                                 </div>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Valor Padrão do Frete</label>
+                                                <label class="form-label">Frete Grátis Acima de</label>
                                                 <div class="input-group">
-                                                    <span class="input-group-text">R$</span>
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="text" class="form-control" name="frete_gratis_acima" value="' . $this->getConfigValue($config, 'entrega', 'frete_gratis_acima', '0') . '">
+                                                </div>
+                                                <small class="text-muted">Deixe como 0 para frete sempre grátis</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Valor Padrão do Frete (USD por kg)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">$</span>
                                                     <input type="text" class="form-control" name="frete_padrao" value="' . $this->getConfigValue($config, 'entrega', 'frete_padrao', '15') . '">
                                                 </div>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Prazo Padrão (dias)</label>
-                                                <input type="number" class="form-control" name="prazo_padrao" value="' . $this->getConfigValue($config, 'entrega', 'prazo_padrao', '7') . '">
+                                                <input type="number" class="form-control" name="prazo_padrao" value="' . $this->getConfigValue($config, 'entrega', 'prazo_padrao', '30') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">CEP de Origem</label>
@@ -320,7 +335,7 @@ class AdminConfiguracoesController extends Controller {
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name'],
-                'entrega' => ['frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
             ];
@@ -333,6 +348,23 @@ class AdminConfiguracoesController extends Controller {
                         // Converter checkboxes para 0/1
                         if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado'])) {
                             $valor = $valor ? '1' : '0';
+                        }
+                        
+                        // Validar valores específicos
+                        if ($chave === 'moeda_padrao') {
+                            $valor = in_array($valor, ['USD', 'BRL']) ? $valor : 'USD';
+                        }
+                        if ($chave === 'taxa_servico_kg') {
+                            $valor = is_numeric($valor) ? floatval($valor) : 39;
+                        }
+                        if ($chave === 'frete_gratis_acima') {
+                            $valor = is_numeric($valor) ? floatval($valor) : 0;
+                        }
+                        if ($chave === 'frete_padrao') {
+                            $valor = is_numeric($valor) ? floatval($valor) : 15;
+                        }
+                        if ($chave === 'prazo_padrao') {
+                            $valor = is_numeric($valor) ? intval($valor) : 30;
                         }
                         
                         // Atualizar ou inserir configuração
