@@ -393,7 +393,8 @@ class AdminProdutosController extends Controller {
         }
     }
     
-    public function editar(Request $request, $id) {
+    public function editar(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
@@ -661,7 +662,8 @@ class AdminProdutosController extends Controller {
         exit;
     }
     
-    public function atualizar(Request $request, $id) {
+    public function atualizar(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
@@ -751,7 +753,8 @@ class AdminProdutosController extends Controller {
         }
     }
     
-    public function removerFoto(Request $request, $fotoId) {
+    public function removerFoto(Request $request, $fotoId = null) {
+        $fotoId = $fotoId ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
@@ -782,7 +785,8 @@ class AdminProdutosController extends Controller {
         }
     }
     
-    public function excluir(Request $request, $id) {
+    public function excluir(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();

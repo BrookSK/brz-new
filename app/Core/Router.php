@@ -112,6 +112,11 @@ class Router {
             $request->setParam($key, $value);
         }
 
-        $controller->$controllerMethod($request);
+        // Chamar método com parâmetros
+        if (!empty($params)) {
+            $controller->$controllerMethod($request, ...array_values($params));
+        } else {
+            $controller->$controllerMethod($request);
+        }
     }
 }
