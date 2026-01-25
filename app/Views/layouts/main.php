@@ -517,23 +517,8 @@
                 element.textContent = currentCurrency;
             });
             
-            // Atualizar badges de moeda nos produtos
-            const currencyBadges = document.querySelectorAll('.badge');
-            currencyBadges.forEach(badge => {
-                const text = badge.textContent;
-                if (text.includes('USD') || text.includes('BRL')) {
-                    const priceMatch = text.match(/[\d.,]+/);
-                    if (priceMatch) {
-                        const price = parseFloat(priceMatch[0].replace(',', '.'));
-                        if (!isNaN(price)) {
-                            // Se o preço atual está em USD, converter para a moeda selecionada
-                            const originalPrice = price / (currentCurrency === 'BRL' ? 5.50 : 1);
-                            const convertedPrice = originalPrice * rate;
-                            badge.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
-                        }
-                    }
-                }
-            });
+            // NÃO atualizar badges de moeda nos produtos aqui para evitar conflito
+            // Isso será feito separadamente se necessário
             
             // Atualizar preços de produtos
             const productPrices = document.querySelectorAll('.product-price');
@@ -571,6 +556,9 @@
             // Atualizar resumo do carrinho
             updateCartSummary();
             
+            // Forçar atualização inicial do resumo
+            setTimeout(updateCartSummary, 100);
+            
             console.log('Todos os preços atualizados para:', currentCurrency);
         }
         
@@ -578,51 +566,69 @@
             const currencySymbol = currentCurrency === 'BRL' ? 'R$' : '$';
             const rate = exchangeRates[currentCurrency];
             
+            console.log('Atualizando resumo do carrinho - Moeda:', currentCurrency, 'Taxa:', rate);
+            
             // Atualizar subtotal
             const subtotalElements = document.querySelectorAll('.subtotal-value');
             subtotalElements.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                console.log('Subtotal original:', originalValue);
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                    console.log('Subtotal convertido:', element.textContent);
+                }
             });
             
             // Atualizar taxa de serviço
             const taxaElements = document.querySelectorAll('.taxa-servico-value');
             taxaElements.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                console.log('Taxa serviço original:', originalValue);
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                    console.log('Taxa serviço convertida:', element.textContent);
+                }
             });
             
             // Atualizar impostos
             const impostosElements = document.querySelectorAll('.impostos-value');
             impostosElements.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                console.log('Impostos original:', originalValue);
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                    console.log('Impostos convertidos:', element.textContent);
+                }
             });
             
             // Atualizar frete
             const freteElements = document.querySelectorAll('.frete-value');
             freteElements.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                console.log('Frete original:', originalValue);
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                    console.log('Frete convertido:', element.textContent);
+                }
             });
             
             // Atualizar total
             const totalElements = document.querySelectorAll('.total-value');
             totalElements.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                console.log('Total original:', originalValue);
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                    console.log('Total convertido:', element.textContent);
+                }
             });
             
-            // Atualizar símbolos de moeda
-            const currencyElements = document.querySelectorAll('.cart-currency');
-            currencyElements.forEach(element => {
-                element.textContent = currentCurrency;
-            });
+            // NÃO atualizar símbolos de moeda aqui, pois já está sendo feito no updateAllPrices
         }
         
         function updateCartPrices() {
@@ -690,12 +696,10 @@
                 }
             });
             
-            // Formatar preços iniciais de acordo com a moeda atual
-            updateAllPrices();
+            // Atualizar todos os preços ao carregar a página
+            setTimeout(function() {
+                updateAllPrices();
+                setTimeout(updateCartSummary, 200);
+            }, 100);
         });
-    </script>
-    
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-</body>
 </html>
