@@ -104,7 +104,7 @@ class CheckoutController extends Controller {
         $usuario = $this->authService->getUsuarioLogado();
         
         // Obter dados do formulário
-        $dados = $request->getAllParams();
+        $dados = $request->getParams();
         
         // Verificar se usuário quer salvar novo endereço
         if (!empty($usuario) && !empty($dados['salvar_endereco'])) {
