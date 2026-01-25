@@ -397,6 +397,11 @@ class AdminPedidosController extends Controller {
             // Obter itens do pedido (já vem com dados do produto adaptados)
             $itens = $pedido['items'] ?? [];
             
+            // Debug: verificar o que foi retornado
+            error_log('DEBUG: Pedido retornado: ' . print_r($pedido, true));
+            error_log('DEBUG: Itens encontrados: ' . print_r($itens, true));
+            error_log('DEBUG: Total de itens: ' . count($itens));
+            
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
@@ -458,12 +463,12 @@ class AdminPedidosController extends Controller {
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table table-bordered">
+                                    <table class="table table-sm table-bordered">
                                         <thead>
                                             <tr>
                                                 <th>Produto</th>
-                                                <th>ID</th>
-                                                <th>SKU</th>
+                                                <th>ID Produto</th>
+                                                <th>Referência</th>
                                                 <th>Quantidade</th>
                                                 <th>Preço Unitário</th>
                                                 <th>Subtotal</th>
@@ -471,6 +476,10 @@ class AdminPedidosController extends Controller {
                                             </tr>
                                         </thead>
                                         <tbody>';
+                                        
+                                        if (empty($itens)) {
+                                            echo '<tr><td colspan="7" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
+                                        }
                                         
                                         foreach ($itens as $item) {
                                             echo '<tr>
