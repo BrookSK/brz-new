@@ -483,7 +483,13 @@ class AdminPedidosController extends Controller {
                                             
                                             // Mostrar imagem apenas se existir
                                             if (!empty($item['imagem']) && $item['imagem'] !== 'default.jpg') {
-                                                echo '<img src="/uploads/produtos/' . htmlspecialchars($item['imagem']) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                // Remover caminho duplicado se existir
+                                                $imagemPath = $item['imagem'];
+                                                if (strpos($imagemPath, 'uploads/produtos/') !== false) {
+                                                    $imagemPath = str_replace('uploads/produtos/', '', $imagemPath);
+                                                }
+                                                
+                                                echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
                                                      style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
                                                      onerror="this.style.display=\'none\'">';
                                             }
