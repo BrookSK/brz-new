@@ -447,9 +447,9 @@ class CheckoutController extends Controller {
             
             $sql = "INSERT INTO pedidos (
                 usuario_id, numero_pedido, status, subtotal, 
-                impostos, frete, total, moeda, peso_total, observacoes, 
+                impostos, frete, total, moeda, observacoes, 
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
             
             $stmt = $db->prepare($sql);
             error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
@@ -463,7 +463,6 @@ class CheckoutController extends Controller {
                 $frete,
                 $total,
                 'USD',
-                $pesoTotal,
                 $dados['observacoes'] ?? ''
             ];
             
