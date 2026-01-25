@@ -770,11 +770,14 @@ class AdminProdutosController extends Controller {
                 $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE id = ?");
                 $stmt->execute([$fotoId]);
                 
+                header('Content-Type: application/json');
                 echo json_encode(['success' => true]);
             } else {
+                header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'message' => 'Foto não encontrada']);
             }
         } catch (\Exception $e) {
+            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }

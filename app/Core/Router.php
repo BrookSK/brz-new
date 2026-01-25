@@ -23,6 +23,16 @@ class Router {
             $this->routes['POST'][$path] = ['controller' => $handler, 'method' => $method];
         }
     }
+    
+    public function delete($path, $handler, $method = null) {
+        if ($handler instanceof \Closure) {
+            // Para closures, armazenar diretamente
+            $this->routes['DELETE'][$path] = ['controller' => $handler, 'method' => null];
+        } else {
+            // Para strings (nomes de controllers)
+            $this->routes['DELETE'][$path] = ['controller' => $handler, 'method' => $method];
+        }
+    }
 
     public function dispatch(Request $request) {
         $method = $request->getMethod();

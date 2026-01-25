@@ -168,7 +168,7 @@ $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
-$router->delete('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
+$router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
 // Pedidos
