@@ -83,6 +83,7 @@
                              
                             <div class="price-section mb-3">
                                 <div class="current-price">
+                                    <span class="currency"><?= $produto['moeda'] ?></span>
                                     <span class="amount product-price" data-original-price="<?= $produto['valor'] ?>"><?= number_format($produto['valor'], 2, ',', '.') ?></span>
                                 </div>
                             </div>

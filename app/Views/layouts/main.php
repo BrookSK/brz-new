@@ -493,6 +493,13 @@
                         updateCheckoutCurrency(newCurrency);
                     }
                     
+                    // Forçar atualização no checkout após mudança
+                    setTimeout(function() {
+                        if (typeof updateCheckoutCurrency === 'function') {
+                            updateCheckoutCurrency(newCurrency);
+                        }
+                    }, 500);
+                    
                     showCurrencyChangeNotification(newCurrency);
                 }
             });
@@ -513,8 +520,10 @@
             const priceElements = document.querySelectorAll('[data-original-price]');
             priceElements.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
-                const convertedPrice = originalPrice * rate;
-                element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                if (!isNaN(originalPrice)) {
+                    const convertedPrice = originalPrice * rate;
+                    element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                }
             });
             
             // Atualizar todos os elementos .currency na página
@@ -523,10 +532,7 @@
                 element.textContent = currentCurrency;
             });
             
-            // NÃO atualizar badges de moeda nos produtos aqui para evitar conflito
-            // Isso será feito separadamente se necessário
-            
-            // Atualizar preços de produtos
+            // Atualizar preços de produtos na lista
             const productPrices = document.querySelectorAll('.product-price');
             productPrices.forEach(element => {
                 const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
@@ -555,6 +561,26 @@
                     element.setAttribute('data-original-price', originalPrice);
                 }
             });
+            
+            // Atualizar conversão de preço na página de detalhes
+            const conversionElements = document.querySelectorAll('.conversion-amount');
+            conversionElements.forEach(element => {
+                const originalPrice = parseFloat(element.getAttribute('data-original-price'));
+                if (!isNaN(originalPrice)) {
+                    const convertedPrice = originalPrice * 5.50; // Sempre mostrar em BRL
+                    element.textContent = `${convertedPrice.toFixed(2).replace('.', ',')}`;
+                }
+            });
+            
+            // Mostrar/ocultar conversão baseado na moeda
+            const priceConversion = document.getElementById('price-conversion');
+            if (priceConversion) {
+                if (currentCurrency === 'USD') {
+                    priceConversion.style.display = 'block';
+                } else {
+                    priceConversion.style.display = 'none';
+                }
+            }
             
             // Atualizar valores específicos do carrinho
             updateCartPrices();
@@ -691,7 +717,7 @@
             }, 3000);
         }
         
-        // Salvar preços originais ao carregar e formatar inicialmente
+        // Atualizar todos os preços ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
             const priceElements = document.querySelectorAll('.product-price');
             priceElements.forEach(element => {
@@ -708,4 +734,19 @@
                 setTimeout(updateCartSummary, 200);
             }, 100);
         });
+        
+        // Forçar atualização quando a página carregar completamente
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                updateAllPrices();
+                setTimeout(updateCartSummary, 300);
+            }, 500);
+        });
+        
+        // Forçar atualização no checkout se existir
+        if (typeof updateCheckoutCurrency === 'function') {
+            setTimeout(function() {
+                updateCheckoutCurrency(currentCurrency);
+            }, 1000);
+        }
 </html>

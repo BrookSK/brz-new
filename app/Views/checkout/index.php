@@ -112,10 +112,10 @@
                                 <h6>Itens do Pedido</h6>
                                 <div id="items-resumo">
                                     <?php foreach ($items as $item): ?>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
-                                        <small class="item-price">$ <?= number_format($item['subtotal'], 2, '.', ',') ?></small>
-                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                    <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
+                                    <small class="item-price" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></small>
+                                </div>
                                     <?php endforeach; ?>
                                 </div>
                             </div>
@@ -258,7 +258,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>$<?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>"><?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -844,19 +844,25 @@ function updatePrices(currency) {
     const cartCurrencyElements = document.querySelectorAll('.cart-currency');
     console.log('🔍 [MOEDA] Elementos .cart-currency encontrados:', cartCurrencyElements.length);
     
-    cartCurrencyElements.forEach((element, index) => {
-        if (element) {
-            const originalValue = parseFloat(element.getAttribute('data-original-value'));
-            console.log(`🔍 [MOEDA] Elemento cart-currency ${index} - Valor original:`, originalValue);
-            
-            if (!isNaN(originalValue)) {
-                const convertedPrice = originalValue * rate;
-                const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
-                element.textContent = formattedPrice;
-                console.log(`🔍 [MOEDA] Elemento cart-currency ${index} atualizado para:`, formattedPrice);
-            } else {
-                console.error(`❌ [MOEDA] Elemento cart-currency ${index} - Valor original inválido:`, element.getAttribute('data-original-value'));
-            }
+    cartCurrencyElements.forEach(element => {
+        const originalValue = parseFloat(element.getAttribute('data-original-value'));
+        if (!isNaN(originalValue)) {
+            const convertedValue = originalValue * rate;
+            element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            console.log(`🔍 [MOEDA] ${element.id}: ${originalValue} → ${convertedValue.toFixed(2)}`);
+        }
+    });
+    
+    // Atualizar itens do carrinho
+    const itemPrices = document.querySelectorAll('.item-price');
+    console.log('🔍 [MOEDA] Elementos .item-price encontrados:', itemPrices.length);
+    
+    itemPrices.forEach(element => {
+        const originalValue = parseFloat(element.getAttribute('data-original-price'));
+        if (!isNaN(originalValue)) {
+            const convertedValue = originalValue * rate;
+            element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+            console.log(`🔍 [MOEDA] Item: ${originalValue} → ${convertedValue.toFixed(2)}`);
         }
     });
     

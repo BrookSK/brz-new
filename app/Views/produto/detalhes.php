@@ -109,11 +109,9 @@
                         <span class="currency"><?= $produto['moeda'] ?></span>
                         <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
                     </div>
-                    <?php if ($produto['moeda'] === 'USD'): ?>
-                    <div class="price-conversion text-muted">
-                        <small>≈ R$ <?= number_format($produto['preco'] * 5.5, 2, ',', '.') ?></small>
+                    <div class="price-conversion text-muted" id="price-conversion">
+                        <small>≈ R$ <span class="conversion-amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'] * 5.5, 2, ',', '.') ?></span></small>
                     </div>
-                    <?php endif; ?>
                 </div>
 
                 <!-- Descrição -->
