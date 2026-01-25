@@ -411,47 +411,36 @@ class CheckoutController extends Controller {
         try {
             error_log('🔍 [CRIAR_PEDIDO] Iniciando criação do pedido');
             
-            // Garantir usuário válido existente na tabela usuarios
-            if (empty($usuario) || empty($usuario['id'])) {
-                // Buscar primeiro usuário existente ou criar novo
-                $db = \Config\Database::getConnection();
-                $stmt = $db->prepare("SELECT id FROM usuarios ORDER BY id LIMIT 1");
-                $stmt->execute();
-                $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
-                
-                if ($existingUser && !empty($existingUser['id'])) {
-                    $usuarioId = $existingUser['id'];
-                    error_log('🔍 [CRIAR_PEDIDO] Usuário existente encontrado: ' . $usuarioId);
-                } else {
-                    // Criar novo usuário apenas se não existir nenhum
-                    $stmt = $db->prepare("INSERT INTO usuarios (nome, email, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
-                    $stmt->execute(['Cliente Padrão', 'cliente' . time() . '@brz.com']);
-                    $usuarioId = $db->lastInsertId();
-                    error_log('🔍 [CRIAR_PEDIDO] Novo usuário criado: ' . $usuarioId);
-                }
-            } else {
-                // Verificar se o usuário realmente existe
-                $db = \Config\Database::getConnection();
-                $stmt = $db->prepare("SELECT id FROM usuarios WHERE id = ?");
-                $stmt->execute([$usuario['id']]);
-                $userExists = $stmt->fetch(\PDO::FETCH_ASSOC);
-                
-                if ($userExists && !empty($userExists['id'])) {
-                    $usuarioId = $usuario['id'];
-                    error_log('🔍 [CRIAR_PEDIDO] Usuário validado: ' . $usuarioId);
-                } else {
-                    // Fallback para primeiro usuário existente
-                    $stmt = $db->prepare("SELECT id FROM usuarios ORDER BY id LIMIT 1");
-                    $stmt->execute();
-                    $fallbackUser = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    $usuarioId = $fallbackUser['id'] ?? null;
-                    error_log('🔍 [CRIAR_PEDIDO] Usuário fallback: ' . $usuarioId);
-                }
+            // Garantir usuário válido - fluxo correto obrigatório
+            $db = \Config\Database::getConnection();
+            
+            if (empty($usuario) || empty($usuario['email'])) {
+                throw new \Exception('Dados do usuário são obrigatórios para criar pedido');
             }
             
-            // Validar usuarioId antes de continuar
+            // 1. Buscar usuário pelo email
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+            $stmt->execute([$usuario['email']]);
+            $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($existingUser && !empty($existingUser['id'])) {
+                // 2. Se existir → usar usuarios.id
+                $usuarioId = $existingUser['id'];
+                error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado por email: ' . $usuarioId);
+            } else {
+                // 3. Se NÃO existir → CRIAR o usuário e usar o lastInsertId()
+                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
+                $stmt->execute([
+                    $usuario['nome'] ?? 'Cliente',
+                    $usuario['email']
+                ]);
+                $usuarioId = $db->lastInsertId();
+                error_log('🔍 [CRIAR_PEDIDO] Novo usuário criado: ' . $usuarioId . ' para email: ' . $usuario['email']);
+            }
+            
+            // 4. usuario_id SEMPRE deve ser um ID válido existente na tabela usuarios
             if (empty($usuarioId)) {
-                throw new \Exception('Não foi possível obter um ID de usuário válido');
+                throw new \Exception('Falha ao obter ID válido do usuário');
             }
             
             // Calcular totais
