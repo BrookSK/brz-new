@@ -462,12 +462,20 @@
         }
         
         // Seletor de Moeda
-        console.log('Inicializando seletor de moeda...');
+        console.log('=== INICIANDO SISTEMA DE MOEDAS ===');
+        
+        // Verificar se elementos existem
         const currencySelectors = document.querySelectorAll('.currency-selector');
         const currentCurrencySpan = document.getElementById('current-currency');
         
         console.log('Seletores encontrados:', currencySelectors.length);
         console.log('Elemento current-currency:', currentCurrencySpan);
+        
+        // Debug: mostrar cada seletor encontrado
+        currencySelectors.forEach((selector, index) => {
+            console.log(`Seletor [${index}]:`, selector);
+            console.log(`Data-currency [${index}]:`, selector.getAttribute('data-currency'));
+        });
         
         // Taxa de conversão (mesma do checkout)
         const exchangeRates = {
@@ -478,47 +486,73 @@
         // Recuperar moeda salva ou usar BRL como padrão
         let currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
         console.log('Moeda inicial:', currentCurrency);
-        updateCurrencyDisplay();
         
-        // Atualizar preços ao carregar a página
-        setTimeout(updateAllPrices, 100);
+        // Atualizar display inicial
+        if (currentCurrencySpan) {
+            currentCurrencySpan.textContent = currentCurrency;
+            console.log('Display inicial atualizado para:', currentCurrency);
+        }
         
-        currencySelectors.forEach(selector => {
-            selector.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+        // Adicionar evento de clique a cada seletor
+        currencySelectors.forEach((selector, index) => {
+            console.log(`Adicionando evento ao seletor [${index}]`);
+            
+            // Remover eventos anteriores
+            selector.removeEventListener('click', handleCurrencyClick);
+            
+            // Adicionar novo evento
+            selector.addEventListener('click', handleCurrencyClick);
+            
+            // Também adicionar evento via onclick para garantir
+            selector.onclick = function(e) {
+                console.log('OnClick disparado para:', this.getAttribute('data-currency'));
+                return handleCurrencyClick.call(this, e);
+            };
+        });
+        
+        // Função para tratar clique
+        function handleCurrencyClick(e) {
+            console.log('=== CLIQUE NO SELETOR DETECTADO ===');
+            console.log('Evento:', e);
+            console.log('Elemento clicado:', this);
+            console.log('Data-currency:', this.getAttribute('data-currency'));
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const newCurrency = this.getAttribute('data-currency');
+            console.log('Moeda selecionada:', newCurrency);
+            console.log('Moeda atual antes da mudança:', currentCurrency);
+            
+            if (newCurrency !== currentCurrency) {
+                currentCurrency = newCurrency;
+                localStorage.setItem('selected_currency', currentCurrency);
+                console.log('Moeda atualizada para:', currentCurrency);
+                console.log('Taxa de conversão:', exchangeRates[currentCurrency]);
                 
-                const newCurrency = this.getAttribute('data-currency');
-                console.log('Moeda selecionada:', newCurrency);
-                console.log('Moeda atual antes da mudança:', currentCurrency);
+                updateCurrencyDisplay();
+                updateAllPrices();
                 
-                if (newCurrency !== currentCurrency) {
-                    currentCurrency = newCurrency;
-                    localStorage.setItem('selected_currency', currentCurrency);
-                    console.log('Moeda atualizada para:', currentCurrency);
-                    console.log('Taxa de conversão:', exchangeRates[currentCurrency]);
-                    
-                    updateCurrencyDisplay();
-                    updateAllPrices();
-                    
-                    // Atualizar checkout se existir
+                // Atualizar checkout se existir
+                if (typeof updateCheckoutCurrency === 'function') {
+                    updateCheckoutCurrency(newCurrency);
+                }
+                
+                // Forçar atualização no checkout após mudança
+                setTimeout(function() {
                     if (typeof updateCheckoutCurrency === 'function') {
                         updateCheckoutCurrency(newCurrency);
                     }
-                    
-                    // Forçar atualização no checkout após mudança
-                    setTimeout(function() {
-                        if (typeof updateCheckoutCurrency === 'function') {
-                            updateCheckoutCurrency(newCurrency);
-                        }
-                    }, 500);
-                    
-                    showCurrencyChangeNotification(newCurrency);
-                } else {
-                    console.log('Moeda já é a mesma, não alterando');
-                }
-            });
-        });
+                }, 500);
+                
+                showCurrencyChangeNotification(newCurrency);
+            } else {
+                console.log('Moeda já é a mesma, não alterando');
+            }
+        }
+        
+        // Atualizar preços ao carregar a página
+        setTimeout(updateAllPrices, 100);
         
         function updateCurrencyDisplay() {
             currentCurrencySpan.textContent = currentCurrency;
@@ -786,6 +820,41 @@
                 setTimeout(updateCartSummary, 200);
             }, 100);
         });
+        
+        // Teste manual - adicionar botão de teste
+        setTimeout(function() {
+            console.log('=== ADICIONANDO BOTÃO DE TESTE ===');
+            
+            const testButton = document.createElement('button');
+            testButton.textContent = 'TESTAR USD';
+            testButton.style.cssText = 'position: fixed; top: 100px; right: 20px; z-index: 9999; background: red; color: white; padding: 10px;';
+            testButton.onclick = function() {
+                console.log('=== BOTÃO DE TESTE CLICADO ===');
+                currentCurrency = 'USD';
+                localStorage.setItem('selected_currency', 'USD');
+                updateCurrencyDisplay();
+                updateAllPrices();
+                showCurrencyChangeNotification('USD');
+            };
+            
+            document.body.appendChild(testButton);
+            
+            const testButton2 = document.createElement('button');
+            testButton2.textContent = 'TESTAR BRL';
+            testButton2.style.cssText = 'position: fixed; top: 140px; right: 20px; z-index: 9999; background: green; color: white; padding: 10px;';
+            testButton2.onclick = function() {
+                console.log('=== BOTÃO DE TESTE BRL CLICADO ===');
+                currentCurrency = 'BRL';
+                localStorage.setItem('selected_currency', 'BRL');
+                updateCurrencyDisplay();
+                updateAllPrices();
+                showCurrencyChangeNotification('BRL');
+            };
+            
+            document.body.appendChild(testButton2);
+            
+            console.log('Botões de teste adicionados');
+        }, 2000);
         
         // Forçar atualização quando a página carregar completamente
         window.addEventListener('load', function() {
