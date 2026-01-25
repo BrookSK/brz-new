@@ -77,7 +77,7 @@
                                      alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
-                                     onclick="changeMainImage('<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>')"
+                                     data-main-image="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>"
                                      title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
                                 <?php if ($foto['principal']): ?>
                                     <span class="position-absolute top-0 start-0 badge bg-primary" style="font-size: 0.6em;">Principal</span>
@@ -108,9 +108,6 @@
                     <div class="current-price">
                         <span class="currency"><?= $produto['moeda'] ?></span>
                         <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
-                    </div>
-                    <div class="price-conversion text-muted" id="price-conversion">
-                        <small>≈ R$ <span class="conversion-amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'] * 5.5, 2, ',', '.') ?></span></small>
                     </div>
                 </div>
 
@@ -302,6 +299,20 @@
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
+.thumbnail-image {
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease, transform 0.2s ease;
+}
+
+.thumbnail-image:hover {
+    transform: scale(1.05);
+    border-color: #6366f1;
+}
+
+.thumbnail-image.border-primary {
+    border-color: #6366f1 !important;
+}
+
 .product-image-container {
     height: 200px;
     overflow: hidden;
@@ -394,11 +405,23 @@ function inicializarDetalhesProduto() {
     // Trocar imagem principal ao clicar na miniatura
     $('.thumbnail-image').on('click', function() {
         const newImageSrc = $(this).data('main-image');
-        $('#main-image').attr('src', newImageSrc);
+        $('#main-image').attr('src', newImageSrc + '?v=' + Date.now());
+        
+        // Atualizar link da imagem principal
+        $('#main-image').parent('a').attr('href', newImageSrc);
         
         // Atualizar classe active
-        $('.thumbnail-image').removeClass('active');
-        $(this).addClass('active');
+        $('.thumbnail-image').removeClass('border-primary');
+        $(this).addClass('border-primary');
+        
+        console.log('Imagem trocada para:', newImageSrc);
+    });
+    
+    // Adicionar borda na imagem principal inicial
+    $('.thumbnail-image').each(function() {
+        if ($(this).data('main-image') === $('#main-image').attr('src').split('?')[0]) {
+            $(this).addClass('border-primary');
+        }
     });
     
     // Zoom na imagem principal

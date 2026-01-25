@@ -92,6 +92,45 @@ class CheckoutController extends Controller {
     }
     
     public function processar(Request $request) {
+        // Obter carrinho da sessão
+        $carrinho = $_SESSION['carrinho'] ?? [];
+        
+        if (empty($carrinho)) {
+            $this->redirect('/produtos');
+            return;
+        }
+        
+        // Obter usuário logado
+        $usuario = $this->authService->getUsuarioLogado();
+        
+        // Obter dados do formulário
+        $dados = $request->getAllParams();
+        
+        // Verificar se usuário quer salvar novo endereço
+        if (!empty($usuario) && !empty($dados['salvar_endereco'])) {
+            // Salvar novo endereço
+            $enderecoData = [
+                'usuario_id' => $usuario['id'],
+                'cep' => $dados['cep'],
+                'endereco' => $dados['endereco'],
+                'numero' => $dados['numero'],
+                'complemento' => $dados['complemento'] ?? '',
+                'bairro' => $dados['bairro'],
+                'cidade' => $dados['cidade'],
+                'estado' => $dados['estado'],
+                'principal' => 0 // Não é principal por padrão
+            ];
+            
+            // Verificar se é o primeiro endereço (torna automático principal)
+            $enderecosExistentes = $this->usuarioModel->getEnderecos($usuario['id']);
+            if (empty($enderecosExistentes)) {
+                $enderecoData['principal'] = 1;
+            }
+            
+            $this->enderecoModel->create($enderecoData);
+        }
+        
+        // Resto do processamento do pedido...
         error_log('🔍 [CONTROLLER] processar() chamado - INÍCIO');
         
         $dados = $request->getParams();

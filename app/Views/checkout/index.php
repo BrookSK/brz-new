@@ -39,41 +39,96 @@
                         <!-- Endereço de Entrega -->
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-map-marker-alt"></i> Endereço de Entrega</h6>
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">CEP *</label>
-                                    <input type="text" class="form-control" name="cep" required 
-                                           id="cep" maxlength="9">
-                                </div>
-                                <div class="col-md-9 mb-3">
-                                    <label class="form-label">Endereço *</label>
-                                    <input type="text" class="form-control" name="endereco" required id="endereco">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Número *</label>
-                                    <input type="text" class="form-control" name="numero" required>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Complemento</label>
-                                    <input type="text" class="form-control" name="complemento">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Bairro *</label>
-                                    <input type="text" class="form-control" name="bairro" required id="bairro">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Cidade *</label>
-                                    <input type="text" class="form-control" name="cidade" required id="cidade">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Estado *</label>
-                                    <select class="form-select" name="estado" required id="estado">
-                                        <option value="">Selecione...</option>
-                                        <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
-                                            <option value="<?= $uf ?>"><?= $uf ?></option>
+                            
+                            <?php if (!empty($usuario) && !empty($enderecos)): ?>
+                                <!-- Dropdown para selecionar endereço -->
+                                <div class="mb-3">
+                                    <label class="form-label">Selecione um endereço</label>
+                                    <select class="form-select" id="endereco-select" name="endereco_selecionado">
+                                        <option value="">Novo endereço...</option>
+                                        <?php foreach ($enderecos as $endereco): ?>
+                                            <option value="<?= $endereco['id'] ?>" 
+                                                    data-cep="<?= htmlspecialchars($endereco['cep']) ?>"
+                                                    data-endereco="<?= htmlspecialchars($endereco['endereco']) ?>"
+                                                    data-numero="<?= htmlspecialchars($endereco['numero']) ?>"
+                                                    data-complemento="<?= htmlspecialchars($endereco['complemento']) ?>"
+                                                    data-bairro="<?= htmlspecialchars($endereco['bairro']) ?>"
+                                                    data-cidade="<?= htmlspecialchars($endereco['cidade']) ?>"
+                                                    data-estado="<?= htmlspecialchars($endereco['estado']) ?>"
+                                                    <?= $endereco['principal'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($endereco['endereco']) ?>, <?= htmlspecialchars($endereco['numero']) ?> - <?= htmlspecialchars($endereco['bairro']) ?>, <?= htmlspecialchars($endereco['cidade']) ?>/<?= htmlspecialchars($endereco['estado']) ?>
+                                                <?php if ($endereco['principal']): ?>
+                                                    <span class="badge bg-primary ms-2">Principal</span>
+                                                <?php endif; ?>
+                                            </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                
+                                <!-- Botão para adicionar novo endereço -->
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-novo-endereco">
+                                        <i class="fas fa-plus me-2"></i> Adicionar Novo Endereço
+                                    </button>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <!-- Formulário de endereço (inicialmente oculto se houver endereços) -->
+                            <div id="endereco-form" <?= (!empty($usuario) && !empty($enderecos)) ? 'style="display: none;"' : '' ?>>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">CEP *</label>
+                                        <input type="text" class="form-control" name="cep" required 
+                                               id="cep" maxlength="9"
+                                               value="<?= htmlspecialchars($enderecos[0]['cep'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-9 mb-3">
+                                        <label class="form-label">Endereço *</label>
+                                        <input type="text" class="form-control" name="endereco" required id="endereco"
+                                               value="<?= htmlspecialchars($enderecos[0]['endereco'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Número *</label>
+                                        <input type="text" class="form-control" name="numero" required
+                                               value="<?= htmlspecialchars($enderecos[0]['numero'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Complemento</label>
+                                        <input type="text" class="form-control" name="complemento"
+                                               value="<?= htmlspecialchars($enderecos[0]['complemento'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Bairro *</label>
+                                        <input type="text" class="form-control" name="bairro" required id="bairro"
+                                               value="<?= htmlspecialchars($enderecos[0]['bairro'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Cidade *</label>
+                                        <input type="text" class="form-control" name="cidade" required id="cidade"
+                                               value="<?= htmlspecialchars($enderecos[0]['cidade'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Estado *</label>
+                                        <select class="form-select" name="estado" required id="estado">
+                                            <option value="">Selecione...</option>
+                                            <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
+                                                <option value="<?= $uf ?>" 
+                                                        <?= ($enderecos[0]['estado'] ?? '') === $uf ? 'selected' : '' ?>>
+                                                    <?= $uf ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <?php if (!empty($usuario)): ?>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="salvar_endereco" id="salvar_endereco">
+                                    <label class="form-check-label" for="salvar_endereco">
+                                        Salvar este endereço para futuras compras
+                                    </label>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -1007,6 +1062,57 @@ function toggleButton() {
         console.error('❌ [BOTÃO] Checkbox ou botão não encontrado');
     }
 }
+
+// Função para gerenciar seleção de endereço
+document.addEventListener('DOMContentLoaded', function() {
+    const enderecoSelect = document.getElementById('endereco-select');
+    const btnNovoEndereco = document.getElementById('btn-novo-endereco');
+    const enderecoForm = document.getElementById('endereco-form');
+    
+    if (enderecoSelect) {
+        enderecoSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            
+            if (this.value === '') {
+                // Mostrar formulário para novo endereço
+                enderecoForm.style.display = 'block';
+                // Limpar campos do formulário
+                document.getElementById('cep').value = '';
+                document.getElementById('endereco').value = '';
+                document.querySelector('input[name="numero"]').value = '';
+                document.querySelector('input[name="complemento"]').value = '';
+                document.getElementById('bairro').value = '';
+                document.getElementById('cidade').value = '';
+                document.getElementById('estado').value = '';
+            } else {
+                // Preencher formulário com endereço selecionado
+                enderecoForm.style.display = 'block';
+                document.getElementById('cep').value = selectedOption.dataset.cep || '';
+                document.getElementById('endereco').value = selectedOption.dataset.endereco || '';
+                document.querySelector('input[name="numero"]').value = selectedOption.dataset.numero || '';
+                document.querySelector('input[name="complemento"]').value = selectedOption.dataset.complemento || '';
+                document.getElementById('bairro').value = selectedOption.dataset.bairro || '';
+                document.getElementById('cidade').value = selectedOption.dataset.cidade || '';
+                document.getElementById('estado').value = selectedOption.dataset.estado || '';
+            }
+        });
+    }
+    
+    if (btnNovoEndereco) {
+        btnNovoEndereco.addEventListener('click', function() {
+            enderecoSelect.value = '';
+            enderecoForm.style.display = 'block';
+            // Limpar campos
+            document.getElementById('cep').value = '';
+            document.getElementById('endereco').value = '';
+            document.querySelector('input[name="numero"]').value = '';
+            document.querySelector('input[name="complemento"]').value = '';
+            document.getElementById('bairro').value = '';
+            document.getElementById('cidade').value = '';
+            document.getElementById('estado').value = '';
+        });
+    }
+});
 </script>
 
 <style>
