@@ -13,11 +13,11 @@ class AdminProdutosController extends Controller {
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
             
-            $sql = "SELECT p.*, c.nome as categoria_nome FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id WHERE 1=1";
+            $sql = "SELECT p.*, c.name as categoria FROM produtos p LEFT JOIN categorias c ON p.category_id = c.id WHERE 1=1";
             $params = [];
             
             if (!empty($busca)) {
-                $sql .= " AND (p.nome LIKE :busca OR p.sku LIKE :busca)";
+                $sql .= " AND (p.name LIKE :busca OR p.sku LIKE :busca)";
                 $params[':busca'] = "%{$busca}%";
             }
             
@@ -39,7 +39,7 @@ class AdminProdutosController extends Controller {
                 $produto['imagem'] = $foto ? 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'] : 'https://via.placeholder.com/300x200';
             }
             
-            $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (nome LIKE :busca OR sku LIKE :busca)" : ""));
+            $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (name LIKE :busca OR sku LIKE :busca)" : ""));
             if (!empty($busca)) $stmtTotal->bindValue(':busca', "%{$busca}%");
             $stmtTotal->execute();
             $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
@@ -110,13 +110,13 @@ class AdminProdutosController extends Controller {
                 foreach ($produtos as $produto) {
                     echo '<div class="col-md-6 col-lg-4 mb-4">
                         <div class="card product-card h-100">
-                            <img src="' . $produto['imagem'] . '" class="card-img-top product-image" alt="' . htmlspecialchars($produto['nome']) . '">
+                            <img src="' . $produto['imagem'] . '" class="card-img-top product-image" alt="' . htmlspecialchars($produto['name']) . '">
                             <div class="card-body">
-                                <h5 class="card-title">' . htmlspecialchars($produto['nome']) . '</h5>
+                                <h5 class="card-title">' . htmlspecialchars($produto['name']) . '</h5>
                                 <p class="text-muted small">SKU: ' . htmlspecialchars($produto['sku']) . '</p>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold text-primary">R$ ' . number_format($produto['valor'], 2, ',', '.') . '</span>
-                                    <span class="badge ' . ($produto['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($produto['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                    <span class="fw-bold text-primary">R$ ' . number_format($produto['price'], 2, ',', '.') . '</span>
+                                    <span class="badge ' . ($produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ($produto['active'] ? 'Ativo' : 'Inativo') . '</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <a href="/admin/produtos/editar/' . $produto['id'] . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
@@ -152,7 +152,7 @@ class AdminProdutosController extends Controller {
     public function novo(Request $request) {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+            $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY name ASC");
             $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             $categorias = [];
@@ -207,7 +207,7 @@ class AdminProdutosController extends Controller {
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label class="form-label">Nome *</label>
-                                        <input type="text" class="form-control" name="nome" required>
+                                        <input type="text" class="form-control" name="name" required>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">SKU *</label>
@@ -215,14 +215,14 @@ class AdminProdutosController extends Controller {
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Descrição Curta</label>
-                                        <textarea class="form-control" name="descricao_curta" rows="3"></textarea>
+                                        <textarea class="form-control" name="short_description" rows="3"></textarea>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Categoria</label>
-                                        <select class="form-select" name="categoria_id">
+                                        <select class="form-select" name="category_id">
                                             <option value="">Selecione...</option>';
                                             foreach ($categorias as $cat) {
-                                                echo '<option value="' . $cat['id'] . '">' . htmlspecialchars($cat['nome']) . '</option>';
+                                                echo '<option value="' . $cat['id'] . '">' . htmlspecialchars($cat['name']) . '</option>';
                                             }
                                         echo '</select>
                                     </div>
@@ -240,20 +240,20 @@ class AdminProdutosController extends Controller {
                                         <label class="form-label">Preço *</label>
                                         <div class="input-group">
                                             <span class="input-group-text">R$</span>
-                                            <input type="text" class="form-control" name="valor" required>
+                                            <input type="text" class="form-control" name="price" required>
                                         </div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Peso (kg)</label>
-                                        <input type="text" class="form-control" name="peso">
+                                        <input type="text" class="form-control" name="weight">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Estoque</label>
-                                        <input type="number" class="form-control" name="estoque">
+                                        <input type="number" class="form-control" name="stock">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Status</label>
-                                        <select class="form-select" name="ativo">
+                                        <select class="form-select" name="active">
                                             <option value="1">Ativo</option>
                                             <option value="0">Inativo</option>
                                         </select>
@@ -278,22 +278,22 @@ class AdminProdutosController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
-            $valor = str_replace(['R$', '.', ','], ['', '', '.'], $request->getParam('valor'));
+            $price = str_replace(['R$', '.', ','], ['', '', '.'], $request->getParam('price'));
             
             $stmt = $pdo->prepare("
-                INSERT INTO produtos (nome, sku, descricao_curta, categoria_id, valor, peso, estoque, ativo, created_at)
+                INSERT INTO produtos (name, sku, short_description, category_id, price, weight, stock, active, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             
             $stmt->execute([
-                $request->getParam('nome'),
+                $request->getParam('name'),
                 $request->getParam('sku'),
-                $request->getParam('descricao_curta'),
-                $request->getParam('categoria_id'),
-                $valor,
-                $request->getParam('peso') ?: 0,
-                $request->getParam('estoque') ?: 0,
-                $request->getParam('ativo') ?: 1
+                $request->getParam('short_description'),
+                $request->getParam('category_id'),
+                $price,
+                $request->getParam('weight') ?: 0,
+                $request->getParam('stock') ?: 0,
+                $request->getParam('active') ?: 1
             ]);
             
             $produto_id = $pdo->lastInsertId();
