@@ -14,11 +14,11 @@ class AdminPedidosController extends Controller {
             $busca = $request->getParam('busca', '');
             $status = $request->getParam('status', '');
             
-            $sql = "SELECT p.*, u.nome as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
+            $sql = "SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $params = [];
             
             if (!empty($busca)) {
-                $sql .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR u.email LIKE :busca)";
+                $sql .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
                 $params[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
@@ -38,7 +38,7 @@ class AdminPedidosController extends Controller {
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
             if (!empty($busca)) {
-                $sqlTotal .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR u.email LIKE :busca)";
+                $sqlTotal .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
@@ -140,7 +140,7 @@ class AdminPedidosController extends Controller {
                                 <p class="card-text text-muted small">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                 <p class="card-text">
                                     <small class="text-muted">Data: ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small><br>
-                                    <strong>Total: R$ ' . number_format($pedido['valor_total'], 2, ',', '.') . '</strong>
+                                    <strong>Total: R$ ' . number_format($pedido['total'], 2, ',', '.') . '</strong>
                                 </p>
                                 <div class="d-flex justify-content-between">
                                     <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
@@ -195,10 +195,7 @@ class AdminPedidosController extends Controller {
             
             // Buscar pedido
             $stmt = $pdo->prepare("
-                SELECT p.*, u.nome as cliente_nome, u.email as cliente_email, u.telefone as cliente_telefone,
-                       u.cpf as cliente_cpf, u.cep as cliente_cep, u.endereco as cliente_endereco,
-                       u.numero as cliente_numero, u.bairro as cliente_bairro, u.cidade as cliente_cidade,
-                       u.estado as cliente_estado
+                SELECT p.*, u.name as cliente_nome, u.email as cliente_email, u.telefone as cliente_telefone
                 FROM pedidos p 
                 LEFT JOIN usuarios u ON p.usuario_id = u.id 
                 WHERE p.id = :id
@@ -215,9 +212,9 @@ class AdminPedidosController extends Controller {
             
             // Buscar itens do pedido
             $stmt = $pdo->prepare("
-                SELECT ip.*, p.nome as produto_nome, p.sku as produto_sku
-                FROM itens_pedido ip
-                JOIN produtos p ON ip.produto_id = p.id
+                SELECT ip.*, pr.nome as produto_nome, pr.sku as produto_sku
+                FROM pedido_itens ip
+                LEFT JOIN produtos pr ON ip.produto_id = pr.id
                 WHERE ip.pedido_id = :pedido_id
             ");
             $stmt->bindParam(':pedido_id', $id);
@@ -299,11 +296,11 @@ class AdminPedidosController extends Controller {
                                         
                                         foreach ($itens as $item) {
                                             echo '<tr>
-                                                <td>' . htmlspecialchars($item['produto_nome']) . '</td>
-                                                <td>' . htmlspecialchars($item['produto_sku']) . '</td>
+                                                <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
+                                                <td>' . htmlspecialchars($item['produto_sku'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
-                                                <td>R$ ' . number_format($item['valor_unitario'], 2, ',', '.') . '</td>
-                                                <td>R$ ' . number_format($item['valor_total'], 2, ',', '.') . '</td>
+                                                <td>R$ ' . number_format($item['preco_unitario'], 2, ',', '.') . '</td>
+                                                <td>R$ ' . number_format($item['subtotal'], 2, ',', '.') . '</td>
                                             </tr>';
                                         }
                                         
@@ -311,7 +308,7 @@ class AdminPedidosController extends Controller {
                                         <tfoot>
                                             <tr>
                                                 <th colspan="4">Total do Pedido:</th>
-                                                <th>R$ ' . number_format($pedido['valor_total'], 2, ',', '.') . '</th>
+                                                <th>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</th>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -328,8 +325,8 @@ class AdminPedidosController extends Controller {
                             <div class="card-body">
                                 <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
-                                <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                <p><strong>Frete:</strong> R$ ' . number_format($pedido['valor_frete'], 2, ',', '.') . '</p>
+                                <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['moeda'] ?? 'BRL') . '</p>
+                                <p><strong>Frete:</strong> R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</p>
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>
@@ -354,13 +351,9 @@ class AdminPedidosController extends Controller {
                                 <p><strong>Nome:</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</p>
                                 <p><strong>Email:</strong> ' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                 <p><strong>Telefone:</strong> ' . htmlspecialchars($pedido['cliente_telefone'] ?? 'N/A') . '</p>
-                                <p><strong>CPF:</strong> ' . htmlspecialchars($pedido['cliente_cpf'] ?? 'N/A') . '</p>
                                 <hr>
                                 <p><strong>Endereço:</strong><br>
-                                ' . htmlspecialchars($pedido['cliente_endereco'] ?? '') . ', ' . htmlspecialchars($pedido['cliente_numero'] ?? '') . '<br>
-                                ' . htmlspecialchars($pedido['cliente_bairro'] ?? '') . '<br>
-                                ' . htmlspecialchars($pedido['cliente_cidade'] ?? '') . ' - ' . htmlspecialchars($pedido['cliente_estado'] ?? '') . '<br>
-                                CEP: ' . htmlspecialchars($pedido['cliente_cep'] ?? '') . '</p>
+                                Endereço não disponível no momento</p>
                             </div>
                         </div>
                     </div>
