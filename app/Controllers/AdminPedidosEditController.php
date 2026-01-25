@@ -207,95 +207,95 @@ class AdminPedidosEditController {
         
         function calcularTotal() {
             let subtotal = 0;
-            document.querySelectorAll(\'.item-row\').forEach(row => {
-                let qtd = parseFloat(row.querySelector(\'.quantidade\').value) || 0;
-                let preco = parseFloat(row.querySelector(\'.preco_unitario\').value) || 0;
+            document.querySelectorAll(".item-row").forEach(function(row) {
+                let qtd = parseFloat(row.querySelector(".quantidade").value) || 0;
+                let preco = parseFloat(row.querySelector(".preco_unitario").value) || 0;
                 subtotal += qtd * preco;
             });
             
-            let frete = parseFloat(document.getElementById(\'valor_frete\').value) || 0;
-            let desconto = parseFloat(document.getElementById(\'percentual_desconto\').value) || 0;
+            let frete = parseFloat(document.getElementById("valor_frete").value) || 0;
+            let desconto = parseFloat(document.getElementById("percentual_desconto").value) || 0;
             let valorDesconto = subtotal * (desconto / 100);
             let total = subtotal + frete - valorDesconto;
             
-            document.getElementById(\'subtotal_produtos\').value = \'R$ \' + subtotal.toFixed(2).replace(\'.\', \',\');
-            document.getElementById(\'valor_desconto\').value = \'R$ \' + valorDesconto.toFixed(2).replace(\'.\', \',\');
-            document.getElementById(\'valor_total\').value = \'R$ \' + total.toFixed(2).replace(\'.\', \',\');
+            document.getElementById("subtotal_produtos").value = "R$ " + subtotal.toFixed(2).replace(".", ",");
+            document.getElementById("valor_desconto").value = "R$ " + valorDesconto.toFixed(2).replace(".", ",");
+            document.getElementById("valor_total").value = "R$ " + total.toFixed(2).replace(".", ",");
         }
         
         function atualizarSubtotal(input) {
-            let row = input.closest(\'.item-row\');
-            let qtd = parseFloat(row.querySelector(\'.quantidade\').value) || 0;
-            let preco = parseFloat(row.querySelector(\'.preco_unitario\').value) || 0;
+            let row = input.closest(".item-row");
+            let qtd = parseFloat(row.querySelector(".quantidade").value) || 0;
+            let preco = parseFloat(row.querySelector(".preco_unitario").value) || 0;
             let subtotal = qtd * preco;
-            row.querySelector(\'.subtotal\').textContent = \'R$ \' + subtotal.toFixed(2).replace(\'.\', \',\');
+            row.querySelector(".subtotal").textContent = "R$ " + subtotal.toFixed(2).replace(".", ",");
             calcularTotal();
         }
         
         function removerItem(btn) {
-            if (confirm(\'Tem certeza que deseja remover este item?\')) {
-                btn.closest(\'.item-row\').remove();
+            if (confirm("Tem certeza que deseja remover este item?")) {
+                btn.closest(".item-row").remove();
                 calcularTotal();
             }
         }
         
         function selecionarProduto(id, nome, preco, sku) {
-            let novaLinha = \'<tr class="item-row">\
-                <td><strong>\' + nome + \'</strong><br><small class="text-muted">SKU: \' + sku + \'</small></td>\
-                <td><input type="number" class="form-control form-control-sm quantidade" value="1" min="1" onchange="atualizarSubtotal(this)"></td>\
-                <td><input type="number" class="form-control form-control-sm preco_unitario" value="\' + preco + \'" min="0" step="0.01" onchange="atualizarSubtotal(this)"></td>\
-                <td class="subtotal">R$ \' + preco.toFixed(2).replace(\'.\', \',\') + \'</td>\
-                <td><button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)"><i class="fas fa-trash"></i></button></td>\
-            </tr>\';
+            let novaLinha = "<tr class=\\"item-row\\">\\
+                <td><strong>" + nome + "</strong><br><small class=\\"text-muted\\">SKU: " + sku + "</small></td>\\
+                <td><input type=\\"number\\" class=\\"form-control form-control-sm quantidade\\" value=\\"1\\" min=\\"1\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
+                <td><input type=\\"number\\" class=\\"form-control form-control-sm preco_unitario\\" value=\\"" + preco + "\\" min=\\"0\\" step=\\"0.01\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
+                <td class=\\"subtotal\\">R$ " + preco.toFixed(2).replace(".", ",") + "</td>\\
+                <td><button type=\\"button\\" class=\\"btn btn-sm btn-danger\\" onclick=\\"removerItem(this)\\"><i class=\\"fas fa-trash\\"></i></button></td>\\
+            </tr>";
             
-            document.getElementById(\'itens_pedido\').insertAdjacentHTML(\'beforeend\', novaLinha);
-            bootstrap.Modal.getInstance(document.getElementById(\'modalAdicionarProduto\')).hide();
+            document.getElementById("itens_pedido").insertAdjacentHTML("beforeend", novaLinha);
+            bootstrap.Modal.getInstance(document.getElementById("modalAdicionarProduto")).hide();
             calcularTotal();
         }
         
         function buscarProdutos() {
-            let termo = document.getElementById(\'busca_produto\').value.toLowerCase();
-            document.querySelectorAll(\'#lista_produtos .col-md-6\').forEach(card => {
+            let termo = document.getElementById("busca_produto").value.toLowerCase();
+            document.querySelectorAll("#lista_produtos .col-md-6").forEach(function(card) {
                 let texto = card.textContent.toLowerCase();
-                card.style.display = texto.includes(termo) ? \'block\' : \'none\';
+                card.style.display = texto.includes(termo) ? "block" : "none";
             });
         }
         
         function salvarPedido() {
             let itens = [];
-            document.querySelectorAll('.item-row').forEach(row => {
+            document.querySelectorAll(".item-row").forEach(function(row) {
                 itens.push({
                     id: row.dataset.itemId,
-                    quantidade: row.querySelector('.quantidade').value,
-                    preco_unitario: row.querySelector('.preco_unitario').value
+                    quantidade: row.querySelector(".quantidade").value,
+                    preco_unitario: row.querySelector(".preco_unitario").value
                 });
             });
             
             let dados = {
                 pedido_id: pedidoId,
-                status: document.getElementById('pedido_status').value,
-                frete: document.getElementById('valor_frete').value,
-                desconto: document.getElementById('percentual_desconto').value,
+                status: document.getElementById("pedido_status").value,
+                frete: document.getElementById("valor_frete").value,
+                desconto: document.getElementById("percentual_desconto").value,
                 itens: itens
             };
             
-            fetch('/admin/pedidos/salvar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+            fetch("/admin/pedidos/salvar", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(dados)
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
-                    alert('Pedido salvo com sucesso!');
-                    window.location.href = '/admin/pedidos/detalhes/' + pedidoId;
+                    alert("Pedido salvo com sucesso!");
+                    window.location.href = "/admin/pedidos/detalhes/" + pedidoId;
                 } else {
-                    alert('Erro: ' + data.message);
+                    alert("Erro: " + data.message);
                 }
             })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao salvar pedido');
+            .catch(function(error) {
+                console.error("Erro:", error);
+                alert("Erro ao salvar pedido");
             });
         }
         
