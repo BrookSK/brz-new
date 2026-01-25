@@ -478,16 +478,17 @@ class AdminPedidosController extends Controller {
                                         }
                                         
                                         foreach ($itens as $item) {
-                                            $imagemPath = !empty($item['imagem']) && $item['imagem'] !== 'default.jpg' 
-                                                ? '/assets/images/produtos/' . htmlspecialchars($item['imagem']) 
-                                                : 'https://via.placeholder.com/50x50/cccccc/666666?text=Sem+Imagem';
-                                            
                                             echo '<tr>
-                                                <td>
-                                                    <img src="' . $imagemPath . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
-                                                         onerror="this.src=\'https://via.placeholder.com/50x50/cccccc/666666?text=Erro\'">
-                                                </td>
+                                                <td>';
+                                            
+                                            // Mostrar imagem apenas se existir
+                                            if (!empty($item['imagem']) && $item['imagem'] !== 'default.jpg') {
+                                                echo '<img src="/assets/images/produtos/' . htmlspecialchars($item['imagem']) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                     style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
+                                                     onerror="this.style.display=\'none\'">';
+                                            }
+                                            
+                                            echo '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto'] ?? 'Produto #' . $item['produto_id']) . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
                                                 <td>' . htmlspecialchars($item['referencia'] ?? 'N/A') . '</td>

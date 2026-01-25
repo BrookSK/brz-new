@@ -165,17 +165,6 @@ class PedidoEcommerce extends Model {
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($pedido) {
-            // Debug: verificar se há itens na tabela pedido_itens
-            try {
-                $stmt = $this->connection->prepare("SELECT COUNT(*) as total FROM pedido_itens WHERE pedido_id = :id");
-                $stmt->bindParam(':id', $pedidoId);
-                $stmt->execute();
-                $count = $stmt->fetch(\PDO::FETCH_ASSOC);
-                error_log('DEBUG: Total de itens na tabela pedido_itens para pedido ' . $pedidoId . ': ' . $count['total']);
-            } catch (\Exception $e) {
-                error_log('DEBUG: Erro ao contar itens: ' . $e->getMessage());
-            }
-            
             // Obter itens do pedido com dados do produto
             try {
                 // Buscar itens básicos primeiro
@@ -189,72 +178,46 @@ class PedidoEcommerce extends Model {
                 $stmt->execute();
                 $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
-                // Para cada item, tentar buscar o nome do produto
+                // Buscar todos os produtos de uma vez (mais eficiente)
+                $produtos = [];
+                try {
+                    $stmtProdutos = $this->connection->prepare("SELECT id, nome, title, imagem, image, foto FROM produtos");
+                    $stmtProdutos->execute();
+                    $todosProdutos = $stmtProdutos->fetchAll(\PDO::FETCH_ASSOC);
+                    
+                    // Criar mapa de produtos por ID
+                    foreach ($todosProdutos as $produto) {
+                        $produtos[$produto['id']] = $produto;
+                    }
+                } catch (\Exception $e) {
+                    // Se tabela produtos não existir, continua sem produtos
+                }
+                
+                // Para cada item, buscar nome do produto no mapa
                 foreach ($itens as &$item) {
                     $item['nome_produto'] = 'Produto #' . $item['produto_id'];
                     $item['referencia'] = $item['referencia'] ?? '';
                     $item['imagem'] = $item['imagem'] ?? 'default.jpg';
                     $item['descricao_produto'] = $item['descricao_produto'] ?? '';
                     
-                    // Tentar buscar nome do produto usando diferentes abordagens
-                    try {
-                        // Tentativa 1: Verificar se existe tabela produtos com coluna nome
-                        $stmtProduto = $this->connection->prepare("
-                            SELECT nome, imagem FROM produtos WHERE id = :produto_id LIMIT 1
-                        ");
-                        $stmtProduto->bindParam(':produto_id', $item['produto_id']);
-                        $stmtProduto->execute();
-                        $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
+                    // Se encontrou o produto no mapa
+                    if (isset($produtos[$item['produto_id']])) {
+                        $produto = $produtos[$item['produto_id']];
                         
-                        if ($produto && !empty($produto['nome'])) {
+                        // Tentar diferentes colunas de nome
+                        if (!empty($produto['nome'])) {
                             $item['nome_produto'] = $produto['nome'];
-                            if (!empty($produto['imagem'])) {
-                                $item['imagem'] = $produto['imagem'];
-                            }
+                        } elseif (!empty($produto['title'])) {
+                            $item['nome_produto'] = $produto['title'];
                         }
                         
-                    } catch (\Exception $e) {
-                        // Se falhar, tentar outras colunas
-                        try {
-                            $stmtProduto = $this->connection->prepare("
-                                SELECT title, image, foto FROM produtos WHERE id = :produto_id LIMIT 1
-                            ");
-                            $stmtProduto->bindParam(':produto_id', $item['produto_id']);
-                            $stmtProduto->execute();
-                            $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
-                            
-                            if ($produto && !empty($produto['title'])) {
-                                $item['nome_produto'] = $produto['title'];
-                                
-                                // Tentar diferentes colunas de imagem
-                                if (!empty($produto['image'])) {
-                                    $item['imagem'] = $produto['image'];
-                                } elseif (!empty($produto['foto'])) {
-                                    $item['imagem'] = $produto['foto'];
-                                }
-                            }
-                            
-                        } catch (\Exception $e2) {
-                            // Tentar mais colunas possíveis
-                            try {
-                                $stmtProduto = $this->connection->prepare("
-                                    SELECT product_name, product_title, descricao FROM produtos WHERE id = :produto_id LIMIT 1
-                                ");
-                                $stmtProduto->bindParam(':produto_id', $item['produto_id']);
-                                $stmtProduto->execute();
-                                $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
-                                
-                                if ($produto && !empty($produto['product_name'])) {
-                                    $item['nome_produto'] = $produto['product_name'];
-                                } elseif ($produto && !empty($produto['product_title'])) {
-                                    $item['nome_produto'] = $produto['product_title'];
-                                } elseif ($produto && !empty($produto['descricao'])) {
-                                    $item['nome_produto'] = substr($produto['descricao'], 0, 50) . '...';
-                                }
-                                
-                            } catch (\Exception $e3) {
-                                // Se todas falharem, mantém o fallback "Produto #ID"
-                            }
+                        // Tentar diferentes colunas de imagem
+                        if (!empty($produto['imagem'])) {
+                            $item['imagem'] = $produto['imagem'];
+                        } elseif (!empty($produto['image'])) {
+                            $item['imagem'] = $produto['image'];
+                        } elseif (!empty($produto['foto'])) {
+                            $item['imagem'] = $produto['foto'];
                         }
                     }
                     
