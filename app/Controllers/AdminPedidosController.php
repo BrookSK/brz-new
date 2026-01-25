@@ -130,7 +130,29 @@ class AdminPedidosController extends Controller {
                     </div>
                 </form>
                 
-                <div class="row">';
+                <!-- Abas de Pedidos por Moeda -->
+                <div class="mb-3">
+                    <ul class="nav nav-pills" id="pedidosTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">
+                                <i class="fas fa-list"></i> Todos os Pedidos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">
+                                <i class="fas fa-dollar-sign"></i> Pagamentos em Dólar
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">
+                                <i class="fas fa-currency-brl"></i> Pagamentos em Reais
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="pedidosTabContent">
+                        <div class="tab-pane fade show active" id="pedidos-todos" role="tabpanel">
+                            <div class="row">';
                 
                 foreach ($pedidos as $pedido) {
                     $statusClass = 'status-' . $pedido['status'];
@@ -157,7 +179,7 @@ class AdminPedidosController extends Controller {
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-primary">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
+                                            <h5 class="mb-0 text-primary">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
                                         </div>
                                     </div>
@@ -191,7 +213,153 @@ class AdminPedidosController extends Controller {
                     </div>';
                 }
                 
-                echo '</div>';
+                echo '</div>
+                            </div>
+                            
+                            <!-- Aba de Pedidos em Dólar -->
+                            <div class="tab-pane fade" id="pedidos-dolar" role="tabpanel">
+                                <div class="row">';
+                
+                // Filtrar pedidos em USD
+                $pedidosUSD = array_filter($pedidos, function($pedido) {
+                    return $pedido['moeda'] === 'USD';
+                });
+                
+                foreach ($pedidosUSD as $pedido) {
+                    $statusClass = 'status-' . $pedido['status'];
+                    $statusIcon = $this->getStatusIcon($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status']);
+                    
+                    echo '<div class="col-12 mb-3">
+                        <div class="card order-card">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-2">
+                                        <div class="text-center">
+                                            <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
+                                                <i class="' . $statusIcon . '"></i>
+                                            </div>
+                                            <h6 class="mb-0">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h6>
+                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h5 class="mb-0 text-success">$ ' . number_format($pedido['total'], 2, '.', ',') . '</h5>
+                                            <small class="text-muted">Total (USD)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                                <option value="">Status</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
+                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
+                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
+                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                }
+                
+                if (empty($pedidosUSD)) {
+                    echo '<div class="col-12 text-center py-5">
+                        <i class="fas fa-dollar-sign fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum pedido em dólar encontrado</h5>
+                    </div>';
+                }
+                
+                echo '</div>
+                            </div>
+                            
+                            <!-- Aba de Pedidos em Real -->
+                            <div class="tab-pane fade" id="pedidos-real" role="tabpanel">
+                                <div class="row">';
+                
+                // Filtrar pedidos em BRL
+                $pedidosBRL = array_filter($pedidos, function($pedido) {
+                    return $pedido['moeda'] === 'BRL';
+                });
+                
+                foreach ($pedidosBRL as $pedido) {
+                    $statusClass = 'status-' . $pedido['status'];
+                    $statusIcon = $this->getStatusIcon($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status']);
+                    
+                    echo '<div class="col-12 mb-3">
+                        <div class="card order-card">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-2">
+                                        <div class="text-center">
+                                            <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
+                                                <i class="' . $statusIcon . '"></i>
+                                            </div>
+                                            <h6 class="mb-0">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h6>
+                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h5 class="mb-0 text-info">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
+                                            <small class="text-muted">Total (BRL)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                                <option value="">Status</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
+                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
+                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
+                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                }
+                
+                if (empty($pedidosBRL)) {
+                    echo '<div class="col-12 text-center py-5">
+                        <i class="fas fa-currency-brl fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum pedido em real encontrado</h5>
+                    </div>';
+                }
+                
+                echo '</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>';
                 
                 if ($totalPaginas > 1) {
                     echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
@@ -431,6 +599,14 @@ class AdminPedidosController extends Controller {
 </body>
 </html>';
         exit;
+    }
+    
+    private function formatarMoeda($valor, $moeda) {
+        if ($moeda === 'USD') {
+            return '$ ' . number_format($valor, 2, '.', ',');
+        } else {
+            return 'R$ ' . number_format($valor, 2, ',', '.');
+        }
     }
     
     private function getStatusIcon($status) {
