@@ -45,21 +45,24 @@ class CarrinhoController extends Controller {
                     }
                 }
                 
+                $itemPrice = floatval($produto['price']);
+                $itemSubtotal = $item['quantidade'] * $itemPrice;
+                
                 $produtosDetalhados[] = [
                     'produto_id' => $item['produto_id'],
                     'sku' => $produto['sku'],
                     'name' => $produto['name'],
                     'description' => $produto['description'],
-                    'price' => $produto['price'],
+                    'price' => $itemPrice,
                     'weight' => $produto['weight'],
                     'quantidade' => $item['quantidade'],
-                    'subtotal' => $item['quantidade'] * $produto['price'],
+                    'subtotal' => $itemSubtotal,
                     'foto_principal' => $fotoUrl,
                     'stock' => $produto['stock']
                 ];
                 
-                $subtotal += $item['quantidade'] * $produto['price'];
-                $pesoTotal += $item['quantidade'] * $produto['weight'];
+                $subtotal += $itemSubtotal;
+                $pesoTotal += $item['quantidade'] * floatval($produto['weight']);
             }
         }
         
@@ -127,17 +130,19 @@ class CarrinhoController extends Controller {
         
         $itemKey = $produtoId;
         
+        $itemPrice = floatval($produto['price']);
+        
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['price'];
+            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $itemPrice;
             error_log("Atualizando item existente no carrinho");
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
                 'name' => $produto['name'],
-                'price' => $produto['price'],
+                'price' => $itemPrice,
                 'quantidade' => $quantidade,
-                'subtotal' => $quantidade * $produto['price']
+                'subtotal' => $quantidade * $itemPrice
             ];
             error_log("Adicionando novo item ao carrinho");
         }
@@ -145,7 +150,10 @@ class CarrinhoController extends Controller {
         error_log("Carrinho atual: " . json_encode($_SESSION['carrinho']));
         
         $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-        $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
+        $totalValor = 0;
+        foreach ($_SESSION['carrinho'] as $item) {
+            $totalValor += floatval($item['subtotal']);
+        }
         
         error_log("Total itens: $totalItens");
         error_log("Total valor: $totalValor");
@@ -175,7 +183,10 @@ class CarrinhoController extends Controller {
             unset($_SESSION['carrinho'][$produtoId]);
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-            $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
+            $totalValor = 0;
+            foreach ($_SESSION['carrinho'] as $item) {
+                $totalValor += floatval($item['subtotal']);
+            }
             
             $this->json([
                 'success' => true,
@@ -206,10 +217,13 @@ class CarrinhoController extends Controller {
             }
             
             $_SESSION['carrinho'][$produtoId]['quantidade'] = $quantidade;
-            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $_SESSION['carrinho'][$produtoId]['price'];
+            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * floatval($_SESSION['carrinho'][$produtoId]['price']);
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-            $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
+            $totalValor = 0;
+            foreach ($_SESSION['carrinho'] as $item) {
+                $totalValor += floatval($item['subtotal']);
+            }
             
             $this->json([
                 'success' => true,
@@ -245,7 +259,7 @@ class CarrinhoController extends Controller {
         foreach ($carrinho as $item) {
             $produto = $this->produtoModel->find($item['produto_id']);
             if ($produto) {
-                $pesoTotal += ($produto['weight'] ?? 0.5) * $item['quantidade'];
+                $pesoTotal += floatval($produto['weight'] ?? 0.5) * $item['quantidade'];
             }
         }
         
@@ -261,7 +275,10 @@ class CarrinhoController extends Controller {
         $frete = $fretePorKg * $pesoArredondado;
         
         // Calcular subtotal
-        $subtotal = array_sum(array_column($carrinho, 'subtotal'));
+        $subtotal = 0;
+        foreach ($carrinho as $item) {
+            $subtotal += floatval($item['subtotal']);
+        }
         
         // Impostos (80% sobre subtotal + taxa de serviço)
         $impostos = ($subtotal + $taxaServico) * 0.8;
