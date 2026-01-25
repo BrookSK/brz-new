@@ -282,26 +282,31 @@ class AdminPedidosEditController {
             }
         }
         
-        function selecionarProduto(id, nome, preco, sku) {
-            let novaLinha = "<tr class=\\"item-row\\" data-produto-id=\\"" + id + "\\" data-nome-produto=\\"" + nome + "\\" data-nome-produto-sku=\\"" + sku + "\\">\\
-                <td><strong>" + nome + "</strong><br><small class=\\"text-muted\\">SKU: " + sku + "</small></td>\\
-                <td><input type=\\"number\\" class=\\"form-control form-control-sm quantidade\\" value=\\"1\\" min=\\"1\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
-                <td><input type=\\"number\\" class=\\"form-control form-control-sm preco_unitario\\" value=\\"" + preco + "\\" min=\\"0\\" step=\\"0.01\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
-                <td class=\\"subtotal\\">R$ " + preco.toFixed(2).replace(".", ",") + "</td>\\
-                <td><button type=\\"button\\" class=\\"btn btn-sm btn-danger\\" onclick=\\"removerItem(this)\\"><i class=\\"fas fa-trash\\"></i></button></td>\\
-            </tr>";
-            
-            document.getElementById("itens_pedido").insertAdjacentHTML("beforeend", novaLinha);
-            bootstrap.Modal.getInstance(document.getElementById("modalAdicionarProduto")).hide();
-            calcularTotal();
-        }
-        
         function buscarProdutos() {
             let termo = document.getElementById("busca_produto").value.toLowerCase();
             document.querySelectorAll("#lista_produtos .col-md-6").forEach(function(card) {
                 let texto = card.textContent.toLowerCase();
                 card.style.display = texto.includes(termo) ? "block" : "none";
             });
+        }
+        
+        function selecionarProduto(id, nome, preco, sku) {
+            let tbody = document.getElementById("itens_pedido");
+            let newRow = tbody.insertRow();
+            newRow.className = "item-row";
+            newRow.setAttribute("data-produto-id", id);
+            newRow.setAttribute("data-nome-produto", nome);
+            newRow.setAttribute("data-nome-produto-sku", sku);
+            
+            newRow.innerHTML = 
+                "<td><strong>" + nome + "</strong><br><small class=\"text-muted\">SKU: " + sku + "</small></td>" +
+                "<td><input type=\"number\" class=\"form-control form-control-sm quantidade\" value=\"1\" min=\"1\" onchange=\"atualizarSubtotal(this)\"></td>" +
+                "<td><input type=\"number\" class=\"form-control form-control-sm preco_unitario\" value=\"" + preco + "\" min=\"0\" step=\"0.01\" onchange=\"atualizarSubtotal(this)\"></td>" +
+                "<td class=\"subtotal\">R$ " + preco.toFixed(2).replace(".", ",") + "</td>" +
+                "<td><button type=\"button\" class=\"btn btn-sm btn-danger\" onclick=\"removerItem(this)\"><i class=\"fas fa-trash\"></i></button></td>";
+            
+            bootstrap.Modal.getInstance(document.getElementById("modalAdicionarProduto")).hide();
+            calcularTotal();
         }
         
         function salvarPedido() {
@@ -315,14 +320,14 @@ class AdminPedidosEditController {
                 // Se for um item existente, tem data-item-id
                 if (row.dataset.itemId) {
                     item.id = row.dataset.itemId;
-                    item.produto_id = row.dataset.produtoId || '';
-                    item.nome_produto = row.dataset.nomeProduto || '';
-                    item.nome_produto_sku = row.dataset.nomeProdutoSku || '';
+                    item.produto_id = row.dataset.produtoId || "";
+                    item.nome_produto = row.dataset.nomeProduto || "";
+                    item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
                 } else {
                     // Se for um item novo, pegar dos atributos data
-                    item.produto_id = row.dataset.produtoId || '';
-                    item.nome_produto = row.dataset.nomeProduto || '';
-                    item.nome_produto_sku = row.dataset.nomeProdutoSku || '';
+                    item.produto_id = row.dataset.produtoId || "";
+                    item.nome_produto = row.dataset.nomeProduto || "";
+                    item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
                 }
                 
                 itens.push(item);
