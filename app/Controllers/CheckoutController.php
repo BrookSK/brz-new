@@ -184,6 +184,24 @@ class CheckoutController extends Controller {
         foreach ($carrinho as $item) {
             error_log('🔍 [ITENS] Item do carrinho: ' . json_encode($item));
             
+            // Validar se o produto existe antes de inserir
+            $produtoId = $item['produto_id'] ?? $item['id'] ?? null;
+            if (empty($produtoId)) {
+                error_log('❌ [ITENS] Produto ID vazio, pulando item');
+                continue;
+            }
+            
+            $stmt = $db->prepare("SELECT id FROM produtos WHERE id = ?");
+            $stmt->execute([$produtoId]);
+            $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$produto) {
+                error_log('❌ [ITENS] Produto ID ' . $produtoId . ' não encontrado, pulando item');
+                continue;
+            }
+            
+            error_log('✅ [ITENS] Produto ID ' . $produtoId . ' validado');
+            
             $sql = "INSERT INTO pedido_itens (
                 pedido_id, produto_id, quantidade, preco_unitario, 
                 subtotal, created_at
@@ -192,11 +210,13 @@ class CheckoutController extends Controller {
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $pedidoId,
-                $item['produto_id'] ?? $item['id'] ?? null,
+                $produtoId,
                 $item['quantidade'],
                 $item['preco_unitario'] ?? $item['price'] ?? 0,
                 $item['subtotal'] ?? ($item['quantidade'] * ($item['preco_unitario'] ?? $item['price'] ?? 0))
             ]);
+            
+            error_log('✅ [ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $item['quantidade']);
         }
     }
     
