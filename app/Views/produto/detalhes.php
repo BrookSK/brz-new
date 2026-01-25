@@ -74,7 +74,7 @@
                             ?>
                             <?php if ($miniaturaUrl && $miniaturaExists): ?>
                                 <img src="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
+                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) "
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
                                      onclick="changeMainImage('<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>')"
@@ -222,7 +222,7 @@
                             ?>
                             <?php if ($relacionadoExists): ?>
                                 <img src="<?= 'https://novobr.brazilianashop.com.br' . $relacionadoPath ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($relacionado['nome']) ?>"
+                                     alt="<?= htmlspecialchars($relacionado['nome']) "
                                      class="card-img-top"
                                      style="height: 150px; object-fit: cover;">
                             <?php else: ?>
@@ -384,6 +384,15 @@ document.addEventListener('DOMContentLoaded', function() {
 function inicializarDetalhesProduto() {
     console.log('Inicializando detalhes do produto...');
     
+    // Verificar se SweetAlert está disponível
+    if (typeof Swal === 'undefined') {
+        console.error('SweetAlert não está carregado!');
+        // Fallback para alert nativo
+        window.alertFallback = function(message, type = 'info') {
+            alert(message);
+        };
+    }
+    
     // Trocar imagem principal ao clicar na miniatura
     $('.thumbnail-image').on('click', function() {
         const newImageSrc = $(this).data('main-image');
@@ -448,13 +457,17 @@ function inicializarDetalhesProduto() {
                 
                 if (response.success) {
                     // Mostrar mensagem de sucesso
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Produto adicionado ao carrinho',
-                        showConfirmButton: false,
-                        timer: 1500
-                    });
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Produto adicionado ao carrinho',
+                            showConfirmButton: false,
+                            timer: 1500
+                        });
+                    } else {
+                        alert('Produto adicionado ao carrinho!');
+                    }
                     
                     // Atualizar badge do carrinho
                     updateCartBadge(response.total_itens || 1);
@@ -467,11 +480,15 @@ function inicializarDetalhesProduto() {
                         window.location.href = '/carrinho';
                     }, 1500);
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: response.error || 'Não foi possível adicionar o produto ao carrinho'
-                    });
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: response.error || 'Não foi possível adicionar o produto ao carrinho'
+                        });
+                    } else {
+                        alert('Erro: ' + (response.error || 'Não foi possível adicionar o produto ao carrinho'));
+                    }
                 }
             },
             error: function(xhr, status, error) {
@@ -479,11 +496,15 @@ function inicializarDetalhesProduto() {
                 console.error('Status:', status);
                 console.error('XHR:', xhr);
                 
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Erro ao adicionar produto ao carrinho. Tente novamente.'
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao adicionar produto ao carrinho. Tente novamente.'
+                    });
+                } else {
+                    alert('Erro ao adicionar produto ao carrinho. Tente novamente.');
+                }
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
