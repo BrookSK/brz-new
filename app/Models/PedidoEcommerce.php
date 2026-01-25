@@ -178,70 +178,78 @@ class PedidoEcommerce extends Model {
             
             // Obter itens do pedido com dados do produto
             try {
-                // Primeiro, verificar se a tabela produtos existe e tem as colunas necessárias
-                $checkTable = $this->connection->query("SHOW TABLES LIKE 'produtos'")->rowCount();
+                // Buscar itens básicos primeiro
+                $stmt = $this->connection->prepare("
+                    SELECT pi.* 
+                    FROM pedido_itens pi 
+                    WHERE pi.pedido_id = :id 
+                    ORDER BY pi.id
+                ");
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
-                if ($checkTable > 0) {
-                    // Verificar colunas da tabela produtos
-                    $columns = $this->connection->query("SHOW COLUMNS FROM produtos")->fetchAll(\PDO::FETCH_COLUMN);
+                // Para cada item, tentar buscar o nome do produto
+                foreach ($itens as &$item) {
+                    $item['nome_produto'] = 'Produto #' . $item['produto_id'];
+                    $item['referencia'] = $item['referencia'] ?? '';
+                    $item['imagem'] = $item['imagem'] ?? 'default.jpg';
+                    $item['descricao_produto'] = $item['descricao_produto'] ?? '';
                     
-                    $sql = "SELECT pi.*";
-                    
-                    // Adicionar colunas do produto apenas se existirem
-                    if (in_array('nome', $columns)) {
-                        $sql .= ", pr.nome as nome_produto";
-                    } else {
-                        $sql .= ", CONCAT('Produto #', pi.produto_id) as nome_produto";
+                    // Tentar buscar nome do produto usando diferentes abordagens
+                    try {
+                        // Tentativa 1: Verificar se existe tabela produtos com coluna nome
+                        $stmtProduto = $this->connection->prepare("
+                            SELECT nome, imagem FROM produtos WHERE id = :produto_id LIMIT 1
+                        ");
+                        $stmtProduto->bindParam(':produto_id', $item['produto_id']);
+                        $stmtProduto->execute();
+                        $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
+                        
+                        if ($produto && !empty($produto['nome'])) {
+                            $item['nome_produto'] = $produto['nome'];
+                            if (!empty($produto['imagem'])) {
+                                $item['imagem'] = $produto['imagem'];
+                            }
+                            error_log('DEBUG: Nome e imagem encontrados para produto ' . $item['produto_id'] . ': ' . $produto['nome']);
+                        }
+                        
+                    } catch (\Exception $e) {
+                        // Se falhar, tentar outras colunas
+                        try {
+                            $stmtProduto = $this->connection->prepare("
+                                SELECT title, image, foto FROM produtos WHERE id = :produto_id LIMIT 1
+                            ");
+                            $stmtProduto->bindParam(':produto_id', $item['produto_id']);
+                            $stmtProduto->execute();
+                            $produto = $stmtProduto->fetch(\PDO::FETCH_ASSOC);
+                            
+                            if ($produto && !empty($produto['title'])) {
+                                $item['nome_produto'] = $produto['title'];
+                                
+                                // Tentar diferentes colunas de imagem
+                                if (!empty($produto['image'])) {
+                                    $item['imagem'] = $produto['image'];
+                                } elseif (!empty($produto['foto'])) {
+                                    $item['imagem'] = $produto['foto'];
+                                }
+                                
+                                error_log('DEBUG: Title e imagem encontrados para produto ' . $item['produto_id'] . ': ' . $produto['title']);
+                            }
+                            
+                        } catch (\Exception $e2) {
+                            error_log('DEBUG: Não foi possível buscar nome/imagem para produto ' . $item['produto_id'] . ': ' . $e2->getMessage());
+                        }
                     }
                     
-                    if (in_array('referencia', $columns)) {
-                        $sql .= ", pr.referencia";
-                    } else {
-                        $sql .= ", '' as referencia";
-                    }
-                    
-                    if (in_array('imagem', $columns)) {
-                        $sql .= ", pr.imagem";
-                    } else {
-                        $sql .= ", 'default.jpg' as imagem";
-                    }
-                    
-                    if (in_array('descricao', $columns)) {
-                        $sql .= ", pr.descricao as descricao_produto";
-                    } elseif (in_array('descricao_curta', $columns)) {
-                        $sql .= ", pr.descricao_curta as descricao_produto";
-                    } else {
-                        $sql .= ", '' as descricao_produto";
-                    }
-                    
-                    // Usar LEFT JOIN para não quebrar se não houver correspondência
-                    $sql .= " FROM pedido_itens pi LEFT JOIN produtos pr ON pi.produto_id = pr.id WHERE pi.pedido_id = :id ORDER BY pi.id";
-                    
-                    error_log("SQL executado: " . $sql);
-                    error_log("Colunas encontradas: " . implode(', ', $columns));
-                    
-                    $stmt = $this->connection->prepare($sql);
-                    $stmt->bindParam(':id', $pedidoId);
-                    $stmt->execute();
-                    $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                    
-                    // Garantir que os itens tenham todos os campos necessários
-                    foreach ($pedido['items'] as &$item) {
-                        $item['nome_produto'] = $item['nome_produto'] ?? 'Produto #' . $item['produto_id'];
-                        $item['referencia'] = $item['referencia'] ?? '';
-                        $item['imagem'] = $item['imagem'] ?? 'default.jpg';
-                        $item['descricao_produto'] = $item['descricao_produto'] ?? '';
-                        $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
-                    }
-                    
-                } else {
-                    // Tabela produtos não existe, usar dados básicos
-                    $pedido['items'] = [];
+                    $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
                 }
+                
+                $pedido['items'] = $itens;
+                error_log('DEBUG: Total de itens processados: ' . count($itens));
                 
             } catch (\Exception $e) {
                 error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
-                error_log('SQL que causou erro: ' . $sql ?? 'SQL não definida');
                 $pedido['items'] = [];
             }
             

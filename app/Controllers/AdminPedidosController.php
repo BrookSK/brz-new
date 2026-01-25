@@ -466,6 +466,7 @@ class AdminPedidosController extends Controller {
                                     <table class="table table-sm table-bordered">
                                         <thead>
                                             <tr>
+                                                <th>Imagem</th>
                                                 <th>Produto</th>
                                                 <th>ID Produto</th>
                                                 <th>Referência</th>
@@ -475,14 +476,23 @@ class AdminPedidosController extends Controller {
                                                 <th>Data de Criação</th>
                                             </tr>
                                         </thead>
-                                        <tbody>';
+                                        <tbody>
                                         
                                         if (empty($itens)) {
-                                            echo '<tr><td colspan="7" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
+                                            echo '<tr><td colspan="8" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
                                         }
                                         
                                         foreach ($itens as $item) {
+                                            $imagemPath = !empty($item['imagem']) && $item['imagem'] !== 'default.jpg' 
+                                                ? '/assets/images/produtos/' . htmlspecialchars($item['imagem']) 
+                                                : '/assets/images/placeholder.jpg';
+                                            
                                             echo '<tr>
+                                                <td>
+                                                    <img src="' . $imagemPath . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
+                                                         onerror="this.src=\'/assets/images/placeholder.jpg\'">
+                                                </td>
                                                 <td>' . htmlspecialchars($item['nome_produto'] ?? 'Produto #' . $item['produto_id']) . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
                                                 <td>' . htmlspecialchars($item['referencia'] ?? 'N/A') . '</td>
