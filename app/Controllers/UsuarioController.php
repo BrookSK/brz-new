@@ -84,26 +84,11 @@ class UsuarioController extends Controller {
                     // Obter usuário logado
                     $usuarioId = $this->authService->getUsuarioLogado()['id'];
                     
-                    // Preparar dados para atualização
-                    $dadosAtualizacao = [
-                        'nome' => $dados['nome'] ?? '',
-                        'email' => $dados['email'] ?? '',
-                        'telefone' => $dados['telefone'] ?? '',
-                        'documento' => $dados['documento'] ?? '',
-                        'cep' => $dados['cep'] ?? '',
-                        'endereco' => $dados['endereco'] ?? '',
-                        'numero' => $dados['numero'] ?? '',
-                        'complemento' => $dados['complemento'] ?? '',
-                        'bairro' => $dados['bairro'] ?? '',
-                        'cidade' => $dados['cidade'] ?? '',
-                        'estado' => $dados['estado'] ?? '',
-                        'notificacoes_email' => isset($dados['notificacoes_email']) ? 1 : 0,
-                        'notificacoes_sms' => isset($dados['notificacoes_sms']) ? 1 : 0,
-                        'idioma' => $dados['idioma'] ?? 'pt-BR',
-                        'perfil' => 'cliente',
-                        'status' => 'ativo',
-                        'creditos_disponiveis' => 0
-                    ];
+                    // Verificar estrutura da tabela antes de atualizar
+                    $this->verificarEstruturaTabela();
+                    
+                    // Preparar dados para atualização (apenas campos que existem)
+                    $dadosAtualizacao = $this->prepararDadosAtualizacao($dados);
                     
                     // Atualizar senha se fornecida
                     if (!empty($dados['senha_atual']) && !empty($dados['senha_nova'])) {
@@ -120,15 +105,20 @@ class UsuarioController extends Controller {
                     // Atualizar dados do usuário
                     $this->usuarioModel->update($usuarioId, $dadosAtualizacao);
                     
-                    // Registrar log
-                    $this->authService->registrarLogAuditoria(
-                        $usuarioId,
-                        'atualizar_perfil',
-                        'usuarios',
-                        $usuarioId,
-                        null,
-                        $dadosAtualizacao
-                    );
+                    // Registrar log (com tratamento de erro)
+                    try {
+                        $this->authService->registrarLogAuditoria(
+                            $usuarioId,
+                            'atualizar_perfil',
+                            'usuarios',
+                            $usuarioId,
+                            null,
+                            $dadosAtualizacao
+                        );
+                    } catch (\Exception $e) {
+                        error_log('Erro ao registrar log de auditoria: ' . $e->getMessage());
+                        // Continuar mesmo se o log falhar
+                    }
                     
                     $_SESSION['message'] = 'Dados atualizados com sucesso!';
                     $_SESSION['message_type'] = 'success';
@@ -136,6 +126,7 @@ class UsuarioController extends Controller {
                 } catch (\Exception $e) {
                     $_SESSION['message'] = 'Erro ao atualizar dados: ' . $e->getMessage();
                     $_SESSION['message_type'] = 'danger';
+                    error_log('Erro em meusDados: ' . $e->getMessage());
                 }
                 
                 $this->redirect('/meus-dados');
@@ -149,6 +140,78 @@ class UsuarioController extends Controller {
         $this->view('usuario/meus-dados', [
             'usuario' => $usuario
         ]);
+    }
+    
+    private function verificarEstruturaTabela() {
+        try {
+            $stmt = $this->usuarioModel->getConnection()->query("DESCRIBE usuarios");
+            $colunas = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            
+            $colunasNecessarias = ['nome', 'email', 'telefone', 'documento', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'notificacoes_email', 'notificacoes_sms', 'idioma'];
+            
+            foreach ($colunasNecessarias as $coluna) {
+                if (!in_array($coluna, $colunas)) {
+                    error_log("Coluna ausente na tabela usuarios: {$coluna}");
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('Erro ao verificar estrutura da tabela: ' . $e->getMessage());
+        }
+    }
+    
+    private function prepararDadosAtualizacao($dados) {
+        // Obter colunas existentes na tabela
+        try {
+            $stmt = $this->usuarioModel->getConnection()->query("DESCRIBE usuarios");
+            $colunas = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+            // Se não conseguir verificar, usar array básico
+            $colunas = ['id', 'email', 'senha'];
+        }
+        
+        $dadosAtualizacao = [];
+        
+        // Mapeamento de campos do formulário para colunas do banco
+        $mapeamento = [
+            'nome' => 'nome',
+            'email' => 'email',
+            'telefone' => 'telefone',
+            'documento' => 'documento',
+            'cep' => 'cep',
+            'endereco' => 'endereco',
+            'numero' => 'numero',
+            'complemento' => 'complemento',
+            'bairro' => 'bairro',
+            'cidade' => 'cidade',
+            'estado' => 'estado',
+            'notificacoes_email' => 'notificacoes_email',
+            'notificacoes_sms' => 'notificacoes_sms',
+            'idioma' => 'idioma'
+        ];
+        
+        // Adicionar apenas campos que existem na tabela
+        foreach ($mapeamento as $campoForm => $colunaBanco) {
+            if (in_array($colunaBanco, $colunas)) {
+                if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
+                    $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
+                } else {
+                    $dadosAtualizacao[$colunaBanco] = $dados[$campoForm] ?? '';
+                }
+            }
+        }
+        
+        // Adicionar campos obrigatórios se existirem
+        if (in_array('perfil', $colunas)) {
+            $dadosAtualizacao['perfil'] = 'cliente';
+        }
+        if (in_array('status', $colunas)) {
+            $dadosAtualizacao['status'] = 'ativo';
+        }
+        if (in_array('creditos_disponiveis', $colunas)) {
+            $dadosAtualizacao['creditos_disponiveis'] = 0;
+        }
+        
+        return $dadosAtualizacao;
     }
 
     public function meusPedidos(Request $request) {

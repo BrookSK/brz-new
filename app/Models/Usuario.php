@@ -65,49 +65,66 @@ class Usuario extends Model {
     }
     
     public function update($id, $data) {
-        $stmt = $this->getConnection()->prepare("
-            UPDATE {$this->table} 
-            SET nome = :nome, 
-                email = :email, 
-                documento = :documento, 
-                telefone = :telefone, 
-                endereco = :endereco, 
-                numero = :numero,
-                complemento = :complemento,
-                bairro = :bairro,
-                cidade = :cidade, 
-                estado = :estado, 
-                cep = :cep, 
-                perfil = :perfil, 
-                status = :status, 
-                creditos_disponiveis = :creditos_disponiveis,
-                notificacoes_email = :notificacoes_email,
-                notificacoes_sms = :notificacoes_sms,
-                idioma = :idioma,
-                updated_at = NOW()
-            WHERE id = :id
-        ");
-        
-        $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':nome', $data['nome']);
-        $stmt->bindParam(':email', $data['email']);
-        $stmt->bindParam(':documento', $data['documento']);
-        $stmt->bindParam(':telefone', $data['telefone']);
-        $stmt->bindParam(':endereco', $data['endereco']);
-        $stmt->bindParam(':numero', $data['numero']);
-        $stmt->bindParam(':complemento', $data['complemento']);
-        $stmt->bindParam(':bairro', $data['bairro']);
-        $stmt->bindParam(':cidade', $data['cidade']);
-        $stmt->bindParam(':estado', $data['estado']);
-        $stmt->bindParam(':cep', $data['cep']);
-        $stmt->bindParam(':perfil', $data['perfil']);
-        $stmt->bindParam(':status', $data['status']);
-        $stmt->bindParam(':creditos_disponiveis', $data['creditos_disponiveis']);
-        $stmt->bindParam(':notificacoes_email', $data['notificacoes_email']);
-        $stmt->bindParam(':notificacoes_sms', $data['notificacoes_sms']);
-        $stmt->bindParam(':idioma', $data['idioma']);
-        
-        return $stmt->execute();
+        try {
+            // Obter colunas existentes na tabela
+            $stmt = $this->getConnection()->query("DESCRIBE {$this->table}");
+            $colunas = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            
+            // Construir SQL dinâmico apenas com colunas existentes
+            $setParts = [];
+            $params = [];
+            
+            $mapeamentoColunas = [
+                'nome' => 'nome',
+                'email' => 'email',
+                'documento' => 'documento',
+                'telefone' => 'telefone',
+                'endereco' => 'endereco',
+                'numero' => 'numero',
+                'complemento' => 'complemento',
+                'bairro' => 'bairro',
+                'cidade' => 'cidade',
+                'estado' => 'estado',
+                'cep' => 'cep',
+                'perfil' => 'perfil',
+                'status' => 'status',
+                'creditos_disponiveis' => 'creditos_disponiveis',
+                'notificacoes_email' => 'notificacoes_email',
+                'notificacoes_sms' => 'notificacoes_sms',
+                'idioma' => 'idioma'
+            ];
+            
+            foreach ($mapeamentoColunas as $campoForm => $colunaBanco) {
+                if (in_array($colunaBanco, $colunas) && isset($data[$colunaBanco])) {
+                    $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
+                    $params[$colunaBanco] = $data[$colunaBanco];
+                }
+            }
+            
+            // Adicionar updated_at se existir
+            if (in_array('updated_at', $colunas)) {
+                $setParts[] = "updated_at = NOW()";
+            }
+            
+            if (empty($setParts)) {
+                throw new \Exception('Nenhuma coluna válida encontrada para atualização');
+            }
+            
+            $sql = "UPDATE {$this->table} SET " . implode(', ', $setParts) . " WHERE id = :id";
+            $params['id'] = $id;
+            
+            $stmt = $this->getConnection()->prepare($sql);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue(":$key", $value);
+            }
+            
+            return $stmt->execute();
+            
+        } catch (\Exception $e) {
+            error_log('Erro no update de usuário: ' . $e->getMessage());
+            throw $e;
+        }
     }
     
     public function delete($id) {

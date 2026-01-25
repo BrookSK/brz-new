@@ -141,20 +141,32 @@ class AuthService {
     }
     
     public function registrarLogAuditoria($usuarioId, $acao, $tabela = null, $registroId = null, $valoresAntigos = null, $valoresNovos = null) {
-        $stmt = $this->usuarioModel->connection->prepare("
-            INSERT INTO auditoria_logs (usuario_id, acao, tabela, registro_id, valores_antigos, valores_novos, ip, user_agent) 
-            VALUES (:usuario_id, :acao, :tabela, :registro_id, :valores_antigos, :valores_novos, :ip, :user_agent)
-        ");
-        
-        $stmt->bindParam(':usuario_id', $usuarioId);
-        $stmt->bindParam(':acao', $acao);
-        $stmt->bindParam(':tabela', $tabela);
-        $stmt->bindParam(':registro_id', $registroId);
-        $stmt->bindParam(':valores_antigos', $valoresAntigos ? json_encode($valoresAntigos) : null);
-        $stmt->bindParam(':valores_novos', $valoresNovos ? json_encode($valoresNovos) : null);
-        $stmt->bindParam(':ip', $_SERVER['REMOTE_ADDR'] ?? null);
-        $stmt->bindParam(':user_agent', $_SERVER['HTTP_USER_AGENT'] ?? null);
-        
-        $stmt->execute();
+        try {
+            $connection = $this->usuarioModel->getConnection();
+            $stmt = $connection->prepare("
+                INSERT INTO auditoria_logs (usuario_id, acao, tabela, registro_id, valores_antigos, valores_novos, ip, user_agent) 
+                VALUES (:usuario_id, :acao, :tabela, :registro_id, :valores_antigos, :valores_novos, :ip, :user_agent)
+            ");
+            
+            $stmt->bindParam(':usuario_id', $usuarioId);
+            $stmt->bindParam(':acao', $acao);
+            $stmt->bindParam(':tabela', $tabela);
+            $stmt->bindParam(':registro_id', $registroId);
+            $stmt->bindParam(':valores_antigos', $valoresAntigos ? json_encode($valoresAntigos) : null);
+            $stmt->bindParam(':valores_novos', $valoresNovos ? json_encode($valoresNovos) : null);
+            
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+            
+            $stmt->bindParam(':ip', $ip);
+            $stmt->bindParam(':user_agent', $userAgent);
+            
+            $stmt->execute();
+            
+        } catch (\Exception $e) {
+            // Se não conseguir registrar log, apenas registrar no error_log
+            error_log('Erro ao registrar log de auditoria: ' . $e->getMessage());
+            error_log("Dados do log: usuario_id={$usuarioId}, acao={$acao}, tabela={$tabela}");
+        }
     }
 }
