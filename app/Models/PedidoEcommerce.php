@@ -320,9 +320,9 @@ class PedidoEcommerce extends Model {
                    e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
                    e_cob.cep as cep_cobranca
             FROM {$this->table} p
-            JOIN usuarios u ON p.usuario_id = u.id
-            JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
-            JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
+            LEFT JOIN usuarios u ON p.usuario_id = u.id
+            LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
+            LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
             WHERE p.id = :id
         ");
         $stmt->bindParam(':id', $pedidoId);
@@ -330,23 +330,86 @@ class PedidoEcommerce extends Model {
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($pedido) {
-            // Obter itens
-            $stmt = $this->connection->prepare("SELECT * FROM pedido_items WHERE pedido_id = :id");
-            $stmt->bindParam(':id', $pedidoId);
-            $stmt->execute();
-            $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            // Obter itens do pedido com dados do produto
+            try {
+                $stmt = $this->connection->prepare("
+                    SELECT pi.*, 
+                           pr.nome as nome_produto, 
+                           pr.referencia,
+                           pr.imagem,
+                           pr.descricao as descricao_produto
+                    FROM pedido_items pi
+                    LEFT JOIN produtos pr ON pi.produto_id = pr.id
+                    WHERE pi.pedido_id = :id
+                    ORDER BY pi.id
+                ");
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $pedido['items'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                // Calcular totais se estiverem zerados ou não existirem
+                if (!isset($pedido['subtotal_produtos']) || $pedido['subtotal_produtos'] == 0) {
+                    $subtotal = 0;
+                    foreach ($pedido['items'] as $item) {
+                        $subtotal += ($item['preco_unitario'] * $item['quantidade']);
+                    }
+                    $pedido['subtotal_produtos'] = $subtotal;
+                    $pedido['valor_total'] = $subtotal + ($pedido['valor_frete'] ?? 0) + ($pedido['taxa_servico'] ?? 0) + ($pedido['valor_impostos'] ?? 0);
+                }
+                
+                // Garantir que os itens tenham todos os campos necessários
+                foreach ($pedido['items'] as &$item) {
+                    $item['nome_produto'] = $item['nome_produto'] ?? 'Produto #' . $item['produto_id'];
+                    $item['referencia'] = $item['referencia'] ?? '';
+                    $item['imagem'] = $item['imagem'] ?? 'default.jpg';
+                    $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
+                }
+                
+            } catch (\Exception $e) {
+                error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
+                $pedido['items'] = [];
+            }
             
-            // Obter histórico
-            $stmt = $this->connection->prepare("
-                SELECT psh.*, u.nome as usuario_alterou 
-                FROM pedido_status_history psh 
-                LEFT JOIN usuarios u ON psh.alterado_por = u.id 
-                WHERE psh.pedido_id = :id 
-                ORDER BY psh.created_at DESC
-            ");
-            $stmt->bindParam(':id', $pedidoId);
-            $stmt->execute();
-            $pedido['historico'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            // Obter histórico de status
+            try {
+                $stmt = $this->connection->prepare("
+                    SELECT psh.*, u.nome as usuario_alterou 
+                    FROM pedido_status_history psh 
+                    LEFT JOIN usuarios u ON psh.alterado_por = u.id 
+                    WHERE psh.pedido_id = :id 
+                    ORDER BY psh.created_at DESC
+                ");
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $pedido['historico'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                // Garantir que o histórico tenha todos os campos
+                foreach ($pedido['historico'] as &$item) {
+                    $item['novo_status'] = $item['novo_status'] ?? 'Status atualizado';
+                    $item['observacao'] = $item['observacao'] ?? 'Sem observação';
+                    $item['usuario_alterou'] = $item['usuario_alterou'] ?? 'Sistema';
+                }
+                
+            } catch (\Exception $e) {
+                error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
+                $pedido['historico'] = [];
+            }
+            
+            // Garantir que o pedido tenha todos os campos necessários
+            $pedido['codigo_pedido'] = $pedido['codigo_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
+            $pedido['status'] = $pedido['status'] ?? 'pendente';
+            $pedido['valor_frete'] = $pedido['valor_frete'] ?? 0;
+            $pedido['taxa_servico'] = $pedido['taxa_servico'] ?? 0;
+            $pedido['valor_impostos'] = $pedido['valor_impostos'] ?? 0;
+            
+            // Garantir que os campos de endereço tenham valores padrão
+            $pedido['endereco_entrega'] = $pedido['endereco_entrega'] ?? 'Não informado';
+            $pedido['numero_entrega'] = $pedido['numero_entrega'] ?? '';
+            $pedido['complemento_entrega'] = $pedido['complemento_entrega'] ?? '';
+            $pedido['bairro_entrega'] = $pedido['bairro_entrega'] ?? '';
+            $pedido['cidade_entrega'] = $pedido['cidade_entrega'] ?? '';
+            $pedido['estado_entrega'] = $pedido['estado_entrega'] ?? '';
+            $pedido['cep_entrega'] = $pedido['cep_entrega'] ?? '';
         }
         
         return $pedido;

@@ -246,10 +246,21 @@ class UsuarioController extends Controller {
         $pedidoId = $request->getParam('id');
         $usuario = $this->authService->getUsuarioLogado();
         
+        // Debug
+        error_log("Tentando acessar detalhes do pedido ID: {$pedidoId} para usuário: {$usuario['id']}");
+        
         try {
             $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
             
-            if (!$pedido || $pedido['usuario_id'] !== $usuario['id']) {
+            error_log("Pedido encontrado: " . ($pedido ? 'SIM' : 'NÃO'));
+            if ($pedido) {
+                error_log("Dono do pedido: {$pedido['usuario_id']}, Usuário logado: {$usuario['id']}");
+                error_log("Itens do pedido: " . count($pedido['items']));
+                error_log("Valor total: " . ($pedido['valor_total'] ?? 0));
+            }
+            
+            if (!$pedido || $pedido['usuario_id'] != $usuario['id']) {
+                error_log("Acesso negado ao pedido {$pedidoId}");
                 $this->view('errors/404');
                 return;
             }
@@ -264,6 +275,7 @@ class UsuarioController extends Controller {
             
         } catch (\Exception $e) {
             error_log('Erro ao obter detalhes do pedido: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
             $this->view('errors/500');
         }
     }
