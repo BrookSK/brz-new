@@ -512,8 +512,7 @@ class CheckoutController extends Controller {
                 null, // endereco_cobranca_id
                 $dados['observacoes'] ?? '',
                 date('Y-m-d H:i:s'), // created_at
-                date('Y-m-d H:i:s'), // updated_at
-                null // parâmetro adicional
+                date('Y-m-d H:i:s')  // updated_at
             ];
             
             error_log('🔍 [CRIAR_PEDIDO] Parâmetros: ' . json_encode($params));
