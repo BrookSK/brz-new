@@ -212,9 +212,8 @@ class AdminPedidosController extends Controller {
             
             // Buscar itens do pedido
             $stmt = $pdo->prepare("
-                SELECT ip.*, pr.nome as produto_nome, pr.sku as produto_sku
+                SELECT ip.* 
                 FROM pedido_itens ip
-                LEFT JOIN produtos pr ON ip.produto_id = pr.id
                 WHERE ip.pedido_id = :pedido_id
             ");
             $stmt->bindParam(':pedido_id', $id);
@@ -275,49 +274,84 @@ class AdminPedidosController extends Controller {
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-8">
+                    <div class="col-md-12">
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Itens do Pedido</h5>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table">
+                                    <table class="table table-bordered">
                                         <thead>
                                             <tr>
-                                                <th>Produto</th>
-                                                <th>SKU</th>
-                                                <th>Qtd</th>
-                                                <th>Valor Unit.</th>
-                                                <th>Total</th>
+                                                <th>Produto ID</th>
+                                                <th>Quantidade</th>
+                                                <th>Preço Unitário</th>
+                                                <th>Subtotal</th>
+                                                <th>Data de Criação</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
                                         
                                         foreach ($itens as $item) {
                                             echo '<tr>
-                                                <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
-                                                <td>' . htmlspecialchars($item['produto_sku'] ?? 'N/A') . '</td>
+                                                <td>' . $item['produto_id'] . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>R$ ' . number_format($item['preco_unitario'], 2, ',', '.') . '</td>
                                                 <td>R$ ' . number_format($item['subtotal'], 2, ',', '.') . '</td>
+                                                <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                             </tr>';
                                         }
                                         
                                         echo '</tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <th colspan="4">Total do Pedido:</th>
-                                                <th>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</th>
-                                            </tr>
-                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-4">
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Dados Completos do Pedido</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Campo</th>
+                                                <th>Valor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
+                                            <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['numero_pedido']) . '</td></tr>
+                                            <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></td></tr>
+                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
+                                            <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
+                                            <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
+                                            <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
+                                            <tr><td><strong>Subtotal</strong></td><td>R$ ' . number_format($pedido['subtotal'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Serviços</strong></td><td>R$ ' . number_format($pedido['servicos'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Impostos</strong></td><td>R$ ' . number_format($pedido['impostos'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Frete</strong></td><td>R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Desconto</strong></td><td>R$ ' . number_format($pedido['desconto'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Total</strong></td><td><strong>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</strong></td></tr>
+                                            <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars($pedido['moeda']) . '</td></tr>
+                                            <tr><td><strong>Taxa Conversão</strong></td><td>' . $pedido['taxa_conversao'] . '</td></tr>
+                                            <tr><td><strong>End. Entrega ID</strong></td><td>' . ($pedido['endereco_entrega_id'] ?? 'N/A') . '</td></tr>
+                                            <tr><td><strong>End. Cobrança ID</strong></td><td>' . ($pedido['endereco_cobranca_id'] ?? 'N/A') . '</td></tr>
+                                            <tr><td><strong>Observações</strong></td><td>' . htmlspecialchars($pedido['observacoes'] ?? 'Nenhuma') . '</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Informações do Pedido</h5>
