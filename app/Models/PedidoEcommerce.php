@@ -228,6 +228,11 @@ class PedidoEcommerce extends Model {
                     $pedido['items'] = [];
                 }
                 
+            } catch (\Exception $e) {
+                error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
+                $pedido['items'] = [];
+            }
+                
                 // Obter histórico de status
                 try {
                     $stmt = $this->connection->prepare("
