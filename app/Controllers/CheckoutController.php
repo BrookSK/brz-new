@@ -196,11 +196,17 @@ class CheckoutController extends Controller {
             $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$produto) {
-                error_log('❌ [ITENS] Produto ID ' . $produtoId . ' não encontrado, pulando item');
+                error_log(' [ITENS] Produto ID ' . $produtoId . ' não encontrado, pulando item');
                 continue;
             }
             
-            error_log('✅ [ITENS] Produto ID ' . $produtoId . ' validado');
+            error_log(' [ITENS] Produto ID ' . $produtoId . ' validado');
+            
+            // Verificar diferentes campos de preço
+            $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
+            $quantidade = $item['quantidade'] ?? 1;
+            
+            error_log(' [ITENS] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
             
             $sql = "INSERT INTO pedido_itens (
                 pedido_id, produto_id, quantidade, preco_unitario, 
@@ -211,12 +217,12 @@ class CheckoutController extends Controller {
             $stmt->execute([
                 $pedidoId,
                 $produtoId,
-                $item['quantidade'],
-                $item['preco_unitario'] ?? $item['price'] ?? 0,
-                $item['subtotal'] ?? ($item['quantidade'] * ($item['preco_unitario'] ?? $item['price'] ?? 0))
+                $quantidade,
+                $precoUnitario,
+                $precoUnitario * $quantidade
             ]);
             
-            error_log('✅ [ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $item['quantidade']);
+            error_log(' [ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
         }
     }
     
@@ -477,9 +483,15 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Calculando totais...');
             
             foreach ($carrinho as $item) {
-                $subtotal += ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 1);
-                $pesoTotal += 0.5 * ($item['quantidade'] ?? 1); // Peso padrão
+                // Verificar diferentes campos de preço
+                $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
+                $quantidade = $item['quantidade'] ?? 1;
+                
+                $subtotal += $precoUnitario * $quantidade;
+                $pesoTotal += 0.5 * $quantidade; // Peso padrão
+                
                 error_log('🔍 [CRIAR_PEDIDO] Item processado: ' . json_encode($item));
+                error_log('🔍 [CRIAR_PEDIDO] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
             }
             
             error_log('🔍 [CRIAR_PEDIDO] Subtotal: ' . $subtotal);
