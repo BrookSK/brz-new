@@ -35,27 +35,12 @@ class ProdutoController extends Controller {
             if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
                 $fotoUrl = $fotoPrincipal['nome_arquivo'];
                 
-                // Se for URL externa, não usar
-                if (strpos($fotoUrl, 'http') === 0) {
+                // Verificar se arquivo existe fisicamente
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
+                if (file_exists($filePath)) {
+                    $produto['foto_principal'] = 'https://novobr.brazilianashop.com.br' . $fotoUrl;
+                } else {
                     $produto['foto_principal'] = null;
-                    error_log('⚠️ [PRODUTO-CONTROLLER] URL externa ignorada para produto ' . $produto['id'] . ': ' . $fotoUrl);
-                }
-                // Se for URL interna, verificar se arquivo existe
-                elseif (strpos($fotoUrl, '/uploads/') === 0) {
-                    $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $fotoUrl;
-                    if (file_exists($caminhoFisico)) {
-                        $produto['foto_principal'] = $fotoUrl;
-                        error_log('✅ [PRODUTO-CONTROLLER] Arquivo encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
-                    } else {
-                        $produto['foto_principal'] = null;
-                        error_log('❌ [PRODUTO-CONTROLLER] Arquivo NÃO encontrado para produto ' . $produto['id'] . ': ' . $fotoUrl);
-                        error_log('❌ [PRODUTO-CONTROLLER] Caminho verificado: ' . $caminhoFisico);
-                    }
-                }
-                // Se não começar com /uploads/, corrigir
-                else {
-                    $produto['foto_principal'] = '/uploads/produtos/' . basename($fotoUrl);
-                    error_log('🔧 [PRODUTO-CONTROLLER] URL corrigida para produto ' . $produto['id'] . ': ' . $fotoUrl . ' → ' . $produto['foto_principal']);
                 }
             } else {
                 $produto['foto_principal'] = null;
@@ -64,7 +49,7 @@ class ProdutoController extends Controller {
         
         $categorias = $this->produtoModel->getCategorias();
         
-        $this->view('produto/index', [
+        $this->view('produto/index_moderno', [
             'produtos' => $produtos,
             'categorias' => $categorias,
             'search' => $search,
@@ -113,7 +98,16 @@ class ProdutoController extends Controller {
         // Adicionar fotos principais aos relacionados
         foreach ($produtosRelacionados as &$relacionado) {
             $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($relacionado['id']);
-            $relacionado['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
+            if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipal['nome_arquivo'], '/');
+                if (file_exists($filePath)) {
+                    $relacionado['foto_principal'] = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                } else {
+                    $relacionado['foto_principal'] = null;
+                }
+            } else {
+                $relacionado['foto_principal'] = null;
+            }
         }
         
         $this->view('produto/detalhes', [
