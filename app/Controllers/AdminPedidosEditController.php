@@ -367,14 +367,13 @@ class AdminPedidosEditController {
             $valorDesconto = $subtotal * ($percentualDesconto / 100);
             $total = $subtotal + $frete - $valorDesconto;
             
-            // Atualizar pedido - usando colunas corretas
+            // Atualizar pedido - usando colunas corretas (sem updated_at)
             $stmt = $this->connection->prepare("
                 UPDATE pedidos SET 
                     status = :status,
                     frete = :frete,
                     subtotal = :subtotal,
-                    total = :total,
-                    updated_at = NOW()
+                    total = :total
                 WHERE id = :pedido_id
             ");
             $stmt->bindParam(':status', $dados['status']);
@@ -384,7 +383,7 @@ class AdminPedidosEditController {
             $stmt->bindParam(':pedido_id', $dados['pedido_id']);
             $stmt->execute();
             
-            // Atualizar itens
+            // Atualizar itens - sem updated_at
             foreach ($dados['itens'] as $item) {
                 $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
                 
@@ -392,8 +391,7 @@ class AdminPedidosEditController {
                     UPDATE pedido_itens SET 
                         quantidade = :quantidade,
                         preco_unitario = :preco_unitario,
-                        subtotal = :subtotal,
-                        updated_at = NOW()
+                        subtotal = :subtotal
                     WHERE id = :id
                 ");
                 $stmt->bindParam(':quantidade', $item['quantidade']);
