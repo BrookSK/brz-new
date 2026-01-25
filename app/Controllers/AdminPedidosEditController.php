@@ -13,7 +13,7 @@ class AdminPedidosEditController {
             // Extrair ID do Request
             $id = $request->getParam('id');
             
-            // Buscar pedido diretamente
+            // Buscar pedido diretamente - usando colunas que existem
             $stmt = $this->connection->prepare("
                 SELECT p.*, 
                        u.nome as cliente_nome, u.email as cliente_email
@@ -138,7 +138,7 @@ class AdminPedidosEditController {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Frete</label>
-                                    <input type="number" class="form-control" id="valor_frete" value="' . $pedido['valor_frete'] . '" step="0.01" onchange="calcularTotal()">
+                                    <input type="number" class="form-control" id="valor_frete" value="' . ($pedido['frete'] ?? 0) . '" step="0.01" onchange="calcularTotal()">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Desconto (%)</label>
@@ -367,13 +367,13 @@ class AdminPedidosEditController {
             $valorDesconto = $subtotal * ($percentualDesconto / 100);
             $total = $subtotal + $frete - $valorDesconto;
             
-            // Atualizar pedido
+            // Atualizar pedido - usando colunas corretas
             $stmt = $this->connection->prepare("
                 UPDATE pedidos SET 
                     status = :status,
-                    valor_frete = :frete,
+                    frete = :frete,
                     subtotal = :subtotal,
-                    valor_total = :total,
+                    total = :total,
                     updated_at = NOW()
                 WHERE id = :pedido_id
             ");
