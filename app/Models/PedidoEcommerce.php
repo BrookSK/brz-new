@@ -167,9 +167,24 @@ class PedidoEcommerce extends Model {
         if ($pedido) {
             // Obter itens do pedido com dados do produto
             try {
-                // Buscar itens básicos primeiro
+                // Buscar itens diretamente com as colunas que criamos
                 $stmt = $this->connection->prepare("
-                    SELECT pi.* 
+                    SELECT 
+                        pi.id,
+                        pi.pedido_id,
+                        pi.produto_id,
+                        pi.quantidade,
+                        pi.preco_unitario,
+                        pi.subtotal,
+                        pi.nome_produto,
+                        pi.nome_produto_sku,
+                        pi.produto_preco,
+                        pi.produto_ncm,
+                        pi.produto_peso,
+                        pi.produto_dimensoes,
+                        pi.produto_tipo,
+                        pi.produto_status,
+                        pi.created_at
                     FROM pedido_itens pi 
                     WHERE pi.pedido_id = :id 
                     ORDER BY pi.id
@@ -178,47 +193,18 @@ class PedidoEcommerce extends Model {
                 $stmt->execute();
                 $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
-                // Buscar todos os produtos de uma vez (mais eficiente)
-                $produtos = [];
-                try {
-                    $stmtProdutos = $this->connection->prepare("SELECT id, nome, title, imagem, image, foto FROM produtos");
-                    $stmtProdutos->execute();
-                    $todosProdutos = $stmtProdutos->fetchAll(\PDO::FETCH_ASSOC);
-                    
-                    // Criar mapa de produtos por ID
-                    foreach ($todosProdutos as $produto) {
-                        $produtos[$produto['id']] = $produto;
-                    }
-                } catch (\Exception $e) {
-                    // Se tabela produtos não existir, continua sem produtos
-                }
+                // Debug para verificar os dados
+                error_log('DEBUG: Itens do pedido ' . $pedidoId . ': ' . print_r($itens, true));
                 
-                // Para cada item, buscar nome do produto no mapa
+                // Garantir que os itens tenham todos os campos necessários
                 foreach ($itens as &$item) {
-                    $item['nome_produto'] = 'Produto #' . $item['produto_id'];
-                    $item['referencia'] = $item['referencia'] ?? '';
+                    $item['referencia'] = $item['referencia'] ?? $item['nome_produto_sku'] ?? '';
                     $item['imagem'] = $item['imagem'] ?? 'default.jpg';
                     $item['descricao_produto'] = $item['descricao_produto'] ?? '';
                     
-                    // Se encontrou o produto no mapa
-                    if (isset($produtos[$item['produto_id']])) {
-                        $produto = $produtos[$item['produto_id']];
-                        
-                        // Tentar diferentes colunas de nome
-                        if (!empty($produto['nome'])) {
-                            $item['nome_produto'] = $produto['nome'];
-                        } elseif (!empty($produto['title'])) {
-                            $item['nome_produto'] = $produto['title'];
-                        }
-                        
-                        // Tentar diferentes colunas de imagem
-                        if (!empty($produto['imagem'])) {
-                            $item['imagem'] = $produto['imagem'];
-                        } elseif (!empty($produto['image'])) {
-                            $item['imagem'] = $produto['image'];
-                        } elseif (!empty($produto['foto'])) {
-                            $item['imagem'] = $produto['foto'];
-                        }
+                    // Se não tiver nome_produto, usar fallback
+                    if (empty($item['nome_produto'])) {
+                        $item['nome_produto'] = 'Produto #' . $item['produto_id'];
                     }
                     
                     $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
