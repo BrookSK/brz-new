@@ -71,13 +71,18 @@ class AdminPedidosController extends Controller {
         .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
         .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
         .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
-        .order-card { transition: transform 0.2s; }
-        .order-card:hover { transform: translateY(-5px); }
-        .status-pendente { background-color: #ffc107; }
-        .status-pago { background-color: #28a745; }
-        .status-cancelado { background-color: #dc3545; }
-        .status-enviado { background-color: #17a2b8; }
-        .status-entregue { background-color: #6f42c1; }
+        .order-card { 
+            transition: all 0.3s ease; 
+            border-left: 4px solid #dee2e6;
+        }
+        .order-card:hover { 
+            transform: translateX(5px); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .order-card .badge {
+            font-size: 1.2rem;
+            padding: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -129,31 +134,50 @@ class AdminPedidosController extends Controller {
                 
                 foreach ($pedidos as $pedido) {
                     $statusClass = 'status-' . $pedido['status'];
-                    echo '<div class="col-md-6 col-lg-4 mb-4">
-                        <div class="card order-card h-100">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <strong>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</strong>
-                                <span class="badge ' . $statusClass . '">' . ucfirst($pedido['status']) . '</span>
-                            </div>
+                    $statusIcon = $this->getStatusIcon($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status']);
+                    
+                    echo '<div class="col-12 mb-3">
+                        <div class="card order-card">
                             <div class="card-body">
-                                <h6 class="card-title">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
-                                <p class="card-text text-muted small">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                <p class="card-text">
-                                    <small class="text-muted">Data: ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small><br>
-                                    <strong>Total: R$ ' . number_format($pedido['total'], 2, ',', '.') . '</strong>
-                                </p>
-                                <div class="d-flex justify-content-between">
-                                    <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Ver
-                                    </a>
-                                    <select class="form-select form-select-sm" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                        <option value="">Alterar</option>
-                                        <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                        <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                        <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
-                                        <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                        <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
-                                    </select>
+                                <div class="row align-items-center">
+                                    <div class="col-md-2">
+                                        <div class="text-center">
+                                            <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
+                                                <i class="' . $statusIcon . '"></i>
+                                            </div>
+                                            <h6 class="mb-0">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h6>
+                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h5 class="mb-0 text-primary">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
+                                            <small class="text-muted">Total do Pedido</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                                <option value="">Status</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
+                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
+                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
+                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -407,6 +431,32 @@ class AdminPedidosController extends Controller {
 </body>
 </html>';
         exit;
+    }
+    
+    private function getStatusIcon($status) {
+        $icons = [
+            'pendente' => 'fas fa-clock',
+            'pagamento' => 'fas fa-credit-card',
+            'aprovado' => 'fas fa-check-circle',
+            'separacao' => 'fas fa-box',
+            'enviado' => 'fas fa-truck',
+            'entregue' => 'fas fa-check-double',
+            'cancelado' => 'fas fa-times-circle'
+        ];
+        return $icons[$status] ?? 'fas fa-question-circle';
+    }
+    
+    private function getStatusColor($status) {
+        $colors = [
+            'pendente' => 'warning',
+            'pagamento' => 'info',
+            'aprovado' => 'success',
+            'separacao' => 'primary',
+            'enviado' => 'info',
+            'entregue' => 'success',
+            'cancelado' => 'danger'
+        ];
+        return $colors[$status] ?? 'secondary';
     }
     
     public function atualizarStatus(Request $request) {
