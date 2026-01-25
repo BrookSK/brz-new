@@ -18,6 +18,7 @@ class CarrinhoController extends Controller {
     }
 
     public function index(Request $request) {
+        session_start();
         $carrinho = $_SESSION['carrinho'] ?? [];
         
         if (empty($carrinho)) {

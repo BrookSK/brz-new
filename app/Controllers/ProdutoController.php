@@ -146,14 +146,15 @@ class ProdutoController extends Controller {
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['valor'];
+            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['preco'];
+            $_SESSION['carrinho'][$itemKey]['preco_unitario'] = $produto['preco']; // Garantir campo correto
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
                 'nome' => $produto['nome'],
-                'preco_unitario' => $produto['valor'],
+                'preco_unitario' => $produto['preco'], // Usar campo correto
                 'quantidade' => $quantidade,
-                'subtotal' => $quantidade * $produto['valor']
+                'subtotal' => $quantidade * $produto['preco']
             ];
         }
         

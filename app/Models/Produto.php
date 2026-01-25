@@ -29,6 +29,7 @@ class Produto extends Model {
                 'descricao_curta' => $produto['short_description'] ?? '',
                 'categoria_id' => $produto['category_id'] ?? 0,
                 'valor' => floatval($produto['price'] ?? 0),
+                'preco' => floatval($produto['price'] ?? 0), // Adicionar campo 'preco' para compatibilidade
                 'preco_custo' => floatval($produto['cost_price'] ?? 0),
                 'preco_promocao' => floatval($produto['sale_price'] ?? 0),
                 'estoque' => intval($produto['stock'] ?? 0),
@@ -44,6 +45,7 @@ class Produto extends Model {
                 'imagens' => $produto['images'] ? json_decode($produto['images'], true) : [],
                 'variacoes' => $produto['variations'] ? json_decode($produto['variations'], true) : [],
                 'atributos' => $produto['attributes'] ? json_decode($produto['attributes'], true) : [],
+                'moeda' => $produto['currency'] ?? 'USD', // Adicionar campo moeda
                 'ativo' => $produto['active'] ?? true,
                 'destaque' => $produto['featured'] ?? false,
                 'digital' => $produto['digital'] ?? false,

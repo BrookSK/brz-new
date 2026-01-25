@@ -32,9 +32,9 @@
                                        c.nome AS categoria_nome,
                                        pf.nome_arquivo AS foto_principal
                                 FROM produtos p
-                                LEFT JOIN categorias c ON p.categoria_id = c.id
+                                LEFT JOIN categorias c ON p.category_id = c.id
                                 LEFT JOIN produto_fotos pf ON p.id = pf.produto_id AND pf.principal = 1
-                                WHERE p.ativo = 1 AND p.destaque = 1
+                                WHERE p.active = 1 AND p.featured = 1
                                 ORDER BY RAND()
                                 LIMIT 4
                             ");
@@ -66,7 +66,7 @@
                                             <?= htmlspecialchars(substr($produto['descricao'] ?? '', 0, 80)) ?>...
                                         </p>
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <span class="badge bg-primary rounded-pill">R$ <?= number_format($produto['valor'], 2, ',', '.') ?></span>
+                                            <span class="badge bg-primary rounded-pill"><?= $produto['moeda'] ?? 'USD' ?> <?= number_format($produto['preco'] ?? 0, 2, ',', '.') ?></span>
                                             <span class="badge bg-success rounded-pill"><?= $produto['categoria_nome'] ?></span>
                                         </div>
                                     </div>
