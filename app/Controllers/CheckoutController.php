@@ -433,34 +433,17 @@ class CheckoutController extends Controller {
                 $clienteId = $existingClient['id'];
                 error_log('🔍 [CRIAR_PEDIDO] Cliente encontrado: ' . $clienteId);
             } else {
-                // TENTATIVA 1: Usar 'nome' (schema original)
-                try {
-                    $stmt = $db->prepare("INSERT INTO clientes (nome, email, telefone, documento, created_at) VALUES (?, ?, ?, ?, NOW())");
-                    $stmt->execute([
-                        $usuario['nome'] ?? 'Cliente',
-                        $usuario['email'],
-                        $usuario['telefone'] ?? '',
-                        'DOC' . time()
-                    ]);
-                    $clienteId = $db->lastInsertId();
-                    error_log('🔍 [CRIAR_PEDIDO] Cliente criado com campo "nome": ' . $clienteId);
-                } catch (\Exception $e) {
-                    // TENTATIVA 2: Usar 'name' (se o banco estiver diferente)
-                    if (strpos($e->getMessage(), "Unknown column 'nome'") !== false) {
-                        error_log('🔍 [CRIAR_PEDIDO] Campo "nome" não existe, tentando com "name"...');
-                        $stmt = $db->prepare("INSERT INTO clientes (name, email, telefone, documento, created_at) VALUES (?, ?, ?, ?, NOW())");
-                        $stmt->execute([
-                            $usuario['nome'] ?? 'Cliente',
-                            $usuario['email'],
-                            $usuario['telefone'] ?? '',
-                            'DOC' . time()
-                        ]);
-                        $clienteId = $db->lastInsertId();
-                        error_log('🔍 [CRIAR_PEDIDO] Cliente criado com campo "name": ' . $clienteId);
-                    } else {
-                        throw $e;
-                    }
-                }
+                // Usar estrutura REAL da tabela clientes
+                $stmt = $db->prepare("INSERT INTO clientes (usuario_id, nome_razao_social, cpf_cnpj, telefone, email, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                $stmt->execute([
+                    $usuarioId,
+                    $usuario['nome'] ?? 'Cliente',
+                    'DOC' . time(), // CPF/CNPJ temporário
+                    $usuario['telefone'] ?? '',
+                    $usuario['email']
+                ]);
+                $clienteId = $db->lastInsertId();
+                error_log('🔍 [CRIAR_PEDIDO] Cliente criado com estrutura real: ' . $clienteId);
             }
             
             // 3. Validar IDs antes de continuar
