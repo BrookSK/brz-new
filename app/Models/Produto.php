@@ -137,10 +137,19 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Iniciando criação de produto');
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados recebidos: ' . print_r($data, true));
         
+        // Gerar slug automaticamente se não fornecido
+        $slug = $data['slug'] ?? '';
+        if (empty($slug)) {
+            $slug = $this->generateSlug($data['name'] ?? '');
+        }
+        
+        // Garantir slug único
+        $slug = $this->ensureUniqueSlug($slug);
+        
         // Mapear campos do formulário para o banco
         $dadosBanco = [
             'name' => $data['name'] ?? '',
-            'slug' => $data['slug'] ?? '',
+            'slug' => $slug,
             'sku' => $data['sku'] ?? '',
             'description' => $data['description'] ?? '',
             'short_description' => $data['short_description'] ?? '',
@@ -391,5 +400,61 @@ class Produto extends Model {
         $stmt->bindParam(':quantidade', $quantidade);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
+    }
+    
+    /**
+     * Gerar slug a partir do nome
+     */
+    private function generateSlug($name) {
+        // Converter para minúsculas e remover caracteres especiais
+        $slug = strtolower($name);
+        
+        // Substituir caracteres especiais
+        $slug = preg_replace('/[áàâãä]/', 'a', $slug);
+        $slug = preg_replace('/[éèêë]/', 'e', $slug);
+        $slug = preg_replace('/[íìîï]/', 'i', $slug);
+        $slug = preg_replace('/[óòôõö]/', 'o', $slug);
+        $slug = preg_replace('/[úùûü]/', 'u', $slug);
+        $slug = preg_replace('/[ç]/', 'c', $slug);
+        
+        // Remover caracteres não alfanuméricos exceto espaços e hífens
+        $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
+        
+        // Converter espaços em hífens
+        $slug = preg_replace('/\s+/', '-', $slug);
+        
+        // Remover múltiplos hífens
+        $slug = preg_replace('/-+/', '-', $slug);
+        
+        // Remover hífens do início e fim
+        $slug = trim($slug, '-');
+        
+        return $slug;
+    }
+    
+    /**
+     * Garantir que o slug seja único
+     */
+    private function ensureUniqueSlug($slug) {
+        $originalSlug = $slug;
+        $counter = 1;
+        
+        while ($this->slugExists($slug)) {
+            $slug = $originalSlug . '-' . $counter;
+            $counter++;
+        }
+        
+        return $slug;
+    }
+    
+    /**
+     * Verificar se slug já existe
+     */
+    private function slugExists($slug) {
+        $stmt = $this->getConnection()->prepare("SELECT COUNT(*) as count FROM {$this->table} WHERE slug = :slug");
+        $stmt->bindParam(':slug', $slug);
+        $stmt->execute();
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result['count'] > 0;
     }
 }
