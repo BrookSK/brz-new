@@ -263,35 +263,39 @@ class AdminPedidosEditController {
         
         function salvarPedido() {
             let itens = [];
-            document.querySelectorAll(\'.item-row\').forEach(row => {
+            document.querySelectorAll('.item-row').forEach(row => {
                 itens.push({
                     id: row.dataset.itemId,
-                    quantidade: row.querySelector(\'.quantidade\').value,
-                    preco_unitario: row.querySelector(\'.preco_unitario\').value
+                    quantidade: row.querySelector('.quantidade').value,
+                    preco_unitario: row.querySelector('.preco_unitario').value
                 });
             });
             
             let dados = {
                 pedido_id: pedidoId,
-                status: document.getElementById(\'pedido_status\').value,
-                frete: document.getElementById(\'valor_frete\').value,
-                desconto: document.getElementById(\'percentual_desconto\').value,
+                status: document.getElementById('pedido_status').value,
+                frete: document.getElementById('valor_frete').value,
+                desconto: document.getElementById('percentual_desconto').value,
                 itens: itens
             };
             
-            fetch(\'/admin/pedidos/salvar\', {
-                method: \'POST\',
-                headers: {\'Content-Type\': \'application/json\'},
+            fetch('/admin/pedidos/salvar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(dados)
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert(\'Pedido salvo com sucesso!\');
-                    window.location.href = \'/admin/pedidos/detalhes/\' + pedidoId;
+                    alert('Pedido salvo com sucesso!');
+                    window.location.href = '/admin/pedidos/detalhes/' + pedidoId;
                 } else {
-                    alert(\'Erro: \' + data.message);
+                    alert('Erro: ' + data.message);
                 }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao salvar pedido');
             });
         }
         
@@ -308,24 +312,38 @@ class AdminPedidosEditController {
             
             $this->connection->beginTransaction();
             
+            // Calcular subtotal dos itens
+            $subtotal = 0;
+            foreach ($dados['itens'] as $item) {
+                $subtotal += ($item['quantidade'] * $item['preco_unitario']);
+            }
+            
+            // Calcular valores
+            $frete = floatval($dados['frete']);
+            $percentualDesconto = floatval($dados['desconto']);
+            $valorDesconto = $subtotal * ($percentualDesconto / 100);
+            $total = $subtotal + $frete - $valorDesconto;
+            
             // Atualizar pedido
             $stmt = $this->connection->prepare("
                 UPDATE pedidos SET 
                     status = :status,
                     valor_frete = :frete,
+                    subtotal = :subtotal,
                     valor_total = :total,
                     updated_at = NOW()
                 WHERE id = :pedido_id
             ");
             $stmt->bindParam(':status', $dados['status']);
-            $stmt->bindParam(':frete', $dados['frete']);
-            $stmt->bindParam(':total', $dados['total']);
+            $stmt->bindParam(':frete', $frete);
+            $stmt->bindParam(':subtotal', $subtotal);
+            $stmt->bindParam(':total', $total);
             $stmt->bindParam(':pedido_id', $dados['pedido_id']);
             $stmt->execute();
             
             // Atualizar itens
             foreach ($dados['itens'] as $item) {
-                $subtotal = $item['quantidade'] * $item['preco_unitario'];
+                $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
                 
                 $stmt = $this->connection->prepare("
                     UPDATE pedido_itens SET 
@@ -337,7 +355,7 @@ class AdminPedidosEditController {
                 ");
                 $stmt->bindParam(':quantidade', $item['quantidade']);
                 $stmt->bindParam(':preco_unitario', $item['preco_unitario']);
-                $stmt->bindParam(':subtotal', $subtotal);
+                $stmt->bindParam(':subtotal', $subtotalItem);
                 $stmt->bindParam(':id', $item['id']);
                 $stmt->execute();
             }
