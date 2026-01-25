@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Models\PedidoEcommerce;
 
 class AdminPedidosController extends Controller {
     
@@ -383,18 +384,9 @@ class AdminPedidosController extends Controller {
         $id = $request->getParam('id');
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            
-            // Buscar pedido
-            $stmt = $pdo->prepare("
-                SELECT p.*, u.name as cliente_nome, u.email as cliente_email, u.telefone as cliente_telefone
-                FROM pedidos p 
-                LEFT JOIN usuarios u ON p.usuario_id = u.id 
-                WHERE p.id = :id
-            ");
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+            // Usar o PedidoEcommerce que já está corrigido e adaptativo
+            $pedidoModel = new PedidoEcommerce();
+            $pedido = $pedidoModel->getComDetalhes($id);
             
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
@@ -402,16 +394,8 @@ class AdminPedidosController extends Controller {
                 exit;
             }
             
-            // Buscar itens do pedido com nome do produto
-            $stmt = $pdo->prepare("
-                SELECT ip.*, pr.nome as produto_nome, pr.sku as produto_sku
-                FROM pedido_itens ip
-                LEFT JOIN produtos pr ON ip.produto_id = pr.id
-                WHERE ip.pedido_id = :pedido_id
-            ");
-            $stmt->bindParam(':pedido_id', $id);
-            $stmt->execute();
-            $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            // Obter itens do pedido (já vem com dados do produto adaptados)
+            $itens = $pedido['items'] ?? [];
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
@@ -490,9 +474,9 @@ class AdminPedidosController extends Controller {
                                         
                                         foreach ($itens as $item) {
                                             echo '<tr>
-                                                <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
+                                                <td>' . htmlspecialchars($item['nome_produto'] ?? 'Produto #' . $item['produto_id']) . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
-                                                <td>' . htmlspecialchars($item['produto_sku'] ?? 'N/A') . '</td>
+                                                <td>' . htmlspecialchars($item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
                                                 <td>' . $this->formatarMoeda($item['subtotal'], $pedido['moeda']) . '</td>
@@ -523,9 +507,9 @@ class AdminPedidosController extends Controller {
                                         </thead>
                                         <tbody>
                                             <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
-                                            <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['numero_pedido']) . '</td></tr>
+                                            <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
                                             <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></td></tr>
-                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
                                             <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
                                             <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
