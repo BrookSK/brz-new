@@ -148,18 +148,19 @@ class AuthService {
                 VALUES (:usuario_id, :acao, :tabela, :registro_id, :valores_antigos, :valores_novos, :ip, :user_agent)
             ");
             
-            $stmt->bindParam(':usuario_id', $usuarioId);
-            $stmt->bindParam(':acao', $acao);
-            $stmt->bindParam(':tabela', $tabela);
-            $stmt->bindParam(':registro_id', $registroId);
-            $stmt->bindParam(':valores_antigos', $valoresAntigos ? json_encode($valoresAntigos) : null);
-            $stmt->bindParam(':valores_novos', $valoresNovos ? json_encode($valoresNovos) : null);
+            // Usar bindValue em vez de bindParam para evitar problemas com nulos
+            $stmt->bindValue(':usuario_id', $usuarioId);
+            $stmt->bindValue(':acao', $acao);
+            $stmt->bindValue(':tabela', $tabela);
+            $stmt->bindValue(':registro_id', $registroId);
+            $stmt->bindValue(':valores_antigos', $valoresAntigos ? json_encode($valoresAntigos) : null);
+            $stmt->bindValue(':valores_novos', $valoresNovos ? json_encode($valoresNovos) : null);
             
             $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
             $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
             
-            $stmt->bindParam(':ip', $ip);
-            $stmt->bindParam(':user_agent', $userAgent);
+            $stmt->bindValue(':ip', $ip);
+            $stmt->bindValue(':user_agent', $userAgent);
             
             $stmt->execute();
             
