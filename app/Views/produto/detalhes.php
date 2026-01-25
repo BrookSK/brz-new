@@ -32,7 +32,7 @@
                     
                     if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
                         $fotoUrl = $fotoPrincipal['nome_arquivo'];
-                        $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $fotoUrl;
+                        $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
                         $fotoExists = file_exists($caminhoFisico);
                     } else {
                         $fotoUrl = null;
@@ -65,7 +65,7 @@
                             <?php 
                             if (!empty($foto['nome_arquivo'])) {
                                 $miniaturaUrl = $foto['nome_arquivo'];
-                                $caminhoMiniatura = $_SERVER['DOCUMENT_ROOT'] . $miniaturaUrl;
+                                $caminhoMiniatura = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($miniaturaUrl, '/');
                                 $miniaturaExists = file_exists($caminhoMiniatura);
                             } else {
                                 $miniaturaUrl = null;
@@ -74,7 +74,7 @@
                             ?>
                             <?php if ($miniaturaUrl && $miniaturaExists): ?>
                                 <img src="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) "
+                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
                                      onclick="changeMainImage('<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>')"
@@ -222,7 +222,7 @@
                             ?>
                             <?php if ($relacionadoExists): ?>
                                 <img src="<?= 'https://novobr.brazilianashop.com.br' . $relacionadoPath ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($relacionado['nome']) "
+                                     alt="<?= htmlspecialchars($relacionado['nome']) ?>"
                                      class="card-img-top"
                                      style="height: 150px; object-fit: cover;">
                             <?php else: ?>
