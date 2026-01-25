@@ -98,12 +98,14 @@
                         
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="price-section">
-                                <span class="h4 text-primary fw-bold mb-0">
+                                <span class="h4 text-primary fw-bold mb-0 product-price" 
+                                      data-original-price="<?= $produto['price'] ?>">
                                     $<?= number_format($produto['price'], 2, '.', ',') ?>
                                 </span>
                                 <?php if ($produto['sale_price'] > 0): ?>
-                                    <small class="text-decoration-line-through text-muted">
-                                        $<?= number_format($produto['price'], 2, '.', ',') ?>
+                                    <small class="text-decoration-line-through text-muted product-sale-price"
+                                          data-original-sale-price="<?= $produto['sale_price'] ?>">
+                                        $<?= number_format($produto['sale_price'], 2, '.', ',') ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
@@ -210,6 +212,52 @@
 </style>
 
 <script>
+// Função para converter preços com base na moeda
+function updateProductPrices(currency) {
+    const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+    const rate = window.exchangeRates ? window.exchangeRates[currency] : 1;
+    
+    // Atualizar todos os preços de produtos
+    const productPrices = document.querySelectorAll('.product-price');
+    productPrices.forEach((element, index) => {
+        const originalValue = parseFloat(element.getAttribute('data-original-price'));
+        
+        if (!isNaN(originalValue)) {
+            let convertedPrice;
+            
+            if (currency === 'BRL') {
+                // Converter USD para BRL: multiplicar pela taxa
+                convertedPrice = originalValue * rate;
+            } else {
+                // Manter em USD: sem conversão
+                convertedPrice = originalValue;
+            }
+            
+            const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+            element.textContent = formattedPrice;
+        }
+    });
+    
+    // Atualizar preços promocionais
+    const salePrices = document.querySelectorAll('.product-sale-price');
+    salePrices.forEach((element, index) => {
+        const originalValue = parseFloat(element.getAttribute('data-original-sale-price'));
+        
+        if (!isNaN(originalValue)) {
+            let convertedPrice;
+            
+            if (currency === 'BRL') {
+                convertedPrice = originalValue * rate;
+            } else {
+                convertedPrice = originalValue;
+            }
+            
+            const formattedPrice = currencySymbol + ' ' + convertedPrice.toFixed(2).replace('.', ',');
+            element.textContent = formattedPrice;
+        }
+    });
+}
+
 // Função para adicionar ao carrinho
 function adicionarAoCarrinhoModerno(botao) {
     const produtoId = botao.getAttribute('data-produto-id');
@@ -285,6 +333,14 @@ function atualizarBadge(totalItens) {
     });
 }
 
+// Inicializar taxas de conversão se não existirem
+if (typeof window.exchangeRates === 'undefined') {
+    window.exchangeRates = {
+        'BRL': 5.50,
+        'USD': 1.00
+    };
+}
+
 // Adicionar eventos aos botões
 document.addEventListener('DOMContentLoaded', function() {
     const botoes = document.querySelectorAll('.btn-adicionar-modern');
@@ -294,7 +350,26 @@ document.addEventListener('DOMContentLoaded', function() {
             adicionarAoCarrinhoModerno(this);
         });
     });
+    
+    // Verificar moeda atual e atualizar preços
+    const headerCurrency = document.getElementById('current-currency');
+    if (headerCurrency) {
+        const currentCurrency = headerCurrency.textContent;
+        updateProductPrices(currentCurrency);
+        
+        // Monitorar mudanças na moeda
+        setInterval(function() {
+            const newCurrency = headerCurrency.textContent;
+            if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
+                window.lastCurrency = newCurrency;
+                updateProductPrices(newCurrency);
+            }
+        }, 200);
+    }
 });
+
+// Função global para atualizar preços
+window.updateProductPrices = updateProductPrices;
 </script>
 
 <?php $content = ob_get_clean(); ?>
