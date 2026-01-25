@@ -185,18 +185,17 @@ class CheckoutController extends Controller {
             error_log('🔍 [ITENS] Item do carrinho: ' . json_encode($item));
             
             $sql = "INSERT INTO pedido_itens (
-                pedido_id, produto_id, nome, quantidade, preco_unitario, 
+                pedido_id, produto_id, quantidade, preco_unitario, 
                 subtotal, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+            ) VALUES (?, ?, ?, ?, ?, NOW())";
             
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $pedidoId,
                 $item['produto_id'] ?? $item['id'] ?? null,
-                $item['nome'],
                 $item['quantidade'],
-                $item['preco_unitario'],
-                $item['subtotal']
+                $item['preco_unitario'] ?? $item['price'] ?? 0,
+                $item['subtotal'] ?? ($item['quantidade'] * ($item['preco_unitario'] ?? $item['price'] ?? 0))
             ]);
         }
     }
