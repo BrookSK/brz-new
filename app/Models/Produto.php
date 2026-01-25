@@ -31,7 +31,7 @@ class Produto extends Model {
                 'moeda' => $produto['moeda'] ?? 'USD',
                 'peso' => floatval($produto['peso'] ?? 0),
                 'estoque' => intval($produto['estoque'] ?? 0),
-                'status' => $produto['ativo'] == 1 ? 'ativo' : 'inativo',
+                'status' => $produto['active'] == 1 ? 'published' : 'draft',
                 'foto_principal' => $produto['foto_principal'] ?? null,
                 'created_at' => $produto['created_at'] ?? null,
                 'updated_at' => $produto['updated_at'] ?? null
@@ -57,7 +57,7 @@ class Produto extends Model {
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.categoria_id = c.id 
-            WHERE p.ativo = 1 
+            WHERE p.active = 1 
             ORDER BY p.nome ASC
         ");
         $stmt->execute();
@@ -69,7 +69,7 @@ class Produto extends Model {
             SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.categoria_id = c.id 
-            WHERE p.status = 'ativo' AND p.ativo = 1 
+            WHERE p.status = 'published' AND p.active = 1 
             ORDER BY p.created_at DESC 
             LIMIT :limit
         ");
@@ -93,7 +93,7 @@ class Produto extends Model {
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.categoria_id = c.id 
             WHERE (p.nome LIKE :term OR p.descricao_curta LIKE :term OR c.name LIKE :term)
-            AND p.status = 'ativo'
+            AND p.status = 'published' AND p.active = 1
             ORDER BY p.nome ASC 
             LIMIT :limit
         ");
@@ -130,8 +130,8 @@ class Produto extends Model {
             'moeda' => $data['moeda'] ?? 'USD',
             'peso' => floatval($data['peso'] ?? 0),
             'estoque' => intval($data['estoque'] ?? 0),
-            'status' => $data['status'] ?? 'ativo',
-            'ativo' => $data['status'] === 'ativo' ? 1 : 0,
+            'status' => $data['status'] ?? 'published',
+            'active' => $data['status'] === 'published' ? 1 : 0,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')
         ];
@@ -139,8 +139,8 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, ativo, created_at, updated_at)
-            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :ativo, :created_at, :updated_at)
+            INSERT INTO {$this->table} (nome, sku, descricao_curta, descricao_completa, categoria_id, valor, moeda, peso, estoque, status, active, created_at, updated_at)
+            VALUES (:nome, :sku, :descricao_curta, :descricao_completa, :categoria_id, :valor, :moeda, :peso, :estoque, :status, :active, :created_at, :updated_at)
         ");
         
         $stmt->bindParam(':nome', $dadosBanco['nome']);
@@ -153,7 +153,7 @@ class Produto extends Model {
         $stmt->bindParam(':peso', $dadosBanco['peso']);
         $stmt->bindParam(':estoque', $dadosBanco['estoque']);
         $stmt->bindParam(':status', $dadosBanco['status']);
-        $stmt->bindParam(':ativo', $dadosBanco['ativo']);
+        $stmt->bindParam(':active', $dadosBanco['active']);
         $stmt->bindParam(':created_at', $dadosBanco['created_at']);
         $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
         
@@ -303,7 +303,7 @@ class Produto extends Model {
     }
     
     public function getAtivos() {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE status = 'ativo' ORDER BY nome ASC");
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE status = 'published' AND active = 1 ORDER BY nome ASC");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
