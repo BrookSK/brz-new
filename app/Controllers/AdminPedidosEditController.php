@@ -283,7 +283,7 @@ class AdminPedidosEditController {
         }
         
         function selecionarProduto(id, nome, preco, sku) {
-            let novaLinha = '<tr class="item-row" data-produto-id="' + id + '" data-nome-produto="' + nome + '" data-nome-produto-sku="' + sku + '">\\
+            let novaLinha = "<tr class=\\"item-row\\" data-produto-id=\\"" + id + "\\" data-nome-produto=\\"" + nome + "\\" data-nome-produto-sku=\\"" + sku + "\\">\\
                 <td><strong>" + nome + "</strong><br><small class=\\"text-muted\\">SKU: " + sku + "</small></td>\\
                 <td><input type=\\"number\\" class=\\"form-control form-control-sm quantidade\\" value=\\"1\\" min=\\"1\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
                 <td><input type=\\"number\\" class=\\"form-control form-control-sm preco_unitario\\" value=\\"" + preco + "\\" min=\\"0\\" step=\\"0.01\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
