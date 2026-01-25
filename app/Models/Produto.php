@@ -23,18 +23,36 @@ class Produto extends Model {
             $produtoMapeado = [
                 'id' => $produto['id'],
                 'nome' => $produto['name'] ?? '',
+                'slug' => $produto['slug'] ?? '',
                 'sku' => $produto['sku'] ?? '',
-                'descricao_curta' => $produto['descricao_curta'] ?? '',
-                'descricao_completa' => $produto['descricao_completa'] ?? '',
+                'descricao' => $produto['description'] ?? '',
+                'descricao_curta' => $produto['short_description'] ?? '',
                 'categoria_id' => $produto['category_id'] ?? 0,
                 'valor' => floatval($produto['price'] ?? 0),
-                'moeda' => $produto['currency'] ?? 'USD',
-                'peso' => floatval($produto['weight'] ?? 0),
+                'preco_custo' => floatval($produto['cost_price'] ?? 0),
+                'preco_promocao' => floatval($produto['sale_price'] ?? 0),
                 'estoque' => intval($produto['stock'] ?? 0),
-                'status' => $produto['active'] == 1 ? 'published' : 'draft',
-                'foto_principal' => $produto['foto_principal'] ?? null,
+                'estoque_minimo' => intval($produto['min_stock'] ?? 0),
+                'estoque_maximo' => intval($produto['max_stock'] ?? 999999),
+                'comprimento' => floatval($produto['length'] ?? 0),
+                'largura' => floatval($produto['width'] ?? 0),
+                'altura' => floatval($produto['height'] ?? 0),
+                'peso' => floatval($produto['weight'] ?? 0),
+                'tipo' => $produto['type'] ?? 'physical',
+                'status' => $produto['status'] ?? 'draft',
+                'tags' => $produto['tags'] ? json_decode($produto['tags'], true) : [],
+                'imagens' => $produto['images'] ? json_decode($produto['images'], true) : [],
+                'variacoes' => $produto['variations'] ? json_decode($produto['variations'], true) : [],
+                'atributos' => $produto['attributes'] ? json_decode($produto['attributes'], true) : [],
+                'ativo' => $produto['active'] ?? true,
+                'destaque' => $produto['featured'] ?? false,
+                'digital' => $produto['digital'] ?? false,
+                'arquivo_digital' => $produto['digital_file'] ?? null,
+                'downloads_digitais' => intval($produto['digital_downloads'] ?? 0),
+                'visualizacoes' => intval($produto['views'] ?? 0),
                 'created_at' => $produto['created_at'] ?? null,
-                'updated_at' => $produto['updated_at'] ?? null
+                'updated_at' => $produto['updated_at'] ?? null,
+                'published_at' => $produto['published_at'] ?? null
             ];
             
             error_log('🔍 [PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
@@ -122,38 +140,87 @@ class Produto extends Model {
         // Mapear campos do formulário para o banco
         $dadosBanco = [
             'name' => $data['name'] ?? '',
+            'slug' => $data['slug'] ?? '',
             'sku' => $data['sku'] ?? '',
             'description' => $data['description'] ?? '',
+            'short_description' => $data['short_description'] ?? '',
             'category_id' => $data['category_id'] ?? 0,
             'price' => floatval($data['price'] ?? 0),
-            'currency' => $data['currency'] ?? 'USD',
-            'weight' => floatval($data['weight'] ?? 0),
+            'cost_price' => floatval($data['cost_price'] ?? 0),
+            'sale_price' => floatval($data['sale_price'] ?? 0),
             'stock' => intval($data['stock'] ?? 0),
-            'status' => $data['status'] ?? 'published',
-            'active' => $data['status'] === 'published' ? 1 : 0,
+            'min_stock' => intval($data['min_stock'] ?? 0),
+            'max_stock' => intval($data['max_stock'] ?? 999999),
+            'length' => floatval($data['length'] ?? 0),
+            'width' => floatval($data['width'] ?? 0),
+            'height' => floatval($data['height'] ?? 0),
+            'weight' => floatval($data['weight'] ?? 0),
+            'type' => $data['type'] ?? 'physical',
+            'status' => $data['status'] ?? 'draft',
+            'tags' => isset($data['tags']) ? json_encode($data['tags']) : null,
+            'images' => isset($data['images']) ? json_encode($data['images']) : null,
+            'variations' => isset($data['variations']) ? json_encode($data['variations']) : null,
+            'attributes' => isset($data['attributes']) ? json_encode($data['attributes']) : null,
+            'active' => ($data['status'] ?? 'draft') === 'published' ? 1 : 0,
+            'featured' => $data['featured'] ?? false,
+            'digital' => $data['digital'] ?? false,
+            'digital_file' => $data['digital_file'] ?? null,
+            'digital_downloads' => intval($data['digital_downloads'] ?? 0),
+            'views' => intval($data['views'] ?? 0),
             'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at' => date('Y-m-d H:i:s'),
+            'published_at' => ($data['status'] ?? 'draft') === 'published' ? date('Y-m-d H:i:s') : null
         ];
         
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
-            INSERT INTO {$this->table} (name, sku, description, category_id, price, currency, weight, stock, status, active, created_at, updated_at)
-            VALUES (:name, :sku, :description, :category_id, :price, :currency, :weight, :stock, :status, :active, :created_at, :updated_at)
+            INSERT INTO {$this->table} (
+                name, slug, sku, description, short_description, category_id, 
+                price, cost_price, sale_price, stock, min_stock, max_stock, 
+                length, width, height, weight, type, status, tags, images, 
+                variations, attributes, active, featured, digital, digital_file, 
+                digital_downloads, views, created_at, updated_at, published_at
+            ) VALUES (
+                :name, :slug, :sku, :description, :short_description, :category_id, 
+                :price, :cost_price, :sale_price, :stock, :min_stock, :max_stock, 
+                :length, :width, :height, :weight, :type, :status, :tags, :images, 
+                :variations, :attributes, :active, :featured, :digital, :digital_file, 
+                :digital_downloads, :views, :created_at, :updated_at, :published_at
+            )
         ");
         
         $stmt->bindParam(':name', $dadosBanco['name']);
+        $stmt->bindParam(':slug', $dadosBanco['slug']);
         $stmt->bindParam(':sku', $dadosBanco['sku']);
         $stmt->bindParam(':description', $dadosBanco['description']);
+        $stmt->bindParam(':short_description', $dadosBanco['short_description']);
         $stmt->bindParam(':category_id', $dadosBanco['category_id']);
         $stmt->bindParam(':price', $dadosBanco['price']);
-        $stmt->bindParam(':currency', $dadosBanco['currency']);
-        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':cost_price', $dadosBanco['cost_price']);
+        $stmt->bindParam(':sale_price', $dadosBanco['sale_price']);
         $stmt->bindParam(':stock', $dadosBanco['stock']);
+        $stmt->bindParam(':min_stock', $dadosBanco['min_stock']);
+        $stmt->bindParam(':max_stock', $dadosBanco['max_stock']);
+        $stmt->bindParam(':length', $dadosBanco['length']);
+        $stmt->bindParam(':width', $dadosBanco['width']);
+        $stmt->bindParam(':height', $dadosBanco['height']);
+        $stmt->bindParam(':weight', $dadosBanco['weight']);
+        $stmt->bindParam(':type', $dadosBanco['type']);
         $stmt->bindParam(':status', $dadosBanco['status']);
+        $stmt->bindParam(':tags', $dadosBanco['tags']);
+        $stmt->bindParam(':images', $dadosBanco['images']);
+        $stmt->bindParam(':variations', $dadosBanco['variations']);
+        $stmt->bindParam(':attributes', $dadosBanco['attributes']);
         $stmt->bindParam(':active', $dadosBanco['active']);
+        $stmt->bindParam(':featured', $dadosBanco['featured']);
+        $stmt->bindParam(':digital', $dadosBanco['digital']);
+        $stmt->bindParam(':digital_file', $dadosBanco['digital_file']);
+        $stmt->bindParam(':digital_downloads', $dadosBanco['digital_downloads']);
+        $stmt->bindParam(':views', $dadosBanco['views']);
         $stmt->bindParam(':created_at', $dadosBanco['created_at']);
         $stmt->bindParam(':updated_at', $dadosBanco['updated_at']);
+        $stmt->bindParam(':published_at', $dadosBanco['published_at']);
         
         error_log('🔍 [PRODUTO-MODEL-CREATE] Executando INSERT no banco...');
         $result = $stmt->execute();
