@@ -177,7 +177,7 @@ class AdminPedidosEditController {
                                         <tbody id="itens_pedido">';
                                         
                                         foreach ($itens as $item) {
-                                            echo '<tr class="item-row" data-item-id="' . $item['id'] . '">
+                                            echo '<tr class="item-row" data-item-id="' . $item['id'] . '" data-produto-id="' . $item['produto_id'] . '" data-nome-produto="' . htmlspecialchars($item['nome_produto']) . '" data-nome-produto-sku="' . htmlspecialchars($item['nome_produto_sku'] ?? '') . '">
                                                 <td>
                                                     <strong>' . htmlspecialchars($item['nome_produto']) . '</strong>
                                                     <br><small class="text-muted">SKU: ' . htmlspecialchars($item['nome_produto_sku'] ?? 'N/A') . '</small>
@@ -283,7 +283,7 @@ class AdminPedidosEditController {
         }
         
         function selecionarProduto(id, nome, preco, sku) {
-            let novaLinha = "<tr class=\\"item-row\\">\\
+            let novaLinha = '<tr class="item-row" data-produto-id="' + id + '" data-nome-produto="' + nome + '" data-nome-produto-sku="' + sku + '">\\
                 <td><strong>" + nome + "</strong><br><small class=\\"text-muted\\">SKU: " + sku + "</small></td>\\
                 <td><input type=\\"number\\" class=\\"form-control form-control-sm quantidade\\" value=\\"1\\" min=\\"1\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
                 <td><input type=\\"number\\" class=\\"form-control form-control-sm preco_unitario\\" value=\\"" + preco + "\\" min=\\"0\\" step=\\"0.01\\" onchange=\\"atualizarSubtotal(this)\\"></td>\\
@@ -307,11 +307,25 @@ class AdminPedidosEditController {
         function salvarPedido() {
             let itens = [];
             document.querySelectorAll(".item-row").forEach(function(row) {
-                itens.push({
-                    id: row.dataset.itemId,
+                let item = {
                     quantidade: row.querySelector(".quantidade").value,
                     preco_unitario: row.querySelector(".preco_unitario").value
-                });
+                };
+                
+                // Se for um item existente, tem data-item-id
+                if (row.dataset.itemId) {
+                    item.id = row.dataset.itemId;
+                    item.produto_id = row.dataset.produtoId || '';
+                    item.nome_produto = row.dataset.nomeProduto || '';
+                    item.nome_produto_sku = row.dataset.nomeProdutoSku || '';
+                } else {
+                    // Se for um item novo, pegar dos atributos data
+                    item.produto_id = row.dataset.produtoId || '';
+                    item.nome_produto = row.dataset.nomeProduto || '';
+                    item.nome_produto_sku = row.dataset.nomeProdutoSku || '';
+                }
+                
+                itens.push(item);
             });
             
             let dados = {
@@ -355,10 +369,35 @@ class AdminPedidosEditController {
             
             $this->connection->beginTransaction();
             
-            // Calcular subtotal dos itens
+            // Primeiro, remover todos os itens existentes do pedido
+            $stmt = $this->connection->prepare("DELETE FROM pedido_itens WHERE pedido_id = :pedido_id");
+            $stmt->bindParam(':pedido_id', $dados['pedido_id']);
+            $stmt->execute();
+            
+            // Calcular subtotal e inserir novos itens
             $subtotal = 0;
             foreach ($dados['itens'] as $item) {
-                $subtotal += ($item['quantidade'] * $item['preco_unitario']);
+                $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
+                $subtotal += $subtotalItem;
+                
+                // Inserir novo item
+                $stmt = $this->connection->prepare("
+                    INSERT INTO pedido_itens (
+                        pedido_id, produto_id, quantidade, preco_unitario, subtotal,
+                        nome_produto, nome_produto_sku, created_at
+                    ) VALUES (
+                        :pedido_id, :produto_id, :quantidade, :preco_unitario, :subtotal,
+                        :nome_produto, :nome_produto_sku, NOW()
+                    )
+                ");
+                $stmt->bindParam(':pedido_id', $dados['pedido_id']);
+                $stmt->bindParam(':produto_id', $item['produto_id']);
+                $stmt->bindParam(':quantidade', $item['quantidade']);
+                $stmt->bindParam(':preco_unitario', $item['preco_unitario']);
+                $stmt->bindParam(':subtotal', $subtotalItem);
+                $stmt->bindParam(':nome_produto', $item['nome_produto']);
+                $stmt->bindParam(':nome_produto_sku', $item['nome_produto_sku']);
+                $stmt->execute();
             }
             
             // Calcular valores
@@ -382,24 +421,6 @@ class AdminPedidosEditController {
             $stmt->bindParam(':total', $total);
             $stmt->bindParam(':pedido_id', $dados['pedido_id']);
             $stmt->execute();
-            
-            // Atualizar itens - sem updated_at
-            foreach ($dados['itens'] as $item) {
-                $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
-                
-                $stmt = $this->connection->prepare("
-                    UPDATE pedido_itens SET 
-                        quantidade = :quantidade,
-                        preco_unitario = :preco_unitario,
-                        subtotal = :subtotal
-                    WHERE id = :id
-                ");
-                $stmt->bindParam(':quantidade', $item['quantidade']);
-                $stmt->bindParam(':preco_unitario', $item['preco_unitario']);
-                $stmt->bindParam(':subtotal', $subtotalItem);
-                $stmt->bindParam(':id', $item['id']);
-                $stmt->execute();
-            }
             
             $this->connection->commit();
             
