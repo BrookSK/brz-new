@@ -15,6 +15,8 @@ $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'exclui
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
+$router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
+$router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 
 // Usuários

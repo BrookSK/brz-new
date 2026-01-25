@@ -445,11 +445,17 @@ class AdminPedidosController extends Controller {
                 </div>
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pedido #' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h1>
-                    <a href="/admin/pedidos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
+                <div>
+                    <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
+                        <i class="fas fa-edit me-1"></i>Editar Pedido
+                    </a>
+                    <a href="/admin/pedidos" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
                 </div>
-                
+            </div>    
                 <div class="row">
                     <div class="col-md-12">
                         <div class="card mb-4">
