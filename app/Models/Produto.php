@@ -54,7 +54,7 @@ class Produto extends Model {
     
     public function getAllWithCategoria() {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.nome as categoria_nome 
+            SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.categoria_id = c.id 
             WHERE p.ativo = 1 
@@ -66,10 +66,10 @@ class Produto extends Model {
     
     public function getDestaque($limit = 8) {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.nome as categoria_nome 
+            SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE p.status = 'published' AND p.active = 1 
+            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            WHERE p.status = 'ativo' AND p.ativo = 1 
             ORDER BY p.created_at DESC 
             LIMIT :limit
         ");
@@ -89,10 +89,10 @@ class Produto extends Model {
     
     public function search($term, $limit = 20) {
         $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.nome as categoria_nome 
+            SELECT p.*, c.name as categoria_nome 
             FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE (p.nome LIKE :term OR p.description LIKE :term OR c.nome LIKE :term)
+            LEFT JOIN categorias c ON p.categoria_id = c.id 
+            WHERE (p.nome LIKE :term OR p.descricao_curta LIKE :term OR c.name LIKE :term)
             AND p.status = 'ativo'
             ORDER BY p.nome ASC 
             LIMIT :limit
@@ -309,9 +309,19 @@ class Produto extends Model {
     }
     
     public function getCategorias() {
-        $stmt = $this->getConnection()->prepare("SELECT DISTINCT categoria FROM {$this->table} ORDER BY categoria");
+        $stmt = $this->getConnection()->prepare("SELECT DISTINCT categoria_id FROM {$this->table} WHERE categoria_id IS NOT NULL ORDER BY categoria_id");
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $categorias = [];
+        foreach ($categoriaIds as $id) {
+            $categoria = $this->getCategoria($id);
+            if ($categoria) {
+                $categorias[] = $categoria;
+            }
+        }
+        
+        return $categorias;
     }
     
     public function updateEstoque($id, $quantidade) {
