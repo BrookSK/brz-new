@@ -434,7 +434,7 @@ class CheckoutController extends Controller {
                 error_log('🔍 [CRIAR_PEDIDO] Cliente encontrado: ' . $clienteId);
             } else {
                 // Usar estrutura REAL da tabela clientes
-                $stmt = $db->prepare("INSERT INTO clientes (usuario_id, nome_razao_social, cpf_cnpj, telefone, email, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                $stmt = $db->prepare("INSERT INTO clientes (usuario_id, nome_razao_social, cpf_cnpj, telefone, email) VALUES (?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
