@@ -8,13 +8,13 @@
                 <!-- Itens do Carrinho -->
                 <div class="card">
                     <div class="card-body">
-                        <?php foreach ($produtosDetalhados as $index => $item): ?>
+                        <?php foreach ($carrinho as $index => $item): ?>
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
                                 <div class="col-md-2">
                                     <?php if (!empty($item['foto_principal'])): ?>
                                     <img src="<?= $item['foto_principal'] ?>" 
-                                         alt="<?= htmlspecialchars($item['name']) ?>"
+                                         alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
                                 <?php else: ?>
                                     <div class="bg-light d-flex align-items-center justify-content-center img-fluid rounded" style="height: 100px;">
@@ -23,7 +23,7 @@
                                 <?php endif; ?>
                                 </div>
                                 <div class="col-md-5">
-                                    <h6 class="mb-1"><?= htmlspecialchars($item['name']) ?></h6>
+                                    <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
                                     <div class="input-group input-group-sm">
                                         <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
                                             <i class="fas fa-minus"></i>

@@ -363,7 +363,16 @@
 </div>
 
 <script>
+// Verificar se jQuery está carregado
+if (typeof $ === 'undefined') {
+    console.error('jQuery não está carregado!');
+} else {
+    console.log('jQuery carregado com sucesso!');
+}
+
 $(document).ready(function() {
+    console.log('Documento pronto, jQuery disponível');
+    
     // Trocar imagem principal ao clicar na miniatura
     $('.thumbnail-image').on('click', function() {
         const newImageSrc = $(this).data('main-image');
@@ -411,6 +420,8 @@ $(document).ready(function() {
     $('#add-to-cart-form').on('submit', function(e) {
         e.preventDefault();
         
+        console.log('Formulário submetido');
+        
         const btn = $(this).find('button[type="submit"]');
         const originalText = btn.html();
         
@@ -422,42 +433,52 @@ $(document).ready(function() {
             data: $(this).serialize(),
             dataType: 'json',
             success: function(response) {
+                console.log('Resposta do servidor:', response);
+                
                 if (response.success) {
-                    // Mostrar notificação
-                    showNotification('success', response.message);
+                    // Mostrar mensagem de sucesso
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Produto adicionado ao carrinho',
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
                     
                     // Atualizar badge do carrinho
-                    updateCartBadge(response.total_itens);
+                    updateCartBadge(response.total_itens || 1);
                     
-                    // Resetar quantidade
+                    // Resetar formulário
                     $('#quantity').val(1);
+                    
+                    // Redirecionar para o carrinho após 1.5 segundos
+                    setTimeout(function() {
+                        window.location.href = '/carrinho';
+                    }, 1500);
                 } else {
-                    showNotification('danger', response.error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: response.error || 'Não foi possível adicionar o produto ao carrinho'
+                    });
                 }
             },
-            error: function() {
-                showNotification('danger', 'Erro ao adicionar produto ao carrinho');
+            error: function(xhr, status, error) {
+                console.error('Erro AJAX:', error);
+                console.error('Status:', status);
+                console.error('XHR:', xhr);
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao adicionar produto ao carrinho. Tente novamente.'
+                });
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
             }
         });
     });
-    
-    function showNotification(type, message) {
-        const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 9999;" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        $('body').append(alertHtml);
-        
-        setTimeout(function() {
-            $('.alert').alert('close');
-        }, 3000);
-    }
     
     function updateCartBadge(totalItens) {
         const badge = $('.navbar-nav .badge');

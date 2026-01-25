@@ -78,7 +78,8 @@ class CarrinhoController extends Controller {
         $total = $subtotal + $taxaServico + $impostos + $frete;
         
         $this->view('carrinho/index', [
-            'carrinho' => $produtosDetalhados,
+            'carrinho' => $carrinho,
+            'produtosDetalhados' => $produtosDetalhados,
             'subtotal' => $subtotal,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
