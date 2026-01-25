@@ -301,7 +301,7 @@ class AdminProdutosController extends Controller {
         });
     </script>
 </body>
-</html>\';
+</html>';
         exit;
     }
     
