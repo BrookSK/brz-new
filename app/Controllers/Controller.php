@@ -7,7 +7,19 @@ abstract class Controller {
         $viewPath = __DIR__ . '/../Views/' . str_replace('.', '/', $view) . '.php';
         
         if (file_exists($viewPath)) {
-            require $viewPath;
+            // Se for a view de carrinho vazio, incluir o layout
+            if ($view === 'carrinho/vazio') {
+                ob_start();
+                require $viewPath;
+                $content = ob_get_clean();
+                
+                ob_start();
+                $title = 'Carrinho Vazio - BRZ Logistics';
+                require __DIR__ . '/../Views/layouts/main.php';
+                echo ob_get_clean();
+            } else {
+                require $viewPath;
+            }
         } else {
             echo "View não encontrada: {$view} (caminho: {$viewPath})";
         }
