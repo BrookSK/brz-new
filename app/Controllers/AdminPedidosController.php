@@ -397,9 +397,6 @@ class AdminPedidosController extends Controller {
             // Obter itens do pedido (já vem com dados do produto adaptados)
             $itens = $pedido['items'] ?? [];
             
-            // Debug para verificar se os nomes estão vindo
-            error_log('DEBUG: Itens recebidos: ' . print_r($itens, true));
-            
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';

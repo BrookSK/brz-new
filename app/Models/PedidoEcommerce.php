@@ -184,7 +184,12 @@ class PedidoEcommerce extends Model {
                         pi.produto_dimensoes,
                         pi.produto_tipo,
                         pi.produto_status,
-                        pi.created_at
+                        pi.created_at,
+                        (SELECT pf.nome_arquivo 
+                         FROM produto_fotos pf 
+                         WHERE pf.produto_id = pi.produto_id 
+                         ORDER BY pf.principal DESC, pf.ordem ASC 
+                         LIMIT 1) as imagem_principal
                     FROM pedido_itens pi 
                     WHERE pi.pedido_id = :id 
                     ORDER BY pi.id
@@ -193,13 +198,10 @@ class PedidoEcommerce extends Model {
                 $stmt->execute();
                 $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
-                // Debug para verificar os dados
-                error_log('DEBUG: Itens do pedido ' . $pedidoId . ': ' . print_r($itens, true));
-                
                 // Garantir que os itens tenham todos os campos necessários
                 foreach ($itens as &$item) {
                     $item['referencia'] = $item['referencia'] ?? $item['nome_produto_sku'] ?? '';
-                    $item['imagem'] = $item['imagem'] ?? 'default.jpg';
+                    $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
                     $item['descricao_produto'] = $item['descricao_produto'] ?? '';
                     
                     // Se não tiver nome_produto, usar fallback
