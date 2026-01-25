@@ -1,37 +1,5 @@
 <?php ob_start(); ?>
 <div class="container py-4">
-    <!-- Hero Section -->
-    <div class="row mb-5">
-        <div class="col-lg-12">
-            <div class="bg-gradient-primary text-white p-5 rounded-3 shadow-lg">
-                <div class="row align-items-center">
-                    <div class="col-lg-8">
-                        <h1 class="display-4 fw-bold mb-3">
-                            <i class="fas fa-shopping-bag me-3"></i>Produtos Premium
-                        </h1>
-                        <p class="lead mb-4">Descubra nossa seleção exclusiva de produtos de alta qualidade</p>
-                        <div class="d-flex gap-3">
-                            <div class="text-center">
-                                <h3 class="fw-bold"><?= count($produtos) ?></h3>
-                                <small>Produtos</small>
-                            </div>
-                            <div class="text-center">
-                                <h3 class="fw-bold"><?= count($categorias) ?></h3>
-                                <small>Categorias</small>
-                            </div>
-                            <div class="text-center">
-                                <h3 class="fw-bold">24h</h3>
-                                <small>Entrega</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 text-center">
-                        <i class="fas fa-box fa-5x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Search and Filters -->
     <div class="row mb-4">
