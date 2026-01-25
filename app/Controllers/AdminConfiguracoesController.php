@@ -76,6 +76,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
                                 <i class="fas fa-edit"></i> Criar E-mail
                             </button>
+                            <button class="nav-link" id="v-pills-pagamentos-tab" data-bs-toggle="pill" data-bs-target="#v-pills-pagamentos" type="button">
+                                <i class="fas fa-credit-card"></i> Pagamentos
+                            </button>
                             <button class="nav-link" id="v-pills-entrega-tab" data-bs-toggle="pill" data-bs-target="#v-pills-entrega" type="button">
                                 <i class="fas fa-truck"></i> Entrega
                             </button>
@@ -362,6 +365,150 @@ class AdminConfiguracoesController extends Controller {
                                     </div>
                                 </div>
                                 
+                                <!-- Configurações de Pagamentos -->
+                                <div class="tab-pane fade" id="v-pills-pagamentos" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurações de Pagamentos</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="mb-0">🇧🇷 Asaas</h6>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="asaas_enabled" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <label class="form-check-label" for="asaas_enabled">Ativo</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Ambiente</label>
+                                                                <select class="form-select" name="asaas_ambiente">
+                                                                    <option value="sandbox" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>Sandbox (Testes)</option>
+                                                                    <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">API Key</label>
+                                                                <div class="input-group">
+                                                                    <input type="password" class="form-control" name="asaas_api_key" value="' . $this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '') . '" placeholder="Sua API Key do Asaas">
+                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <small class="text-muted">API Key obtida no painel do Asaas</small>
+                                                            </div>
+                                                            <div class="d-flex gap-2">
+                                                                <button type="button" class="btn btn-outline-primary" onclick="testarAsaasAPI()">
+                                                                    <i class="fas fa-plug"></i> Testar Conexão
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoAsaas()">
+                                                                    <i class="fas fa-book"></i> Documentação
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="mb-0">💳 Stripe</h6>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="stripe_enabled" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <label class="form-check-label" for="stripe_enabled">Ativo</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Ambiente</label>
+                                                                <select class="form-select" name="stripe_ambiente">
+                                                                    <option value="test" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test') === 'test' ? 'selected' : '') . '>Test (Chaves de Teste)</option>
+                                                                    <option value="live" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', '') === 'live' ? 'selected' : '') . '>Live (Chaves de Produção)</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Publishable Key</label>
+                                                                <div class="input-group">
+                                                                    <input type="password" class="form-control" name="stripe_publishable_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '') . '" placeholder="pk_test_...">
+                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <small class="text-muted">Chave pública (pk_test_... ou pk_live_...)</small>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Secret Key</label>
+                                                                <div class="input-group">
+                                                                    <input type="password" class="form-control" name="stripe_secret_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_secret_key', '') . '" placeholder="sk_test_...">
+                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <small class="text-muted">Chave secreta (sk_test_... ou sk_live_...)</small>
+                                                            </div>
+                                                            <div class="d-flex gap-2">
+                                                                <button type="button" class="btn btn-outline-primary" onclick="testarStripeAPI()">
+                                                                    <i class="fas fa-plug"></i> Testar Conexão
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoStripe()">
+                                                                    <i class="fas fa-book"></i> Documentação
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Status dos Gateways -->
+                                            <div class="row mt-4">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            <h6 class="mb-0">📊 Status dos Gateways de Pagamento</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="d-flex align-items-center mb-3">
+                                                                        <div class="me-3">
+                                                                            <i class="fas fa-circle text-' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'success' : 'secondary') . '"></i>
+                                                                            <strong>Asaas:</strong>
+                                                                        </div>
+                                                                        <span class="badge bg-' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'success' : 'secondary') . '">
+                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'Ativo' : 'Inativo') . '
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="text-muted small">
+                                                                        Ambiente: ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox')) . ' | 
+                                                                        API Key: ' . (empty($this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '')) ? 'Não configurada' : 'Configurada') . '
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="d-flex align-items-center mb-3">
+                                                                        <div class="me-3">
+                                                                            <i class="fas fa-circle text-' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'success' : 'secondary') . '"></i>
+                                                                            <strong>Stripe:</strong>
+                                                                        </div>
+                                                                        <span class="badge bg-' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'success' : 'secondary') . '">
+                                                                            ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'Ativo' : 'Inativo') . '
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="text-muted small">
+                                                                        Ambiente: ' . ucfirst($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test')) . ' | 
+                                                                        Keys: ' . (empty($this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '')) ? 'Não configuradas' : 'Configuradas') . '
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <!-- Configurações do Sistema -->
                                 <div class="tab-pane fade" id="v-pills-sistema" role="tabpanel">
                                     <div class="card">
@@ -422,7 +569,7 @@ class AdminConfiguracoesController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getEmailCreatorJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . '
 </body>
 </html>';
         exit;
@@ -437,6 +584,7 @@ class AdminConfiguracoesController extends Controller {
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'webhook_enabled', 'webhook_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
@@ -448,7 +596,7 @@ class AdminConfiguracoesController extends Controller {
                     
                     if ($valor !== null) {
                         // Converter checkboxes para 0/1
-                        if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled'])) {
+                        if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled', 'asaas_enabled', 'stripe_enabled'])) {
                             $valor = $valor ? '1' : '0';
                         }
                         
@@ -491,6 +639,99 @@ class AdminConfiguracoesController extends Controller {
             echo '<a href="/admin/configuracoes" class="btn btn-secondary">Voltar</a>';
             exit;
         }
+    }
+    
+    // JavaScript para pagamentos
+    private function getPagamentosJS() {
+        ob_start();
+        ?>
+        <script>
+        function togglePasswordVisibility(button) {
+            const input = button.previousElementSibling;
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        function testarAsaasAPI() {
+            const apiKey = document.querySelector('input[name="asaas_api_key"]').value;
+            const ambiente = document.querySelector('select[name="asaas_ambiente"]').value;
+            
+            if (!apiKey) {
+                alert('Digite a API Key do Asaas primeiro');
+                return;
+            }
+            
+            // URL da API do Asaas
+            const url = ambiente === 'production' ? 'https://www.asaas.com/api/v3/myAccount' : 'https://sandbox.asaas.com/api/v3/myAccount';
+            
+            fetch(url, {
+                headers: {
+                    'access_token': apiKey,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    alert('✅ Conexão com Asaas bem-sucedida!\n\nConta: ' + data.name + '\nAmbiente: ' + ambiente);
+                } else {
+                    alert('❌ Erro na conexão com Asaas: ' + (data.errors?.[0]?.description || 'Verifique sua API Key'));
+                }
+            })
+            .catch(error => {
+                alert('❌ Erro ao testar conexão: ' + error.message);
+            });
+        }
+        
+        function testarStripeAPI() {
+            const publishableKey = document.querySelector('input[name="stripe_publishable_key"]').value;
+            const secretKey = document.querySelector('input[name="stripe_secret_key"]').value;
+            const ambiente = document.querySelector('select[name="stripe_ambiente"]').value;
+            
+            if (!publishableKey || !secretKey) {
+                alert('Digite as chaves do Stripe primeiro');
+                return;
+            }
+            
+            // Testar com a API do Stripe (usando a chave secreta)
+            fetch('https://api.stripe.com/v1/account', {
+                headers: {
+                    'Authorization': 'Bearer ' + secretKey,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    alert('✅ Conexão com Stripe bem-sucedida!\n\nConta: ' + (data.business_profile?.name || data.display_name) + '\nAmbiente: ' + ambiente);
+                } else {
+                    alert('❌ Erro na conexão com Stripe: ' + (data.error?.message || 'Verifique suas chaves'));
+                }
+            })
+            .catch(error => {
+                alert('❌ Erro ao testar conexão: ' + error.message);
+            });
+        }
+        
+        function verDocumentacaoAsaas() {
+            window.open('https://docs.asaas.com/reference/introduction', '_blank');
+        }
+        
+        function verDocumentacaoStripe() {
+            window.open('https://stripe.com/docs/api', '_blank');
+        }
+        </script>
+        <?php
+        return ob_get_clean();
     }
     
     // JavaScript para o criador de e-mail
