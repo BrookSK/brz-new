@@ -491,7 +491,7 @@ class CheckoutController extends Controller {
                 moeda, taxa_conversao, endereco_entrega_id, endereco_cobranca_id, 
                 observacoes, rastreamento, data_aprovacao, data_envio, data_entrega, 
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
@@ -518,8 +518,7 @@ class CheckoutController extends Controller {
                 null, // data_envio
                 null, // data_entrega
                 date('Y-m-d H:i:s'), // created_at
-                date('Y-m-d H:i:s'), // updated_at
-                null // parâmetro adicional
+                date('Y-m-d H:i:s')  // updated_at
             ];
             
             error_log('🔍 [CRIAR_PEDIDO] Parâmetros: ' . json_encode($params));
