@@ -52,13 +52,17 @@ class CheckoutController extends Controller {
         $pesoTotal = 0;
         
         foreach ($carrinho as $produtoId => $item) {
+            // Verificar diferentes campos de preço
+            $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
+            $quantidade = $item['quantidade'] ?? 1;
+            
             // Buscar detalhes do produto (simulado por enquanto)
             $produto = [
                 'id' => $produtoId,
-                'nome' => $item['nome'] ?? 'Produto ' . $produtoId,
-                'preco' => $item['preco_unitario'] ?? 0,
-                'quantidade' => $item['quantidade'] ?? 1,
-                'subtotal' => ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 1),
+                'nome' => $item['nome'] ?? $item['name'] ?? 'Produto ' . $produtoId,
+                'preco' => $precoUnitario,
+                'quantidade' => $quantidade,
+                'subtotal' => $precoUnitario * $quantidade,
                 'peso' => 0.5, // Padrão
                 'foto_principal' => $item['foto_principal'] ?? null
             ];
@@ -66,6 +70,9 @@ class CheckoutController extends Controller {
             $items[] = $produto;
             $subtotal += $produto['subtotal'];
             $pesoTotal += $produto['peso'] * $produto['quantidade'];
+            
+            error_log('🔍 [CHECKOUT_INDEX] Item: ' . json_encode($item));
+            error_log('🔍 [CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
         
         $this->view('checkout/index', [
