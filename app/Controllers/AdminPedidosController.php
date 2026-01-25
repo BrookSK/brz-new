@@ -402,10 +402,11 @@ class AdminPedidosController extends Controller {
                 exit;
             }
             
-            // Buscar itens do pedido
+            // Buscar itens do pedido com nome do produto
             $stmt = $pdo->prepare("
-                SELECT ip.* 
+                SELECT ip.*, pr.nome as produto_nome, pr.sku as produto_sku
                 FROM pedido_itens ip
+                LEFT JOIN produtos pr ON ip.produto_id = pr.id
                 WHERE ip.pedido_id = :pedido_id
             ");
             $stmt->bindParam(':pedido_id', $id);
@@ -476,7 +477,9 @@ class AdminPedidosController extends Controller {
                                     <table class="table table-bordered">
                                         <thead>
                                             <tr>
-                                                <th>Produto ID</th>
+                                                <th>Produto</th>
+                                                <th>ID</th>
+                                                <th>SKU</th>
                                                 <th>Quantidade</th>
                                                 <th>Preço Unitário</th>
                                                 <th>Subtotal</th>
@@ -487,10 +490,12 @@ class AdminPedidosController extends Controller {
                                         
                                         foreach ($itens as $item) {
                                             echo '<tr>
+                                                <td>' . htmlspecialchars($item['produto_nome'] ?? 'Produto #' . $item['produto_id']) . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
+                                                <td>' . htmlspecialchars($item['produto_sku'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
-                                                <td>R$ ' . number_format($item['preco_unitario'], 2, ',', '.') . '</td>
-                                                <td>R$ ' . number_format($item['subtotal'], 2, ',', '.') . '</td>
+                                                <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
+                                                <td>' . $this->formatarMoeda($item['subtotal'], $pedido['moeda']) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                             </tr>';
                                         }

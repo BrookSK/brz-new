@@ -73,6 +73,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
                                 <i class="fas fa-envelope"></i> Email
                             </button>
+                            <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
+                                <i class="fas fa-edit"></i> Criar E-mail
+                            </button>
                             <button class="nav-link" id="v-pills-entrega-tab" data-bs-toggle="pill" data-bs-target="#v-pills-entrega" type="button">
                                 <i class="fas fa-truck"></i> Entrega
                             </button>
@@ -169,6 +172,104 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Nome de Envio</label>
                                                 <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'BRZ Shop') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Criador de E-mail -->
+                                <div class="tab-pane fade" id="v-pills-email-creator" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h5 class="mb-0">Criador de E-mail</h5>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="webhook_enabled" ' . ($this->getConfigValue($config, 'email', 'webhook_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                <label class="form-check-label" for="webhook_enabled">Webhook Ativo</label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Tipo de Evento</label>
+                                                        <select class="form-select" id="evento_tipo" onchange="carregarVariaveis()">
+                                                            <option value="">Selecione um evento...</option>
+                                                            <option value="novo_pedido">🛒 Novo Pedido</option>
+                                                            <option value="pedido_aprovado">✅ Pedido Aprovado</option>
+                                                            <option value="pedido_enviado">📦 Pedido Enviado</option>
+                                                            <option value="pedido_entregue">🎁 Pedido Entregue</option>
+                                                            <option value="pedido_cancelado">❌ Pedido Cancelado</option>
+                                                            <option value="novo_usuario">👤 Novo Usuário</option>
+                                                            <option value="recuperar_senha">🔑 Recuperar Senha</option>
+                                                            <option value="contato_contato">📧 Contato</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Assunto do E-mail</label>
+                                                        <input type="text" class="form-control" id="email_assunto" placeholder="Assunto do e-mail">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Variáveis Disponíveis</label>
+                                                        <div class="border rounded p-2 bg-light" style="max-height: 150px; overflow-y: auto;" id="variaveis_disponiveis">
+                                                            <small class="text-muted">Selecione um evento para ver as variáveis disponíveis</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">URL do Webhook</label>
+                                                        <input type="url" class="form-control" id="webhook_url" value="' . $this->getConfigValue($config, 'email', 'webhook_url', '') . '" placeholder="https://sua-api.com/webhook">
+                                                        <small class="text-muted">URL para receber os dados do evento</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Editor HTML</label>
+                                                        <textarea class="form-control" id="email_conteudo" rows="15" placeholder="Digite o conteúdo HTML do e-mail..."></textarea>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-outline-primary" onclick="inserirVariavel()">
+                                                            <i class="fas fa-code"></i> Inserir Variável
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-success" onclick="previsualizarEmail()">
+                                                            <i class="fas fa-eye"></i> Pré-visualizar
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-info" onclick="salvarTemplate()">
+                                                            <i class="fas fa-save"></i> Salvar Template
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-warning" onclick="testarWebhook()">
+                                                            <i class="fas fa-plug"></i> Testar Webhook
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Pré-visualização -->
+                                            <div class="row mt-4" id="preview_section" style="display: none;">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            <h6 class="mb-0">📧 Pré-visualização do E-mail</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <iframe id="email_preview" style="width: 100%; height: 400px; border: 1px solid #ddd;"></iframe>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Templates Salvos -->
+                                            <div class="row mt-4">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            <h6 class="mb-0">📋 Templates Salvos</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div id="templates_salvos">
+                                                                <small class="text-muted">Nenhum template salvo ainda</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -321,6 +422,7 @@ class AdminConfiguracoesController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    ' . $this->getEmailCreatorJS() . '
 </body>
 </html>';
         exit;
@@ -334,7 +436,7 @@ class AdminConfiguracoesController extends Controller {
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name'],
+                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'webhook_enabled', 'webhook_url'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
@@ -346,7 +448,7 @@ class AdminConfiguracoesController extends Controller {
                     
                     if ($valor !== null) {
                         // Converter checkboxes para 0/1
-                        if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado'])) {
+                        if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled'])) {
                             $valor = $valor ? '1' : '0';
                         }
                         
@@ -389,6 +491,253 @@ class AdminConfiguracoesController extends Controller {
             echo '<a href="/admin/configuracoes" class="btn btn-secondary">Voltar</a>';
             exit;
         }
+    }
+    
+    // JavaScript para o criador de e-mail
+    private function getEmailCreatorJS() {
+        return '
+        <script>
+        // Variáveis disponíveis por evento
+        const variaveisEvento = {
+            "novo_pedido": {
+                "{pedido_id}": "ID do Pedido",
+                "{numero_pedido}": "Número do Pedido",
+                "{cliente_nome}": "Nome do Cliente",
+                "{cliente_email}": "Email do Cliente",
+                "{total}": "Total do Pedido",
+                "{moeda}": "Moeda",
+                "{data_pedido}": "Data do Pedido",
+                "{itens}": "Lista de Itens",
+                "{endereco_entrega}": "Endereço de Entrega"
+            },
+            "pedido_aprovado": {
+                "{pedido_id}": "ID do Pedido",
+                "{numero_pedido}": "Número do Pedido",
+                "{cliente_nome}": "Nome do Cliente",
+                "{data_aprovacao}": "Data de Aprovação",
+                "{total}": "Total do Pedido"
+            },
+            "pedido_enviado": {
+                "{pedido_id}": "ID do Pedido",
+                "{numero_pedido}": "Número do Pedido",
+                "{codigo_rastreamento}": "Código de Rastreamento",
+                "{data_envio}": "Data de Envio",
+                "{transportadora}": "Transportadora"
+            },
+            "pedido_entregue": {
+                "{pedido_id}": "ID do Pedido",
+                "{numero_pedido}": "Número do Pedido",
+                "{data_entrega}": "Data de Entrega",
+                "{recebedor}": "Quem Recebeu"
+            },
+            "pedido_cancelado": {
+                "{pedido_id}": "ID do Pedido",
+                "{numero_pedido}": "Número do Pedido",
+                "{motivo_cancelamento}": "Motivo do Cancelamento",
+                "{data_cancelamento}": "Data do Cancelamento"
+            },
+            "novo_usuario": {
+                "{usuario_nome}": "Nome do Usuário",
+                "{usuario_email}": "Email do Usuário",
+                "{data_cadastro}": "Data de Cadastro",
+                "{token_confirmacao}": "Token de Confirmação"
+            },
+            "recuperar_senha": {
+                "{usuario_nome}": "Nome do Usuário",
+                "{usuario_email}": "Email do Usuário",
+                "{token_reset}": "Token de Reset",
+                "{data_solicitacao}": "Data da Solicitação"
+            },
+            "contato_contato": {
+                "{nome_contato}": "Nome do Contato",
+                "{email_contato}": "Email do Contato",
+                "{mensagem}": "Mensagem",
+                "{data_contato}": "Data do Contato"
+            }
+        };
+        
+        function carregarVariaveis() {
+            const evento = document.getElementById("evento_tipo").value;
+            const variaveisDiv = document.getElementById("variaveis_disponiveis");
+            
+            if (!evento || !variaveisEvento[evento]) {
+                variaveisDiv.innerHTML = "<small class=\"text-muted\">Selecione um evento para ver as variáveis disponíveis</small>";
+                return;
+            }
+            
+            let html = "<div class=\"mb-2\"><strong>Variáveis disponíveis:</strong></div>";
+            for (const [variavel, descricao] of Object.entries(variaveisEvento[evento])) {
+                html += `<div class="mb-1">
+                    <code class="bg-light p-1 rounded" style="cursor: pointer; font-size: 12px;" 
+                          onclick="inserirVariavelNoCursor('${variavel}')">${variavel}</code>
+                    <small class="text-muted ms-2">${descricao}</small>
+                </div>`;
+            }
+            
+            variaveisDiv.innerHTML = html;
+        }
+        
+        function inserirVariavelNoCursor(variavel) {
+            const textarea = document.getElementById("email_conteudo");
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            
+            textarea.value = text.substring(0, start) + variavel + text.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + variavel.length;
+            textarea.focus();
+        }
+        
+        function inserirVariavel() {
+            const evento = document.getElementById("evento_tipo").value;
+            if (!evento) {
+                alert("Selecione um evento primeiro");
+                return;
+            }
+            
+            const variaveis = Object.keys(variaveisEvento[evento]);
+            if (variaveis.length === 0) return;
+            
+            const variavel = prompt("Variáveis disponíveis:\n" + variaveis.join("\n"), variaveis[0]);
+            if (variavel) {
+                inserirVariavelNoCursor(variavel);
+            }
+        }
+        
+        function previsualizarEmail() {
+            const conteudo = document.getElementById("email_conteudo").value;
+            const preview = document.getElementById("email_preview");
+            const previewSection = document.getElementById("preview_section");
+            
+            if (!conteudo) {
+                alert("Digite o conteúdo do e-mail primeiro");
+                return;
+            }
+            
+            // Criar HTML básico para preview
+            const htmlCompleto = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Preview</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                    </style>
+                </head>
+                <body>
+                    ${conteudo}
+                </body>
+                </html>
+            `;
+            
+            preview.srcdoc = htmlCompleto;
+            previewSection.style.display = "block";
+        }
+        
+        function salvarTemplate() {
+            const evento = document.getElementById("evento_tipo").value;
+            const assunto = document.getElementById("email_assunto").value;
+            const conteudo = document.getElementById("email_conteudo").value;
+            
+            if (!evento || !assunto || !conteudo) {
+                alert("Preencha todos os campos");
+                return;
+            }
+            
+            // Salvar no localStorage (em produção, salvar no banco)
+            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
+            templates[evento] = { assunto, conteudo, data: new Date().toISOString() };
+            localStorage.setItem("email_templates", JSON.stringify(templates));
+            
+            alert("Template salvo com sucesso!");
+            carregarTemplatesSalvos();
+        }
+        
+        function carregarTemplatesSalvos() {
+            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
+            const div = document.getElementById("templates_salvos");
+            
+            const eventos = Object.keys(templates);
+            if (eventos.length === 0) {
+                div.innerHTML = "<small class=\"text-muted\">Nenhum template salvo ainda</small>";
+                return;
+            }
+            
+            let html = "<div class=\"row\">";
+            for (const evento of eventos) {
+                const template = templates[evento];
+                html += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">${evento}</h6>
+                                <p class="card-text"><small>${template.assunto}</small></p>
+                                <p class="card-text"><small class=\"text-muted\">${new Date(template.data).toLocaleDateString()}</small></p>
+                                <button class="btn btn-sm btn-outline-primary" onclick="carregarTemplate('${evento}')">Carregar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            html += "</div>";
+            div.innerHTML = html;
+        }
+        
+        function carregarTemplate(evento) {
+            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
+            const template = templates[evento];
+            
+            if (template) {
+                document.getElementById("evento_tipo").value = evento;
+                document.getElementById("email_assunto").value = template.assunto;
+                document.getElementById("email_conteudo").value = template.conteudo;
+                carregarVariaveis();
+            }
+        }
+        
+        function testarWebhook() {
+            const webhookUrl = document.getElementById("webhook_url").value;
+            const evento = document.getElementById("evento_tipo").value;
+            
+            if (!webhookUrl) {
+                alert("Digite a URL do webhook");
+                return;
+            }
+            
+            if (!evento) {
+                alert("Selecione um evento");
+                return;
+            }
+            
+            // Dados de teste para o webhook
+            const dadosTeste = {
+                evento: evento,
+                timestamp: new Date().toISOString(),
+                dados: variaveisEvento[evento]
+            };
+            
+            fetch(webhookUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(dadosTeste)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert("Webhook testado com sucesso! Resposta: " + JSON.stringify(data));
+            })
+            .catch(error => {
+                alert("Erro ao testar webhook: " + error.message);
+            });
+        }
+        
+        // Carregar templates ao iniciar
+        document.addEventListener("DOMContentLoaded", function() {
+            carregarTemplatesSalvos();
+        });
+        </script>';
     }
     
     private function getConfigValue($config, $categoria, $chave, $default = '') {
