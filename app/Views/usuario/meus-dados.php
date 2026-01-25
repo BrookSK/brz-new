@@ -287,6 +287,102 @@
     </div>
 </div>
 
+<!-- JavaScript para validação e máscaras -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Máscara para telefone
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 11) {
+                value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+            }
+            e.target.value = value;
+        });
+    }
+    
+    // Máscara para CPF/CNPJ
+    const documentoInput = document.getElementById('documento');
+    if (documentoInput) {
+        documentoInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 11) {
+                value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
+            } else if (value.length <= 14) {
+                value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, '$1.$2.$3/$4-$5');
+            }
+            e.target.value = value;
+        });
+    }
+    
+    // Máscara para CEP
+    const cepInput = document.getElementById('cep');
+    if (cepInput) {
+        cepInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 8) {
+                value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
+            }
+            e.target.value = value;
+        });
+        
+        // Busca CEP via API
+        cepInput.addEventListener('blur', function(e) {
+            const cep = e.target.value.replace(/\D/g, '');
+            if (cep.length === 8) {
+                fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.erro) {
+                            document.getElementById('endereco').value = data.logradouro || '';
+                            document.getElementById('bairro').value = data.bairro || '';
+                            document.getElementById('cidade').value = data.localidade || '';
+                            document.getElementById('estado').value = data.uf || '';
+                            document.getElementById('numero').focus();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar CEP:', error);
+                    });
+            }
+        });
+    }
+    
+    // Validação de senhas
+    const senhaAtual = document.getElementById('senha_atual');
+    const senhaNova = document.getElementById('senha_nova');
+    const senhaConfirmacao = document.getElementById('senha_confirmacao');
+    
+    function validarSenhas() {
+        if (senhaNova.value && senhaConfirmacao.value) {
+            if (senhaNova.value !== senhaConfirmacao.value) {
+                senhaConfirmacao.setCustomValidity('As senhas não conferem!');
+            } else {
+                senhaConfirmacao.setCustomValidity('');
+            }
+        }
+    }
+    
+    if (senhaNova && senhaConfirmacao) {
+        senhaNova.addEventListener('input', validarSenhas);
+        senhaConfirmacao.addEventListener('input', validarSenhas);
+    }
+    
+    // Feedback visual de salvamento
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Salvando...';
+            }
+        });
+    });
+});
+</script>
+
 <style>
 .user-avatar img {
     border: 3px solid #fff;

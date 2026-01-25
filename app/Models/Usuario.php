@@ -72,12 +72,18 @@ class Usuario extends Model {
                 documento = :documento, 
                 telefone = :telefone, 
                 endereco = :endereco, 
+                numero = :numero,
+                complemento = :complemento,
+                bairro = :bairro,
                 cidade = :cidade, 
                 estado = :estado, 
                 cep = :cep, 
                 perfil = :perfil, 
                 status = :status, 
                 creditos_disponiveis = :creditos_disponiveis,
+                notificacoes_email = :notificacoes_email,
+                notificacoes_sms = :notificacoes_sms,
+                idioma = :idioma,
                 updated_at = NOW()
             WHERE id = :id
         ");
@@ -88,12 +94,18 @@ class Usuario extends Model {
         $stmt->bindParam(':documento', $data['documento']);
         $stmt->bindParam(':telefone', $data['telefone']);
         $stmt->bindParam(':endereco', $data['endereco']);
+        $stmt->bindParam(':numero', $data['numero']);
+        $stmt->bindParam(':complemento', $data['complemento']);
+        $stmt->bindParam(':bairro', $data['bairro']);
         $stmt->bindParam(':cidade', $data['cidade']);
         $stmt->bindParam(':estado', $data['estado']);
         $stmt->bindParam(':cep', $data['cep']);
         $stmt->bindParam(':perfil', $data['perfil']);
         $stmt->bindParam(':status', $data['status']);
         $stmt->bindParam(':creditos_disponiveis', $data['creditos_disponiveis']);
+        $stmt->bindParam(':notificacoes_email', $data['notificacoes_email']);
+        $stmt->bindParam(':notificacoes_sms', $data['notificacoes_sms']);
+        $stmt->bindParam(':idioma', $data['idioma']);
         
         return $stmt->execute();
     }

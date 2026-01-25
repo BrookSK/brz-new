@@ -39,25 +39,16 @@ class UsuarioController extends Controller {
         
         $usuario = $this->usuarioModel->find($this->authService->getUsuarioLogado()['id']);
         
+        // Obter endereços do usuário
         $enderecos = $this->usuarioModel->getEnderecos($usuario['id']);
         
-        // Simulação de dados de pedidos enquanto o método não existe
-        $pedidos = [
-            [
-                'id' => 1,
-                'codigo_pedido' => 'BRZ20250123001',
-                'status' => 'pendente',
-                'valor_total' => 150.00,
-                'created_at' => '2025-01-23 10:00:00'
-            ],
-            [
-                'id' => 2,
-                'codigo_pedido' => 'BRZ20250123002',
-                'status' => 'enviado',
-                'valor_total' => 250.00,
-                'created_at' => '2025-01-23 09:30:00'
-            ]
-        ];
+        // Obter pedidos reais do usuário
+        try {
+            $pedidos = $this->pedidoModel->getPedidos($usuario['id'], 10, 0);
+        } catch (\Exception $e) {
+            // Se houver erro, usar array vazio
+            $pedidos = [];
+        }
         
         $pedidos_recentes = array_slice($pedidos, 0, 5);
         $total_pedidos = count($pedidos);
@@ -81,14 +72,53 @@ class UsuarioController extends Controller {
             
             if (empty($erros)) {
                 try {
-                    $this->usuarioModel->update($this->authService->getUsuarioLogado()['id'], $dados);
+                    // Obter usuário logado
+                    $usuarioId = $this->authService->getUsuarioLogado()['id'];
+                    
+                    // Preparar dados para atualização
+                    $dadosAtualizacao = [
+                        'nome' => $dados['nome'] ?? '',
+                        'email' => $dados['email'] ?? '',
+                        'telefone' => $dados['telefone'] ?? '',
+                        'documento' => $dados['documento'] ?? '',
+                        'cep' => $dados['cep'] ?? '',
+                        'endereco' => $dados['endereco'] ?? '',
+                        'numero' => $dados['numero'] ?? '',
+                        'complemento' => $dados['complemento'] ?? '',
+                        'bairro' => $dados['bairro'] ?? '',
+                        'cidade' => $dados['cidade'] ?? '',
+                        'estado' => $dados['estado'] ?? '',
+                        'notificacoes_email' => isset($dados['notificacoes_email']) ? 1 : 0,
+                        'notificacoes_sms' => isset($dados['notificacoes_sms']) ? 1 : 0,
+                        'idioma' => $dados['idioma'] ?? 'pt-BR',
+                        'perfil' => 'cliente',
+                        'status' => 'ativo',
+                        'creditos_disponiveis' => 0
+                    ];
+                    
+                    // Atualizar senha se fornecida
+                    if (!empty($dados['senha_atual']) && !empty($dados['senha_nova'])) {
+                        if ($dados['senha_nova'] === $dados['senha_confirmacao']) {
+                            $this->usuarioModel->updatePassword($usuarioId, $dados['senha_nova']);
+                        } else {
+                            $_SESSION['message'] = 'As senhas não conferem!';
+                            $_SESSION['message_type'] = 'danger';
+                            $this->redirect('/meus-dados');
+                            return;
+                        }
+                    }
+                    
+                    // Atualizar dados do usuário
+                    $this->usuarioModel->update($usuarioId, $dadosAtualizacao);
+                    
+                    // Registrar log
                     $this->authService->registrarLogAuditoria(
-                        $this->authService->getUsuarioLogado()['id'],
+                        $usuarioId,
                         'atualizar_perfil',
                         'usuarios',
-                        $this->authService->getUsuarioLogado()['id'],
+                        $usuarioId,
                         null,
-                        $dados
+                        $dadosAtualizacao
                     );
                     
                     $_SESSION['message'] = 'Dados atualizados com sucesso!';
@@ -99,13 +129,16 @@ class UsuarioController extends Controller {
                     $_SESSION['message_type'] = 'danger';
                 }
                 
-                $this->redirect('/minha-conta');
+                $this->redirect('/meus-dados');
                 return;
             }
         }
         
+        // Obter dados completos do usuário
+        $usuario = $this->usuarioModel->find($this->authService->getUsuarioLogado()['id']);
+        
         $this->view('usuario/meus-dados', [
-            'usuario' => $this->authService->getUsuarioLogado()
+            'usuario' => $usuario
         ]);
     }
 
@@ -117,31 +150,19 @@ class UsuarioController extends Controller {
         $limite = 10;
         $offset = ($pagina - 1) * $limite;
         
-        // Simulação de dados enquanto o método não existe
-        $pedidos = [
-            [
-                'id' => 1,
-                'codigo_pedido' => 'BRZ20250123001',
-                'status' => 'pendente',
-                'valor_total' => 150.00,
-                'total_itens' => 2,
-                'created_at' => '2025-01-23 10:00:00'
-            ],
-            [
-                'id' => 2,
-                'codigo_pedido' => 'BRZ20250123002',
-                'status' => 'enviado',
-                'valor_total' => 250.00,
-                'total_itens' => 3,
-                'created_at' => '2025-01-23 09:30:00'
-            ]
-        ];
+        // Obter pedidos reais do usuário
+        try {
+            $pedidos = $this->pedidoModel->getPedidos($usuario['id'], $limite, $offset);
+        } catch (\Exception $e) {
+            // Se houver erro, usar array vazio
+            $pedidos = [];
+        }
         
         $this->view('usuario/meus-pedidos', [
             'usuario' => $usuario,
             'pedidos' => $pedidos,
             'pagina' => $pagina,
-            'total' => ceil(count($pedidos) / $limite),
+            'total' => count($pedidos),
             'total_paginas' => ceil(count($pedidos) / $limite)
         ]);
     }
