@@ -232,51 +232,50 @@ class PedidoEcommerce extends Model {
                 error_log('Erro ao obter itens do pedido: ' . $e->getMessage());
                 $pedido['items'] = [];
             }
+            
+            // Obter histórico de status
+            try {
+                $stmt = $this->connection->prepare("
+                    SELECT psh.*, u.nome as usuario_alterou 
+                    FROM pedido_status_history psh 
+                    LEFT JOIN usuarios u ON psh.usuario_id = u.id 
+                    WHERE psh.pedido_id = :id 
+                    ORDER BY psh.created_at DESC
+                ");
+                $stmt->bindParam(':id', $pedidoId);
+                $stmt->execute();
+                $pedido['historico'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 
-                // Obter histórico de status
-                try {
-                    $stmt = $this->connection->prepare("
-                        SELECT psh.*, u.nome as usuario_alterou 
-                        FROM pedido_status_history psh 
-                        LEFT JOIN usuarios u ON psh.usuario_id = u.id 
-                        WHERE psh.pedido_id = :id 
-                        ORDER BY psh.created_at DESC
-                    ");
-                    $stmt->bindParam(':id', $pedidoId);
-                    $stmt->execute();
-                    $pedido['historico'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                    
-                    // Garantir que o histórico tenha todos os campos
-                    foreach ($pedido['historico'] as &$item) {
-                        $item['novo_status'] = $item['status_novo'] ?? 'Status atualizado';
-                        $item['observacao'] = $item['observacoes'] ?? 'Sem observação';
-                        $item['usuario_alterou'] = $item['usuario_alterou'] ?? 'Sistema';
-                    }
-                    
-                } catch (\Exception $e) {
-                    error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
-                    error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
-                    $pedido['historico'] = [];
+                // Garantir que o histórico tenha todos os campos
+                foreach ($pedido['historico'] as &$item) {
+                    $item['novo_status'] = $item['status_novo'] ?? 'Status atualizado';
+                    $item['observacao'] = $item['observacoes'] ?? 'Sem observação';
+                    $item['usuario_alterou'] = $item['usuario_alterou'] ?? 'Sistema';
                 }
                 
-                // Garantir que o pedido tenha todos os campos necessários
-                $pedido['codigo_pedido'] = $pedido['numero_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
-                $pedido['status'] = $pedido['status'] ?? 'pendente';
-                $pedido['subtotal_produtos'] = $pedido['subtotal'] ?? 0;
-                $pedido['valor_frete'] = $pedido['frete'] ?? 0;
-                $pedido['taxa_servico'] = $pedido['servicos'] ?? 0;
-                $pedido['valor_impostos'] = $pedido['impostos'] ?? 0;
-                $pedido['valor_total'] = $pedido['total'] ?? 0;
-                
-                // Garantir que os campos de endereço tenham valores padrão
-                $pedido['endereco_entrega'] = $pedido['endereco_entrega'] ?? 'Não informado';
-                $pedido['numero_entrega'] = $pedido['numero_entrega'] ?? '';
-                $pedido['complemento_entrega'] = $pedido['complemento_entrega'] ?? '';
-                $pedido['bairro_entrega'] = $pedido['bairro_entrega'] ?? '';
-                $pedido['cidade_entrega'] = $pedido['cidade_entrega'] ?? '';
-                $pedido['estado_entrega'] = $pedido['estado_entrega'] ?? '';
-                $pedido['cep_entrega'] = $pedido['cep_entrega'] ?? '';
+            } catch (\Exception $e) {
+                error_log('Erro ao obter histórico do pedido: ' . $e->getMessage());
+                error_log('SQL executado: SELECT psh.*, u.nome as usuario_alterou FROM pedido_status_history psh LEFT JOIN usuarios u ON psh.usuario_id = u.id WHERE psh.pedido_id = :id ORDER BY psh.created_at DESC');
+                $pedido['historico'] = [];
             }
+            
+            // Garantir que o pedido tenha todos os campos necessários
+            $pedido['codigo_pedido'] = $pedido['numero_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
+            $pedido['status'] = $pedido['status'] ?? 'pendente';
+            $pedido['subtotal_produtos'] = $pedido['subtotal'] ?? 0;
+            $pedido['valor_frete'] = $pedido['frete'] ?? 0;
+            $pedido['taxa_servico'] = $pedido['servicos'] ?? 0;
+            $pedido['valor_impostos'] = $pedido['impostos'] ?? 0;
+            $pedido['valor_total'] = $pedido['total'] ?? 0;
+            
+            // Garantir que os campos de endereço tenham valores padrão
+            $pedido['endereco_entrega'] = $pedido['endereco_entrega'] ?? 'Não informado';
+            $pedido['numero_entrega'] = $pedido['numero_entrega'] ?? '';
+            $pedido['complemento_entrega'] = $pedido['complemento_entrega'] ?? '';
+            $pedido['bairro_entrega'] = $pedido['bairro_entrega'] ?? '';
+            $pedido['cidade_entrega'] = $pedido['cidade_entrega'] ?? '';
+            $pedido['estado_entrega'] = $pedido['estado_entrega'] ?? '';
+            $pedido['cep_entrega'] = $pedido['cep_entrega'] ?? '';
         }
         
         return $pedido;
