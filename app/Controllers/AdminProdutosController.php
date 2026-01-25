@@ -36,7 +36,17 @@ class AdminProdutosController extends Controller {
                 $stmtFotos->bindParam(':produto_id', $produto['id']);
                 $stmtFotos->execute();
                 $foto = $stmtFotos->fetch(\PDO::FETCH_ASSOC);
-                $produto['imagem'] = $foto ? 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'] : 'https://via.placeholder.com/300x200';
+                
+                if ($foto && $foto['nome_arquivo']) {
+                    // Verificar se já é URL completa
+                    if (strpos($foto['nome_arquivo'], 'http') === 0) {
+                        $produto['imagem'] = $foto['nome_arquivo'];
+                    } else {
+                        $produto['imagem'] = 'https://novobr.brazilianashop.com.br/' . ltrim($foto['nome_arquivo'], '/');
+                    }
+                } else {
+                    $produto['imagem'] = 'https://via.placeholder.com/300x200?text=Sem+Imagem';
+                }
             }
             
             $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (name LIKE :busca OR sku LIKE :busca)" : ""));
@@ -115,7 +125,7 @@ class AdminProdutosController extends Controller {
                                 <h5 class="card-title">' . htmlspecialchars($produto['name']) . '</h5>
                                 <p class="text-muted small">SKU: ' . htmlspecialchars($produto['sku']) . '</p>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold text-primary">R$ ' . number_format($produto['price'], 2, ',', '.') . '</span>
+                                    <span class="fw-bold text-primary">$' . number_format($produto['price'], 2, '.', ',') . '</span>
                                     <span class="badge ' . ($produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ($produto['active'] ? 'Ativo' : 'Inativo') . '</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
@@ -237,9 +247,9 @@ class AdminProdutosController extends Controller {
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Preço *</label>
+                                        <label class="form-label">Preço (USD) *</label>
                                         <div class="input-group">
-                                            <span class="input-group-text">R$</span>
+                                            <span class="input-group-text">$</span>
                                             <input type="text" class="form-control" name="price" required>
                                         </div>
                                     </div>
@@ -278,7 +288,19 @@ class AdminProdutosController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
-            $price = str_replace(['R$', '.', ','], ['', '', '.'], $request->getParam('price'));
+            $price = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('price'));
+            
+            // Validar categoria se fornecida
+            $categoryId = $request->getParam('category_id');
+            if (!empty($categoryId)) {
+                $stmtCat = $pdo->prepare("SELECT id FROM categorias WHERE id = ?");
+                $stmtCat->execute([$categoryId]);
+                if (!$stmtCat->fetch()) {
+                    throw new \Exception("Categoria selecionada não existe");
+                }
+            } else {
+                $categoryId = null; // Permitir NULL se não selecionada
+            }
             
             $stmt = $pdo->prepare("
                 INSERT INTO produtos (name, sku, short_description, category_id, price, weight, stock, active, created_at)
@@ -289,7 +311,7 @@ class AdminProdutosController extends Controller {
                 $request->getParam('name'),
                 $request->getParam('sku'),
                 $request->getParam('short_description'),
-                $request->getParam('category_id'),
+                $categoryId,
                 $price,
                 $request->getParam('weight') ?: 0,
                 $request->getParam('stock') ?: 0,
@@ -331,6 +353,327 @@ class AdminProdutosController extends Controller {
             if (isset($pdo)) $pdo->rollBack();
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
+        }
+    }
+    
+    public function editar(Request $request, $id) {
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            
+            // Buscar produto
+            $stmt = $pdo->prepare("SELECT * FROM produtos WHERE id = ?");
+            $stmt->execute([$id]);
+            $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$produto) {
+                echo '<div class="alert alert-danger">Produto não encontrado</div>';
+                exit;
+            }
+            
+            // Buscar categorias
+            $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY name ASC");
+            $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Buscar fotos do produto
+            $stmtFotos = $pdo->prepare("SELECT * FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC");
+            $stmtFotos->execute([$id]);
+            $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
+            
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+        
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Produto - BRZ Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
+        .foto-item { position: relative; margin-bottom: 10px; }
+        .foto-item img { width: 100px; height: 100px; object-fit: cover; border-radius: 5px; }
+        .btn-remove-foto { position: absolute; top: -5px; right: -5px; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                        <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
+                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                    </a>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+                        <li class="nav-item"><a class="nav-link active" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
+                    </ul>
+                    <hr class="sidebar-divider">
+                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Editar Produto</h1>
+                    <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                </div>
+                
+                <form method="POST" action="/admin/produtos/atualizar/' . $id . '" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nome *</label>
+                                        <input type="text" class="form-control" name="name" value="' . htmlspecialchars($produto['name']) . '" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">SKU *</label>
+                                        <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Descrição Curta</label>
+                                        <textarea class="form-control" name="short_description" rows="3">' . htmlspecialchars($produto['short_description']) . '</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Descrição Completa</label>
+                                        <textarea class="form-control" name="description" rows="5">' . htmlspecialchars($produto['description']) . '</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Categoria</label>
+                                        <select class="form-select" name="category_id">
+                                            <option value="">Selecione...</option>';
+                                            foreach ($categorias as $cat) {
+                                                $selected = $cat['id'] == $produto['category_id'] ? 'selected' : '';
+                                                echo '<option value="' . $cat['id'] . '" ' . $selected . '>' . htmlspecialchars($cat['name']) . '</option>';
+                                            }
+                                        echo '</select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Galeria de Fotos</label>
+                                        <div class="row mb-3">';
+                                        foreach ($fotos as $foto) {
+                                            echo '<div class="col-md-2 foto-item">
+                                                <img src="https://novobr.brazilianashop.com.br/' . ltrim($foto['nome_arquivo'], '/') . '" alt="Foto">
+                                                <button type="button" class="btn btn-sm btn-danger btn-remove-foto" onclick="removerFoto(' . $foto['id'] . ')">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>';
+                                        }
+                                        echo '</div>
+                                        <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                        <small class="text-muted">Adicione novas fotos (múltiplas seleções permitidas)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Preço (USD) *</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" name="price" value="' . number_format($produto['price'], 2, '.', '') . '" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Preço de Custo (USD)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" name="cost_price" value="' . number_format($produto['cost_price'], 2, '.', '') . '">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Preço Promocional (USD)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="text" class="form-control" name="sale_price" value="' . number_format($produto['sale_price'], 2, '.', '') . '">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Estoque</label>
+                                        <input type="number" class="form-control" name="stock" value="' . $produto['stock'] . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Estoque Mínimo</label>
+                                        <input type="number" class="form-control" name="min_stock" value="' . $produto['min_stock'] . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Peso (kg)</label>
+                                        <input type="text" class="form-control" name="weight" value="' . $produto['weight'] . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Status</label>
+                                        <select class="form-select" name="status">
+                                            <option value="draft" ' . ($produto['status'] == 'draft' ? 'selected' : '') . '>Rascunho</option>
+                                            <option value="published" ' . ($produto['status'] == 'published' ? 'selected' : '') . '>Publicado</option>
+                                            <option value="archived" ' . ($produto['status'] == 'archived' ? 'selected' : '') . '>Arquivado</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Ativo</label>
+                                        <select class="form-select" name="active">
+                                            <option value="1" ' . ($produto['active'] ? 'selected' : '') . '>Ativo</option>
+                                            <option value="0" ' . (!$produto['active'] ? 'selected' : '') . '>Inativo</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Destaque</label>
+                                        <select class="form-select" name="featured">
+                                            <option value="1" ' . ($produto['featured'] ? 'selected' : '') . '>Sim</option>
+                                            <option value="0" ' . (!$produto['featured'] ? 'selected' : '') . '>Não</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Atualizar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function removerFoto(fotoId) {
+            if (confirm(\'Tem certeza que deseja remover esta foto?\')) {
+                fetch(\'/admin/produtos/remover-foto/\' + fotoId, {method: \'DELETE\'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(\'Erro ao remover foto\');
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>';
+        exit;
+    }
+    
+    public function atualizar(Request $request, $id) {
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+            
+            $price = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('price'));
+            $costPrice = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('cost_price'));
+            $salePrice = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('sale_price'));
+            
+            // Validar categoria se fornecida
+            $categoryId = $request->getParam('category_id');
+            if (!empty($categoryId)) {
+                $stmtCat = $pdo->prepare("SELECT id FROM categorias WHERE id = ?");
+                $stmtCat->execute([$categoryId]);
+                if (!$stmtCat->fetch()) {
+                    throw new \Exception("Categoria selecionada não existe");
+                }
+            } else {
+                $categoryId = null;
+            }
+            
+            $stmt = $pdo->prepare("
+                UPDATE produtos SET 
+                    name = ?, sku = ?, description = ?, short_description = ?, category_id = ?, 
+                    price = ?, cost_price = ?, sale_price = ?, stock = ?, min_stock = ?, weight = ?, 
+                    status = ?, active = ?, featured = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            
+            $stmt->execute([
+                $request->getParam('name'),
+                $request->getParam('sku'),
+                $request->getParam('description'),
+                $request->getParam('short_description'),
+                $categoryId,
+                $price,
+                $costPrice,
+                $salePrice,
+                $request->getParam('stock') ?: 0,
+                $request->getParam('min_stock') ?: 0,
+                $request->getParam('weight') ?: 0,
+                $request->getParam('status'),
+                $request->getParam('active') ?: 0,
+                $request->getParam('featured') ?: 0,
+                $id
+            ]);
+            
+            // Processar novas imagens
+            if (isset($_FILES['imagens'])) {
+                $uploadDir = 'uploads/produtos/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if ($_FILES['imagens']['error'][$key] === 0) {
+                        $fileName = time() . '_' . $name;
+                        if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $uploadDir . $fileName)) {
+                            $stmt = $pdo->prepare("
+                                INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem)
+                                VALUES (?, ?, ?, ?, ?)
+                            ");
+                            $stmt->execute([
+                                $id,
+                                $uploadDir . $fileName,
+                                $name,
+                                0, // Não é principal por padrão
+                                $key
+                            ]);
+                        }
+                    }
+                }
+            }
+            
+            $pdo->commit();
+            header('Location: /admin/produtos?success=2');
+            exit;
+            
+        } catch (\Exception $e) {
+            if (isset($pdo)) $pdo->rollBack();
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+    }
+    
+    public function removerFoto(Request $request, $fotoId) {
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            
+            $stmt = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE id = ?");
+            $stmt->execute([$fotoId]);
+            $foto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($foto) {
+                // Remover arquivo físico
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+                
+                // Remover do banco
+                $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE id = ?");
+                $stmt->execute([$fotoId]);
+                
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Foto não encontrada']);
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 }
