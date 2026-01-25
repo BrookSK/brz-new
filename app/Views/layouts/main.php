@@ -462,8 +462,12 @@
         }
         
         // Seletor de Moeda
+        console.log('Inicializando seletor de moeda...');
         const currencySelectors = document.querySelectorAll('.currency-selector');
         const currentCurrencySpan = document.getElementById('current-currency');
+        
+        console.log('Seletores encontrados:', currencySelectors.length);
+        console.log('Elemento current-currency:', currentCurrencySpan);
         
         // Taxa de conversão (mesma do checkout)
         const exchangeRates = {
@@ -473,6 +477,7 @@
         
         // Recuperar moeda salva ou usar BRL como padrão
         let currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+        console.log('Moeda inicial:', currentCurrency);
         updateCurrencyDisplay();
         
         // Atualizar preços ao carregar a página
@@ -481,10 +486,16 @@
         currencySelectors.forEach(selector => {
             selector.addEventListener('click', function(e) {
                 e.preventDefault();
+                e.stopPropagation();
+                
                 const newCurrency = this.getAttribute('data-currency');
+                console.log('Moeda selecionada:', newCurrency);
+                
                 if (newCurrency !== currentCurrency) {
                     currentCurrency = newCurrency;
                     localStorage.setItem('selected_currency', currentCurrency);
+                    console.log('Moeda atualizada para:', currentCurrency);
+                    
                     updateCurrencyDisplay();
                     updateAllPrices();
                     
@@ -518,11 +529,14 @@
             
             // Atualizar todos os preços na página com data-original-price
             const priceElements = document.querySelectorAll('[data-original-price]');
+            console.log('Elementos com data-original-price:', priceElements.length);
+            
             priceElements.forEach(element => {
                 const originalPrice = parseFloat(element.getAttribute('data-original-price'));
                 if (!isNaN(originalPrice)) {
                     const convertedPrice = originalPrice * rate;
                     element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                    console.log(`Preço atualizado: ${originalPrice} → ${element.textContent}`);
                 }
             });
             
@@ -532,8 +546,10 @@
                 element.textContent = currentCurrency;
             });
             
-            // Atualizar preços de produtos na lista
-            const productPrices = document.querySelectorAll('.product-price');
+            // Atualizar preços de produtos na lista (se não tiver data-original-price)
+            const productPrices = document.querySelectorAll('.product-price:not([data-original-price])');
+            console.log('Preços de produtos sem data-original-price:', productPrices.length);
+            
             productPrices.forEach(element => {
                 const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
                 const price = parseFloat(priceText);
@@ -544,6 +560,7 @@
                     element.textContent = `${currencySymbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
                     // Adicionar data-original-price para conversões futuras
                     element.setAttribute('data-original-price', originalPrice);
+                    console.log(`Preço de produto atualizado: ${originalPrice} → ${element.textContent}`);
                 }
             });
             
@@ -695,8 +712,10 @@
             const cartValues = document.querySelectorAll('.cart-currency');
             cartValues.forEach(element => {
                 const originalValue = parseFloat(element.getAttribute('data-original-value'));
-                const convertedValue = originalValue * rate;
-                element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                if (!isNaN(originalValue)) {
+                    const convertedValue = originalValue * rate;
+                    element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
+                }
             });
         }
         
@@ -719,17 +738,22 @@
         
         // Atualizar todos os preços ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM carregado, inicializando sistema de moedas...');
+            
+            // Salvar preços originais
             const priceElements = document.querySelectorAll('.product-price');
             priceElements.forEach(element => {
                 const priceText = element.textContent.replace(/[R$\s]/g, '').replace(',', '.');
                 const price = parseFloat(priceText);
                 if (!isNaN(price)) {
                     element.setAttribute('data-original-price', price);
+                    console.log('Preço original salvo:', price);
                 }
             });
             
-            // Atualizar todos os preços ao carregar a página
+            // Forçar atualização inicial
             setTimeout(function() {
+                console.log('Forçando atualização inicial de preços...');
                 updateAllPrices();
                 setTimeout(updateCartSummary, 200);
             }, 100);

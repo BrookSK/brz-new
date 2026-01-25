@@ -101,29 +101,29 @@
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal (<?= $total_itens ?> itens)</span>
-                        <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
+                        <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, '.', ',') ?></span>
+                        <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Impostos</span>
-                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, '.', ',') ?></span>
+                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Frete (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= number_format($frete, 2, '.', ',') ?></span>
+                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= number_format($frete, 2, ',', '.') ?></span>
                     </div>
                     
                     <hr>
                     
                     <div class="d-flex justify-content-between mb-3">
                         <h5>Total</h5>
-                        <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, '.', ',') ?></h5>
+                        <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, ',', '.') ?></h5>
                     </div>
                     
                     <div class="d-grid">
