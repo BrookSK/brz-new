@@ -69,6 +69,55 @@ class AuthController extends Controller {
         $this->view('auth/login');
     }
     
+    public function loginAdmin(Request $request) {
+        if ($this->authService->estaLogado()) {
+            $usuario = $this->authService->getUsuarioLogado();
+            if ($usuario['perfil'] === 'admin') {
+                $this->redirect('/admin/dashboard');
+            } else {
+                $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/loginadmin');
+            }
+            return;
+        }
+        
+        if ($request->getMethod() === 'POST') {
+            $email = $request->getParam('email');
+            $senha = $request->getParam('senha');
+            
+            try {
+                $usuario = $this->authService->autenticar($email, $senha);
+                
+                if ($usuario) {
+                    // Verificar se é admin
+                    if ($usuario['perfil'] !== 'admin') {
+                        $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
+                        $_SESSION['message_type'] = 'danger';
+                        $this->redirect('/loginadmin');
+                        return;
+                    }
+                    
+                    $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '! Acesso administrativo.';
+                    $_SESSION['message_type'] = 'success';
+                    $this->redirect('/admin/dashboard');
+                    return;
+                } else {
+                    $_SESSION['message'] = 'E-mail ou senha incorretos';
+                    $_SESSION['message_type'] = 'danger';
+                }
+            } catch (\Exception $e) {
+                $_SESSION['message'] = 'Erro ao fazer login: ' . $e->getMessage();
+                $_SESSION['message_type'] = 'danger';
+            }
+            
+            $this->redirect('/loginadmin');
+            return;
+        }
+        
+        $this->view('auth/loginadmin');
+    }
+    
     public function register(Request $request) {
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();

@@ -38,13 +38,18 @@ class Usuario extends Model {
     public function authenticate($email, $senha) {
         $usuario = $this->findByEmail($email);
         
-        if ($usuario && ($senha === $usuario['senha'] || password_verify($senha, $usuario['senha']))) {
+        if ($usuario && ($senha === $usuario['password'] || password_verify($senha, $usuario['password']))) {
             // Atualizar último login
             $stmt = $this->connection->prepare("UPDATE {$this->table} SET ultimo_login = NOW() WHERE id = :id");
             $stmt->bindParam(':id', $usuario['id']);
             $stmt->execute();
             
-            unset($usuario['senha']); // Remover senha do retorno
+            unset($usuario['password']); // Remover senha do retorno
+            
+            // Adicionar campo 'perfil' para compatibilidade
+            $usuario['perfil'] = $usuario['role'] ?? 'cliente';
+            $usuario['nome'] = $usuario['name'] ?? $usuario['nome'] ?? '';
+            
             return $usuario;
         }
         
