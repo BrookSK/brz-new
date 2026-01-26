@@ -124,14 +124,15 @@ class AdminRelatoriosController extends Controller {
                         </button>
                         <button type="button" class="btn btn-info me-2" onclick="gerarPDFCompras()">
                             <i class="fas fa-shopping-basket me-1"></i>Compras
-                        </button>';
+                        </button>
                         <button type="button" class="btn btn-success" onclick="gerarPDFMovimentacao()">
                             <i class="fas fa-exchange-alt me-1"></i>Movimentação
                         </button>
                     </div>
-                </div>
+                </div>';
 
-                <!-- Cards de Estatísticas -->
+                // Cards de Estatísticas
+                echo '<!-- Cards de Estatísticas -->
                 <div class="row mb-4">
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
