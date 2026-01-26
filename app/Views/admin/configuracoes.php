@@ -225,7 +225,7 @@
                                         
                                         <div class="mb-4">
                                             <label class="form-label">Campos Personalizados (JSON)</label>
-                                            <textarea name="webhook_campos" class="form-control" rows="5" placeholder='{"empresa": "BRZ Logistics", "ambiente": "producao"}'></textarea>
+                                            <textarea name="webhook_campos" class="form-control" rows="5" placeholder='{"empresa": "Braziliana Shop", "ambiente": "producao"}'></textarea>
                                             <div class="form-text">Campos adicionais em formato JSON que serão incluídos no payload</div>
                                         </div>
                                         
@@ -350,7 +350,7 @@
     "valor_total": "R$ 1.500,00",
     "status": "pago"
   },
-  "empresa": "BRZ Logistics",
+  "empresa": "Braziliana Shop",
   "ambiente": "produção"
 }</code></pre>
                                 </div>

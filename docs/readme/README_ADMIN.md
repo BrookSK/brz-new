@@ -1,4 +1,4 @@
-# BRZ Shop - Painel Administrativo
+# Braziliana Shop - Painel Administrativo
 
 ## 📋 Visão Geral
 

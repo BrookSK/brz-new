@@ -31,7 +31,7 @@ class AdminConfiguracoesController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - BRZ Admin</title>
+    <title>Configurações - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -98,7 +98,7 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Nome da Loja</label>
-                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'BRZ Shop') . '">
+                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana Shop') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Descrição</label>
@@ -106,7 +106,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Email de Contato</label>
-                                                <input type="email" class="form-control" name="loja_email" value="' . $this->getConfigValue($config, 'loja', 'email', 'contato@brzshop.com.br') . '">
+                                                <input type="email" class="form-control" name="loja_email" value="' . $this->getConfigValue($config, 'loja', 'email', 'contato@brazilianashop.com.br') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Telefone</label>
@@ -165,11 +165,11 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Email de Envio</label>
-                                                <input type="email" class="form-control" name="email_from" value="' . $this->getConfigValue($config, 'email', 'from', 'noreply@brzshop.com.br') . '">
+                                                <input type="email" class="form-control" name="email_from" value="' . $this->getConfigValue($config, 'email', 'from', 'noreply@brazilianashop.com.br') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Nome de Envio</label>
-                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'BRZ Shop') . '">
+                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana Shop') . '">
                                             </div>
                                         </div>
                                     </div>
@@ -334,11 +334,11 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Title Padrão</label>
-                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'BRZ Shop - Produtos de Qualidade') . '">
+                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana Shop - Produtos de Qualidade') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Description Padrão</label>
-                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na BRZ Shop') . '</textarea>
+                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana Shop') . '</textarea>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Palavras-chave</label>

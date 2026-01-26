@@ -99,7 +99,7 @@
 
 ### **Navbar (Usuário Logado)**
 ```
-[BRZ Logistics] [Home] [Produtos] [FAQ] [Contato] 
+[Braziliana Shop] [Home] [Produtos] [FAQ] [Contato] 
 [Avatar JD ▼] [🛒 3]
 
 Dropdown:
@@ -112,7 +112,7 @@ Dropdown:
 
 ### **Navbar (Não Logado)**
 ```
-[BRZ Logistics] [Home] [Produtos] [FAQ] [Contato] 
+[Braziliana Shop] [Home] [Produtos] [FAQ] [Contato] 
 [Entrar] [Cadastrar] [Admin] [🛒]
 ```
 

@@ -3,7 +3,7 @@
 ## 📁 Estrutura de Diretórios
 
 ```
-brz-new/
+braziliana-shop/
 ├── app/
 │   ├── Core/                           # Camada Core (Domain)
 │   │   ├── Domain/                     # Entidades de Domínio

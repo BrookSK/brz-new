@@ -1,4 +1,4 @@
-# BRZ Logistics - Sistema de E-commerce Logístico Internacional Completo
+# Braziliana Shop - Sistema de E-commerce Logístico Internacional Completo
 
 Arquitetura completa e funcional de e-commerce com foco em operação logística internacional, experiência do cliente progressiva e controle administrativo total.
 
@@ -265,4 +265,4 @@ Sistema completo e funcional pronto para produção. Para suporte técnico ou d�
 
 ---
 
-**BRZ Logistics** - Transformando o e-commerce internacional em uma experiência simples e eficiente.
+**Braziliana Shop** - Transformando o e-commerce internacional em uma experiência simples e eficiente.

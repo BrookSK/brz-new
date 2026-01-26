@@ -1,197 +1,218 @@
-# BRZ Logistics - Sistema de Logística Internacional
-
-Sistema completo de logística e comércio internacional desenvolvido em PHP com arquitetura MVC.
-
-## Fluxo do Processo
-
-1. **Cliente** - Acesso ao sistema e seleção de produtos
-2. **Seleção dos Produtos** - Escolha dos produtos desejados no catálogo
-3. **Cobrança** - Cálculo automático de produtos + serviços + impostos
-4. **API W Express** - Integração com sistema de envio internacional
-5. **Despacho para MIA** - Processamento de despacho para Miami
-6. **Voo para BR** - Transporte aéreo para o Brasil
-7. **Pagamento dos Impostos** - Processamento aduaneiro e tributário
-8. **Translado da Carga** - Transporte até armazém
-9. **Processamento da Carga** - Tratamento e armazenamento
-10. **Envio via Correios** - Entrega final ao cliente
-
-## Estrutura do Projeto
-
-```
+# Braziliana Shop
+ 
+Sistema MVC em PHP para e-commerce com operação logística internacional e painel administrativo.
+ 
+Este `README.md` é a documentação principal do repositório (como rodar, como configurar e como a estrutura está organizada). Documentação complementar está em `docs/`.
+ 
+## Visão geral
+ 
+O projeto implementa:
+- **Loja (público)**: catálogo, carrinho, checkout e páginas institucionais.
+- **Autenticação**: login/cadastro de usuário e login admin.
+- **Admin**: dashboard, produtos, pedidos, usuários, pagamentos, configurações e módulos operacionais (estoque, compras, relatórios e remessas).
+- **Integrações / Webhooks**: endpoints para webhooks (ex.: Asaas/Stripe) e endpoints de API interna.
+ 
+## Stack / requisitos
+ 
+- **PHP**: `^8.0`
+- **Extensões**: `pdo`, `mysqli` (ver `composer.json`)
+- **Banco**: MySQL/MariaDB
+- **Frontend**: Bootstrap + jQuery (views)
+- **Web server**: Apache (com `mod_rewrite`) ou Nginx (com rewrite para front controller)
+ 
+## Estrutura de pastas
+ 
+```bash
 brz-new/
-├── app/
-│   ├── Controllers/     # Controladores MVC
-│   ├── Core/           # Classes principais (Router, Request)
-│   ├── Models/         # Modelos de dados
-│   ├── Services/       # Serviços externos (WExpress)
-│   ├── Views/          # Views/templates
-│   └── routes.php      # Definição de rotas
+├── app/                        # Aplicação (MVC)
+│   ├── Controllers/            # Controllers
+│   ├── Models/                 # Models
+│   ├── Views/                  # Views/templates
+│   ├── Core/                   # Router/Request e base do framework
+│   ├── Services/               # Serviços (ex.: autenticação/pagamento)
+│   ├── routes.php              # Rotas principais (público + admin + api)
+│   └── routes_admin.php        # Rotas alternativas do admin (legado/auxiliar)
 ├── config/
-│   └── Database.php    # Configuração do banco
+│   └── Database.php            # Configuração de conexão com banco
+├── public/                     # Única pasta pública (DocumentRoot)
+│   ├── index.php               # Front controller (carrega Router + routes.php)
+│   ├── .htaccess               # Rewrites do Apache para /public/index.php
+│   └── uploads/                # Uploads (imagens etc.)
 ├── database/
-│   └── 001_create_tables.sql  # Migração inicial
-├── public/
-│   └── index.php       # Front controller
-├── composer.json       # Dependências PHP
-└── .htaccess          # Configuração Apache
+│   ├── *.sql                   # Scripts de banco/schema
+│   ├── migrations/             # Scripts auxiliares/migrations (quando existirem)
+│   └── scripts/                # Scripts utilitários (ex.: verificações)
+├── docs/                       # Documentação
+│   ├── arquitetura.md
+│   ├── readme/                 # READMEs complementares
+│   └── notes/                  # Notas internas (checkpoint/correções/fluxo)
+├── legacy/                     # Código/rascunhos antigos preservados (não usados no runtime)
+├── scripts/                    # Scripts de desenvolvimento/debug (não usados no runtime)
+├── index.php                   # Entry point alternativo (delegando para public/index.php)
+└── composer.json               # Dependências + autoload
+```
+ 
+## Como o sistema roda (fluxo HTTP)
+ 
+1. O servidor aponta o **DocumentRoot** para `public/`.
+2. Rewrites encaminham as URLs para `public/index.php`.
+3. `public/index.php` inicializa sessão, carrega `Router`/`Request` e inclui `app/routes.php`.
+4. O router resolve a rota e chama o controller/método correspondente.
+
+## Quick start (local)
+
+1. **Configure o banco** (crie o schema executando os `.sql` em `database/`).
+2. **Ajuste credenciais** em `config/Database.php`.
+3. **Aponte o servidor para `public/`**.
+
+Se você quiser rodar de forma simples em ambiente local, pode usar o servidor embutido do PHP apontando para a pasta `public/` (útil para testes rápidos). Exemplo:
+
+```bash
+php -S localhost:8000 -t public
 ```
 
-## Instalação
+Depois acesse:
+- `http://localhost:8000/`
 
-1. **Clone o repositório**
-   ```bash
-   git clone <repository-url>
-   cd brz-new
-   ```
+## Instalação / configuração
+ 
+### 1) Dependências PHP
+- Rode `composer install` para gerar o autoload.
+- Observação: existe um autoloader manual em `public/index.php` para facilitar ambientes onde o Composer ainda não foi executado.
 
-2. **Instale as dependências**
-   ```bash
-   composer install
-   ```
+### 1.1) Variáveis de ambiente (opcional)
 
-3. **Configure o banco de dados**
-   - Crie o banco de dados `brz_logistics`
-   - Execute o arquivo SQL: `database/001_create_tables.sql`
-   - Ajuste as credenciais em `config/Database.php`
+O projeto hoje lê a configuração de banco via `config/Database.php`. Se você quiser padronizar ambientes, pode criar um `.env` na raiz e adaptar o `config/Database.php` futuramente.
 
-4. **Configure o servidor web**
-   - Apache: Configure o DocumentRoot para a pasta `public/`
-   - Nginx: Configure rewrite rules para apontar para `public/index.php`
+### 2) Banco de dados
+ 
+Os scripts SQL ficam em `database/`. Em geral, você vai usar:
+- `database/001_create_tables.sql`
+- `database/002_complete_ecommerce_schema.sql`
+- `database/003_admin_user_and_product_photos.sql`
+ 
+Além disso, utilitários ficam em:
+- `database/scripts/038_verificar_placeholder_banco.sql`
+ 
+Configure a conexão em `config/Database.php`.
 
-## Funcionalidades
+### 2.1) Observações de permissões (uploads)
 
-### 📦 Catálogo de Produtos
-- Listagem de produtos com busca e filtros
-- Informações detalhadas (preço, peso, estoque)
-- Sistema de carrinho de compras
+- A pasta `public/uploads/` deve existir e ter permissão de escrita no ambiente onde o PHP roda.
+- Em produção, evite servir uploads sem validação (tipo, tamanho e sanitização de nome de arquivo).
 
-### 💰 Cálculo Automático
-- Cálculo de impostos (Importação, ICMS, PIS, COFINS)
-- Serviços adicionais (despacho, translado, armazenamento)
-- Resumo detalhado dos custos
+### 3) Apache / Nginx
+ 
+**Apache**:
+- Habilitar `mod_rewrite`.
+- Configurar o DocumentRoot para a pasta `public/`.
+ 
+**Nginx**:
+- Configurar rewrite para direcionar todas as rotas para `public/index.php`.
 
-### 🚀 Integração W Express
-- API para cotação de fretes
-- Rastreamento de envios
-- Criação de remessas internacionais
+## Rotas e endpoints (principais)
+ 
+As rotas reais ficam em `app/routes.php`.
+ 
+### Público
+- `GET /` → `HomeController::index`
+- `GET /produtos` → `ProdutoController::index`
+- `GET /produto/detalhes/{id}` → `ProdutoController::detalhes`
+- `GET /carrinho` → `CarrinhoController::index`
+- `POST /carrinho/adicionar` → `CarrinhoController::adicionar`
+- `POST /carrinho/remover` → `CarrinhoController::remover`
+- `POST /carrinho/atualizar` → `CarrinhoController::atualizar`
+- `POST /carrinho/limpar` → `CarrinhoController::limpar`
+- `GET /checkout` → `CheckoutController::index`
+- `POST /checkout/processar` → `CheckoutController::processar`
+- `GET /checkout/conclusao/{id}` → `CheckoutController::conclusao`
+- `GET /rastreamento` → `RastreamentoController::index`
+- `GET /faq` → `FaqController::index`
+- `GET /como-funciona` → `ComoFuncionaController::index`
+- `GET /contato` → `ContatoController::index`
+ 
+### Autenticação
+- `GET/POST /login` → `AuthController::login`
+- `GET/POST /loginadmin` → `AuthController::loginAdmin`
+- `GET /logout` → `AuthController::logout`
+- `GET/POST /register` → `AuthController::register`
+- `GET/POST /perfil` → `AuthController::perfil`
+ 
+### Área do usuário
+- `GET /minha-conta` → `UsuarioController::minhaConta`
+- `GET/POST /meus-dados` → `UsuarioController::meusDados`
+- `GET /meus-pedidos` → `UsuarioController::meusPedidos`
+- `GET /pedido/detalhes/{id}` → `UsuarioController::pedidoDetalhes`
+ 
+### Admin (painel)
+- `GET /admin` → página de menu do admin
+- `GET /admin/dashboard` → `AdminDashboardController::index`
+- `GET /admin/produtos` → `AdminProdutosController::index`
+- `GET /admin/pedidos` → `AdminPedidosController::index`
+- `GET /admin/usuarios` → `AdminUsuariosController::index`
+- `GET /admin/pagamentos` → `AdminPagamentosController::index`
+- `GET /admin/configuracoes` → `AdminConfiguracoesController::index`
+ 
+### Admin (estoque / compras / relatórios)
+- `GET /admin/estoque` → `AdminEstoqueController::index`
+- `GET /admin/estoque/compras` → `AdminComprasController::index`
+- `GET /admin/estoque/relatorios` → `AdminRelatoriosController::index`
+ 
+### Webhooks
+- `POST /webhook/asaas` → `WebhookController::asaas`
+- `POST /webhook/stripe` → `WebhookController::stripe`
+ 
+### API interna
+- `GET /api/produtos/buscar` → `ApiController::buscarProdutos`
+- `GET /api/produtos/destaque` → `ApiController::produtosDestaque`
+- `POST /api/carrinho/adicionar` → `ApiController::adicionarAoCarrinho`
+- `POST /api/carrinho/remover` → `ApiController::removerDoCarrinho`
+- `POST /api/carrinho/atualizar` → `ApiController::atualizarCarrinho`
+- `POST /api/carrinho/limpar` → `ApiController::limparCarrinho`
+- `GET /api/cep/{cep}` → `ApiController::consultarCEP`
+- `GET /api/frete/calcular` → `ApiController::calcularFrete`
+ 
+## Documentação
+ 
+- `docs/arquitetura.md`
+- `docs/readme/README_ECOMMERCE.md`
+- `docs/readme/README_ADMIN.md`
+- `docs/notes/` (notas internas de correções/fluxo/checkpoints)
+ 
+## Testes
 
-### 📍 Rastreamento
-- Acompanhamento completo do pedido
-- Timeline visual do processo
-- Histórico de atualizações
-
-### 👥 Gestão de Clientes
-- Cadastro automático de clientes
-- Histórico de pedidos
-- Dados de contato e endereço
-
-## Tecnologias Utilizadas
-
-- **PHP 8.0+** - Linguagem principal
-- **MySQL** - Banco de dados
-- **Bootstrap 5** - Framework CSS
-- **jQuery** - Biblioteca JavaScript
-- **Font Awesome** - Ícones
-
-## Configuração de Ambiente
-
-### Variáveis de Ambiente
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-WEXPRESS_API_KEY=sua_chave_api
-DB_HOST=localhost
-DB_NAME=brz_logistics
-DB_USER=root
-DB_PASSWORD=
+O `composer.json` lista `phpunit/phpunit` em `require-dev`. Se você estiver usando Composer:
+ 
+```bash
+./vendor/bin/phpunit
 ```
 
-### Configuração Apache
-Certifique-se de que os módulos abaixo estão ativos:
-- mod_rewrite
-- mod_php
+## Troubleshooting
 
-### Configuração PHP
-Extensões necessárias:
-- pdo_mysql
-- curl
-- json
+- **Erro 404 em rotas**
+  - Confirme que o DocumentRoot está apontando para `public/`.
+  - Confirme que o rewrite está ativo (Apache: `mod_rewrite`).
+- **Erro 500**
+  - Verifique logs do servidor web/PHP.
+  - Confirme credenciais e acesso ao banco em `config/Database.php`.
+- **Imagens/uploads não funcionam**
+  - Confirme permissão de escrita em `public/uploads/`.
+ 
+## Nota sobre `legacy/`
 
-## Endpoints da API
-
-### Produtos
-- `GET /produtos` - Listar produtos
-- `POST /produtos/carrinho` - Adicionar ao carrinho
-
-### Cobrança
-- `GET /cobranca` - Página de cálculo
-- `POST /cobranca/calcular` - Calcular valores
-
-### Processamento
-- `POST /processar` - Processar pedido
-
-### Rastreamento
-- `GET /rastreamento` - Buscar pedido
-- `GET /rastreamento?id={id}` - Detalhes do pedido
-
-## Estrutura do Banco de Dados
-
-### Tabelas Principais
-- `clientes` - Dados dos clientes
-- `produtos` - Catálogo de produtos
-- `pedidos` - Pedidos realizados
-- `pedido_items` - Itens dos pedidos
-- `rastreamento` - Histórico de rastreamento
-- `servicos` - Serviços disponíveis
-- `impostos` - Configurações de impostos
-
-## Fluxo de Trabalho
-
-1. **Cliente acessa o sistema** → Página inicial
-2. **Seleciona produtos** → Adiciona ao carrinho
-3. **Finaliza compra** → Preenche dados e calcula custos
-4. **Processa pedido** → Gera pedido no sistema
-5. **Integração W Express** → Cria envio internacional
-6. **Acompanhamento** → Rastreamento completo
-
-## Desenvolvimento
-
-### Adicionando Novos Controllers
-```php
-<?php
-namespace App\Controllers;
-
-use App\Core\Request;
-
-class NovoController extends Controller {
-    public function index(Request $request) {
-        $this->view('novo/index', ['data' => []]);
-    }
-}
-```
-
-### Adicionando Novos Models
-```php
-<?php
-namespace App\Models;
-
-class NovoModel extends Model {
-    protected $table = 'nova_tabela';
-    
-    public function customMethod() {
-        // Lógica personalizada
-    }
-}
-```
-
-## Contribuição
-
-1. Fork do projeto
-2. Criar branch para feature (`git checkout -b feature/nova-funcionalidade`)
-3. Commit das mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
-4. Push para o branch (`git push origin feature/nova-funcionalidade`)
-5. Abrir Pull Request
-
+A pasta `legacy/` contém artefatos antigos/rascunhos preservados para referência e **não** deve ser usada no runtime.
+ 
+## Desenvolvimento (padrões rápidos)
+ 
+### Controllers
+- Devem ficar em `app/Controllers/`.
+ 
+### Models
+- Devem ficar em `app/Models/`.
+ 
+### Views
+- Devem ficar em `app/Views/`.
+ 
 ## Licença
-
+ 
 Este projeto está licenciado sob a MIT License.

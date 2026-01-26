@@ -18,7 +18,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BRZ Admin - Painel Administrativo</title>
+    <title>Braziliana Shop Admin - Painel Administrativo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         
@@ -196,7 +196,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - BRZ Admin</title>
+    <title>Dashboard - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -482,7 +482,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - BRZ Admin</title>
+    <title>Pedidos - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -491,7 +491,6 @@ class AdminController extends Controller {
         .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
         .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
         .order-card { transition: transform 0.2s; }
-        .order-card:hover { transform: translateY(-2px); }
         .status-pendente { background-color: #ffc107; }
         .status-pago { background-color: #28a745; }
         .status-cancelado { background-color: #dc3545; }
@@ -506,7 +505,7 @@ class AdminController extends Controller {
                 <div class="position-sticky pt-3">
                     <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                         <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
                     </a>
                     <ul class="nav flex-column">
                         <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
@@ -632,7 +631,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Produto - BRZ Admin</title>
+    <title>Novo Produto - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -667,7 +666,7 @@ class AdminController extends Controller {
                         <div class="sidebar-brand-icon">
                             <i class="fas fa-shipping-fast"></i>
                         </div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
                     </a>
                     
                     <ul class="nav flex-column">
@@ -928,7 +927,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Erro - BRZ Admin</title>
+    <title>Erro - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>

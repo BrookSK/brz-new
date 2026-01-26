@@ -584,7 +584,7 @@ class CheckoutController extends Controller {
             error_log('🔍 [CRIAR_PEDIDO] Total: ' . $total);
             
             // Criar número do pedido
-            $numeroPedido = 'BRZ' . date('YmdHis') . rand(1000, 9999);
+            $numeroPedido = 'BZS' . date('YmdHis') . rand(1000, 9999);
             error_log('🔍 [CRIAR_PEDIDO] Número do pedido: ' . $numeroPedido);
             
             // Inserir pedido com todos os campos originais

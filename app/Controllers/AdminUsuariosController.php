@@ -35,7 +35,7 @@ class AdminUsuariosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usuários - BRZ Admin</title>
+    <title>Usuários - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -167,7 +167,7 @@ class AdminUsuariosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>' . htmlspecialchars($usuario['nome']) . ' - BRZ Admin</title>
+    <title>' . htmlspecialchars($usuario['nome']) . ' - Braziliana Shop Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -185,7 +185,7 @@ class AdminUsuariosController extends Controller {
                 <div class="position-sticky pt-3">
                     <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                         <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
                     </a>
                     <ul class="nav flex-column">
                         <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>

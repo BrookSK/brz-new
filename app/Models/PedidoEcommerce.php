@@ -84,7 +84,7 @@ class PedidoEcommerce extends Model {
 
     public function gerarCodigoPedido() {
         do {
-            $codigo = 'BRZ' . date('Ymd') . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
+            $codigo = 'BZS' . date('Ymd') . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
             $stmt = $this->connection->prepare("SELECT id FROM {$this->table} WHERE codigo_pedido = :codigo");
             $stmt->bindParam(':codigo', $codigo);
             $stmt->execute();

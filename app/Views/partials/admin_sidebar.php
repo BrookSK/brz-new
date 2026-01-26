@@ -19,7 +19,7 @@ function renderAdminSidebar($activePage = '') {
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                 <div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div>
-                <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
             </a>
             <ul class="nav flex-column">';
             

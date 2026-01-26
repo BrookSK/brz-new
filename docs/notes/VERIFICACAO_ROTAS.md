@@ -2,7 +2,7 @@
 
 ## 📋 **ANÁLISE DE TODAS AS PÁGINAS E LINKS**
 
-### 🏠 **HOME (/)**
+### 🏠 **HOME (/) **
 **Links encontrados:**
 - ✅ `/produtos` → Existe na rota: `ProdutoController::index`
 - ✅ `/como-funciona` → Existe na rota: `ComoFuncionaController::index`

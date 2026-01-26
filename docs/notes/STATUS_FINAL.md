@@ -231,7 +231,7 @@ app/Services/
 
 ## 🚀 **SISTEMA 100% FUNCIONAL!**
 
-**O e-commerce BRZ Logistics está completo e pronto para produção!**
+**O e-commerce Braziliana Shop está completo e pronto para produção!**
 
 ### **Principais Destaques:**
 - ✅ **Zero erros de rota**

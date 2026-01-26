@@ -45,7 +45,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.register', [
-            'title' => 'Criar Conta - BRZ Shop',
+            'title' => 'Criar Conta - Braziliana Shop',
             'errors' => $_SESSION['errors'] ?? [],
             'old' => $_SESSION['old'] ?? []
         ]);
@@ -104,7 +104,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.login', [
-            'title' => 'Entrar - BRZ Shop',
+            'title' => 'Entrar - Braziliana Shop',
             'errors' => $_SESSION['errors'] ?? [],
             'old' => $_SESSION['old'] ?? []
         ]);
@@ -185,7 +185,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.profile', [
-            'title' => 'Meu Perfil - BRZ Shop',
+            'title' => 'Meu Perfil - Braziliana Shop',
             'user' => $user->toSafeArray(),
             'success' => $_SESSION['success'] ?? '',
             'errors' => $_SESSION['errors'] ?? []
@@ -245,7 +245,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.change-password', [
-            'title' => 'Alterar Senha - BRZ Shop',
+            'title' => 'Alterar Senha - Braziliana Shop',
             'errors' => $_SESSION['errors'] ?? []
         ]);
 
@@ -322,7 +322,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.forgot-password', [
-            'title' => 'Recuperar Senha - BRZ Shop',
+            'title' => 'Recuperar Senha - Braziliana Shop',
             'errors' => $_SESSION['errors'] ?? [],
             'success' => $_SESSION['success'] ?? ''
         ]);
@@ -382,7 +382,7 @@ class AuthController extends Controller {
         }
 
         $this->view('auth.reset-password', [
-            'title' => 'Redefinir Senha - BRZ Shop',
+            'title' => 'Redefinir Senha - Braziliana Shop',
             'token' => $token,
             'errors' => $_SESSION['errors'] ?? []
         ]);
