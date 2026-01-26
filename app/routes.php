@@ -134,6 +134,18 @@ $router->get('/admin', function() {
                     <i class="fas fa-shopping-cart"></i>
                     <span>Pedidos</span>
                 </a>
+                <a href="/admin/estoque" class="admin-menu-item">
+                    <i class="fas fa-warehouse"></i>
+                    <span>Estoque</span>
+                </a>
+                <a href="/admin/estoque/compras" class="admin-menu-item">
+                    <i class="fas fa-shopping-basket"></i>
+                    <span>Compras</span>
+                </a>
+                <a href="/admin/estoque/relatorios" class="admin-menu-item">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Relatórios</span>
+                </a>
                 <a href="/admin/usuarios" class="admin-menu-item">
                     <i class="fas fa-users"></i>
                     <span>Usuários</span>

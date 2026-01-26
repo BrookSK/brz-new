@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-class AdminEstoqueController {
+class AdminEstoqueController extends Controller {
     private $connection;
 
     public function __construct() {

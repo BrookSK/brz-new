@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-class AdminRelatoriosController {
+class AdminRelatoriosController extends Controller {
     private $connection;
 
     public function __construct() {

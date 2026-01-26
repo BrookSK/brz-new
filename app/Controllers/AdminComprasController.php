@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-class AdminComprasController {
+class AdminComprasController extends Controller {
     private $connection;
 
     public function __construct() {
