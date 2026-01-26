@@ -11,183 +11,168 @@ class AdminController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         } catch (\Exception $e) {
             // Se não conseguir conectar ao banco, mostra dashboard básico
+            include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
             echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - BRZ Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .sidebar {
-            min-height: 100vh;
-            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
-        }
-        .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            border-radius: 0.35rem;
-            margin: 0.2rem 0;
-        }
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            color: #fff;
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        .sidebar .sidebar-brand {
-            color: #fff;
-            font-weight: bold;
-            padding: 1rem;
-        }
-        .quick-action-card {
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        .quick-action-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-    </style>
-</head>
+    <title>BRZ Admin - Painel Administrativo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+        
+            // Renderizar estilos do menu
+            renderAdminSidebarStyles();
+        
+            echo '</head>
 <body>
     <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                        <div class="sidebar-brand-icon">
-                            <i class="fas fa-shipping-fast"></i>
-                        </div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
-                    </a>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="/admin/dashboard">
-                                <i class="fas fa-fw fa-tachometer-alt"></i>
-                                <span>Dashboard</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/produtos">
-                                <i class="fas fa-fw fa-box"></i>
-                                <span>Produtos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/pedidos">
-                                <i class="fas fa-fw fa-shopping-cart"></i>
-                                <span>Pedidos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/usuarios">
-                                <i class="fas fa-fw fa-users"></i>
-                                <span>Usuários</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/pagamentos">
-                                <i class="fas fa-fw fa-credit-card"></i>
-                                <span>Pagamentos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/configuracoes">
-                                <i class="fas fa-fw fa-cog"></i>
-                                <span>Configurações</span>
-                            </a>
-                        </li>
-                    </ul>
-                    
-                    <hr class="sidebar-divider">
-                    
-                    <div class="nav-item">
-                        <a class="nav-link" href="/logout">
-                            <i class="fas fa-fw fa-sign-out-alt"></i>
-                            <span>Sair</span>
-                        </a>
-                    </div>
-                </div>
-            </nav>
-            
-            <!-- Main Content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="row">';
+        
+            // Renderizar menu lateral usando o partial
+            renderAdminSidebar('dashboard');
+        
+            echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
+                    <h1 class="h2"><i class="fas fa-tachometer-alt me-2"></i>Dashboard Administrativo</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-sm btn-primary">
-                            <i class="fas fa-sync"></i> Atualizar
-                        </button>
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-calendar-alt"></i> Hoje
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download"></i> Exportar
+                            </button>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    <strong>Atenção:</strong> Não foi possível conectar ao banco de dados. As estatísticas não estão disponíveis no momento.
-                </div>
-                
-                <!-- Ações Rápidas -->
+
+                <!-- Cards de Estatísticas -->
                 <div class="row mb-4">
-                    <div class="col-12">
-                        <h3 class="h5 mb-3">Ações Rápidas</h3>
-                        <div class="row">
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/novo-produto" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-primary text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-plus fa-3x mb-3"></i>
-                                            <h5 class="card-title">Novo Produto</h5>
-                                            <p class="card-text small">Adicionar novo produto ao catálogo</p>
-                                        </div>
-                                    </div>
-                                </a>
+                    <div class="col-md-3">
+                        <div class="card card-stats bg-primary text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Vendas Hoje</h5>
+                                <h3>R$ 2.543</h3>
+                                <small><i class="fas fa-arrow-up"></i> 12% vs ontem</small>
                             </div>
-                            
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/produtos" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-success text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-box fa-3x mb-3"></i>
-                                            <h5 class="card-title">Gerenciar Produtos</h5>
-                                            <p class="card-text small">Ver e editar produtos</p>
-                                        </div>
-                                    </div>
-                                </a>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats bg-success text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Pedidos</h5>
+                                <h3>47</h3>
+                                <small><i class="fas fa-arrow-up"></i> 8% vs semana</small>
                             </div>
-                            
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/pedidos" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-info text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-shopping-cart fa-3x mb-3"></i>
-                                            <h5 class="card-title">Pedidos</h5>
-                                            <p class="card-text small">Gerenciar pedidos</p>
-                                        </div>
-                                    </div>
-                                </a>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats bg-warning text-dark">
+                            <div class="card-body">
+                                <h5 class="card-title">Produtos</h5>
+                                <h3>1.234</h3>
+                                <small>Total ativos</small>
                             </div>
-                            
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/configuracoes" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-warning text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-cog fa-3x mb-3"></i>
-                                            <h5 class="card-title">Configurações</h5>
-                                            <p class="card-text small">Configurar loja</p>
-                                        </div>
-                                    </div>
-                                </a>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats bg-danger text-white">
+                            <div class="card-body">
+                                <h5 class="card-title">Usuários</h5>
+                                <h3>892</h3>
+                                <small><i class="fas fa-arrow-up"></i> 23 novos</small>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Gráficos e Tabelas -->
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-chart-line me-2"></i>Vendas - Últimos 7 dias</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="salesChart" height="100"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-shopping-cart me-2"></i>Pedidos Recentes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Pedido #1234</h6>
+                                            <small class="text-muted">João Silva</small>
+                                        </div>
+                                        <span class="badge bg-success">R$ 234</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Pedido #1235</h6>
+                                            <small class="text-muted">Maria Santos</small>
+                                        </div>
+                                        <span class="badge bg-warning">R$ 189</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Pedido #1236</h6>
+                                            <small class="text-muted">Pedro Costa</small>
+                                        </div>
+                                        <span class="badge bg-primary">R$ 456</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
-    </div>
+    </div>';
+
+    // Renderizar scripts
+    renderAdminScripts();
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    echo '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Gráfico de vendas
+        const ctx = document.getElementById(\'salesChart\').getContext(\'2d\');
+        const salesChart = new Chart(ctx, {
+            type: \'line\',
+            data: {
+                labels: [\'Seg\', \'Ter\', \'Qua\', \'Qui\', \'Sex\', \'Sáb\', \'Dom\'],
+                datasets: [{
+                    label: \'Vendas\',
+                    data: [1200, 1900, 1500, 2500, 2200, 3000, 2800],
+                    borderColor: \'rgb(75, 192, 192)\',
+                    backgroundColor: \'rgba(75, 192, 192, 0.2)\',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>';
             exit;
