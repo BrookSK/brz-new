@@ -136,7 +136,9 @@ class AdminUsuariosHelper {
     
     public function getPedidosUsuario($usuarioId, $limite = 10) {
         $stmt = $this->pdo->prepare("SELECT * FROM pedidos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT ?");
-        $stmt->execute([$usuarioId, $limite]);
+        $stmt->bindValue(1, $usuarioId);
+        $stmt->bindValue(2, (int)$limite, \PDO::PARAM_INT);
+        $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
