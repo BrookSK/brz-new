@@ -113,8 +113,7 @@ class AdminComprasController extends Controller {
                 </div>';
 
                 // Cards de Estatísticas
-                echo '<!-- Cards de Estatísticas -->
-                <div class="row mb-4">
+                echo '<div class="row mb-4">
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
