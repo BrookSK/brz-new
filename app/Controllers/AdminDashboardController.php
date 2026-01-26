@@ -4,6 +4,35 @@ namespace App\Controllers;
 use App\Core\Request;
 
 class AdminDashboardController extends Controller {
+
+    private function tableExists(\PDO $pdo, $table) {
+        try {
+            $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute([$table]);
+            return (bool)$stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function columnExists(\PDO $pdo, $table, $column) {
+        try {
+            $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE ?');
+            $stmt->execute([$column]);
+            return (bool)$stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function safeScalar(\PDO $pdo, $sql) {
+        try {
+            $stmt = $pdo->query($sql);
+            return $stmt ? ($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0) : 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
     
     public function index(Request $request) {
         try {
@@ -11,43 +40,56 @@ class AdminDashboardController extends Controller {
             
             // Estatísticas
             $stats = [];
-            $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos");
-            $stats['produtos_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-            
-            $stmt = $pdo->query("SELECT COUNT(*) as total FROM produtos WHERE ativo = 1");
-            $stats['produtos_ativos'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-            
-            $stmt = $pdo->query("SELECT COUNT(*) as total FROM pedidos");
-            $stats['pedidos_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-            
-            $stmt = $pdo->query("SELECT COUNT(*) as total FROM usuarios");
-            $stats['usuarios_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-            
-            $stmt = $pdo->query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'pago'");
-            $stats['faturamento_total'] = $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+
+            $stats['produtos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos");
+
+            $produtosAtivoCol = $this->columnExists($pdo, 'produtos', 'ativo') ? 'ativo' : ($this->columnExists($pdo, 'produtos', 'active') ? 'active' : null);
+            if ($produtosAtivoCol) {
+                $stats['produtos_ativos'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos WHERE {$produtosAtivoCol} = 1");
+            } else {
+                $stats['produtos_ativos'] = 0;
+            }
+
+            $stats['pedidos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM pedidos");
+            $stats['usuarios_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM usuarios");
+
+            $pedidoTotalCol = $this->columnExists($pdo, 'pedidos', 'valor_total') ? 'valor_total' : ($this->columnExists($pdo, 'pedidos', 'total') ? 'total' : null);
+            if ($pedidoTotalCol) {
+                $stats['faturamento_total'] = $this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
+            } else {
+                $stats['faturamento_total'] = 0;
+            }
             
             // Pedidos recentes
-            $stmt = $pdo->query("
-                SELECT p.*, u.nome as cliente_nome 
-                FROM pedidos p 
-                LEFT JOIN usuarios u ON p.usuario_id = u.id 
-                ORDER BY p.created_at DESC 
-                LIMIT 5
-            ");
-            $pedidos_recentes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $usuarioNomeCol = $this->columnExists($pdo, 'usuarios', 'nome') ? 'nome' : ($this->columnExists($pdo, 'usuarios', 'name') ? 'name' : null);
+            $pedidosSql = "SELECT p.*";
+            if ($usuarioNomeCol) {
+                $pedidosSql .= ", u.{$usuarioNomeCol} as cliente_nome";
+            } else {
+                $pedidosSql .= ", '' as cliente_nome";
+            }
+            $pedidosSql .= " FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id ORDER BY p.created_at DESC LIMIT 5";
+            $stmt = $pdo->query($pedidosSql);
+            $pedidos_recentes = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
             
             // Produtos mais vendidos
-            $stmt = $pdo->query("
-                SELECT pr.nome, COUNT(ip.produto_id) as vendas, SUM(ip.quantidade) as quantidade
-                FROM itens_pedido ip
-                JOIN produtos pr ON ip.produto_id = pr.id
-                JOIN pedidos p ON ip.pedido_id = p.id
-                WHERE p.status = 'pago'
-                GROUP BY pr.id, pr.nome
-                ORDER BY vendas DESC
-                LIMIT 5
-            ");
-            $produtos_mais_vendidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $itensTable = $this->tableExists($pdo, 'pedido_itens') ? 'pedido_itens' : ($this->tableExists($pdo, 'itens_pedido') ? 'itens_pedido' : null);
+            $produtoNomeCol = $this->columnExists($pdo, 'produtos', 'nome') ? 'nome' : ($this->columnExists($pdo, 'produtos', 'name') ? 'name' : null);
+            if ($itensTable && $produtoNomeCol) {
+                $stmt = $pdo->query("
+                    SELECT pr.{$produtoNomeCol} as nome, COUNT(ip.produto_id) as vendas, COALESCE(SUM(ip.quantidade),0) as quantidade
+                    FROM {$itensTable} ip
+                    JOIN produtos pr ON ip.produto_id = pr.id
+                    JOIN pedidos p ON ip.pedido_id = p.id
+                    WHERE p.status = 'pago'
+                    GROUP BY pr.id, pr.{$produtoNomeCol}
+                    ORDER BY vendas DESC
+                    LIMIT 5
+                ");
+                $produtos_mais_vendidos = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            } else {
+                $produtos_mais_vendidos = [];
+            }
             
         } catch (\Exception $e) {
             $stats = ['produtos_total' => 0, 'produtos_ativos' => 0, 'pedidos_total' => 0, 'usuarios_total' => 0, 'faturamento_total' => 0];
