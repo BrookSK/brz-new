@@ -90,66 +90,7 @@ $(document).ready(function() {
             icon.removeClass('fa-eye-slash').addClass('fa-eye');
         }
     });
-    
-    // Form submission
-    $('#adminLoginForm').on('submit', function(e) {
-        e.preventDefault();
-        
-        const btn = $('#loginBtn');
-        const originalText = btn.html();
-        
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Autenticando...');
-        
-        $.ajax({
-            url: '/loginadmin',
-            method: 'POST',
-            data: $(this).serialize(),
-            dataType: 'json',
-            success: function(response) {
-                if (response.success) {
-                    window.location.href = response.redirect || '/admin/dashboard';
-                } else {
-                    showAlert('danger', response.error || 'Erro ao fazer login administrativo');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.log('Erro:', xhr.responseText);
-                showAlert('danger', 'Erro de conexão. Tente novamente.');
-            },
-            complete: function() {
-                btn.prop('disabled', false).html(originalText);
-            }
-        });
-    });
 });
-
-function showAlert(type, message) {
-    const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show auth-alert" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-
-    const $card = $('.card').first();
-    $card.find('.auth-alert').remove();
-
-    const $header = $card.find('.card-header').first();
-    if ($header.length) {
-        $header.after(alertHtml);
-    } else {
-        const $body = $card.find('.card-body').first();
-        if ($body.length) {
-            $body.prepend(alertHtml);
-        } else {
-            $card.prepend(alertHtml);
-        }
-    }
-    
-    setTimeout(function() {
-        $card.find('.auth-alert').alert('close');
-    }, 5000);
-}
 </script>
 
 <style>
