@@ -198,6 +198,8 @@ $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
+$router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
+$router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 
 // Usuários
@@ -268,6 +270,7 @@ $router->get('/admin/carteira/stats', 'AdminCarteiraController', 'getStatsGerais
 // Rotas de Usuários
 $router->get('/admin/usuarios/editar/{id}', 'AdminUsuariosController', 'editar');
 $router->post('/admin/usuarios/salvar', 'AdminUsuariosController', 'salvar');
+$router->get('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
 $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
 $router->get('/admin/usuarios/novo', 'AdminUsuariosController', 'novo');
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');

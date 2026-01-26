@@ -41,6 +41,8 @@ class AdminRemessaCorreiosController extends Controller {
         renderAdminSidebarStyles();
         
         echo '<style>
+        .bg-purple { background-color: #6f42c1 !important; }
+        .badge.bg-purple { background-color: #6f42c1 !important; color: #fff !important; }
         .status-pronta { background-color: #17a2b8; }
         .status-etiqueta { background-color: #6f42c1; }
         .status-impressa { background-color: #28a745; }

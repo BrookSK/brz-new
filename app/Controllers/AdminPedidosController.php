@@ -186,6 +186,9 @@ class AdminPedidosController extends Controller {
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
+                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
@@ -257,6 +260,9 @@ class AdminPedidosController extends Controller {
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
+                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
@@ -327,6 +333,9 @@ class AdminPedidosController extends Controller {
                                         <div class="d-flex justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                                <i class="fas fa-trash"></i>
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
@@ -440,6 +449,9 @@ class AdminPedidosController extends Controller {
                 <div>
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
                         <i class="fas fa-edit me-1"></i>Editar Pedido
+                    </a>
+                    <a href="/admin/pedidos/excluir/' . $id . '" class="btn btn-danger me-2" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                        <i class="fas fa-trash me-1"></i>Excluir Pedido
                     </a>
                     <a href="/admin/pedidos" class="btn btn-secondary">
                         <i class="fas fa-arrow-left me-1"></i>Voltar
@@ -662,6 +674,45 @@ class AdminPedidosController extends Controller {
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro ao atualizar status: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos/detalhes/' . $id . '" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
+
+    public function excluir(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
+
+        if (empty($id)) {
+            echo '<div class="alert alert-danger">Pedido inválido</div>';
+            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("SELECT id FROM pedidos WHERE id = ?");
+            $stmt->execute([$id]);
+            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                throw new \Exception('Pedido não encontrado');
+            }
+
+            $stmt = $pdo->prepare("DELETE FROM pedido_itens WHERE pedido_id = ?");
+            $stmt->execute([$id]);
+
+            $stmt = $pdo->prepare("DELETE FROM pedidos WHERE id = ?");
+            $stmt->execute([$id]);
+
+            $pdo->commit();
+            header('Location: /admin/pedidos?success=excluido');
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            echo '<div class="alert alert-danger">Erro ao excluir pedido: ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/pedidos/detalhes/' . htmlspecialchars((string)$id) . '" class="btn btn-secondary">Voltar</a>';
             exit;
         }
     }

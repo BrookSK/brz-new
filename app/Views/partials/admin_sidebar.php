@@ -36,6 +36,12 @@ function renderAdminSidebar($activePage = '') {
             echo '</ul>
             <hr class="sidebar-divider">
             <div class="nav-item">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-fw fa-home"></i>
+                    <span>Voltar ao Site</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link" href="/logout">
                     <i class="fas fa-fw fa-sign-out-alt"></i>
                     <span>Sair</span>

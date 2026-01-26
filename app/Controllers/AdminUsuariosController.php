@@ -141,6 +141,208 @@ class AdminUsuariosController extends Controller {
         exit;
     }
 
+    public function novo(Request $request) {
+        // Incluir o partial do menu lateral
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Usuário - Braziliana Shop Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('usuarios');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-user-plus me-2"></i>Novo Usuário</h1>
+                <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="/admin/usuarios/salvar">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nome</label>
+                                <input type="text" class="form-control" name="nome" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">E-mail</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">CPF</label>
+                                <input type="text" class="form-control" name="cpf">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Telefone</label>
+                                <input type="text" class="form-control" name="telefone">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Senha</label>
+                                <input type="password" class="form-control" name="senha" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="ativo">
+                                    <option value="1" selected>Ativo</option>
+                                    <option value="0">Inativo</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Salvar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function editar(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
+
+        try {
+            $helper = new \App\Controllers\AdminUsuariosHelper();
+            $usuario = $helper->getUsuarioComCarteira($id);
+
+            if (!$usuario) {
+                echo '<div class="alert alert-danger">Usuário não encontrado</div>';
+                echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+
+        // Incluir o partial do menu lateral
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Usuário - Braziliana Shop Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('usuarios');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-user-edit me-2"></i>Editar Usuário</h1>
+                <a href="/admin/usuarios/detalhes/' . (int)$usuario['id'] . '" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="/admin/usuarios/salvar">
+                        <input type="hidden" name="id" value="' . (int)$usuario['id'] . '">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nome</label>
+                                <input type="text" class="form-control" name="nome" value="' . htmlspecialchars($usuario['nome'] ?? '') . '" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">E-mail</label>
+                                <input type="email" class="form-control" name="email" value="' . htmlspecialchars($usuario['email'] ?? '') . '" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">CPF</label>
+                                <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars($usuario['cpf'] ?? '') . '">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Telefone</label>
+                                <input type="text" class="form-control" name="telefone" value="' . htmlspecialchars($usuario['telefone'] ?? '') . '">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nova Senha (opcional)</label>
+                                <input type="password" class="form-control" name="senha" placeholder="Deixe em branco para manter">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="ativo">
+                                    <option value="1" ' . ((int)($usuario['ativo'] ?? 1) === 1 ? 'selected' : '') . '>Ativo</option>
+                                    <option value="0" ' . ((int)($usuario['ativo'] ?? 1) === 0 ? 'selected' : '') . '>Inativo</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Salvar Alterações
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function salvar(Request $request) {
+        try {
+            $helper = new \App\Controllers\AdminUsuariosHelper();
+
+            $id = $request->getParam('id');
+            $dados = [
+                'nome' => $request->getParam('nome'),
+                'email' => $request->getParam('email'),
+                'cpf' => $request->getParam('cpf'),
+                'telefone' => $request->getParam('telefone'),
+                'ativo' => $request->getParam('ativo', 1),
+                'senha' => $request->getParam('senha')
+            ];
+
+            if (!empty($id)) {
+                $helper->atualizarUsuario($id, $dados);
+                header('Location: /admin/usuarios/detalhes/' . (int)$id . '?success=1');
+                exit;
+            }
+
+            $novoId = $helper->criarUsuario($dados);
+            header('Location: /admin/usuarios/detalhes/' . (int)$novoId . '?success=1');
+            exit;
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro ao salvar usuário: ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
+
     public function detalhes(Request $request) {
         $id = $request->getParam('id');
         
@@ -155,6 +357,20 @@ class AdminUsuariosController extends Controller {
             }
             
             $pedidos = $helper->getPedidosUsuario($id);
+
+            $totalPedidos = is_array($pedidos) ? count($pedidos) : 0;
+            $totalGasto = 0;
+            if (!empty($pedidos) && is_array($pedidos)) {
+                foreach ($pedidos as $p) {
+                    $totalGasto += (float)($p['total'] ?? 0);
+                }
+            }
+
+            $stats = [
+                'total_pedidos' => $totalPedidos,
+                'total_gasto' => $totalGasto,
+                'ultimo_pedido' => (!empty($pedidos[0]['created_at']) ? $pedidos[0]['created_at'] : null)
+            ];
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
@@ -329,6 +545,24 @@ class AdminUsuariosController extends Controller {
 </body>
 </html>';
         exit;
+    }
+
+    public function excluir(Request $request, $id = null) {
+        $id = $id ?? $request->getParam('id');
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
+            $stmt->execute([$id]);
+
+            header('Location: /admin/usuarios?success=excluido');
+            exit;
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro ao excluir usuário: ' . $e->getMessage() . '</div>';
+            echo '<a href="/admin/usuarios" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
     }
     
     public function atualizarStatus(Request $request) {
