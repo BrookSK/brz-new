@@ -246,8 +246,8 @@ $(document).ready(function() {
     });
     
     var colors = [
-        '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
-        '#858796', '#5a5c69', '#2e59d9', '#17a673', '#2c9faf'
+        '#1d4ed8', '#10b981', '#38bdf8', '#f59e0b', '#ef4444',
+        '#94a3b8', '#0b1f3a', '#2563eb', '#059669', '#0891b2'
     ];
     
     new Chart(ctx, {

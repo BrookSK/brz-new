@@ -7,7 +7,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center p-4">
                     <div class="user-avatar mx-auto mb-3">
-                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($usuario['nome']) ?>&background=6366f1&color=fff&size=128" 
+                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($usuario['nome']) ?>&background=0b1f3a&color=fff&size=128" 
                              alt="<?= htmlspecialchars($usuario['nome']) ?>" 
                              class="rounded-circle" width="80" height="80">
                     </div>
@@ -312,7 +312,7 @@
 }
 
 .nav-link.active {
-    background-color: #6366f1;
+    background: var(--primary-gradient);
     color: white !important;
 }
 

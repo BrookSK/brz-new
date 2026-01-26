@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .nav-link.active {
-    background-color: #6366f1;
+    background: var(--primary-gradient);
     color: white !important;
 }
 
@@ -427,8 +427,8 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .form-control:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+    border-color: rgba(29, 78, 216, 0.55);
+    box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
 }
 
 .btn {
@@ -442,12 +442,12 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .form-check-input:checked {
-    background-color: #6366f1;
-    border-color: #6366f1;
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
 }
 
 .form-check-input:focus {
-    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
 }
 </style>
 

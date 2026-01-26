@@ -50,7 +50,7 @@ function renderAdminSidebarStyles() {
     echo '<style>
         .sidebar { 
             min-height: 100vh; 
-            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); 
+            background: linear-gradient(180deg, #0b1f3a 10%, #1d4ed8 100%); 
         }
         .sidebar .nav-link { 
             color: rgba(255, 255, 255, 0.8); 

@@ -6,9 +6,37 @@
     <title>Detalhes do Pedido #<?= htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['id']) ?> - Brazilianashop</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php
+    function getStatusColor($status) {
+        $colors = [
+            'pendente' => 'warning',
+            'processando' => 'info',
+            'enviado' => 'primary',
+            'entregue' => 'success',
+            'cancelado' => 'danger',
+            'pago' => 'success'
+        ];
+
+        return $colors[$status] ?? 'secondary';
+    }
+
+    function getStatusText($status) {
+        $texts = [
+            'pendente' => 'Pendente',
+            'processando' => 'Processando',
+            'enviado' => 'Enviado',
+            'entregue' => 'Entregue',
+            'cancelado' => 'Cancelado',
+            'pago' => 'Pago'
+        ];
+
+        return $texts[$status] ?? (is_string($status) ? ucfirst($status) : '');
+    }
+    ?>
     <style>
         :root {
-            --primary-color: #6366f1;
+            --primary-color: #0b1f3a;
+            --primary-color-2: #1d4ed8;
             --secondary-color: #6c757d;
             --success-color: #198754;
             --warning-color: #ffc107;
@@ -22,7 +50,7 @@
         }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #343a40;
@@ -41,7 +69,7 @@
         }
 
         .header-section {
-            background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-2) 55%, #e2e8f0 120%);
             color: white;
             padding: 2rem;
             margin-bottom: 2rem;

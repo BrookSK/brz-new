@@ -236,9 +236,9 @@ function getStatusColor($status) {
     $colors = [
         'pago' => '#10b981',
         'aguardando_processamento' => '#3b82f6',
-        'consolidado' => '#6366f1',
+        'consolidado' => '#1d4ed8',
         'rascunho_etiqueta' => '#f59e0b',
-        'etiqueta_efetivada' => '#6366f1',
+        'etiqueta_efetivada' => '#1d4ed8',
         'enviado' => '#3b82f6',
         'aguardando_lib_alfandegaria' => '#f59e0b',
         'finalizacao_embalagem' => '#3b82f6',
@@ -268,19 +268,19 @@ function getStatusLabel($status) {
 document.addEventListener('DOMContentLoaded', function() {
     // Gráfico de pizza para pedidos por status
     const ctx = document.getElementById('pedidosStatusChart').getContext('2d');
-    const pedidosStatus = <?= json_encode($stats['pedidos_por_status']) ?>;
+    const pedidosStatus = JSON.parse('<?= json_encode($stats['pedidos_por_status'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>');
     
     const labels = pedidosStatus.map(function(item) {
         const statusLabels = {
-            'pago' => 'Pago',
-            'aguardando_processamento' => 'Aguardando Processamento',
-            'consolidado' => 'Consolidado',
-            'rascunho_etiqueta' => 'Rascunho Etiqueta',
-            'etiqueta_efetivada' => 'Etiqueta Efetivada',
-            'enviado' : 'Enviado',
-            'aguardando_lib_alfandegaria' => 'Aguardando Liberação',
-            'finalizacao_embalagem' => 'Finalização Embalagem',
-            'entrega_finalizada' => 'Entrega Finalizada'
+            'pago': 'Pago',
+            'aguardando_processamento': 'Aguardando Processamento',
+            'consolidado': 'Consolidado',
+            'rascunho_etiqueta': 'Rascunho Etiqueta',
+            'etiqueta_efetivada': 'Etiqueta Efetivada',
+            'enviado': 'Enviado',
+            'aguardando_lib_alfandegaria': 'Aguardando Liberação',
+            'finalizacao_embalagem': 'Finalização Embalagem',
+            'entrega_finalizada': 'Entrega Finalizada'
         };
         return statusLabels[item.status] || item.status;
     });
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const colors = [
-        '#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444',
+        '#10b981', '#3b82f6', '#1d4ed8', '#f59e0b', '#ef4444',
         '#6b7280', '#4b5563', '#2563eb', '#059669', '#0891b2'
     ];
     

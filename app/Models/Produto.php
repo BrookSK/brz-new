@@ -118,8 +118,9 @@ class Produto extends Model {
             LIMIT :limit
         ");
         $term = "%{$term}%";
+        $limit = (int) $limit;
         $stmt->bindParam(':term', $term);
-        $stmt->bindParam(':limit', $limit);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

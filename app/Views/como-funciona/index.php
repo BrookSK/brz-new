@@ -179,7 +179,7 @@
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #667eea, #764ba2);
+    background: var(--primary-gradient);
 }
 
 .timeline-item {
@@ -194,7 +194,7 @@
     top: 0;
     width: 60px;
     height: 60px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     color: white;
     border-radius: 50%;
     display: flex;
@@ -202,14 +202,14 @@
     justify-content: center;
     font-size: 1.5rem;
     font-weight: bold;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: var(--shadow-sm);
 }
 
 .timeline-content {
     background: white;
     padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
     transition: transform 0.3s ease;
 }
 

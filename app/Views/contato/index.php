@@ -194,7 +194,6 @@ function showAlert(type, message) {
 
 <style>
 .card {
-    border: none;
     transition: transform 0.3s ease;
 }
 
@@ -203,9 +202,9 @@ function showAlert(type, message) {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     border: none;
-    border-radius: 50px;
+    border-radius: var(--radius-lg);
     padding: 12px 30px;
     font-weight: 600;
     transition: all 0.3s ease;
@@ -213,7 +212,7 @@ function showAlert(type, message) {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-outline-primary:hover,

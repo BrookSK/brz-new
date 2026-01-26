@@ -10,11 +10,24 @@
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #2563eb;
-            --secondary-color: #64748b;
-            --accent-color: #f59e0b;
+            --primary-color: #0b1f3a;
+            --primary-color-2: #1d4ed8;
+            --secondary-color: #94a3b8;
+            --accent-color: #38bdf8;
             --success-color: #10b981;
             --danger-color: #ef4444;
+
+            --bg-gradient: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
+            --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
+            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #fee2e2 100%);
+            --info-gradient: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
+
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+
+            --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
+            --shadow-md: 0 14px 40px rgba(15, 23, 42, 0.12);
         }
         
         .navbar-brand {
@@ -34,6 +47,7 @@
             padding: 0 !important;
             width: 100% !important;
             background: white !important;
+            padding-top: 10px !important;
         }
         
         /* Sobrescrever qualquer classe sticky do Bootstrap */
@@ -54,6 +68,59 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            background: var(--bg-gradient);
+            color: #0f172a;
+        }
+
+        .card,
+        .dropdown-menu,
+        .modal-content,
+        .form-control,
+        .form-select,
+        .btn {
+            border-radius: var(--radius-md);
+        }
+
+        .card {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-header {
+            background: rgba(255, 255, 255, 0.65);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .btn {
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            border: none;
+            background: var(--primary-gradient);
+            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.22);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.03);
+            box-shadow: 0 14px 32px rgba(29, 78, 216, 0.28);
+        }
+
+        .btn-danger {
+            border: none;
+            background: var(--danger-gradient);
+            color: #7f1d1d;
+        }
+
+        .btn-outline-primary {
+            border-color: rgba(29, 78, 216, 0.45);
+            color: #1d4ed8;
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--info-gradient);
+            border-color: rgba(29, 78, 216, 0.35);
+            color: #0b1f3a;
         }
         
         /* Garantir que main fique abaixo */
@@ -66,7 +133,7 @@
         
         /* Hero section ajustado */
         .hero-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary-gradient);
             color: white;
             padding: 60px 0 40px;
             margin-top: 0 !important;
@@ -412,7 +479,7 @@
             
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <p class="text-muted small mb-0">&copy; 2024 Braziliana Shop. Todos os direitos reservados.</p>
+                    <p class="text-muted small mb-0">&copy; 2026 Braziliana Shop. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <a href="/politica-privacidade" class="text-muted small text-decoration-none me-3">Política de Privacidade</a>

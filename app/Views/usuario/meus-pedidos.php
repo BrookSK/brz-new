@@ -328,7 +328,7 @@
 }
 
 .nav-link.active {
-    background-color: #6366f1;
+    background: var(--primary-gradient);
     color: white !important;
 }
 
@@ -375,8 +375,8 @@
 }
 
 .pagination .page-item.active .page-link {
-    background-color: #6366f1;
-    border-color: #6366f1;
+    background: var(--primary-gradient);
+    border-color: rgba(29, 78, 216, 0.35);
 }
 </style>
 

@@ -89,20 +89,74 @@
             <?php endif; ?>
         </div>
         
-        <?php if (!empty($carrinho)): ?>
         <div class="col-lg-4">
-            <!-- Resumo do Pedido -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Resumo do Pedido</h5>
-                </div>
-                <div class="card-body">
-                    <hr>
-                    
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Subtotal (<?= $total_itens ?> itens)</span>
-                        <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
+            <?php if (empty($carrinho)): ?>
+                <!-- Resumo do Pedido (Carrinho vazio) -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Resumo do Pedido</h5>
                     </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal (0 itens)</span>
+                            <span class="cart-currency subtotal-value" data-original-value="0">0,00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Taxa de Serviço (0 kg)</span>
+                            <span class="cart-currency taxa-servico-value" data-original-value="0">0,00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Impostos</span>
+                            <span class="cart-currency impostos-value" data-original-value="0">0,00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Frete (0 kg)</span>
+                            <span class="cart-currency frete-value" data-original-value="0">0,00</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <h5>Total</h5>
+                            <h5 id="total-valor" class="cart-currency total-value" data-original-value="0">0,00</h5>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/checkout" class="btn btn-primary btn-lg disabled" aria-disabled="true" tabindex="-1">
+                                <i class="fas fa-lock"></i> Finalizar Compra
+                            </a>
+                        </div>
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> Adicione itens ao carrinho para continuar.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações Importantes -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                        <ul class="small text-muted mb-0">
+                            <li>Prazo de entrega: 15-30 dias</li>
+                            <li>Impostos inclusos no valor final</li>
+                            <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
+                            <li>Frete calculado pelo peso total arredondado</li>
+                            <li>Seguro contra perda/dano</li>
+                        </ul>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- Resumo do Pedido -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Resumo do Pedido</h5>
+                    </div>
+                    <div class="card-body">
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal (<?= $total_itens ?> itens)</span>
+                            <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
+                        </div>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
@@ -140,21 +194,21 @@
                 </div>
             </div>
             
-            <!-- Informações Importantes -->
-            <div class="card mt-3">
-                <div class="card-body">
-                    <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
-                    <ul class="small text-muted mb-0">
-                        <li>Prazo de entrega: 15-30 dias</li>
-                        <li>Impostos inclusos no valor final</li>
-                        <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
-                        <li>Frete calculado pelo peso total arredondado</li>
-                        <li>Seguro contra perda/dano</li>
-                    </ul>
+                <!-- Informações Importantes -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                        <ul class="small text-muted mb-0">
+                            <li>Prazo de entrega: 15-30 dias</li>
+                            <li>Impostos inclusos no valor final</li>
+                            <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
+                            <li>Frete calculado pelo peso total arredondado</li>
+                            <li>Seguro contra perda/dano</li>
+                        </ul>
+                    </div>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
     </div>
 </div>
 

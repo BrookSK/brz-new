@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -43,7 +43,7 @@
         
         .btn-home {
             background: white;
-            color: #667eea;
+            color: #0b1f3a;
             padding: 12px 30px;
             border-radius: 50px;
             text-decoration: none;
@@ -56,7 +56,7 @@
         .btn-home:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            color: #764ba2;
+            color: #1d4ed8;
         }
         
         .error-icon {

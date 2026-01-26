@@ -1,82 +1,18 @@
-<?php ob_start(); ?>
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-6">
-            <div class="text-center">
-                <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
-                <h3 class="mb-4">Seu carrinho está vazio</h3>
-                <p class="text-muted mb-4">Parece um momento para adicionar produtos ao seu carrinho.</p>
-                <div class="d-grid gap-3 d-flex justify-content-center">
-                    <a href="/produtos" class="btn btn-primary">
-                        <i class="fas fa-shopping-cart me-2"></i>
-                        Ver Produtos
-                    </a>
-                    <a href="/" class="btn btn-outline-primary">
-                        <i class="fas fa-home me-2"></i>
-                        Voltar à Home
-                    </a>
-                </div>
-                
-                <!-- Produtos Recentes -->
-                <div class="mt-5">
-                    <h5 class="text-center mb-4">Produtos em Destaque</h5>
-                    <div class="row">
-                        <?php
-                        // Obter produtos em destaque para exibir
-                        $produtosDestaque = [];
-                        try {
-                            // Aqui você pode buscar produtos em destaque do banco
-                            $db = \Config\Database::getConnection();
-                            $stmt = $db->prepare("
-                                SELECT p.*, 
-                                       c.nome AS categoria_nome,
-                                       pf.nome_arquivo AS foto_principal
-                                FROM produtos p
-                                LEFT JOIN categorias c ON p.category_id = c.id
-                                LEFT JOIN produto_fotos pf ON p.id = pf.produto_id AND pf.principal = 1
-                                WHERE p.active = 1 AND p.featured = 1
-                                ORDER BY RAND()
-                                LIMIT 4
-                            ");
-                            $stmt->execute();
-                            $produtosDestaque = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                        } catch (\Exception $e) {
-                            $produtosDestaque = [];
-                        }
-                        
-                        foreach ($produtosDestaque as $produto):
-                        ?>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 product-card">
-                                <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none text-dark">
-                                    <div class="product-image-container">
-                                        <?php if ($produto['foto_principal']): ?>
-                                            <img src="/uploads/produtos/<?= $produto['foto_principal'] ?>" 
-                                                 alt="<?= htmlspecialchars($produto['nome']) ?>" 
-                                                 class="card-img-top">
-                                        <?php else: ?>
-                                            <img src="https://via.placeholder.com/300x200/667eea/ffffff?text=<?= urlencode($produto['nome']) ?>" 
-                                                 alt="<?= htmlspecialchars($produto['nome']) ?>" 
-                                                 class="card-img-top">
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="card-body p-3">
-                                        <h6 class="card-title"><?= htmlspecialchars($produto['nome']) ?></h6>
-                                        <p class="card-text text-muted small">
-                                            <?= htmlspecialchars(substr($produto['descricao'] ?? '', 0, 80)) ?>...
-                                        </p>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="badge bg-primary rounded-pill"><?= $produto['moeda'] ?? 'USD' ?> <?= number_format($produto['preco'] ?? 0, 2, ',', '.') ?></span>
-                                            <span class="badge bg-success rounded-pill"><?= $produto['categoria_nome'] ?></span>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
+        <h3 class="mb-2">Carrinho vazio</h3>
+        <p class="text-muted mb-4">Adicione produtos ao carrinho para ver o resumo e finalizar a compra.</p>
+
+        <div class="d-grid gap-3 d-flex justify-content-center">
+            <a href="/produtos" class="btn btn-primary">
+                <i class="fas fa-shopping-cart me-2"></i>
+                Ver Produtos
+            </a>
+            <a href="/" class="btn btn-outline-primary">
+                <i class="fas fa-home me-2"></i>
+                Voltar à Home
+            </a>
         </div>
     </div>
 </div>
@@ -191,5 +127,3 @@
     }
 }
 </style>
-
-<?php $content = ob_get_clean(); ?>

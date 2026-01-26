@@ -306,11 +306,11 @@
 
 .thumbnail-image:hover {
     transform: scale(1.05);
-    border-color: #6366f1;
+    border-color: #1d4ed8;
 }
 
 .thumbnail-image.border-primary {
-    border-color: #6366f1 !important;
+    border-color: #1d4ed8 !important;
 }
 
 .product-image-container {

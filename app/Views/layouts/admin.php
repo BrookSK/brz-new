@@ -7,6 +7,19 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #0b1f3a;
+            --primary-color-2: #1d4ed8;
+            --secondary-color: #94a3b8;
+            --danger-color: #ef4444;
+
+            --bg-gradient: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
+            --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
+
+            --radius-md: 14px;
+            --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+
         html {
             height: 100%;
         }
@@ -16,6 +29,27 @@
             display: flex;
             flex-direction: column;
             margin: 0;
+            background: var(--bg-gradient);
+            color: #0f172a;
+        }
+
+        .card,
+        .dropdown-menu,
+        .modal-content,
+        .form-control,
+        .form-select,
+        .btn {
+            border-radius: var(--radius-md);
+        }
+
+        .card {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-primary {
+            border: none;
+            background: var(--primary-gradient);
         }
 
         .admin-shell {
@@ -32,7 +66,7 @@
 
         .sidebar {
             min-height: 100vh;
-            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+            background: linear-gradient(180deg, #0b1f3a 10%, #1d4ed8 100%);
         }
         
         .sidebar .nav-link {
@@ -54,7 +88,7 @@
         }
         
         .border-left-primary {
-            border-left: 0.25rem solid #4e73df !important;
+            border-left: 0.25rem solid #1d4ed8 !important;
         }
         
         .border-left-success {
@@ -62,7 +96,7 @@
         }
         
         .border-left-info {
-            border-left: 0.25rem solid #36b9cc !important;
+            border-left: 0.25rem solid #38bdf8 !important;
         }
         
         .border-left-warning {

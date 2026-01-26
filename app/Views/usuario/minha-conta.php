@@ -232,7 +232,7 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     color: white;
     display: flex;
     align-items: center;
@@ -253,7 +253,7 @@
 }
 
 .nav-link.active {
-    background-color: #007bff;
+    background: var(--primary-gradient);
     color: white !important;
 }
 
