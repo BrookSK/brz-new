@@ -44,40 +44,63 @@ class AdminComprasController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Compras - BRZ Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); }
-        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
-        .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
-        .card-stats { transition: transform 0.2s; }
-        .card-stats:hover { transform: translateY(-5px); }
-    </style>
-</head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+
+        // Incluir estilos do menu lateral
+        echo '<style>
+        .sidebar { 
+            min-height: 100vh; 
+            background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); 
+        }
+        .sidebar .nav-link { 
+            color: rgba(255, 255, 255, 0.8); 
+            border-radius: 0.35rem; 
+            margin: 0.2rem 0; 
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { 
+            color: #fff; 
+            background-color: rgba(255, 255, 255, 0.1); 
+        }
+        .sidebar .sidebar-brand { 
+            color: #fff; 
+            font-weight: bold; 
+            padding: 1rem; 
+        }
+        .card-stats { 
+            transition: transform 0.2s; 
+        }
+        .card-stats:hover { 
+            transform: translateY(-5px); 
+        }
+    </style>';
+
+        echo '</head>
 <body>
     <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                        <div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div>
-                        <div class="sidebar-brand-text mx-3">BRZ Estoque</div>
-                    </a>
-                    <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/estoque"><i class="fas fa-fw fa-warehouse"></i><span>Estoque</span></a></li>
-                        <li class="nav-item"><a class="nav-link active" href="/admin/estoque/compras"><i class="fas fa-fw fa-shopping-basket"></i><span>Compras</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/estoque/relatorios"><i class="fas fa-fw fa-file-pdf"></i><span>Relatórios</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
-                    </ul>
-                    <hr class="sidebar-divider">
-                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
-                </div>
-            </nav>
+        <div class="row">';
+
+        // Menu lateral padrão
+        echo '<nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <div class="position-sticky pt-3">
+                <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                    <div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div>
+                    <div class="sidebar-brand-text mx-3">BRZ Admin</div>
+                </a>
+                <ul class="nav flex-column">
+                    <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/estoque"><i class="fas fa-fw fa-warehouse"></i><span>Estoque</span></a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/admin/estoque/compras"><i class="fas fa-fw fa-shopping-basket"></i><span>Compras</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/estoque/relatorios"><i class="fas fa-fw fa-file-pdf"></i><span>Relatórios</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
+                </ul>
+                <hr class="sidebar-divider">
+                <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
+            </div>
+        </nav>';
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
