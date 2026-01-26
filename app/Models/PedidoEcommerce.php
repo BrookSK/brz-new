@@ -4,6 +4,35 @@ namespace App\Models;
 class PedidoEcommerce extends Model {
     protected $table = 'pedidos';
 
+    public function getPedidos($usuarioId = null, $limite = 10, $offset = 0) {
+        $sql = "SELECT p.* FROM {$this->table} p";
+        $where = [];
+        $params = [];
+
+        if (!empty($usuarioId)) {
+            $where[] = 'p.usuario_id = :usuario_id';
+            $params[':usuario_id'] = (int) $usuarioId;
+        }
+
+        if (!empty($where)) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset';
+
+        $stmt = $this->connection->prepare($sql);
+
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, \PDO::PARAM_INT);
+        }
+
+        $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
     public function criarPedidoAPartirDoCarrinho($carrinhoId, $usuarioId, $enderecoEntregaId, $enderecoCobrancaId, $dadosPagamento) {
         $this->connection->beginTransaction();
         
