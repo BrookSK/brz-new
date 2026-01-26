@@ -23,6 +23,9 @@ class AdminConfiguracoesController extends Controller {
             $config = [];
         }
         
+        // Incluir o partial do menu lateral
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -30,38 +33,30 @@ class AdminConfiguracoesController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurações - BRZ Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); }
-        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
-        .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
-    </style>
-</head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        
+        // Renderizar estilos do menu
+        renderAdminSidebarStyles();
+        
+        echo '</head>
 <body>
     <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                        <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
-                    </a>
-                    <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
-                        <li class="nav-item"><a class="nav-link active" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
-                    </ul>
-                    <hr class="sidebar-divider">
-                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
-                </div>
-            </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="row">';
+        
+        // Renderizar menu lateral usando o partial
+        renderAdminSidebar('configuracoes');
+        
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Configurações</h1>
+                    <div>
+                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
+                            <i class="fas fa-download me-1"></i>Backup
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="location.reload()">
+                            <i class="fas fa-sync me-1"></i>Atualizar
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="row">
@@ -567,8 +562,12 @@ class AdminConfiguracoesController extends Controller {
                 </div>
             </main>
         </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    </div>';
+
+    // Renderizar scripts
+    renderAdminScripts();
+    
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . '
 </body>
 </html>';

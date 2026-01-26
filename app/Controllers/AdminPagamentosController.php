@@ -90,6 +90,9 @@ class AdminPagamentosController extends Controller {
             $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
         }
         
+        // Incluir o partial do menu lateral
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -97,12 +100,12 @@ class AdminPagamentosController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pagamentos - BRZ Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #4e73df 10%, #224abe 100%); }
-        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); border-radius: 0.35rem; margin: 0.2rem 0; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
-        .sidebar .sidebar-brand { color: #fff; font-weight: bold; padding: 1rem; }
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        
+        // Renderizar estilos do menu
+        renderAdminSidebarStyles();
+        
+        echo '<style>
         .payment-card { transition: transform 0.2s; }
         .payment-card:hover { transform: translateY(-5px); }
         .status-aprovado { background-color: #28a745; }
@@ -113,36 +116,25 @@ class AdminPagamentosController extends Controller {
 </head>
 <body>
     <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                        <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="sidebar-brand-text mx-3">BRZ Admin</div>
-                    </a>
-                    <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/produtos"><i class="fas fa-fw fa-box"></i><span>Produtos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
-                        <li class="nav-item"><a class="nav-link active" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
-                    </ul>
-                    <hr class="sidebar-divider">
-                    <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
-                </div>
-            </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="row">';
+        
+        // Renderizar menu lateral usando o partial
+        renderAdminSidebar('pagamentos');
+        
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pagamentos (' . $total . ')</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
-                            <i class="fas fa-sync"></i> Atualizar
+                    <h1 class="h2">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
+                    <div>
+                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
+                            <i class="fas fa-download me-1"></i>Exportar Relatório
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="location.reload()">
+                            <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
-                </div>
+                </div>';
                 
-                <div class="row mb-4">
+                echo '<div class="row mb-4">
                     <div class="col-xl-3 col-md-6 mb-4">
                         <div class="card border-left-primary shadow h-100 py-2">
                             <div class="card-body">
@@ -277,8 +269,12 @@ class AdminPagamentosController extends Controller {
                     echo '</ul></nav>';
                 }
                 
-                echo '</main></div></div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                echo '</main></div></div>';
+
+    // Renderizar scripts
+    renderAdminScripts();
+    
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function confirmarPagamento(pedidoId) {
             if (confirm("Tem certeza que deseja confirmar este pagamento?")) {
