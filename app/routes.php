@@ -254,3 +254,10 @@ $router->post('/admin/carteira/adicionar-creditos-em-lote', 'AdminCarteiraContro
 $router->get('/admin/carteira/saldo/{usuario_id}', 'AdminCarteiraController', 'getSaldo');
 $router->get('/admin/carteira/extrato/{usuario_id}', 'AdminCarteiraController', 'getExtrato');
 $router->get('/admin/carteira/stats', 'AdminCarteiraController', 'getStatsGerais');
+
+// Rotas de Usuários
+$router->get('/admin/usuarios/editar/{id}', 'AdminUsuariosController', 'editar');
+$router->post('/admin/usuarios/salvar', 'AdminUsuariosController', 'salvar');
+$router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
+$router->get('/admin/usuarios/novo', 'AdminUsuariosController', 'novo');
+$router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
