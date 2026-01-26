@@ -109,9 +109,10 @@ class AdminEstoqueController extends Controller {
                         <li class="nav-item"><a class="nav-link" href="/admin/pedidos"><i class="fas fa-fw fa-shopping-cart"></i><span>Pedidos</span></a></li>
                         <li class="nav-item"><a class="nav-link active" href="/admin/estoque"><i class="fas fa-fw fa-warehouse"></i><span>Estoque</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="/admin/estoque/compras"><i class="fas fa-fw fa-shopping-basket"></i><span>Compras</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/estoque/movimentacao"><i class="fas fa-fw fa-exchange-alt"></i><span>Movimentação</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="/admin/estoque/relatorios"><i class="fas fa-fw fa-file-pdf"></i><span>Relatórios</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="/admin/usuarios"><i class="fas fa-fw fa-users"></i><span>Usuários</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/pagamentos"><i class="fas fa-fw fa-credit-card"></i><span>Pagamentos</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/configuracoes"><i class="fas fa-fw fa-cog"></i><span>Configurações</span></a></li>
                     </ul>
                     <hr class="sidebar-divider">
                     <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
