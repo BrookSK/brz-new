@@ -21,6 +21,14 @@ $router->get('/faq', 'FaqController', 'index');
 $router->get('/como-funciona', 'ComoFuncionaController', 'index');
 $router->get('/contato', 'ContatoController', 'index');
 
+// Suporte e políticas
+$router->get('/suporte', 'SuporteController', 'index');
+$router->get('/politicas', 'PoliticasController', 'index');
+
+// Páginas institucionais
+$router->get('/politica-privacidade', 'PoliticaPrivacidadeController', 'index');
+$router->get('/termos-uso', 'TermosUsoController', 'index');
+
 // Autenticação
 $router->get('/login', 'AuthController', 'login');
 $router->post('/login', 'AuthController', 'login');
