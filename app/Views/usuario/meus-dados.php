@@ -4,7 +4,7 @@
         <!-- Sidebar -->
         <div class="col-lg-3">
             <!-- Profile Card -->
-            <div class="card border-0 shadow-sm">
+            <div class="card border-0 shadow-sm profile-card">
                 <div class="card-body text-center p-4">
                     <?php
                         $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
@@ -26,6 +26,9 @@
                             <img src="<?= htmlspecialchars($avatarUrl) ?>" 
                                  alt="<?= htmlspecialchars($usuario['nome']) ?>" 
                                  class="rounded-circle" width="80" height="80" style="object-fit: cover;">
+                            <span class="avatar-camera-indicator" aria-hidden="true">
+                                <i class="fas fa-camera"></i>
+                            </span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="avatarDropdown">
                             <li>
@@ -109,6 +112,8 @@
             </div>
             <?php unset($_SESSION['message'], $_SESSION['message_type']); ?>
             <?php endif; ?>
+
+            <form method="POST" action="/meus-dados" id="formMeusDados">
             
             <!-- Profile Form -->
             <div class="card border-0 shadow-sm">
@@ -118,7 +123,6 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="/meus-dados" id="formDadosPessoais">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="nome" class="form-label">Nome Completo</label>
@@ -143,7 +147,6 @@
                                        placeholder="000.000.000-00">
                             </div>
                         </div>
-                    </form>
                 </div>
             </div>
             
@@ -155,7 +158,6 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="/meus-dados" id="formEndereco">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="cep" class="form-label">CEP</label>
@@ -227,7 +229,6 @@
                                 </select>
                             </div>
                         </div>
-                    </form>
                 </div>
             </div>
             
@@ -239,7 +240,6 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="/meus-dados" id="formSeguranca">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="senha_atual" class="form-label">Senha Atual</label>
@@ -261,7 +261,6 @@
                             <i class="fas fa-info-circle me-2"></i>
                             Deixe os campos de senha em branco caso não queira alterá-los.
                         </div>
-                    </form>
                 </div>
             </div>
             
@@ -273,7 +272,6 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="/meus-dados" id="formPreferencias">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="notificacoes_email" class="form-label">
@@ -298,7 +296,6 @@
                                 </select>
                             </div>
                         </div>
-                    </form>
                 </div>
             </div>
             
@@ -309,21 +306,14 @@
                         <a href="/minha-conta" class="btn btn-outline-secondary">
                             <i class="fas fa-times me-2"></i> Cancelar
                         </a>
-                        <button type="submit" form="formDadosPessoais" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i> Salvar Dados Pessoais
-                        </button>
-                        <button type="submit" form="formEndereco" class="btn btn-info">
-                            <i class="fas fa-map-marker-alt me-2"></i> Salvar Endereço
-                        </button>
-                        <button type="submit" form="formSeguranca" class="btn btn-warning">
-                            <i class="fas fa-shield-alt me-2"></i> Atualizar Senha
-                        </button>
-                        <button type="submit" form="formPreferencias" class="btn btn-secondary">
-                            <i class="fas fa-cog me-2"></i> Salvar Preferências
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i> Salvar Alterações
                         </button>
                     </div>
                 </div>
             </div>
+
+            </form>
         </div>
     </div>
 </div>
@@ -464,6 +454,28 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.col-lg-3 {
+    position: relative;
+    z-index: 10;
+}
+
+.col-lg-3 .card {
+    position: relative;
+    z-index: 1;
+}
+
+.col-lg-3 .profile-card {
+    z-index: 20;
+}
+
+.col-lg-3 .profile-card:hover {
+    z-index: 25;
+}
+
+.col-lg-3 .card:hover {
+    z-index: 2;
+}
+
 .col-lg-3 .card,
 .col-lg-3 .card-body {
     overflow: visible;
@@ -471,11 +483,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .user-avatar {
     position: relative;
-    z-index: 1060;
+    z-index: 2000;
 }
 
 .user-avatar .dropdown-menu {
-    z-index: 1061;
+    z-index: 2001;
+}
+
+.avatar-camera-indicator {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+    pointer-events: none;
+    font-size: 12px;
 }
 
 .user-avatar img {
