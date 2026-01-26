@@ -202,7 +202,7 @@ class AdminEstoqueController extends Controller {
                             </table>
                         </div>
                     </div>
-                </div>
+                </div>';
 
                 // Informações do Sistema
                 echo '<div class="card mt-4">
