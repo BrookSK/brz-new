@@ -96,16 +96,18 @@ class AdminProdutosController extends Controller {
                     <a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
                 </div>';
                 
-                <form method="GET" class="row g-3 mb-4">
+                // Formulário de busca
+                echo '<form method="GET" class="row g-3 mb-4">
                     <div class="col-md-8">
                         <input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca) . '">
                     </div>
                     <div class="col-md-4">
                         <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>
                     </div>
-                </form>
+                </form>';
                 
-                <div class="row">';
+                // Lista de produtos
+                echo '<div class="row">';
                 
                 foreach ($produtos as $produto) {
                     echo '<div class="col-md-6 col-lg-4 mb-4">
