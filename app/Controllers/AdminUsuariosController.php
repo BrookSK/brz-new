@@ -2,14 +2,12 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Helpers\AdminUsuariosHelper;
-use App\Views\AdminUsuariosViews;
 
 class AdminUsuariosController extends Controller {
     
     public function index(Request $request) {
         try {
-            $helper = new AdminUsuariosHelper();
+            $helper = new \App\Controllers\AdminUsuariosHelper();
             
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
@@ -45,7 +43,7 @@ class AdminUsuariosController extends Controller {
         renderAdminSidebarStyles();
         
         // Adicionar estilos dos usuários
-        echo AdminUsuariosViews::getStyles();
+        echo \App\Controllers\AdminUsuariosViews::getStyles();
         
         echo '</head>
 <body>
@@ -76,7 +74,7 @@ class AdminUsuariosController extends Controller {
         }
                 
         // Renderizar cards de estatísticas
-        echo AdminUsuariosViews::renderStatsCards($stats);
+        echo \App\Controllers\AdminUsuariosViews::renderStatsCards($stats);
                 
         echo '<form method="GET" class="row g-3 mb-4">
                     <div class="col-md-8">
@@ -103,7 +101,7 @@ class AdminUsuariosController extends Controller {
                 }
                 
                 foreach ($usuarios as $usuario) {
-                    echo AdminUsuariosViews::renderCardUsuario($usuario);
+                    echo \App\Controllers\AdminUsuariosViews::renderCardUsuario($usuario);
                 }
                 
                 echo '</div>';
@@ -126,12 +124,12 @@ class AdminUsuariosController extends Controller {
     renderAdminScripts();
     
     // Adicionar scripts dos usuários
-    echo AdminUsuariosViews::getScripts();
+    echo \App\Controllers\AdminUsuariosViews::getScripts();
     
     // Adicionar modais
-    echo AdminUsuariosViews::renderModalAdicionarCredito();
-    echo AdminUsuariosViews::renderModalConverterMoeda();
-    echo AdminUsuariosViews::renderModalCreditosLote();
+    echo \App\Controllers\AdminUsuariosViews::renderModalAdicionarCredito();
+    echo \App\Controllers\AdminUsuariosViews::renderModalConverterMoeda();
+    echo \App\Controllers\AdminUsuariosViews::renderModalCreditosLote();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -147,13 +145,8 @@ class AdminUsuariosController extends Controller {
         $id = $request->getParam('id');
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            
-            // Buscar usuário
-            $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = :id");
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            $usuario = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $helper = new \App\Controllers\AdminUsuariosHelper();
+            $usuario = $helper->getUsuarioComCarteira($id);
             
             if (!$usuario) {
                 echo '<div class="alert alert-danger">Usuário não encontrado</div>';
@@ -161,27 +154,7 @@ class AdminUsuariosController extends Controller {
                 exit;
             }
             
-            // Buscar pedidos do usuário
-            $stmt = $pdo->prepare("
-                SELECT * FROM pedidos 
-                WHERE usuario_id = :usuario_id 
-                ORDER BY created_at DESC 
-                LIMIT 10
-            ");
-            $stmt->bindParam(':usuario_id', $id);
-            $stmt->execute();
-            $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Estatísticas
-            $stmtStats = $pdo->prepare("
-                SELECT COUNT(*) as total_pedidos, SUM(valor_total) as total_gasto,
-                       MAX(created_at) as ultimo_pedido
-                FROM pedidos 
-                WHERE usuario_id = :usuario_id
-            ");
-            $stmtStats->bindParam(':usuario_id', $id);
-            $stmtStats->execute();
-            $stats = $stmtStats->fetch(\PDO::FETCH_ASSOC);
+            $pedidos = $helper->getPedidosUsuario($id);
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
