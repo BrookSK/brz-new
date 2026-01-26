@@ -62,7 +62,7 @@ class AdminRemessaCorreiosController extends Controller {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .codigo-etiqueta {
-            font-family: 'Courier New', monospace;
+            font-family: "Courier New", monospace;
             font-size: 14px;
             background: #f8f9fa;
             padding: 8px;
