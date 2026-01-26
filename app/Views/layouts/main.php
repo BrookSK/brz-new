@@ -34,11 +34,129 @@
             --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
             --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
             --shadow-lg: 0 16px 44px rgba(15, 23, 42, 0.12);
+
+            --header-surface: rgba(255, 255, 255, 0.86);
+            --header-border: rgba(148, 163, 184, 0.35);
+            --footer-bg: linear-gradient(135deg, #0b1f3a 0%, #0f2b57 45%, #1d4ed8 110%);
+            --footer-border: rgba(255, 255, 255, 0.10);
         }
         
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
+        }
+
+        .navbar-brand i {
+            color: var(--primary-color-2) !important;
+        }
+
+        .navbar .nav-link {
+            color: rgba(15, 23, 42, 0.78) !important;
+            font-weight: 600;
+            padding: 0.55rem 0.75rem;
+            border-radius: 999px;
+            transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .navbar .nav-link:hover {
+            color: rgba(15, 23, 42, 0.92) !important;
+            background: rgba(29, 78, 216, 0.10);
+        }
+
+        .navbar .dropdown-menu {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: var(--shadow-md);
+        }
+
+        .navbar .dropdown-item {
+            font-weight: 600;
+        }
+
+        .navbar .btn.btn-primary {
+            background: var(--primary-btn-gradient);
+            border: none;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .navbar .btn.btn-outline-danger {
+            border-color: rgba(239, 68, 68, 0.55);
+            color: rgba(239, 68, 68, 0.95);
+        }
+
+        .navbar .btn.btn-outline-danger:hover {
+            background: var(--danger-gradient);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .navbar .cart-badge {
+            background: var(--danger-gradient) !important;
+        }
+
+        .site-footer {
+            background: var(--footer-bg);
+            border-top: 1px solid var(--footer-border);
+        }
+
+        .site-footer .text-muted {
+            color: rgba(255, 255, 255, 0.72) !important;
+        }
+
+        .site-footer a.text-muted {
+            color: rgba(255, 255, 255, 0.75) !important;
+        }
+
+        .site-footer a.text-muted:hover {
+            color: rgba(255, 255, 255, 0.95) !important;
+        }
+
+        .site-footer .footer-link {
+            color: rgba(255, 255, 255, 0.78);
+            text-decoration: none;
+        }
+
+        .site-footer .footer-link:hover {
+            color: rgba(255, 255, 255, 0.98);
+            text-decoration: underline;
+        }
+
+        .site-footer .social-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.92);
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .site-footer .social-link:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.16);
+        }
+
+        .site-footer .input-group .form-control {
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.10);
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .site-footer .input-group .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.65);
+        }
+
+        .site-footer .input-group .btn {
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .site-footer .input-group .btn:hover {
+            background: rgba(255, 255, 255, 0.26);
         }
         
         /* Header fixo - FORÇAR FIXO ACIMA DE TUDO */
@@ -48,11 +166,14 @@
             left: 0 !important;
             right: 0 !important;
             z-index: 9999 !important; /* Máima prioridade */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            box-shadow: var(--shadow-sm) !important;
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            background: white !important;
+            background: var(--header-surface) !important;
+            border-bottom: 1px solid var(--header-border) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
         
         /* Sobrescrever qualquer classe sticky do Bootstrap */
@@ -394,7 +515,7 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">
                 <i class="fas fa-globe-americas text-primary"></i> Braziliana Shop
@@ -405,7 +526,7 @@
             </button>
             
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mx-auto">
+                <ul class="navbar-nav mx-auto gap-lg-1">
                     <li class="nav-item">
                         <a class="nav-link" href="/"><i class="fas fa-home"></i> Início</a>
                     </li>
@@ -423,7 +544,7 @@
                     </li>
                 </ul>
                 
-                <ul class="navbar-nav align-items-center">
+                <ul class="navbar-nav align-items-center gap-1">
                     <!-- Seletor de Moeda -->
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
@@ -525,37 +646,37 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-light py-5 mt-auto">
+    <footer class="site-footer text-light py-5 mt-auto">
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
                     <h5 class="mb-3"><i class="fas fa-globe-americas"></i> Braziliana Shop</h5>
                     <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
                     <div class="mt-3">
-                        <a href="#" class="text-white me-3"><i class="fab fa-facebook fa-lg"></i></a>
-                        <a href="#" class="text-white me-3"><i class="fab fa-instagram fa-lg"></i></a>
-                        <a href="#" class="text-white me-3"><i class="fab fa-twitter fa-lg"></i></a>
-                        <a href="#" class="text-white"><i class="fab fa-linkedin fa-lg"></i></a>
+                        <a href="#" class="social-link me-2"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="social-link me-2"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-link me-2"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-linkedin"></i></a>
                     </div>
                 </div>
                 
                 <div class="col-lg-2 mb-4">
                     <h6 class="mb-3">Links Úteis</h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/" class="text-muted text-decoration-none">Início</a></li>
-                        <li class="mb-2"><a href="/produtos" class="text-muted text-decoration-none">Produtos</a></li>
-                        <li class="mb-2"><a href="/como-funciona" class="text-muted text-decoration-none">Como Funciona</a></li>
-                        <li class="mb-2"><a href="/faq" class="text-muted text-decoration-none">FAQ</a></li>
+                        <li class="mb-2"><a href="/" class="footer-link">Início</a></li>
+                        <li class="mb-2"><a href="/produtos" class="footer-link">Produtos</a></li>
+                        <li class="mb-2"><a href="/como-funciona" class="footer-link">Como Funciona</a></li>
+                        <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                     </ul>
                 </div>
                 
                 <div class="col-lg-3 mb-4">
                     <h6 class="mb-3">Atendimento</h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/contato" class="text-muted text-decoration-none">Contato</a></li>
-                        <li class="mb-2"><a href="/suporte" class="text-muted text-decoration-none">Suporte</a></li>
-                        <li class="mb-2"><a href="/rastreamento" class="text-muted text-decoration-none">Rastrear Pedido</a></li>
-                        <li class="mb-2"><a href="/politicas" class="text-muted text-decoration-none">Políticas</a></li>
+                        <li class="mb-2"><a href="/contato" class="footer-link">Contato</a></li>
+                        <li class="mb-2"><a href="/suporte" class="footer-link">Suporte</a></li>
+                        <li class="mb-2"><a href="/rastreamento" class="footer-link">Rastrear Pedido</a></li>
+                        <li class="mb-2"><a href="/politicas" class="footer-link">Políticas</a></li>
                     </ul>
                 </div>
                 
@@ -571,15 +692,15 @@
                 </div>
             </div>
             
-            <hr class="my-4 border-secondary">
+            <hr class="my-4" style="border-color: rgba(255,255,255,0.18);">
             
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <p class="text-muted small mb-0">&copy; 2026 Braziliana Shop. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <a href="/politica-privacidade" class="text-muted small text-decoration-none me-3">Política de Privacidade</a>
-                    <a href="/termos-uso" class="text-muted small text-decoration-none">Termos de Uso</a>
+                    <a href="/politica-privacidade" class="footer-link small me-3">Política de Privacidade</a>
+                    <a href="/termos-uso" class="footer-link small">Termos de Uso</a>
                 </div>
             </div>
         </div>

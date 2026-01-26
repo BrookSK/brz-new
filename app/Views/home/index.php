@@ -321,6 +321,36 @@ $(document).ready(function() {
 </script>
 
 <style>
+.hero-section .hero-image {
+    position: relative;
+    padding: 14px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 18px 50px rgba(11, 31, 58, 0.28);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+.hero-section .hero-image::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(11, 31, 58, 0.18) 0%, rgba(29, 78, 216, 0.14) 55%, rgba(255, 255, 255, 0.06) 100%);
+    pointer-events: none;
+}
+
+.hero-section .hero-image img {
+    position: relative;
+    display: block;
+    width: 100%;
+    border-radius: 18px;
+    box-shadow: 0 14px 38px rgba(11, 31, 58, 0.30);
+    filter: saturate(1.08) contrast(1.02);
+    transform: translateZ(0);
+}
+
 .timeline {
     position: relative;
 }
