@@ -95,7 +95,7 @@ class AdminComprasController extends Controller {
                     <hr class="sidebar-divider">
                     <div class="nav-item"><a class="nav-link" href="/logout"><i class="fas fa-fw fa-sign-out-alt"></i><span>Sair</span></a></div>
                 </div>
-            </nav>';
+            </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
@@ -110,7 +110,7 @@ class AdminComprasController extends Controller {
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
-                </div>
+                </div>';
 
                 <!-- Cards de Estatísticas -->
                 <div class="row mb-4">
