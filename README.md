@@ -215,4 +215,6 @@ A pasta `legacy/` contém artefatos antigos/rascunhos preservados para referênc
  
 ## Licença
  
-Este projeto está licenciado sob a MIT License.
+Este projeto está licenciado sob uma **licença proprietária de uso restrito**.
+
+Veja `LICENSE.md`.
