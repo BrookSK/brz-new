@@ -8,6 +8,8 @@ function renderAdminSidebar($activePage = '') {
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque'],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras'],
         'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios'],
+        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Remessa Internacional', 'url' => '/admin/remessa-internacional'],
+        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Remessa Correios', 'url' => '/admin/remessa-correios'],
         'usuarios' => ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios'],
         'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos'],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes']
