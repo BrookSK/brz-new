@@ -7,6 +7,29 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        html {
+            height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+        }
+
+        .admin-shell {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .admin-shell > .row {
+            flex: 1 0 auto;
+            min-height: 0;
+        }
+
         .sidebar {
             min-height: 100vh;
             background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
@@ -64,7 +87,7 @@
     </style>
 </head>
 <body>
-    <div class="container-fluid">
+    <div class="container-fluid admin-shell">
         <div class="row">
             <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
@@ -128,7 +151,7 @@
             </nav>
             
             <!-- Main Content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 d-flex flex-column">
                 <?php if (isset($_SESSION['message'])): ?>
                     <div class="alert alert-<?= $_SESSION['message_type'] ?? 'info' ?> alert-dismissible fade show mt-3" role="alert">
                         <?= $_SESSION['message'] ?>
@@ -140,6 +163,10 @@
                 <?= $content ?? '' ?>
             </main>
         </div>
+
+        <footer class="border-top py-3 mt-auto">
+            <div class="text-center text-muted small">&copy; 2024 Braziliana Shop. Todos os direitos reservados.</div>
+        </footer>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>

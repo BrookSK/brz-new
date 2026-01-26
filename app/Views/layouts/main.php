@@ -44,9 +44,16 @@
         }
         
         /* Garantir que body tenha espaçamento correto */
+        html {
+            height: 100%;
+        }
+
         body {
             padding-top: 76px !important; /* Altura do navbar */
             margin: 0 !important;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         
         /* Garantir que main fique abaixo */
@@ -54,6 +61,7 @@
             margin-top: 0 !important;
             padding-top: 20px !important;
             position: relative !important;
+            flex: 1 0 auto;
         }
         
         /* Hero section ajustado */
@@ -354,7 +362,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-light py-5 mt-5">
+    <footer class="bg-dark text-light py-5 mt-auto">
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
