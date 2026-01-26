@@ -117,6 +117,28 @@ class AuthController extends Controller {
         
         $this->view('auth/loginadmin');
     }
+
+    public function logout(Request $request) {
+        try {
+            $this->authService->logout();
+
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            $_SESSION['message'] = 'Logout realizado com sucesso.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            $_SESSION['message'] = 'Erro ao fazer logout.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/login');
+    }
     
     public function register(Request $request) {
         if ($this->authService->estaLogado()) {
