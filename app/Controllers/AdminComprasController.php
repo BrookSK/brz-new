@@ -153,7 +153,7 @@ class AdminComprasController extends Controller {
                     </div>
                 </div>
 
-                <!-- Tabela de Compras -->
+                // Tabela de Compras
                 echo '<div class="card">
                     <div class="card-header">
                         <h5><i class="fas fa-list me-2"></i>Itens da Lista de Compras</h5>
@@ -213,9 +213,9 @@ class AdminComprasController extends Controller {
                             </table>
                         </div>
                     </div>
-                </div>
+                </div>';
 
-                <!-- Informações do Sistema -->
+                // Informações do Sistema
                 echo '<div class="card mt-4">
                     <div class="card-header">
                         <h5><i class="fas fa-info-circle me-2"></i>Informações do Sistema</h5>
