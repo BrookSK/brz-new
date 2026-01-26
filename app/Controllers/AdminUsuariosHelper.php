@@ -142,18 +142,38 @@ class AdminUsuariosHelper {
     
     public function criarUsuario($dados) {
         try {
-            $stmt = $this->pdo->prepare("
-                INSERT INTO usuarios (nome, email, senha, cpf, telefone, ativo) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $dados['nome'],
-                $dados['email'],
-                password_hash($dados['senha'], PASSWORD_DEFAULT),
-                $dados['cpf'] ?? null,
-                $dados['telefone'] ?? null,
-                $dados['ativo'] ?? 1
-            ]);
+            $colunas = $this->getColunasUsuarios();
+
+            $documento = $dados['documento'] ?? ($dados['cpf'] ?? null);
+            if (in_array('documento', $colunas) && empty($documento)) {
+                throw new \Exception('Documento é obrigatório');
+            }
+
+            $insertCols = [];
+            $placeholders = [];
+            $params = [];
+
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'nome', $dados['nome'] ?? null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'email', $dados['email'] ?? null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'senha', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
+
+            if (in_array('ativo', $colunas)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
+            } elseif (in_array('status', $colunas)) {
+                $status = ((int)($dados['ativo'] ?? 1) === 1) ? 'ativo' : 'inativo';
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'status', $status);
+            }
+
+            if (empty($insertCols)) {
+                throw new \Exception('Nenhuma coluna válida encontrada para criar usuário');
+            }
+
+            $sql = 'INSERT INTO usuarios (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
             
             $usuarioId = $this->pdo->lastInsertId();
             
@@ -169,23 +189,46 @@ class AdminUsuariosHelper {
     
     public function atualizarUsuario($id, $dados) {
         try {
-            $sql = "UPDATE usuarios SET nome = ?, email = ?, cpf = ?, telefone = ?, ativo = ?, updated_at = NOW()";
-            $params = [
-                $dados['nome'],
-                $dados['email'],
-                $dados['cpf'] ?? null,
-                $dados['telefone'] ?? null,
-                $dados['ativo'] ?? 1
-            ];
-            
-            if (!empty($dados['senha'])) {
-                $sql .= ", senha = ?";
-                $params[] = password_hash($dados['senha'], PASSWORD_DEFAULT);
+            $colunas = $this->getColunasUsuarios();
+
+            $setParts = [];
+            $params = [];
+
+            $this->setIfColumnExists($setParts, $params, $colunas, 'nome', $dados['nome'] ?? null);
+            $this->setIfColumnExists($setParts, $params, $colunas, 'email', $dados['email'] ?? null);
+            $this->setIfColumnExists($setParts, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
+
+            if (in_array('cpf', $colunas)) {
+                $this->setIfColumnExists($setParts, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
             }
-            
-            $sql .= " WHERE id = ?";
+            if (in_array('documento', $colunas)) {
+                $documento = $dados['documento'] ?? ($dados['cpf'] ?? null);
+                if (!empty($documento)) {
+                    $this->setIfColumnExists($setParts, $params, $colunas, 'documento', $documento);
+                }
+            }
+
+            if (in_array('ativo', $colunas)) {
+                $this->setIfColumnExists($setParts, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
+            } elseif (in_array('status', $colunas)) {
+                $status = ((int)($dados['ativo'] ?? 1) === 1) ? 'ativo' : 'inativo';
+                $this->setIfColumnExists($setParts, $params, $colunas, 'status', $status);
+            }
+
+            if (!empty($dados['senha']) && in_array('senha', $colunas)) {
+                $this->setIfColumnExists($setParts, $params, $colunas, 'senha', password_hash($dados['senha'], PASSWORD_DEFAULT));
+            }
+
+            if (in_array('updated_at', $colunas)) {
+                $setParts[] = 'updated_at = NOW()';
+            }
+
+            if (empty($setParts)) {
+                throw new \Exception('Nenhuma coluna válida encontrada para atualizar usuário');
+            }
+
+            $sql = 'UPDATE usuarios SET ' . implode(', ', $setParts) . ' WHERE id = ?';
             $params[] = $id;
-            
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute($params);
             
@@ -193,6 +236,30 @@ class AdminUsuariosHelper {
             
         } catch (\Exception $e) {
             throw new \Exception('Erro ao atualizar usuário: ' . $e->getMessage());
+        }
+    }
+
+    private function getColunasUsuarios() {
+        try {
+            $stmt = $this->pdo->query('DESCRIBE usuarios');
+            return $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function addIfColumnExists(&$cols, &$placeholders, &$params, $existingCols, $col, $value) {
+        if (in_array($col, $existingCols)) {
+            $cols[] = $col;
+            $placeholders[] = '?';
+            $params[] = $value;
+        }
+    }
+
+    private function setIfColumnExists(&$setParts, &$params, $existingCols, $col, $value) {
+        if (in_array($col, $existingCols)) {
+            $setParts[] = $col . ' = ?';
+            $params[] = $value;
         }
     }
     
