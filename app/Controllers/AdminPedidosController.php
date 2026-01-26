@@ -502,6 +502,7 @@ class AdminPedidosController extends Controller {
                                             </tr>';
                                         }
                                         
+                                    echo '</tbody>
                                     </table>
                                 </div>
                             </div>
