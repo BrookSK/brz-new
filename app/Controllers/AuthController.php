@@ -70,13 +70,28 @@ class AuthController extends Controller {
     }
     
     public function loginAdmin(Request $request) {
+        $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
             if ($usuario['perfil'] === 'admin') {
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
+                    return;
+                }
+
                 $this->redirect('/admin/dashboard');
             } else {
                 $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
                 $_SESSION['message_type'] = 'danger';
+
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                    return;
+                }
+
                 $this->redirect('/loginadmin');
             }
             return;
@@ -94,21 +109,47 @@ class AuthController extends Controller {
                     if ($usuario['perfil'] !== 'admin') {
                         $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
                         $_SESSION['message_type'] = 'danger';
+
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                            return;
+                        }
+
                         $this->redirect('/loginadmin');
                         return;
                     }
                     
                     $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '! Acesso administrativo.';
                     $_SESSION['message_type'] = 'success';
+
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
+                        return;
+                    }
+
                     $this->redirect('/admin/dashboard');
                     return;
                 } else {
                     $_SESSION['message'] = 'E-mail ou senha incorretos';
                     $_SESSION['message_type'] = 'danger';
+
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                        return;
+                    }
                 }
             } catch (\Exception $e) {
                 $_SESSION['message'] = 'Erro ao fazer login: ' . $e->getMessage();
                 $_SESSION['message_type'] = 'danger';
+
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                    return;
+                }
             }
             
             $this->redirect('/loginadmin');
