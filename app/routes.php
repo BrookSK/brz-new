@@ -36,6 +36,8 @@ $router->post('/perfil', 'AuthController', 'perfil');
 $router->get('/minha-conta', 'UsuarioController', 'minhaConta');
 $router->get('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados', 'UsuarioController', 'meusDados');
+$router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
+$router->post('/meus-dados/avatar/remover', 'UsuarioController', 'avatarRemover');
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
 $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 

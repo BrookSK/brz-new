@@ -141,6 +141,166 @@ class UsuarioController extends Controller {
             'usuario' => $usuario
         ]);
     }
+
+    public function avatarUpload(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = $this->authService->getUsuarioLogado()['id'];
+
+        if (!isset($_FILES['avatar']) || empty($_FILES['avatar']['tmp_name'])) {
+            $_SESSION['message'] = 'Selecione uma foto para enviar.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        $file = $_FILES['avatar'];
+
+        if (!empty($file['error']) && $file['error'] !== UPLOAD_ERR_OK) {
+            $_SESSION['message'] = 'Erro ao enviar a foto.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        if (($file['size'] ?? 0) > (3 * 1024 * 1024)) {
+            $_SESSION['message'] = 'A foto deve ter no máximo 3MB.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($file['tmp_name']);
+
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp'
+        ];
+
+        if (!isset($allowed[$mime])) {
+            $_SESSION['message'] = 'Formato inválido. Envie JPG, PNG ou WebP.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        $uploadsDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'avatars';
+        if (!is_dir($uploadsDir)) {
+            @mkdir($uploadsDir, 0775, true);
+        }
+
+        if (!is_dir($uploadsDir) || !is_writable($uploadsDir)) {
+            $_SESSION['message'] = 'Diretório de upload não está disponível.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        $ext = $allowed[$mime];
+        $filename = 'u' . (int)$usuarioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $destPath = $uploadsDir . DIRECTORY_SEPARATOR . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+            $_SESSION['message'] = 'Não foi possível salvar a foto.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
+        $relativeUrl = '/uploads/avatars/' . $filename;
+
+        try {
+            $stmt = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+            $colunas = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $candidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+            $colunaAvatar = null;
+            foreach ($candidates as $c) {
+                if (in_array($c, $colunas)) {
+                    $colunaAvatar = $c;
+                    break;
+                }
+            }
+
+            if (!$colunaAvatar) {
+                @unlink($destPath);
+                $_SESSION['message'] = 'Sua tabela de usuários não possui coluna para foto de perfil.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/meus-dados');
+                return;
+            }
+
+            $usuarioAtual = $this->usuarioModel->find($usuarioId);
+            $old = $usuarioAtual[$colunaAvatar] ?? '';
+
+            $this->usuarioModel->update($usuarioId, [$colunaAvatar => $relativeUrl]);
+
+            if (!empty($old) && is_string($old) && strpos($old, '/uploads/avatars/') === 0) {
+                $oldPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . str_replace('/', DIRECTORY_SEPARATOR, $old);
+                if (is_file($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+
+            $_SESSION['message'] = 'Foto de perfil atualizada com sucesso!';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            @unlink($destPath);
+            $_SESSION['message'] = 'Erro ao atualizar foto de perfil.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meus-dados');
+    }
+
+    public function avatarRemover(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = $this->authService->getUsuarioLogado()['id'];
+
+        try {
+            $stmt = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+            $colunas = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $candidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+            $colunaAvatar = null;
+            foreach ($candidates as $c) {
+                if (in_array($c, $colunas)) {
+                    $colunaAvatar = $c;
+                    break;
+                }
+            }
+
+            if (!$colunaAvatar) {
+                $_SESSION['message'] = 'Sua tabela de usuários não possui coluna para foto de perfil.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/meus-dados');
+                return;
+            }
+
+            $usuarioAtual = $this->usuarioModel->find($usuarioId);
+            $old = $usuarioAtual[$colunaAvatar] ?? '';
+
+            $this->usuarioModel->update($usuarioId, [$colunaAvatar => null]);
+
+            if (!empty($old) && is_string($old) && strpos($old, '/uploads/avatars/') === 0) {
+                $oldPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . str_replace('/', DIRECTORY_SEPARATOR, $old);
+                if (is_file($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+
+            $_SESSION['message'] = 'Foto de perfil removida.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao remover foto de perfil.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meus-dados');
+    }
     
     private function verificarEstruturaTabela() {
         try {

@@ -6,11 +6,52 @@
             <!-- Profile Card -->
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center p-4">
-                    <div class="user-avatar mx-auto mb-3">
-                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($usuario['nome']) ?>&background=6366f1&color=fff&size=128" 
-                             alt="<?= htmlspecialchars($usuario['nome']) ?>" 
-                             class="rounded-circle" width="80" height="80">
+                    <?php
+                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                        $avatarUrl = null;
+                        foreach ($avatarColumnCandidates as $c) {
+                            if (!empty($usuario[$c])) {
+                                $avatarUrl = $usuario[$c];
+                                break;
+                            }
+                        }
+
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=1d4ed8&color=fff&size=128';
+                        }
+                    ?>
+
+                    <div class="user-avatar mx-auto mb-3 dropdown">
+                        <button type="button" class="btn p-0 border-0 bg-transparent" id="avatarDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="<?= htmlspecialchars($avatarUrl) ?>" 
+                                 alt="<?= htmlspecialchars($usuario['nome']) ?>" 
+                                 class="rounded-circle" width="80" height="80" style="object-fit: cover;">
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="avatarDropdown">
+                            <li>
+                                <button type="button" class="dropdown-item" id="btnAvatarView">
+                                    <i class="fas fa-eye me-2"></i> Ver foto
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item" id="btnAvatarChange">
+                                    <i class="fas fa-upload me-2"></i> Alterar foto
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <button type="button" class="dropdown-item text-danger" id="btnAvatarRemove">
+                                    <i class="fas fa-trash me-2"></i> Remover foto
+                                </button>
+                            </li>
+                        </ul>
                     </div>
+
+                    <form method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" id="avatarUploadForm" class="d-none">
+                        <input type="file" name="avatar" id="avatarFileInput" accept="image/png,image/jpeg,image/webp">
+                    </form>
+                    <form method="POST" action="/meus-dados/avatar/remover" id="avatarRemoveForm" class="d-none"></form>
+
                     <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email']) ?></p>
                     <span class="badge bg-primary px-3 py-2"><?= ucfirst($usuario['perfil']) ?></span>
@@ -102,7 +143,7 @@
                                        placeholder="000.000.000-00">
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
             
@@ -186,7 +227,7 @@
                                 </select>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
             
@@ -220,7 +261,7 @@
                             <i class="fas fa-info-circle me-2"></i>
                             Deixe os campos de senha em branco caso não queira alterá-los.
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
             
@@ -257,7 +298,7 @@
                                 </select>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
             
@@ -290,6 +331,45 @@
 <!-- JavaScript para validação e máscaras -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const btnAvatarView = document.getElementById('btnAvatarView');
+    const btnAvatarChange = document.getElementById('btnAvatarChange');
+    const btnAvatarRemove = document.getElementById('btnAvatarRemove');
+    const avatarFileInput = document.getElementById('avatarFileInput');
+    const avatarUploadForm = document.getElementById('avatarUploadForm');
+    const avatarRemoveForm = document.getElementById('avatarRemoveForm');
+
+    if (btnAvatarView) {
+        btnAvatarView.addEventListener('click', function() {
+            const modalEl = document.getElementById('avatarViewModal');
+            if (!modalEl || !window.bootstrap) return;
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        });
+    }
+
+    if (btnAvatarChange && avatarFileInput) {
+        btnAvatarChange.addEventListener('click', function() {
+            avatarFileInput.click();
+        });
+    }
+
+    if (avatarFileInput && avatarUploadForm) {
+        avatarFileInput.addEventListener('change', function() {
+            if (avatarFileInput.files && avatarFileInput.files.length > 0) {
+                avatarUploadForm.submit();
+            }
+        });
+    }
+
+    if (btnAvatarRemove && avatarRemoveForm) {
+        btnAvatarRemove.addEventListener('click', function() {
+            const ok = confirm('Remover sua foto de perfil?');
+            if (ok) {
+                avatarRemoveForm.submit();
+            }
+        });
+    }
+
     // Máscara para telefone
     const telefoneInput = document.getElementById('telefone');
     if (telefoneInput) {
@@ -530,6 +610,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<div class="modal fade" id="avatarViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Foto de Perfil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>" class="img-fluid rounded" style="max-height: 70vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
