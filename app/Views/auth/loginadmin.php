@@ -1,4 +1,9 @@
 <?php ob_start(); ?>
+
+<!-- jQuery e Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-4 col-md-6">
@@ -66,12 +71,16 @@
                 <h6><i class="fas fa-info-circle"></i> Informações de Acesso</h6>
                 <hr>
                 <p class="mb-2"><strong>Email:</strong> admin@onsolutions.com</p>
-                <p class="mb-2"><strong>Senha:</strong> 33537095a</p>
+                <p class="mb-2"><strong>Senha:</strong> admin123</p>
                 <small class="text-muted">Use estas credenciais para acessar o painel administrativo</small>
             </div>
         </div>
     </div>
 </div>
+
+<!-- jQuery e Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 $(document).ready(function() {
