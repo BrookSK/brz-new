@@ -232,3 +232,17 @@ $router->get('/admin/estoque/verificar-estoque/{produto_id}', 'AdminComprasContr
 // Rotas de Relatórios
 $router->get('/admin/estoque/relatorios', 'AdminRelatoriosController', 'index');
 $router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerarPDF');
+
+// Rotas de Remessa Internacional
+$router->get('/admin/remessa-internacional', 'AdminRemessaInternacionalController', 'index');
+$router->post('/admin/remessa-internacional/gerar/{id}', 'AdminRemessaInternacionalController', 'gerarRemessa');
+$router->post('/admin/remessa-internacional/reenviar-webhook/{id}', 'AdminRemessaInternacionalController', 'reenviarWebhook');
+
+// Rotas de Remessa Correios
+$router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');
+$router->post('/admin/remessa-correios/gerar-etiqueta/{id}', 'AdminRemessaCorreiosController', 'gerarEtiqueta');
+$router->post('/admin/remessa-correios/gerar-lote-etiquetas', 'AdminRemessaCorreiosController', 'gerarLoteEtiquetas');
+$router->get('/admin/remessa-correios/imprimir-etiqueta/{id}', 'AdminRemessaCorreiosController', 'imprimirEtiqueta');
+$router->get('/admin/remessa-correios/imprimir-todas-etiquetas', 'AdminRemessaCorreiosController', 'imprimirTodasEtiquetas');
+$router->post('/admin/remessa-correios/confirmar-postagem/{id}', 'AdminRemessaCorreiosController', 'confirmarPostagem');
+$router->get('/admin/remessa-correios/rastrear/{id}', 'AdminRemessaCorreiosController', 'rastrearEtiqueta');
