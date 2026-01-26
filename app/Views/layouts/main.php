@@ -17,7 +17,8 @@
             --success-color: #10b981;
             --danger-color: #ef4444;
 
-            --bg-gradient: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
+            --bg-gradient: linear-gradient(180deg, #f8fafc 0%, #eef2f7 45%, #ffffff 100%);
+            --surface-gradient: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
             --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
             --danger-gradient: linear-gradient(135deg, #ef4444 0%, #fee2e2 100%);
             --info-gradient: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
@@ -26,8 +27,9 @@
             --radius-md: 14px;
             --radius-lg: 18px;
 
-            --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
-            --shadow-md: 0 14px 40px rgba(15, 23, 42, 0.12);
+            --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
+            --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+            --shadow-lg: 0 16px 44px rgba(15, 23, 42, 0.12);
         }
         
         .navbar-brand {
@@ -72,6 +74,10 @@
             color: #0f172a;
         }
 
+        section.bg-light {
+            background: var(--surface-gradient) !important;
+        }
+
         .card,
         .dropdown-menu,
         .modal-content,
@@ -86,6 +92,23 @@
             box-shadow: var(--shadow-sm);
         }
 
+        .shadow {
+            box-shadow: var(--shadow-md) !important;
+        }
+
+        .shadow-sm {
+            box-shadow: var(--shadow-sm) !important;
+        }
+
+        .shadow-lg {
+            box-shadow: var(--shadow-lg) !important;
+        }
+
+        .feature-card:hover,
+        .product-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
         .card-header {
             background: rgba(255, 255, 255, 0.65);
             border-bottom: 1px solid rgba(148, 163, 184, 0.35);
@@ -95,15 +118,54 @@
             font-weight: 600;
         }
 
+        .btn:not(:disabled):not(.disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:not(:disabled):not(.disabled):active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
         .btn-primary {
             border: none;
             background: var(--primary-gradient);
-            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.22);
+            box-shadow: var(--shadow-sm);
         }
 
         .btn-primary:hover {
             filter: brightness(1.03);
-            box-shadow: 0 14px 32px rgba(29, 78, 216, 0.28);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-success {
+            border: none;
+            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
+            color: #064e3b;
+        }
+
+        .btn-info {
+            border: none;
+            background: var(--info-gradient);
+            color: #0b1f3a;
+        }
+
+        .btn-warning {
+            border: none;
+            background: linear-gradient(135deg, #f59e0b 0%, #fff7ed 100%);
+            color: #7c2d12;
+        }
+
+        .btn-secondary {
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            background: rgba(255, 255, 255, 0.8);
+            color: #0f172a;
+        }
+
+        .btn-dark {
+            border: none;
+            background: linear-gradient(135deg, #0b1f3a 0%, #0f172a 100%);
         }
 
         .btn-danger {
@@ -121,6 +183,36 @@
             background: var(--info-gradient);
             border-color: rgba(29, 78, 216, 0.35);
             color: #0b1f3a;
+        }
+
+        .btn-outline-danger:hover {
+            background: var(--danger-gradient);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: #7f1d1d;
+        }
+
+        .btn-outline-info:hover {
+            background: var(--info-gradient);
+            border-color: rgba(56, 189, 248, 0.35);
+            color: #0b1f3a;
+        }
+
+        .btn-outline-success:hover {
+            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
+            border-color: rgba(16, 185, 129, 0.35);
+            color: #064e3b;
+        }
+
+        .btn-outline-secondary:hover {
+            background: rgba(241, 245, 249, 0.9);
+            border-color: rgba(148, 163, 184, 0.55);
+            color: #0f172a;
+        }
+
+        .btn-outline-dark:hover {
+            background: rgba(15, 23, 42, 0.08);
+            border-color: rgba(15, 23, 42, 0.25);
+            color: #0f172a;
         }
         
         /* Garantir que main fique abaixo */
@@ -148,7 +240,7 @@
         
         .feature-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            box-shadow: var(--shadow-md);
         }
         
         .product-card {
@@ -159,7 +251,7 @@
         
         .product-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            box-shadow: var(--shadow-md);
         }
         
         .product-image {

@@ -175,7 +175,7 @@
 
 .btn-adicionar-modern:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+    box-shadow: var(--shadow-sm);
 }
 
 .cart-badge {

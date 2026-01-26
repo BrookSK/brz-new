@@ -4,6 +4,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
+<div class="auth-page">
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-4 col-md-6">
@@ -147,28 +148,28 @@ function showAlert(type, message) {
 </script>
 
 <style>
-.card {
+.auth-page .card {
     border: none;
     border-radius: 15px;
     transition: transform 0.3s ease;
 }
 
-.card:hover {
+.auth-page .card:hover {
     transform: translateY(-2px);
 }
 
-.input-group-text {
+.auth-page .input-group-text {
     background: #f8f9fa;
     border-right: none;
 }
 
-.form-control:focus {
+.auth-page .form-control:focus {
     border-color: #dc3545;
     box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
 }
 
-.btn-danger {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+.auth-page .btn-danger {
+    background: var(--danger-gradient);
     border: none;
     border-radius: 50px;
     padding: 12px 30px;
@@ -176,14 +177,15 @@ function showAlert(type, message) {
     transition: all 0.3s ease;
 }
 
-.btn-danger:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(220, 53, 69, 0.3);
+.auth-page .btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
 }
 
-.text-decoration-none:hover {
+.auth-page .text-decoration-none:hover {
     text-decoration: underline !important;
 }
 </style>
 <?php $content = ob_get_clean(); ?>
+</div>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

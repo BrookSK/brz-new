@@ -215,7 +215,7 @@
 
 .timeline-content:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-md);
 }
 
 .timeline-content h4 {

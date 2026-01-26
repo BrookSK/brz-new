@@ -211,17 +211,10 @@ function showAlert(type, message) {
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
 }
 
-.btn-outline-primary:hover,
-.btn-outline-info:hover,
-.btn-outline-danger:hover,
-.btn-outline-dark:hover,
-.btn-outline-success:hover {
-    transform: translateY(-2px);
-}
 </style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

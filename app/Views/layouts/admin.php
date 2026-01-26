@@ -17,7 +17,9 @@
             --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
 
             --radius-md: 14px;
-            --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
+            --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
+            --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+            --shadow-lg: 0 16px 44px rgba(15, 23, 42, 0.12);
         }
 
         html {
@@ -45,6 +47,46 @@
         .card {
             border: 1px solid rgba(148, 163, 184, 0.35);
             box-shadow: var(--shadow-sm);
+        }
+
+        .shadow {
+            box-shadow: var(--shadow-md) !important;
+        }
+
+        .shadow-sm {
+            box-shadow: var(--shadow-sm) !important;
+        }
+
+        .shadow-lg {
+            box-shadow: var(--shadow-lg) !important;
+        }
+
+        .btn:not(:disabled):not(.disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:not(:disabled):not(.disabled):active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        .btn-success {
+            border: none;
+            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
+            color: #064e3b;
+        }
+
+        .btn-info {
+            border: none;
+            background: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
+            color: #0b1f3a;
+        }
+
+        .btn-warning {
+            border: none;
+            background: linear-gradient(135deg, #f59e0b 0%, #fff7ed 100%);
+            color: #7c2d12;
         }
 
         .btn-primary {

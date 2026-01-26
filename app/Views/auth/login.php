@@ -1,4 +1,5 @@
 <?php ob_start(); ?>
+<div class="auth-page">
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-5 col-md-7">
@@ -163,27 +164,27 @@ function showAlert(type, message) {
 </script>
 
 <style>
-.card {
+.auth-page .card {
     border: none;
     border-radius: 15px;
     transition: transform 0.3s ease;
 }
 
-.card:hover {
+.auth-page .card:hover {
     transform: translateY(-2px);
 }
 
-.input-group-text {
+.auth-page .input-group-text {
     background: #f8f9fa;
     border-right: none;
 }
 
-.form-control:focus {
+.auth-page .form-control:focus {
     border-color: rgba(29, 78, 216, 0.55);
     box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
 }
 
-.btn-primary {
+.auth-page .btn-primary {
     background: var(--primary-gradient);
     border: none;
     border-radius: var(--radius-lg);
@@ -192,14 +193,15 @@ function showAlert(type, message) {
     transition: all 0.3s ease;
 }
 
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+.auth-page .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
 }
 
-.text-decoration-none:hover {
+.auth-page .text-decoration-none:hover {
     text-decoration: underline !important;
 }
 </style>
 <?php $content = ob_get_clean(); ?>
+</div>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
