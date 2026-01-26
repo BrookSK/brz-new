@@ -246,3 +246,11 @@ $router->get('/admin/remessa-correios/imprimir-etiqueta/{id}', 'AdminRemessaCorr
 $router->get('/admin/remessa-correios/imprimir-todas-etiquetas', 'AdminRemessaCorreiosController', 'imprimirTodasEtiquetas');
 $router->post('/admin/remessa-correios/confirmar-postagem/{id}', 'AdminRemessaCorreiosController', 'confirmarPostagem');
 $router->get('/admin/remessa-correios/rastrear/{id}', 'AdminRemessaCorreiosController', 'rastrearEtiqueta');
+
+// Rotas de Carteira
+$router->post('/admin/usuarios/adicionar-credito', 'AdminUsuariosController', 'adicionarCredito');
+$router->post('/admin/carteira/converter-para-brl', 'AdminCarteiraController', 'converterParaBRL');
+$router->post('/admin/carteira/adicionar-creditos-em-lote', 'AdminCarteiraController', 'adicionarCreditosEmLote');
+$router->get('/admin/carteira/saldo/{usuario_id}', 'AdminCarteiraController', 'getSaldo');
+$router->get('/admin/carteira/extrato/{usuario_id}', 'AdminCarteiraController', 'getExtrato');
+$router->get('/admin/carteira/stats', 'AdminCarteiraController', 'getStatsGerais');

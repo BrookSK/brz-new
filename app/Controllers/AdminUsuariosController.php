@@ -2,54 +2,31 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Helpers\AdminUsuariosHelper;
+use App\Views\AdminUsuariosViews;
 
 class AdminUsuariosController extends Controller {
     
     public function index(Request $request) {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $helper = new AdminUsuariosHelper();
+            
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
             
-            $sql = "SELECT * FROM usuarios WHERE 1=1";
-            $params = [];
-            
-            if (!empty($busca)) {
-                $sql .= " AND (nome LIKE :busca OR email LIKE :busca OR cpf LIKE :busca)";
-                $params[':busca'] = "%{$busca}%";
-            }
-            
-            $sql .= " ORDER BY created_at DESC LIMIT :limite OFFSET :offset";
-            
-            $stmt = $pdo->prepare($sql);
-            foreach ($params as $key => $value) $stmt->bindValue($key, $value);
-            $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-            $stmt->execute();
-            $usuarios = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM usuarios WHERE 1=1" . (!empty($busca) ? " AND (nome LIKE :busca OR email LIKE :busca OR cpf LIKE :busca)" : ""));
-            if (!empty($busca)) $stmtTotal->bindValue(':busca', "%{$busca}%");
-            $stmtTotal->execute();
-            $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
+            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset);
+            $total = $helper->getTotalUsuarios($busca);
             $totalPaginas = ceil($total / $limite);
-            
-            // Buscar estatísticas para cada usuário
-            foreach ($usuarios as &$usuario) {
-                $stmtPedidos = $pdo->prepare("SELECT COUNT(*) as total, SUM(valor_total) as valor FROM pedidos WHERE usuario_id = :usuario_id");
-                $stmtPedidos->bindParam(':usuario_id', $usuario['id']);
-                $stmtPedidos->execute();
-                $pedidosStats = $stmtPedidos->fetch(\PDO::FETCH_ASSOC);
-                $usuario['total_pedidos'] = $pedidosStats['total'] ?: 0;
-                $usuario['total_gasto'] = $pedidosStats['valor'] ?: 0;
-            }
+            $stats = $helper->getStatsUsuarios();
             
         } catch (\Exception $e) {
             $usuarios = [];
             $total = 0;
             $totalPaginas = 0;
+            $stats = [];
+            $erro = $e->getMessage();
         }
         
         // Incluir o partial do menu lateral
@@ -67,12 +44,10 @@ class AdminUsuariosController extends Controller {
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
         
-        echo '<style>
-        .user-card { transition: transform 0.2s; }
-        .user-card:hover { transform: translateY(-5px); }
-        .user-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; }
-    </style>
-</head>
+        // Adicionar estilos dos usuários
+        echo AdminUsuariosViews::getStyles();
+        
+        echo '</head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -82,75 +57,58 @@ class AdminUsuariosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Usuários (' . $total . ')</h1>
-                    <a href="/admin/usuarios/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
-                </div>
+                    <h1 class="h2"><i class="fas fa-users me-2"></i>Usuários (' . $total . ')</h1>
+                    <div>
+                        <button type="button" class="btn btn-success me-2" onclick="adicionarCreditosEmLote()">
+                            <i class="fas fa-dollar-sign me-1"></i>Adicionar Créditos em Lote
+                        </button>
+                        <a href="/admin/usuarios/novo" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Novo Usuário
+                        </a>
+                    </div>
+                </div>';
                 
-                <form method="GET" class="row g-3 mb-4">
+        if (isset($erro)) {
+            echo '<div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Erro:</strong> ' . htmlspecialchars($erro) . '
+            </div>';
+        }
+                
+        // Renderizar cards de estatísticas
+        echo AdminUsuariosViews::renderStatsCards($stats);
+                
+        echo '<form method="GET" class="row g-3 mb-4">
                     <div class="col-md-8">
                         <input type="text" class="form-control" name="busca" placeholder="Buscar usuário por nome, email ou CPF..." value="' . htmlspecialchars($busca) . '">
                     </div>
                     <div class="col-md-4">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>
+                        <button type="submit" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-search me-1"></i>Buscar
+                        </button>
+                        <a href="/admin/usuarios" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Limpar
+                        </a>
                     </div>
                 </form>
                 
                 <div class="row">';
                 
-                foreach ($usuarios as $usuario) {
-                    echo '<div class="col-md-6 col-lg-4 mb-4">
-                        <div class="card user-card h-100">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center mb-3">
-                                    <img src="https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=4e73df&color=fff&size=60" class="user-avatar me-3" alt="Avatar">
-                                    <div>
-                                        <h6 class="card-title mb-1">' . htmlspecialchars($usuario['nome']) . '</h6>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($usuario['email']) . '</p>
-                                    </div>
-                                </div>
-                                <div class="row text-center mb-3">
-                                    <div class="col-4">
-                                        <small class="text-muted d-block">Pedidos</small>
-                                        <strong>' . $usuario['total_pedidos'] . '</strong>
-                                    </div>
-                                    <div class="col-4">
-                                        <small class="text-muted d-block">Total Gasto</small>
-                                        <strong>R$ ' . number_format($usuario['total_gasto'], 2, ',', '.') . '</strong>
-                                    </div>
-                                    <div class="col-4">
-                                        <small class="text-muted d-block">Status</small>
-                                        <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
-                                    </div>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <a href="/admin/usuarios/detalhes/' . $usuario['id'] . '" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Ver
-                                    </a>
-                                    <div>
-                                        <a href="/admin/usuarios/editar/' . $usuario['id'] . '" class="btn btn-sm btn-outline-warning">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <form method="POST" action="/admin/usuarios/excluir/' . $usuario['id'] . '" style="display: inline;">
-                                            <button type="submit" onclick="return confirm(\'Tem certeza que deseja excluir este usuário?\')" class="btn btn-sm btn-outline-danger">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
-                }
-                
                 if (empty($usuarios)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-users fa-3x text-muted mb-3"></i>
                         <h5 class="text-muted">Nenhum usuário encontrado</h5>
+                        <p class="text-muted">Tente ajustar sua busca ou cadastre um novo usuário.</p>
                     </div>';
+                }
+                
+                foreach ($usuarios as $usuario) {
+                    echo AdminUsuariosViews::renderCardUsuario($usuario);
                 }
                 
                 echo '</div>';
                 
+                // Paginação
                 if ($totalPaginas > 1) {
                     echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
                     for ($i = 1; $i <= $totalPaginas; $i++) {
@@ -167,11 +125,8 @@ class AdminUsuariosController extends Controller {
     // Renderizar scripts
     renderAdminScripts();
     
-    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>';
-        exit;
-    }
+    // Adicionar scripts dos usuários
+    echo AdminUsuariosViews::getScripts();
     
     public function detalhes(Request $request) {
         $id = $request->getParam('id');
