@@ -445,8 +445,10 @@ class AdminPedidosController extends Controller {
                         <i class="fas fa-arrow-left me-1"></i>Voltar
                     </a>
                 </div>
-            </div>';    
-                <div class="row">
+            </div>';
+            
+            // Conteúdo principal
+            echo '<div class="row">
                     <div class="col-md-12">
                         <div class="card mb-4">
                             <div class="card-header">
@@ -486,7 +488,7 @@ class AdminPedidosController extends Controller {
                                                 }
                                                 
                                                 echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                     style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
+                                                     style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"';
                                                      onerror="this.style.display=\'none\'">';
                                             }
                                             
@@ -501,14 +503,13 @@ class AdminPedidosController extends Controller {
                                             </tr>';
                                         }
                                         
-                                        echo '</tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div>';
                     
-                    <div class="col-md-6">
+                    echo '<div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Dados Completos do Pedido</h5>
