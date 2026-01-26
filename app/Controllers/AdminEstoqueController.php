@@ -107,7 +107,8 @@ class AdminEstoqueController extends Controller {
                     </div>
                 </div>';
 
-                <!-- Cards de Estatísticas -->
+                // Cards de Estatísticas
+                echo '<!-- Cards de Estatísticas -->
                 <div class="row mb-4">
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
@@ -148,7 +149,7 @@ class AdminEstoqueController extends Controller {
                 </div>
 
                 <!-- Tabela de Estoque -->
-                <div class="card">
+                echo '<div class="card">
                     <div class="card-header">
                         <h5><i class="fas fa-list me-2"></i>Estoque Atual</h5>
                     </div>
@@ -205,7 +206,7 @@ class AdminEstoqueController extends Controller {
                 </div>
 
                 <!-- Informações do Sistema -->
-                <div class="card mt-4">
+                echo '<div class="card mt-4">
                     <div class="card-header">
                         <h5><i class="fas fa-info-circle me-2"></i>Informações do Sistema</h5>
                     </div>
