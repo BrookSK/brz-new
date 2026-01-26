@@ -464,6 +464,20 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.col-lg-3 .card,
+.col-lg-3 .card-body {
+    overflow: visible;
+}
+
+.user-avatar {
+    position: relative;
+    z-index: 1060;
+}
+
+.user-avatar .dropdown-menu {
+    z-index: 1061;
+}
+
 .user-avatar img {
     border: 3px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
