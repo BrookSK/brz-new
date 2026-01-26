@@ -225,6 +225,16 @@ class AdminProdutosController extends Controller {
                                         <input type="text" class="form-control" name="sku" required>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Loja *</label>
+                                        <select class="form-select" name="loja" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="sams">Sams</option>
+                                            <option value="costco">Costco</option>
+                                            <option value="outro">Outro</option>
+                                        </select>
+                                        <small class="text-muted">Selecione a loja onde este produto está disponível</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">NCM</label>
                                         <input type="text" class="form-control" name="ncm" placeholder="Ex: 8517.12.00" maxlength="10">
                                         <small class="text-muted">Nomenclatura Comum do Mercosul (opcional)</small>
@@ -330,13 +340,14 @@ class AdminProdutosController extends Controller {
             }
             
             $stmt = $pdo->prepare("
-                INSERT INTO produtos (name, sku, ncm, short_description, category_id, price, weight, stock, active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO produtos (name, sku, loja, ncm, short_description, category_id, price, weight, stock, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             
             $stmt->execute([
                 $request->getParam('name'),
                 $request->getParam('sku'),
+                $request->getParam('loja'),
                 $request->getParam('ncm'),
                 $request->getParam('short_description'),
                 $categoryId,
@@ -576,6 +587,16 @@ class AdminProdutosController extends Controller {
                                         <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '" required>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Loja *</label>
+                                        <select class="form-select" name="loja" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="sams" ' . ($produto['loja'] == 'sams' ? 'selected' : '') . '>Sams</option>
+                                            <option value="costco" ' . ($produto['loja'] == 'costco' ? 'selected' : '') . '>Costco</option>
+                                            <option value="outro" ' . ($produto['loja'] == 'outro' ? 'selected' : '') . '>Outro</option>
+                                        </select>
+                                        <small class="text-muted">Selecione a loja onde este produto está disponível</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">NCM</label>
                                         <input type="text" class="form-control" name="ncm" value="' . htmlspecialchars($produto['ncm'] ?? '') . '" placeholder="Ex: 8517.12.00" maxlength="10">
                                         <small class="text-muted">Nomenclatura Comum do Mercosul (opcional)</small>
@@ -735,7 +756,7 @@ class AdminProdutosController extends Controller {
             
             $stmt = $pdo->prepare("
                 UPDATE produtos SET 
-                    name = ?, sku = ?, ncm = ?, description = ?, short_description = ?, category_id = ?, 
+                    name = ?, sku = ?, loja = ?, ncm = ?, description = ?, short_description = ?, category_id = ?, 
                     price = ?, cost_price = ?, sale_price = ?, stock = ?, min_stock = ?, weight = ?, 
                     status = ?, active = ?, featured = ?, updated_at = NOW()
                 WHERE id = ?
@@ -744,6 +765,7 @@ class AdminProdutosController extends Controller {
             $stmt->execute([
                 $request->getParam('name'),
                 $request->getParam('sku'),
+                $request->getParam('loja'),
                 $request->getParam('ncm'),
                 $request->getParam('description'),
                 $request->getParam('short_description'),

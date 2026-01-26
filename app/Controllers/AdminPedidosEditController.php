@@ -42,6 +42,7 @@ class AdminPedidosEditController {
                     pi.subtotal,
                     pi.nome_produto,
                     pi.nome_produto_sku,
+                    pi.loja,
                     pi.created_at,
                     (SELECT pf.nome_arquivo 
                      FROM produto_fotos pf 
@@ -67,7 +68,7 @@ class AdminPedidosEditController {
             $pedido['items'] = $itens;
             
             // Obter todos os produtos para adicionar
-            $stmt = $this->connection->prepare("SELECT id, name, price, sku FROM produtos WHERE active = 1 ORDER BY name");
+            $stmt = $this->connection->prepare("SELECT id, name, price, sku, loja FROM produtos WHERE active = 1 ORDER BY name");
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
@@ -168,6 +169,7 @@ class AdminPedidosEditController {
                                         <thead>
                                             <tr>
                                                 <th>Produto</th>
+                                                <th>Loja</th>
                                                 <th>Qtd</th>
                                                 <th>Preço</th>
                                                 <th>Subtotal</th>
@@ -181,6 +183,11 @@ class AdminPedidosEditController {
                                                 <td>
                                                     <strong>' . htmlspecialchars($item['nome_produto']) . '</strong>
                                                     <br><small class="text-muted">SKU: ' . htmlspecialchars($item['nome_produto_sku'] ?? 'N/A') . '</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-' . ($item['loja'] == 'sams' ? 'primary' : ($item['loja'] == 'costco' ? 'success' : 'secondary')) . '">
+                                                        ' . ucfirst($item['loja'] ?? 'outro') . '
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     <input type="number" class="form-control form-control-sm quantidade" value="' . $item['quantidade'] . '" min="1" onchange="atualizarSubtotal(this)">
@@ -225,18 +232,31 @@ class AdminPedidosEditController {
                     <div class="row" id="lista_produtos">';
                     
                     foreach ($produtos as $produto) {
-                        echo '<div class="col-md-6 mb-3">
-                            <div class="card product-card" onclick="selecionarProduto(' . $produto['id'] . ', \'' . htmlspecialchars($produto['name']) . '\', ' . $produto['price'] . ', \'' . htmlspecialchars($produto['sku']) . '\')">
-                                <div class="card-body">
-                                    <h6>' . htmlspecialchars($produto['name']) . '</h6>
-                                    <p class="mb-0">
-                                        <small class="text-muted">SKU: ' . htmlspecialchars($produto['sku']) . '</small><br>
-                                        <strong>R$ ' . number_format($produto['price'], 2, ',', '.') . '</strong>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>';
+                    $lojaBadge = '';
+                    $lojaClass = 'secondary';
+                    if ($produto['loja'] == 'sams') {
+                        $lojaBadge = 'Sams';
+                        $lojaClass = 'primary';
+                    } elseif ($produto['loja'] == 'costco') {
+                        $lojaBadge = 'Costco';
+                        $lojaClass = 'success';
+                    } else {
+                        $lojaBadge = 'Outro';
                     }
+                    
+                    echo '<div class="col-md-6 mb-3">
+                        <div class="card product-card" onclick="selecionarProduto(' . $produto['id'] . ', \'' . htmlspecialchars($produto['name']) . '\', ' . $produto['price'] . ', \'' . htmlspecialchars($produto['sku']) . '\', \'' . $produto['loja'] . '\')">
+                            <div class="card-body">
+                                <h6>' . htmlspecialchars($produto['name']) . '</h6>
+                                <p class="mb-0">
+                                    <small class="text-muted">SKU: ' . htmlspecialchars($produto['sku']) . '</small><br>
+                                    <span class="badge bg-' . $lojaClass . '">' . $lojaBadge . '</span><br>
+                                    <strong>R$ ' . number_format($produto['price'], 2, ',', '.') . '</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>';
+                }
                     
                     echo '</div>
                 </div>
@@ -290,16 +310,30 @@ class AdminPedidosEditController {
             });
         }
         
-        function selecionarProduto(id, nome, preco, sku) {
+        function selecionarProduto(id, nome, preco, sku, loja) {
             let tbody = document.getElementById("itens_pedido");
             let newRow = tbody.insertRow();
             newRow.className = "item-row";
             newRow.setAttribute("data-produto-id", id);
             newRow.setAttribute("data-nome-produto", nome);
             newRow.setAttribute("data-nome-produto-sku", sku);
+            newRow.setAttribute("data-loja", loja || "outro");
+            
+            let lojaBadge = "";
+            let lojaClass = "secondary";
+            if (loja === "sams") {
+                lojaBadge = "Sams";
+                lojaClass = "primary";
+            } else if (loja === "costco") {
+                lojaBadge = "Costco";
+                lojaClass = "success";
+            } else {
+                lojaBadge = "Outro";
+            }
             
             newRow.innerHTML = 
                 "<td><strong>" + nome + "</strong><br><small class=\"text-muted\">SKU: " + sku + "</small></td>" +
+                "<td><span class=\"badge bg-" + lojaClass + "\">" + lojaBadge + "</span></td>" +
                 "<td><input type=\"number\" class=\"form-control form-control-sm quantidade\" value=\"1\" min=\"1\" onchange=\"atualizarSubtotal(this)\"></td>" +
                 "<td><input type=\"number\" class=\"form-control form-control-sm preco_unitario\" value=\"" + preco + "\" min=\"0\" step=\"0.01\" onchange=\"atualizarSubtotal(this)\"></td>" +
                 "<td class=\"subtotal\">R$ " + preco.toFixed(2).replace(".", ",") + "</td>" +
@@ -323,11 +357,13 @@ class AdminPedidosEditController {
                     item.produto_id = row.dataset.produtoId || "";
                     item.nome_produto = row.dataset.nomeProduto || "";
                     item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
+                    item.loja = row.dataset.loja || "outro";
                 } else {
                     // Se for um item novo, pegar dos atributos data
                     item.produto_id = row.dataset.produtoId || "";
                     item.nome_produto = row.dataset.nomeProduto || "";
                     item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
+                    item.loja = row.dataset.loja || "outro";
                 }
                 
                 itens.push(item);
@@ -389,10 +425,10 @@ class AdminPedidosEditController {
                 $stmt = $this->connection->prepare("
                     INSERT INTO pedido_itens (
                         pedido_id, produto_id, quantidade, preco_unitario, subtotal,
-                        nome_produto, nome_produto_sku, created_at
+                        nome_produto, nome_produto_sku, loja, created_at
                     ) VALUES (
                         :pedido_id, :produto_id, :quantidade, :preco_unitario, :subtotal,
-                        :nome_produto, :nome_produto_sku, NOW()
+                        :nome_produto, :nome_produto_sku, :loja, NOW()
                     )
                 ");
                 $stmt->bindParam(':pedido_id', $dados['pedido_id']);
@@ -402,6 +438,7 @@ class AdminPedidosEditController {
                 $stmt->bindParam(':subtotal', $subtotalItem);
                 $stmt->bindParam(':nome_produto', $item['nome_produto']);
                 $stmt->bindParam(':nome_produto_sku', $item['nome_produto_sku']);
+                $stmt->bindParam(':loja', $item['loja']);
                 $stmt->execute();
             }
             
