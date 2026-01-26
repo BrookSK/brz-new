@@ -64,9 +64,16 @@ function renderAdminSidebarStyles() {
             top: 12px;
             left: 12px;
             z-index: 10050;
-            padding: 0.55rem 0.75rem;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
             border-radius: 12px;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
         }
 
         html, body {

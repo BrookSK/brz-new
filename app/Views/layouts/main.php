@@ -193,6 +193,7 @@
         /* Garantir que body tenha espaçamento correto */
         html {
             height: 100%;
+            overflow-x: hidden;
         }
 
         body {
@@ -575,7 +576,7 @@
                 border-radius: 12px;
             }
 
-            .navbar .btn {
+            .navbar-collapse .btn {
                 width: 100%;
             }
 
