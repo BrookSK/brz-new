@@ -206,17 +206,17 @@ $router->get('/api/cep/{cep}', 'ApiController', 'consultarCEP');
 $router->get('/api/frete/calcular', 'ApiController', 'calcularFrete');
 
 // Rotas do Módulo de Estoque Interno
-$router->get('/admin/estoque', 'App\Controllers\AdminEstoqueController@index');
-$router->post('/admin/estoque/salvar', 'App\Controllers\AdminEstoqueController@salvar');
-$router->post('/admin/estoque/marcar-comprado', 'App\Controllers\AdminEstoqueController@marcarComprado');
+$router->get('/admin/estoque', 'AdminEstoqueController', 'index');
+$router->post('/admin/estoque/salvar', 'AdminEstoqueController', 'salvar');
+$router->post('/admin/estoque/marcar-comprado', 'AdminEstoqueController', 'marcarComprado');
 
 // Rotas de Lista de Compras
-$router->get('/admin/estoque/compras', 'App\Controllers\AdminComprasController@index');
-$router->post('/admin/estoque/compras/salvar', 'App\Controllers\AdminComprasController@salvar');
-$router->post('/admin/estoque/compras/mudar-status', 'App\Controllers\AdminComprasController@mudarStatus');
-$router->get('/admin/estoque/compras/pdf', 'App\Controllers\AdminComprasController@gerarPDF');
-$router->get('/admin/estoque/verificar-estoque/{produto_id}', 'App\Controllers\AdminComprasController@verificarEstoque');
+$router->get('/admin/estoque/compras', 'AdminComprasController', 'index');
+$router->post('/admin/estoque/compras/salvar', 'AdminComprasController', 'salvar');
+$router->post('/admin/estoque/compras/mudar-status', 'AdminComprasController', 'mudarStatus');
+$router->get('/admin/estoque/compras/pdf', 'AdminComprasController', 'gerarPDF');
+$router->get('/admin/estoque/verificar-estoque/{produto_id}', 'AdminComprasController', 'verificarEstoque');
 
 // Rotas de Relatórios
-$router->get('/admin/estoque/relatorios', 'App\Controllers\AdminRelatoriosController@index');
-$router->get('/admin/estoque/relatorio-pdf', 'App\Controllers\AdminRelatoriosController@gerarPDF');
+$router->get('/admin/estoque/relatorios', 'AdminRelatoriosController', 'index');
+$router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerarPDF');
