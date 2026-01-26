@@ -151,7 +151,7 @@ class AdminComprasController extends Controller {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>';
 
                 // Tabela de Compras
                 echo '<div class="card">
