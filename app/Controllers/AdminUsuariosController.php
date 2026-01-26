@@ -128,6 +128,21 @@ class AdminUsuariosController extends Controller {
     // Adicionar scripts dos usuários
     echo AdminUsuariosViews::getScripts();
     
+    // Adicionar modais
+    echo AdminUsuariosViews::renderModalAdicionarCredito();
+    echo AdminUsuariosViews::renderModalConverterMoeda();
+    echo AdminUsuariosViews::renderModalCreditosLote();
+    
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Armazenar dados dos usuários para uso nos scripts
+        usuariosData = ' . json_encode(array_values($usuarios)) . ';
+    </script>
+</body>
+</html>';
+        exit;
+    }
+
     public function detalhes(Request $request) {
         $id = $request->getParam('id');
         
