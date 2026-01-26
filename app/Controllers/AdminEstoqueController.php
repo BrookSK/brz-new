@@ -316,7 +316,7 @@ class AdminEstoqueController extends Controller {
                             echo '<div class="col-md-4 mb-2">
                                 <div class="validade-proxima p-2 rounded">
                                     <strong>' . htmlspecialchars($item['produto_nome']) . '</strong>
-                                    <br><small>SKU: ' . htmlspecialchars($item['sku']) . '</small>
+                                    <br><small class="text-muted">SKU: ' . htmlspecialchars($item['sku']) . '</small>
                                     <br><small class="text-danger">Vence em ' . $dias_para_vencer . ' dias (' . date('d/m/Y', strtotime($item['data_validade'])) . ')</small>
                                 </div>
                             </div>';
