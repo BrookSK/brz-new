@@ -203,6 +203,28 @@
             flex-direction: column;
             background: var(--bg-gradient);
             color: #0f172a;
+            overflow-x: hidden;
+        }
+
+        main {
+            flex: 1 0 auto;
+            width: 100%;
+        }
+
+        footer.site-footer {
+            flex-shrink: 0;
+        }
+
+        img,
+        svg,
+        video,
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
         }
 
         section.bg-light {
@@ -502,6 +524,81 @@
             justify-content: center;
             font-weight: bold;
             cursor: pointer;
+        }
+
+        /* Mobile + Tablet: navbar usable, avoid overflow, better tap targets */
+        @media (max-width: 991.98px) {
+            :root {
+                --navbar-height: 64px;
+            }
+
+            body {
+                padding-top: var(--navbar-height) !important;
+            }
+
+            .navbar .container {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+
+            .navbar-toggler {
+                border-radius: 12px;
+                padding: 0.5rem 0.65rem;
+            }
+
+            .navbar-collapse {
+                margin-top: 10px;
+                padding: 12px;
+                border-radius: var(--radius-md);
+                background: rgba(255, 255, 255, 0.95);
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                box-shadow: var(--shadow-md);
+                max-height: calc(100vh - var(--navbar-height) - 16px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .navbar .nav-link {
+                padding: 0.75rem 0.9rem;
+                border-radius: 12px;
+            }
+
+            .navbar .dropdown-menu {
+                position: static;
+                float: none;
+                width: 100%;
+                box-shadow: none;
+                border-radius: 12px;
+            }
+
+            .navbar .btn {
+                width: 100%;
+            }
+
+            .floating-cart {
+                bottom: 16px;
+                right: 16px;
+            }
+
+            .floating-cart button {
+                width: 54px;
+                height: 54px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .section-title {
+                font-size: 1.75rem;
+            }
+
+            .hero-section {
+                padding: 48px 0 30px;
+                padding-top: calc(86px + var(--navbar-height)) !important;
+            }
         }
         
         @media (max-width: 768px) {

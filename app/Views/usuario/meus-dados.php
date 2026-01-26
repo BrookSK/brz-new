@@ -93,7 +93,7 @@
         <!-- Main Content -->
         <div class="col-lg-9">
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
                 <div>
                     <h2 class="mb-1">Meus Dados</h2>
                     <p class="text-muted mb-0">Gerencie suas informações pessoais</p>
@@ -668,6 +668,211 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+<style>
+.col-lg-3 .profile-card {
+    z-index: 20;
+}
+
+.col-lg-3 .profile-card:hover {
+    z-index: 25;
+}
+
+.col-lg-3 .card:hover {
+    z-index: 2;
+}
+
+.col-lg-3 .card,
+.col-lg-3 .card-body {
+    overflow: visible;
+}
+
+.user-avatar {
+    position: relative;
+    z-index: 2000;
+}
+
+.user-avatar .dropdown-menu {
+    z-index: 2001;
+}
+
+.avatar-camera-indicator {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+    pointer-events: none;
+    font-size: 12px;
+}
+
+.user-avatar img {
+    border: 3px solid #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+    color: #6c757d;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.nav-link:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+    transform: translateX(5px);
+}
+
+.nav-link.active {
+    background: var(--primary-gradient);
+    color: white !important;
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control:focus {
+    border-color: rgba(29, 78, 216, 0.55);
+    box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
+}
+
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.form-check-input:checked {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
+}
+
+@media (max-width: 767.98px) {
+    .user-page-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
+
+    .user-page-header .text-end {
+        width: 100%;
+        text-align: left !important;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Máscaras de CPF/CNPJ
+    const documento = document.getElementById('documento');
+    if (documento) {
+        documento.addEventListener('input', function() {
+            let value = this.value.replace(/\D/g, '');
+            
+            if (value.length <= 11) {
+                // CPF
+                value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            } else {
+                // CNPJ
+                value = value.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            }
+            
+            this.value = value;
+        });
+    }
+    
+    // Máscara de Telefone
+    const telefone = document.getElementById('telefone');
+    if (telefone) {
+        telefone.addEventListener('input', function() {
+            let value = this.value.replace(/\D/g, '');
+            
+            if (value.length <= 10) {
+                // Celular sem DDD
+                value = value.replace(/(\d{5})(\d{4})(\d{1})/, '$1-$2-$3');
+            } else {
+                // Celular com DDD
+                value = value.replace(/(\d{2})(\d{5})(\d{4})(\d{1})/, '($1) $2-$3-$4');
+            }
+            
+            this.value = value;
+        });
+    }
+    
+    // Busca de CEP
+    const cep = document.getElementById('cep');
+    if (cep) {
+        cep.addEventListener('blur', function() {
+            const cepValue = this.value.replace(/\D/g, '');
+            
+            if (cepValue.length === 8) {
+                // Simulação de busca de CEP
+                setTimeout(() => {
+                    document.getElementById('endereco').value = 'Rua Exemplo';
+                    document.getElementById('bairro').value = 'Centro';
+                    document.getElementById('cidade').value = 'São Paulo';
+                    document.getElementById('estado').value = 'SP';
+                    document.getElementById('numero').focus();
+                }, 500);
+            }
+        });
+    }
+    
+    // Validação de senha
+    const formSeguranca = document.getElementById('formSeguranca');
+    if (formSeguranca) {
+        formSeguranca.addEventListener('submit', function(e) {
+            const senhaNova = document.getElementById('senha_nova').value;
+            const senhaConfirmacao = document.getElementById('senha_confirmacao').value;
+            
+            if (senhaNova && senhaNova !== senhaConfirmacao) {
+                e.preventDefault();
+                alert('As senhas não conferem!');
+                return false;
+            }
+            
+            if (senhaNova && senhaNova.length < 6) {
+                e.preventDefault();
+                alert('A senha deve ter pelo menos 6 caracteres!');
+                return false;
+            }
+        });
+    }
+});
+</script>
 
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

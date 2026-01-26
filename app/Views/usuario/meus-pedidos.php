@@ -49,12 +49,12 @@
         <!-- Main Content -->
         <div class="col-lg-9">
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
                 <div>
                     <h2 class="mb-1">Meus Pedidos</h2>
                     <p class="text-muted mb-0">Histórico completo dos seus pedidos</p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 user-page-actions">
                     <div class="input-group" style="width: 250px;">
                         <input type="text" class="form-control" placeholder="Buscar pedido..." id="buscaPedido">
                         <button class="btn btn-outline-secondary" type="button">
@@ -377,6 +377,29 @@
 .pagination .page-item.active .page-link {
     background: var(--primary-gradient);
     border-color: rgba(29, 78, 216, 0.35);
+}
+
+@media (max-width: 991.98px) {
+    .user-page-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .user-page-actions .input-group {
+        width: 100% !important;
+    }
+
+    #filtroStatus {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .user-page-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
 }
 </style>
 

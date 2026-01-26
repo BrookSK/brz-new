@@ -15,7 +15,12 @@ function renderAdminSidebar($activePage = '') {
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes']
     ];
 
-    echo '<nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+    // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
+    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">
+            <i class="fas fa-bars"></i>
+          </button>';
+
+    echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                 <div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div>
@@ -54,6 +59,24 @@ function renderAdminSidebar($activePage = '') {
 // Estilos CSS comuns para o menu lateral
 function renderAdminSidebarStyles() {
     echo '<style>
+        .admin-menu-toggle {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 10050;
+            padding: 0.55rem 0.75rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+        }
+
+        html, body {
+            overflow-x: hidden;
+        }
+
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
+        }
+
         .sidebar { 
             min-height: 100vh; 
             background: linear-gradient(180deg, #0b1f3a 10%, #1d4ed8 100%); 
@@ -77,6 +100,83 @@ function renderAdminSidebarStyles() {
         }
         .card-stats:hover { 
             transform: translateY(-5px); 
+        }
+
+        @media (max-width: 767.98px) {
+            /* Sidebar como overlay no mobile */
+            #adminSidebar.sidebar {
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                width: min(86vw, 320px);
+                z-index: 10040;
+                overflow-y: auto;
+                box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+                border-top-right-radius: 18px;
+                border-bottom-right-radius: 18px;
+            }
+
+            /* Quando aberto, precisa ficar acima */
+            #adminSidebar.sidebar.show {
+                display: block;
+            }
+
+            /* Dar espaço no conteúdo pra não ficar atrás do botão */
+            main.col-md-9.ms-sm-auto.col-lg-10 {
+                padding-top: 58px;
+            }
+
+            /* Tabelas do admin: garantir usabilidade */
+            table {
+                width: 100%;
+            }
+
+            .table-responsive {
+                margin-left: -12px;
+                margin-right: -12px;
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            /* Ações (btn-group) no mobile: empilhar */
+            .btn-group {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .btn-group > .btn {
+                border-radius: 12px !important;
+            }
+
+            /* Header padrão do admin (título + botões) */
+            main .d-flex.justify-content-between.flex-wrap.flex-md-nowrap.align-items-center {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 12px;
+            }
+
+            main .d-flex.justify-content-between.flex-wrap.flex-md-nowrap.align-items-center > div {
+                width: 100%;
+            }
+
+            main .d-flex.justify-content-between.flex-wrap.flex-md-nowrap.align-items-center .btn,
+            main .d-flex.justify-content-between.flex-wrap.flex-md-nowrap.align-items-center .btn-group {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            /* Tablet: botões e ações mais confortáveis */
+            .btn-group {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            main .d-flex.justify-content-between.flex-wrap.flex-md-nowrap.align-items-center {
+                gap: 12px;
+            }
         }
     </style>';
 }

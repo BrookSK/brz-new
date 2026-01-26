@@ -130,32 +130,34 @@
                 <!-- Especificações -->
                 <div class="specifications mb-4">
                     <h5>Especificações</h5>
-                    <table class="table table-sm">
-                        <tr>
-                            <td><strong>SKU:</strong></td>
-                            <td><?= htmlspecialchars($produto['sku']) ?></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Peso:</strong></td>
-                            <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
-                        </tr>
-                        <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
-                        <tr>
-                            <td><strong>Dimensões:</strong></td>
-                            <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
-                        </tr>
-                        <?php endif; ?>
-                        <tr>
-                            <td><strong>Estoque:</strong></td>
-                            <td>
-                                <?php if ($produto['estoque'] > 0): ?>
-                                    <span class="badge bg-success"><?= $produto['estoque'] ?> unidades</span>
-                                <?php else: ?>
-                                    <span class="badge bg-danger">Fora de estoque</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>SKU:</strong></td>
+                                <td><?= htmlspecialchars($produto['sku']) ?></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Peso:</strong></td>
+                                <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
+                            </tr>
+                            <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
+                            <tr>
+                                <td><strong>Dimensões:</strong></td>
+                                <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
+                            </tr>
+                            <?php endif; ?>
+                            <tr>
+                                <td><strong>Estoque:</strong></td>
+                                <td>
+                                    <?php if ($produto['estoque'] > 0): ?>
+                                        <span class="badge bg-success"><?= $produto['estoque'] ?> unidades</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger">Fora de estoque</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Adicionar ao Carrinho -->
@@ -363,6 +365,13 @@
     
     .currency {
         font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .add-to-cart-section .input-group {
+        max-width: none !important;
+        width: 100%;
     }
 }
 </style>

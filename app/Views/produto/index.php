@@ -151,6 +151,27 @@
 .price-conversion {
     font-size: 0.8rem;
 }
+
+@media (max-width: 575.98px) {
+    .product-card .card-footer .input-group {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .product-card .card-footer .quantidade-input {
+        flex: 1 1 100px;
+        min-width: 96px;
+        border-radius: 12px !important;
+    }
+
+    .product-card .card-footer .btn-adicionar {
+        flex: 1 1 100%;
+        width: 100%;
+        border-radius: 12px !important;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+}
 </style>
 
 <script>

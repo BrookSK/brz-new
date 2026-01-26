@@ -1185,6 +1185,20 @@ main {
     top: 90px; /* Ajustado para header fixo */
     z-index: 10;
 }
+
+@media (max-width: 991.98px) {
+    .checkout-sticky {
+        position: static;
+        top: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+}
 </style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

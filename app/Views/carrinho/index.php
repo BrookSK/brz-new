@@ -12,7 +12,7 @@
                         <?php foreach ($carrinho as $index => $item): ?>
                         <div class="cart-item border-bottom pb-3 mb-3">
                             <div class="row align-items-center">
-                                <div class="col-md-2">
+                                <div class="col-4 col-md-2 mb-2 mb-md-0">
                                     <?php 
                                     // Buscar foto do produto
                                     $fotoPrincipal = null;
@@ -38,9 +38,9 @@
                                     </div>
                                 <?php endif; ?>
                                 </div>
-                                <div class="col-md-5">
+                                <div class="col-8 col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
-                                    <div class="input-group input-group-sm">
+                                    <div class="input-group input-group-sm" style="max-width: 240px;">
                                         <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
                                             <i class="fas fa-minus"></i>
                                         </button>
@@ -56,7 +56,7 @@
                                     </div>
                                     <small class="text-muted">ID: <?= $item['produto_id'] ?></small>
                                 </div>
-                                <div class="col-md-3 text-end">
+                                <div class="col-8 col-md-3 text-start text-md-end mt-2 mt-md-0">
                                     <div class="fw-bold">
                                         <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>">
                                             <?= number_format($item['subtotal'], 2, ',', '.') ?>
@@ -68,7 +68,7 @@
                                         </span>
                                     </small>
                                 </div>
-                                <div class="col-md-1 text-end">
+                                <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
                                     <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= $item['produto_id'] ?>)">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -80,12 +80,14 @@
                 </div>
                 
                 <div class="mt-3">
-                    <a href="/produtos" class="btn btn-outline-primary">
-                        <i class="fas fa-arrow-left"></i> Continuar Comprando
-                    </a>
-                    <button class="btn btn-outline-danger float-end" onclick="limparCarrinho()">
-                        <i class="fas fa-trash"></i> Limpar Carrinho
-                    </button>
+                    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between">
+                        <a href="/produtos" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left"></i> Continuar Comprando
+                        </a>
+                        <button class="btn btn-outline-danger" onclick="limparCarrinho()">
+                            <i class="fas fa-trash"></i> Limpar Carrinho
+                        </button>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
