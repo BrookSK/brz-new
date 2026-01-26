@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Core\Url;
 use App\Models\Produto;
 use App\Models\ProdutoFoto;
 use App\Services\AuthService;
@@ -46,7 +47,7 @@ class CarrinhoController extends Controller {
                 if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
                     $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipal['nome_arquivo'], '/');
                     if (file_exists($filePath)) {
-                        $fotoUrl = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                        $fotoUrl = Url::absolute($fotoPrincipal['nome_arquivo']);
                     }
                 }
                 

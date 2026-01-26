@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Core\Url;
 use App\Models\Produto;
 use App\Models\ProdutoFoto;
 
@@ -38,7 +39,7 @@ class ProdutoController extends Controller {
                 // Verificar se arquivo existe fisicamente
                 $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
                 if (file_exists($filePath)) {
-                    $produto['foto_principal'] = 'https://novobr.brazilianashop.com.br' . $fotoUrl;
+                    $produto['foto_principal'] = Url::absolute($fotoUrl);
                 } else {
                     $produto['foto_principal'] = null;
                 }
@@ -101,7 +102,7 @@ class ProdutoController extends Controller {
             if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
                 $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipal['nome_arquivo'], '/');
                 if (file_exists($filePath)) {
-                    $relacionado['foto_principal'] = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                    $relacionado['foto_principal'] = Url::absolute($fotoPrincipal['nome_arquivo']);
                 } else {
                     $relacionado['foto_principal'] = null;
                 }

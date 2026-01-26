@@ -33,6 +33,7 @@
         return $texts[$status] ?? (is_string($status) ? ucfirst($status) : '');
     }
     ?>
+    <?php use App\Core\Url; ?>
     <style>
         :root {
             --primary-color: #0b1f3a;
@@ -527,7 +528,7 @@
                             <?php if (!empty($pedido['items'])): ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
-                                        <img src="https://novobr.brazilianashop.com.br/uploads/produtos/<?= $item['imagem'] ?? 'default.jpg' ?>" 
+                                        <img src="<?= Url::absolute('/uploads/produtos/' . ($item['imagem'] ?? 'default.jpg')) ?>" 
                                              alt="<?= htmlspecialchars($item['nome_produto'] ?? 'Produto') ?>" 
                                              class="product-image">
                                         <div class="product-info flex-grow-1">

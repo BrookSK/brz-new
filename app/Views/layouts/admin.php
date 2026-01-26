@@ -15,6 +15,7 @@
 
             --bg-gradient: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
             --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
+            --primary-btn-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 100%);
 
             --radius-md: 14px;
             --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
@@ -91,7 +92,8 @@
 
         .btn-primary {
             border: none;
-            background: var(--primary-gradient);
+            background: var(--primary-btn-gradient);
+            color: #ffffff;
         }
 
         .admin-shell {

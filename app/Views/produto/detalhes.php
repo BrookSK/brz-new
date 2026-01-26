@@ -1,4 +1,5 @@
 <?php ob_start(); ?>
+<?php use App\Core\Url; ?>
 <div class="container py-5">
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
@@ -40,9 +41,9 @@
                     }
                     ?>
                     <?php if ($fotoUrl && $fotoExists): ?>
-                        <a href="<?= 'https://novobr.brazilianashop.com.br' . $fotoUrl ?>" target="_blank">
+                        <a href="<?= Url::absolute($fotoUrl) ?>" target="_blank">
                             <img id="main-image" 
-                                 src="<?= 'https://novobr.brazilianashop.com.br' . $fotoUrl ?>?v=<?= time() ?>" 
+                                 src="<?= Url::absolute($fotoUrl) ?>?v=<?= time() ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
                                  style="cursor: pointer; transition: transform 0.2s;"
@@ -73,11 +74,11 @@
                             }
                             ?>
                             <?php if ($miniaturaUrl && $miniaturaExists): ?>
-                                <img src="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>?v=<?= time() ?>" 
+                                <img src="<?= Url::absolute($miniaturaUrl) ?>?v=<?= time() ?>" 
                                      alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
-                                     data-main-image="<?= 'https://novobr.brazilianashop.com.br' . $miniaturaUrl ?>"
+                                     data-main-image="<?= Url::absolute($miniaturaUrl) ?>"
                                      title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
                                 <?php if ($foto['principal']): ?>
                                     <span class="position-absolute top-0 start-0 badge bg-primary" style="font-size: 0.6em;">Principal</span>
@@ -216,7 +217,7 @@
                             $relacionadoExists = !empty($relacionado['foto_principal']) && file_exists(__DIR__ . '/../../public' . $relacionadoPath);
                             ?>
                             <?php if ($relacionadoExists): ?>
-                                <img src="<?= 'https://novobr.brazilianashop.com.br' . $relacionadoPath ?>?v=<?= time() ?>" 
+                                <img src="<?= Url::absolute($relacionadoPath) ?>?v=<?= time() ?>" 
                                      alt="<?= htmlspecialchars($relacionado['nome']) ?>"
                                      class="card-img-top"
                                      style="height: 150px; object-fit: cover;">

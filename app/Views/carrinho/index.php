@@ -1,4 +1,5 @@
 <?php ob_start(); ?>
+<?php use App\Core\Url; ?>
 <div class="container py-5">
     <div class="row">
         <div class="col-lg-8">
@@ -24,7 +25,7 @@
                                     
                                     $fotoUrl = null;
                                     if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
-                                        $fotoUrl = 'https://novobr.brazilianashop.com.br' . $fotoPrincipal['nome_arquivo'];
+                                        $fotoUrl = Url::absolute($fotoPrincipal['nome_arquivo']);
                                     }
                                     ?>
                                     <?php if ($fotoUrl): ?>

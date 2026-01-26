@@ -1,6 +1,8 @@
 <?php
 namespace App\Models;
 
+use App\Core\Url;
+
 class Produto extends Model {
     protected $table = 'produtos';
 
@@ -423,7 +425,7 @@ class Produto extends Model {
             if ($foto['nome_arquivo'] && strpos($foto['nome_arquivo'], '/uploads/') === 0) {
                 $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $foto['nome_arquivo'];
                 $foto['arquivo_existe'] = file_exists($caminhoFisico);
-                $foto['url_completa'] = 'https://novobr.brazilianashop.com.br' . $foto['nome_arquivo'];
+                $foto['url_completa'] = Url::absolute($foto['nome_arquivo']);
                 
                 if (!$foto['arquivo_existe']) {
                     error_log('❌ [PRODUTO-MODEL] Arquivo não encontrado: ' . $caminhoFisico);

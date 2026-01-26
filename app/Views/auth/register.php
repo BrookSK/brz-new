@@ -205,16 +205,29 @@ $(document).ready(function() {
 
 function showAlert(type, message) {
     const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        <div class="alert alert-${type} alert-dismissible fade show auth-alert" role="alert">
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
-    
-    $('.card').first().prepend(alertHtml);
+
+    const $card = $('.card').first();
+    $card.find('.auth-alert').remove();
+
+    const $header = $card.find('.card-header').first();
+    if ($header.length) {
+        $header.after(alertHtml);
+    } else {
+        const $body = $card.find('.card-body').first();
+        if ($body.length) {
+            $body.prepend(alertHtml);
+        } else {
+            $card.prepend(alertHtml);
+        }
+    }
     
     setTimeout(function() {
-        $('.alert').alert('close');
+        $card.find('.auth-alert').alert('close');
     }, 5000);
 }
 </script>
@@ -241,17 +254,25 @@ function showAlert(type, message) {
 }
 
 .auth-page .btn-primary {
-    background: var(--primary-gradient);
+    background: var(--primary-btn-gradient);
     border: none;
     border-radius: var(--radius-lg);
     padding: 12px 30px;
     font-weight: 600;
+    color: #ffffff;
     transition: all 0.3s ease;
 }
 
 .auth-page .btn-primary:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
+}
+
+.auth-page .auth-alert {
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
 }
 
 .auth-page .text-decoration-none:hover {

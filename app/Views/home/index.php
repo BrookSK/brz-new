@@ -35,7 +35,7 @@
             </div>
             <div class="col-lg-6">
                 <div class="hero-image" data-aos="fade-left">
-                    <img src="https://via.placeholder.com/600x400/667eea/ffffff?text=Importação+Internacional" 
+                    <img src="/import.png" 
                          alt="Importação Internacional" 
                          class="img-fluid rounded-3 shadow-lg">
                 </div>

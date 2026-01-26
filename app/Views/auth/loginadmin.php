@@ -1,9 +1,5 @@
 <?php ob_start(); ?>
 
-<!-- jQuery e Bootstrap CSS -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
 <div class="auth-page">
 <div class="container py-5">
     <div class="row justify-content-center">
@@ -79,10 +75,6 @@
     </div>
 </div>
 
-<!-- jQuery e Bootstrap JS -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 $(document).ready(function() {
     // Toggle password visibility
@@ -133,16 +125,29 @@ $(document).ready(function() {
 
 function showAlert(type, message) {
     const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        <div class="alert alert-${type} alert-dismissible fade show auth-alert" role="alert">
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
-    
-    $('.card').first().prepend(alertHtml);
+
+    const $card = $('.card').first();
+    $card.find('.auth-alert').remove();
+
+    const $header = $card.find('.card-header').first();
+    if ($header.length) {
+        $header.after(alertHtml);
+    } else {
+        const $body = $card.find('.card-body').first();
+        if ($body.length) {
+            $body.prepend(alertHtml);
+        } else {
+            $card.prepend(alertHtml);
+        }
+    }
     
     setTimeout(function() {
-        $('.alert').alert('close');
+        $card.find('.auth-alert').alert('close');
     }, 5000);
 }
 </script>
@@ -174,12 +179,20 @@ function showAlert(type, message) {
     border-radius: 50px;
     padding: 12px 30px;
     font-weight: 600;
+    color: #ffffff;
     transition: all 0.3s ease;
 }
 
 .auth-page .btn-danger:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
+}
+
+.auth-page .auth-alert {
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
 }
 
 .auth-page .text-decoration-none:hover {

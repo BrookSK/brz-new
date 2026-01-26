@@ -20,12 +20,15 @@
             --bg-gradient: linear-gradient(180deg, #f8fafc 0%, #eef2f7 45%, #ffffff 100%);
             --surface-gradient: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
             --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
-            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #fee2e2 100%);
+            --primary-btn-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 100%);
+            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
             --info-gradient: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
 
             --radius-sm: 10px;
             --radius-md: 14px;
             --radius-lg: 18px;
+
+            --navbar-height: 76px;
 
             --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
             --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
@@ -49,7 +52,6 @@
             padding: 0 !important;
             width: 100% !important;
             background: white !important;
-            padding-top: 10px !important;
         }
         
         /* Sobrescrever qualquer classe sticky do Bootstrap */
@@ -65,7 +67,7 @@
         }
 
         body {
-            padding-top: 76px !important; /* Altura do navbar */
+            padding-top: var(--navbar-height) !important; /* Altura do navbar */
             margin: 0 !important;
             min-height: 100vh;
             display: flex;
@@ -130,8 +132,9 @@
 
         .btn-primary {
             border: none;
-            background: var(--primary-gradient);
+            background: var(--primary-btn-gradient);
             box-shadow: var(--shadow-sm);
+            color: #ffffff;
         }
 
         .btn-primary:hover {
@@ -171,7 +174,7 @@
         .btn-danger {
             border: none;
             background: var(--danger-gradient);
-            color: #7f1d1d;
+            color: #ffffff;
         }
 
         .btn-outline-primary {
@@ -188,7 +191,7 @@
         .btn-outline-danger:hover {
             background: var(--danger-gradient);
             border-color: rgba(239, 68, 68, 0.35);
-            color: #7f1d1d;
+            color: #ffffff;
         }
 
         .btn-outline-info:hover {
@@ -228,8 +231,8 @@
             background: var(--primary-gradient);
             color: white;
             padding: 60px 0 40px;
-            margin-top: 0 !important;
-            padding-top: 100px !important;
+            margin-top: calc(var(--navbar-height) * -1) !important;
+            padding-top: calc(100px + var(--navbar-height)) !important;
         }
         
         .feature-card {
@@ -301,7 +304,7 @@
         }
         
         .cta-button {
-            background: var(--accent-color);
+            background: var(--primary-btn-gradient);
             color: white;
             padding: 15px 40px;
             border-radius: 50px;
@@ -313,9 +316,9 @@
         }
         
         .cta-button:hover {
-            background: #d97706;
+            filter: brightness(1.03);
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+            box-shadow: var(--shadow-md);
             color: white;
         }
         
