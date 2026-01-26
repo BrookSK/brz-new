@@ -337,10 +337,10 @@ class AdminComprasController extends Controller {
                                 foreach ($lista_compras as $item) {
                                     $prioridade_class = $item['prioridade'] == 'urgente' ? 'danger' : 
                                                        ($item['prioridade'] == 'alta' ? 'warning' : 
-                                                       ($item['prioridade'] == 'media' ? 'info' : 'secondary');
+                                                       ($item['prioridade'] == 'media' ? 'info' : 'secondary'));
                                     $status_class = $item['status'] == 'pendente' ? 'warning' : 
                                                   ($item['status'] == 'comprando' ? 'info' : 
-                                                  ($item['status'] == 'comprado' ? 'success' : 'secondary');
+                                                  ($item['status'] == 'comprado' ? 'success' : 'secondary'));
                                     $total_item = $item['quantidade_faltante'] * $item['price'];
                                     
                                     echo '<tr data-item-id="' . $item['id'] . '">
