@@ -489,7 +489,7 @@ class AdminPedidosController extends Controller {
                                                 
                                                 echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
                                                      style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
-                                                     onerror="this.style.display=\'none\'">';
+                                                     onerror="this.style.display='none'">';
                                             }
                                             
                                             echo '</td>
