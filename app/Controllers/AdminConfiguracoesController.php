@@ -12,23 +12,40 @@ class AdminConfiguracoesController extends Controller {
             // Buscar configurações
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
-            $keyCol = $tableInfo['keyCol'];
-            $valueCol = $tableInfo['valueCol'];
-            $orderBy = [$keyCol];
+            $orderBy = [];
+            if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                $orderBy = [$tableInfo['categoriaCol'], $tableInfo['chaveCol']];
+            } else {
+                $orderBy = [$tableInfo['keyCol']];
+            }
             if (!empty($tableInfo['updatedAtCol'])) {
                 $orderBy[] = $tableInfo['updatedAtCol'] . ' ASC';
             }
             if (!empty($tableInfo['idCol'])) {
                 $orderBy[] = $tableInfo['idCol'] . ' ASC';
             }
-            $sql = "SELECT {$keyCol} AS chave, {$valueCol} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
+
+            if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                $sql = "SELECT {$tableInfo['categoriaCol']} AS categoria, {$tableInfo['chaveCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
+            } else {
+                $sql = "SELECT {$tableInfo['keyCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
+            }
+
             $stmt = $pdo->query($sql);
             $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // Organizar por categoria a partir do padrão categoria_chave
             $config = [];
             foreach ($configuracoes as $c) {
-                $fullKey = (string) ($c['chave'] ?? '');
+                $fullKey = '';
+                if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                    $cat = (string) ($c['categoria'] ?? '');
+                    $k = (string) ($c['chave'] ?? '');
+                    $fullKey = ($cat !== '' && $k !== '') ? ($cat . '_' . $k) : '';
+                } else {
+                    $fullKey = (string) ($c['chave'] ?? '');
+                }
+
                 $valor = $c['valor'] ?? '';
                 if ($fullKey === '') {
                     continue;
@@ -607,7 +624,6 @@ class AdminConfiguracoesController extends Controller {
 
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
-            $keyCol = $tableInfo['keyCol'];
             $valueCol = $tableInfo['valueCol'];
             $updatedAtCol = $tableInfo['updatedAtCol'];
             
@@ -658,20 +674,46 @@ class AdminConfiguracoesController extends Controller {
                         // Atualizar ou inserir configuração
                         $fullKey = $categoria . '_' . $chave;
 
-                        if (!empty($updatedAtCol)) {
-                            $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ?, {$updatedAtCol} = NOW() WHERE {$keyCol} = ?");
+                        if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                            $catCol = $tableInfo['categoriaCol'];
+                            $keyCol = $tableInfo['chaveCol'];
+
+                            if (!empty($updatedAtCol)) {
+                                $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ?, {$updatedAtCol} = NOW() WHERE {$catCol} = ? AND {$keyCol} = ?");
+                            } else {
+                                $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$catCol} = ? AND {$keyCol} = ?");
+                            }
+                            $stmtUpdate->execute([$valor, $categoria, $chave]);
                         } else {
-                            $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$keyCol} = ?");
+                            $keyCol = $tableInfo['keyCol'];
+                            if (!empty($updatedAtCol)) {
+                                $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ?, {$updatedAtCol} = NOW() WHERE {$keyCol} = ?");
+                            } else {
+                                $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$keyCol} = ?");
+                            }
+                            $stmtUpdate->execute([$valor, $fullKey]);
                         }
-                        $stmtUpdate->execute([$valor, $fullKey]);
 
                         if ($stmtUpdate->rowCount() === 0) {
-                            if (!empty($updatedAtCol)) {
-                                $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                            if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                                $catCol = $tableInfo['categoriaCol'];
+                                $keyCol = $tableInfo['chaveCol'];
+                                if (!empty($updatedAtCol)) {
+                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, ?, NOW())");
+                                    $stmtInsert->execute([$categoria, $chave, $valor]);
+                                } else {
+                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}) VALUES (?, ?, ?)");
+                                    $stmtInsert->execute([$categoria, $chave, $valor]);
+                                }
                             } else {
-                                $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                                $keyCol = $tableInfo['keyCol'];
+                                if (!empty($updatedAtCol)) {
+                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                                } else {
+                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                                }
+                                $stmtInsert->execute([$fullKey, $valor]);
                             }
-                            $stmtInsert->execute([$fullKey, $valor]);
                         }
                     }
                 }
@@ -688,7 +730,7 @@ class AdminConfiguracoesController extends Controller {
             try {
                 if (isset($pdo)) {
                     $ti = $this->getConfigTableInfo($pdo);
-                    $schemaInfo = ' (tabela=' . htmlspecialchars((string) ($ti['table'] ?? '')) . ', chave=' . htmlspecialchars((string) ($ti['keyCol'] ?? '')) . ', valor=' . htmlspecialchars((string) ($ti['valueCol'] ?? '')) . ')';
+                    $schemaInfo = ' (tabela=' . htmlspecialchars((string) ($ti['table'] ?? '')) . ', modo=' . htmlspecialchars((string) ($ti['mode'] ?? '')) . ')';
                 }
             } catch (\Exception $e2) {
             }
@@ -1065,12 +1107,63 @@ class AdminConfiguracoesController extends Controller {
         }
 
         $stmt = $pdo->query('DESCRIBE ' . $table);
-        $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $describeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $cols = [];
+        $types = [];
+        foreach ($describeRows as $r) {
+            $field = (string) ($r['Field'] ?? '');
+            if ($field === '') {
+                continue;
+            }
+            $cols[] = $field;
+            $types[$field] = strtolower((string) ($r['Type'] ?? ''));
+        }
 
-        $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug'];
+        $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'];
         $valueCandidates = ['valor', 'value', 'conteudo', 'content', 'config_value'];
         $updatedCandidates = ['updated_at', 'data_atualizacao', 'updated'];
         $idCandidates = ['id'];
+
+        // Suporte para schema com categoria + chave + valor
+        $hasCategoria = in_array('categoria', $cols, true);
+        $hasChave = in_array('chave', $cols, true);
+
+        if ($hasCategoria && $hasChave) {
+            $valueCol = null;
+            foreach ($valueCandidates as $c) {
+                if (in_array($c, $cols, true)) {
+                    $valueCol = $c;
+                    break;
+                }
+            }
+            if ($valueCol) {
+                $updatedAtCol = '';
+                foreach ($updatedCandidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $updatedAtCol = $c;
+                        break;
+                    }
+                }
+
+                $idCol = '';
+                foreach ($idCandidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $idCol = $c;
+                        break;
+                    }
+                }
+
+                return [
+                    'mode' => 'categoria_chave',
+                    'table' => $table,
+                    'categoriaCol' => 'categoria',
+                    'chaveCol' => 'chave',
+                    'valueCol' => $valueCol,
+                    'updatedAtCol' => $updatedAtCol,
+                    'idCol' => $idCol,
+                ];
+            }
+        }
 
         $keyCol = null;
         foreach ($keyCandidates as $c) {
@@ -1087,8 +1180,58 @@ class AdminConfiguracoesController extends Controller {
             }
         }
 
+        // Inferência por tipo/nome quando colunas não seguem o padrão
         if (!$keyCol || !$valueCol) {
-            throw new \Exception('Tabela de configurações incompatível: colunas não encontradas');
+            $reserved = array_merge($idCandidates, $updatedCandidates, ['created_at', 'data_criacao', 'descricao', 'tipo', 'type']);
+
+            $textLike = [];
+            foreach ($cols as $c) {
+                if (in_array($c, $reserved, true)) {
+                    continue;
+                }
+                $t = $types[$c] ?? '';
+                if (strpos($t, 'char') !== false || strpos($t, 'text') !== false || strpos($t, 'enum') !== false) {
+                    $textLike[] = $c;
+                }
+            }
+
+            if (!$keyCol) {
+                foreach ($textLike as $c) {
+                    $lc = strtolower($c);
+                    if (strpos($lc, 'chav') !== false || strpos($lc, 'key') !== false || strpos($lc, 'nome') !== false || strpos($lc, 'slug') !== false || strpos($lc, 'param') !== false) {
+                        $keyCol = $c;
+                        break;
+                    }
+                }
+                if (!$keyCol && !empty($textLike)) {
+                    $keyCol = $textLike[0];
+                }
+            }
+
+            if (!$valueCol) {
+                foreach ($textLike as $c) {
+                    if ($c === $keyCol) {
+                        continue;
+                    }
+                    $lc = strtolower($c);
+                    if (strpos($lc, 'val') !== false || strpos($lc, 'conteud') !== false || strpos($lc, 'content') !== false) {
+                        $valueCol = $c;
+                        break;
+                    }
+                }
+                if (!$valueCol) {
+                    foreach ($textLike as $c) {
+                        if ($c !== $keyCol) {
+                            $valueCol = $c;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!$keyCol || !$valueCol) {
+            throw new \Exception('Tabela de configurações incompatível: colunas não encontradas (cols=' . implode(', ', $cols) . ')');
         }
 
         $updatedAtCol = '';
@@ -1108,6 +1251,7 @@ class AdminConfiguracoesController extends Controller {
         }
 
         return [
+            'mode' => 'chave_valor',
             'table' => $table,
             'keyCol' => $keyCol,
             'valueCol' => $valueCol,
