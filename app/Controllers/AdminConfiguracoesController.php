@@ -10,7 +10,7 @@ class AdminConfiguracoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Buscar configurações
-            $stmt = $pdo->query("SELECT chave, valor FROM configuracoes_sistema ORDER BY chave");
+            $stmt = $pdo->query("SELECT chave, valor FROM configuracoes_sistema ORDER BY chave, updated_at ASC, id ASC");
             $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // Organizar por categoria a partir do padrão categoria_chave
@@ -637,13 +637,15 @@ class AdminConfiguracoesController extends Controller {
                             $valor = is_numeric($valor) ? intval($valor) : 30;
                         }
                         
-                        // Atualizar ou inserir configuração
-                        $stmt = $pdo->prepare("
-                            INSERT INTO configuracoes_sistema (chave, valor, updated_at)
-                            VALUES (?, ?, NOW())
-                            ON DUPLICATE KEY UPDATE valor = VALUES(valor), updated_at = NOW()
-                        ");
-                        $stmt->execute([$categoria . '_' . $chave, $valor]);
+                        // Atualizar ou inserir configuração (não depende de UNIQUE em chave)
+                        $fullKey = $categoria . '_' . $chave;
+                        $stmtUpdate = $pdo->prepare("UPDATE configuracoes_sistema SET valor = ?, updated_at = NOW() WHERE chave = ?");
+                        $stmtUpdate->execute([$valor, $fullKey]);
+
+                        if ($stmtUpdate->rowCount() === 0) {
+                            $stmtInsert = $pdo->prepare("INSERT INTO configuracoes_sistema (chave, valor, updated_at) VALUES (?, ?, NOW())");
+                            $stmtInsert->execute([$fullKey, $valor]);
+                        }
                     }
                 }
             }
