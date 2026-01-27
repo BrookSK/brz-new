@@ -401,9 +401,9 @@ class Produto extends Model {
         $stmt->bindParam(':foto_principal', $urlCompleta);
         
         $result = $stmt->execute();
-        error_log('🔍 [PRODUTO-MODEL] URL salva no banco: ' . $urlCompleta);
-        error_log('🔍 [PRODUTO-MODEL] Resultado da atualização da foto principal: ' . ($result ? 'true' : 'false'));
-        error_log('🔍 [PRODUTO-MODEL] SQL Error: ' . print_r($stmt->errorInfo(), true));
+        $this->debugLog('[PRODUTO-MODEL] URL salva no banco: ' . $urlCompleta);
+        $this->debugLog('[PRODUTO-MODEL] Resultado da atualização da foto principal: ' . ($result ? 'true' : 'false'));
+        $this->debugLog('[PRODUTO-MODEL] SQL Error: ' . print_r($stmt->errorInfo(), true));
         
         return $result;
     }
@@ -422,7 +422,7 @@ class Produto extends Model {
     }
     
     public function getImagens($produtoId) {
-        error_log('🔍 [PRODUTO-MODEL] Buscando galeria de imagens do produto ID: ' . $produtoId);
+        $this->debugLog('[PRODUTO-MODEL] Buscando galeria de imagens do produto ID: ' . $produtoId);
         
         $stmt = $this->getConnection()->prepare("
             SELECT * FROM produto_fotos 
@@ -468,11 +468,11 @@ class Produto extends Model {
             $foto['url_completa'] = Url::absolute($nomeArquivo);
 
             if (!$foto['arquivo_existe']) {
-                error_log('❌ [PRODUTO-MODEL] Arquivo não encontrado (tentativas): ' . implode(' | ', $caminhosFisicos));
+                $this->debugLog('[PRODUTO-MODEL] Arquivo não encontrado (tentativas): ' . implode(' | ', $caminhosFisicos));
             }
         }
         
-        error_log('🔍 [PRODUTO-MODEL] Galerias encontradas: ' . count($fotos));
+        $this->debugLog('[PRODUTO-MODEL] Galerias encontradas: ' . count($fotos));
         
         return $fotos;
     }
