@@ -73,7 +73,7 @@ function renderAdminSidebarStyles() {
             padding: 0 !important;
             border-radius: 12px;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
-            display: inline-flex !important;
+            display: none;
             align-items: center;
             justify-content: center;
         }
@@ -112,6 +112,10 @@ function renderAdminSidebarStyles() {
         }
 
         @media (max-width: 767.98px) {
+            .admin-menu-toggle {
+                display: inline-flex !important;
+            }
+
             /* Sidebar como overlay no mobile */
             #adminSidebar.sidebar {
                 position: fixed;
