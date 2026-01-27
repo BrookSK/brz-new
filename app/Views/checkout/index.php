@@ -338,13 +338,13 @@
                             </button>
                             
                             <!-- Botão de Teste Inline -->
-                            <button type="button" class="btn btn-warning btn-sm w-100 mt-2" 
+                            <button type="button" class="btn btn-warning btn-sm w-100 mt-2 d-none" 
                                     onclick="console.log('🔍 [TESTE] Botão de teste clicado!'); alert('Botão de teste funciona!');">
                                 <i class="fas fa-bug"></i> Teste Inline
                             </button>
                             
                             <!-- Botão de Debug -->
-                            <button type="button" class="btn btn-info btn-sm w-100 mt-2" 
+                            <button type="button" class="btn btn-info btn-sm w-100 mt-2 d-none" 
                                     onclick="debugBotaoFinalizar();">
                                 <i class="fas fa-bug"></i> Debug Botão
                             </button>
