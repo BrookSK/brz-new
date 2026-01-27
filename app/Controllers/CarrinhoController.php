@@ -12,6 +12,19 @@ class CarrinhoController extends Controller {
     private $produtoFotoModel;
     private $authService;
 
+    private function debugLog(string $message): void {
+        $enabled = false;
+        if (isset($_ENV['APP_DEBUG'])) {
+            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+        }
+
+        if ($enabled) {
+            error_log($message);
+        }
+    }
+
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
@@ -33,12 +46,12 @@ class CarrinhoController extends Controller {
         $pesoTotal = 0;
         
         foreach ($carrinho as $item) {
-            error_log('🔍 [CARRINHO] Processando item: ' . json_encode($item));
+            $this->debugLog('[CARRINHO] Processando item: ' . json_encode($item));
             
             $produto = $this->produtoModel->find($item['produto_id']);
             
             if ($produto) {
-                error_log('🔍 [CARRINHO] Produto encontrado: ' . json_encode($produto));
+                $this->debugLog('[CARRINHO] Produto encontrado: ' . json_encode($produto));
                 
                 $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
                 
@@ -56,7 +69,7 @@ class CarrinhoController extends Controller {
                 $itemStock = intval($produto['estoque'] ?? 0);
                 $itemSubtotal = $item['quantidade'] * $itemPrice;
                 
-                error_log('🔍 [CARRINHO] Preço: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
+                $this->debugLog('[CARRINHO] Preco: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
                 
                 $produtosDetalhados[] = [
                     'produto_id' => $item['produto_id'],
@@ -74,7 +87,7 @@ class CarrinhoController extends Controller {
                 $subtotal += $itemSubtotal;
                 $pesoTotal += $item['quantidade'] * floatval($produto['peso'] ?? 0.5);
             } else {
-                error_log('❌ [CARRINHO] Produto não encontrado: ' . $item['produto_id']);
+                $this->debugLog('[CARRINHO] Produto nao encontrado: ' . $item['produto_id']);
             }
         }
         
@@ -100,19 +113,18 @@ class CarrinhoController extends Controller {
     }
 
     public function adicionar(Request $request) {
-        // LOG DE DEPURAÇÃO
-        error_log("=== DEPURAÇÃO CARRINHO ADICIONAR ===");
-        error_log("Método: " . $request->getMethod());
-        error_log("Parâmetros recebidos: " . json_encode($request->getParams()));
+        $this->debugLog('=== DEPURACAO CARRINHO ADICIONAR ===');
+        $this->debugLog('Metodo: ' . $request->getMethod());
+        $this->debugLog('Parametros recebidos: ' . json_encode($request->getParams()));
         
         $produtoId = $request->getParam('id');
         $quantidade = $request->getParam('quantidade', 1);
         
-        error_log("Produto ID: $produtoId");
-        error_log("Quantidade: $quantidade");
+        $this->debugLog("Produto ID: $produtoId");
+        $this->debugLog("Quantidade: $quantidade");
         
         if (!$produtoId) {
-            error_log("ERRO: Produto não informado");
+            $this->debugLog('ERRO: Produto nao informado');
             $this->json(['error' => 'Produto não informado'], 400);
             return;
         }
@@ -124,21 +136,21 @@ class CarrinhoController extends Controller {
         
         
         if (!$produto) {
-            error_log("ERRO: Produto não encontrado no banco");
+            $this->debugLog('ERRO: Produto nao encontrado no banco');
             $this->json(['error' => 'Produto não encontrado'], 404);
             return;
         }
         
         $produtoStock = intval($produto['estoque'] ?? 0);
         if ($produtoStock < $quantidade) {
-            error_log("ERRO: Estoque insuficiente. Estoque: " . $produtoStock . ", Quantidade: " . $quantidade);
+            $this->debugLog('ERRO: Estoque insuficiente. Estoque: ' . $produtoStock . ', Quantidade: ' . $quantidade);
             $this->json(['error' => 'Estoque insuficiente'], 400);
             return;
         }
         
         if (!isset($_SESSION['carrinho'])) {
             $_SESSION['carrinho'] = [];
-            error_log("Criando array de carrinho vazio");
+            $this->debugLog('Criando array de carrinho vazio');
         }
         
         $itemKey = $produtoId;
@@ -150,7 +162,7 @@ class CarrinhoController extends Controller {
             $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $itemPrice;
             $_SESSION['carrinho'][$itemKey]['price'] = $itemPrice;
             $_SESSION['carrinho'][$itemKey]['preco_unitario'] = $itemPrice;
-            error_log("Atualizando item existente no carrinho");
+            $this->debugLog('Atualizando item existente no carrinho');
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
@@ -160,10 +172,10 @@ class CarrinhoController extends Controller {
                 'quantidade' => $quantidade,
                 'subtotal' => $quantidade * $itemPrice
             ];
-            error_log("Adicionando novo item ao carrinho");
+            $this->debugLog('Adicionando novo item ao carrinho');
         }
         
-        error_log("Carrinho atual: " . json_encode($_SESSION['carrinho']));
+        $this->debugLog('Carrinho atual: ' . json_encode($_SESSION['carrinho']));
         
         $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
         $totalValor = 0;
@@ -171,8 +183,8 @@ class CarrinhoController extends Controller {
             $totalValor += floatval($item['subtotal']);
         }
         
-        error_log("Total itens: $totalItens");
-        error_log("Total valor: $totalValor");
+        $this->debugLog("Total itens: $totalItens");
+        $this->debugLog("Total valor: $totalValor");
         
         $response = [
             'success' => true,
@@ -182,7 +194,7 @@ class CarrinhoController extends Controller {
             'total_valor' => $totalValor
         ];
         
-        error_log("Resposta JSON: " . json_encode($response));
+        $this->debugLog('Resposta JSON: ' . json_encode($response));
         
         $this->json($response);
     }

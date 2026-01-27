@@ -23,6 +23,19 @@ class CheckoutController extends Controller {
     private $usuarioModel;
     private $enderecoModel;
     private $pedidoModel;
+
+    private function debugLog(string $message): void {
+        $enabled = false;
+        if (isset($_ENV['APP_DEBUG'])) {
+            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+        }
+
+        if ($enabled) {
+            error_log($message);
+        }
+    }
     
     public function __construct() {
         $this->authService = new AuthService();
@@ -74,9 +87,9 @@ class CheckoutController extends Controller {
             $items[] = $produto;
             $subtotal += $produto['subtotal'];
             $pesoTotal += $produto['peso'] * $quantidade;
-            
-            error_log('🔍 [CHECKOUT_INDEX] Item: ' . json_encode($item));
-            error_log('🔍 [CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
+
+            $this->debugLog('[CHECKOUT_INDEX] Item: ' . json_encode($item));
+            $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
         
         $this->view('checkout/index', [
@@ -131,14 +144,14 @@ class CheckoutController extends Controller {
         }
         
         // Resto do processamento do pedido...
-        error_log('🔍 [CONTROLLER] processar() chamado - INÍCIO');
+        $this->debugLog('[CHECKOUT] processar() chamado - INICIO');
         
         $dados = $request->getParams();
-        error_log('🔍 [CONTROLLER] Dados recebidos: ' . json_encode($dados));
+        $this->debugLog('[CHECKOUT] Dados recebidos: ' . json_encode($dados));
         
         // Validar consentimento legal
         if (empty($dados['consentimento_legal'])) {
-            error_log('❌ [CONTROLLER] Consentimento legal não aceito');
+            $this->debugLog('[CHECKOUT] Consentimento legal nao aceito');
             $this->json(['error' => 'É necessário aceitar os termos para continuar'], 400);
             return;
         }
@@ -146,17 +159,17 @@ class CheckoutController extends Controller {
         // Validar dados obrigatórios
         $erros = $this->validarDadosCheckout($dados);
         if (!empty($erros)) {
-            error_log('❌ [CONTROLLER] Erros de validação: ' . implode(', ', $erros));
+            $this->debugLog('[CHECKOUT] Erros de validacao: ' . implode(', ', $erros));
             $this->json(['error' => implode(', ', $erros)], 400);
             return;
         }
         
         // Obter carrinho da sessão
         $carrinho = $_SESSION['carrinho'] ?? [];
-        error_log('🔍 [CONTROLLER] Carrinho encontrado: ' . json_encode($carrinho));
+        $this->debugLog('[CHECKOUT] Carrinho encontrado: ' . json_encode($carrinho));
         
         if (empty($carrinho)) {
-            error_log('❌ [CONTROLLER] Carrinho vazio');
+            $this->debugLog('[CHECKOUT] Carrinho vazio');
             $this->json(['error' => 'Carrinho vazio'], 400);
             return;
         }
@@ -164,27 +177,27 @@ class CheckoutController extends Controller {
         try {
             // Obter usuário logado
             $usuario = $this->authService->getUsuarioLogado();
-            error_log('🔍 [CONTROLLER] Usuário: ' . ($usuario ? $usuario['email'] : 'Não logado'));
+            $this->debugLog('[CHECKOUT] Usuario: ' . ($usuario ? $usuario['email'] : 'Nao logado'));
             
             // Criar pedido
-            error_log('🔍 [CONTROLLER] Chamando criarPedido()...');
+            $this->debugLog('[CHECKOUT] Chamando criarPedido()...');
             $pedidoId = $this->criarPedido($dados, $carrinho, $usuario);
-            error_log('🔍 [CONTROLLER] Pedido criado com ID: ' . $pedidoId);
+            $this->debugLog('[CHECKOUT] Pedido criado com ID: ' . $pedidoId);
             
             if ($pedidoId) {
                 // Salvar itens do pedido
-                error_log('🔍 [CONTROLLER] Salvando itens do pedido...');
+                $this->debugLog('[CHECKOUT] Salvando itens do pedido...');
                 $this->salvarItensPedido($pedidoId, $carrinho);
-                error_log('🔍 [CONTROLLER] Itens do pedido salvos');
+                $this->debugLog('[CHECKOUT] Itens do pedido salvos');
                 
                 // Salvar dados do cliente
-                error_log('🔍 [CONTROLLER] Salvando dados do cliente...');
+                $this->debugLog('[CHECKOUT] Salvando dados do cliente...');
                 $this->salvarDadosCliente($pedidoId, $dados, $usuario);
-                error_log('🔍 [CONTROLLER] Dados do cliente salvos');
+                $this->debugLog('[CHECKOUT] Dados do cliente salvos');
                 
                 // Limpar carrinho
                 unset($_SESSION['carrinho']);
-                error_log('🔍 [CONTROLLER] Carrinho limpo');
+                $this->debugLog('[CHECKOUT] Carrinho limpo');
                 
                 $response = [
                     'success' => true,
@@ -193,19 +206,19 @@ class CheckoutController extends Controller {
                     'redirect' => '/checkout/conclusao/' . $pedidoId
                 ];
                 
-                error_log('✅ [CONTROLLER] Resposta sucesso: ' . json_encode($response));
+                $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
                 $this->json($response);
             } else {
-                error_log('❌ [CONTROLLER] Erro ao criar pedido - ID retornado: ' . $pedidoId);
+                $this->debugLog('[CHECKOUT] Erro ao criar pedido - ID retornado: ' . $pedidoId);
                 $this->json(['error' => 'Erro ao criar pedido'], 500);
             }
-        } catch (Exception $e) {
-            error_log('❌ [CONTROLLER] Exceção: ' . $e->getMessage());
-            error_log('❌ [CONTROLLER] Stack: ' . $e->getTraceAsString());
+        } catch (\Exception $e) {
+            $this->debugLog('[CHECKOUT] Excecao: ' . $e->getMessage());
+            $this->debugLog('[CHECKOUT] Stack: ' . $e->getTraceAsString());
             $this->json(['error' => 'Erro ao processar pedido: ' . $e->getMessage()], 500);
         }
         
-        error_log('🔍 [CONTROLLER] processar() - FIM');
+        $this->debugLog('[CHECKOUT] processar() - FIM');
     }
     
     public function conclusao(Request $request) {
@@ -234,12 +247,12 @@ class CheckoutController extends Controller {
         $db = \Config\Database::getConnection();
         
         foreach ($carrinho as $item) {
-            error_log('🔍 [ITENS] Item do carrinho: ' . json_encode($item));
+            $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
             
             // Validar se o produto existe antes de inserir
             $produtoId = $item['produto_id'] ?? $item['id'] ?? null;
             if (empty($produtoId)) {
-                error_log('❌ [ITENS] Produto ID vazio, pulando item');
+                $this->debugLog('[CHECKOUT_ITENS] Produto ID vazio, pulando item');
                 continue;
             }
             
@@ -248,17 +261,17 @@ class CheckoutController extends Controller {
             $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$produto) {
-                error_log(' [ITENS] Produto ID ' . $produtoId . ' não encontrado, pulando item');
+                $this->debugLog('[CHECKOUT_ITENS] Produto ID ' . $produtoId . ' nao encontrado, pulando item');
                 continue;
             }
             
-            error_log(' [ITENS] Produto ID ' . $produtoId . ' validado');
+            $this->debugLog('[CHECKOUT_ITENS] Produto ID ' . $produtoId . ' validado');
             
             // Verificar diferentes campos de preço
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
             $quantidade = $item['quantidade'] ?? 1;
             
-            error_log(' [ITENS] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
+            $this->debugLog('[CHECKOUT_ITENS] Preco unitario: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
             
             $sql = "INSERT INTO pedido_itens (
                 pedido_id, produto_id, quantidade, preco_unitario, 
@@ -274,7 +287,7 @@ class CheckoutController extends Controller {
                 $precoUnitario * $quantidade
             ]);
             
-            error_log(' [ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
+            $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
         }
     }
     
@@ -283,12 +296,12 @@ class CheckoutController extends Controller {
             $db = \Config\Database::getConnection();
             
             // Removido UPDATE com colunas inexistentes - dados já salvos nas tabelas usuarios/clientes
-            error_log(' [DADOS_CLIENTE] Dados já persistidos em usuarios e clientes');
+            $this->debugLog('[CHECKOUT_DADOS_CLIENTE] Dados ja persistidos em usuarios e clientes');
             
             return true;
             
         } catch (\Exception $e) {
-            error_log(' [DADOS_CLIENTE] Erro: ' . $e->getMessage());
+            $this->debugLog('[CHECKOUT_DADOS_CLIENTE] Erro: ' . $e->getMessage());
             return false;
         }
     }
@@ -403,7 +416,7 @@ class CheckoutController extends Controller {
         ];
         
         $this->enderecoModel->create($enderecoData);
-        return $this->enderecoModel->connection->lastInsertId();
+        return $this->enderecoModel->getConnection()->lastInsertId();
     }
     
     private function registrarConsentimentoLegal($usuarioId, $dados) {
@@ -472,7 +485,7 @@ class CheckoutController extends Controller {
     
     private function criarPedido($dados, $carrinho, $usuario) {
         try {
-            error_log('🔍 [CRIAR_PEDIDO] Iniciando criação do pedido');
+            $this->debugLog('[CRIAR_PEDIDO] Iniciando criacao do pedido');
             
             // Garantir usuário e cliente válidos - fluxo correto obrigatório
             $db = \Config\Database::getConnection();
@@ -488,7 +501,7 @@ class CheckoutController extends Controller {
             
             if ($existingUser && !empty($existingUser['id'])) {
                 $usuarioId = $existingUser['id'];
-                error_log('🔍 [CRIAR_PEDIDO] Usuário encontrado: ' . $usuarioId);
+                $this->debugLog('[CRIAR_PEDIDO] Usuario encontrado: ' . $usuarioId);
             } else {
                 $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
                 $stmt->execute([
@@ -498,7 +511,7 @@ class CheckoutController extends Controller {
                     'DOC' . time()
                 ]);
                 $usuarioId = $db->lastInsertId();
-                error_log('🔍 [CRIAR_PEDIDO] Usuário criado: ' . $usuarioId);
+                $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
             }
             
             // 2. Buscar/criar cliente na tabela clientes (foreign key obrigatória)
@@ -508,19 +521,19 @@ class CheckoutController extends Controller {
             
             if ($existingClient && !empty($existingClient['id'])) {
                 $clienteId = $existingClient['id'];
-                error_log('🔍 [CRIAR_PEDIDO] Cliente encontrado: ' . $clienteId);
+                $this->debugLog('[CRIAR_PEDIDO] Cliente encontrado: ' . $clienteId);
             } else {
                 // Usar estrutura REAL da tabela clientes
                 $stmt = $db->prepare("INSERT INTO clientes (usuario_id, nome_razao_social, cpf_cnpj, telefone, email) VALUES (?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
-                    'DOC' . time(), // CPF/CNPJ temporário
+                    $usuario['documento'] ?? 'DOC' . time(),
                     $usuario['telefone'] ?? '',
                     $usuario['email']
                 ]);
                 $clienteId = $db->lastInsertId();
-                error_log('🔍 [CRIAR_PEDIDO] Cliente criado com estrutura real: ' . $clienteId);
+                $this->debugLog('[CRIAR_PEDIDO] Cliente criado com estrutura real: ' . $clienteId);
             }
             
             // 3. Validar IDs antes de continuar
@@ -530,13 +543,13 @@ class CheckoutController extends Controller {
             
             // Obter moeda selecionada pelo cliente
             $moedaSelecionada = $dados['moeda'] ?? 'USD';
-            error_log('🔍 [CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
+            $this->debugLog('[CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
             
             // Calcular totais
             $subtotal = 0;
             $pesoTotal = 0;
             
-            error_log('🔍 [CRIAR_PEDIDO] Calculando totais...');
+            $this->debugLog('[CRIAR_PEDIDO] Calculando totais...');
             
             foreach ($carrinho as $item) {
                 // Verificar diferentes campos de preço
@@ -550,12 +563,12 @@ class CheckoutController extends Controller {
                 $pesoArredondado = ceil($pesoItem); // Arredondar para cima
                 $pesoTotal += $pesoArredondado;
                 
-                error_log('🔍 [CRIAR_PEDIDO] Item processado: ' . json_encode($item));
-                error_log('🔍 [CRIAR_PEDIDO] Preço unitário: ' . $precoUnitario . ', Quantidade: ' . $quantidade . ', Peso item: ' . $pesoItem . ', Peso arredondado: ' . $pesoArredondado);
+                $this->debugLog('[CRIAR_PEDIDO] Item processado: ' . json_encode($item));
+                $this->debugLog('[CRIAR_PEDIDO] Preco unitario: ' . $precoUnitario . ', Quantidade: ' . $quantidade . ', Peso item: ' . $pesoItem . ', Peso arredondado: ' . $pesoArredondado);
             }
             
-            error_log('🔍 [CRIAR_PEDIDO] Subtotal: ' . $subtotal);
-            error_log('🔍 [CRIAR_PEDIDO] Peso total: ' . $pesoTotal);
+            $this->debugLog('[CRIAR_PEDIDO] Subtotal: ' . $subtotal);
+            $this->debugLog('[CRIAR_PEDIDO] Peso total: ' . $pesoTotal);
             
             // Taxas baseadas na moeda selecionada
             if ($moedaSelecionada === 'BRL') {
@@ -566,7 +579,7 @@ class CheckoutController extends Controller {
                 $frete = (($pesoTotal * 15) * $taxaConversao > 0) ? ($pesoTotal * 15) * $taxaConversao : 0; // Converter para BRL
                 $total = $subtotal + $taxaServico + $impostos + $frete;
                 
-                error_log('🔍 [CRIAR_PEDIDO] Cálculo em BRL - Taxa conversão: ' . $taxaConversao);
+                $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL - Taxa conversao: ' . $taxaConversao);
             } else {
                 // Valores em USD (padrão)
                 $taxaConversao = 1.0;
@@ -575,21 +588,21 @@ class CheckoutController extends Controller {
                 $frete = ($pesoTotal * 15 > 0) ? $pesoTotal * 15 : 0; // US$15 por kg ou grátis se 0
                 $total = $subtotal + $taxaServico + $impostos + $frete;
                 
-                error_log('🔍 [CRIAR_PEDIDO] Cálculo em USD - Taxa conversão: ' . $taxaConversao);
+                $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
             }
             
-            error_log('🔍 [CRIAR_PEDIDO] Taxa de serviço: ' . $taxaServico);
-            error_log('🔍 [CRIAR_PEDIDO] Impostos: ' . $impostos);
-            error_log('🔍 [CRIAR_PEDIDO] Frete: ' . $frete . ' (' . (($frete == 0) ? 'GRÁTIS' : 'PAGO') . ')');
-            error_log('🔍 [CRIAR_PEDIDO] Total: ' . $total);
+            $this->debugLog('[CRIAR_PEDIDO] Taxa de servico: ' . $taxaServico);
+            $this->debugLog('[CRIAR_PEDIDO] Impostos: ' . $impostos);
+            $this->debugLog('[CRIAR_PEDIDO] Frete: ' . $frete . ' (' . (($frete == 0) ? 'GRATIS' : 'PAGO') . ')');
+            $this->debugLog('[CRIAR_PEDIDO] Total: ' . $total);
             
             // Criar número do pedido
             $numeroPedido = 'BZS' . date('YmdHis') . rand(1000, 9999);
-            error_log('🔍 [CRIAR_PEDIDO] Número do pedido: ' . $numeroPedido);
+            $this->debugLog('[CRIAR_PEDIDO] Numero do pedido: ' . $numeroPedido);
             
             // Inserir pedido com todos os campos originais
             $db = \Config\Database::getConnection();
-            error_log('🔍 [CRIAR_PEDIDO] Conexão com banco obtida');
+            $this->debugLog('[CRIAR_PEDIDO] Conexao com banco obtida');
             
             $sql = "INSERT INTO pedidos (
                 usuario_id, nome, numero_pedido, cliente_id, status, 
@@ -599,7 +612,7 @@ class CheckoutController extends Controller {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
-            error_log('🔍 [CRIAR_PEDIDO] SQL preparado');
+            $this->debugLog('[CRIAR_PEDIDO] SQL preparado');
             
             $params = [
                 $usuarioId,
@@ -620,19 +633,19 @@ class CheckoutController extends Controller {
                 $dados['observacoes'] ?? ''
             ];
             
-            error_log('🔍 [CRIAR_PEDIDO] Parâmetros: ' . json_encode($params));
+            $this->debugLog('[CRIAR_PEDIDO] Parametros: ' . json_encode($params));
             
             $stmt->execute($params);
-            error_log('🔍 [CRIAR_PEDIDO] Query executado com sucesso');
+            $this->debugLog('[CRIAR_PEDIDO] Query executado com sucesso');
             
             $pedidoId = $db->lastInsertId();
-            error_log('🔍 [CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
+            $this->debugLog('[CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
             
             return $pedidoId;
             
         } catch (\Exception $e) {
-            error_log('❌ [CRIAR_PEDIDO] Erro ao criar pedido: ' . $e->getMessage());
-            error_log('❌ [CRIAR_PEDIDO] Stack: ' . $e->getTraceAsString());
+            $this->debugLog('[CRIAR_PEDIDO] Erro ao criar pedido: ' . $e->getMessage());
+            $this->debugLog('[CRIAR_PEDIDO] Stack: ' . $e->getTraceAsString());
             
             // Retornar JSON válido em caso de erro
             $this->json([

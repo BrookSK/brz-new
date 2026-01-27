@@ -6,19 +6,32 @@ use App\Core\Url;
 class Produto extends Model {
     protected $table = 'produtos';
 
+    private function debugLog(string $message): void {
+        $enabled = false;
+        if (isset($_ENV['APP_DEBUG'])) {
+            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+        }
+
+        if ($enabled) {
+            error_log($message);
+        }
+    }
+
     public function __construct() {
         parent::__construct();
     }
     
     public function find($id) {
-        error_log('🔍 [PRODUTO-MODEL] Buscando produto ID: ' . $id);
+        $this->debugLog('[PRODUTO-MODEL] Buscando produto ID: ' . $id);
         
         $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} WHERE id = :id");
         $stmt->bindParam(':id', $id);
         $stmt->execute();
         $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        error_log('🔍 [PRODUTO-MODEL] Produto bruto do banco: ' . print_r($produto, true));
+        $this->debugLog('[PRODUTO-MODEL] Produto bruto do banco: ' . print_r($produto, true));
         
         if ($produto) {
             // Mapear campos do banco para o frontend
@@ -59,10 +72,10 @@ class Produto extends Model {
                 'published_at' => $produto['published_at'] ?? null
             ];
             
-            error_log('🔍 [PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
+            $this->debugLog('[PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
             return $produtoMapeado;
         } else {
-            error_log('🔍 [PRODUTO-MODEL] Produto ID ' . $id . ' não encontrado no banco');
+            $this->debugLog('[PRODUTO-MODEL] Produto ID ' . $id . ' nao encontrado no banco');
         }
         
         return null;
