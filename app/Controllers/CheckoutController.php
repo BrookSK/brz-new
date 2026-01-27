@@ -24,6 +24,45 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function getTaxaServicoPorKg(): float {
+        return floatval($this->getConfigValue('entrega_taxa_servico_kg', '39'));
+    }
+
+    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
+        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
+        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
+        if (!$calcularAutomatico) {
+            return 0.0;
+        }
+
+        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
+        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
+            return 0.0;
+        }
+
+        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
+        if ($fretePorKg <= 0) {
+            return 0.0;
+        }
+
+        $pesoArredondado = ceil($pesoTotal);
+        return $fretePorKg * $pesoArredondado;
+    }
+
     private function debugLog(string $message): void {
         $enabled = false;
         if (isset($_ENV['APP_DEBUG'])) {
@@ -91,6 +130,11 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT_INDEX] Item: ' . json_encode($item));
             $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
+
+        $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, $_GET['moeda'] ?? 'USD');
+        $impostos = $subtotal * 0.80;
+        $total = $subtotal + $frete + $taxaServico + $impostos;
         
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
@@ -100,7 +144,11 @@ class CheckoutController extends Controller {
             'usuario' => $usuario,
             'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [],
             'moeda' => $_GET['moeda'] ?? 'USD', // Obter moeda da URL ou padrão USD
-            'frete_gratis' => ($pesoTotal * 15 == 0) // Verificar se frete é grátis
+            'frete' => $frete,
+            'taxa_servico' => $taxaServico,
+            'impostos' => $impostos,
+            'total' => $total,
+            'frete_gratis' => ($frete == 0)
         ]);
     }
     
@@ -585,18 +633,19 @@ class CheckoutController extends Controller {
             if ($moedaSelecionada === 'BRL') {
                 // Valores em BRL (convertidos)
                 $taxaConversao = 5.50; // Taxa de conversão USD para BRL
-                $taxaServico = ($pesoTotal * 39) * $taxaConversao; // Converter para BRL
+                $taxaServico = (ceil($pesoTotal) * $this->getTaxaServicoPorKg()) * $taxaConversao; // Converter para BRL
                 $impostos = $subtotal * 0.80; // Já está em BRL
-                $frete = (($pesoTotal * 15) * $taxaConversao > 0) ? ($pesoTotal * 15) * $taxaConversao : 0; // Converter para BRL
+                $freteUSD = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+                $frete = ($freteUSD > 0) ? ($freteUSD * $taxaConversao) : 0;
                 $total = $subtotal + $taxaServico + $impostos + $frete;
                 
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL - Taxa conversao: ' . $taxaConversao);
             } else {
                 // Valores em USD (padrão)
                 $taxaConversao = 1.0;
-                $taxaServico = $pesoTotal * 39; // US$39 por kg
+                $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
                 $impostos = $subtotal * 0.80; // 80%
-                $frete = ($pesoTotal * 15 > 0) ? $pesoTotal * 15 : 0; // US$15 por kg ou grátis se 0
+                $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
                 $total = $subtotal + $taxaServico + $impostos + $frete;
                 
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);

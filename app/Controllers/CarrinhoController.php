@@ -12,6 +12,41 @@ class CarrinhoController extends Controller {
     private $produtoFotoModel;
     private $authService;
 
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
+        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
+        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
+        if (!$calcularAutomatico) {
+            return 0.0;
+        }
+
+        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
+        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
+            return 0.0;
+        }
+
+        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
+        if ($fretePorKg <= 0) {
+            return 0.0;
+        }
+
+        $pesoArredondado = ceil($pesoTotal);
+        return $fretePorKg * $pesoArredondado;
+    }
+
     private function debugLog(string $message): void {
         $enabled = false;
         if (isset($_ENV['APP_DEBUG'])) {
@@ -95,7 +130,7 @@ class CarrinhoController extends Controller {
         $pesoArredondado = ceil($pesoTotal); // Arredondar para cima
         $taxaServico = $pesoArredondado * 39; // US$39 por kg arredondado
         $impostos = $subtotal * 0.80; // 80% de impostos
-        $frete = $pesoArredondado * 15; // US$15 por kg arredondado
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
         
@@ -315,20 +350,19 @@ class CarrinhoController extends Controller {
         
         // Arredondar peso para cima (ex: 1.7kg → 2kg)
         $pesoArredondado = ceil($pesoTotal);
+
+        // Calcular subtotal
+        $subtotal = 0;
+        foreach ($carrinho as $item) {
+            $subtotal += floatval($item['subtotal']);
+        }
         
         // Taxas fixas
         $taxaServicoPorKg = 39; // USD por kg
         $taxaServico = $taxaServicoPorKg * $pesoArredondado;
         
         // Frete baseado no peso arredondado
-        $fretePorKg = 15; // USD por kg
-        $frete = $fretePorKg * $pesoArredondado;
-        
-        // Calcular subtotal
-        $subtotal = 0;
-        foreach ($carrinho as $item) {
-            $subtotal += floatval($item['subtotal']);
-        }
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
         
         // Impostos (80% sobre subtotal + taxa de serviço)
         $impostos = ($subtotal + $taxaServico) * 0.8;

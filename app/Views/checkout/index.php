@@ -295,17 +295,17 @@
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
-                                    <span id="frete" class="cart-currency" data-original-value="<?= $peso_total * 15 ?>">
-                                        <?= ($peso_total * 15 == 0) ? 'GRÁTIS' : '$' . number_format($peso_total * 15, 2, '.', ',') ?>
+                                    <span id="frete" class="cart-currency" data-original-value="<?= $frete ?? 0 ?>">
+                                        <?= (($frete ?? 0) == 0) ? 'GRÁTIS' : '$' . number_format(($frete ?? 0), 2, '.', ',') ?>
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
-                                    <span id="taxa-servico" class="cart-currency" data-original-value="<?= $peso_total * 39 ?>"><?= number_format($peso_total * 39, 2, '.', ',') ?></span>
+                                    <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
-                                    <span id="impostos" class="cart-currency" data-original-value="<?= $subtotal * 0.80 ?>"><?= number_format($subtotal * 0.80, 2, '.', ',') ?></span>
+                                    <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                 </div>
                             </div>
 
@@ -313,7 +313,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6>Total:</h6>
-                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80) ?>"><?= number_format($subtotal + ($peso_total * 15) + ($peso_total * 39) + ($subtotal * 0.80), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0))), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
@@ -827,9 +827,9 @@ function updatePrices(currency) {
     // Valores originais em USD (fixos)
     const originalValues = {
         subtotal: <?= $subtotal ?>,
-        frete: <?= ($peso_total * 15 > 0) ? $peso_total * 15 : 0 ?>,
-        taxaServico: <?= $peso_total * 39 ?>,
-        impostos: <?= $subtotal * 0.80 ?>
+        frete: <?= ($frete ?? 0) ?>,
+        taxaServico: <?= ($taxa_servico ?? 0) ?>,
+        impostos: <?= ($impostos ?? 0) ?>
     };
     
     console.log('🔍 [MOEDA] Valores originais:', originalValues);
