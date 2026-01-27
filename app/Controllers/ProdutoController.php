@@ -28,18 +28,23 @@ class ProdutoController extends Controller {
             $produtos = $this->produtoModel->getAllWithCategoria();
         }
         
-        // Adicionar fotos principais aos produtos
+        // Adicionar foto de capa (produtos.foto_principal) com fallback para galeria
         foreach ($produtos as &$produto) {
-            $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
-            
-            // Validar e corrigir URL da foto
-            if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
-                $fotoUrl = $fotoPrincipal['nome_arquivo'];
-                
-                // Verificar se arquivo existe fisicamente
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
+            $capa = $produto['foto_principal'] ?? null;
+            if (!empty($capa)) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capa, '/');
                 if (file_exists($filePath)) {
-                    $produto['foto_principal'] = Url::absolute($fotoUrl);
+                    $produto['foto_principal'] = Url::absolute((string) $capa);
+                    continue;
+                }
+            }
+
+            $fotoGaleria = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
+            if ($fotoGaleria && !empty($fotoGaleria['nome_arquivo'])) {
+                $fotoUrl = $fotoGaleria['nome_arquivo'];
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $fotoUrl, '/');
+                if (file_exists($filePath)) {
+                    $produto['foto_principal'] = Url::absolute((string) $fotoUrl);
                 } else {
                     $produto['foto_principal'] = null;
                 }
@@ -74,18 +79,26 @@ class ProdutoController extends Controller {
         
         // Obter fotos do produto (galeria completa)
         $fotos = $this->produtoModel->getImagens($produtoId);
+
+        // Foto principal no detalhe: priorizar capa do produto
         $fotoPrincipal = null;
-        
-        // Encontrar foto principal
-        if (!empty($fotos)) {
+        $capa = $produto['foto_principal'] ?? null;
+        if (!empty($capa)) {
+            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capa, '/');
+            if (file_exists($filePath)) {
+                $fotoPrincipal = ['nome_arquivo' => (string) $capa, 'principal' => true];
+            }
+        }
+
+        // Fallback: usar principal da galeria (ou primeira)
+        if (!$fotoPrincipal && !empty($fotos)) {
             foreach ($fotos as $foto) {
-                if ($foto['principal']) {
+                if (!empty($foto['principal'])) {
                     $fotoPrincipal = $foto;
                     break;
                 }
             }
-            // Se não tiver principal, usa a primeira
-            if (!$fotoPrincipal && !empty($fotos)) {
+            if (!$fotoPrincipal) {
                 $fotoPrincipal = $fotos[0];
             }
         }

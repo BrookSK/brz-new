@@ -65,6 +65,10 @@ class AdminProdutosController extends Controller {
         return null;
     }
 
+    private function isAjaxRequest(): bool {
+        return (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+    }
+
     private function getTableColumns(\PDO $pdo, string $table): array {
         $cols = [];
         try {
@@ -237,22 +241,30 @@ class AdminProdutosController extends Controller {
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            // Buscar imagens
+            // Buscar imagens (priorizar capa do produto)
             foreach ($produtos as &$produto) {
-                $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = :produto_id ORDER BY principal DESC LIMIT 1");
+                $produto['imagem'] = Url::absolute('/uploads/produtos/placeholder.jpg');
+
+                $fotoCapa = $produto['foto_principal'] ?? null;
+                if (!empty($fotoCapa)) {
+                    $filePath = $this->resolveUploadsPublicPath((string) $fotoCapa);
+                    if ($filePath) {
+                        $produto['imagem'] = Url::absolute((string) $fotoCapa);
+                        continue;
+                    }
+                }
+
+                // fallback: primeira foto da galeria (se existir)
+                $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = :produto_id ORDER BY ordem ASC, id ASC LIMIT 1");
                 $stmtFotos->bindParam(':produto_id', $produto['id']);
                 $stmtFotos->execute();
                 $foto = $stmtFotos->fetch(\PDO::FETCH_ASSOC);
 
-                if ($foto && $foto['nome_arquivo']) {
+                if ($foto && !empty($foto['nome_arquivo'])) {
                     $filePath = $this->resolveUploadsPublicPath($foto['nome_arquivo']);
                     if ($filePath) {
                         $produto['imagem'] = Url::absolute($foto['nome_arquivo']);
-                    } else {
-                        $produto['imagem'] = 'https://via.placeholder.com/300x200?text=Arquivo+Não+Encontrado';
                     }
-                } else {
-                    $produto['imagem'] = 'https://via.placeholder.com/300x200?text=Sem+Imagem';
                 }
             }
 
@@ -468,7 +480,12 @@ HTML;
                                         </select>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Imagens</label>
+                                        <label class="form-label">Foto de Capa</label>
+                                        <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
+                                        <div id="capaPreview" class="row mt-3"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Galeria de Fotos</label>
                                         <input type="file" class="form-control" name="imagens[]" multiple accept="image/*" id="imagensInput">
                                         <div id="imagePreview" class="row mt-3"></div>
                                     </div>
@@ -544,24 +561,49 @@ HTML;
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Preview de imagens ao selecionar
-        document.getElementById(\'imagensInput\').addEventListener(\'change\', function(e) {
-            const preview = document.getElementById(\'imagePreview\');
-            preview.innerHTML = \'\';
-            
-            Array.from(e.target.files).forEach((file, index) => {
-                if (file.type.startsWith(\'image/\')) {
+        // Preview de capa ao selecionar
+        var capaInput = document.getElementById('capaInput');
+        if (capaInput) {
+            capaInput.addEventListener('change', function(e) {
+                const preview = document.getElementById('capaPreview');
+                if (!preview) return;
+                preview.innerHTML = '';
+
+                const file = (e.target.files || [])[0];
+                if (file && file.type.startsWith('image/')) {
                     const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const div = document.createElement(\'div\');
-                        div.className = \'col-md-3 mb-2\';
-                        div.innerHTML = \'<img src="\' + e.target.result + \'" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover;">\';
+                    reader.onload = function(ev) {
+                        const div = document.createElement('div');
+                        div.className = 'col-md-4 mb-2';
+                        div.innerHTML = '<img src="' + ev.target.result + '" class="img-thumbnail" style="width: 100%; height: 200px; object-fit: cover;">';
                         preview.appendChild(div);
                     };
                     reader.readAsDataURL(file);
                 }
             });
-        });
+        }
+
+        // Preview de imagens ao selecionar
+        var imagensInput = document.getElementById('imagensInput');
+        if (imagensInput) {
+            imagensInput.addEventListener('change', function(e) {
+                const preview = document.getElementById('imagePreview');
+                if (!preview) return;
+                preview.innerHTML = '';
+
+                Array.from(e.target.files || []).forEach((file) => {
+                    if (!file.type || !file.type.startsWith('image/')) return;
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        const div = document.createElement('div');
+                        div.className = 'col-md-3 mb-2';
+                        div.innerHTML = '<img src="' + ev.target.result + '" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover;">';
+                        preview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+        }
 
         // Busca no select de NCM
         (function() {
@@ -655,8 +697,28 @@ HTML;
             $stmt->execute();
             
             $produto_id = $pdo->lastInsertId();
+
+            // Processar foto de capa
+            if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                $name = $_FILES['capa']['name'];
+                $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                $fileName = time() . '_' . $fileName;
+                $filePath = $uploadDir . $fileName;
+                $webPath = $webDir . $fileName;
+
+                if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                    if (in_array('foto_principal', $cols, true)) {
+                        $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                        $stmtCover->execute([$webPath, $produto_id]);
+                    }
+                }
+            }
             
-            // Processar imagens
+            // Processar galeria de imagens
             if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
                 $uploadDir = $this->getProdutoUploadsDir();
                 $webDir = '/uploads/produtos/';
@@ -680,7 +742,7 @@ HTML;
                                 $produto_id,
                                 $webPath,
                                 $name,
-                                $key === 0 ? 1 : 0,
+                                0,
                                 $key
                             ]);
                             
@@ -752,6 +814,16 @@ HTML;
 
         renderAdminSidebar('produtos');
 
+        $fotoCapa = $produto['foto_principal'] ?? null;
+        $fotoCapaPath = null;
+        $fotoCapaUrl = null;
+        if (!empty($fotoCapa)) {
+            $fotoCapaPath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $fotoCapa, '/');
+            if (file_exists($fotoCapaPath)) {
+                $fotoCapaUrl = Url::absolute((string) $fotoCapa);
+            }
+        }
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Editar Produto</h1>
@@ -777,8 +849,11 @@ HTML;
                                             <option value="">Selecione...</option>';
 
         if (!empty($lojas)) {
+            $produtoLoja = trim((string) ($produto['loja'] ?? ''));
             foreach ($lojas as $l) {
-                $selected = (($produto['loja'] ?? '') === ($l['slug'] ?? '')) ? 'selected' : '';
+                $lojaSlug = (string) ($l['slug'] ?? '');
+                $lojaId = (string) ($l['id'] ?? '');
+                $selected = ($produtoLoja !== '' && ($produtoLoja === $lojaSlug || $produtoLoja === $lojaId)) ? 'selected' : '';
                 echo '<option value="' . htmlspecialchars($l['slug']) . '" ' . $selected . '>' . htmlspecialchars($l['nome']) . '</option>';
             }
         } else {
@@ -826,21 +901,55 @@ HTML;
         echo '                        </select>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Foto de Capa</label>
+                                        <div class="row mb-3">';
+
+        if (!empty($fotoCapaUrl)) {
+            echo '<div class="col-6 col-md-3 mb-2">
+                    <a href="' . $fotoCapaUrl . '" target="_blank">
+                        <img src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    </a>
+                </div>';
+        } else {
+            echo '<div class="col-6 col-md-3 mb-2">
+                    <img src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                </div>';
+        }
+
+        echo '</div>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="file" class="form-control" name="capa" accept="image/*">
+                                            <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/remover-capa/' . (int) $id . '" formmethod="POST" formnovalidate ' . (!empty($fotoCapaUrl) ? '' : 'disabled') . '>Remover capa</button>
+                                        </div>
+                                        <small class="text-muted">A foto de capa é usada como imagem principal do produto</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Galeria de Fotos</label>
                                         <div class="row mb-3">';
 
         foreach ($fotos as $foto) {
             $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
-            $imageUrl = file_exists($filePath) ? Url::absolute($foto['nome_arquivo']) : 'https://via.placeholder.com/100x100?text=Erro';
+            $imageUrl = file_exists($filePath) ? Url::absolute($foto['nome_arquivo']) : Url::absolute('/uploads/produtos/placeholder.jpg');
+            $fotoId = (int) ($foto['id'] ?? 0);
+            $ordem = (int) ($foto['ordem'] ?? 0);
             echo '<div class="col-6 col-md-2 mb-2">
                     <a href="' . $imageUrl . '" target="_blank">
                         <img src="' . $imageUrl . '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">
                     </a>
+                    <div class="mt-2">
+                        <input type="number" class="form-control form-control-sm" name="ordens[' . $fotoId . ']" value="' . $ordem . '" min="0">
+                    </div>
+                    <div class="mt-2">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/remover-foto/' . $fotoId . '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto?\')">Remover</button>
+                    </div>
                 </div>';
         }
 
         echo '                        </div>
-                                        <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/galeria/ordem/' . (int) $id . '" formmethod="POST" formnovalidate>Salvar ordem</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -989,6 +1098,24 @@ HTML;
                 $request->getParam('featured') ?: 0,
                 $id
             ]);
+
+            // Atualizar foto de capa (se enviada)
+            if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                $name = $_FILES['capa']['name'];
+                $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                $fileName = time() . '_' . $fileName;
+                $filePath = $uploadDir . $fileName;
+                $webPath = $webDir . $fileName;
+
+                if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                    $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                    $stmtCover->execute([$webPath, $id]);
+                }
+            }
             
             // Processar novas imagens
             if (isset($_FILES['imagens'])) {
@@ -1014,7 +1141,7 @@ HTML;
                                 $id,
                                 $webPath,
                                 $name,
-                                0, // Não é principal por padrão
+                                0, // Galeria: não é principal
                                 $key
                             ]);
                         }
@@ -1053,15 +1180,84 @@ HTML;
                 $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE id = ?");
                 $stmt->execute([$fotoId]);
                 
-                header('Content-Type: application/json');
-                echo json_encode(['success' => true]);
+                if ($this->isAjaxRequest()) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true]);
+                } else {
+                    header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+                }
             } else {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Foto não encontrada']);
+                if ($this->isAjaxRequest()) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Foto não encontrada']);
+                } else {
+                    header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+                }
             }
         } catch (\Exception $e) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            if ($this->isAjaxRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            } else {
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            }
+        }
+    }
+
+    public function removerCapa(Request $request, $id = null) {
+        $id = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $stmt = $pdo->prepare('SELECT foto_principal FROM produtos WHERE id = ?');
+            $stmt->execute([$id]);
+            $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if ($produto && !empty($produto['foto_principal'])) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $produto['foto_principal'], '/');
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+            }
+
+            $stmt = $pdo->prepare('UPDATE produtos SET foto_principal = NULL WHERE id = ?');
+            $stmt->execute([$id]);
+
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? ('/admin/produtos/editar/' . $id)));
+            exit;
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+    }
+
+    public function salvarOrdemGaleria(Request $request, $id = null) {
+        $id = (int) ($id ?? $request->getParam('id'));
+        $ordens = $request->getParam('ordens', []);
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (is_array($ordens)) {
+                foreach ($ordens as $fotoId => $ordem) {
+                    $fotoId = (int) $fotoId;
+                    $ordem = (int) $ordem;
+                    if ($fotoId <= 0) {
+                        continue;
+                    }
+                    $stmt = $pdo->prepare('UPDATE produto_fotos SET ordem = ? WHERE id = ? AND produto_id = ?');
+                    $stmt->execute([$ordem, $fotoId, $id]);
+                }
+            }
+
+            $pdo->commit();
+            header('Location: /admin/produtos/editar/' . $id);
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo)) {
+                $pdo->rollBack();
+            }
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
         }
     }
     

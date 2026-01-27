@@ -258,6 +258,15 @@ class AdminDashboardController extends Controller {
                             
                             if (!empty($pedidos_recentes)) {
                                 foreach ($pedidos_recentes as $pedido) {
+                                    $valorTotalPedido = 0;
+                                    if (isset($pedido['valor_total'])) {
+                                        $valorTotalPedido = floatval($pedido['valor_total']);
+                                    } elseif (isset($pedido['total'])) {
+                                        $valorTotalPedido = floatval($pedido['total']);
+                                    } elseif (isset($pedido['valor'])) {
+                                        $valorTotalPedido = floatval($pedido['valor']);
+                                    }
+
                                     echo '<div class="d-flex justify-content-between align-items-center mb-2">
                                         <div>
                                             <strong>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</strong> - ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '
@@ -265,7 +274,7 @@ class AdminDashboardController extends Controller {
                                         </div>
                                         <div class="text-end">
                                             <span class="badge bg-' . ($pedido['status'] == 'pago' ? 'success' : 'warning') . '">' . ucfirst($pedido['status']) . '</span>
-                                            <br><strong>R$ ' . number_format($pedido['valor_total'], 2, ',', '.') . '</strong>
+                                            <br><strong>R$ ' . number_format($valorTotalPedido, 2, ',', '.') . '</strong>
                                         </div>
                                     </div>';
                                 }

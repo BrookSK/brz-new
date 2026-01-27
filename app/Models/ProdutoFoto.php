@@ -3,6 +3,19 @@ namespace App\Models;
 
 class ProdutoFoto extends Model {
     protected $table = 'produto_fotos';
+
+    private function normalizeNomeArquivo($nomeArquivo): ?string {
+        $nomeArquivo = is_string($nomeArquivo) ? trim($nomeArquivo) : '';
+        if ($nomeArquivo === '') {
+            return null;
+        }
+
+        if (str_starts_with($nomeArquivo, '/')) {
+            return $nomeArquivo;
+        }
+
+        return '/uploads/produtos/' . ltrim($nomeArquivo, '/');
+    }
     
     public function getFotosProduto($produtoId) {
         $stmt = $this->connection->prepare("
@@ -12,7 +25,13 @@ class ProdutoFoto extends Model {
         ");
         $stmt->bindParam(':produto_id', $produtoId);
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $fotos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($fotos as &$foto) {
+            if (array_key_exists('nome_arquivo', $foto)) {
+                $foto['nome_arquivo'] = $this->normalizeNomeArquivo($foto['nome_arquivo']);
+            }
+        }
+        return $fotos;
     }
     
     public function getFotoPrincipal($produtoId) {
@@ -23,7 +42,11 @@ class ProdutoFoto extends Model {
         ");
         $stmt->bindParam(':produto_id', $produtoId);
         $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
+        $foto = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($foto && array_key_exists('nome_arquivo', $foto)) {
+            $foto['nome_arquivo'] = $this->normalizeNomeArquivo($foto['nome_arquivo']);
+        }
+        return $foto;
     }
     
     public function adicionarFoto($produtoId, $nomeArquivo, $arquivoOriginal = null, $legenda = null, $principal = false) {
@@ -145,8 +168,9 @@ class ProdutoFoto extends Model {
         }
         
         // Excluir arquivo físico (se existir)
-        $caminhoArquivo = $_SERVER['DOCUMENT_ROOT'] . '/uploads/produtos/' . $foto['nome_arquivo'];
-        if (file_exists($caminhoArquivo)) {
+        $nomeArquivo = $this->normalizeNomeArquivo($foto['nome_arquivo'] ?? '');
+        $caminhoArquivo = $nomeArquivo ? ($_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($nomeArquivo, '/')) : null;
+        if ($caminhoArquivo && file_exists($caminhoArquivo)) {
             unlink($caminhoArquivo);
             error_log('🔍 [PRODUTO-FOTO] Arquivo físico excluído: ' . $caminhoArquivo);
         } else {

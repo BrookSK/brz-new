@@ -491,7 +491,17 @@ class CheckoutController extends Controller {
             $db = \Config\Database::getConnection();
             
             if (empty($usuario) || empty($usuario['email'])) {
-                throw new \Exception('Dados do usuário são obrigatórios para criar pedido');
+                $usuario = [
+                    'nome' => $dados['nome'] ?? 'Cliente',
+                    'email' => $dados['email'] ?? null,
+                    'documento' => $dados['documento'] ?? null,
+                    'telefone' => $dados['telefone'] ?? null,
+                    'senha' => $dados['senha'] ?? null,
+                ];
+            }
+
+            if (empty($usuario['email'])) {
+                throw new \Exception('E-mail é obrigatório para criar pedido');
             }
             
             // 1. Buscar/criar usuário na tabela usuarios
@@ -504,11 +514,12 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CRIAR_PEDIDO] Usuario encontrado: ' . $usuarioId);
             } else {
                 $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
+                $senhaPlano = $usuario['senha'] ?? 'temp123';
                 $stmt->execute([
                     $usuario['nome'] ?? 'Cliente',
                     $usuario['email'],
-                    password_hash('temp123', PASSWORD_DEFAULT),
-                    'DOC' . time()
+                    password_hash((string) $senhaPlano, PASSWORD_DEFAULT),
+                    $usuario['documento'] ?? ('DOC' . time())
                 ]);
                 $usuarioId = $db->lastInsertId();
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
@@ -528,7 +539,7 @@ class CheckoutController extends Controller {
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
-                    $usuario['documento'] ?? 'DOC' . time(),
+                    $usuario['documento'] ?? ('DOC' . time()),
                     $usuario['telefone'] ?? '',
                     $usuario['email']
                 ]);

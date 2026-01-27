@@ -17,21 +17,19 @@
                 <!-- Foto Principal -->
                 <div class="main-image-container mb-3">
                     <?php 
-                    $fotoPrincipal = null;
-                    if (!empty($fotos)) {
+                    if (empty($fotoPrincipal) && !empty($fotos)) {
                         foreach ($fotos as $foto) {
-                            if ($foto['principal']) {
+                            if (!empty($foto['principal'])) {
                                 $fotoPrincipal = $foto;
                                 break;
                             }
                         }
-                        // Se não tiver principal, usa a primeira
-                        if (!$fotoPrincipal && !empty($fotos)) {
+                        if (empty($fotoPrincipal) && !empty($fotos)) {
                             $fotoPrincipal = $fotos[0];
                         }
                     }
-                    
-                    if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
+
+                    if (!empty($fotoPrincipal) && !empty($fotoPrincipal['nome_arquivo'])) {
                         $fotoUrl = $fotoPrincipal['nome_arquivo'];
                         $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
                         $fotoExists = file_exists($caminhoFisico);
@@ -221,24 +219,6 @@
         <h3 class="mb-4">Produtos Relacionados</h3>
         <div class="row">
             <?php foreach ($produtosRelacionados as $relacionado): ?>
-            <div class="col-md-3 col-sm-6 mb-4">
-                <div class="card h-100 product-card">
-                    <a href="/produto/detalhes/<?= $relacionado['id'] ?>" class="text-decoration-none">
-                        <div class="product-image-container">
-                            <?php 
-                            $relacionadoPath = '/uploads/produtos/' . ($relacionado['foto_principal'] ?? '');
-                            $relacionadoExists = !empty($relacionado['foto_principal']) && file_exists(__DIR__ . '/../../public' . $relacionadoPath);
-                            ?>
-                            <?php if ($relacionadoExists): ?>
-                                <img src="<?= Url::absolute($relacionadoPath) ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($relacionado['nome']) ?>"
-                                     class="card-img-top"
-                                     style="height: 150px; object-fit: cover;">
-                            <?php else: ?>
-                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 150px;">
-                                    <i class="fas fa-image text-muted fa-2x"></i>
-                                </div>
-                            <?php endif; ?>
                         </div>
                         <div class="card-body">
                             <h6 class="card-title text-dark"><?= htmlspecialchars($relacionado['nome']) ?></h6>

@@ -36,7 +36,7 @@
             </div>
             <div class="col-lg-6">
                 <div class="hero-image" data-aos="fade-left">
-                    <img src="https://via.placeholder.com/600x400/667eea/ffffff?text=Importação+Internacional" 
+                    <img src="/import.png" 
                          alt="Importação Internacional" 
                          class="img-fluid rounded-3 shadow-lg">
                 </div>
@@ -291,7 +291,7 @@ $(document).ready(function() {
                         <div class="col-lg-3 col-md-6">
                             <div class="product-card card h-100">
                                 <div class="position-relative overflow-hidden">
-                                    <img src="${produto.foto_principal || 'https://via.placeholder.com/300x200'}" 
+                                    <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
                                          class="product-image card-img-top">
                                     ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge bg-warning">Últimas unidades</span>' : ''}
