@@ -10,7 +10,19 @@ class AdminConfiguracoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Buscar configurações
-            $stmt = $pdo->query("SELECT chave, valor FROM configuracoes_sistema ORDER BY chave, updated_at ASC, id ASC");
+            $tableInfo = $this->getConfigTableInfo($pdo);
+            $table = $tableInfo['table'];
+            $keyCol = $tableInfo['keyCol'];
+            $valueCol = $tableInfo['valueCol'];
+            $orderBy = [$keyCol];
+            if (!empty($tableInfo['updatedAtCol'])) {
+                $orderBy[] = $tableInfo['updatedAtCol'] . ' ASC';
+            }
+            if (!empty($tableInfo['idCol'])) {
+                $orderBy[] = $tableInfo['idCol'] . ' ASC';
+            }
+            $sql = "SELECT {$keyCol} AS chave, {$valueCol} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
+            $stmt = $pdo->query($sql);
             $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // Organizar por categoria a partir do padrão categoria_chave
@@ -592,6 +604,12 @@ class AdminConfiguracoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
+
+            $tableInfo = $this->getConfigTableInfo($pdo);
+            $table = $tableInfo['table'];
+            $keyCol = $tableInfo['keyCol'];
+            $valueCol = $tableInfo['valueCol'];
+            $updatedAtCol = $tableInfo['updatedAtCol'];
             
             // Mapeamento de configurações
             $configMap = [
@@ -637,13 +655,22 @@ class AdminConfiguracoesController extends Controller {
                             $valor = is_numeric($valor) ? intval($valor) : 30;
                         }
                         
-                        // Atualizar ou inserir configuração (não depende de UNIQUE em chave)
+                        // Atualizar ou inserir configuração
                         $fullKey = $categoria . '_' . $chave;
-                        $stmtUpdate = $pdo->prepare("UPDATE configuracoes_sistema SET valor = ?, updated_at = NOW() WHERE chave = ?");
+
+                        if (!empty($updatedAtCol)) {
+                            $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ?, {$updatedAtCol} = NOW() WHERE {$keyCol} = ?");
+                        } else {
+                            $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$keyCol} = ?");
+                        }
                         $stmtUpdate->execute([$valor, $fullKey]);
 
                         if ($stmtUpdate->rowCount() === 0) {
-                            $stmtInsert = $pdo->prepare("INSERT INTO configuracoes_sistema (chave, valor, updated_at) VALUES (?, ?, NOW())");
+                            if (!empty($updatedAtCol)) {
+                                $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                            } else {
+                                $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                            }
                             $stmtInsert->execute([$fullKey, $valor]);
                         }
                     }
@@ -657,7 +684,15 @@ class AdminConfiguracoesController extends Controller {
             
         } catch (\Exception $e) {
             if (isset($pdo)) $pdo->rollBack();
-            echo '<div class="alert alert-danger">Erro ao salvar configurações: ' . $e->getMessage() . '</div>';
+            $schemaInfo = '';
+            try {
+                if (isset($pdo)) {
+                    $ti = $this->getConfigTableInfo($pdo);
+                    $schemaInfo = ' (tabela=' . htmlspecialchars((string) ($ti['table'] ?? '')) . ', chave=' . htmlspecialchars((string) ($ti['keyCol'] ?? '')) . ', valor=' . htmlspecialchars((string) ($ti['valueCol'] ?? '')) . ')';
+                }
+            } catch (\Exception $e2) {
+            }
+            echo '<div class="alert alert-danger">Erro ao salvar configurações: ' . $e->getMessage() . $schemaInfo . '</div>';
             echo '<a href="/admin/configuracoes" class="btn btn-secondary">Voltar</a>';
             exit;
         }
@@ -1008,5 +1043,76 @@ class AdminConfiguracoesController extends Controller {
             return (string) $config[$categoria][$chave];
         }
         return $default;
+    }
+
+    private function getConfigTableInfo(\PDO $pdo): array {
+        $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        $table = null;
+        foreach ($tableCandidates as $t) {
+            try {
+                $stmtTable = $pdo->prepare("SHOW TABLES LIKE ?");
+                $stmtTable->execute([$t]);
+                if ($stmtTable->fetchColumn()) {
+                    $table = $t;
+                    break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (!$table) {
+            throw new \Exception('Tabela de configurações não encontrada');
+        }
+
+        $stmt = $pdo->query('DESCRIBE ' . $table);
+        $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug'];
+        $valueCandidates = ['valor', 'value', 'conteudo', 'content', 'config_value'];
+        $updatedCandidates = ['updated_at', 'data_atualizacao', 'updated'];
+        $idCandidates = ['id'];
+
+        $keyCol = null;
+        foreach ($keyCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $keyCol = $c;
+                break;
+            }
+        }
+        $valueCol = null;
+        foreach ($valueCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $valueCol = $c;
+                break;
+            }
+        }
+
+        if (!$keyCol || !$valueCol) {
+            throw new \Exception('Tabela de configurações incompatível: colunas não encontradas');
+        }
+
+        $updatedAtCol = '';
+        foreach ($updatedCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $updatedAtCol = $c;
+                break;
+            }
+        }
+
+        $idCol = '';
+        foreach ($idCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $idCol = $c;
+                break;
+            }
+        }
+
+        return [
+            'table' => $table,
+            'keyCol' => $keyCol,
+            'valueCol' => $valueCol,
+            'updatedAtCol' => $updatedAtCol,
+            'idCol' => $idCol,
+        ];
     }
 }
