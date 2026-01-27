@@ -87,6 +87,24 @@ class ProdutoController extends Controller {
             $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capa, '/');
             if (file_exists($filePath)) {
                 $fotoPrincipal = ['nome_arquivo' => (string) $capa, 'principal' => true];
+
+                // Garantir capa como primeira imagem da galeria (para miniaturas/carrossel)
+                $jaExisteNaGaleria = false;
+                foreach ($fotos as $f) {
+                    if (!empty($f['nome_arquivo']) && (string) $f['nome_arquivo'] === (string) $capa) {
+                        $jaExisteNaGaleria = true;
+                        break;
+                    }
+                }
+                if (!$jaExisteNaGaleria) {
+                    array_unshift($fotos, [
+                        'nome_arquivo' => (string) $capa,
+                        'arquivo_original' => null,
+                        'legenda' => 'Capa',
+                        'ordem' => -1,
+                        'principal' => true
+                    ]);
+                }
             }
         }
 
@@ -111,11 +129,20 @@ class ProdutoController extends Controller {
         
         // Adicionar fotos principais aos relacionados
         foreach ($produtosRelacionados as &$relacionado) {
-            $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($relacionado['id']);
-            if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipal['nome_arquivo'], '/');
+            $capaRel = $relacionado['foto_principal'] ?? null;
+            if (!empty($capaRel)) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capaRel, '/');
                 if (file_exists($filePath)) {
-                    $relacionado['foto_principal'] = Url::absolute($fotoPrincipal['nome_arquivo']);
+                    $relacionado['foto_principal'] = Url::absolute((string) $capaRel);
+                    continue;
+                }
+            }
+
+            $fotoPrincipalRel = $this->produtoFotoModel->getFotoPrincipal($relacionado['id']);
+            if ($fotoPrincipalRel && !empty($fotoPrincipalRel['nome_arquivo'])) {
+                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipalRel['nome_arquivo'], '/');
+                if (file_exists($filePath)) {
+                    $relacionado['foto_principal'] = Url::absolute($fotoPrincipalRel['nome_arquivo']);
                 } else {
                     $relacionado['foto_principal'] = null;
                 }

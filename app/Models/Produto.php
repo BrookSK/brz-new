@@ -42,6 +42,7 @@ class Produto extends Model {
                 'sku' => $produto['sku'] ?? '',
                 'descricao' => $produto['description'] ?? '',
                 'descricao_curta' => $produto['short_description'] ?? '',
+                'foto_principal' => $produto['foto_principal'] ?? null,
                 'categoria_id' => $produto['category_id'] ?? 0,
                 'valor' => floatval($produto['price'] ?? 0),
                 'preco' => floatval($produto['price'] ?? 0), // Adicionar campo 'preco' para compatibilidade
