@@ -30,24 +30,16 @@ class ProdutoController extends Controller {
         
         // Adicionar foto de capa (produtos.foto_principal) com fallback para galeria
         foreach ($produtos as &$produto) {
-            $capa = $produto['foto_principal'] ?? null;
-            if (!empty($capa)) {
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capa, '/');
-                if (file_exists($filePath)) {
-                    $produto['foto_principal'] = Url::absolute((string) $capa);
-                    continue;
-                }
+            $capa = $this->normalizeProdutoImagemPath($produto['foto_principal'] ?? null);
+            if (!empty($capa) && $this->produtoImagemExiste($capa)) {
+                $produto['foto_principal'] = Url::absolute($capa);
+                continue;
             }
 
             $fotoGaleria = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
             if ($fotoGaleria && !empty($fotoGaleria['nome_arquivo'])) {
-                $fotoUrl = $fotoGaleria['nome_arquivo'];
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $fotoUrl, '/');
-                if (file_exists($filePath)) {
-                    $produto['foto_principal'] = Url::absolute((string) $fotoUrl);
-                } else {
-                    $produto['foto_principal'] = null;
-                }
+                $fotoUrl = $this->normalizeProdutoImagemPath($fotoGaleria['nome_arquivo']);
+                $produto['foto_principal'] = ($fotoUrl && $this->produtoImagemExiste($fotoUrl)) ? Url::absolute($fotoUrl) : null;
             } else {
                 $produto['foto_principal'] = null;
             }
@@ -82,29 +74,33 @@ class ProdutoController extends Controller {
 
         // Foto principal no detalhe: priorizar capa do produto
         $fotoPrincipal = null;
-        $capa = $produto['foto_principal'] ?? null;
-        if (!empty($capa)) {
-            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capa, '/');
-            if (file_exists($filePath)) {
-                $fotoPrincipal = ['nome_arquivo' => (string) $capa, 'principal' => true];
+        $capa = $this->normalizeProdutoImagemPath($produto['foto_principal'] ?? null);
+        if (!empty($capa) && $this->produtoImagemExiste($capa)) {
+            $fotoPrincipal = [
+                'nome_arquivo' => (string) $capa,
+                'principal' => true,
+                'arquivo_existe' => true,
+                'url_completa' => Url::absolute((string) $capa)
+            ];
 
-                // Garantir capa como primeira imagem da galeria (para miniaturas/carrossel)
-                $jaExisteNaGaleria = false;
-                foreach ($fotos as $f) {
-                    if (!empty($f['nome_arquivo']) && (string) $f['nome_arquivo'] === (string) $capa) {
-                        $jaExisteNaGaleria = true;
-                        break;
-                    }
+            // Garantir capa como primeira imagem da galeria (para miniaturas/carrossel)
+            $jaExisteNaGaleria = false;
+            foreach ($fotos as $f) {
+                if (!empty($f['nome_arquivo']) && (string) $f['nome_arquivo'] === (string) $capa) {
+                    $jaExisteNaGaleria = true;
+                    break;
                 }
-                if (!$jaExisteNaGaleria) {
-                    array_unshift($fotos, [
-                        'nome_arquivo' => (string) $capa,
-                        'arquivo_original' => null,
-                        'legenda' => 'Capa',
-                        'ordem' => -1,
-                        'principal' => true
-                    ]);
-                }
+            }
+            if (!$jaExisteNaGaleria) {
+                array_unshift($fotos, [
+                    'nome_arquivo' => (string) $capa,
+                    'arquivo_original' => null,
+                    'legenda' => 'Capa',
+                    'ordem' => -1,
+                    'principal' => true,
+                    'arquivo_existe' => true,
+                    'url_completa' => Url::absolute((string) $capa)
+                ]);
             }
         }
 
@@ -129,23 +125,16 @@ class ProdutoController extends Controller {
         
         // Adicionar fotos principais aos relacionados
         foreach ($produtosRelacionados as &$relacionado) {
-            $capaRel = $relacionado['foto_principal'] ?? null;
-            if (!empty($capaRel)) {
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $capaRel, '/');
-                if (file_exists($filePath)) {
-                    $relacionado['foto_principal'] = Url::absolute((string) $capaRel);
-                    continue;
-                }
+            $capaRel = $this->normalizeProdutoImagemPath($relacionado['foto_principal'] ?? null);
+            if (!empty($capaRel) && $this->produtoImagemExiste($capaRel)) {
+                $relacionado['foto_principal'] = Url::absolute((string) $capaRel);
+                continue;
             }
 
             $fotoPrincipalRel = $this->produtoFotoModel->getFotoPrincipal($relacionado['id']);
             if ($fotoPrincipalRel && !empty($fotoPrincipalRel['nome_arquivo'])) {
-                $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoPrincipalRel['nome_arquivo'], '/');
-                if (file_exists($filePath)) {
-                    $relacionado['foto_principal'] = Url::absolute($fotoPrincipalRel['nome_arquivo']);
-                } else {
-                    $relacionado['foto_principal'] = null;
-                }
+                $fotoUrl = $this->normalizeProdutoImagemPath($fotoPrincipalRel['nome_arquivo']);
+                $relacionado['foto_principal'] = ($fotoUrl && $this->produtoImagemExiste($fotoUrl)) ? Url::absolute($fotoUrl) : null;
             } else {
                 $relacionado['foto_principal'] = null;
             }
@@ -213,5 +202,39 @@ class ProdutoController extends Controller {
 
     public function adicionarAoCarrinho(Request $request) {
         $this->selecionar($request);
+    }
+
+    private function normalizeProdutoImagemPath($path): ?string {
+        if (!is_string($path)) {
+            return null;
+        }
+
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
+
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        if (strpos($path, '/uploads/') === 0) {
+            return $path;
+        }
+
+        return '/uploads/produtos/' . ltrim($path, '/');
+    }
+
+    private function produtoImagemExiste(string $path): bool {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+        if ($docRoot === '') {
+            return false;
+        }
+
+        $rel = '/' . ltrim($path, '/');
+        return (
+            file_exists($docRoot . $rel) ||
+            file_exists($docRoot . '/public' . $rel)
+        );
     }
 }
