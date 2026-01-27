@@ -850,10 +850,21 @@ HTML;
 
         if (!empty($lojas)) {
             $produtoLoja = trim((string) ($produto['loja'] ?? ''));
+            $produtoLojaNorm = strtolower($produtoLoja);
             foreach ($lojas as $l) {
                 $lojaSlug = (string) ($l['slug'] ?? '');
                 $lojaId = (string) ($l['id'] ?? '');
-                $selected = ($produtoLoja !== '' && ($produtoLoja === $lojaSlug || $produtoLoja === $lojaId)) ? 'selected' : '';
+                $lojaNome = (string) ($l['nome'] ?? '');
+
+                $lojaSlugNorm = strtolower(trim($lojaSlug));
+                $lojaIdNorm = strtolower(trim($lojaId));
+                $lojaNomeNorm = strtolower(trim($lojaNome));
+
+                $selected = ($produtoLojaNorm !== '' && (
+                    $produtoLojaNorm === $lojaSlugNorm ||
+                    $produtoLojaNorm === $lojaIdNorm ||
+                    $produtoLojaNorm === $lojaNomeNorm
+                )) ? 'selected' : '';
                 echo '<option value="' . htmlspecialchars($l['slug']) . '" ' . $selected . '>' . htmlspecialchars($l['nome']) . '</option>';
             }
         } else {
