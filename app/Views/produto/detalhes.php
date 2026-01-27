@@ -107,7 +107,18 @@
                 <!-- Preço -->
                 <div class="price-section mb-4">
                     <div class="current-price">
-                        <span class="currency"><?= $produto['moeda'] ?></span>
+                        <?php
+                        $currencySymbols = [
+                            'BRL' => 'R$',
+                            'USD' => '$',
+                            'EUR' => '€',
+                            'GBP' => '£',
+                            'JPY' => '¥',
+                        ];
+                        $currencyCode = strtoupper((string) ($produto['moeda'] ?? ''));
+                        $currencyLabel = $currencySymbols[$currencyCode] ?? $currencyCode;
+                        ?>
+                        <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
                         <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
                     </div>
                 </div>
@@ -233,7 +244,11 @@
                             <h6 class="card-title text-dark"><?= htmlspecialchars($relacionado['nome']) ?></h6>
                             <p class="card-text">
                                 <span class="text-primary fw-bold">
-                                    <?= $relacionado['moeda'] ?> <?= number_format($relacionado['preco'], 2, ',', '.') ?>
+                                    <?php
+                                    $relCurrencyCode = strtoupper((string) ($relacionado['moeda'] ?? ''));
+                                    $relCurrencyLabel = $currencySymbols[$relCurrencyCode] ?? $relCurrencyCode;
+                                    ?>
+                                    <?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format($relacionado['preco'], 2, ',', '.') ?>
                                 </span>
                             </p>
                         </div>

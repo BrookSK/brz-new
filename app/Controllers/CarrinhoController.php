@@ -188,6 +188,7 @@ class CarrinhoController extends Controller {
     }
 
     public function remover(Request $request) {
+        session_start();
         $produtoId = $request->getParam('id');
         
         if (!$produtoId) {
@@ -216,11 +217,18 @@ class CarrinhoController extends Controller {
     }
 
     public function atualizar(Request $request) {
+        session_start();
         $produtoId = $request->getParam('id');
         $quantidade = $request->getParam('quantidade');
         
         if (!$produtoId || !$quantidade) {
             $this->json(['error' => 'Dados incompletos'], 400);
+            return;
+        }
+
+        $quantidade = (int) $quantidade;
+        if ($quantidade < 1) {
+            $this->json(['error' => 'Quantidade inválida'], 400);
             return;
         }
         
@@ -232,9 +240,20 @@ class CarrinhoController extends Controller {
                 $this->json(['error' => 'Estoque insuficiente'], 400);
                 return;
             }
-            
+
+            // Garantir preço numérico (não depender de formatação)
+            $itemPrice = 0.0;
+            if ($produto) {
+                $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+            }
+            if ($itemPrice <= 0) {
+                $itemPrice = floatval($_SESSION['carrinho'][$produtoId]['price'] ?? $_SESSION['carrinho'][$produtoId]['preco_unitario'] ?? 0);
+            }
+
             $_SESSION['carrinho'][$produtoId]['quantidade'] = $quantidade;
-            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * floatval($_SESSION['carrinho'][$produtoId]['price']);
+            $_SESSION['carrinho'][$produtoId]['price'] = $itemPrice;
+            $_SESSION['carrinho'][$produtoId]['preco_unitario'] = $itemPrice;
+            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $itemPrice;
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
             $totalValor = 0;
@@ -255,6 +274,7 @@ class CarrinhoController extends Controller {
     }
 
     public function limpar(Request $request) {
+        session_start();
         unset($_SESSION['carrinho']);
         
         $this->json([
@@ -264,6 +284,7 @@ class CarrinhoController extends Controller {
     }
 
     public function calcular(Request $request) {
+        session_start();
         $carrinho = $_SESSION['carrinho'] ?? [];
         
         if (empty($carrinho)) {

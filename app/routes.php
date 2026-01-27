@@ -193,6 +193,20 @@ $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atua
 $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
+// Lojas
+$router->get('/admin/lojas', 'AdminLojasController', 'index');
+$router->get('/admin/lojas/novo', 'AdminLojasController', 'novo');
+$router->get('/admin/lojas/editar/{id}', 'AdminLojasController', 'editar');
+$router->post('/admin/lojas/salvar', 'AdminLojasController', 'salvar');
+$router->post('/admin/lojas/excluir/{id}', 'AdminLojasController', 'excluir');
+
+// Categorias
+$router->get('/admin/categorias', 'AdminCategoriasController', 'index');
+$router->get('/admin/categorias/novo', 'AdminCategoriasController', 'novo');
+$router->get('/admin/categorias/editar/{id}', 'AdminCategoriasController', 'editar');
+$router->post('/admin/categorias/salvar', 'AdminCategoriasController', 'salvar');
+$router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'excluir');
+
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');

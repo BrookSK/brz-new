@@ -4,6 +4,8 @@ function renderAdminSidebar($activePage = '') {
     $menuItems = [
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard'],
         'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos'],
+        'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas'],
+        'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias'],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos'],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque'],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras'],
@@ -190,6 +192,6 @@ function renderAdminSidebarStyles() {
 
 // Scripts JavaScript comuns
 function renderAdminScripts() {
-    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>';
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
 }
 ?>

@@ -37,14 +37,49 @@ class Usuario extends Model {
 
     public function authenticate($email, $senha) {
         $usuario = $this->findByEmail($email);
-        
-        if ($usuario && ($senha === $usuario['password'] || password_verify($senha, $usuario['password']))) {
+
+        $hash = $usuario['senha'] ?? $usuario['password'] ?? null;
+        $ok = false;
+        if ($usuario && is_string($hash) && $hash !== '') {
+            // Compatibilidade: aceita senha em texto plano antiga
+            if (hash_equals($hash, (string) $senha)) {
+                $ok = true;
+                // Migrar para hash
+                $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
+                $col = array_key_exists('senha', $usuario) ? 'senha' : 'password';
+                try {
+                    $stmtHash = $this->connection->prepare("UPDATE {$this->table} SET {$col} = :hash WHERE id = :id");
+                    $stmtHash->bindParam(':hash', $newHash);
+                    $stmtHash->bindParam(':id', $usuario['id']);
+                    $stmtHash->execute();
+                    $hash = $newHash;
+                } catch (\Exception $e) {
+                }
+            } elseif (password_verify((string) $senha, $hash)) {
+                $ok = true;
+                // Rehash quando necessário
+                if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+                    $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
+                    $col = array_key_exists('senha', $usuario) ? 'senha' : 'password';
+                    try {
+                        $stmtHash = $this->connection->prepare("UPDATE {$this->table} SET {$col} = :hash WHERE id = :id");
+                        $stmtHash->bindParam(':hash', $newHash);
+                        $stmtHash->bindParam(':id', $usuario['id']);
+                        $stmtHash->execute();
+                        $hash = $newHash;
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        }
+
+        if ($usuario && $ok) {
             // Atualizar último login
             $stmt = $this->connection->prepare("UPDATE {$this->table} SET ultimo_login = NOW() WHERE id = :id");
             $stmt->bindParam(':id', $usuario['id']);
             $stmt->execute();
             
-            unset($usuario['password']); // Remover senha do retorno
+            unset($usuario['password'], $usuario['senha']);
             
             // Adicionar campo 'perfil' para compatibilidade
             $usuario['perfil'] = $usuario['role'] ?? 'cliente';
@@ -57,14 +92,39 @@ class Usuario extends Model {
     }
 
     public function create($data) {
-        // Não fazer hash da senha - armazenar em texto plano
+        if (isset($data['senha']) && $data['senha'] !== '' && !is_null($data['senha'])) {
+            $info = password_get_info((string) $data['senha']);
+            if (($info['algo'] ?? 0) === 0) {
+                $data['senha'] = password_hash((string) $data['senha'], PASSWORD_DEFAULT);
+            }
+        }
+        if (isset($data['password']) && $data['password'] !== '' && !is_null($data['password'])) {
+            $info = password_get_info((string) $data['password']);
+            if (($info['algo'] ?? 0) === 0) {
+                $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
+            }
+        }
         return parent::create($data);
     }
 
     public function updatePassword($id, $novaSenha) {
-        // Armazenar senha em texto plano
-        $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET senha = :senha WHERE id = :id");
-        $stmt->bindParam(':senha', $novaSenha);
+        $hash = password_hash((string) $novaSenha, PASSWORD_DEFAULT);
+
+        // Detectar coluna de senha existente
+        $colunaSenha = 'senha';
+        try {
+            $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols) && in_array('senha', $cols, true)) {
+                $colunaSenha = 'senha';
+            } elseif (is_array($cols) && in_array('password', $cols, true)) {
+                $colunaSenha = 'password';
+            }
+        } catch (\Exception $e) {
+        }
+
+        $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET {$colunaSenha} = :senha WHERE id = :id");
+        $stmt->bindParam(':senha', $hash);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }

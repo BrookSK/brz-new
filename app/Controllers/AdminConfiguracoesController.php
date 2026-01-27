@@ -10,13 +10,27 @@ class AdminConfiguracoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Buscar configurações
-            $stmt = $pdo->query("SELECT * FROM configuracoes ORDER BY categoria, chave");
+            $stmt = $pdo->query("SELECT chave, valor FROM configuracoes_sistema ORDER BY chave");
             $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Organizar por categoria
+
+            // Organizar por categoria a partir do padrão categoria_chave
             $config = [];
             foreach ($configuracoes as $c) {
-                $config[$c['categoria']][] = $c;
+                $fullKey = (string) ($c['chave'] ?? '');
+                $valor = $c['valor'] ?? '';
+                if ($fullKey === '') {
+                    continue;
+                }
+                if (strpos($fullKey, '_') !== false) {
+                    [$categoria, $chave] = explode('_', $fullKey, 2);
+                } else {
+                    $categoria = 'geral';
+                    $chave = $fullKey;
+                }
+                if (!isset($config[$categoria])) {
+                    $config[$categoria] = [];
+                }
+                $config[$categoria][$chave] = $valor;
             }
             
         } catch (\Exception $e) {
@@ -87,7 +101,7 @@ class AdminConfiguracoesController extends Controller {
                     </div>
                     
                     <div class="col-md-9">
-                        <form method="POST" action="/admin/configuracoes/salvar">
+                        <form method="POST" action="/admin/configuracoes/salvar" novalidate>
                             <div class="tab-content" id="v-pills-tabContent">
                                 <!-- Configurações da Loja -->
                                 <div class="tab-pane fade show active" id="v-pills-loja" role="tabpanel">
@@ -118,7 +132,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
-                                                <input type="url" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                                <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
                                             </div>
                                         </div>
                                     </div>
@@ -282,7 +296,7 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Moeda Padrão</label>
-                                                <select class="form-select" name="moeda_padrao">
+                                                <select class="form-select" name="entrega_moeda_padrao">
                                                     <option value="USD" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'USD' ? 'selected' : '') . '>USD - Dólar Americano</option>
                                                     <option value="BRL" ' . ($this->getConfigValue($config, 'entrega', 'moeda_padrao', 'USD') === 'BRL' ? 'selected' : '') . '>BRL - Real Brasileiro</option>
                                                 </select>
@@ -291,14 +305,14 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Taxa de Serviço (USD por kg)</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="text" class="form-control" name="taxa_servico_kg" value="' . $this->getConfigValue($config, 'entrega', 'taxa_servico_kg', '39') . '">
+                                                    <input type="text" class="form-control" name="entrega_taxa_servico_kg" value="' . $this->getConfigValue($config, 'entrega', 'taxa_servico_kg', '39') . '">
                                                 </div>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Frete Grátis Acima de</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="text" class="form-control" name="frete_gratis_acima" value="' . $this->getConfigValue($config, 'entrega', 'frete_gratis_acima', '0') . '">
+                                                    <input type="text" class="form-control" name="entrega_frete_gratis_acima" value="' . $this->getConfigValue($config, 'entrega', 'frete_gratis_acima', '0') . '">
                                                 </div>
                                                 <small class="text-muted">Deixe como 0 para frete sempre grátis</small>
                                             </div>
@@ -306,19 +320,19 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Valor Padrão do Frete (USD por kg)</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="text" class="form-control" name="frete_padrao" value="' . $this->getConfigValue($config, 'entrega', 'frete_padrao', '15') . '">
+                                                    <input type="text" class="form-control" name="entrega_frete_padrao" value="' . $this->getConfigValue($config, 'entrega', 'frete_padrao', '15') . '">
                                                 </div>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Prazo Padrão (dias)</label>
-                                                <input type="number" class="form-control" name="prazo_padrao" value="' . $this->getConfigValue($config, 'entrega', 'prazo_padrao', '30') . '">
+                                                <input type="number" class="form-control" name="entrega_prazo_padrao" value="' . $this->getConfigValue($config, 'entrega', 'prazo_padrao', '30') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">CEP de Origem</label>
-                                                <input type="text" class="form-control" name="cep_origem" value="' . $this->getConfigValue($config, 'entrega', 'cep_origem', '') . '">
+                                                <input type="text" class="form-control" name="entrega_cep_origem" value="' . $this->getConfigValue($config, 'entrega', 'cep_origem', '') . '">
                                             </div>
                                             <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="calcular_automatico" ' . ($this->getConfigValue($config, 'entrega', 'calcular_automatico', '1') === '1' ? 'checked' : '') . '>
+                                                <input class="form-check-input" type="checkbox" name="entrega_calcular_automatico" value="1" ' . ($this->getConfigValue($config, 'entrega', 'calcular_automatico', '1') === '1' ? 'checked' : '') . '>
                                                 <label class="form-check-label">Calcular frete automaticamente</label>
                                             </div>
                                         </div>
@@ -589,14 +603,21 @@ class AdminConfiguracoesController extends Controller {
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
             ];
             
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled', 'asaas_enabled', 'stripe_enabled'];
+
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
                     $valor = $request->getParam($categoria . '_' . $chave);
-                    
+
+                    // Checkboxes não enviados no POST quando desmarcados
+                    if ($valor === null && in_array($chave, $checkboxKeys, true)) {
+                        $valor = '0';
+                    }
+
                     if ($valor !== null) {
                         // Converter checkboxes para 0/1
-                        if (in_array($chave, ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled', 'asaas_enabled', 'stripe_enabled'])) {
-                            $valor = $valor ? '1' : '0';
+                        if (in_array($chave, $checkboxKeys, true)) {
+                            $valor = ($valor === '1' || $valor === 1 || $valor === true) ? '1' : '0';
                         }
                         
                         // Validar valores específicos
@@ -618,11 +639,11 @@ class AdminConfiguracoesController extends Controller {
                         
                         // Atualizar ou inserir configuração
                         $stmt = $pdo->prepare("
-                            INSERT INTO configuracoes (categoria, chave, valor, updated_at)
-                            VALUES (?, ?, ?, NOW())
-                            ON DUPLICATE KEY UPDATE valor = ?, updated_at = NOW()
+                            INSERT INTO configuracoes_sistema (chave, valor, updated_at)
+                            VALUES (?, ?, NOW())
+                            ON DUPLICATE KEY UPDATE valor = VALUES(valor), updated_at = NOW()
                         ");
-                        $stmt->execute([$categoria, $chave, $valor, $valor]);
+                        $stmt->execute([$categoria . '_' . $chave, $valor]);
                     }
                 }
             }
@@ -981,12 +1002,8 @@ class AdminConfiguracoesController extends Controller {
     }
     
     private function getConfigValue($config, $categoria, $chave, $default = '') {
-        if (isset($config[$categoria])) {
-            foreach ($config[$categoria] as $c) {
-                if ($c['chave'] === $chave) {
-                    return $c['valor'];
-                }
-            }
+        if (isset($config[$categoria]) && is_array($config[$categoria]) && array_key_exists($chave, $config[$categoria])) {
+            return (string) $config[$categoria][$chave];
         }
         return $default;
     }
