@@ -436,14 +436,39 @@ class Produto extends Model {
         
         // Verificar existência dos arquivos físicos
         foreach ($fotos as &$foto) {
-            if ($foto['nome_arquivo'] && strpos($foto['nome_arquivo'], '/uploads/') === 0) {
-                $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . $foto['nome_arquivo'];
-                $foto['arquivo_existe'] = file_exists($caminhoFisico);
-                $foto['url_completa'] = Url::absolute($foto['nome_arquivo']);
-                
-                if (!$foto['arquivo_existe']) {
-                    error_log('❌ [PRODUTO-MODEL] Arquivo não encontrado: ' . $caminhoFisico);
+            $nomeArquivo = $foto['nome_arquivo'] ?? null;
+            if (!$nomeArquivo) {
+                continue;
+            }
+
+            $nomeArquivo = (string) $nomeArquivo;
+            if ($nomeArquivo !== '' && $nomeArquivo[0] !== '/') {
+                $nomeArquivo = '/' . $nomeArquivo;
+            }
+
+            if (strpos($nomeArquivo, '/uploads/') !== 0) {
+                continue;
+            }
+
+            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+            $caminhosFisicos = [
+                $docRoot . $nomeArquivo,
+                $docRoot . '/public' . $nomeArquivo,
+            ];
+
+            $caminhoEncontrado = null;
+            foreach ($caminhosFisicos as $caminhoFisico) {
+                if ($caminhoFisico !== '' && file_exists($caminhoFisico)) {
+                    $caminhoEncontrado = $caminhoFisico;
+                    break;
                 }
+            }
+
+            $foto['arquivo_existe'] = ($caminhoEncontrado !== null);
+            $foto['url_completa'] = Url::absolute($nomeArquivo);
+
+            if (!$foto['arquivo_existe']) {
+                error_log('❌ [PRODUTO-MODEL] Arquivo não encontrado (tentativas): ' . implode(' | ', $caminhosFisicos));
             }
         }
         

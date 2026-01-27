@@ -31,17 +31,27 @@
 
                     if (!empty($fotoPrincipal) && !empty($fotoPrincipal['nome_arquivo'])) {
                         $fotoUrl = $fotoPrincipal['nome_arquivo'];
-                        $caminhoFisico = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($fotoUrl, '/');
-                        $fotoExists = file_exists($caminhoFisico);
+                        $fotoAbsUrl = $fotoPrincipal['url_completa'] ?? Url::absolute($fotoUrl);
+                        if (array_key_exists('arquivo_existe', $fotoPrincipal)) {
+                            $fotoExists = (bool) $fotoPrincipal['arquivo_existe'];
+                        } else {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+                            $rel = '/' . ltrim((string) $fotoUrl, '/');
+                            $fotoExists = (
+                                ($docRoot !== '' && file_exists($docRoot . $rel)) ||
+                                ($docRoot !== '' && file_exists($docRoot . '/public' . $rel))
+                            );
+                        }
                     } else {
                         $fotoUrl = null;
+                        $fotoAbsUrl = null;
                         $fotoExists = false;
                     }
                     ?>
                     <?php if ($fotoUrl && $fotoExists): ?>
-                        <a href="<?= Url::absolute($fotoUrl) ?>" target="_blank">
+                        <a href="<?= $fotoAbsUrl ?>" target="_blank">
                             <img id="main-image" 
-                                 src="<?= Url::absolute($fotoUrl) ?>?v=<?= time() ?>" 
+                                 src="<?= $fotoAbsUrl ?>?v=<?= time() ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
                                  style="cursor: pointer; transition: transform 0.2s;"
@@ -64,19 +74,29 @@
                             <?php 
                             if (!empty($foto['nome_arquivo'])) {
                                 $miniaturaUrl = $foto['nome_arquivo'];
-                                $caminhoMiniatura = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($miniaturaUrl, '/');
-                                $miniaturaExists = file_exists($caminhoMiniatura);
+                                $miniaturaAbsUrl = $foto['url_completa'] ?? Url::absolute($miniaturaUrl);
+                                if (array_key_exists('arquivo_existe', $foto)) {
+                                    $miniaturaExists = (bool) $foto['arquivo_existe'];
+                                } else {
+                                    $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+                                    $rel = '/' . ltrim((string) $miniaturaUrl, '/');
+                                    $miniaturaExists = (
+                                        ($docRoot !== '' && file_exists($docRoot . $rel)) ||
+                                        ($docRoot !== '' && file_exists($docRoot . '/public' . $rel))
+                                    );
+                                }
                             } else {
                                 $miniaturaUrl = null;
+                                $miniaturaAbsUrl = null;
                                 $miniaturaExists = false;
                             }
                             ?>
                             <?php if ($miniaturaUrl && $miniaturaExists): ?>
-                                <img src="<?= Url::absolute($miniaturaUrl) ?>?v=<?= time() ?>" 
+                                <img src="<?= $miniaturaAbsUrl ?>?v=<?= time() ?>" 
                                      alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
-                                     data-main-image="<?= Url::absolute($miniaturaUrl) ?>"
+                                     data-main-image="<?= $miniaturaAbsUrl ?>"
                                      title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
                                 <?php if ($foto['principal']): ?>
                                     <span class="position-absolute top-0 start-0 badge bg-primary" style="font-size: 0.6em;">Principal</span>
@@ -99,7 +119,7 @@
                 <!-- Nome e Categoria -->
                 <h1 class="h2 mb-2"><?= htmlspecialchars($produto['nome']) ?></h1>
                 <p class="text-muted mb-3">
-                    <small>Categoria: <?= htmlspecialchars($produto['categoria']) ?></small>
+                    <small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small>
                 </p>
 
                 <!-- Preço -->
