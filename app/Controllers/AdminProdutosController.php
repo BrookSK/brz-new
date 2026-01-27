@@ -15,7 +15,7 @@ class AdminProdutosController extends Controller {
                 return [];
             }
 
-            $stmtLojas = $pdo->query("SELECT id, nome, slug, ativo FROM lojas WHERE ativo = 1 ORDER BY nome ASC");
+            $stmtLojas = $pdo->query("SELECT id, nome, slug, ativo FROM lojas ORDER BY nome ASC");
             $rows = $stmtLojas->fetchAll(\PDO::FETCH_ASSOC);
             return $rows ?: [];
         } catch (\Exception $e) {
