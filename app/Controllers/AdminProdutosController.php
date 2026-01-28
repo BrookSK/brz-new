@@ -796,6 +796,16 @@ HTML;
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        if ($request->getParam('debug_loja')) {
+            echo '<pre style="padding:12px;background:#fff;border:1px solid #ddd;max-width:100%;overflow:auto">';
+            var_dump([
+                'produto_id' => $id,
+                'produto_loja' => $produto['loja'] ?? null,
+                'lojas_0' => $lojas[0] ?? null,
+            ]);
+            echo '</pre>';
+        }
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
