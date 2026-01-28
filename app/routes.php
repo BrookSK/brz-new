@@ -190,7 +190,11 @@ $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
+$router->post('/admin/produtos/upload-capa/{id}', 'AdminProdutosController', 'uploadCapa');
+$router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 'uploadGaleria');
+$router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'removerCapa');
 $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
+$router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
 // Lojas

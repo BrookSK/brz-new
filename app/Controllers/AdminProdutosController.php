@@ -975,6 +975,7 @@ HTML;
         echo '</div>
                                         <div class="d-flex gap-2 align-items-center">
                                             <input type="file" class="form-control" name="capa" accept="image/*">
+                                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/upload-capa/' . (int) $id . '" formmethod="POST" formnovalidate>Enviar capa</button>
                                             <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/remover-capa/' . (int) $id . '" formmethod="POST" formnovalidate ' . (!empty($fotoCapaUrl) ? '' : 'disabled') . '>Remover capa</button>
                                         </div>
                                         <small class="text-muted">A foto de capa é usada como imagem principal do produto</small>
@@ -1005,6 +1006,7 @@ HTML;
         echo '                        </div>
                                         <div class="d-flex gap-2 align-items-center">
                                             <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/upload-galeria/' . (int) $id . '" formmethod="POST" formnovalidate>Enviar fotos</button>
                                             <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/galeria/ordem/' . (int) $id . '" formmethod="POST" formnovalidate>Salvar ordem</button>
                                         </div>
                                     </div>
@@ -1238,6 +1240,94 @@ HTML;
             
         } catch (\Exception $e) {
             if (isset($pdo)) $pdo->rollBack();
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+    }
+
+    public function uploadCapa(Request $request, $id = null) {
+        $id = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                $name = $_FILES['capa']['name'];
+                $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $name);
+                $fileName = time() . '_' . $fileName;
+                $filePath = $uploadDir . $fileName;
+                $webPath = $webDir . $fileName;
+
+                if (!move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                    throw new \Exception('Erro ao fazer upload da capa');
+                }
+
+                $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                $stmtCover->execute([$webPath, $id]);
+            }
+
+            $pdo->commit();
+            header('Location: /admin/produtos/editar/' . $id);
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+    }
+
+    public function uploadGaleria(Request $request, $id = null) {
+        $id = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if (($_FILES['imagens']['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                        continue;
+                    }
+
+                    $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $name);
+                    $fileName = time() . '_' . $fileName;
+                    $filePath = $uploadDir . $fileName;
+                    $webPath = $webDir . $fileName;
+
+                    if (!move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
+                        continue;
+                    }
+
+                    $stmt = $pdo->prepare('
+                        INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([
+                        $id,
+                        $webPath,
+                        $name,
+                        0,
+                        (int) $key
+                    ]);
+                }
+            }
+
+            $pdo->commit();
+            header('Location: /admin/produtos/editar/' . $id);
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
