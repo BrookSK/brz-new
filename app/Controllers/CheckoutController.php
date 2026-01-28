@@ -397,18 +397,52 @@ class CheckoutController extends Controller {
     
     private function obterItensPedido($pedidoId) {
         $db = \Config\Database::getConnection();
-        
-        $sql = "SELECT 
-                    pi.*,
-                    COALESCE(pi.nome_produto, pr.nome, pr.name) AS nome
-                FROM pedido_itens pi
-                LEFT JOIN produtos pr ON pi.produto_id = pr.id
-                WHERE pi.pedido_id = ?";
+
+        $produtoNomeCol = null;
+        try {
+            $stmtCols = $db->query('DESCRIBE produtos');
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols)) {
+                if (in_array('nome', $cols, true)) {
+                    $produtoNomeCol = 'nome';
+                } elseif (in_array('name', $cols, true)) {
+                    $produtoNomeCol = 'name';
+                } elseif (in_array('titulo', $cols, true)) {
+                    $produtoNomeCol = 'titulo';
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        if (!empty($produtoNomeCol)) {
+            $sql = "SELECT 
+                        pi.*,
+                        COALESCE(pi.nome_produto, pr.{$produtoNomeCol}) AS nome
+                    FROM pedido_itens pi
+                    LEFT JOIN produtos pr ON pi.produto_id = pr.id
+                    WHERE pi.pedido_id = ?";
+        } else {
+            $sql = "SELECT 
+                        pi.*,
+                        pi.nome_produto AS nome
+                    FROM pedido_itens pi
+                    WHERE pi.pedido_id = ?";
+        }
         
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
-        
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        if (is_array($itens)) {
+            foreach ($itens as &$item) {
+                if (empty($item['nome'])) {
+                    $produtoId = $item['produto_id'] ?? null;
+                    $item['nome'] = !empty($produtoId) ? ('Produto #' . $produtoId) : 'Produto';
+                }
+            }
+        }
+
+        return $itens;
     }
     
     private function obterCarrinho($usuario) {
