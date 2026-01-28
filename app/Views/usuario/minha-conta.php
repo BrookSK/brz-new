@@ -2,7 +2,7 @@
 <div class="container py-5">
     <div class="row">
         <!-- Sidebar -->
-        <div class="col-lg-3 mb-4">
+        <div class="col-lg-3 mb-4 account-sidebar">
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <?php
@@ -245,7 +245,7 @@
 </div>
 
 <style>
-.user-avatar {
+.account-sidebar .user-avatar {
     width: 80px;
     height: 80px;
     border-radius: 50%;
@@ -259,7 +259,7 @@
     overflow: hidden;
 }
 
-.user-avatar img {
+.account-sidebar .user-avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;

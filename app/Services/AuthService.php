@@ -49,7 +49,7 @@ class AuthService {
         $_SESSION['usuario_nome'] = $usuario['nome'];
         $_SESSION['usuario_email'] = $usuario['email'];
         $_SESSION['usuario_perfil'] = $usuario['perfil'];
-        $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+        $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
         $avatarUrl = null;
         foreach ($avatarCandidates as $c) {
             if (!empty($usuario[$c]) && is_string($usuario[$c])) {

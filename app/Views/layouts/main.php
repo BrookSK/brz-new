@@ -535,6 +535,20 @@
             display: block;
         }
 
+        .navbar .user-menu .user-avatar {
+            width: 35px;
+            height: 35px;
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .navbar .user-menu .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
         /* Mobile + Tablet: navbar usable, avoid overflow, better tap targets */
         @media (max-width: 991.98px) {
             :root {
@@ -770,6 +784,23 @@
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
                     $usuarioLogado = $isLoggedIn ? $_SESSION['usuario_nome'] : null;
                     $usuarioAvatar = $isLoggedIn ? ($_SESSION['usuario_avatar'] ?? null) : null;
+                    if ($isLoggedIn && (empty($usuarioAvatar) || !is_string($usuarioAvatar))) {
+                        try {
+                            $uModel = new \App\Models\Usuario();
+                            $u = $uModel->find($_SESSION['usuario_id'] ?? 0);
+                            if (is_array($u)) {
+                                $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
+                                foreach ($avatarCandidates as $c) {
+                                    if (!empty($u[$c]) && is_string($u[$c])) {
+                                        $usuarioAvatar = $u[$c];
+                                        $_SESSION['usuario_avatar'] = $usuarioAvatar;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
                     $usuarioPerfil = $isLoggedIn ? ($_SESSION['usuario_perfil'] ?? 'cliente') : 'cliente';
                     $totalItens = isset($_SESSION['carrinho']) ? array_sum(array_column($_SESSION['carrinho'], 'quantidade')) : 0;
                     ?>
