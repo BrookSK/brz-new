@@ -514,7 +514,7 @@
             position: relative;
         }
         
-        .user-avatar {
+        .navbar .user-menu .user-avatar {
             width: 35px;
             height: 35px;
             border-radius: 50%;
@@ -526,18 +526,6 @@
             font-weight: bold;
             cursor: pointer;
             overflow: hidden;
-        }
-
-        .user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        .navbar .user-menu .user-avatar {
-            width: 35px;
-            height: 35px;
             font-size: 0.85rem;
             line-height: 1;
         }

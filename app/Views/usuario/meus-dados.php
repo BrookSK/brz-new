@@ -17,6 +17,10 @@
                         }
 
                         if (empty($avatarUrl)) {
+                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                        }
+
+                        if (empty($avatarUrl)) {
                             $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=1d4ed8&color=fff&size=128';
                         }
                     ?>
@@ -50,8 +54,8 @@
                         </ul>
                     </div>
 
-                    <form method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" id="avatarUploadForm" class="d-none">
-                        <input type="file" name="avatar" id="avatarFileInput" accept="image/png,image/jpeg,image/webp">
+                    <form method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" id="avatarUploadForm">
+                        <input type="file" name="avatar" id="avatarFileInput" accept="image/png,image/jpeg,image/webp" class="avatar-file-input-hidden">
                     </form>
                     <form method="POST" action="/meus-dados/avatar/remover" id="avatarRemoveForm" class="d-none"></form>
 
@@ -511,6 +515,14 @@ document.addEventListener('DOMContentLoaded', function() {
 .user-avatar img {
     border: 0px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-file-input-hidden {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
 }
 
 .nav-link {
