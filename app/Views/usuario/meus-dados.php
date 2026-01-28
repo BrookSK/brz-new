@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .user-avatar img {
-    border: 3px solid #fff;
+    border: 0px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .user-avatar img {
-    border: 3px solid #fff;
+    border: 0px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
