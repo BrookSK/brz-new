@@ -342,10 +342,125 @@ class CheckoutController extends Controller {
     private function salvarDadosCliente($pedidoId, $dados, $usuario) {
         try {
             $db = \Config\Database::getConnection();
-            
-            // Removido UPDATE com colunas inexistentes - dados já salvos nas tabelas usuarios/clientes
-            $this->debugLog('[CHECKOUT_DADOS_CLIENTE] Dados ja persistidos em usuarios e clientes');
-            
+
+            $stmtPedido = $db->prepare('SELECT usuario_id, cliente_id FROM pedidos WHERE id = ? LIMIT 1');
+            $stmtPedido->execute([$pedidoId]);
+            $pedidoRow = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
+
+            $usuarioId = $pedidoRow['usuario_id'] ?? null;
+            $clienteId = $pedidoRow['cliente_id'] ?? null;
+
+            // Atualizar usuario (se existir)
+            if (!empty($usuarioId)) {
+                $colsU = [];
+                try {
+                    $stmtColsU = $db->query('DESCRIBE usuarios');
+                    $colsU = $stmtColsU->fetchAll(\PDO::FETCH_COLUMN);
+                } catch (\Exception $e) {
+                }
+
+                $setU = [];
+                $paramsU = ['id' => $usuarioId];
+
+                if (!empty($dados['email']) && is_array($colsU) && in_array('email', $colsU, true)) {
+                    $setU[] = 'email = :email';
+                    $paramsU['email'] = $dados['email'];
+                }
+
+                if (!empty($dados['nome'])) {
+                    if (is_array($colsU) && in_array('nome', $colsU, true)) {
+                        $setU[] = 'nome = :nome';
+                        $paramsU['nome'] = $dados['nome'];
+                    } elseif (is_array($colsU) && in_array('name', $colsU, true)) {
+                        $setU[] = 'name = :nome';
+                        $paramsU['nome'] = $dados['nome'];
+                    }
+                }
+
+                if (!empty($dados['telefone'])) {
+                    $telefoneCol = null;
+                    foreach (['telefone', 'celular', 'phone', 'whatsapp'] as $c) {
+                        if (is_array($colsU) && in_array($c, $colsU, true)) {
+                            $telefoneCol = $c;
+                            break;
+                        }
+                    }
+                    if (!empty($telefoneCol)) {
+                        $setU[] = "{$telefoneCol} = :telefone";
+                        $paramsU['telefone'] = $dados['telefone'];
+                    }
+                }
+
+                if (!empty($dados['documento']) && is_array($colsU) && in_array('documento', $colsU, true)) {
+                    $setU[] = 'documento = :documento';
+                    $paramsU['documento'] = $dados['documento'];
+                }
+
+                if (!empty($setU)) {
+                    $sqlU = 'UPDATE usuarios SET ' . implode(', ', $setU) . ' WHERE id = :id';
+                    $stmtU = $db->prepare($sqlU);
+                    $stmtU->execute($paramsU);
+                }
+            }
+
+            // Atualizar cliente (se existir)
+            if (!empty($clienteId)) {
+                $colsC = [];
+                try {
+                    $stmtColsC = $db->query('DESCRIBE clientes');
+                    $colsC = $stmtColsC->fetchAll(\PDO::FETCH_COLUMN);
+                } catch (\Exception $e) {
+                }
+
+                $setC = [];
+                $paramsC = ['id' => $clienteId];
+
+                if (!empty($dados['nome'])) {
+                    if (is_array($colsC) && in_array('nome_razao_social', $colsC, true)) {
+                        $setC[] = 'nome_razao_social = :nome';
+                        $paramsC['nome'] = $dados['nome'];
+                    } elseif (is_array($colsC) && in_array('nome', $colsC, true)) {
+                        $setC[] = 'nome = :nome';
+                        $paramsC['nome'] = $dados['nome'];
+                    }
+                }
+
+                if (!empty($dados['email']) && is_array($colsC) && in_array('email', $colsC, true)) {
+                    $setC[] = 'email = :email';
+                    $paramsC['email'] = $dados['email'];
+                }
+
+                if (!empty($dados['telefone'])) {
+                    $telefoneCol = null;
+                    foreach (['telefone', 'celular', 'phone', 'whatsapp'] as $c) {
+                        if (is_array($colsC) && in_array($c, $colsC, true)) {
+                            $telefoneCol = $c;
+                            break;
+                        }
+                    }
+                    if (!empty($telefoneCol)) {
+                        $setC[] = "{$telefoneCol} = :telefone";
+                        $paramsC['telefone'] = $dados['telefone'];
+                    }
+                }
+
+                if (!empty($dados['documento'])) {
+                    if (is_array($colsC) && in_array('cpf_cnpj', $colsC, true)) {
+                        $setC[] = 'cpf_cnpj = :documento';
+                        $paramsC['documento'] = $dados['documento'];
+                    } elseif (is_array($colsC) && in_array('documento', $colsC, true)) {
+                        $setC[] = 'documento = :documento';
+                        $paramsC['documento'] = $dados['documento'];
+                    }
+                }
+
+                if (!empty($setC)) {
+                    $sqlC = 'UPDATE clientes SET ' . implode(', ', $setC) . ' WHERE id = :id';
+                    $stmtC = $db->prepare($sqlC);
+                    $stmtC->execute($paramsC);
+                }
+            }
+
             return true;
             
         } catch (\Exception $e) {
@@ -370,13 +485,68 @@ class CheckoutController extends Controller {
             }
         } catch (\Exception $e) {
         }
-        
+
+        $usuarioNomeCol = null;
+        $usuarioTelefoneCol = null;
+        try {
+            $stmtColsU = $db->query('DESCRIBE usuarios');
+            $colsU = $stmtColsU->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($colsU)) {
+                if (in_array('nome', $colsU, true)) {
+                    $usuarioNomeCol = 'nome';
+                } elseif (in_array('name', $colsU, true)) {
+                    $usuarioNomeCol = 'name';
+                }
+
+                foreach (['telefone', 'celular', 'phone', 'whatsapp'] as $c) {
+                    if (in_array($c, $colsU, true)) {
+                        $usuarioTelefoneCol = $c;
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        $clienteTemTabela = false;
+        $clienteNomeCol = null;
+        $clienteEmailCol = null;
+        $clienteTelefoneCol = null;
+        try {
+            $stmtColsC = $db->query('DESCRIBE clientes');
+            $colsC = $stmtColsC->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($colsC) && !empty($colsC)) {
+                $clienteTemTabela = true;
+                if (in_array('nome_razao_social', $colsC, true)) {
+                    $clienteNomeCol = 'nome_razao_social';
+                } elseif (in_array('nome', $colsC, true)) {
+                    $clienteNomeCol = 'nome';
+                }
+                if (in_array('email', $colsC, true)) {
+                    $clienteEmailCol = 'email';
+                }
+                foreach (['telefone', 'celular', 'phone', 'whatsapp'] as $c) {
+                    if (in_array($c, $colsC, true)) {
+                        $clienteTelefoneCol = $c;
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        $uNomeExpr = $usuarioNomeCol ? ("u.{$usuarioNomeCol}") : 'NULL';
+        $uTelExpr = $usuarioTelefoneCol ? ("u.{$usuarioTelefoneCol}") : 'NULL';
+        $cNomeExpr = ($clienteTemTabela && $clienteNomeCol) ? ("c.{$clienteNomeCol}") : 'NULL';
+        $cEmailExpr = ($clienteTemTabela && $clienteEmailCol) ? ("c.{$clienteEmailCol}") : 'NULL';
+        $cTelExpr = ($clienteTemTabela && $clienteTelefoneCol) ? ("c.{$clienteTelefoneCol}") : 'NULL';
+
         $sql = "SELECT 
                     p.*,
                     p.servicos AS taxa_servico,
-                    u.name AS cliente_nome,
-                    u.email AS cliente_email,
-                    u.telefone AS cliente_telefone,
+                    COALESCE({$cNomeExpr}, {$uNomeExpr}, p.nome) AS cliente_nome,
+                    COALESCE({$cEmailExpr}, u.email) AS cliente_email,
+                    COALESCE({$cTelExpr}, {$uTelExpr}) AS cliente_telefone,
                     e_ent.cep AS cep,
                     e_ent.{$enderecoCol} AS endereco,
                     e_ent.numero AS numero,
@@ -386,9 +556,10 @@ class CheckoutController extends Controller {
                     e_ent.estado AS estado
                 FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
+                " . ($clienteTemTabela ? " LEFT JOIN clientes c ON p.cliente_id = c.id" : "") . "
                 LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
                 WHERE p.id = ?";
-        
+
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
 
