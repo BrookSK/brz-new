@@ -597,8 +597,19 @@ class AdminPedidosController extends Controller {
                                 <p><strong>Email:</strong> ' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                 <p><strong>Telefone:</strong> ' . htmlspecialchars($pedido['cliente_telefone'] ?? 'N/A') . '</p>
                                 <hr>
-                                <p><strong>Endereço:</strong><br>
-                                Endereço não disponível no momento</p>
+                                <p><strong>Endereço:</strong><br>' .
+                                    htmlspecialchars(
+                                        trim(
+                                            ($pedido['endereco_entrega'] ?? '') .
+                                            (!empty($pedido['numero_entrega']) ? ', ' . $pedido['numero_entrega'] : '') .
+                                            (!empty($pedido['complemento_entrega']) ? ' - ' . $pedido['complemento_entrega'] : '') .
+                                            (!empty($pedido['bairro_entrega']) ? ' - ' . $pedido['bairro_entrega'] : '') .
+                                            (!empty($pedido['cidade_entrega']) ? ' - ' . $pedido['cidade_entrega'] : '') .
+                                            (!empty($pedido['estado_entrega']) ? '/' . $pedido['estado_entrega'] : '') .
+                                            (!empty($pedido['cep_entrega']) ? ' - CEP: ' . $pedido['cep_entrega'] : '')
+                                        )
+                                    ) .
+                                '</p>
                             </div>
                         </div>
                     </div>

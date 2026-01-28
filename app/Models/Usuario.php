@@ -299,7 +299,17 @@ class Usuario extends Model {
     }
 
     public function getEnderecos($usuarioId) {
-        $stmt = $this->connection->prepare("SELECT * FROM enderecos WHERE usuario_id = :id ORDER BY principal DESC, created_at DESC");
+        $orderBy = 'created_at DESC';
+        try {
+            $stmtCols = $this->connection->query("DESCRIBE enderecos");
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols) && in_array('principal', $cols, true)) {
+                $orderBy = 'principal DESC, created_at DESC';
+            }
+        } catch (\Exception $e) {
+        }
+
+        $stmt = $this->connection->prepare("SELECT * FROM enderecos WHERE usuario_id = :id ORDER BY {$orderBy}");
         $stmt->bindParam(':id', $usuarioId);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);

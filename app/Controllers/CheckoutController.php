@@ -560,6 +560,20 @@ class CheckoutController extends Controller {
             if ($existingUser && !empty($existingUser['id'])) {
                 $usuarioId = $existingUser['id'];
                 $this->debugLog('[CRIAR_PEDIDO] Usuario encontrado: ' . $usuarioId);
+
+                // Se não estiver logado, exigir que a senha informada seja válida
+                if (!$this->authService->estaLogado()) {
+                    $senhaInformada = $dados['senha'] ?? $usuario['senha'] ?? null;
+                    if (empty($senhaInformada)) {
+                        throw new \Exception('Senha é obrigatória para concluir com este e-mail');
+                    }
+
+                    $usuarioModelApp = new \App\Models\Usuario();
+                    $authOk = $usuarioModelApp->authenticate($usuario['email'], $senhaInformada);
+                    if (!$authOk) {
+                        throw new \Exception('E-mail já cadastrado com senha diferente');
+                    }
+                }
             } else {
                 $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
                 $senhaPlano = $usuario['senha'] ?? 'temp123';
@@ -571,6 +585,22 @@ class CheckoutController extends Controller {
                 ]);
                 $usuarioId = $db->lastInsertId();
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
+            }
+
+            // Login automático quando não estava logado
+            if (!$this->authService->estaLogado()) {
+                try {
+                    $stmtUser = $db->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                    $stmtUser->execute([$usuarioId]);
+                    $rowUser = $stmtUser->fetch(\PDO::FETCH_ASSOC);
+
+                    if ($rowUser) {
+                        $rowUser['perfil'] = $rowUser['perfil'] ?? ($rowUser['role'] ?? 'cliente');
+                        $rowUser['nome'] = $rowUser['nome'] ?? ($rowUser['name'] ?? ($usuario['nome'] ?? 'Cliente'));
+                        $this->authService->criarSessao($rowUser);
+                    }
+                } catch (\Exception $e) {
+                }
             }
             
             // 2. Buscar/criar cliente na tabela clientes (foreign key obrigatória)
@@ -700,6 +730,48 @@ class CheckoutController extends Controller {
             
             $pedidoId = $db->lastInsertId();
             $this->debugLog('[CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
+
+            // Criar endereço(s) e vincular ao pedido
+            try {
+                $enderecoModelApp = new \App\Models\Endereco();
+
+                $enderecosExistentes = [];
+                try {
+                    $usuarioModelApp = new \App\Models\Usuario();
+                    $enderecosExistentes = $usuarioModelApp->getEnderecos($usuarioId);
+                } catch (\Exception $e) {
+                }
+
+                $principal = empty($enderecosExistentes) ? 1 : 0;
+                $enderecoEntregaData = [
+                    'usuario_id' => $usuarioId,
+                    'tipo' => 'entrega',
+                    'cep' => $dados['cep'],
+                    'endereco' => $dados['endereco'],
+                    'numero' => $dados['numero'],
+                    'complemento' => $dados['complemento'] ?? '',
+                    'bairro' => $dados['bairro'],
+                    'cidade' => $dados['cidade'],
+                    'estado' => $dados['estado'],
+                    'pais' => 'BR',
+                    'principal' => $principal,
+                ];
+
+                $enderecoEntregaId = null;
+                if ($enderecoModelApp->create($enderecoEntregaData)) {
+                    $enderecoEntregaId = $enderecoModelApp->getConnection()->lastInsertId();
+                }
+
+                // Por enquanto, usar o mesmo endereço para cobrança (pode ser separado depois)
+                $enderecoCobrancaId = $enderecoEntregaId;
+
+                if (!empty($enderecoEntregaId)) {
+                    $stmtUpd = $db->prepare('UPDATE pedidos SET endereco_entrega_id = ?, endereco_cobranca_id = ? WHERE id = ?');
+                    $stmtUpd->execute([$enderecoEntregaId, $enderecoCobrancaId, $pedidoId]);
+                }
+            } catch (\Exception $e) {
+                $this->debugLog('[CRIAR_PEDIDO] Falha ao criar/vincular endereco: ' . $e->getMessage());
+            }
             
             return $pedidoId;
             

@@ -9,22 +9,59 @@ class Endereco extends Model {
     }
     
     public function create($data) {
-        $sql = "INSERT INTO {$this->table} 
-                (usuario_id, tipo, cep, logradouro, numero, complemento, bairro, cidade, estado, created_at) 
-                VALUES (:usuario_id, :tipo, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado, NOW())";
-        
+        $cols = [];
+        try {
+            $stmtCols = $this->connection->query("DESCRIBE {$this->table}");
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+        }
+
+        $dataNormalized = $data;
+        if (!isset($dataNormalized['logradouro']) && isset($dataNormalized['endereco'])) {
+            $dataNormalized['logradouro'] = $dataNormalized['endereco'];
+        }
+        if (!isset($dataNormalized['endereco']) && isset($dataNormalized['logradouro'])) {
+            $dataNormalized['endereco'] = $dataNormalized['logradouro'];
+        }
+
+        $allowedMap = [
+            'usuario_id' => 'usuario_id',
+            'tipo' => 'tipo',
+            'cep' => 'cep',
+            'logradouro' => 'logradouro',
+            'endereco' => 'endereco',
+            'numero' => 'numero',
+            'complemento' => 'complemento',
+            'bairro' => 'bairro',
+            'cidade' => 'cidade',
+            'estado' => 'estado',
+            'pais' => 'pais',
+            'principal' => 'principal',
+        ];
+
+        $insert = [];
+        foreach ($allowedMap as $key => $col) {
+            if (isset($dataNormalized[$key]) && (empty($cols) || in_array($col, $cols, true))) {
+                $insert[$col] = $dataNormalized[$key];
+            }
+        }
+
+        if (!empty($cols) && in_array('created_at', $cols, true)) {
+            $insert['created_at'] = date('Y-m-d H:i:s');
+        }
+        if (empty($insert)) {
+            return false;
+        }
+
+        $columns = implode(', ', array_keys($insert));
+        $placeholders = ':' . implode(', :', array_keys($insert));
+        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
         $stmt = $this->connection->prepare($sql);
-        
-        $stmt->bindParam(':usuario_id', $data['usuario_id']);
-        $stmt->bindParam(':tipo', $data['tipo']);
-        $stmt->bindParam(':cep', $data['cep']);
-        $stmt->bindParam(':logradouro', $data['logradouro']);
-        $stmt->bindParam(':numero', $data['numero']);
-        $stmt->bindParam(':complemento', $data['complemento']);
-        $stmt->bindParam(':bairro', $data['bairro']);
-        $stmt->bindParam(':cidade', $data['cidade']);
-        $stmt->bindParam(':estado', $data['estado']);
-        
+
+        foreach ($insert as $k => $v) {
+            $stmt->bindValue(":" . $k, $v);
+        }
+
         return $stmt->execute();
     }
     
