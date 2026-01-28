@@ -47,7 +47,10 @@ class AdminProdutosController extends Controller {
     }
 
     private function resolveUploadsPublicPath(string $urlPath): ?string {
-        $normalized = '/' . ltrim($urlPath, '/');
+        $normalized = $this->normalizeUploadsWebPath($urlPath);
+        if ($normalized === null) {
+            return null;
+        }
 
         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
         $candidates = [
@@ -63,6 +66,33 @@ class AdminProdutosController extends Controller {
         }
 
         return null;
+    }
+
+    private function normalizeUploadsWebPath(string $path): ?string {
+        $path = is_string($path) ? trim($path) : '';
+        if ($path === '') {
+            return null;
+        }
+
+        // If a full URL was stored, keep only the path part
+        if (preg_match('#^https?://#i', $path)) {
+            $parsed = parse_url($path);
+            $path = (string) ($parsed['path'] ?? '');
+        }
+
+        if ($path === '') {
+            return null;
+        }
+
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        if (strpos($path, '/uploads/') === 0) {
+            return $path;
+        }
+
+        return '/uploads/produtos/' . ltrim($path, '/');
     }
 
     private function isAjaxRequest(): bool {
@@ -828,9 +858,12 @@ HTML;
         $fotoCapaPath = null;
         $fotoCapaUrl = null;
         if (!empty($fotoCapa)) {
-            $fotoCapaPath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim((string) $fotoCapa, '/');
-            if (file_exists($fotoCapaPath)) {
-                $fotoCapaUrl = Url::absolute((string) $fotoCapa);
+            $fotoCapaWeb = $this->normalizeUploadsWebPath((string) $fotoCapa);
+            if (!empty($fotoCapaWeb)) {
+                $fotoCapaPath = $this->resolveUploadsPublicPath((string) $fotoCapaWeb);
+                if (!empty($fotoCapaPath)) {
+                    $fotoCapaUrl = Url::absolute((string) $fotoCapaWeb);
+                }
             }
         }
 
@@ -951,8 +984,9 @@ HTML;
                                         <div class="row mb-3">';
 
         foreach ($fotos as $foto) {
-            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
-            $imageUrl = file_exists($filePath) ? Url::absolute($foto['nome_arquivo']) : Url::absolute('/uploads/produtos/placeholder.jpg');
+            $webPath = $this->normalizeUploadsWebPath((string) ($foto['nome_arquivo'] ?? ''));
+            $filePath = !empty($webPath) ? $this->resolveUploadsPublicPath($webPath) : null;
+            $imageUrl = (!empty($webPath) && !empty($filePath)) ? Url::absolute($webPath) : Url::absolute('/uploads/produtos/placeholder.jpg');
             $fotoId = (int) ($foto['id'] ?? 0);
             $ordem = (int) ($foto['ordem'] ?? 0);
             echo '<div class="col-6 col-md-2 mb-2">
