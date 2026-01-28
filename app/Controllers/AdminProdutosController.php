@@ -1078,9 +1078,9 @@ HTML;
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
-            $price = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('price'));
-            $costPrice = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('cost_price'));
-            $salePrice = str_replace(['$', '.', ','], ['', '', '.'], $request->getParam('sale_price'));
+            $price = $this->parseMoneyToDb($request->getParam('price'));
+            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
+            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
             
             // Validar categoria se fornecida
             $categoryId = $request->getParam('category_id');
@@ -1355,5 +1355,34 @@ HTML;
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
+    }
+
+    private function parseMoneyToDb($value): string {
+        $s = is_string($value) ? trim($value) : '';
+        if ($s === '') {
+            return '0';
+        }
+
+        $s = str_replace(['$', 'R$', ' '], '', $s);
+        $hasComma = strpos($s, ',') !== false;
+        $hasDot = strpos($s, '.') !== false;
+
+        if ($hasComma && $hasDot) {
+            // format like 15.000,00
+            $s = str_replace('.', '', $s);
+            $s = str_replace(',', '.', $s);
+        } elseif ($hasComma && !$hasDot) {
+            // format like 15000,00
+            $s = str_replace(',', '.', $s);
+        } else {
+            // format like 15000.00 or 15000
+        }
+
+        $s = preg_replace('/[^0-9.\-]/', '', $s);
+        if ($s === '' || $s === '-' || $s === '.' || $s === '-.') {
+            return '0';
+        }
+
+        return $s;
     }
 }
