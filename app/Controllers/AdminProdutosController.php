@@ -963,26 +963,26 @@ HTML;
         if (!empty($fotoCapaUrl)) {
             echo '<div class="col-6 col-md-3 mb-2">
                     <a href="' . $fotoCapaUrl . '" target="_blank">
-                        <img src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                        <img id="capaImg" src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
                     </a>
                 </div>';
         } else {
             echo '<div class="col-6 col-md-3 mb-2">
-                    <img src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    <img id="capaImg" src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
                 </div>';
         }
 
         echo '</div>
                                         <div class="d-flex gap-2 align-items-center">
-                                            <input type="file" class="form-control" name="capa" accept="image/*">
-                                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/upload-capa/' . (int) $id . '" formmethod="POST" formnovalidate>Enviar capa</button>
+                                            <input id="capaFile" type="file" class="form-control" name="capa" accept="image/*">
+                                            <button type="button" id="btnUploadCapa" class="btn btn-outline-primary" data-url="/admin/produtos/upload-capa/' . (int) $id . '">Enviar capa</button>
                                             <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/remover-capa/' . (int) $id . '" formmethod="POST" formnovalidate ' . (!empty($fotoCapaUrl) ? '' : 'disabled') . '>Remover capa</button>
                                         </div>
                                         <small class="text-muted">A foto de capa é usada como imagem principal do produto</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Galeria de Fotos</label>
-                                        <div class="row mb-3">';
+                                        <div id="galeriaRow" class="row mb-3">';
 
         foreach ($fotos as $foto) {
             $webPath = $this->normalizeUploadsWebPath((string) ($foto['nome_arquivo'] ?? ''));
@@ -1005,8 +1005,8 @@ HTML;
 
         echo '                        </div>
                                         <div class="d-flex gap-2 align-items-center">
-                                            <input type="file" class="form-control" name="imagens[]" multiple accept="image/*">
-                                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/upload-galeria/' . (int) $id . '" formmethod="POST" formnovalidate>Enviar fotos</button>
+                                            <input id="galeriaFiles" type="file" class="form-control" name="imagens[]" multiple accept="image/*">
+                                            <button type="button" id="btnUploadGaleria" class="btn btn-outline-primary" data-url="/admin/produtos/upload-galeria/' . (int) $id . '">Enviar fotos</button>
                                             <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/galeria/ordem/' . (int) $id . '" formmethod="POST" formnovalidate>Salvar ordem</button>
                                         </div>
                                     </div>
@@ -1084,7 +1084,8 @@ HTML;
 
         renderAdminScripts();
 
-        echo '<script>
+        echo <<<'HTMLSCRIPT'
+<script>
         // Busca no select de NCM
         (function() {
             const input = document.getElementById("ncmSearch");
@@ -1100,7 +1101,92 @@ HTML;
                 });
             });
         })();
-        </script>';
+
+        (function() {
+            const btnCapa = document.getElementById('btnUploadCapa');
+            const capaFile = document.getElementById('capaFile');
+            const capaImg = document.getElementById('capaImg');
+
+            const btnGaleria = document.getElementById('btnUploadGaleria');
+            const galeriaFiles = document.getElementById('galeriaFiles');
+            const galeriaRow = document.getElementById('galeriaRow');
+
+            async function postFormData(url, formData) {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                });
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch (e) { data = { ok: false, message: text }; }
+                if (!res.ok || !data || data.ok !== true) {
+                    throw new Error((data && data.message) ? data.message : 'Falha no upload');
+                }
+                return data;
+            }
+
+            if (btnCapa && capaFile && capaImg) {
+                btnCapa.addEventListener('click', async function() {
+                    if (!capaFile.files || !capaFile.files[0]) return;
+                    const url = btnCapa.getAttribute('data-url');
+                    const fd = new FormData();
+                    fd.append('capa', capaFile.files[0]);
+                    btnCapa.disabled = true;
+                    try {
+                        const data = await postFormData(url, fd);
+                        if (data && data.url) {
+                            capaImg.src = data.url;
+                            const parentLink = capaImg.closest('a');
+                            if (parentLink) parentLink.href = data.url;
+                        }
+                        capaFile.value = '';
+                    } catch (e) {
+                        alert(e.message || 'Erro ao enviar capa');
+                    } finally {
+                        btnCapa.disabled = false;
+                    }
+                });
+            }
+
+            if (btnGaleria && galeriaFiles && galeriaRow) {
+                btnGaleria.addEventListener('click', async function() {
+                    if (!galeriaFiles.files || galeriaFiles.files.length === 0) return;
+                    const url = btnGaleria.getAttribute('data-url');
+                    const fd = new FormData();
+                    for (const f of galeriaFiles.files) fd.append('imagens[]', f);
+                    btnGaleria.disabled = true;
+                    try {
+                        const data = await postFormData(url, fd);
+                        const fotos = (data && data.fotos) ? data.fotos : [];
+                        fotos.forEach(function(item) {
+                            const col = document.createElement('div');
+                            col.className = 'col-6 col-md-2 mb-2';
+                            const fotoId = item && item.id ? item.id : 0;
+                            const url = item && item.url ? item.url : '';
+                            col.innerHTML =
+                                '<a href="' + url + '" target="_blank">' +
+                                '<img src="' + url + '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">' +
+                                '</a>' +
+                                '<div class="mt-2">' +
+                                '<input type="number" class="form-control form-control-sm" name="ordens[' + fotoId + ']" value="0" min="0">' +
+                                '</div>' +
+                                '<div class="mt-2">' +
+                                '<button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/remover-foto/' + fotoId + '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto?\')">Remover</button>' +
+                                '</div>';
+                            galeriaRow.appendChild(col);
+                        });
+                        galeriaFiles.value = '';
+                    } catch (e) {
+                        alert(e.message || 'Erro ao enviar fotos');
+                    } finally {
+                        btnGaleria.disabled = false;
+                    }
+                });
+            }
+        })();
+</script>
+HTMLSCRIPT;
 
         echo '
 </body>
@@ -1271,12 +1357,27 @@ HTML;
             }
 
             $pdo->commit();
+            $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') || (strpos((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'url' => isset($webPath) ? Url::absolute($webPath) : null]);
+                exit;
+            }
+
             header('Location: /admin/produtos/editar/' . $id);
             exit;
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') || (strpos((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+            if ($isAjax) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
@@ -1287,6 +1388,8 @@ HTML;
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
+
+            $inserted = [];
 
             if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
                 $uploadDir = $this->getProdutoUploadsDir();
@@ -1318,16 +1421,34 @@ HTML;
                         0,
                         (int) $key
                     ]);
+
+                    $insertId = (int) $pdo->lastInsertId();
+                    $inserted[] = ['id' => $insertId, 'url' => Url::absolute($webPath)];
                 }
             }
 
             $pdo->commit();
+            $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') || (strpos((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'fotos' => $inserted]);
+                exit;
+            }
+
             header('Location: /admin/produtos/editar/' . $id);
             exit;
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') || (strpos((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false);
+            if ($isAjax) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
