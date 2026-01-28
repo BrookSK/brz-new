@@ -556,6 +556,23 @@ class CheckoutController extends Controller {
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$usuario['email']]);
             $existingUser = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            // Se não encontrou por e-mail, tentar por documento (CPF/CNPJ) pois pode ser UNIQUE
+            if ((!$existingUser || empty($existingUser['id'])) && !empty($usuario['documento'])) {
+                $stmtDoc = $db->prepare("SELECT id, email, name, password, senha, role, perfil FROM usuarios WHERE documento = ? LIMIT 1");
+                $stmtDoc->execute([$usuario['documento']]);
+                $existingUserByDoc = $stmtDoc->fetch(\PDO::FETCH_ASSOC);
+                if ($existingUserByDoc && !empty($existingUserByDoc['id'])) {
+                    $existingUser = ['id' => $existingUserByDoc['id']];
+                    // Preferir dados já existentes do cadastro
+                    if (!empty($existingUserByDoc['email'])) {
+                        $usuario['email'] = $existingUserByDoc['email'];
+                    }
+                    if (!empty($existingUserByDoc['name']) || !empty($existingUserByDoc['nome'])) {
+                        $usuario['nome'] = $existingUserByDoc['nome'] ?? $existingUserByDoc['name'];
+                    }
+                }
+            }
             
             if ($existingUser && !empty($existingUser['id'])) {
                 $usuarioId = $existingUser['id'];
