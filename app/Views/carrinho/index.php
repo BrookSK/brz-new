@@ -14,29 +14,33 @@
                             <div class="row align-items-center">
                                 <div class="col-4 col-md-2 mb-2 mb-md-0">
                                     <?php 
-                                    // Buscar foto do produto
                                     $fotoPrincipal = null;
+                                    $fotosProduto = [];
                                     try {
                                         $fotoModel = new \App\Models\ProdutoFoto();
                                         $fotoPrincipal = $fotoModel->getFotoPrincipal($item['produto_id']);
+                                        if (!$fotoPrincipal) {
+                                            $fotosProduto = $fotoModel->getFotosProduto($item['produto_id']);
+                                        }
                                     } catch (\Exception $e) {
                                         // Ignorar erro
                                     }
                                     
                                     $fotoUrl = null;
-                                    if ($fotoPrincipal && !empty($fotoPrincipal['nome_arquivo'])) {
-                                        $fotoUrl = Url::absolute($fotoPrincipal['nome_arquivo']);
+                                    $fotoArquivo = $fotoPrincipal['nome_arquivo'] ?? ($fotosProduto[0]['nome_arquivo'] ?? null);
+                                    if (!empty($fotoArquivo) && is_string($fotoArquivo)) {
+                                        $filePath = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . ltrim($fotoArquivo, '/');
+                                        if (!empty($_SERVER['DOCUMENT_ROOT']) && is_file($filePath)) {
+                                            $fotoUrl = Url::absolute($fotoArquivo);
+                                        }
+                                    }
+                                    if (empty($fotoUrl)) {
+                                        $fotoUrl = Url::absolute('/uploads/produtos/placeholder.jpg');
                                     }
                                     ?>
-                                    <?php if ($fotoUrl): ?>
                                     <img src="<?= $fotoUrl ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
-                                <?php else: ?>
-                                    <div class="bg-light d-flex align-items-center justify-content-center img-fluid rounded" style="height: 100px;">
-                                        <i class="fas fa-image text-muted fa-2x"></i>
-                                    </div>
-                                <?php endif; ?>
                                 </div>
                                 <div class="col-8 col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
