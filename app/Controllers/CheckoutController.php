@@ -75,6 +75,104 @@ class CheckoutController extends Controller {
             error_log($message);
         }
     }
+
+    private function registrarPagamentoPedido($pedidoId, $dados) {
+        try {
+            $db = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE pagamentos');
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                return;
+            }
+
+            if (!is_array($cols) || empty($cols)) {
+                return;
+            }
+
+            $stmtPedido = $db->prepare('SELECT total, moeda, forma_pagamento FROM pedidos WHERE id = ? LIMIT 1');
+            $stmtPedido->execute([$pedidoId]);
+            $pedidoRow = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
+
+            $metodo = $dados['forma_pagamento'] ?? ($pedidoRow['forma_pagamento'] ?? null);
+            $statusInicial = 'pendente';
+
+            $insert = [];
+            if (in_array('pedido_id', $cols, true)) {
+                $insert['pedido_id'] = $pedidoId;
+            }
+
+            foreach (['metodo', 'forma_pagamento', 'payment_method', 'tipo'] as $c) {
+                if (!empty($metodo) && in_array($c, $cols, true)) {
+                    $insert[$c] = $metodo;
+                    break;
+                }
+            }
+
+            foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $insert[$c] = $statusInicial;
+                    break;
+                }
+            }
+
+            if (in_array('gateway', $cols, true)) {
+                $insert['gateway'] = ($pedidoRow['moeda'] ?? null) === 'BRL' ? 'asaas' : 'stripe';
+            }
+
+            if (in_array('valor', $cols, true) && isset($pedidoRow['total'])) {
+                $insert['valor'] = $pedidoRow['total'];
+            }
+            if (in_array('valor_total', $cols, true) && isset($pedidoRow['total'])) {
+                $insert['valor_total'] = $pedidoRow['total'];
+            }
+
+            if (empty($insert) || !isset($insert['pedido_id'])) {
+                return;
+            }
+
+            // Se já existir, atualizar; senão, inserir
+            $existe = false;
+            if (in_array('pedido_id', $cols, true)) {
+                try {
+                    $stmtExiste = $db->prepare('SELECT 1 FROM pagamentos WHERE pedido_id = ? LIMIT 1');
+                    $stmtExiste->execute([$pedidoId]);
+                    $existe = (bool) $stmtExiste->fetchColumn();
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($existe) {
+                $setParts = [];
+                $params = [];
+                foreach ($insert as $k => $v) {
+                    if ($k === 'pedido_id') {
+                        continue;
+                    }
+                    $setParts[] = "{$k} = :{$k}";
+                    $params[$k] = $v;
+                }
+                if (!empty($setParts)) {
+                    $params['pedido_id'] = $pedidoId;
+                    $sql = 'UPDATE pagamentos SET ' . implode(', ', $setParts) . ' WHERE pedido_id = :pedido_id';
+                    $stmtUpd = $db->prepare($sql);
+                    $stmtUpd->execute($params);
+                }
+            } else {
+                $columns = implode(', ', array_keys($insert));
+                $placeholders = ':' . implode(', :', array_keys($insert));
+                $sql = "INSERT INTO pagamentos ({$columns}) VALUES ({$placeholders})";
+                $stmtIns = $db->prepare($sql);
+                foreach ($insert as $k => $v) {
+                    $stmtIns->bindValue(':' . $k, $v);
+                }
+                $stmtIns->execute();
+            }
+        } catch (\Exception $e) {
+        }
+    }
     
     public function __construct() {
         $this->authService = new AuthService();
@@ -242,6 +340,9 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CHECKOUT] Salvando dados do cliente...');
                 $this->salvarDadosCliente($pedidoId, $dados, $usuario);
                 $this->debugLog('[CHECKOUT] Dados do cliente salvos');
+
+                // Registrar pagamento (status inicial)
+                $this->registrarPagamentoPedido($pedidoId, $dados);
                 
                 // Limpar carrinho
                 unset($_SESSION['carrinho']);

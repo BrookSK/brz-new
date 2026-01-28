@@ -178,6 +178,7 @@ class PedidoEcommerce extends Model {
         $joinPagamentos = '';
         $selectPagamentos = '';
         $selectFormaPagamento = '';
+        $selectExtras = '';
 
         try {
             $stmtColsP = $this->connection->query("DESCRIBE {$this->table}");
@@ -253,14 +254,14 @@ class PedidoEcommerce extends Model {
         } catch (\Exception $e) {
         }
 
+        $selectExtras = $selectFormaPagamento . $selectPagamentos;
+
         // Adaptar query para a estrutura correta das tabelas
         $stmt = $this->connection->prepare("
             SELECT p.*, 
                    COALESCE(c.nome_razao_social, u.nome, u.name, p.nome) as cliente_nome,
                    COALESCE(c.email, u.email) as cliente_email,
-                   COALESCE(c.telefone, u.telefone) as cliente_telefone
-                   {$selectFormaPagamento}
-                   {$selectPagamentos},
+                   COALESCE(c.telefone, u.telefone) as cliente_telefone{$selectExtras},
                    e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
                    e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
                    e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
