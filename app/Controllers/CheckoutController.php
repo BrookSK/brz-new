@@ -356,6 +356,20 @@ class CheckoutController extends Controller {
     
     private function obterPedidoCompleto($pedidoId) {
         $db = \Config\Database::getConnection();
+
+        $enderecoCol = 'endereco';
+        try {
+            $stmtCols = $db->query('DESCRIBE enderecos');
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols)) {
+                if (in_array('endereco', $cols, true)) {
+                    $enderecoCol = 'endereco';
+                } elseif (in_array('logradouro', $cols, true)) {
+                    $enderecoCol = 'logradouro';
+                }
+            }
+        } catch (\Exception $e) {
+        }
         
         $sql = "SELECT 
                     p.*,
@@ -364,8 +378,7 @@ class CheckoutController extends Controller {
                     u.email AS cliente_email,
                     u.telefone AS cliente_telefone,
                     e_ent.cep AS cep,
-                    e_ent.endereco AS endereco,
-                    e_ent.logradouro AS logradouro,
+                    e_ent.{$enderecoCol} AS endereco,
                     e_ent.numero AS numero,
                     e_ent.complemento AS complemento,
                     e_ent.bairro AS bairro,
@@ -379,14 +392,7 @@ class CheckoutController extends Controller {
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
 
-        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (is_array($pedido)) {
-            if (empty($pedido['endereco']) && !empty($pedido['logradouro'])) {
-                $pedido['endereco'] = $pedido['logradouro'];
-            }
-        }
-
-        return $pedido;
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
     private function obterItensPedido($pedidoId) {
