@@ -29,8 +29,13 @@
                                     $fotoUrl = null;
                                     $fotoArquivo = $fotoPrincipal['nome_arquivo'] ?? ($fotosProduto[0]['nome_arquivo'] ?? null);
                                     if (!empty($fotoArquivo) && is_string($fotoArquivo)) {
-                                        $filePath = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . ltrim($fotoArquivo, '/');
-                                        if (!empty($_SERVER['DOCUMENT_ROOT']) && is_file($filePath)) {
+                                        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+                                        $rel = '/' . ltrim((string) $fotoArquivo, '/');
+                                        $fotoExists = (
+                                            ($docRoot !== '' && file_exists($docRoot . $rel)) ||
+                                            ($docRoot !== '' && file_exists($docRoot . '/public' . $rel))
+                                        );
+                                        if ($fotoExists) {
                                             $fotoUrl = Url::absolute($fotoArquivo);
                                         }
                                     }
@@ -38,7 +43,7 @@
                                         $fotoUrl = Url::absolute('/uploads/produtos/placeholder.jpg');
                                     }
                                     ?>
-                                    <img src="<?= $fotoUrl ?>" 
+                                    <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
                                          class="img-fluid rounded">
                                 </div>
