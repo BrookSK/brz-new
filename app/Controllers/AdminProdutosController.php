@@ -834,13 +834,15 @@ HTML;
             }
         }
 
+        $debugSuffix = $request->getParam('debug_loja') ? '?debug_loja=1' : '';
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Editar Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
 
-                <form method="POST" action="/admin/produtos/atualizar/' . $id . '" enctype="multipart/form-data">
+                <form method="POST" action="/admin/produtos/atualizar/' . $id . $debugSuffix . '" enctype="multipart/form-data">
                     <div class="row">
                         <div class="col-md-8">
                             <div class="card mb-4">
@@ -1120,6 +1122,8 @@ HTML;
                 $id
             ]);
 
+            $rowsUpdated = $stmt->rowCount();
+
             // Atualizar foto de capa (se enviada)
             if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
                 $uploadDir = $this->getProdutoUploadsDir();
@@ -1171,6 +1175,23 @@ HTML;
             }
             
             $pdo->commit();
+
+            if ($request->getParam('debug_loja')) {
+                $stmtCheck = $pdo->prepare('SELECT loja FROM produtos WHERE id = ?');
+                $stmtCheck->execute([$id]);
+                $dbRow = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+
+                echo '<pre style="padding:12px;background:#fff;border:1px solid #ddd;max-width:100%;overflow:auto">';
+                var_dump([
+                    'produto_id' => (int) $id,
+                    'loja_post' => $request->getParam('loja'),
+                    'update_rowCount' => (int) $rowsUpdated,
+                    'loja_db' => $dbRow['loja'] ?? null,
+                ]);
+                echo '</pre>';
+                exit;
+            }
+
             header('Location: /admin/produtos?success=2');
             exit;
             
@@ -1223,6 +1244,7 @@ HTML;
                 header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
             }
         }
+        exit;
     }
 
     public function removerCapa(Request $request, $id = null) {
@@ -1271,10 +1293,10 @@ HTML;
             }
 
             $pdo->commit();
-            header('Location: /admin/produtos/editar/' . $id);
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? ('/admin/produtos/editar/' . $id)));
             exit;
         } catch (\Exception $e) {
-            if (isset($pdo)) {
+            if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
