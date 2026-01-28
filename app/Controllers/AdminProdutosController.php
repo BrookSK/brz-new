@@ -1123,6 +1123,8 @@ HTML;
             ]);
 
             $rowsUpdated = $stmt->rowCount();
+            $stmtWarnings = $pdo->query('SHOW WARNINGS');
+            $warnings = $stmtWarnings ? $stmtWarnings->fetchAll(\PDO::FETCH_ASSOC) : [];
 
             // Atualizar foto de capa (se enviada)
             if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
@@ -1177,6 +1179,9 @@ HTML;
             $pdo->commit();
 
             if ($request->getParam('debug_loja')) {
+                $stmtCol = $pdo->query("SHOW COLUMNS FROM produtos LIKE 'loja'");
+                $colInfo = $stmtCol ? $stmtCol->fetch(\PDO::FETCH_ASSOC) : null;
+
                 $stmtCheck = $pdo->prepare('SELECT loja FROM produtos WHERE id = ?');
                 $stmtCheck->execute([$id]);
                 $dbRow = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
@@ -1187,6 +1192,8 @@ HTML;
                     'loja_post' => $request->getParam('loja'),
                     'update_rowCount' => (int) $rowsUpdated,
                     'loja_db' => $dbRow['loja'] ?? null,
+                    'loja_column' => $colInfo,
+                    'sql_warnings' => $warnings,
                 ]);
                 echo '</pre>';
                 exit;
