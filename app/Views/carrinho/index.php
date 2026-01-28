@@ -14,6 +14,39 @@
                             <div class="row align-items-center">
                                 <div class="col-4 col-md-2 mb-2 mb-md-0">
                                     <?php 
+                                    $fotoUrl = null;
+                                    $capaArquivo = null;
+                                    try {
+                                        $produtoModel = new \App\Models\Produto();
+                                        $produtoCarrinho = $produtoModel->find($item['produto_id']);
+                                        if (!empty($produtoCarrinho) && is_array($produtoCarrinho) && !empty($produtoCarrinho['foto_principal'])) {
+                                            $capaArquivo = (string) $produtoCarrinho['foto_principal'];
+                                        }
+                                    } catch (\Exception $e) {
+                                    }
+
+                                    if (!empty($capaArquivo) && is_string($capaArquivo)) {
+                                        $capaArquivo = trim($capaArquivo);
+                                        if ($capaArquivo !== '') {
+                                            if ($capaArquivo[0] !== '/') {
+                                                $capaArquivo = '/' . $capaArquivo;
+                                            }
+                                            if (strpos($capaArquivo, '/uploads/') !== 0) {
+                                                $capaArquivo = '/uploads/produtos/' . ltrim($capaArquivo, '/');
+                                            }
+
+                                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+                                            $rel = '/' . ltrim((string) $capaArquivo, '/');
+                                            $capaExists = (
+                                                ($docRoot !== '' && file_exists($docRoot . $rel)) ||
+                                                ($docRoot !== '' && file_exists($docRoot . '/public' . $rel))
+                                            );
+                                            if ($capaExists) {
+                                                $fotoUrl = Url::absolute($capaArquivo);
+                                            }
+                                        }
+                                    }
+
                                     $fotoPrincipal = null;
                                     $fotosProduto = [];
                                     try {
@@ -25,10 +58,9 @@
                                     } catch (\Exception $e) {
                                         // Ignorar erro
                                     }
-                                    
-                                    $fotoUrl = null;
+
                                     $fotoArquivo = $fotoPrincipal['nome_arquivo'] ?? ($fotosProduto[0]['nome_arquivo'] ?? null);
-                                    if (!empty($fotoArquivo) && is_string($fotoArquivo)) {
+                                    if (empty($fotoUrl) && !empty($fotoArquivo) && is_string($fotoArquivo)) {
                                         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
                                         $rel = '/' . ltrim((string) $fotoArquivo, '/');
                                         $fotoExists = (
