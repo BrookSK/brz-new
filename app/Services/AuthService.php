@@ -49,6 +49,15 @@ class AuthService {
         $_SESSION['usuario_nome'] = $usuario['nome'];
         $_SESSION['usuario_email'] = $usuario['email'];
         $_SESSION['usuario_perfil'] = $usuario['perfil'];
+        $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+        $avatarUrl = null;
+        foreach ($avatarCandidates as $c) {
+            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                $avatarUrl = $usuario[$c];
+                break;
+            }
+        }
+        $_SESSION['usuario_avatar'] = $avatarUrl;
         $_SESSION['logado'] = true;
         $_SESSION['ultimo_acesso'] = time();
         
@@ -75,7 +84,8 @@ class AuthService {
             'id' => $_SESSION['usuario_id'],
             'nome' => $_SESSION['usuario_nome'],
             'email' => $_SESSION['usuario_email'],
-            'perfil' => $_SESSION['usuario_perfil']
+            'perfil' => $_SESSION['usuario_perfil'],
+            'avatar' => $_SESSION['usuario_avatar'] ?? null
         ];
     }
     

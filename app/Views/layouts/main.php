@@ -525,6 +525,14 @@
             justify-content: center;
             font-weight: bold;
             cursor: pointer;
+            overflow: hidden;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
 
         /* Mobile + Tablet: navbar usable, avoid overflow, better tap targets */
@@ -761,6 +769,7 @@
                     <?php
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
                     $usuarioLogado = $isLoggedIn ? $_SESSION['usuario_nome'] : null;
+                    $usuarioAvatar = $isLoggedIn ? ($_SESSION['usuario_avatar'] ?? null) : null;
                     $usuarioPerfil = $isLoggedIn ? ($_SESSION['usuario_perfil'] ?? 'cliente') : 'cliente';
                     $totalItens = isset($_SESSION['carrinho']) ? array_sum(array_column($_SESSION['carrinho'], 'quantidade')) : 0;
                     ?>
@@ -770,7 +779,11 @@
                         <li class="nav-item dropdown user-menu">
                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                                 <div class="user-avatar me-2">
-                                    <?= strtoupper(substr($usuarioLogado, 0, 2)) ?>
+                                    <?php if (!empty($usuarioAvatar) && is_string($usuarioAvatar)): ?>
+                                        <img src="<?= htmlspecialchars($usuarioAvatar) ?>" alt="<?= htmlspecialchars($usuarioLogado) ?>">
+                                    <?php else: ?>
+                                        <?= strtoupper(substr($usuarioLogado, 0, 2)) ?>
+                                    <?php endif; ?>
                                 </div>
                                 <span class="d-none d-md-inline"><?= htmlspecialchars($usuarioLogado) ?></span>
                             </a>

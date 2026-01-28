@@ -5,8 +5,25 @@
         <div class="col-lg-3 mb-4">
             <div class="card shadow-sm">
                 <div class="card-body text-center">
+                    <?php
+                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                        $avatarUrl = null;
+                        foreach ($avatarColumnCandidates as $c) {
+                            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                                $avatarUrl = $usuario[$c];
+                                break;
+                            }
+                        }
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                        }
+                    ?>
                     <div class="user-avatar mx-auto mb-3">
-                        <?= strtoupper(substr($usuario['nome'], 0, 2)) ?>
+                        <?php if (!empty($avatarUrl) && is_string($avatarUrl)): ?>
+                            <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>">
+                        <?php else: ?>
+                            <?= strtoupper(substr($usuario['nome'], 0, 2)) ?>
+                        <?php endif; ?>
                     </div>
                     <h5 class="card-title"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted"><?= htmlspecialchars($usuario['email']) ?></p>
@@ -239,6 +256,14 @@
     justify-content: center;
     font-size: 2rem;
     font-weight: bold;
+    overflow: hidden;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .nav-link {

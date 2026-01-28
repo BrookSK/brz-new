@@ -237,6 +237,11 @@ class UsuarioController extends Controller {
 
             $this->usuarioModel->update($usuarioId, [$colunaAvatar => $relativeUrl]);
 
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['usuario_avatar'] = $relativeUrl;
+
             if (!empty($old) && is_string($old) && strpos($old, '/uploads/avatars/') === 0) {
                 $oldPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . str_replace('/', DIRECTORY_SEPARATOR, $old);
                 if (is_file($oldPath)) {
@@ -284,6 +289,11 @@ class UsuarioController extends Controller {
             $old = $usuarioAtual[$colunaAvatar] ?? '';
 
             $this->usuarioModel->update($usuarioId, [$colunaAvatar => null]);
+
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['usuario_avatar'] = null;
 
             if (!empty($old) && is_string($old) && strpos($old, '/uploads/avatars/') === 0) {
                 $oldPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . str_replace('/', DIRECTORY_SEPARATOR, $old);

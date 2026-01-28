@@ -6,10 +6,26 @@
             <!-- Profile Card -->
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center p-4">
+                    <?php
+                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                        $avatarUrl = null;
+                        foreach ($avatarColumnCandidates as $c) {
+                            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                                $avatarUrl = $usuario[$c];
+                                break;
+                            }
+                        }
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                        }
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=0b1f3a&color=fff&size=128';
+                        }
+                    ?>
                     <div class="user-avatar mx-auto mb-3">
-                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($usuario['nome']) ?>&background=0b1f3a&color=fff&size=128" 
+                        <img src="<?= htmlspecialchars($avatarUrl) ?>" 
                              alt="<?= htmlspecialchars($usuario['nome']) ?>" 
-                             class="rounded-circle" width="80" height="80">
+                             class="rounded-circle" width="80" height="80" style="object-fit: cover;">
                     </div>
                     <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email']) ?></p>
