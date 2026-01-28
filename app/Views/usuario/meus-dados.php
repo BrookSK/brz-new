@@ -515,6 +515,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .user-avatar img {
     border: 0px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 80px;
 }
 
 .avatar-file-input-hidden {
@@ -729,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .user-avatar img {
     border: 0px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 80px;
 }
 
 .nav-link {
