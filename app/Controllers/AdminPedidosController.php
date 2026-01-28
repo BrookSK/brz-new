@@ -570,8 +570,17 @@ class AdminPedidosController extends Controller {
                             <div class="card-body">
                                 <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
-                                <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['moeda'] ?? 'BRL') . '</p>
+                                <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
                                 <p><strong>Frete:</strong> R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</p>
+                                <hr>
+                                <div class="mb-3">
+                                    <h6 class="mb-2">Pagamento</h6>
+                                    <p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? 'N/A') . '</p>
+                                    <p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pedido['pagamento_status'] ?? 'Pendente') . '</p>
+                                    <p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pedido['pagamento_gateway'] ?? 'N/A') . '</p>
+                                    <p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pedido['pagamento_transacao'] ?? 'N/A') . '</p>
+                                    <p class="mb-0"><strong>Data:</strong> ' . (!empty($pedido['pagamento_data']) ? date('d/m/Y H:i', strtotime($pedido['pagamento_data'])) : 'N/A') . '</p>
+                                </div>
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>

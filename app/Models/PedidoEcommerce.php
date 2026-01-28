@@ -175,12 +175,92 @@ class PedidoEcommerce extends Model {
     }
 
     public function getComDetalhes($pedidoId) {
+        $joinPagamentos = '';
+        $selectPagamentos = '';
+        $selectFormaPagamento = '';
+
+        try {
+            $stmtColsP = $this->connection->query("DESCRIBE {$this->table}");
+            $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($colsP) && in_array('forma_pagamento', $colsP, true)) {
+                $selectFormaPagamento = ', p.forma_pagamento as forma_pagamento';
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmtColsPg = $this->connection->query('DESCRIBE pagamentos');
+            $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($colsPg) && !empty($colsPg)) {
+                $joinPagamentos = 'LEFT JOIN pagamentos pg ON p.id = pg.pedido_id';
+
+                $metodoCol = null;
+                foreach (['metodo', 'forma_pagamento', 'payment_method', 'tipo'] as $c) {
+                    if (in_array($c, $colsPg, true)) {
+                        $metodoCol = $c;
+                        break;
+                    }
+                }
+
+                $statusCol = null;
+                foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                    if (in_array($c, $colsPg, true)) {
+                        $statusCol = $c;
+                        break;
+                    }
+                }
+
+                $gatewayCol = null;
+                foreach (['gateway', 'provedor', 'provider'] as $c) {
+                    if (in_array($c, $colsPg, true)) {
+                        $gatewayCol = $c;
+                        break;
+                    }
+                }
+
+                $transacaoCol = null;
+                foreach (['codigo_transacao', 'transaction_id', 'transacao', 'payment_id'] as $c) {
+                    if (in_array($c, $colsPg, true)) {
+                        $transacaoCol = $c;
+                        break;
+                    }
+                }
+
+                $dataCol = null;
+                foreach (['data_pagamento', 'paid_at', 'data_confirmacao', 'updated_at', 'created_at'] as $c) {
+                    if (in_array($c, $colsPg, true)) {
+                        $dataCol = $c;
+                        break;
+                    }
+                }
+
+                if (!empty($metodoCol)) {
+                    $selectPagamentos .= ", pg.{$metodoCol} AS pagamento_metodo";
+                }
+                if (!empty($statusCol)) {
+                    $selectPagamentos .= ", pg.{$statusCol} AS pagamento_status";
+                }
+                if (!empty($gatewayCol)) {
+                    $selectPagamentos .= ", pg.{$gatewayCol} AS pagamento_gateway";
+                }
+                if (!empty($transacaoCol)) {
+                    $selectPagamentos .= ", pg.{$transacaoCol} AS pagamento_transacao";
+                }
+                if (!empty($dataCol)) {
+                    $selectPagamentos .= ", pg.{$dataCol} AS pagamento_data";
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
         // Adaptar query para a estrutura correta das tabelas
         $stmt = $this->connection->prepare("
             SELECT p.*, 
                    COALESCE(c.nome_razao_social, u.nome, u.name, p.nome) as cliente_nome,
                    COALESCE(c.email, u.email) as cliente_email,
-                   COALESCE(c.telefone, u.telefone) as cliente_telefone,
+                   COALESCE(c.telefone, u.telefone) as cliente_telefone
+                   {$selectFormaPagamento}
+                   {$selectPagamentos},
                    e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
                    e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
                    e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
@@ -188,6 +268,7 @@ class PedidoEcommerce extends Model {
             FROM {$this->table} p
             LEFT JOIN usuarios u ON p.usuario_id = u.id
             LEFT JOIN clientes c ON p.cliente_id = c.id
+            {$joinPagamentos}
             LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
             LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
             WHERE p.id = :id
