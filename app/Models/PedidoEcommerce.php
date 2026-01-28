@@ -178,13 +178,16 @@ class PedidoEcommerce extends Model {
         // Adaptar query para a estrutura correta das tabelas
         $stmt = $this->connection->prepare("
             SELECT p.*, 
-                   u.nome as cliente_nome, u.email as cliente_email,
+                   COALESCE(c.nome_razao_social, u.nome, u.name, p.nome) as cliente_nome,
+                   COALESCE(c.email, u.email) as cliente_email,
+                   COALESCE(c.telefone, u.telefone) as cliente_telefone,
                    e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
                    e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
                    e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
                    e_cob.cep as cep_cobranca
             FROM {$this->table} p
             LEFT JOIN usuarios u ON p.usuario_id = u.id
+            LEFT JOIN clientes c ON p.cliente_id = c.id
             LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
             LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
             WHERE p.id = :id

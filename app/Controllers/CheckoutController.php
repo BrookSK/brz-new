@@ -357,21 +357,47 @@ class CheckoutController extends Controller {
     private function obterPedidoCompleto($pedidoId) {
         $db = \Config\Database::getConnection();
         
-        $sql = "SELECT p.*, u.name as usuario_nome 
-                FROM pedidos p 
-                LEFT JOIN usuarios u ON p.usuario_id = u.id 
+        $sql = "SELECT 
+                    p.*,
+                    p.servicos AS taxa_servico,
+                    u.name AS cliente_nome,
+                    u.email AS cliente_email,
+                    u.telefone AS cliente_telefone,
+                    e_ent.cep AS cep,
+                    e_ent.endereco AS endereco,
+                    e_ent.logradouro AS logradouro,
+                    e_ent.numero AS numero,
+                    e_ent.complemento AS complemento,
+                    e_ent.bairro AS bairro,
+                    e_ent.cidade AS cidade,
+                    e_ent.estado AS estado
+                FROM pedidos p
+                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
                 WHERE p.id = ?";
         
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
-        
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (is_array($pedido)) {
+            if (empty($pedido['endereco']) && !empty($pedido['logradouro'])) {
+                $pedido['endereco'] = $pedido['logradouro'];
+            }
+        }
+
+        return $pedido;
     }
     
     private function obterItensPedido($pedidoId) {
         $db = \Config\Database::getConnection();
         
-        $sql = "SELECT * FROM pedido_itens WHERE pedido_id = ?";
+        $sql = "SELECT 
+                    pi.*,
+                    COALESCE(pi.nome_produto, pr.nome, pr.name) AS nome
+                FROM pedido_itens pi
+                LEFT JOIN produtos pr ON pi.produto_id = pr.id
+                WHERE pi.pedido_id = ?";
         
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
@@ -551,6 +577,8 @@ class CheckoutController extends Controller {
             if (empty($usuario['email'])) {
                 throw new \Exception('E-mail é obrigatório para criar pedido');
             }
+
+            $emailInformado = $usuario['email'];
             
             // 1. Buscar/criar usuário na tabela usuarios
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
@@ -563,6 +591,10 @@ class CheckoutController extends Controller {
                 $stmtDoc->execute([$usuario['documento']]);
                 $existingUserByDoc = $stmtDoc->fetch(\PDO::FETCH_ASSOC);
                 if ($existingUserByDoc && !empty($existingUserByDoc['id'])) {
+                    // Se encontrou pelo CPF mas o e-mail informado é diferente, exigir login com o e-mail correto
+                    if (!$this->authService->estaLogado() && !empty($existingUserByDoc['email']) && strcasecmp((string) $existingUserByDoc['email'], (string) $emailInformado) !== 0) {
+                        throw new \Exception('Já existe uma conta com esse CPF. Faça login com o e-mail cadastrado para finalizar a compra.');
+                    }
                     $existingUser = ['id' => $existingUserByDoc['id']];
                     // Preferir dados já existentes do cadastro
                     if (!empty($existingUserByDoc['email'])) {
