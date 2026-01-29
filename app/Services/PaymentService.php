@@ -34,6 +34,18 @@ class PaymentService {
         } catch (\Exception $e) {
         }
 
+        // Tenta schema chave/valor em configuracoes_sistema (sem coluna categoria)
+        try {
+            $key = $categoria . '_' . $chave;
+            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
         // Tenta schema chave/valor (configuracoes)
         try {
             $key = $categoria . '_' . $chave;

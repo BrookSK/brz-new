@@ -416,14 +416,14 @@ class AdminConfiguracoesController extends Controller {
                                                         <div class="card-header d-flex justify-content-between align-items-center">
                                                             <h6 class="mb-0">🇧🇷 Asaas</h6>
                                                             <div class="form-check form-switch">
-                                                                <input class="form-check-input" type="checkbox" id="asaas_enabled" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <input class="form-check-input" type="checkbox" id="asaas_enabled" name="pagamentos_asaas_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_enabled', '0') === '1' ? 'checked' : '') . '>
                                                                 <label class="form-check-label" for="asaas_enabled">Ativo</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="mb-3">
                                                                 <label class="form-label">Ambiente</label>
-                                                                <select class="form-select" name="asaas_ambiente">
+                                                                <select class="form-select" name="pagamentos_asaas_ambiente">
                                                                     <option value="sandbox" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>Sandbox (Testes)</option>
                                                                     <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'asaas_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
                                                                 </select>
@@ -431,7 +431,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="mb-3">
                                                                 <label class="form-label">API Key</label>
                                                                 <div class="input-group">
-                                                                    <input type="password" class="form-control" name="asaas_api_key" value="' . $this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '') . '" placeholder="Sua API Key do Asaas">
+                                                                    <input type="password" class="form-control" name="pagamentos_asaas_api_key" value="' . $this->getConfigValue($config, 'pagamentos', 'asaas_api_key', '') . '" placeholder="Sua API Key do Asaas">
                                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
@@ -454,14 +454,14 @@ class AdminConfiguracoesController extends Controller {
                                                         <div class="card-header d-flex justify-content-between align-items-center">
                                                             <h6 class="mb-0">💳 Stripe</h6>
                                                             <div class="form-check form-switch">
-                                                                <input class="form-check-input" type="checkbox" id="stripe_enabled" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <input class="form-check-input" type="checkbox" id="stripe_enabled" name="pagamentos_stripe_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_enabled', '0') === '1' ? 'checked' : '') . '>
                                                                 <label class="form-check-label" for="stripe_enabled">Ativo</label>
                                                             </div>
                                                         </div>
                                                         <div class="card-body">
                                                             <div class="mb-3">
                                                                 <label class="form-label">Ambiente</label>
-                                                                <select class="form-select" name="stripe_ambiente">
+                                                                <select class="form-select" name="pagamentos_stripe_ambiente">
                                                                     <option value="test" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', 'test') === 'test' ? 'selected' : '') . '>Test (Chaves de Teste)</option>
                                                                     <option value="live" ' . ($this->getConfigValue($config, 'pagamentos', 'stripe_ambiente', '') === 'live' ? 'selected' : '') . '>Live (Chaves de Produção)</option>
                                                                 </select>
@@ -469,7 +469,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="mb-3">
                                                                 <label class="form-label">Publishable Key</label>
                                                                 <div class="input-group">
-                                                                    <input type="password" class="form-control" name="stripe_publishable_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '') . '" placeholder="pk_test_...">
+                                                                    <input type="password" class="form-control" name="pagamentos_stripe_publishable_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_publishable_key', '') . '" placeholder="pk_test_...">
                                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
@@ -479,7 +479,7 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="mb-3">
                                                                 <label class="form-label">Secret Key</label>
                                                                 <div class="input-group">
-                                                                    <input type="password" class="form-control" name="stripe_secret_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_secret_key', '') . '" placeholder="sk_test_...">
+                                                                    <input type="password" class="form-control" name="pagamentos_stripe_secret_key" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_secret_key', '') . '" placeholder="sk_test_...">
                                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
