@@ -934,7 +934,18 @@ class CheckoutController extends Controller {
         $stmt = $db->prepare($sql);
         $stmt->execute([$pedidoId]);
 
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (is_array($pedido)) {
+            $stPag = $pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? null);
+            if (is_string($stPag)) {
+                $stPag = strtoupper(trim($stPag));
+            }
+            if (!empty($stPag) && in_array($stPag, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                $pedido['status'] = 'pago';
+            }
+        }
+
+        return $pedido;
     }
     
     private function obterItensPedido($pedidoId) {
@@ -1292,12 +1303,11 @@ class CheckoutController extends Controller {
             
             // Taxas baseadas na moeda selecionada
             if ($moedaSelecionada === 'BRL') {
-                // Valores em BRL (convertidos)
-                $taxaConversao = 5.50; // Taxa de conversão USD para BRL
-                $taxaServico = (ceil($pesoTotal) * $this->getTaxaServicoPorKg()) * $taxaConversao; // Converter para BRL
-                $impostos = $subtotal * 0.80; // Já está em BRL
-                $freteUSD = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
-                $frete = ($freteUSD > 0) ? ($freteUSD * $taxaConversao) : 0;
+                // Valores em BRL (sem conversão fixa para evitar conversão dupla)
+                $taxaConversao = 1.0;
+                $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
+                $impostos = $subtotal * 0.80;
+                $frete = $this->calcularFrete($subtotal, $pesoTotal, 'BRL');
                 $total = $subtotal + $taxaServico + $impostos + $frete;
                 
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL - Taxa conversao: ' . $taxaConversao);
