@@ -118,6 +118,7 @@ class PaymentService {
             'Content-Type: application/json',
             'Accept: application/json',
             'access_token: ' . $this->asaasApiKey,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
 
         $payload = null;
