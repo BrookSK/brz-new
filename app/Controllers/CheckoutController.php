@@ -375,8 +375,8 @@ class CheckoutController extends Controller {
         // Obter dados do formulário
         $dados = $request->getParams();
         
-        // Verificar se usuário quer salvar novo endereço
-        if (!empty($usuario) && !empty($dados['salvar_endereco'])) {
+        // Salvar endereço automaticamente para futuras compras (quando logado)
+        if (!empty($usuario)) {
             // Salvar novo endereço
             $enderecoData = [
                 'usuario_id' => $usuario['id'],

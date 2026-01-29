@@ -120,15 +120,6 @@
                                         </select>
                                     </div>
                                 </div>
-                                
-                                <?php if (!empty($usuario)): ?>
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="salvar_endereco" id="salvar_endereco">
-                                    <label class="form-check-label" for="salvar_endereco">
-                                        Salvar este endereço para futuras compras
-                                    </label>
-                                </div>
-                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -254,11 +245,6 @@
                                         <div class="col-12" id="campos-boleto" style="display: none;">
                                             <label class="form-label">CPF/CNPJ do Titular</label>
                                             <input type="text" name="boleto_cpf" class="form-control" placeholder="000.000.000-00">
-                                        </div>
-                                        <div class="col-12" id="campos-pix" style="display: none;">
-                                            <label class="form-label">Chave PIX (opcional)</label>
-                                            <input type="text" name="pix_chave" class="form-control" placeholder="Chave aleatória">
-                                            <div class="form-text">Deixe em branco para gerar automaticamente</div>
                                         </div>
                                         <div class="col-12" id="campos-transferencia" style="display: none;">
                                             <label class="form-label">Banco</label>
