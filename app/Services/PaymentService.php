@@ -447,8 +447,39 @@ class PaymentService {
             }
 
             if ($aprovado && in_array('status', $colsP, true)) {
+                $pedidoStatusPago = 'pago';
+                try {
+                    $stmtEnum = $db->prepare('SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1');
+                    $stmtEnum->execute(['pedidos', 'status']);
+                    $colType = (string) ($stmtEnum->fetchColumn() ?: '');
+                    $colTypeLower = strtolower($colType);
+
+                    if (str_starts_with($colTypeLower, 'enum(')) {
+                        $inside = trim(substr($colType, 5));
+                        $inside = rtrim($inside, ')');
+                        $rawVals = array_filter(array_map('trim', explode(',', $inside)));
+                        $vals = [];
+                        foreach ($rawVals as $rv) {
+                            $rv = trim($rv);
+                            $rv = trim($rv, "\"' ");
+                            if ($rv !== '') {
+                                $vals[] = $rv;
+                            }
+                        }
+
+                        $candidates = ['pago', 'paid', 'aprovado', 'approved'];
+                        foreach ($candidates as $cand) {
+                            if (in_array($cand, $vals, true)) {
+                                $pedidoStatusPago = $cand;
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+
                 $set[] = 'status = :status';
-                $params['status'] = 'pago';
+                $params['status'] = $pedidoStatusPago;
             }
 
             if (!empty($set)) {

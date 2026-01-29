@@ -379,6 +379,9 @@ class PedidoEcommerce extends Model {
             // Garantir que o pedido tenha todos os campos necessários
             $pedido['codigo_pedido'] = $pedido['numero_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
             $pedido['status'] = $pedido['status'] ?? 'pendente';
+            if (empty($pedido['status'])) {
+                $pedido['status'] = 'pendente';
+            }
             $pedido['subtotal_produtos'] = $pedido['subtotal'] ?? 0;
             $pedido['valor_frete'] = $pedido['frete'] ?? 0;
             $pedido['taxa_servico'] = $pedido['servicos'] ?? 0;
