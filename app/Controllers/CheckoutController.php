@@ -24,6 +24,41 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function formatarErroParaUsuario(string $mensagem): string {
+        $m = trim($mensagem);
+
+        // Extrair erro do Asaas quando vier como JSON
+        if (stripos($m, 'Erro Asaas HTTP') !== false) {
+            $jsonPos = strpos($m, '{');
+            if ($jsonPos !== false) {
+                $jsonStr = substr($m, $jsonPos);
+                $decoded = json_decode($jsonStr, true);
+                if (is_array($decoded) && !empty($decoded['errors']) && is_array($decoded['errors'])) {
+                    $first = $decoded['errors'][0] ?? null;
+                    if (is_array($first)) {
+                        $desc = (string) ($first['description'] ?? '');
+                        if ($desc !== '') {
+                            return $desc;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remover prefixos técnicos em cadeia
+        $prefixes = [
+            'Erro ao processar pedido:',
+            'Erro ao processar pagamento:',
+        ];
+        foreach ($prefixes as $p) {
+            if (stripos($m, $p) === 0) {
+                $m = trim(substr($m, strlen($p)));
+            }
+        }
+
+        return $m !== '' ? $m : 'Não foi possível processar o pagamento. Tente novamente.';
+    }
+
     private function getConfigValue(string $chave, $default = null) {
         try {
             $db = \Config\Database::getConnection();
@@ -581,7 +616,8 @@ class CheckoutController extends Controller {
         } catch (\Exception $e) {
             $this->debugLog('[CHECKOUT] Excecao: ' . $e->getMessage());
             $this->debugLog('[CHECKOUT] Stack: ' . $e->getTraceAsString());
-            $this->json(['error' => 'Erro ao processar pedido: ' . $e->getMessage()], 500);
+            $msgUser = $this->formatarErroParaUsuario($e->getMessage());
+            $this->json(['error' => 'Erro ao processar pedido: ' . $msgUser], 500);
         }
         
         $this->debugLog('[CHECKOUT] processar() - FIM');
