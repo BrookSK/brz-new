@@ -1,11 +1,11 @@
 <?php ob_start(); ?>
 <div class="container-fluid px-0">
     <div class="row g-0">
+        <form id="checkout-form" method="POST">
         <!-- Formulário Principal -->
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
-                    <form id="checkout-form" method="POST">
                         <!-- Campo oculto para moeda -->
                         <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
                         
@@ -415,6 +415,34 @@ function processarPedidoDireto() {
         const formaPagamento = formaPagamentoSelect.value;
         formData.append('forma_pagamento', formaPagamento);
         console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
+
+        // Garantir coleta explícita dos campos do cartão quando selecionado
+        if (formaPagamento === 'cartao_credito') {
+            const camposCartao = document.getElementById('campos-cartao');
+            const nomeCartao = camposCartao ? camposCartao.querySelector('input[name="card_holder_name"]') : null;
+            const numeroCartao = camposCartao ? camposCartao.querySelector('input[name="card_number"]') : null;
+            const mesCartao = camposCartao ? camposCartao.querySelector('input[name="card_expiry_month"]') : null;
+            const anoCartao = camposCartao ? camposCartao.querySelector('input[name="card_expiry_year"]') : null;
+            const cvvCartao = camposCartao ? camposCartao.querySelector('input[name="card_cvv"]') : null;
+
+            const vNome = nomeCartao ? nomeCartao.value : '';
+            const vNumero = numeroCartao ? numeroCartao.value : '';
+            const vMes = mesCartao ? mesCartao.value : '';
+            const vAno = anoCartao ? anoCartao.value : '';
+            const vCvv = cvvCartao ? cvvCartao.value : '';
+
+            formData.set('card_holder_name', vNome);
+            formData.set('card_number', vNumero);
+            formData.set('card_expiry_month', vMes);
+            formData.set('card_expiry_year', vAno);
+            formData.set('card_cvv', vCvv);
+
+            console.log('🔍 [DIRETO] [CARTAO] card_holder_name:', vNome);
+            console.log('🔍 [DIRETO] [CARTAO] card_number:', vNumero);
+            console.log('🔍 [DIRETO] [CARTAO] card_expiry_month:', vMes);
+            console.log('🔍 [DIRETO] [CARTAO] card_expiry_year:', vAno);
+            console.log('🔍 [DIRETO] [CARTAO] card_cvv:', vCvv);
+        }
     } else {
         console.error('❌ [DIRETO] Campo forma_pagamento não encontrado');
     }
@@ -422,6 +450,12 @@ function processarPedidoDireto() {
     console.log('🔍 [DIRETO] Total de campos no FormData:', [...formData.keys()].length);
     console.log('🔍 [DIRETO] Verificando consentimento_legal no FormData:', formData.get('consentimento_legal'));
     console.log('🔍 [DIRETO] Verificando forma_pagamento no FormData:', formData.get('forma_pagamento'));
+
+    console.log('🔍 [DIRETO] Verificando card_holder_name no FormData:', formData.get('card_holder_name'));
+    console.log('🔍 [DIRETO] Verificando card_number no FormData:', formData.get('card_number'));
+    console.log('🔍 [DIRETO] Verificando card_expiry_month no FormData:', formData.get('card_expiry_month'));
+    console.log('🔍 [DIRETO] Verificando card_expiry_year no FormData:', formData.get('card_expiry_year'));
+    console.log('🔍 [DIRETO] Verificando card_cvv no FormData:', formData.get('card_cvv'));
     
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
