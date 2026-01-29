@@ -984,6 +984,9 @@ function updatePrices(currency) {
         moedaHidden.value = currency;
         console.log('🔍 [MOEDA] Campo oculto de moeda atualizado para:', currency);
     }
+
+    // Atualizar opções de forma de pagamento conforme moeda (BRL=Asaas, USD=Stripe)
+    updatePaymentMethodsForCurrency(currency);
     
     // Atualizar símbolo da moeda no header se existir
     const currentCurrencyElement = document.getElementById('current-currency');
@@ -993,6 +996,37 @@ function updatePrices(currency) {
     }
     
     console.log('🔍 [MOEDA] updatePrices() concluída com sucesso');
+}
+
+function updatePaymentMethodsForCurrency(currency) {
+    const select = document.getElementById('forma_pagamento');
+    if (!select) return;
+
+    const cur = (currency || '').toString().trim().toUpperCase();
+    const isBRL = (cur === 'BRL');
+
+    const currentValue = select.value;
+
+    // Recriar options (evita opções inconsistentes ao trocar moeda)
+    select.innerHTML = '';
+    select.appendChild(new Option('Selecione...', ''));
+
+    if (isBRL) {
+        select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
+        select.appendChild(new Option('Boleto Bancário', 'boleto'));
+        select.appendChild(new Option('PIX', 'pix'));
+    } else {
+        select.appendChild(new Option('Cartão de Crédito (Stripe)', 'cartao_credito'));
+    }
+
+    // Manter seleção se ainda válida
+    const stillValid = Array.from(select.options).some(o => o.value === currentValue);
+    select.value = stillValid ? currentValue : '';
+
+    // Atualizar exibição dos campos conforme a forma selecionada
+    if (typeof atualizarFormaPagamento === 'function') {
+        atualizarFormaPagamento();
+    }
 }
 
 // Inicializar com a moeda do header

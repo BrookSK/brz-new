@@ -169,10 +169,7 @@ class PaymentService {
             return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
         }
 
-        return [
-            'success' => false,
-            'error' => 'Pagamento em moeda diferente de BRL ainda não está disponível'
-        ];
+        return $this->processarPagamentoStripe($dadosPagamento, $valor, $descricao);
     }
     
     private function processarPagamentoAsaas($dados, $valor, $descricao) {
@@ -291,10 +288,9 @@ class PaymentService {
         $response = [
             'success' => true,
             'payment_id' => 'pi_' . uniqid(),
-            'status' => 'succeeded',
+            'status' => 'pending',
             'charge_id' => 'ch_' . uniqid(),
             'amount' => $valor,
-            'paid_at' => date('Y-m-d H:i:s')
         ];
         
         return $response;
