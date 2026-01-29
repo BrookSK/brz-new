@@ -675,6 +675,19 @@
                                     </div>
                                 <?php endif; ?>
                             <?php endif; ?>
+
+                            <?php
+                            $statusInterno = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ''));
+                            $podeReemitir = in_array(strtoupper($statusInterno), ['PENDING', 'PENDENTE', 'OVERDUE'], true);
+                            ?>
+
+                            <?php if ($podeReemitir && in_array($billingType, ['PIX', 'BOLETO'], true) && !empty($pedido['id'])): ?>
+                                <form method="POST" action="/pedido/reemitir-pagamento/<?= (int) $pedido['id'] ?>" class="mt-3">
+                                    <button type="submit" class="btn btn-outline-secondary">
+                                        Gerar nova cobrança
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php endif; ?>

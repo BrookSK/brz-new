@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Models\PedidoEcommerce;
+use App\Services\PaymentService;
 
 class AdminPedidosController extends Controller {
     
@@ -579,8 +580,20 @@ class AdminPedidosController extends Controller {
                                     <p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pedido['pagamento_status'] ?? 'Pendente') . '</p>
                                     <p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pedido['pagamento_gateway'] ?? 'N/A') . '</p>
                                     <p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pedido['pagamento_transacao'] ?? 'N/A') . '</p>
-                                    <p class="mb-0"><strong>Data:</strong> ' . (!empty($pedido['pagamento_data']) ? date('d/m/Y H:i', strtotime($pedido['pagamento_data'])) : 'N/A') . '</p>
-                                </div>
+                                    <p class="mb-0"><strong>Data:</strong> ' . (!empty($pedido['pagamento_data']) ? date('d/m/Y H:i', strtotime($pedido['pagamento_data'])) : 'N/A') . '</p>';
+
+                                    $pgGateway = (string) ($pedido['pagamento_gateway'] ?? '');
+                                    $pgMetodo = strtoupper((string) ($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? ''));
+                                    $pgStatus = strtoupper((string) ($pedido['pagamento_status'] ?? ''));
+                                    $podeReemitir = ($pgGateway === 'asaas') && in_array($pgMetodo, ['PIX', 'BOLETO', 'PXD', 'PIX '], true) && !in_array($pgStatus, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);
+
+                                    if ($podeReemitir) {
+                                        echo '<form method="POST" action="/admin/pedidos/reemitir-pagamento/' . (int) $pedido['id'] . '" class="mt-2">'
+                                            . '<button type="submit" class="btn btn-outline-secondary btn-sm">Gerar nova cobrança</button>'
+                                            . '</form>';
+                                    }
+
+                                echo '</div>
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>
@@ -638,12 +651,31 @@ class AdminPedidosController extends Controller {
 
     // Renderizar scripts
     renderAdminScripts();
-    
+        
     echo '</body>
 </html>';
-        exit;
+    exit;
+
     }
-    
+
+    public function reemitirPagamento(Request $request) {
+        $id = (int) $request->getParam('id');
+        if (empty($id)) {
+            header('Location: /admin/pedidos');
+            exit;
+        }
+
+        try {
+            $paymentService = new PaymentService();
+            $paymentService->reemitirCobrancaAsaasPorPedido($id);
+            header('Location: /admin/pedidos/detalhes/' . $id . '?reemitido=1');
+            exit;
+        } catch (\Exception $e) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?reemitido=0');
+            exit;
+        }
+    }
+
     private function formatarMoeda($valor, $moeda) {
         if ($moeda === 'USD') {
             return '$ ' . number_format($valor, 2, '.', ',');

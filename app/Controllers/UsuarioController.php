@@ -331,6 +331,31 @@ class UsuarioController extends Controller {
             error_log('Erro ao verificar estrutura da tabela: ' . $e->getMessage());
         }
     }
+
+    public function reemitirPagamento(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $pedidoId = (int) $request->getParam('id');
+        $usuario = $this->authService->getUsuarioLogado();
+
+        if (empty($pedidoId)) {
+            $this->redirect('/meus-pedidos');
+            return;
+        }
+
+        try {
+            $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+            if (!$pedido || (int) ($pedido['usuario_id'] ?? 0) !== (int) ($usuario['id'] ?? 0)) {
+                $this->redirect('/meus-pedidos');
+                return;
+            }
+
+            $this->paymentService->reemitirCobrancaAsaasPorPedido($pedidoId);
+            $this->redirect('/pedido/detalhes/' . $pedidoId . '?reemitido=1');
+        } catch (\Exception $e) {
+            $this->redirect('/pedido/detalhes/' . $pedidoId . '?reemitido=0');
+        }
+    }
     
     private function prepararDadosAtualizacao($dados) {
         // Obter colunas existentes na tabela

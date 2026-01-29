@@ -48,6 +48,7 @@ $router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
 $router->post('/meus-dados/avatar/remover', 'UsuarioController', 'avatarRemover');
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
 $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
+$router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirPagamento');
 
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
@@ -214,6 +215,7 @@ $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'ex
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
+$router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');

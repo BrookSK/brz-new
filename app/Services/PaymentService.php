@@ -374,6 +374,125 @@ class PaymentService {
     public function obterPixQrCodeAsaas(string $paymentId): array {
         return $this->asaasRequest('GET', '/payments/' . $paymentId . '/pixQrCode');
     }
+
+    public function reemitirCobrancaAsaasPorPedido(int $pedidoId): array {
+        $pedido = $this->pedidoModel->find($pedidoId);
+        if (!$pedido) {
+            throw new \Exception('Pedido não encontrado');
+        }
+
+        $gateway = (string) ($pedido['payment_gateway'] ?? '');
+        $paymentId = (string) ($pedido['payment_id'] ?? '');
+        if ($gateway !== 'asaas' || empty($paymentId)) {
+            throw new \Exception('Pedido sem pagamento Asaas');
+        }
+
+        $payment = $this->obterPagamentoAsaas($paymentId);
+        $billingType = strtoupper((string) ($payment['billingType'] ?? ''));
+        if (!in_array($billingType, ['PIX', 'BOLETO'], true)) {
+            throw new \Exception('Reemissão disponível apenas para PIX e BOLETO');
+        }
+
+        $status = strtoupper((string) ($payment['status'] ?? ''));
+        $precisaCriarNova = false;
+        if (in_array($status, ['OVERDUE', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
+            $precisaCriarNova = true;
+        }
+
+        $novoPaymentId = $paymentId;
+        $novoPayment = $payment;
+
+        if ($precisaCriarNova) {
+            $payload = [
+                'customer' => $payment['customer'] ?? null,
+                'billingType' => $billingType,
+                'value' => isset($payment['value']) ? (float) $payment['value'] : null,
+                'dueDate' => date('Y-m-d', strtotime('+1 day')),
+                'description' => $payment['description'] ?? ('Pedido #' . $pedidoId),
+                'externalReference' => (string) $pedidoId,
+            ];
+
+            if (empty($payload['customer']) || empty($payload['value'])) {
+                throw new \Exception('Não foi possível reemitir: dados incompletos no Asaas');
+            }
+
+            $novoPayment = $this->asaasRequest('POST', '/payments', $payload);
+            $novoPaymentId = (string) ($novoPayment['id'] ?? '');
+            if (empty($novoPaymentId)) {
+                throw new \Exception('Asaas: falha ao criar nova cobrança');
+            }
+
+            $this->atualizarPedidoComNovoPagamentoAsaas($pedidoId, $novoPaymentId, (string) ($novoPayment['status'] ?? 'PENDING'));
+        }
+
+        $pixQrCode = null;
+        if ($billingType === 'PIX' && !empty($novoPaymentId)) {
+            try {
+                $pixQrCode = $this->obterPixQrCodeAsaas($novoPaymentId);
+            } catch (\Exception $e) {
+            }
+        }
+
+        return [
+            'success' => true,
+            'billingType' => $billingType,
+            'payment' => $novoPayment,
+            'payment_id' => $novoPaymentId,
+            'pixQrCode' => $pixQrCode,
+            'recreated' => $precisaCriarNova,
+        ];
+    }
+
+    private function atualizarPedidoComNovoPagamentoAsaas(int $pedidoId, string $paymentId, string $gatewayStatus): void {
+        $db = \Config\Database::getConnection();
+        $colsP = [];
+        try {
+            $stmtColsP = $db->query('DESCRIBE pedidos');
+            $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+        }
+
+        if (!is_array($colsP) || empty($colsP)) {
+            return;
+        }
+
+        $set = [];
+        $params = ['id' => $pedidoId];
+
+        if (in_array('payment_gateway', $colsP, true)) {
+            $set[] = 'payment_gateway = :payment_gateway';
+            $params['payment_gateway'] = 'asaas';
+        }
+
+        if (in_array('payment_id', $colsP, true)) {
+            $set[] = 'payment_id = :payment_id';
+            $params['payment_id'] = $paymentId;
+        }
+
+        $internal = $this->mapearStatusAsaasParaInterno(strtoupper((string) $gatewayStatus));
+        if (in_array('payment_status', $colsP, true)) {
+            $set[] = 'payment_status = :payment_status';
+            $params['payment_status'] = $internal;
+        }
+
+        if (in_array('pago_em', $colsP, true)) {
+            $set[] = 'pago_em = :pago_em';
+            $params['pago_em'] = null;
+        }
+
+        if (in_array('status', $colsP, true)) {
+            $set[] = 'status = :status';
+            $params['status'] = 'pendente';
+        }
+
+        if (empty($set)) {
+            return;
+        }
+
+        $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+        $stmtUp = $db->prepare($sql);
+        $stmtUp->execute($params);
+    }
     
     public function estornarPagamento($pedidoId, $motivo = '') {
         $pedido = $this->pedidoModel->find($pedidoId);
