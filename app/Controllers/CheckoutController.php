@@ -228,8 +228,11 @@ class CheckoutController extends Controller {
                 }
             }
 
-            if (in_array('gateway', $cols, true)) {
-                $insert['gateway'] = ($pedidoRow['moeda'] ?? null) === 'BRL' ? 'asaas' : 'stripe';
+            foreach (['gateway', 'provedor', 'provider'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $insert[$c] = ($pedidoRow['moeda'] ?? null) === 'BRL' ? 'asaas' : 'stripe';
+                    break;
+                }
             }
 
             if (in_array('valor', $cols, true) && isset($pedidoRow['total'])) {
@@ -406,6 +409,9 @@ class CheckoutController extends Controller {
             }
 
             $dataVal = (string) ($paymentResult['paid_at'] ?? '');
+            if (empty($dataVal) && (!empty($paymentResult['status']) || !empty($paymentResult['payment_id']))) {
+                $dataVal = date('Y-m-d H:i:s');
+            }
             foreach (['data_pagamento', 'paid_at', 'data_confirmacao', 'updated_at', 'created_at'] as $c) {
                 if (!empty($dataVal) && in_array($c, $cols, true)) {
                     $updates[] = "$c = :data_pagamento";
@@ -515,6 +521,26 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CHECKOUT] Salvando dados do cliente...');
                 $this->salvarDadosCliente($pedidoId, $dados, $usuario);
                 $this->debugLog('[CHECKOUT] Dados do cliente salvos');
+
+                // Persistir forma_pagamento no pedido (alguns schemas exibem isso no admin)
+                try {
+                    $dbFp = \Config\Database::getConnection();
+                    $colsPed = [];
+                    try {
+                        $stmtColsPed = $dbFp->query('DESCRIBE pedidos');
+                        $colsPed = $stmtColsPed->fetchAll(\PDO::FETCH_COLUMN);
+                    } catch (\Exception $e) {
+                    }
+
+                    if (is_array($colsPed) && in_array('forma_pagamento', $colsPed, true)) {
+                        $forma = (string) ($dados['forma_pagamento'] ?? '');
+                        if ($forma !== '') {
+                            $stmtUpdFp = $dbFp->prepare('UPDATE pedidos SET forma_pagamento = ? WHERE id = ?');
+                            $stmtUpdFp->execute([$forma, $pedidoId]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
 
                 // Registrar pagamento (status inicial)
                 $this->registrarPagamentoPedido($pedidoId, $dados);
