@@ -12,54 +12,71 @@ class AdminConfiguracoesController extends Controller {
             // Buscar configurações
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
-            $orderBy = [];
-            if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
-                $orderBy = [$tableInfo['categoriaCol'], $tableInfo['chaveCol']];
-            } else {
-                $orderBy = [$tableInfo['keyCol']];
-            }
-            if (!empty($tableInfo['updatedAtCol'])) {
-                $orderBy[] = $tableInfo['updatedAtCol'] . ' ASC';
-            }
-            if (!empty($tableInfo['idCol'])) {
-                $orderBy[] = $tableInfo['idCol'] . ' ASC';
-            }
 
-            if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
-                $sql = "SELECT {$tableInfo['categoriaCol']} AS categoria, {$tableInfo['chaveCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
-            } else {
-                $sql = "SELECT {$tableInfo['keyCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
-            }
-
-            $stmt = $pdo->query($sql);
-            $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            // Organizar por categoria a partir do padrão categoria_chave
             $config = [];
-            foreach ($configuracoes as $c) {
-                $fullKey = '';
+
+            if (($tableInfo['mode'] ?? '') === 'single_row') {
+                $stmt = $pdo->query("SELECT * FROM {$table} ORDER BY {$tableInfo['idCol']} ASC LIMIT 1");
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $map = $tableInfo['columnMap'] ?? [];
+                foreach ($map as $categoria => $chaves) {
+                    foreach ($chaves as $chave => $col) {
+                        if (array_key_exists($col, $row)) {
+                            if (!isset($config[$categoria])) {
+                                $config[$categoria] = [];
+                            }
+                            $config[$categoria][$chave] = (string) ($row[$col] ?? '');
+                        }
+                    }
+                }
+            } else {
+                $orderBy = [];
                 if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
-                    $cat = (string) ($c['categoria'] ?? '');
-                    $k = (string) ($c['chave'] ?? '');
-                    $fullKey = ($cat !== '' && $k !== '') ? ($cat . '_' . $k) : '';
+                    $orderBy = [$tableInfo['categoriaCol'], $tableInfo['chaveCol']];
                 } else {
-                    $fullKey = (string) ($c['chave'] ?? '');
+                    $orderBy = [$tableInfo['keyCol']];
+                }
+                if (!empty($tableInfo['updatedAtCol'])) {
+                    $orderBy[] = $tableInfo['updatedAtCol'] . ' ASC';
+                }
+                if (!empty($tableInfo['idCol'])) {
+                    $orderBy[] = $tableInfo['idCol'] . ' ASC';
                 }
 
-                $valor = $c['valor'] ?? '';
-                if ($fullKey === '') {
-                    continue;
-                }
-                if (strpos($fullKey, '_') !== false) {
-                    [$categoria, $chave] = explode('_', $fullKey, 2);
+                if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                    $sql = "SELECT {$tableInfo['categoriaCol']} AS categoria, {$tableInfo['chaveCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
                 } else {
-                    $categoria = 'geral';
-                    $chave = $fullKey;
+                    $sql = "SELECT {$tableInfo['keyCol']} AS chave, {$tableInfo['valueCol']} AS valor FROM {$table} ORDER BY " . implode(', ', $orderBy);
                 }
-                if (!isset($config[$categoria])) {
-                    $config[$categoria] = [];
+
+                $stmt = $pdo->query($sql);
+                $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+                foreach ($configuracoes as $c) {
+                    $fullKey = '';
+                    if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                        $cat = (string) ($c['categoria'] ?? '');
+                        $k = (string) ($c['chave'] ?? '');
+                        $fullKey = ($cat !== '' && $k !== '') ? ($cat . '_' . $k) : '';
+                    } else {
+                        $fullKey = (string) ($c['chave'] ?? '');
+                    }
+
+                    $valor = $c['valor'] ?? '';
+                    if ($fullKey === '') {
+                        continue;
+                    }
+                    if (strpos($fullKey, '_') !== false) {
+                        [$categoria, $chave] = explode('_', $fullKey, 2);
+                    } else {
+                        $categoria = 'geral';
+                        $chave = $fullKey;
+                    }
+                    if (!isset($config[$categoria])) {
+                        $config[$categoria] = [];
+                    }
+                    $config[$categoria][$chave] = $valor;
                 }
-                $config[$categoria][$chave] = $valor;
             }
             
         } catch (\Exception $e) {
@@ -674,6 +691,22 @@ class AdminConfiguracoesController extends Controller {
                         // Atualizar ou inserir configuração
                         $fullKey = $categoria . '_' . $chave;
 
+                        if (($tableInfo['mode'] ?? '') === 'single_row') {
+                            $map = $tableInfo['columnMap'] ?? [];
+                            $col = $map[$categoria][$chave] ?? null;
+                            if (!empty($col) && preg_match('/^[a-zA-Z0-9_]+$/', (string) $col)) {
+                                $idCol = $tableInfo['idCol'];
+                                $idVal = $tableInfo['idVal'] ?? 1;
+                                $set = "{$col} = ?";
+                                if (!empty($updatedAtCol)) {
+                                    $set .= ", {$updatedAtCol} = NOW()";
+                                }
+                                $stmtUpdate = $pdo->prepare("UPDATE {$table} SET {$set} WHERE {$idCol} = ?");
+                                $stmtUpdate->execute([$valor, $idVal]);
+                            }
+                            continue;
+                        }
+
                         if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
                             $catCol = $tableInfo['categoriaCol'];
                             $keyCol = $tableInfo['chaveCol'];
@@ -1127,6 +1160,57 @@ class AdminConfiguracoesController extends Controller {
         // Suporte para schema com categoria + chave + valor
         $hasCategoria = in_array('categoria', $cols, true);
         $hasChave = in_array('chave', $cols, true);
+
+        // Schema de 1 linha com colunas diretas (ex: configuracoes_sistema legado)
+        if (!$hasCategoria && !$hasChave && in_array('id', $cols, true)) {
+            $paymentCols = [
+                'asaas_enabled',
+                'asaas_ambiente',
+                'asaas_api_key',
+                'stripe_enabled',
+                'stripe_ambiente',
+                'stripe_publishable_key',
+                'stripe_secret_key',
+            ];
+
+            $temAlguma = false;
+            foreach ($paymentCols as $pc) {
+                if (in_array($pc, $cols, true)) {
+                    $temAlguma = true;
+                    break;
+                }
+            }
+
+            if ($temAlguma) {
+                $updatedAtCol = '';
+                foreach (['updated_at', 'data_atualizacao', 'updated'] as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $updatedAtCol = $c;
+                        break;
+                    }
+                }
+
+                return [
+                    'mode' => 'single_row',
+                    'table' => $table,
+                    'idCol' => 'id',
+                    'idVal' => 1,
+                    'updatedAtCol' => $updatedAtCol,
+                    'valueCol' => '',
+                    'columnMap' => [
+                        'pagamentos' => [
+                            'asaas_enabled' => 'asaas_enabled',
+                            'asaas_ambiente' => 'asaas_ambiente',
+                            'asaas_api_key' => 'asaas_api_key',
+                            'stripe_enabled' => 'stripe_enabled',
+                            'stripe_ambiente' => 'stripe_ambiente',
+                            'stripe_publishable_key' => 'stripe_publishable_key',
+                            'stripe_secret_key' => 'stripe_secret_key',
+                        ]
+                    ]
+                ];
+            }
+        }
 
         if ($hasCategoria && $hasChave) {
             $valueCol = null;

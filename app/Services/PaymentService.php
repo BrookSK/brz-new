@@ -23,6 +23,39 @@ class PaymentService {
     private function getConfig(string $categoria, string $chave, $default = null) {
         $db = \Config\Database::getConnection();
 
+        // Tenta schema single-row em configuracoes_sistema (colunas diretas)
+        try {
+            $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols) && !empty($cols)) {
+                $colName = null;
+                if ($categoria === 'pagamentos') {
+                    $direct = [
+                        'asaas_api_key',
+                        'asaas_ambiente',
+                        'asaas_enabled',
+                        'stripe_secret_key',
+                        'stripe_publishable_key',
+                        'stripe_ambiente',
+                        'stripe_enabled',
+                        'stripe_api_key',
+                    ];
+                    if (in_array($chave, $direct, true) && in_array($chave, $cols, true)) {
+                        $colName = $chave;
+                    }
+                }
+
+                if (!empty($colName)) {
+                    $stmt = $db->query('SELECT ' . $colName . ' AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
         // Tenta schema categoria+chave (configuracoes_sistema)
         try {
             $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
