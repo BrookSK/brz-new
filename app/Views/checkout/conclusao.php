@@ -133,7 +133,8 @@
                             'boleto' => 'Boleto Bancário',
                             'pix' => 'PIX',
                         ];
-                        echo $formas[$pedido['forma_pagamento']] ?? $pedido['forma_pagamento'];
+                        $fp = (string) ($pedido['forma_pagamento'] ?? '');
+                        echo $formas[$fp] ?? $fp;
                         ?>
                     </p>
 

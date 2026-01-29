@@ -22,7 +22,7 @@ class WebhookController extends Controller {
             $result = $this->paymentService->processarWebhookAsaas($payload);
             $this->json(['success' => true, 'result' => $result]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => $e->getMessage()], 400);
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
 
@@ -37,7 +37,7 @@ class WebhookController extends Controller {
             $result = $this->paymentService->processarWebhookStripe($payload);
             $this->json(['success' => true, 'result' => $result]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => $e->getMessage()], 400);
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
 }

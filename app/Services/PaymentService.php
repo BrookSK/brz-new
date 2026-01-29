@@ -354,59 +354,140 @@ class PaymentService {
     }
 
     private function atualizarPagamentoPedidoPorGateway(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
-        $db = \Config\Database::getConnection();
-
-        $stmt = $db->prepare("SELECT id, status FROM pedidos WHERE payment_id = :payment_id AND payment_gateway = :gateway LIMIT 1");
-        $stmt->bindParam(':payment_id', $paymentId);
-        $stmt->bindParam(':gateway', $gateway);
-        $stmt->execute();
-        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$pedido || empty($pedido['id'])) {
-            return;
-        }
-
-        $pedidoId = (int) $pedido['id'];
-
-        $colsP = [];
         try {
-            $stmtColsP = $db->query('DESCRIBE pedidos');
-            $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+            $db = \Config\Database::getConnection();
+
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+            }
+
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $pedidoId = null;
+
+            // Primeiro, tenta localizar via colunas em pedidos (schema completo)
+            if (in_array('payment_id', $colsP, true) && in_array('payment_gateway', $colsP, true)) {
+                $stmt = $db->prepare("SELECT id FROM pedidos WHERE payment_id = :payment_id AND payment_gateway = :gateway LIMIT 1");
+                $stmt->bindParam(':payment_id', $paymentId);
+                $stmt->bindParam(':gateway', $gateway);
+                $stmt->execute();
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($row && !empty($row['id'])) {
+                    $pedidoId = (int) $row['id'];
+                }
+            }
+
+            // Fallback: localizar via tabela pagamentos (schema onde pagamentos guarda transação/gateway)
+            if (empty($pedidoId)) {
+                try {
+                    $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                    $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
+
+                    if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                        $gatewayCol = null;
+                        foreach (['gateway', 'provedor', 'provider'] as $c) {
+                            if (in_array($c, $colsPg, true)) {
+                                $gatewayCol = $c;
+                                break;
+                            }
+                        }
+
+                        $transacaoCol = null;
+                        foreach (['codigo_transacao', 'transaction_id', 'transacao', 'payment_id'] as $c) {
+                            if (in_array($c, $colsPg, true)) {
+                                $transacaoCol = $c;
+                                break;
+                            }
+                        }
+
+                        if (!empty($transacaoCol)) {
+                            $sql = 'SELECT pedido_id FROM pagamentos WHERE ' . $transacaoCol . ' = :payment_id';
+                            if (!empty($gatewayCol)) {
+                                $sql .= ' AND ' . $gatewayCol . ' = :gateway';
+                            }
+                            $sql .= ' LIMIT 1';
+
+                            $stmt = $db->prepare($sql);
+                            $stmt->bindParam(':payment_id', $paymentId);
+                            if (!empty($gatewayCol)) {
+                                $stmt->bindParam(':gateway', $gateway);
+                            }
+                            $stmt->execute();
+                            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            if ($row && !empty($row['pedido_id'])) {
+                                $pedidoId = (int) $row['pedido_id'];
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            if (empty($pedidoId)) {
+                return;
+            }
+
+            $set = [];
+            $params = ['id' => $pedidoId];
+
+            if (in_array('payment_status', $colsP, true)) {
+                $set[] = 'payment_status = :payment_status';
+                $params['payment_status'] = $paymentStatusInterno;
+            }
+
+            $aprovado = ($paymentStatusInterno === 'approved');
+            if ($aprovado && in_array('pago_em', $colsP, true)) {
+                $set[] = 'pago_em = :pago_em';
+                $params['pago_em'] = date('Y-m-d H:i:s');
+            }
+
+            if ($aprovado && in_array('status', $colsP, true)) {
+                $set[] = 'status = :status';
+                $params['status'] = 'pago';
+            }
+
+            if (!empty($set)) {
+                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $stmtUp = $db->prepare($sql);
+                $stmtUp->execute($params);
+            }
+
+            // Atualizar também a linha em pagamentos, quando existir
+            try {
+                $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
+                if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                    $updates = [];
+                    $paramsPg = ['pedido_id' => $pedidoId];
+
+                    foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                        if (in_array($c, $colsPg, true)) {
+                            $updates[] = "$c = :pg_status";
+                            $paramsPg['pg_status'] = $gatewayStatus !== '' ? $gatewayStatus : $paymentStatusInterno;
+                            break;
+                        }
+                    }
+
+                    if (!empty($updates)) {
+                        $sqlPg = 'UPDATE pagamentos SET ' . implode(', ', $updates) . ' WHERE pedido_id = :pedido_id';
+                        $stmtUpPg = $db->prepare($sqlPg);
+                        $stmtUpPg->execute($paramsPg);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
+            if ($aprovado) {
+                $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedidoId);
+            }
         } catch (\Exception $e) {
-        }
-
-        if (!is_array($colsP) || empty($colsP)) {
+            // Webhook não deve retornar 4xx por causa de erro interno/schema
             return;
-        }
-
-        $set = [];
-        $params = ['id' => $pedidoId];
-
-        if (in_array('payment_status', $colsP, true)) {
-            $set[] = 'payment_status = :payment_status';
-            $params['payment_status'] = $paymentStatusInterno;
-        }
-
-        $aprovado = ($paymentStatusInterno === 'approved');
-        if ($aprovado && in_array('pago_em', $colsP, true)) {
-            $set[] = 'pago_em = :pago_em';
-            $params['pago_em'] = date('Y-m-d H:i:s');
-        }
-
-        if ($aprovado && in_array('status', $colsP, true)) {
-            $set[] = 'status = :status';
-            $params['status'] = 'pago';
-        }
-
-        if (empty($set)) {
-            return;
-        }
-
-        $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
-        $stmtUp = $db->prepare($sql);
-        $stmtUp->execute($params);
-
-        if ($aprovado) {
-            $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedidoId);
         }
     }
     
