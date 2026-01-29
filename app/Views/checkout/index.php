@@ -329,9 +329,26 @@
     </div>
 </div>
 
+<div id="checkout-loading" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 9999;">
+    <div style="position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); text-align:center; color:#fff;">
+        <div class="spinner-border" role="status" aria-hidden="true"></div>
+        <div style="margin-top: 10px; font-weight: 600;">Processando seu pedido...</div>
+    </div>
+</div>
+
 <!-- JavaScript para processar o formulário - no final da página -->
 <script>
 console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
+
+function showCheckoutLoading() {
+    const el = document.getElementById('checkout-loading');
+    if (el) el.style.display = 'block';
+}
+
+function hideCheckoutLoading() {
+    const el = document.getElementById('checkout-loading');
+    if (el) el.style.display = 'none';
+}
 
 // Função para debug do botão
 function debugBotaoFinalizar() {
@@ -460,6 +477,7 @@ function processarPedidoDireto() {
     // Desabilitar botão e mostrar loading
     botao.disabled = true;
     botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    showCheckoutLoading();
     
     // Enviar requisição AJAX
     fetch('/checkout/processar', {
@@ -475,16 +493,18 @@ function processarPedidoDireto() {
         
         if (data.success) {
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
-            alert('Pedido processado com sucesso! ID: ' + data.pedido_id);
-            
-            // Redirecionar para página de conclusão
+
+            // Manter overlay até redirecionar para página de conclusão
+            const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);
+            console.log('🔍 [DIRETO] Redirecionando para:', destino);
             setTimeout(function() {
-                console.log('🔍 [DIRETO] Redirecionando para:', data.redirect || '/checkout/conclusao/' + data.pedido_id);
-                window.location.href = data.redirect || '/checkout/' + data.pedido_id;
-            }, 2000);
+                window.location.href = destino;
+            }, 300);
         } else {
             console.error('❌ [DIRETO] Erro ao processar pedido:', data.error);
             alert('Erro: ' + data.error);
+
+            hideCheckoutLoading();
             
             // Restaurar botão
             botao.disabled = false;
@@ -494,6 +514,8 @@ function processarPedidoDireto() {
     .catch(error => {
         console.error('❌ [DIRETO] Erro na requisição:', error);
         alert('Erro de conexão: ' + error.message);
+
+        hideCheckoutLoading();
         
         // Restaurar botão
         botao.disabled = false;

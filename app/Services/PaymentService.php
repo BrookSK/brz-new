@@ -167,9 +167,12 @@ class PaymentService {
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
         if ($moeda === 'BRL') {
             return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
-        } else {
-            return $this->processarPagamentoStripe($dadosPagamento, $valor, $descricao);
         }
+
+        return [
+            'success' => false,
+            'error' => 'Pagamento em moeda diferente de BRL ainda não está disponível'
+        ];
     }
     
     private function processarPagamentoAsaas($dados, $valor, $descricao) {

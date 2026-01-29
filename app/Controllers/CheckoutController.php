@@ -340,7 +340,7 @@ class CheckoutController extends Controller {
         }
 
         $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-        $frete = $this->calcularFrete($subtotal, $pesoTotal, $_GET['moeda'] ?? 'USD');
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, $_GET['moeda'] ?? 'BRL');
         $impostos = $subtotal * 0.80;
         $total = $subtotal + $frete + $taxaServico + $impostos;
         
@@ -351,13 +351,78 @@ class CheckoutController extends Controller {
             'peso_total' => $pesoTotal,
             'usuario' => $usuario,
             'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [],
-            'moeda' => $_GET['moeda'] ?? 'USD', // Obter moeda da URL ou padrão USD
+            'moeda' => $_GET['moeda'] ?? 'BRL', // Obter moeda da URL ou padrão BRL
             'frete' => $frete,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
             'frete_gratis' => ($frete == 0)
         ]);
+    }
+
+    private function atualizarPagamentoNaTabelaPagamentos(int $pedidoId, array $paymentResult, string $gateway): void {
+        try {
+            $db = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE pagamentos');
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                return;
+            }
+
+            if (!is_array($cols) || empty($cols) || !in_array('pedido_id', $cols, true)) {
+                return;
+            }
+
+            $updates = [];
+            $params = ['pedido_id' => $pedidoId];
+
+            foreach (['gateway', 'provedor', 'provider'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $updates[] = "$c = :gateway";
+                    $params['gateway'] = $gateway;
+                    break;
+                }
+            }
+
+            $statusVal = (string) ($paymentResult['status'] ?? '');
+            foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                if (!empty($statusVal) && in_array($c, $cols, true)) {
+                    $updates[] = "$c = :status_pagamento";
+                    $params['status_pagamento'] = $statusVal;
+                    break;
+                }
+            }
+
+            $txVal = (string) ($paymentResult['payment_id'] ?? '');
+            foreach (['codigo_transacao', 'transaction_id', 'transacao', 'payment_id'] as $c) {
+                if (!empty($txVal) && in_array($c, $cols, true)) {
+                    $updates[] = "$c = :transacao";
+                    $params['transacao'] = $txVal;
+                    break;
+                }
+            }
+
+            $dataVal = (string) ($paymentResult['paid_at'] ?? '');
+            foreach (['data_pagamento', 'paid_at', 'data_confirmacao', 'updated_at', 'created_at'] as $c) {
+                if (!empty($dataVal) && in_array($c, $cols, true)) {
+                    $updates[] = "$c = :data_pagamento";
+                    $params['data_pagamento'] = $dataVal;
+                    break;
+                }
+            }
+
+            if (empty($updates)) {
+                return;
+            }
+
+            $sql = 'UPDATE pagamentos SET ' . implode(', ', $updates) . ' WHERE pedido_id = :pedido_id';
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+        } catch (\Exception $e) {
+        }
     }
     
     public function processar(Request $request) {
@@ -464,6 +529,7 @@ class CheckoutController extends Controller {
                     $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                     $gateway = (($pedidoRowPay['moeda'] ?? 'BRL') === 'BRL') ? 'asaas' : 'stripe';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                    $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
                 } catch (\Exception $e) {
                     // Se pagamento falhar, manter pedido como aguardando pagamento e retornar erro amigável
                     throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
