@@ -1,7 +1,7 @@
 <?php ob_start(); ?>
 <div class="container-fluid px-0">
+    <form id="checkout-form" method="POST">
     <div class="row g-0">
-        <form id="checkout-form" method="POST">
         <!-- Formulário Principal -->
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
