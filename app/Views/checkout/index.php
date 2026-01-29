@@ -214,31 +214,21 @@
                                             <div class="row g-2 mt-2">
                                                 <div class="col-6">
                                                     <label class="form-label">Número do Cartão</label>
-                                                    <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" required>
+                                                    <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number" inputmode="numeric" required>
                                                 </div>
                                                 <div class="col-3">
                                                     <label class="form-label">Validade</label>
-                                                    <select name="card_expiry_month" class="form-select" required>
-                                                        <option value="">Mês</option>
-                                                        <?php for ($m = 1; $m <= 12; $m++): ?>
-                                                            <option value="<?= str_pad($m, 2, '0', STR_PAD_LEFT) ?>"><?= str_pad($m, 2, '0', STR_PAD_LEFT) ?></option>
-                                                        <?php endfor; ?>
-                                                    </select>
+                                                    <input type="text" name="card_expiry_month" class="form-control" placeholder="MM" maxlength="2" autocomplete="cc-exp-month" inputmode="numeric" required>
                                                 </div>
                                                 <div class="col-3">
                                                     <label class="form-label">&nbsp;</label>
-                                                    <select name="card_expiry_year" class="form-select" required>
-                                                        <option value="">Ano</option>
-                                                        <?php for ($y = date('Y'); $y <= date('Y') + 10; $y++): ?>
-                                                            <option value="<?= $y ?>"><?= $y ?></option>
-                                                        <?php endfor; ?>
-                                                    </select>
+                                                    <input type="text" name="card_expiry_year" class="form-control" placeholder="AAAA" maxlength="4" autocomplete="cc-exp-year" inputmode="numeric" required>
                                                 </div>
                                             </div>
                                             <div class="row g-2 mt-2">
                                                 <div class="col-6">
                                                     <label class="form-label">CVV</label>
-                                                    <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" required>
+                                                    <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" autocomplete="cc-csc" inputmode="numeric" required>
                                                 </div>
                                             </div>
                                         </div>
@@ -575,15 +565,20 @@ console.log('🔍 [DEBUG] Script carregado - fim - VERSÃO ATUALIZADA');
 </div>
 
 <script>
+// Inicializar na carga da página
+document.addEventListener('DOMContentLoaded', () => {
+    atualizarFormaPagamento();
+    setupCardMasks();
+});
+
 // Função para atualizar campos de pagamento
 function atualizarFormaPagamento() {
     console.log('🔍 [INÍCIO] atualizarFormaPagamento() chamada');
     
+    // Garantir que o elemento forma_pagamento existe
     const formaPagamentoElement = document.getElementById('forma_pagamento');
-    console.log('🔍 [DEBUG] Elemento forma_pagamento:', !!formaPagamentoElement);
-    
     if (!formaPagamentoElement) {
-        console.error('❌ [ERRO] Elemento forma_pagamento não encontrado');
+        console.error('❌ [ERRO] Elemento forma_pagamento não encontrado!');
         return;
     }
     
@@ -981,6 +976,69 @@ window.updateCheckoutCurrency = function(currency) {
 
 // Inicializar
 initCurrency();
+
+function onlyDigits(value) {
+    return (value || '').toString().replace(/\D+/g, '');
+}
+
+function formatCardNumber(value) {
+    const digits = onlyDigits(value).slice(0, 19);
+    const groups = digits.match(/.{1,4}/g) || [];
+    return groups.join(' ');
+}
+
+function clampMonth(mm) {
+    const d = onlyDigits(mm).slice(0, 2);
+    if (d.length === 0) return '';
+    const n = Math.max(1, Math.min(12, parseInt(d, 10)));
+    return String(n).padStart(2, '0');
+}
+
+function setupCardMasks() {
+    const camposCartao = document.getElementById('campos-cartao');
+    if (!camposCartao) return;
+
+    const inputNumero = camposCartao.querySelector('input[name="card_number"]');
+    const inputMes = camposCartao.querySelector('input[name="card_expiry_month"]');
+    const inputAno = camposCartao.querySelector('input[name="card_expiry_year"]');
+    const inputCvv = camposCartao.querySelector('input[name="card_cvv"]');
+
+    if (inputNumero) {
+        inputNumero.addEventListener('input', () => {
+            const start = inputNumero.selectionStart || 0;
+            const before = inputNumero.value;
+            inputNumero.value = formatCardNumber(before);
+            const delta = inputNumero.value.length - before.length;
+            const nextPos = Math.max(0, start + delta);
+            try { inputNumero.setSelectionRange(nextPos, nextPos); } catch (e) {}
+        });
+    }
+
+    if (inputMes) {
+        inputMes.addEventListener('input', () => {
+            const raw = onlyDigits(inputMes.value).slice(0, 2);
+            inputMes.value = raw;
+            if (raw.length === 2 && inputAno) {
+                inputAno.focus();
+            }
+        });
+        inputMes.addEventListener('blur', () => {
+            inputMes.value = clampMonth(inputMes.value);
+        });
+    }
+
+    if (inputAno) {
+        inputAno.addEventListener('input', () => {
+            inputAno.value = onlyDigits(inputAno.value).slice(0, 4);
+        });
+    }
+
+    if (inputCvv) {
+        inputCvv.addEventListener('input', () => {
+            inputCvv.value = onlyDigits(inputCvv.value).slice(0, 4);
+        });
+    }
+}
 
 // Verificar mudanças na moeda do header a cada 200ms (mais rápido)
 setInterval(function() {
