@@ -102,6 +102,11 @@ class PaymentService {
         return 'https://sandbox.asaas.com/api/v3';
     }
 
+    private function isAsaasSandbox(): bool {
+        $amb = strtolower(trim((string) $this->asaasAmbiente));
+        return !($amb === 'production' || $amb === 'prod' || $amb === 'live');
+    }
+
     private function asaasRequest(string $method, string $path, ?array $body = null): array {
         if (empty($this->asaasApiKey)) {
             throw new \Exception('Asaas não configurado (API Key ausente)');
@@ -635,7 +640,7 @@ class PaymentService {
             
             if (empty($dados['card_number'])) {
                 $erros[] = 'Número do cartão é obrigatório';
-            } elseif (!$this->validarNumeroCartao($dados['card_number'])) {
+            } elseif (!$this->validarNumeroCartao($dados['card_number'], !$this->isAsaasSandbox())) {
                 $erros[] = 'Número do cartão inválido';
             }
             
@@ -655,13 +660,17 @@ class PaymentService {
         return $erros;
     }
     
-    private function validarNumeroCartao($numero) {
+    private function validarNumeroCartao($numero, bool $validarLuhn = true) {
         // Remover espaços e caracteres não numéricos
         $numero = preg_replace('/\D/', '', $numero);
         
         // Verificar se tem entre 13 e 19 dígitos
         if (strlen($numero) < 13 || strlen($numero) > 19) {
             return false;
+        }
+
+        if (!$validarLuhn) {
+            return true;
         }
         
         // Algoritmo de Luhn
