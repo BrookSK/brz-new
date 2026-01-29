@@ -382,6 +382,15 @@ class PedidoEcommerce extends Model {
             if (empty($pedido['status'])) {
                 $pedido['status'] = 'pendente';
             }
+
+            // Se o pagamento já estiver aprovado, refletir o status do pedido como pago
+            $stPag = $pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? null);
+            if (is_string($stPag)) {
+                $stPag = strtoupper(trim($stPag));
+            }
+            if (!empty($stPag) && in_array($stPag, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                $pedido['status'] = 'pago';
+            }
             $pedido['subtotal_produtos'] = $pedido['subtotal'] ?? 0;
             $pedido['valor_frete'] = $pedido['frete'] ?? 0;
             $pedido['taxa_servico'] = $pedido['servicos'] ?? 0;
