@@ -608,6 +608,76 @@
                             </div>
                         </div>
                     </div>
+
+                    <?php if (!empty($paymentDetails) || !empty($pedido['pagamento_gateway']) || !empty($pedido['payment_gateway'])): ?>
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-credit-card me-2"></i> Pagamento
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <?php
+                            $statusPagamento = $pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ($paymentDetails['status'] ?? null));
+                            if (is_string($statusPagamento)) {
+                                $statusPagamento = strtoupper($statusPagamento);
+                            }
+
+                            $badgeClass = 'bg-warning text-dark';
+                            $statusLabel = 'Aguardando';
+                            if (!empty($statusPagamento)) {
+                                if (in_array($statusPagamento, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                                    $badgeClass = 'bg-success';
+                                    $statusLabel = 'Pago';
+                                } elseif (in_array($statusPagamento, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
+                                    $badgeClass = 'bg-danger';
+                                    $statusLabel = 'Cancelado';
+                                } elseif (in_array($statusPagamento, ['REFUNDED'], true)) {
+                                    $badgeClass = 'bg-secondary';
+                                    $statusLabel = 'Estornado';
+                                }
+                            }
+
+                            $billingType = strtoupper((string) ($paymentDetails['billingType'] ?? ''));
+                            $invoiceUrl = $paymentDetails['invoiceUrl'] ?? null;
+                            $bankSlipUrl = $paymentDetails['bankSlipUrl'] ?? null;
+                            $digitableLine = $paymentDetails['digitableLine'] ?? null;
+                            ?>
+
+                            <p class="mb-2 text-muted">
+                                <small>Status do pagamento: <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($statusLabel) ?></span></small>
+                            </p>
+
+                            <?php if ($billingType === 'PIX' && !empty($pixQrCode)): ?>
+                                <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
+                                <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
+                                <?php if (!empty($pixImage)): ?>
+                                    <div class="text-center my-3">
+                                        <img src="data:image/png;base64,<?= $pixImage ?>" alt="QR Code PIX" style="max-width: 240px; width: 100%; height: auto;" />
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($pixPayload)): ?>
+                                    <div class="mb-2">
+                                        <strong>Copia e cola:</strong>
+                                        <input type="text" class="form-control" value="<?= htmlspecialchars($pixPayload) ?>" readonly onclick="this.select();" />
+                                    </div>
+                                <?php endif; ?>
+                            <?php elseif ($billingType === 'BOLETO'): ?>
+                                <?php if (!empty($bankSlipUrl) || !empty($invoiceUrl)): ?>
+                                    <p class="mb-2">
+                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($bankSlipUrl ?: $invoiceUrl) ?>" target="_blank" rel="noopener">Abrir boleto</a>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if (!empty($digitableLine)): ?>
+                                    <div class="mb-2">
+                                        <strong>Linha digitável:</strong>
+                                        <input type="text" class="form-control" value="<?= htmlspecialchars($digitableLine) ?>" readonly onclick="this.select();" />
+                                    </div>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     
                     <!-- Action Buttons -->
                     <div class="action-buttons">

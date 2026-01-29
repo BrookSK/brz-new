@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\PaymentService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
 use App\Models\Carrinho;
@@ -12,12 +13,14 @@ class UsuarioController extends Controller {
     private $usuarioModel;
     private $pedidoModel;
     private $carrinhoModel;
+    private $paymentService;
 
     public function __construct() {
         $this->authService = new AuthService();
         $this->usuarioModel = new Usuario();
         $this->pedidoModel = new PedidoEcommerce();
         $this->carrinhoModel = new Carrinho();
+        $this->paymentService = new PaymentService();
     }
 
     public function dashboard(Request $request) {
@@ -436,11 +439,36 @@ class UsuarioController extends Controller {
             }
             
             $historico = $this->pedidoModel->getRastreamento($pedidoId);
+
+            $paymentDetails = null;
+            $pixQrCode = null;
+            try {
+                if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
+                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
+                    if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                        try {
+                            $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['pagamento_transacao']);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                    if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                        try {
+                            $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
             
             $this->view('usuario/pedido-detalhes', [
                 'pedido' => $pedido,
                 'historico' => $historico,
-                'usuario' => $usuario
+                'usuario' => $usuario,
+                'paymentDetails' => $paymentDetails,
+                'pixQrCode' => $pixQrCode
             ]);
             
         } catch (\Exception $e) {

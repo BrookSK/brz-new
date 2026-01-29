@@ -179,6 +179,8 @@ class PedidoEcommerce extends Model {
         $selectPagamentos = '';
         $selectFormaPagamento = '';
         $selectExtras = '';
+        $colsP = [];
+        $temJoinPagamentos = false;
 
         try {
             $stmtColsP = $this->connection->query("DESCRIBE {$this->table}");
@@ -194,6 +196,7 @@ class PedidoEcommerce extends Model {
             $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
             if (is_array($colsPg) && !empty($colsPg)) {
                 $joinPagamentos = 'LEFT JOIN pagamentos pg ON p.id = pg.pedido_id';
+                $temJoinPagamentos = true;
 
                 $metodoCol = null;
                 foreach (['metodo', 'forma_pagamento', 'payment_method', 'tipo'] as $c) {
@@ -254,7 +257,24 @@ class PedidoEcommerce extends Model {
         } catch (\Exception $e) {
         }
 
-        $selectExtras = $selectFormaPagamento . $selectPagamentos;
+        // Fallback: alguns schemas guardam dados de pagamento diretamente em pedidos
+        $selectPagamentoNoPedido = '';
+        if (!$temJoinPagamentos && is_array($colsP) && !empty($colsP)) {
+            if (in_array('payment_status', $colsP, true)) {
+                $selectPagamentoNoPedido .= ', p.payment_status AS pagamento_status';
+            }
+            if (in_array('payment_gateway', $colsP, true)) {
+                $selectPagamentoNoPedido .= ', p.payment_gateway AS pagamento_gateway';
+            }
+            if (in_array('payment_id', $colsP, true)) {
+                $selectPagamentoNoPedido .= ', p.payment_id AS pagamento_transacao';
+            }
+            if (in_array('pago_em', $colsP, true)) {
+                $selectPagamentoNoPedido .= ', p.pago_em AS pagamento_data';
+            }
+        }
+
+        $selectExtras = $selectFormaPagamento . $selectPagamentos . $selectPagamentoNoPedido;
 
         // Adaptar query para a estrutura correta das tabelas
         $stmt = $this->connection->prepare("

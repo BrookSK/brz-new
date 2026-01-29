@@ -189,8 +189,6 @@
                                                 <option value="cartao_credito">Cartão de Crédito</option>
                                                 <option value="boleto">Boleto Bancário</option>
                                                 <option value="pix">PIX</option>
-                                                <option value="transferencia">Transferência Bancária</option>
-                                                <option value="pagamento_entrega">Pagamento na Entrega</option>
                                             </select>
                                             <script>
                                             // Adicionar listener para debug

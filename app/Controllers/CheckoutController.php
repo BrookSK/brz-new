@@ -76,6 +76,116 @@ class CheckoutController extends Controller {
         }
     }
 
+    private function atualizarPagamentoNoPedido(int $pedidoId, array $paymentResult, string $gateway): void {
+        try {
+            $db = \Config\Database::getConnection();
+
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+            }
+
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $set = [];
+            $params = ['id' => $pedidoId];
+
+            if (in_array('payment_gateway', $colsP, true)) {
+                $set[] = 'payment_gateway = :payment_gateway';
+                $params['payment_gateway'] = $gateway;
+            }
+
+            if (!empty($paymentResult['payment_id']) && in_array('payment_id', $colsP, true)) {
+                $set[] = 'payment_id = :payment_id';
+                $params['payment_id'] = $paymentResult['payment_id'];
+            }
+
+            if (!empty($paymentResult['status']) && in_array('payment_status', $colsP, true)) {
+                $set[] = 'payment_status = :payment_status';
+                $params['payment_status'] = $paymentResult['status'];
+            }
+
+            if (!empty($paymentResult['paid_at']) && in_array('pago_em', $colsP, true)) {
+                $set[] = 'pago_em = :pago_em';
+                $params['pago_em'] = $paymentResult['paid_at'];
+            }
+
+            // Se o pagamento já veio confirmado/aprovado, atualizar o status do pedido
+            $statusPago = false;
+            $st = strtoupper((string) ($paymentResult['status'] ?? ''));
+            if (in_array($st, ['CONFIRMED', 'RECEIVED', 'APPROVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                $statusPago = true;
+            }
+
+            if ($statusPago && in_array('status', $colsP, true)) {
+                $set[] = 'status = :status';
+                $params['status'] = 'pago';
+            }
+
+            if (empty($set)) {
+                return;
+            }
+
+            $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function processarPagamentoPedido(int $pedidoId, array $dados, array $usuario, array $pedidoRow): array {
+        $forma = (string) ($dados['forma_pagamento'] ?? '');
+
+        $billingType = 'CREDIT_CARD';
+        if ($forma === 'pix') {
+            $billingType = 'PIX';
+        } elseif ($forma === 'boleto') {
+            $billingType = 'BOLETO';
+        }
+
+        $valor = (float) ($pedidoRow['total'] ?? 0);
+        $moeda = (string) ($pedidoRow['moeda'] ?? 'BRL');
+        $descricao = 'Pedido #' . (string) ($pedidoRow['numero_pedido'] ?? $pedidoId);
+
+        $payload = [
+            'billingType' => $billingType,
+            'externalReference' => (string) $pedidoId,
+            'customer_name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
+            'customer_email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+            'customer_document' => (string) ($dados['documento'] ?? ''),
+            'customer_phone' => (string) ($dados['telefone'] ?? ''),
+            'customer_zipcode' => (string) ($dados['cep'] ?? ''),
+            'customer_address' => (string) ($dados['endereco'] ?? ''),
+            'customer_address_number' => (string) ($dados['numero'] ?? ''),
+            'customer_address_complement' => (string) ($dados['complemento'] ?? ''),
+            'customer_province' => (string) ($dados['bairro'] ?? ''),
+        ];
+
+        if ($billingType === 'CREDIT_CARD') {
+            $payload['card_holder_name'] = (string) ($dados['card_holder_name'] ?? '');
+            $payload['card_number'] = (string) ($dados['card_number'] ?? '');
+            $payload['card_expiry_month'] = (string) ($dados['card_expiry_month'] ?? '');
+            $payload['card_expiry_year'] = (string) ($dados['card_expiry_year'] ?? '');
+            $payload['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
+        }
+
+        $errosPagamento = $this->paymentService->validarDadosPagamento($payload);
+        if (!empty($errosPagamento)) {
+            throw new \Exception(implode(', ', $errosPagamento));
+        }
+
+        $result = $this->paymentService->processarPagamento($payload, $valor, $moeda, $descricao);
+        if (empty($result['success'])) {
+            throw new \Exception('Falha ao processar pagamento');
+        }
+
+        return $result;
+    }
+
     private function registrarPagamentoPedido($pedidoId, $dados) {
         try {
             $db = \Config\Database::getConnection();
@@ -343,6 +453,21 @@ class CheckoutController extends Controller {
 
                 // Registrar pagamento (status inicial)
                 $this->registrarPagamentoPedido($pedidoId, $dados);
+
+                // Processar pagamento (Asaas/Stripe) e persistir referência no pedido
+                try {
+                    $dbPay = \Config\Database::getConnection();
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtPedidoPay->execute([$pedidoId]);
+                    $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                    $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
+                    $gateway = (($pedidoRowPay['moeda'] ?? 'BRL') === 'BRL') ? 'asaas' : 'stripe';
+                    $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                } catch (\Exception $e) {
+                    // Se pagamento falhar, manter pedido como aguardando pagamento e retornar erro amigável
+                    throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
+                }
                 
                 // Limpar carrinho
                 unset($_SESSION['carrinho']);
@@ -385,10 +510,27 @@ class CheckoutController extends Controller {
             $this->redirect('/produtos');
             return;
         }
+
+        $paymentDetails = null;
+        $pixQrCode = null;
+        try {
+            if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                    try {
+                        $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
         
         $this->view('checkout/conclusao', [
             'pedido' => $pedido,
-            'itens' => $this->obterItensPedido($pedidoId)
+            'itens' => $this->obterItensPedido($pedidoId),
+            'paymentDetails' => $paymentDetails,
+            'pixQrCode' => $pixQrCode
         ]);
     }
     

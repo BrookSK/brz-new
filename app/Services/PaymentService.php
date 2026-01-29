@@ -7,6 +7,7 @@ class PaymentService {
     private $asaasApiKey;
     private $stripeApiKey;
     private $pedidoModel;
+    private $asaasAmbiente;
     
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -14,25 +15,103 @@ class PaymentService {
     }
     
     private function loadConfigurations() {
+        $this->asaasApiKey = (string) $this->getConfig('pagamentos', 'asaas_api_key', '');
+        $this->asaasAmbiente = (string) $this->getConfig('pagamentos', 'asaas_ambiente', 'sandbox');
+        $this->stripeApiKey = (string) $this->getConfig('pagamentos', 'stripe_secret_key', (string) $this->getConfig('pagamentos', 'stripe_api_key', ''));
+    }
+
+    private function getConfig(string $categoria, string $chave, $default = null) {
         $db = \Config\Database::getConnection();
-        
+
+        // Tenta schema categoria+chave (configuracoes_sistema)
         try {
-            $stmt = $db->prepare("SELECT c.valor FROM configuracoes c WHERE c.chave IN ('asaas_api_key', 'stripe_api_key')");
-            $stmt->execute();
-            $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            foreach ($configs as $config) {
-                if (strpos($config['valor'], 'asaas') !== false) {
-                    $this->asaasApiKey = $config['valor'];
-                } else {
-                    $this->stripeApiKey = $config['valor'];
-                }
+            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
+            $stmt->execute([$categoria, $chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
             }
         } catch (\Exception $e) {
-            // Valores padrão em caso de falha
-            $this->asaasApiKey = '';
-            $this->stripeApiKey = '';
         }
+
+        // Tenta schema chave/valor (configuracoes)
+        try {
+            $key = $categoria . '_' . $chave;
+            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
+    }
+
+    private function getAsaasBaseUrl(): string {
+        $amb = strtolower(trim((string) $this->asaasAmbiente));
+        if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
+            return 'https://www.asaas.com/api/v3';
+        }
+        return 'https://sandbox.asaas.com/api/v3';
+    }
+
+    private function asaasRequest(string $method, string $path, ?array $body = null): array {
+        if (empty($this->asaasApiKey)) {
+            throw new \Exception('Asaas não configurado (API Key ausente)');
+        }
+
+        $url = rtrim($this->getAsaasBaseUrl(), '/') . '/' . ltrim($path, '/');
+
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'access_token: ' . $this->asaasApiKey,
+        ];
+
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body);
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com Asaas: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro Asaas HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload ?? '',
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
     }
     
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
@@ -44,24 +123,31 @@ class PaymentService {
     }
     
     private function processarPagamentoAsaas($dados, $valor, $descricao) {
-        // Simulação de integração com Asaas
-        // Em produção, implementar chamada real à API do Asaas
-        
+        $billingType = $dados['billingType'] ?? 'CREDIT_CARD';
+
+        $customerId = $dados['customer_id'] ?? null;
+        if (empty($customerId)) {
+            $customerId = $this->criarOuReutilizarClienteAsaas($dados);
+        }
+
         $payload = [
-            'customer' => $dados['customer_id'] ?? null,
-            'billingType' => $dados['billingType'] ?? 'CREDIT_CARD',
-            'value' => $valor,
-            'dueDate' => date('Y-m-d'),
+            'customer' => $customerId,
+            'billingType' => $billingType,
+            'value' => (float) $valor,
+            'dueDate' => $dados['dueDate'] ?? date('Y-m-d', strtotime('+1 day')),
             'description' => $descricao,
             'externalReference' => $dados['externalReference'] ?? null,
-            'creditCard' => [
+        ];
+
+        if ($billingType === 'CREDIT_CARD') {
+            $payload['creditCard'] = [
                 'holderName' => $dados['card_holder_name'],
-                'number' => $dados['card_number'],
+                'number' => preg_replace('/\D/', '', (string) $dados['card_number']),
                 'expiryMonth' => $dados['card_expiry_month'],
                 'expiryYear' => $dados['card_expiry_year'],
                 'ccv' => $dados['card_cvv']
-            ],
-            'creditCardHolderInfo' => [
+            ];
+            $payload['creditCardHolderInfo'] = [
                 'name' => $dados['customer_name'],
                 'email' => $dados['customer_email'],
                 'cpfCnpj' => $dados['customer_document'],
@@ -69,20 +155,67 @@ class PaymentService {
                 'addressNumber' => $dados['customer_address_number'],
                 'addressComplement' => $dados['customer_address_complement'] ?? '',
                 'mobilePhone' => $dados['customer_phone']
-            ]
-        ];
-        
-        // Simulação de resposta
-        $response = [
+            ];
+        }
+
+        $asaasPayment = $this->asaasRequest('POST', '/payments', $payload);
+
+        $result = [
             'success' => true,
-            'payment_id' => 'pay_' . uniqid(),
-            'status' => 'CONFIRMED',
-            'authorization_id' => 'auth_' . uniqid(),
-            'amount' => $valor,
-            'paid_at' => date('Y-m-d H:i:s')
+            'payment_id' => $asaasPayment['id'] ?? null,
+            'status' => $asaasPayment['status'] ?? null,
+            'invoiceUrl' => $asaasPayment['invoiceUrl'] ?? null,
+            'bankSlipUrl' => $asaasPayment['bankSlipUrl'] ?? null,
+            'digitableLine' => $asaasPayment['digitableLine'] ?? null,
+            'billingType' => $asaasPayment['billingType'] ?? $billingType,
         ];
-        
-        return $response;
+
+        if (($asaasPayment['billingType'] ?? $billingType) === 'PIX' && !empty($result['payment_id'])) {
+            try {
+                $pix = $this->asaasRequest('GET', '/payments/' . $result['payment_id'] . '/pixQrCode');
+                $result['pix'] = [
+                    'encodedImage' => $pix['encodedImage'] ?? null,
+                    'payload' => $pix['payload'] ?? null,
+                    'expirationDate' => $pix['expirationDate'] ?? null,
+                ];
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $result;
+    }
+
+    private function criarOuReutilizarClienteAsaas(array $dados): string {
+        // Tentativa simples: criar cliente sempre (Asaas lida bem, mas pode duplicar)
+        // Em produção, ideal é armazenar customer_id no seu banco.
+        $payload = [
+            'name' => $dados['customer_name'] ?? 'Cliente',
+            'email' => $dados['customer_email'] ?? null,
+            'cpfCnpj' => $dados['customer_document'] ?? null,
+            'mobilePhone' => $dados['customer_phone'] ?? null,
+        ];
+
+        if (!empty($dados['customer_zipcode'])) {
+            $payload['postalCode'] = $dados['customer_zipcode'];
+        }
+        if (!empty($dados['customer_address'])) {
+            $payload['address'] = $dados['customer_address'];
+        }
+        if (!empty($dados['customer_address_number'])) {
+            $payload['addressNumber'] = $dados['customer_address_number'];
+        }
+        if (!empty($dados['customer_address_complement'])) {
+            $payload['complement'] = $dados['customer_address_complement'];
+        }
+        if (!empty($dados['customer_province'])) {
+            $payload['province'] = $dados['customer_province'];
+        }
+
+        $created = $this->asaasRequest('POST', '/customers', $payload);
+        if (empty($created['id'])) {
+            throw new \Exception('Asaas: falha ao criar cliente');
+        }
+        return (string) $created['id'];
     }
     
     private function processarPagamentoStripe($dados, $valor, $descricao) {
@@ -115,15 +248,17 @@ class PaymentService {
     }
     
     public function processarWebhookAsaas($payload) {
-        // Validar webhook do Asaas
-        $evento = $payload['event'] ?? '';
-        $paymentId = $payload['payment']['id'] ?? '';
-        $status = $payload['payment']['status'] ?? '';
-        
-        if ($evento === 'PAYMENT_CONFIRMED' && $status === 'CONFIRMED') {
-            $this->confirmarPagamento($paymentId, 'asaas');
+        $evento = (string) ($payload['event'] ?? '');
+        $paymentId = (string) ($payload['payment']['id'] ?? '');
+        $status = strtoupper((string) ($payload['payment']['status'] ?? ''));
+
+        if (empty($paymentId)) {
+            return ['status' => 'ignored'];
         }
-        
+
+        $internal = $this->mapearStatusAsaasParaInterno($status, $evento);
+        $this->atualizarPagamentoPedidoPorGateway($paymentId, 'asaas', $internal, $status);
+
         return ['status' => 'processed'];
     }
     
@@ -133,35 +268,111 @@ class PaymentService {
         
         if ($eventType === 'payment_intent.succeeded') {
             $paymentId = $payload['data']['object']['id'] ?? '';
-            $this->confirmarPagamento($paymentId, 'stripe');
+            if (!empty($paymentId)) {
+                $this->atualizarPagamentoPedidoPorGateway((string) $paymentId, 'stripe', 'approved', 'SUCCEEDED');
+            }
         }
         
         return ['status' => 'processed'];
     }
-    
-    private function confirmarPagamento($paymentId, $gateway) {
-        // Encontrar pedido pelo payment_id
+
+    private function mapearStatusAsaasParaInterno(string $status, string $evento = ''): string {
+        $st = strtoupper(trim($status));
+        $ev = strtoupper(trim($evento));
+
+        if (in_array($st, ['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH'], true)) {
+            return 'approved';
+        }
+
+        if (in_array($st, ['REFUNDED'], true) || str_contains($ev, 'REFUND')) {
+            return 'refunded';
+        }
+
+        if (in_array($st, ['CANCELED', 'CANCELLED', 'DELETED'], true) || str_contains($ev, 'CANCEL') || str_contains($ev, 'DELET')) {
+            return 'rejected';
+        }
+
+        if (in_array($st, ['OVERDUE'], true) || str_contains($ev, 'OVERDUE')) {
+            return 'pending';
+        }
+
+        if (in_array($st, ['PENDING'], true)) {
+            return 'pending';
+        }
+
+        return 'pending';
+    }
+
+    private function atualizarPagamentoPedidoPorGateway(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
         $db = \Config\Database::getConnection();
-        $stmt = $db->prepare("
-            SELECT id FROM {$this->pedidoModel->table} 
-            WHERE payment_id = :payment_id AND payment_gateway = :gateway
-        ");
+
+        $stmt = $db->prepare("SELECT id, status FROM pedidos WHERE payment_id = :payment_id AND payment_gateway = :gateway LIMIT 1");
         $stmt->bindParam(':payment_id', $paymentId);
         $stmt->bindParam(':gateway', $gateway);
         $stmt->execute();
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if ($pedido) {
-            // Atualizar status do pagamento
-            $this->pedidoModel->update($pedido['id'], [
-                'payment_status' => 'approved',
-                'pago_em' => date('Y-m-d H:i:s'),
-                'status' => 'pago'
-            ]);
-            
-            // Disparar evento de pagamento aprovado
-            $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedido['id']);
+        if (!$pedido || empty($pedido['id'])) {
+            return;
         }
+
+        $pedidoId = (int) $pedido['id'];
+
+        $colsP = [];
+        try {
+            $stmtColsP = $db->query('DESCRIBE pedidos');
+            $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+        }
+
+        if (!is_array($colsP) || empty($colsP)) {
+            return;
+        }
+
+        $set = [];
+        $params = ['id' => $pedidoId];
+
+        if (in_array('payment_status', $colsP, true)) {
+            $set[] = 'payment_status = :payment_status';
+            $params['payment_status'] = $paymentStatusInterno;
+        }
+
+        $aprovado = ($paymentStatusInterno === 'approved');
+        if ($aprovado && in_array('pago_em', $colsP, true)) {
+            $set[] = 'pago_em = :pago_em';
+            $params['pago_em'] = date('Y-m-d H:i:s');
+        }
+
+        if ($aprovado && in_array('status', $colsP, true)) {
+            $set[] = 'status = :status';
+            $params['status'] = 'pago';
+        }
+
+        if (empty($set)) {
+            return;
+        }
+
+        $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+        $stmtUp = $db->prepare($sql);
+        $stmtUp->execute($params);
+
+        if ($aprovado) {
+            $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedidoId);
+        }
+    }
+    
+    private function confirmarPagamento($paymentId, $gateway) {
+        if (empty($paymentId) || empty($gateway)) {
+            return;
+        }
+        $this->atualizarPagamentoPedidoPorGateway((string) $paymentId, (string) $gateway, 'approved', 'CONFIRMED');
+    }
+
+    public function obterPagamentoAsaas(string $paymentId): array {
+        return $this->asaasRequest('GET', '/payments/' . $paymentId);
+    }
+
+    public function obterPixQrCodeAsaas(string $paymentId): array {
+        return $this->asaasRequest('GET', '/payments/' . $paymentId . '/pixQrCode');
     }
     
     public function estornarPagamento($pedidoId, $motivo = '') {
