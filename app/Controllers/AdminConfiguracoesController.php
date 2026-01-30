@@ -858,25 +858,43 @@ class AdminConfiguracoesController extends Controller {
                             $stmtUpdate->execute([$valor, $fullKey]);
                         }
 
+                        // rowCount() pode ser 0 mesmo quando o registro existe (valor não mudou).
+                        // Só inserir quando realmente não existir.
                         if ($stmtUpdate->rowCount() === 0) {
+                            $exists = false;
                             if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
                                 $catCol = $tableInfo['categoriaCol'];
                                 $keyCol = $tableInfo['chaveCol'];
-                                if (!empty($updatedAtCol)) {
-                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, ?, NOW())");
-                                    $stmtInsert->execute([$categoria, $chave, $valor]);
-                                } else {
-                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}) VALUES (?, ?, ?)");
-                                    $stmtInsert->execute([$categoria, $chave, $valor]);
-                                }
+                                $stExists = $pdo->prepare("SELECT 1 FROM {$table} WHERE {$catCol} = ? AND {$keyCol} = ? LIMIT 1");
+                                $stExists->execute([$categoria, $chave]);
+                                $exists = (bool) $stExists->fetchColumn();
                             } else {
                                 $keyCol = $tableInfo['keyCol'];
-                                if (!empty($updatedAtCol)) {
-                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                                $stExists = $pdo->prepare("SELECT 1 FROM {$table} WHERE {$keyCol} = ? LIMIT 1");
+                                $stExists->execute([$fullKey]);
+                                $exists = (bool) $stExists->fetchColumn();
+                            }
+
+                            if (!$exists) {
+                                if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                                    $catCol = $tableInfo['categoriaCol'];
+                                    $keyCol = $tableInfo['chaveCol'];
+                                    if (!empty($updatedAtCol)) {
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, ?, NOW())");
+                                        $stmtInsert->execute([$categoria, $chave, $valor]);
+                                    } else {
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}) VALUES (?, ?, ?)");
+                                        $stmtInsert->execute([$categoria, $chave, $valor]);
+                                    }
                                 } else {
-                                    $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                                    $keyCol = $tableInfo['keyCol'];
+                                    if (!empty($updatedAtCol)) {
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                                    } else {
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                                    }
+                                    $stmtInsert->execute([$fullKey, $valor]);
                                 }
-                                $stmtInsert->execute([$fullKey, $valor]);
                             }
                         }
                     }
