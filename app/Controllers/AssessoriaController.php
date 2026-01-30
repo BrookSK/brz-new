@@ -162,46 +162,72 @@ class AssessoriaController extends Controller {
         }
         
         $requestUrl = 'https://app.scrapingbee.com/api/v1';
-        $params = [
-            'api_key' => $scriptbeeApiKey,
-            'url' => $url,
-            'stealth_proxy' => 'true',
-            'country_code' => 'us',
-            'wait_browser' => 'load',
-            'block_ads' => 'true',
-            'ai_query' => 'Extract all available product information, including product name, image, base price, and all variations. Each variation must include size, weight, or any selectable attribute, its value, and price if different. Preserve measurement units and return missing data as null.'
-        ];
-        
-        $queryString = http_build_query($params);
-        $fullUrl = $requestUrl . '?' . $queryString;
+
+        $buildUrl = function(array $override = []) use ($requestUrl, $scriptbeeApiKey, $url) {
+            $params = array_merge([
+                'api_key' => $scriptbeeApiKey,
+                'url' => $url,
+                'stealth_proxy' => 'true',
+                'country_code' => 'us',
+                'wait_browser' => 'load',
+                'block_ads' => 'true',
+                'ai_query' => 'Extract all available product information, including product name, image, base price, and all variations. Each variation must include size, weight, or any selectable attribute, its value, and price if different. Preserve measurement units and return missing data as null.'
+            ], $override);
+            return $requestUrl . '?' . http_build_query($params);
+        };
+
+        $fullUrl = $buildUrl();
         
         // Log da requisição
         if (headers_sent() === false) {
             header('X-ScrapingBee-Request-URL: ' . substr($fullUrl, 0, 200));
         }
         
-        // Executa a requisição
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $fullUrl,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST => 'GET',
-            CURLOPT_TIMEOUT => 45,  // Aumentado para 45 segundos
-            CURLOPT_CONNECTTIMEOUT => 10,  // Timeout de conexão 10 segundos
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+        $doRequest = function(string $targetUrl, int $timeoutSeconds) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $targetUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => 'GET',
+                CURLOPT_TIMEOUT => $timeoutSeconds,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErrno = curl_errno($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            return [$response, $httpCode, $curlErrno, $curlError];
+        };
+
+        // Tentativa 1 (com wait_browser=load)
+        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 45);
+
+        // Retry automático em caso de timeout (CURLE_OPERATION_TIMEDOUT = 28)
+        if ($curlErrno === 28) {
+            $retryUrl = $buildUrl([
+                // Menos pesado que "load" em alguns sites
+                'wait_browser' => 'domcontentloaded'
+            ]);
+
+            if (headers_sent() === false) {
+                header('X-ScrapingBee-Retry: timeout');
+                header('X-ScrapingBee-Retry-URL: ' . substr($retryUrl, 0, 200));
+            }
+
+            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 45);
+        }
         
         // Log da resposta
         if (headers_sent() === false) {
             header('X-ScrapingBee-HTTP-Code: ' . $httpCode);
             header('X-ScrapingBee-Response-Length: ' . strlen($response));
             header('X-ScrapingBee-Response-Prefix: ' . substr($response, 0, 200));
+            header('X-ScrapingBee-CURL-Errno: ' . $curlErrno);
         }
         
         if ($curlError) {

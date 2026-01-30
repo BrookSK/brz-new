@@ -243,8 +243,20 @@ class CarrinhoController extends Controller {
             return;
         }
         
+        $keyToRemove = null;
         if (isset($_SESSION['carrinho'][$produtoId])) {
-            unset($_SESSION['carrinho'][$produtoId]);
+            $keyToRemove = $produtoId;
+        } else {
+            foreach (($_SESSION['carrinho'] ?? []) as $k => $item) {
+                if (is_array($item) && array_key_exists('produto_id', $item) && (string) $item['produto_id'] === (string) $produtoId) {
+                    $keyToRemove = $k;
+                    break;
+                }
+            }
+        }
+
+        if ($keyToRemove !== null) {
+            unset($_SESSION['carrinho'][$keyToRemove]);
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
             $totalValor = 0;
@@ -279,7 +291,19 @@ class CarrinhoController extends Controller {
             return;
         }
         
+        $itemKey = null;
         if (isset($_SESSION['carrinho'][$produtoId])) {
+            $itemKey = $produtoId;
+        } else {
+            foreach (($_SESSION['carrinho'] ?? []) as $k => $item) {
+                if (is_array($item) && array_key_exists('produto_id', $item) && (string) $item['produto_id'] === (string) $produtoId) {
+                    $itemKey = $k;
+                    break;
+                }
+            }
+        }
+
+        if ($itemKey !== null) {
             $produto = $this->produtoModel->find($produtoId);
             
             $produtoStock = intval($produto['estoque'] ?? 0);
@@ -294,13 +318,13 @@ class CarrinhoController extends Controller {
                 $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
             }
             if ($itemPrice <= 0) {
-                $itemPrice = floatval($_SESSION['carrinho'][$produtoId]['price'] ?? $_SESSION['carrinho'][$produtoId]['preco_unitario'] ?? 0);
+                $itemPrice = floatval($_SESSION['carrinho'][$itemKey]['price'] ?? $_SESSION['carrinho'][$itemKey]['preco_unitario'] ?? 0);
             }
 
-            $_SESSION['carrinho'][$produtoId]['quantidade'] = $quantidade;
-            $_SESSION['carrinho'][$produtoId]['price'] = $itemPrice;
-            $_SESSION['carrinho'][$produtoId]['preco_unitario'] = $itemPrice;
-            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $itemPrice;
+            $_SESSION['carrinho'][$itemKey]['quantidade'] = $quantidade;
+            $_SESSION['carrinho'][$itemKey]['price'] = $itemPrice;
+            $_SESSION['carrinho'][$itemKey]['preco_unitario'] = $itemPrice;
+            $_SESSION['carrinho'][$itemKey]['subtotal'] = $quantidade * $itemPrice;
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
             $totalValor = 0;
@@ -311,7 +335,7 @@ class CarrinhoController extends Controller {
             $this->json([
                 'success' => true,
                 'message' => 'Carrinho atualizado',
-                'item_subtotal' => $_SESSION['carrinho'][$produtoId]['subtotal'],
+                'item_subtotal' => $_SESSION['carrinho'][$itemKey]['subtotal'],
                 'total_itens' => $totalItens,
                 'total_valor' => $totalValor
             ]);

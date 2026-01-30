@@ -28,6 +28,9 @@
                                     if (!empty($capaArquivo) && is_string($capaArquivo)) {
                                         $capaArquivo = trim($capaArquivo);
                                         if ($capaArquivo !== '') {
+                                            if (preg_match('#^https?://#i', $capaArquivo)) {
+                                                $fotoUrl = $capaArquivo;
+                                            }
                                             if ($capaArquivo[0] !== '/') {
                                                 $capaArquivo = '/' . $capaArquivo;
                                             }
@@ -44,6 +47,18 @@
                                             if ($capaExists) {
                                                 $fotoUrl = Url::absolute($capaArquivo);
                                             }
+                                        }
+                                    }
+
+                                    if (empty($fotoUrl)) {
+                                        try {
+                                            if (!empty($produtoCarrinho) && is_array($produtoCarrinho) && !empty($produtoCarrinho['imagens']) && is_array($produtoCarrinho['imagens'])) {
+                                                $first = $produtoCarrinho['imagens'][0] ?? null;
+                                                if (is_string($first) && preg_match('#^https?://#i', $first)) {
+                                                    $fotoUrl = $first;
+                                                }
+                                            }
+                                        } catch (\Exception $e) {
                                         }
                                     }
 
@@ -82,7 +97,7 @@
                                 <div class="col-8 col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
+                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= json_encode((string) $item['produto_id']) ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
                                             <i class="fas fa-minus"></i>
                                         </button>
                                         <input type="number" class="form-control text-center" 
@@ -90,8 +105,8 @@
                                                min="1" 
                                                max="999"
                                                id="quantidade-<?= $item['produto_id'] ?>"
-                                               onchange="atualizarQuantidade(<?= $item['produto_id'] ?>, this.value)">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= $item['produto_id'] ?>, <?= $item['quantidade'] + 1 ?>)">
+                                               onchange="atualizarQuantidade(<?= json_encode((string) $item['produto_id']) ?>, this.value)">
+                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= json_encode((string) $item['produto_id']) ?>, <?= $item['quantidade'] + 1 ?>)">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -110,7 +125,7 @@
                                     </small>
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= $item['produto_id'] ?>)">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= json_encode((string) $item['produto_id']) ?>)">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
