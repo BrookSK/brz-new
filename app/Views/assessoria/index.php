@@ -346,6 +346,11 @@ $(document).ready(function() {
     }
 
     function handleErrorResponse(message) {
+        // Mensagem amigável para timeout
+        if (message.includes('demorou muito para responder') || message.includes('timeout')) {
+            message = 'O servidor está demorando para responder. Isso pode acontecer com sites complexos. Tente novamente ou use um link mais simples.';
+        }
+        
         Swal.fire({
             icon: 'error',
             title: 'Erro no Processamento',

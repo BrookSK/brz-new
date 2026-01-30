@@ -131,7 +131,8 @@ class AssessoriaController extends Controller {
             CURLOPT_URL => $fullUrl,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => 'GET',
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 45,  // Aumentado para 45 segundos
+            CURLOPT_CONNECTTIMEOUT => 10,  // Timeout de conexão 10 segundos
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         ]);
@@ -152,9 +153,16 @@ class AssessoriaController extends Controller {
             if (headers_sent() === false) {
                 header('X-ScrapingBee-CURL-Error: ' . $curlError);
             }
+            
+            // Mensagem amigável para timeout
+            $errorMessage = 'Erro na requisição cURL: ' . $curlError;
+            if (strpos($curlError, 'timeout') !== false) {
+                $errorMessage = 'O servidor demorou muito para responder. Tente novamente ou use um link diferente.';
+            }
+            
             return [
                 'success' => false,
-                'error' => 'Erro na requisição cURL: ' . $curlError
+                'error' => $errorMessage
             ];
         }
         
@@ -652,7 +660,8 @@ class AssessoriaController extends Controller {
                 'temperature' => 0.1,
                 'max_tokens' => 1000
             ]),
-            CURLOPT_TIMEOUT => 30
+            CURLOPT_TIMEOUT => 45,  // Aumentado para 45 segundos
+            CURLOPT_CONNECTTIMEOUT => 10  // Timeout de conexão 10 segundos
         ]);
         
         $response = curl_exec($ch);
@@ -669,7 +678,14 @@ class AssessoriaController extends Controller {
             if (headers_sent() === false) {
                 header('X-ChatGPT-CURL-Error: ' . $curlError);
             }
-            throw new \Exception('Erro na requisição ChatGPT: ' . $curlError);
+            
+            // Mensagem amigável para timeout
+            $errorMessage = 'Erro na requisição ChatGPT: ' . $curlError;
+            if (strpos($curlError, 'timeout') !== false) {
+                $errorMessage = 'O serviço de análise demorou muito para responder. Tente novamente.';
+            }
+            
+            throw new \Exception($errorMessage);
         }
         
         if ($httpCode !== 200) {
