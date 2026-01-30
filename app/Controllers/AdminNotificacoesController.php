@@ -4,6 +4,28 @@ namespace App\Controllers;
 use App\Core\Request;
 
 class AdminNotificacoesController extends Controller {
+    private function ensureEventosSistemaTable(\PDO $pdo): void {
+        try {
+            $pdo->query('SELECT 1 FROM eventos_sistema LIMIT 1');
+            return;
+        } catch (\Exception $e) {
+        }
+
+        $sql = "CREATE TABLE IF NOT EXISTS eventos_sistema (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )";
+        $pdo->exec($sql);
+
+        try {
+            $pdo->exec('CREATE UNIQUE INDEX idx_eventos_sistema_nome ON eventos_sistema (nome)');
+        } catch (\Exception $e) {
+        }
+    }
+
     private function requireAdmin(): void {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -83,6 +105,8 @@ class AdminNotificacoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $pdo->beginTransaction();
+
+            $this->ensureEventosSistemaTable($pdo);
 
             $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
             $stmtEv->execute([$evento]);
@@ -243,6 +267,8 @@ class AdminNotificacoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
+            $this->ensureEventosSistemaTable($pdo);
+
             $sql = 'SELECT w.id, w.url, w.metodo, w.headers, w.payload_template, w.ativo FROM webhooks w INNER JOIN eventos_sistema e ON e.id = w.evento_id WHERE e.nome = ? ORDER BY w.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);
             $st->execute([$evento]);
@@ -402,6 +428,8 @@ class AdminNotificacoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $pdo->beginTransaction();
+
+            $this->ensureEventosSistemaTable($pdo);
 
             $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
             $stmtEv->execute([$evento]);
