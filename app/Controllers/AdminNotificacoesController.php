@@ -224,7 +224,7 @@ class AdminNotificacoesController extends Controller {
             $this->json(['success' => true, 'webhook_id' => $webhookId, 'evento_id' => $eventoId]);
         } catch (\Exception $e) {
             try {
-                if (isset($pdo)) {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
             } catch (\Exception $e2) {
@@ -531,7 +531,7 @@ class AdminNotificacoesController extends Controller {
             $this->json(['success' => true, 'template_id' => $templateId, 'evento_id' => $eventoId]);
         } catch (\Exception $e) {
             try {
-                if (isset($pdo)) {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
             } catch (\Exception $e2) {
