@@ -14,6 +14,123 @@ class AssessoriaController extends Controller {
         $this->view('assessoria/index');
     }
 
+    public function enfileirarLinks(Request $request) {
+        header('Content-Type: application/json');
+        session_start();
+
+        try {
+            $body = $request->getBody();
+            $links = $body['links'] ?? [];
+            if (!is_array($links) || empty($links)) {
+                echo json_encode(['success' => false, 'message' => 'Nenhum link fornecido']);
+                return;
+            }
+
+            $cleanLinks = [];
+            foreach ($links as $l) {
+                $l = trim((string) $l);
+                if ($l === '' || !filter_var($l, FILTER_VALIDATE_URL)) {
+                    continue;
+                }
+                $cleanLinks[] = $l;
+            }
+
+            if (empty($cleanLinks)) {
+                echo json_encode(['success' => false, 'message' => 'Nenhum link válido fornecido']);
+                return;
+            }
+
+            $_SESSION['assessoria_orcamento'] = [
+                'produtos' => [],
+                'erros' => [],
+                'data_criacao' => date('Y-m-d H:i:s')
+            ];
+
+            $jobId = bin2hex(random_bytes(16));
+            $_SESSION['assessoria_job_id'] = $jobId;
+
+            $job = [
+                'job_id' => $jobId,
+                'status' => 'queued',
+                'total' => count($cleanLinks),
+                'processed' => 0,
+                'produtos' => [],
+                'erros' => [],
+                'started_at' => null,
+                'finished_at' => null
+            ];
+            $this->writeJobFile($jobId, $job);
+
+            session_write_close();
+
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'job_id' => $jobId,
+                    'total' => count($cleanLinks)
+                ]
+            ]);
+
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            ignore_user_abort(true);
+            @set_time_limit(0);
+
+            $this->startBackgroundProcessing($cleanLinks, $jobId);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao iniciar processamento: ' . $e->getMessage()]);
+            return;
+        }
+    }
+
+    public function statusJob(Request $request) {
+        header('Content-Type: application/json');
+        session_start();
+
+        $jobId = (string) $request->getParam('job_id', '');
+        if ($jobId === '') {
+            $jobId = (string) ($_SESSION['assessoria_job_id'] ?? '');
+        }
+
+        if ($jobId === '') {
+            echo json_encode(['success' => false, 'message' => 'job_id não informado']);
+            return;
+        }
+
+        $job = $this->readJobFile($jobId);
+        if ($job === null) {
+            echo json_encode(['success' => false, 'message' => 'Job não encontrado']);
+            return;
+        }
+
+        if (($job['status'] ?? '') === 'done') {
+            if (!isset($_SESSION['assessoria_orcamento']) || !is_array($_SESSION['assessoria_orcamento'])) {
+                $_SESSION['assessoria_orcamento'] = [
+                    'produtos' => [],
+                    'erros' => [],
+                    'data_criacao' => date('Y-m-d H:i:s')
+                ];
+            }
+
+            $_SESSION['assessoria_orcamento']['produtos'] = $job['produtos'] ?? [];
+            $_SESSION['assessoria_orcamento']['erros'] = $job['erros'] ?? [];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'job_id' => $jobId,
+                'status' => (string) ($job['status'] ?? ''),
+                'total' => (int) ($job['total'] ?? 0),
+                'processed' => (int) ($job['processed'] ?? 0),
+                'total_produtos' => is_array($job['produtos'] ?? null) ? count($job['produtos']) : 0,
+                'total_erros' => is_array($job['erros'] ?? null) ? count($job['erros']) : 0
+            ]
+        ]);
+    }
+
     private function headerSafeValue($value, int $maxLen = 200): string {
         $v = (string) $value;
         $v = preg_replace('/[\r\n]+/', ' ', $v);
@@ -37,6 +154,138 @@ class AssessoriaController extends Controller {
             return null;
         }
         return substr($text, $start, $end - $start + 1);
+    }
+
+    private function normalizePossibleJson(string $text): string {
+        $t = trim($text);
+
+        // Remover code fences ```json ... ```
+        $t = preg_replace('/^```(?:json)?\s*/i', '', $t);
+        $t = preg_replace('/\s*```\s*$/', '', $t);
+
+        // Aspas “inteligentes” que quebram JSON
+        $t = str_replace(["\u{201C}", "\u{201D}", "\u{201E}", "\u{201F}", "\u{00AB}", "\u{00BB}"], '"', $t);
+        $t = str_replace(["\u{2018}", "\u{2019}", "\u{201A}", "\u{201B}"], "'", $t);
+
+        // Remover caracteres de controle
+        $t = $this->cleanJsonText($t);
+
+        // Pegar apenas o objeto JSON (se houver texto extra)
+        $obj = $this->extractFirstJsonObject($t);
+        if ($obj !== null) {
+            $t = $obj;
+        }
+
+        // Remover vírgulas finais antes de } ou ]
+        $t = preg_replace('/,\s*([}\]])/', '$1', $t);
+
+        return trim($t);
+    }
+
+    private function decodeJsonResilient(string $raw): array {
+        $candidate = $this->normalizePossibleJson($raw);
+
+        $data = json_decode($candidate, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+            return $data;
+        }
+
+        // Caso: JSON veio como string escapada "{...}"
+        $maybeString = json_decode($candidate, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_string($maybeString)) {
+            $candidate2 = $this->normalizePossibleJson($maybeString);
+            $data2 = json_decode($candidate2, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data2)) {
+                return $data2;
+            }
+        }
+
+        $err = json_last_error_msg();
+        throw new \Exception('ChatGPT não retornou JSON válido: ' . $err);
+    }
+
+    private function getAssessoriaJobsDir(): string {
+        $base = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+        $dir = $base . DIRECTORY_SEPARATOR . 'assessoria_jobs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+        return $dir;
+    }
+
+    private function getJobFilePath(string $jobId): string {
+        $safe = preg_replace('/[^a-zA-Z0-9_-]/', '', $jobId);
+        return $this->getAssessoriaJobsDir() . DIRECTORY_SEPARATOR . 'job_' . $safe . '.json';
+    }
+
+    private function writeJobFile(string $jobId, array $data): void {
+        $path = $this->getJobFilePath($jobId);
+        $fp = @fopen($path, 'c+');
+        if ($fp === false) {
+            return;
+        }
+        @flock($fp, LOCK_EX);
+        ftruncate($fp, 0);
+        fwrite($fp, json_encode($data));
+        fflush($fp);
+        @flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    private function readJobFile(string $jobId): ?array {
+        $path = $this->getJobFilePath($jobId);
+        if (!file_exists($path)) {
+            return null;
+        }
+        $raw = @file_get_contents($path);
+        if ($raw === false || trim($raw) === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return null;
+        }
+        return $data;
+    }
+
+    private function startBackgroundProcessing(array $links, string $jobId): void {
+        $job = [
+            'job_id' => $jobId,
+            'status' => 'running',
+            'total' => count($links),
+            'processed' => 0,
+            'produtos' => [],
+            'erros' => [],
+            'started_at' => date('Y-m-d H:i:s'),
+            'finished_at' => null
+        ];
+        $this->writeJobFile($jobId, $job);
+
+        foreach ($links as $link) {
+            try {
+                $resultado = $this->processarLinkIndividual((string) $link);
+                if (!empty($resultado['success'])) {
+                    $job['produtos'][] = $resultado['data'];
+                } else {
+                    $job['erros'][] = [
+                        'link' => (string) $link,
+                        'error' => (string) ($resultado['error'] ?? 'Erro ao processar link')
+                    ];
+                }
+            } catch (\Exception $e) {
+                $job['erros'][] = [
+                    'link' => (string) $link,
+                    'error' => $e->getMessage()
+                ];
+            }
+
+            $job['processed'] = (int) $job['processed'] + 1;
+            $this->writeJobFile($jobId, $job);
+        }
+
+        $job['status'] = 'done';
+        $job['finished_at'] = date('Y-m-d H:i:s');
+        $this->writeJobFile($jobId, $job);
     }
     
     /**
@@ -859,24 +1108,19 @@ class AssessoriaController extends Controller {
             header('X-ChatGPT-Content-Prefix: ' . $this->headerSafeValue(substr((string) $content, 0, 200), 200));
         }
         
-        // Tentar fazer parse do JSON retornado pelo ChatGPT
-        $cleanContent = $this->cleanJsonText((string) $content);
-        $jsonCandidate = $this->extractFirstJsonObject($cleanContent);
-        if ($jsonCandidate === null) {
-            $jsonCandidate = $cleanContent;
-        }
-
-        $produtoData = json_decode($jsonCandidate, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        // Tentar fazer parse do JSON retornado pelo ChatGPT (com correções)
+        try {
+            $produtoData = $this->decodeJsonResilient((string) $content);
+        } catch (\Exception $e) {
             if (headers_sent() === false) {
-                header('X-ChatGPT-Parse-Error: ' . json_last_error_msg());
+                header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e->getMessage(), 200));
                 header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content, 0, 500), 500));
             }
-            throw new \Exception('ChatGPT não retornou JSON válido: ' . json_last_error_msg());
+            throw $e;
         }
         
         // Validar campos obrigatórios
-        $camposObrigatorios = ['nome', 'valor', 'moeda', 'peso', 'descricao', 'imagens'];
+        $camposObrigatorios = ['nome', 'valor', 'peso', 'descricao', 'imagens'];
         foreach ($camposObrigatorios as $campo) {
             if (!isset($produtoData[$campo]) || empty($produtoData[$campo])) {
                 if (headers_sent() === false) {
@@ -885,6 +1129,27 @@ class AssessoriaController extends Controller {
                 throw new \Exception("Campo obrigatório '{$campo}' não encontrado ou vazio");
             }
         }
+
+        // Garantir url_original e filtrar apenas campos essenciais para persistência
+        if (!isset($produtoData['url_original']) || (string) $produtoData['url_original'] === '') {
+            $produtoData['url_original'] = $urlOriginal;
+        }
+        if (!isset($produtoData['sku'])) {
+            $produtoData['sku'] = '';
+        }
+        if (!isset($produtoData['imagens']) || !is_array($produtoData['imagens'])) {
+            $produtoData['imagens'] = [];
+        }
+
+        $produtoData = [
+            'sku' => (string) ($produtoData['sku'] ?? ''),
+            'nome' => (string) ($produtoData['nome'] ?? ''),
+            'descricao' => (string) ($produtoData['descricao'] ?? ''),
+            'valor' => floatval($produtoData['valor'] ?? 0),
+            'peso' => floatval($produtoData['peso'] ?? 0),
+            'imagens' => $produtoData['imagens'] ?? [],
+            'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
+        ];
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
@@ -909,22 +1174,16 @@ class AssessoriaController extends Controller {
 DADOS BRUTOS:
 " . json_encode($dadosBrutos, JSON_PRETTY_PRINT) . "
 
-EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON VÁLIDO COM ESTA ESTRUTURA EXATA:
+EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON VÁLIDO (SEM TEXTO, SEM MARKDOWN, SEM ```), COM ESTA ESTRUTURA EXATA E SOMENTE ESTES CAMPOS:
 
 {
-    \"sku\": \"SKU do produto ou código único\",
+    \"sku\": \"SKU do produto ou código único (se não achar, pode retornar string vazia)\",
     \"nome\": \"Nome completo do produto\",
     \"descricao\": \"Descrição detalhada do produto\",
     \"valor\": 99.99,
-    \"moeda\": \"USD\",
     \"peso\": 1.5,
-    \"comprimento\": 10.0,
-    \"largura\": 8.0,
-    \"altura\": 5.0,
     \"imagens\": [\"url1\", \"url2\"],
-    \"url_original\": \"{$urlOriginal}\",
-    \"data_scraping\": \"" . date('Y-m-d H:i:s') . "\",
-    \"fonte\": \"chatgpt_analysis\"
+    \"url_original\": \"{$urlOriginal}\"
 }
 
 REGRAS ESPECÍFICAS:
