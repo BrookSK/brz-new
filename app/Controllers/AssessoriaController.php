@@ -205,8 +205,8 @@ class AssessoriaController extends Controller {
             return [$response, $httpCode, $curlErrno, $curlError];
         };
 
-        // 1 tentativa curta para não estourar timeout do proxy (evita 504)
-        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 25);
+        // 1 tentativa (até 60s) por produto
+        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 60);
         
         // Log da resposta
         if (headers_sent() === false) {
