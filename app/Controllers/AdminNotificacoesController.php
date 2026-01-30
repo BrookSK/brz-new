@@ -134,6 +134,7 @@ class AdminNotificacoesController extends Controller {
             $cfg['encryption'] = $get('encryption');
             $cfg['from'] = $get('from');
             $cfg['from_name'] = $get('from_name');
+            $cfg['test_to'] = $get('test_to');
             return $cfg;
         }
 
@@ -146,6 +147,7 @@ class AdminNotificacoesController extends Controller {
             $cfg['encryption'] = $getByFullKey('email_encryption');
             $cfg['from'] = $getByFullKey('email_from');
             $cfg['from_name'] = $getByFullKey('email_from_name');
+            $cfg['test_to'] = $getByFullKey('email_test_to');
 
             if (($cfg['host'] ?? '') === null || (string) ($cfg['host'] ?? '') === '') {
                 $cfg['host'] = $getByFullKey('smtp_host');
@@ -167,6 +169,10 @@ class AdminNotificacoesController extends Controller {
             }
             if (($cfg['from_name'] ?? '') === null || (string) ($cfg['from_name'] ?? '') === '') {
                 $cfg['from_name'] = $getByFullKey('email_nome_remetente');
+            }
+
+            if (($cfg['test_to'] ?? '') === null || (string) ($cfg['test_to'] ?? '') === '') {
+                $cfg['test_to'] = $getByFullKey('email_teste_para');
             }
 
             return $cfg;
@@ -207,6 +213,7 @@ class AdminNotificacoesController extends Controller {
             $cfg['encryption'] = $pick(['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption']);
             $cfg['from'] = $pick(['email_from', 'email_remetente', 'smtp_from']);
             $cfg['from_name'] = $pick(['email_from_name', 'email_nome_remetente', 'smtp_from_name']);
+            $cfg['test_to'] = $pick(['email_test_to', 'email_teste_para']);
             return $cfg;
         }
 
@@ -947,10 +954,7 @@ class AdminNotificacoesController extends Controller {
             session_start();
         }
 
-        $to = (string) ($_SESSION['usuario_email'] ?? '');
-        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-            $this->json(['success' => false, 'error' => 'Email do admin não encontrado na sessão'], 400);
-        }
+        $sessionEmail = (string) ($_SESSION['usuario_email'] ?? '');
 
         $evento = (string) $request->getParam('evento', '');
         if ($evento === '') {
@@ -965,6 +969,17 @@ class AdminNotificacoesController extends Controller {
 
             $emailCfg = $this->getEmailConfigFromDb($pdo);
             $driver = strtolower(trim((string) ($emailCfg['driver'] ?? 'smtp')));
+
+            $to = (string) $request->getParam('to', '');
+            if ($to === '' && !empty($emailCfg['test_to'])) {
+                $to = (string) $emailCfg['test_to'];
+            }
+            if ($to === '') {
+                $to = $sessionEmail;
+            }
+            if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                $this->json(['success' => false, 'error' => 'Informe um email válido para teste (campo Email de teste para), ou configure email_test_to'], 400);
+            }
 
             $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);

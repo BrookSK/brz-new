@@ -377,6 +377,11 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Nome de Envio</label>
                                                 <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana Shop') . '">
                                             </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Email de teste (para)</label>
+                                                <input type="email" class="form-control" name="email_test_to" value="' . $this->getConfigValue($config, 'email', 'test_to', '') . '">
+                                                <small class="text-muted">Usado ao clicar em “Testar” nos templates de e-mail.</small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -835,7 +840,7 @@ class AdminConfiguracoesController extends Controller {
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name'],
+                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
@@ -1505,6 +1510,11 @@ class AdminConfiguracoesController extends Controller {
             const formData = new FormData();
             formData.set('evento', evento);
 
+            const testTo = document.querySelector('input[name="email_test_to"]');
+            if (testTo && testTo.value) {
+                formData.set('to', testTo.value);
+            }
+
             fetch('/admin/testar-email-template', {
                 method: 'POST',
                 body: formData
@@ -1630,6 +1640,7 @@ class AdminConfiguracoesController extends Controller {
                     'encryption' => ['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption'],
                     'from' => ['email_from', 'email_remetente', 'smtp_from'],
                     'from_name' => ['email_from_name', 'email_nome_remetente', 'smtp_from_name'],
+                    'test_to' => ['email_test_to', 'email_teste_para'],
                 ];
 
                 $emailColumnMap = [];
