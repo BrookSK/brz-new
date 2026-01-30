@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Models\Produto;
 
 class AssessoriaController extends Controller {
     
@@ -576,23 +577,26 @@ class AssessoriaController extends Controller {
             foreach ($produtosSelecionados as $produtoIndex) {
                 if (isset($orcamento['produtos'][$produtoIndex])) {
                     $produto = $orcamento['produtos'][$produtoIndex];
-                    
-                    // Cria ID temporário para o produto
-                    $tempId = 'temp_' . uniqid();
-                    
-                    $_SESSION['carrinho'][] = [
-                        'produto_id' => $tempId,
-                        'sku' => $produto['sku'],
-                        'nome' => $produto['nome'],
-                        'descricao' => $produto['descricao'],
-                        'valor' => $produto['valor'],
-                        'moeda' => $produto['moeda'],
-                        'peso' => $produto['peso'],
-                        'quantidade' => 1,
-                        'fonte' => 'assessoria',
-                        'url_original' => $produto['url_original'],
-                        'imagens' => $produto['imagens']
-                    ];
+
+                    $produtoId = $this->criarOuReutilizarProdutoNoSistema($produto);
+
+                    $itemKey = (string) $produtoId;
+                    $quantidade = 1;
+
+                    if (isset($_SESSION['carrinho'][$itemKey])) {
+                        $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
+                        $preco = floatval($_SESSION['carrinho'][$itemKey]['preco_unitario'] ?? 0);
+                        $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $preco;
+                    } else {
+                        $preco = floatval($produto['valor'] ?? 0);
+                        $_SESSION['carrinho'][$itemKey] = [
+                            'produto_id' => $produtoId,
+                            'nome' => (string) ($produto['nome'] ?? ''),
+                            'preco_unitario' => $preco,
+                            'quantidade' => $quantidade,
+                            'subtotal' => $quantidade * $preco
+                        ];
+                    }
                     
                     $produtosAdicionados++;
                 }
@@ -613,6 +617,57 @@ class AssessoriaController extends Controller {
                 'message' => 'Erro ao adicionar produtos ao carrinho: ' . $e->getMessage()
             ]);
         }
+    }
+
+    private function criarOuReutilizarProdutoNoSistema(array $produto): int {
+        $db = \Config\Database::getConnection();
+
+        $nome = trim((string) ($produto['nome'] ?? ''));
+        if ($nome === '') {
+            throw new \Exception('Produto sem nome');
+        }
+
+        $sku = trim((string) ($produto['sku'] ?? ''));
+        if ($sku === '') {
+            $sku = 'ASS-' . substr(md5($nome . '|' . ((string) ($produto['url_original'] ?? ''))), 0, 10);
+        }
+
+        try {
+            $stmt = $db->prepare('SELECT id FROM produtos WHERE sku = ? ORDER BY id DESC LIMIT 1');
+            $stmt->execute([$sku]);
+            $existingId = $stmt->fetchColumn();
+            if ($existingId) {
+                return (int) $existingId;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $preco = floatval($produto['valor'] ?? 0);
+        $peso = floatval($produto['peso'] ?? 0.5);
+        $descricao = (string) ($produto['descricao'] ?? '');
+
+        $produtoModel = new Produto();
+        $newId = (int) $produtoModel->create([
+            'name' => $nome,
+            'sku' => $sku,
+            'description' => $descricao,
+            'price' => $preco,
+            'weight' => $peso,
+            'status' => 'published',
+            'stock' => 999999,
+            'category_id' => 0,
+            'images' => $produto['imagens'] ?? [],
+            'attributes' => [
+                'fonte' => 'assessoria',
+                'url_original' => (string) ($produto['url_original'] ?? '')
+            ]
+        ]);
+
+        if ($newId <= 0) {
+            throw new \Exception('Falha ao criar produto no sistema');
+        }
+
+        return $newId;
     }
     
     /**
