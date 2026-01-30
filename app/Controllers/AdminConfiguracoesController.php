@@ -699,7 +699,7 @@ class AdminConfiguracoesController extends Controller {
                                 </div>
                             </div>
                             
-                            <div class="d-flex justify-content-end mt-4">
+                            <div class="d-flex justify-content-end mt-4" id="admin-config-salvar-geral">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save"></i> Salvar Configurações
                                 </button>
@@ -957,6 +957,17 @@ class AdminConfiguracoesController extends Controller {
         ob_start();
         ?>
         <script>
+        function syncSalvarGeralVisibilityNotificacoes() {
+            const btnContainer = document.getElementById('admin-config-salvar-geral');
+            if (!btnContainer) {
+                return;
+            }
+
+            const tabPane = document.getElementById('v-pills-notificacoes');
+            const isActive = !!(tabPane && tabPane.classList.contains('active') && tabPane.classList.contains('show'));
+            btnContainer.style.display = isActive ? 'none' : '';
+        }
+
         function getNotificacoesFormData() {
             const container = document.getElementById('formNotificacoes');
             const formData = new FormData();
@@ -974,6 +985,15 @@ class AdminConfiguracoesController extends Controller {
             });
             return formData;
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabBtn = document.getElementById('v-pills-notificacoes-tab');
+            if (tabBtn) {
+                tabBtn.addEventListener('shown.bs.tab', syncSalvarGeralVisibilityNotificacoes);
+                tabBtn.addEventListener('hidden.bs.tab', syncSalvarGeralVisibilityNotificacoes);
+            }
+            syncSalvarGeralVisibilityNotificacoes();
+        });
 
         function salvarNotificacaoAdmin() {
             const formData = getNotificacoesFormData();
