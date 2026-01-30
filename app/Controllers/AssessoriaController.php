@@ -319,18 +319,40 @@ class AssessoriaController extends Controller {
      * Página de debug para analisar respostas do ScrapingBee
      */
     public function debug(Request $request) {
-        session_start();
-        
-        // Obter logs da sessão
-        $debugLogs = $_SESSION['assessoria_debug_logs'] ?? [];
-        
-        $this->view('assessoria/debug', [
-            'debugLogs' => $debugLogs,
-            'currentConfig' => [
-                'api_key_configured' => !empty($this->getScriptBeeApiKey()),
-                'api_key_preview' => substr($this->getScriptBeeApiKey() ?? '', 0, 8) . '...' . substr($this->getScriptBeeApiKey() ?? '', -4)
-            ]
-        ]);
+        try {
+            session_start();
+            
+            // Obter logs da sessão
+            $debugLogs = $_SESSION['assessoria_debug_logs'] ?? [];
+            
+            $this->view('assessoria/debug_simple', [
+                'debugLogs' => $debugLogs,
+                'currentConfig' => [
+                    'api_key_configured' => !empty($this->getScriptBeeApiKey()),
+                    'api_key_preview' => substr($this->getScriptBeeApiKey() ?? '', 0, 8) . '...' . substr($this->getScriptBeeApiKey() ?? '', -4)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            // Em caso de erro, mostrar página simples com erro
+            echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Error</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="alert alert-danger">
+            <h4>Erro no Debug</h4>
+            <p>' . htmlspecialchars($e->getMessage()) . '</p>
+            <pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>
+            <a href="/assessoria" class="btn btn-primary">Voltar para Assessoria</a>
+        </div>
+    </div>
+</body>
+</html>';
+        }
     }
     
     /**
@@ -339,21 +361,21 @@ class AssessoriaController extends Controller {
     public function debugTest(Request $request) {
         header('Content-Type: application/json');
         
-        session_start();
-        
         try {
+            session_start();
+            
             $body = $request->getBody();
             $url = $body['url'] ?? '';
             
             if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
                 echo json_encode([
                     'success' => false,
-                    'message' => 'URL inválida'
+                    'error' => 'URL inválida'
                 ]);
                 return;
             }
             
-            // Fazer request completo e salvar log
+            // Fazer request simples
             $result = $this->processarLinkIndividualDebug($url);
             
             // Salvar log na sessão
@@ -374,14 +396,14 @@ class AssessoriaController extends Controller {
             
             echo json_encode([
                 'success' => true,
-                'result' => $result
+                'debug' => $result['debug'] ?? null,
+                'data' => $result['data'] ?? null
             ]);
             
         } catch (\Exception $e) {
             echo json_encode([
                 'success' => false,
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
         }
     }
