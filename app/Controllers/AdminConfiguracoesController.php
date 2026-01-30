@@ -228,11 +228,55 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="mb-3">
                                                     <label class="form-label">Campos Personalizados (JSON)</label>
                                                     <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana Shop&quot;}"></textarea>
+                                                    <small class="text-muted">Esses campos são mesclados no payload final enviado ao webhook.</small>
                                                 </div>
 
                                                 <div class="mb-3">
                                                     <label class="form-label">Template da Mensagem</label>
                                                     <textarea name="webhook_template" class="form-control" rows="4" placeholder="Olá {{nome}}, seu pedido #{{codigo_pedido}} está {{status}}"></textarea>
+                                                    <small class="text-muted">Você pode usar variáveis no formato <code>{{nome}}</code>, <code>{{codigo_pedido}}</code>, <code>{{status}}</code>, etc.</small>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Campos Enviados no Webhook</label>
+                                                    <div class="border rounded p-3 bg-light">
+                                                        <div class="mb-2"><strong>Variáveis disponíveis:</strong></div>
+                                                        <div class="row">
+                                                            <div class="col-md-4"><code>{{evento}}</code></div>
+                                                            <div class="col-md-4"><code>{{pedido_id}}</code></div>
+                                                            <div class="col-md-4"><code>{{codigo_pedido}}</code></div>
+                                                            <div class="col-md-4"><code>{{status}}</code></div>
+                                                            <div class="col-md-4"><code>{{moeda}}</code></div>
+                                                            <div class="col-md-4"><code>{{valor_total}}</code></div>
+                                                            <div class="col-md-4"><code>{{nome}}</code></div>
+                                                            <div class="col-md-4"><code>{{email}}</code></div>
+                                                            <div class="col-md-4"><code>{{telefone}}</code></div>
+                                                            <div class="col-md-4"><code>{{data}}</code></div>
+                                                        </div>
+                                                        <div class="mt-2"><small class="text-muted">Além disso, o sistema pode adicionar campos extras do evento (quando aplicável) e também tudo que você colocar em “Campos Personalizados (JSON)”.</small></div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Exemplo de Payload (JSON)</label>
+                                                    <pre class="border rounded p-3 bg-light mb-0" style="white-space: pre-wrap;">{
+  "channel": "whatsapp",
+  "evento": "novo_pedido",
+  "to": "5511999999999",
+  "message": "Olá Cliente, seu pedido #ABC123 está aprovado.",
+  "vars": {
+    "evento": "novo_pedido",
+    "pedido_id": "123",
+    "codigo_pedido": "ABC123",
+    "status": "aprovado",
+    "moeda": "BRL",
+    "valor_total": "199.90",
+    "nome": "Cliente",
+    "email": "cliente@exemplo.com",
+    "telefone": "5511999999999",
+    "data": "2026-01-30 12:00:00"
+  }
+}</pre>
                                                 </div>
 
                                                 <div class="mb-3">
