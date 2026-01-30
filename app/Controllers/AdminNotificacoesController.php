@@ -26,6 +26,35 @@ class AdminNotificacoesController extends Controller {
         }
     }
 
+    private function ensureEmailTemplatesTable(\PDO $pdo): void {
+        try {
+            $pdo->query('SELECT 1 FROM email_templates LIMIT 1');
+            return;
+        } catch (\Exception $e) {
+        }
+
+        $sql = "CREATE TABLE IF NOT EXISTS email_templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            evento_id INT NULL,
+            nome VARCHAR(100) NOT NULL,
+            assunto VARCHAR(255) NOT NULL,
+            corpo_html LONGTEXT NOT NULL,
+            ativo TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL
+        )";
+        $pdo->exec($sql);
+
+        try {
+            $pdo->exec('CREATE INDEX idx_email_templates_evento_id ON email_templates (evento_id)');
+        } catch (\Exception $e) {
+        }
+        try {
+            $pdo->exec('CREATE INDEX idx_email_templates_nome ON email_templates (nome)');
+        } catch (\Exception $e) {
+        }
+    }
+
     private function ensureWebhooksTable(\PDO $pdo): void {
         try {
             $pdo->query('SELECT 1 FROM webhooks LIMIT 1');
@@ -170,6 +199,7 @@ class AdminNotificacoesController extends Controller {
             $pdo->beginTransaction();
 
             $this->ensureEventosSistemaTable($pdo);
+            $this->ensureEmailTemplatesTable($pdo);
             $this->ensureWebhooksTable($pdo);
 
             $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
@@ -547,6 +577,8 @@ class AdminNotificacoesController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
+            $this->ensureEmailTemplatesTable($pdo);
+
             $stmt = $pdo->query('DESCRIBE email_templates');
             $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
             if (!is_array($cols) || empty($cols) || !in_array('id', $cols, true)) {
@@ -575,6 +607,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEmailTemplatesTable($pdo);
 
             if ($id > 0) {
                 $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo, t.updated_at FROM email_templates t WHERE t.id = ? LIMIT 1';
@@ -617,6 +651,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEmailTemplatesTable($pdo);
 
             $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);
