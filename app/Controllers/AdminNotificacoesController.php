@@ -593,7 +593,7 @@ class AdminNotificacoesController extends Controller {
     private function getEmailVarsTeste(string $evento): array {
         $base = [
             'evento' => $evento,
-            'pedido_id' => 'TExT-122',
+            'pedido_id' => 'TEST-123',
             'codigo_pedido' => 'TEST-123',
             'numero_pedido' => 'TEST-123',
             'status' => 'teste',

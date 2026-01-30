@@ -242,7 +242,7 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="border rounded p-3 bg-light">
                                                         <div class="mb-2"><strong>Variáveis disponíveis:</strong></div>
                                                         <div class="row">
-                                                            <div class="col-md-4"><code>{{eventooo}}</code></div>
+                                                            <div class="col-md-4"><code>{{evento}}</code></div>
                                                             <div class="col-md-4"><code>{{pedido_id}}</code></div>
                                                             <div class="col-md-4"><code>{{codigo_pedido}}</code></div>
                                                             <div class="col-md-4"><code>{{status}}</code></div>
