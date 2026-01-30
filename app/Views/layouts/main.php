@@ -749,6 +749,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> Contato</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Assessoria</a>
+                    </li>
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">

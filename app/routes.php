@@ -56,6 +56,12 @@ $router->post('/checkout/processar', 'CheckoutController', 'processar');
 $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
+// Assessoria de Compras
+$router->get('/assessoria', 'AssessoriaController', 'index');
+$router->post('/assessoria/processar', 'AssessoriaController', 'processarLinks');
+$router->get('/assessoria/orcamento', 'AssessoriaController', 'orcamento');
+$router->post('/assessoria/adicionar-ao-carrinho', 'AssessoriaController', 'adicionarAoCarrinho');
+
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function() {
     echo '<!DOCTYPE html>

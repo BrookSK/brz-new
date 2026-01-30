@@ -1,0 +1,337 @@
+<?php
+$title = 'Orçamento - Assessoria de Compras';
+require __DIR__ . '/../layouts/main.php';
+?>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">Seu Orçamento Personalizado</h1>
+                    <p class="text-muted mb-0">Revise os produtos e selecione os que deseja comprar</p>
+                </div>
+                <div>
+                    <a href="/assessoria" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Novo Orçamento
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php if (!empty($orcamento['erros'])): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning" role="alert">
+                <h5 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Alguns produtos não puderam ser processados
+                </h5>
+                <hr>
+                <?php foreach ($orcamento['erros'] as $erro): ?>
+                    <div class="mb-2">
+                        <strong>Link:</strong> <?= htmlspecialchars(substr($erro['link'], 0, 80)) ?>...<br>
+                        <strong>Erro:</strong> <?= htmlspecialchars($erro['error']) ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (empty($orcamento['produtos'])): ?>
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+                <h3>Nenhum produto processado</h3>
+                <p class="text-muted">Todos os links apresentaram erros. Tente novamente com outros links.</p>
+                <a href="/assessoria" class="btn btn-primary">
+                    <i class="fas fa-redo me-2"></i>Tentar Novamente
+                </a>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
+    <form id="orcamentoForm">
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Lista de Produtos -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-box me-2"></i>Produtos Disponíveis
+                            <span class="badge bg-primary ms-2"><?= count($orcamento['produtos']) ?></span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <?php foreach ($orcamento['produtos'] as $index => $produto): ?>
+                        <div class="product-item border rounded p-3 mb-3">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <div class="form-check">
+                                        <input class="form-check-input product-checkbox" 
+                                               type="checkbox" 
+                                               id="produto_<?= $index ?>" 
+                                               value="<?= $index ?>"
+                                               checked>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <?php if (!empty($produto['imagens'])): ?>
+                                        <img src="<?= htmlspecialchars($produto['imagens'][0]) ?>" 
+                                             alt="<?= htmlspecialchars($produto['nome']) ?>" 
+                                             class="img-thumbnail" 
+                                             style="width: 80px; height: 80px; object-fit: cover;">
+                                    <?php else: ?>
+                                        <div class="bg-light d-flex align-items-center justify-content-center" 
+                                             style="width: 80px; height: 80px;">
+                                            <i class="fas fa-image text-muted"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col">
+                                    <h6 class="mb-1"><?= htmlspecialchars($produto['nome']) ?></h6>
+                                    <p class="text-muted small mb-1"><?= htmlspecialchars($produto['descricao']) ?></p>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-tag me-1"></i><?= htmlspecialchars($produto['sku']) ?>
+                                        </span>
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-weight me-1"></i><?= number_format($produto['peso'], 2) ?> kg
+                                        </span>
+                                        <small class="text-muted">
+                                            <i class="fas fa-link me-1"></i>
+                                            <a href="<?= htmlspecialchars($produto['url_original']) ?>" 
+                                               target="_blank" class="text-decoration-none">
+                                                Ver original
+                                            </a>
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-auto text-end">
+                                    <div class="fw-bold text-primary h5">
+                                        $<?= number_format($produto['valor'], 2) ?>
+                                    </div>
+                                    <small class="text-muted">USD</small>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Termos e Condições -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning bg-opacity-10 py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Termos Importantes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning mb-3">
+                            <h6 class="alert-heading">Atenção!</h6>
+                            <p class="mb-2">Este é um <strong>recurso experimental</strong> que utiliza inteligência artificial para extrair informações dos produtos.</p>
+                            <ul class="mb-0">
+                                <li>Os valores estão sujeitos a revisão e podem variar</li>
+                                <li>Podem ocorrer cobranças adicionais ou reembolsos</li>
+                                <li>A precisão dos dados depende da qualidade da fonte</li>
+                                <li>Verifique todas as informações antes de finalizar</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="termosAceitos" required>
+                            <label class="form-check-label" for="termosAceitos">
+                                Li e aceito os termos acima. Estou ciente de que se trata de um recurso experimental 
+                                e que os valores podem ser revisados. Concordo com possíveis ajustes no valor final.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Resumo do Orçamento -->
+                <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                    <div class="card-header bg-primary text-white py-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calculator me-2"></i>Resumo do Orçamento
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Produtos selecionados:</span>
+                                <span id="produtosCount"><?= count($orcamento['produtos']) ?></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Subtotal:</span>
+                                <span id="subtotal">$<?= number_format($totais['subtotal'], 2) ?></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Taxa de Serviço:</span>
+                                <span id="taxaServico">$<?= number_format($totais['taxa_servico'], 2) ?></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Frete:</span>
+                                <span id="frete">$<?= number_format($totais['frete'], 2) ?></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Impostos:</span>
+                                <span id="impostos">$<?= number_format($totais['impostos'], 2) ?></span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between fw-bold h5">
+                                <span>Total:</span>
+                                <span class="text-primary" id="total">$<?= number_format($totais['total'], 2) ?></span>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="addToCartBtn" disabled>
+                                <i class="fas fa-shopping-cart me-2"></i>Adicionar ao Carrinho
+                            </button>
+                            <a href="/carrinho" class="btn btn-outline-secondary">
+                                <i class="fas fa-eye me-2"></i>Ver Carrinho
+                            </a>
+                        </div>
+
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-lock me-1"></i>Pagamento seguro via checkout
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+    <?php endif; ?>
+</div>
+
+<!-- Container de Notificações -->
+<div id="notificationContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 9998;">
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(document).ready(function() {
+    const produtos = <?= json_encode($orcamento['produtos']) ?>;
+    const totaisOriginais = <?= json_encode($totais) ?>;
+
+    // Calcular totais baseado nos produtos selecionados
+    function calcularTotaisSelecionados() {
+        const selecionados = [];
+        $('.product-checkbox:checked').each(function() {
+            const index = parseInt($(this).val());
+            selecionados.push(produtos[index]);
+        });
+
+        const subtotal = selecionados.reduce((sum, p) => sum + p.valor, 0);
+        const pesoTotal = selecionados.reduce((sum, p) => sum + p.peso, 0);
+        
+        // Recalcular taxas proporcionalmente
+        const taxaServicoOriginal = totaisOriginais.taxa_servico;
+        const freteOriginal = totaisOriginais.frete;
+        const impostosOriginais = totaisOriginais.impostos;
+        
+        const proporcao = subtotal > 0 ? subtotal / totaisOriginais.subtotal : 0;
+        
+        const taxaServico = taxaServicoOriginal * proporcao;
+        const frete = freteOriginal * proporcao;
+        const impostos = impostosOriginais * proporcao;
+        const total = subtotal + taxaServico + frete + impostos;
+
+        // Atualizar interface
+        $('#produtosCount').text(selecionados.length);
+        $('#subtotal').text('$' + subtotal.toFixed(2));
+        $('#taxaServico').text('$' + taxaServico.toFixed(2));
+        $('#frete').text('$' + frete.toFixed(2));
+        $('#impostos').text('$' + impostos.toFixed(2));
+        $('#total').text('$' + total.toFixed(2));
+
+        // Habilitar/desabilitar botão
+        const termosAceitos = $('#termosAceitos').is(':checked');
+        const temSelecionados = selecionados.length > 0;
+        $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados));
+    }
+
+    // Event listeners
+    $('.product-checkbox').change(calcularTotaisSelecionados);
+    $('#termosAceitos').change(calcularTotaisSelecionados);
+
+    // Submit do formulário
+    $('#orcamentoForm').submit(function(e) {
+        e.preventDefault();
+
+        if (!$('#termosAceitos').is(':checked')) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Termos Obrigatórios',
+                text: 'Você precisa aceitar os termos para prosseguir.',
+                confirmButtonColor: '#0b1f3a'
+            });
+            return;
+        }
+
+        const selecionados = [];
+        $('.product-checkbox:checked').each(function() {
+            selecionados.push(parseInt($(this).val()));
+        });
+
+        if (selecionados.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Nenhum Produto Selecionado',
+                text: 'Selecione pelo menos um produto para adicionar ao carrinho.',
+                confirmButtonColor: '#0b1f3a'
+            });
+            return;
+        }
+
+        // Enviar requisição
+        $.ajax({
+            url: '/assessoria/adicionar-ao-carrinho',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                termos_aceitos: true,
+                produtos_selecionados: selecionados
+            }),
+            success: function(response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Produtos Adicionados!',
+                        text: response.message,
+                        confirmButtonColor: '#0b1f3a',
+                        showConfirmButton: false,
+                        timer: 2000
+                    }).then(() => {
+                        window.location.href = response.redirect;
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: response.message,
+                        confirmButtonColor: '#0b1f3a'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Ocorreu um erro ao adicionar os produtos ao carrinho. Tente novamente.',
+                    confirmButtonColor: '#0b1f3a'
+                });
+            }
+        });
+    });
+
+    // Inicializar cálculos
+    calcularTotaisSelecionados();
+});
+</script>
