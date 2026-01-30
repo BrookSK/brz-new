@@ -13,6 +13,31 @@ class AssessoriaController extends Controller {
         session_start();
         $this->view('assessoria/index');
     }
+
+    private function headerSafeValue($value, int $maxLen = 200): string {
+        $v = (string) $value;
+        $v = preg_replace('/[\r\n]+/', ' ', $v);
+        $v = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $v);
+        $v = trim($v);
+        if (strlen($v) > $maxLen) {
+            $v = substr($v, 0, $maxLen);
+        }
+        return $v;
+    }
+
+    private function cleanJsonText(string $text): string {
+        // Remove caracteres de controle que quebram json_decode
+        return (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
+    }
+
+    private function extractFirstJsonObject(string $text): ?string {
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+        if ($start === false || $end === false || $end <= $start) {
+            return null;
+        }
+        return substr($text, $start, $end - $start + 1);
+    }
     
     /**
      * Processa os links enviados via AJAX
@@ -181,7 +206,7 @@ class AssessoriaController extends Controller {
         
         // Log da requisição
         if (headers_sent() === false) {
-            header('X-ScrapingBee-Request-URL: ' . substr($fullUrl, 0, 200));
+            header('X-ScrapingBee-Request-URL: ' . $this->headerSafeValue(substr($fullUrl, 0, 200), 200));
         }
         
         $doRequest = function(string $targetUrl, int $timeoutSeconds) {
@@ -212,7 +237,7 @@ class AssessoriaController extends Controller {
         if (headers_sent() === false) {
             header('X-ScrapingBee-HTTP-Code: ' . $httpCode);
             header('X-ScrapingBee-Response-Length: ' . strlen($response));
-            header('X-ScrapingBee-Response-Prefix: ' . substr($response, 0, 200));
+            header('X-ScrapingBee-Response-Prefix: ' . $this->headerSafeValue(substr((string) $response, 0, 200), 200));
             header('X-ScrapingBee-CURL-Errno: ' . $curlErrno);
         }
         
@@ -238,7 +263,7 @@ class AssessoriaController extends Controller {
         
         if ($httpCode !== 200) {
             if (headers_sent() === false) {
-                header('X-ScrapingBee-HTTP-Error: ' . substr($response, 0, 500));
+                header('X-ScrapingBee-HTTP-Error: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
             }
             return [
                 'success' => false,
@@ -263,7 +288,7 @@ class AssessoriaController extends Controller {
         if ($jsonError !== JSON_ERROR_NONE) {
             if (headers_sent() === false) {
                 header('X-ScrapingBee-JSON-Error: ' . json_last_error_msg());
-                header('X-ScrapingBee-Response-Raw: ' . substr($response, 0, 1000));
+                header('X-ScrapingBee-Response-Raw: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
             }
             return [
                 'success' => false,
@@ -814,7 +839,7 @@ class AssessoriaController extends Controller {
         
         if ($httpCode !== 200) {
             if (headers_sent() === false) {
-                header('X-ChatGPT-HTTP-Error: ' . substr($response, 0, 500));
+                header('X-ChatGPT-HTTP-Error: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
             }
             throw new \Exception('Erro HTTP ChatGPT ' . $httpCode . ': ' . substr($response, 0, 500));
         }
@@ -831,15 +856,21 @@ class AssessoriaController extends Controller {
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Content-Length: ' . strlen($content));
-            header('X-ChatGPT-Content-Prefix: ' . substr($content, 0, 200));
+            header('X-ChatGPT-Content-Prefix: ' . $this->headerSafeValue(substr((string) $content, 0, 200), 200));
         }
         
         // Tentar fazer parse do JSON retornado pelo ChatGPT
-        $produtoData = json_decode($content, true);
+        $cleanContent = $this->cleanJsonText((string) $content);
+        $jsonCandidate = $this->extractFirstJsonObject($cleanContent);
+        if ($jsonCandidate === null) {
+            $jsonCandidate = $cleanContent;
+        }
+
+        $produtoData = json_decode($jsonCandidate, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             if (headers_sent() === false) {
                 header('X-ChatGPT-Parse-Error: ' . json_last_error_msg());
-                header('X-ChatGPT-Raw-Content: ' . $content);
+                header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content, 0, 500), 500));
             }
             throw new \Exception('ChatGPT não retornou JSON válido: ' . json_last_error_msg());
         }
