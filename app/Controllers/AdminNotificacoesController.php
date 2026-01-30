@@ -26,6 +26,98 @@ class AdminNotificacoesController extends Controller {
         }
     }
 
+    private function ensureEmailTemplatesTable(\PDO $pdo): void {
+        try {
+            $pdo->query('SELECT 1 FROM email_templates LIMIT 1');
+            return;
+        } catch (\Exception $e) {
+        }
+
+        $sql = "CREATE TABLE IF NOT EXISTS email_templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            evento_id INT NULL,
+            nome VARCHAR(100) NOT NULL,
+            assunto VARCHAR(255) NOT NULL,
+            corpo_html LONGTEXT NOT NULL,
+            ativo TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL
+        )";
+        $pdo->exec($sql);
+
+        try {
+            $pdo->exec('CREATE INDEX idx_email_templates_evento_id ON email_templates (evento_id)');
+        } catch (\Exception $e) {
+        }
+        try {
+            $pdo->exec('CREATE INDEX idx_email_templates_nome ON email_templates (nome)');
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function ensureWebhooksTable(\PDO $pdo): void {
+        try {
+            $pdo->query('SELECT 1 FROM webhooks LIMIT 1');
+            return;
+        } catch (\Exception $e) {
+        }
+
+        $sql = "CREATE TABLE IF NOT EXISTS webhooks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            url VARCHAR(255) NOT NULL,
+            evento_id INT NULL,
+            metodo VARCHAR(10) DEFAULT 'POST',
+            headers TEXT NULL,
+            payload_template TEXT NULL,
+            ativo TINYINT(1) DEFAULT 1,
+            retry_count INT DEFAULT 0,
+            criado_por INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL
+        )";
+        $pdo->exec($sql);
+
+        try {
+            $pdo->exec('CREATE INDEX idx_webhooks_evento_id ON webhooks (evento_id)');
+        } catch (\Exception $e) {
+        }
+        try {
+            $pdo->exec('CREATE INDEX idx_webhooks_nome ON webhooks (nome)');
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function ensureWebhookDisparosTable(\PDO $pdo): void {
+        try {
+            $pdo->query('SELECT 1 FROM webhook_disparos LIMIT 1');
+            return;
+        } catch (\Exception $e) {
+        }
+
+        $sql = "CREATE TABLE IF NOT EXISTS webhook_disparos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            webhook_id INT NULL,
+            pedido_id INT NULL,
+            payload LONGTEXT NULL,
+            response_code INT NULL,
+            response_body LONGTEXT NULL,
+            status VARCHAR(20) DEFAULT 'pendente',
+            tentativas INT DEFAULT 1,
+            disparado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )";
+        $pdo->exec($sql);
+
+        try {
+            $pdo->exec('CREATE INDEX idx_webhook_disparos_webhook_id ON webhook_disparos (webhook_id)');
+        } catch (\Exception $e) {
+        }
+        try {
+            $pdo->exec('CREATE INDEX idx_webhook_disparos_disparado_em ON webhook_disparos (disparado_em)');
+        } catch (\Exception $e) {
+        }
+    }
+
     private function requireAdmin(): void {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -107,6 +199,8 @@ class AdminNotificacoesController extends Controller {
             $pdo->beginTransaction();
 
             $this->ensureEventosSistemaTable($pdo);
+            $this->ensureEmailTemplatesTable($pdo);
+            $this->ensureWebhooksTable($pdo);
 
             $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
             $stmtEv->execute([$evento]);
@@ -160,7 +254,7 @@ class AdminNotificacoesController extends Controller {
             $this->json(['success' => true, 'webhook_id' => $webhookId, 'evento_id' => $eventoId]);
         } catch (\Exception $e) {
             try {
-                if (isset($pdo)) {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
             } catch (\Exception $e2) {
@@ -175,6 +269,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureWebhookDisparosTable($pdo);
 
             $stmt = $pdo->query('DESCRIBE webhook_disparos');
             $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
@@ -202,6 +298,9 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureWebhookDisparosTable($pdo);
+            $this->ensureWebhooksTable($pdo);
 
             $sql = 'SELECT d.id, d.disparado_em AS data_envio, d.status, w.url AS webhook_url, w.metodo, w.headers, d.payload, d.response_code, d.response_body AS resposta FROM webhook_disparos d LEFT JOIN webhooks w ON w.id = d.webhook_id WHERE d.id = ? LIMIT 1';
             $st = $pdo->prepare($sql);
@@ -268,6 +367,8 @@ class AdminNotificacoesController extends Controller {
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
             $this->ensureEventosSistemaTable($pdo);
+            $this->ensureWebhooksTable($pdo);
+            $this->ensureWebhookDisparosTable($pdo);
 
             $sql = 'SELECT w.id, w.url, w.metodo, w.headers, w.payload_template, w.ativo FROM webhooks w INNER JOIN eventos_sistema e ON e.id = w.evento_id WHERE e.nome = ? ORDER BY w.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);
@@ -460,7 +561,7 @@ class AdminNotificacoesController extends Controller {
             $this->json(['success' => true, 'template_id' => $templateId, 'evento_id' => $eventoId]);
         } catch (\Exception $e) {
             try {
-                if (isset($pdo)) {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
             } catch (\Exception $e2) {
@@ -475,6 +576,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEmailTemplatesTable($pdo);
 
             $stmt = $pdo->query('DESCRIBE email_templates');
             $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
@@ -504,6 +607,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEmailTemplatesTable($pdo);
 
             if ($id > 0) {
                 $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo, t.updated_at FROM email_templates t WHERE t.id = ? LIMIT 1';
@@ -546,6 +651,8 @@ class AdminNotificacoesController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEmailTemplatesTable($pdo);
 
             $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);
@@ -593,7 +700,7 @@ class AdminNotificacoesController extends Controller {
     private function getEmailVarsTeste(string $evento): array {
         $base = [
             'evento' => $evento,
-            'pedido_id' => 'TExT-987',
+            'pedido_id' => 'TEST-123',
             'codigo_pedido' => 'TEST-123',
             'numero_pedido' => 'TEST-123',
             'status' => 'teste',

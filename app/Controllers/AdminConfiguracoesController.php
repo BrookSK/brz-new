@@ -242,7 +242,7 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="border rounded p-3 bg-light">
                                                         <div class="mb-2"><strong>Variáveis disponíveis:</strong></div>
                                                         <div class="row">
-                                                            <div class="col-md-4"><code>{{eventooo}}</code></div>
+                                                            <div class="col-md-4"><code>{{evento}}</code></div>
                                                             <div class="col-md-4"><code>{{pedido_id}}</code></div>
                                                             <div class="col-md-4"><code>{{codigo_pedido}}</code></div>
                                                             <div class="col-md-4"><code>{{status}}</code></div>
@@ -889,7 +889,12 @@ class AdminConfiguracoesController extends Controller {
             exit;
             
         } catch (\Exception $e) {
-            if (isset($pdo)) $pdo->rollBack();
+            try {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+            } catch (\Exception $e3) {
+            }
             $schemaInfo = '';
             try {
                 if (isset($pdo)) {
@@ -1526,6 +1531,43 @@ class AdminConfiguracoesController extends Controller {
                     }
                 }
 
+                $columnMap = [
+                    'pagamentos' => [
+                        'asaas_enabled' => 'asaas_enabled',
+                        'asaas_ambiente' => 'asaas_ambiente',
+                        'asaas_api_key' => 'asaas_api_key',
+                        'stripe_enabled' => 'stripe_enabled',
+                        'stripe_ambiente' => 'stripe_ambiente',
+                        'stripe_publishable_key' => 'stripe_publishable_key',
+                        'stripe_secret_key' => 'stripe_secret_key',
+                    ],
+                ];
+
+                // Mapear colunas de e-mail (SMTP) se existirem no schema single_row
+                $emailMapCandidates = [
+                    'driver' => ['email_driver'],
+                    'host' => ['email_host', 'smtp_host'],
+                    'port' => ['email_port', 'smtp_port'],
+                    'username' => ['email_username', 'smtp_usuario', 'smtp_user', 'smtp_username'],
+                    'password' => ['email_password', 'smtp_senha', 'smtp_pass', 'smtp_password'],
+                    'encryption' => ['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption'],
+                    'from' => ['email_from', 'email_remetente', 'smtp_from'],
+                    'from_name' => ['email_from_name', 'email_nome_remetente', 'smtp_from_name'],
+                ];
+
+                $emailColumnMap = [];
+                foreach ($emailMapCandidates as $k => $cands) {
+                    foreach ($cands as $colName) {
+                        if (in_array($colName, $cols, true)) {
+                            $emailColumnMap[$k] = $colName;
+                            break;
+                        }
+                    }
+                }
+                if (!empty($emailColumnMap)) {
+                    $columnMap['email'] = $emailColumnMap;
+                }
+
                 return [
                     'mode' => 'single_row',
                     'table' => $table,
@@ -1533,17 +1575,7 @@ class AdminConfiguracoesController extends Controller {
                     'idVal' => 1,
                     'updatedAtCol' => $updatedAtCol,
                     'valueCol' => '',
-                    'columnMap' => [
-                        'pagamentos' => [
-                            'asaas_enabled' => 'asaas_enabled',
-                            'asaas_ambiente' => 'asaas_ambiente',
-                            'asaas_api_key' => 'asaas_api_key',
-                            'stripe_enabled' => 'stripe_enabled',
-                            'stripe_ambiente' => 'stripe_ambiente',
-                            'stripe_publishable_key' => 'stripe_publishable_key',
-                            'stripe_secret_key' => 'stripe_secret_key',
-                        ]
-                    ]
+                    'columnMap' => $columnMap
                 ];
             }
         }
