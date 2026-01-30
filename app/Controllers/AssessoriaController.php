@@ -169,7 +169,8 @@ class AssessoriaController extends Controller {
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
-                'wait_browser' => 'load',
+                // Default mais rápido para evitar timeout no proxy
+                'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
                 'ai_query' => 'Extract all available product information, including product name, image, base price, and all variations. Each variation must include size, weight, or any selectable attribute, its value, and price if different. Preserve measurement units and return missing data as null.'
             ], $override);
@@ -190,7 +191,7 @@ class AssessoriaController extends Controller {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CUSTOMREQUEST => 'GET',
                 CURLOPT_TIMEOUT => $timeoutSeconds,
-                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             ]);
@@ -204,23 +205,8 @@ class AssessoriaController extends Controller {
             return [$response, $httpCode, $curlErrno, $curlError];
         };
 
-        // Tentativa 1 (com wait_browser=load)
-        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 45);
-
-        // Retry automático em caso de timeout (CURLE_OPERATION_TIMEDOUT = 28)
-        if ($curlErrno === 28) {
-            $retryUrl = $buildUrl([
-                // Menos pesado que "load" em alguns sites
-                'wait_browser' => 'domcontentloaded'
-            ]);
-
-            if (headers_sent() === false) {
-                header('X-ScrapingBee-Retry: timeout');
-                header('X-ScrapingBee-Retry-URL: ' . substr($retryUrl, 0, 200));
-            }
-
-            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 45);
-        }
+        // 1 tentativa curta para não estourar timeout do proxy (evita 504)
+        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 25);
         
         // Log da resposta
         if (headers_sent() === false) {
@@ -237,8 +223,11 @@ class AssessoriaController extends Controller {
             
             // Mensagem amigável para timeout
             $errorMessage = 'Erro na requisição cURL: ' . $curlError;
-            if (strpos($curlError, 'timeout') !== false) {
-                $errorMessage = 'O servidor demorou muito para responder. Tente novamente ou use um link diferente.';
+            if ($curlErrno === 28 || strpos($curlError, 'timeout') !== false) {
+                if (headers_sent() === false) {
+                    header('X-ScrapingBee-Timeout: true');
+                }
+                $errorMessage = 'Timeout ao processar este site. Tente novamente (1 link por vez) ou use outro link.';
             }
             
             return [
