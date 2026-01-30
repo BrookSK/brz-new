@@ -200,16 +200,8 @@ class AssessoriaController extends Controller {
         }
         
         try {
-            $produto = $this->normalizarDadosProduto($decodedResponse, $url);
-            
-            // Log do produto normalizado
-            if (headers_sent() === false) {
-                header('X-ScrapingBee-Normalized: ' . json_encode([
-                    'nome' => $produto['nome'] ?? 'not_found',
-                    'valor' => $produto['valor'] ?? 'not_found',
-                    'peso' => $produto['peso'] ?? 'not_found'
-                ]));
-            }
+            // Usar ChatGPT para analisar os dados brutos
+            $produto = $this->analisarComChatGPT($decodedResponse, $url);
             
             return [
                 'success' => true,
@@ -612,6 +604,214 @@ class AssessoriaController extends Controller {
                 'success' => false,
                 'message' => 'Erro ao adicionar produtos ao carrinho: ' . $e->getMessage()
             ]);
+        }
+    }
+    
+    /**
+     * Analisa dados brutos do ScrapingBee usando ChatGPT
+     */
+    private function analisarComChatGPT(array $dadosBrutos, string $urlOriginal): array {
+        $chatGptApiKey = $this->getChatGPTApiKey();
+        
+        if (!$chatGptApiKey) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-Error: API Key not configured');
+            }
+            throw new \Exception('API Key do ChatGPT não configurada');
+        }
+        
+        // Preparar o prompt para o ChatGPT
+        $prompt = $this->gerarPromptChatGPT($dadosBrutos, $urlOriginal);
+        
+        if (headers_sent() === false) {
+            header('X-ChatGPT-Prompt-Length: ' . strlen($prompt));
+        }
+        
+        // Fazer requisição para a API do ChatGPT
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $chatGptApiKey
+            ],
+            CURLOPT_POSTFIELDS => json_encode([
+                'model' => 'gpt-3.5-turbo',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'Você é um especialista em extração de dados de produtos de e-commerce. Analise os dados brutos fornecidos e extraia as informações necessárias no formato JSON exato solicitado.'
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => $prompt
+                    ]
+                ],
+                'temperature' => 0.1,
+                'max_tokens' => 1000
+            ]),
+            CURLOPT_TIMEOUT => 30
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        if (headers_sent() === false) {
+            header('X-ChatGPT-HTTP-Code: ' . $httpCode);
+            header('X-ChatGPT-Response-Length: ' . strlen($response));
+        }
+        
+        if ($curlError) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-CURL-Error: ' . $curlError);
+            }
+            throw new \Exception('Erro na requisição ChatGPT: ' . $curlError);
+        }
+        
+        if ($httpCode !== 200) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-HTTP-Error: ' . substr($response, 0, 500));
+            }
+            throw new \Exception('Erro HTTP ChatGPT ' . $httpCode . ': ' . substr($response, 0, 500));
+        }
+        
+        $decodedResponse = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-JSON-Error: ' . json_last_error_msg());
+            }
+            throw new \Exception('Resposta ChatGPT não é JSON válido: ' . json_last_error_msg());
+        }
+        
+        $content = $decodedResponse['choices'][0]['message']['content'] ?? '';
+        
+        if (headers_sent() === false) {
+            header('X-ChatGPT-Content-Length: ' . strlen($content));
+            header('X-ChatGPT-Content-Prefix: ' . substr($content, 0, 200));
+        }
+        
+        // Tentar fazer parse do JSON retornado pelo ChatGPT
+        $produtoData = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-Parse-Error: ' . json_last_error_msg());
+                header('X-ChatGPT-Raw-Content: ' . $content);
+            }
+            throw new \Exception('ChatGPT não retornou JSON válido: ' . json_last_error_msg());
+        }
+        
+        // Validar campos obrigatórios
+        $camposObrigatorios = ['nome', 'valor', 'moeda', 'peso', 'descricao', 'imagens'];
+        foreach ($camposObrigatorios as $campo) {
+            if (!isset($produtoData[$campo]) || empty($produtoData[$campo])) {
+                if (headers_sent() === false) {
+                    header('X-ChatGPT-Missing-Field: ' . $campo);
+                }
+                throw new \Exception("Campo obrigatório '{$campo}' não encontrado ou vazio");
+            }
+        }
+        
+        if (headers_sent() === false) {
+            header('X-ChatGPT-Success: true');
+            header('X-ChatGPT-Product-Data: ' . json_encode([
+                'nome' => $produtoData['nome'],
+                'valor' => $produtoData['valor'],
+                'peso' => $produtoData['peso'],
+                'descricao' => $produtoData['descricao'],
+                'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0
+            ]));
+        }
+        
+        return $produtoData;
+    }
+    
+    /**
+     * Gera o prompt para o ChatGPT
+     */
+    private function gerarPromptChatGPT(array $dadosBrutos, string $urlOriginal): string {
+        return "Analise os dados brutos abaixo extraídos da URL: {$urlOriginal}
+
+DADOS BRUTOS:
+" . json_encode($dadosBrutos, JSON_PRETTY_PRINT) . "
+
+EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON VÁLIDO COM ESTA ESTRUTURA EXATA:
+
+{
+    \"sku\": \"SKU do produto ou código único\",
+    \"nome\": \"Nome completo do produto\",
+    \"descricao\": \"Descrição detalhada do produto\",
+    \"valor\": 99.99,
+    \"moeda\": \"USD\",
+    \"peso\": 1.5,
+    \"comprimento\": 10.0,
+    \"largura\": 8.0,
+    \"altura\": 5.0,
+    \"imagens\": [\"url1\", \"url2\"],
+    \"url_original\": \"{$urlOriginal}\",
+    \"data_scraping\": \"" . date('Y-m-d H:i:s') . "\",
+    \"fonte\": \"chatgpt_analysis\"
+}
+
+REGRAS ESPECÍFICAS:
+
+1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
+2. PESO (kg): 
+   - Se não encontrar o peso exato, ESTIME com base no tipo de produto
+   - Adicione 15% de margem de segurança sobre o peso estimado
+   - Ex: se estimar 1kg, use 1.15kg
+   - Use sempre casas decimais (ex: 1.15)
+
+3. DESCRIÇÃO:
+   - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
+   - Inclua informações relevantes sobre o produto
+   - Seja específico e útil para o cliente
+
+4. IMAGEM:
+   - Extraia todas as URLs de imagens disponíveis
+   - Se não encontrar, use array vazio []
+
+5. VALOR: Use número decimal com 2 casas (ex: 99.99)
+
+6. NOME: Use o nome completo do produto
+
+IMPORTANTE:
+- Retorne APENAS o JSON, sem texto adicional
+- Para peso, SEMPRE inclua a margem de 15% se precisar estimar
+- Para descrição, CRIE uma se não encontrar
+- SKU pode ser gerado baseado no nome se não existir
+- Use kg para peso, cm para dimensões
+
+RETORNE APENAS O JSON:";
+    }
+    
+    /**
+     * Obtém a API Key do ChatGPT
+     */
+    private function getChatGPTApiKey(): ?string {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute(['chatgpt_api_key']);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            $apiKey = $row ? $row['valor'] : null;
+            
+            // Log no console via header
+            if (headers_sent() === false) {
+                header('X-ChatGPT-Debug: API Key ' . ($apiKey ? 'found' : 'not found'));
+                header('X-ChatGPT-Key-Length: ' . strlen($apiKey ?? ''));
+            }
+            
+            return $apiKey;
+        } catch (\Exception $e) {
+            if (headers_sent() === false) {
+                header('X-ChatGPT-Error: ' . $e->getMessage());
+            }
+            return null;
         }
     }
 }

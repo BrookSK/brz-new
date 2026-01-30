@@ -270,8 +270,22 @@ $(document).ready(function() {
                     'X-ScrapingBee-Response-Raw',
                     'X-ScrapingBee-JSON-Keys',
                     'X-ScrapingBee-JSON-Type',
-                    'X-ScrapingBee-Normalized',
-                    'X-ScrapingBee-Normalization-Error'
+                    'X-ScrapingBee-Normalization-Error',
+                    'X-ChatGPT-Debug',
+                    'X-ChatGPT-Error',
+                    'X-ChatGPT-Prompt-Length',
+                    'X-ChatGPT-HTTP-Code',
+                    'X-ChatGPT-Response-Length',
+                    'X-ChatGPT-CURL-Error',
+                    'X-ChatGPT-HTTP-Error',
+                    'X-ChatGPT-JSON-Error',
+                    'X-ChatGPT-Content-Length',
+                    'X-ChatGPT-Content-Prefix',
+                    'X-ChatGPT-Parse-Error',
+                    'X-ChatGPT-Raw-Content',
+                    'X-ChatGPT-Missing-Field',
+                    'X-ChatGPT-Success',
+                    'X-ChatGPT-Product-Data'
                 ];
                 
                 debugHeaders.forEach(function(header) {
@@ -281,7 +295,7 @@ $(document).ready(function() {
                         
                         // Tentar fazer parse do JSON
                         try {
-                            if (header.includes('Data') || header.includes('Keys') || header.includes('Normalized')) {
+                            if (header.includes('Data') || header.includes('Keys') || header.includes('Normalized') || header.includes('Product-Data')) {
                                 var parsed = JSON.parse(value);
                                 console.log('🔍 ' + header + ' (parsed):', parsed);
                             }
