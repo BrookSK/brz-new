@@ -349,6 +349,9 @@ class AssessoriaController extends Controller {
         }
 
         $descricao = $this->extractDescricaoFromScrapingBee($dadosBrutos);
+        if (trim((string) $descricao) === '') {
+            $descricao = 'Produto importado automaticamente: ' . $nome;
+        }
 
         return [
             'sku' => '',
@@ -808,6 +811,23 @@ class AssessoriaController extends Controller {
 
         // 1 tentativa (até 60s) por produto
         [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 60);
+
+        // Retry automático em caso de timeout (sites pesados / bloqueios)
+        if ($curlErrno === 28 || (is_string($curlError) && stripos($curlError, 'timeout') !== false)) {
+            $retryUrl = $buildUrl([
+                // Mais tolerante para páginas pesadas
+                'wait_browser' => 'networkidle',
+                // Se o site bloquear muito, o premium_proxy ajuda (se sua conta permitir)
+                'premium_proxy' => 'true'
+            ]);
+
+            if (headers_sent() === false) {
+                header('X-ScrapingBee-Retry: true');
+                header('X-ScrapingBee-Retry-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
+            }
+
+            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 120);
+        }
         
         // Log da resposta
         if (headers_sent() === false) {
@@ -1517,6 +1537,19 @@ class AssessoriaController extends Controller {
                     $img = $this->extractFirstImageUrl($dadosBrutos);
                     if ($img) {
                         $produtoData['imagens'] = [$img];
+                        continue;
+                    }
+                }
+
+                // Fallback para descricao: tentar ScrapingBee e/ou gerar mínima baseada no nome
+                if ($campo === 'descricao') {
+                    $desc = $this->extractDescricaoFromScrapingBee($dadosBrutos);
+                    if (trim((string) $desc) !== '') {
+                        $produtoData['descricao'] = $desc;
+                        continue;
+                    }
+                    if (!empty($produtoData['nome'])) {
+                        $produtoData['descricao'] = 'Produto importado automaticamente: ' . (string) $produtoData['nome'];
                         continue;
                     }
                 }
