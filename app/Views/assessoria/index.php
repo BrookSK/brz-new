@@ -307,42 +307,7 @@ $(document).ready(function() {
                 }
 
                 const jobId = enqResp.data.job_id;
-
-                let lastProcessed = 0;
-                const poll = async function() {
-                    const statusResp = await fetchStatus(jobId);
-                    if (!statusResp || statusResp.success !== true || !statusResp.data) {
-                        throw new Error('Erro ao consultar status');
-                    }
-
-                    const data = statusResp.data;
-                    const processed = typeof data.processed === 'number' ? data.processed : 0;
-                    const total = typeof data.total === 'number' && data.total > 0 ? data.total : totalLinks;
-                    const progress = Math.round((processed / total) * 100);
-                    $('#progressBar').css('width', progress + '%');
-
-                    if (processed > lastProcessed) {
-                        lastProcessed = processed;
-                    }
-
-                    if (data.status === 'done') {
-                        $('#progressBar').css('width', '100%');
-                        setTimeout(() => {
-                            $('#loadingOverlay').addClass('d-none');
-                            $('#processBtn').prop('disabled', false);
-                            handleSuccessResponse({
-                                total_produtos: data.total_produtos || total,
-                                total_erros: data.total_erros || 0,
-                                erros: []
-                            });
-                        }, 300);
-                        return;
-                    }
-
-                    setTimeout(poll, 2000);
-                };
-
-                poll();
+                window.location.href = '/assessoria/orcamento?job_id=' + encodeURIComponent(jobId);
             } catch (e) {
                 $('#loadingOverlay').addClass('d-none');
                 $('#processBtn').prop('disabled', false);

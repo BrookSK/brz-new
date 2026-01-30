@@ -54,6 +54,7 @@ class AssessoriaController extends Controller {
                 'status' => 'queued',
                 'total' => count($cleanLinks),
                 'processed' => 0,
+                'links' => $cleanLinks,
                 'produtos' => [],
                 'erros' => [],
                 'started_at' => null,
@@ -70,6 +71,13 @@ class AssessoriaController extends Controller {
                     'total' => count($cleanLinks)
                 ]
             ]);
+
+            $spawned = $this->trySpawnJobWorker($jobId);
+            $job['spawned'] = $spawned ? true : false;
+            $this->writeJobFile($jobId, $job);
+            if ($spawned) {
+                return;
+            }
 
             if (function_exists('fastcgi_finish_request')) {
                 fastcgi_finish_request();
@@ -204,6 +212,52 @@ class AssessoriaController extends Controller {
         throw new \Exception('ChatGPT não retornou JSON válido: ' . $err);
     }
 
+    private function truncateForPrompt($value, int $depth = 0) {
+        if ($depth > 4) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            $out = [];
+            $i = 0;
+            foreach ($value as $k => $v) {
+                if ($i >= 40) {
+                    break;
+                }
+                $out[$k] = $this->truncateForPrompt($v, $depth + 1);
+                $i++;
+            }
+            return $out;
+        }
+
+        if (is_string($value)) {
+            $v = $this->cleanJsonText($value);
+            if (strlen($v) > 800) {
+                $v = substr($v, 0, 800);
+            }
+            return $v;
+        }
+
+        if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+            return $value;
+        }
+
+        return (string) $value;
+    }
+
+    private function reduceScrapingBeePayload(array $dadosBrutos): array {
+        $picked = [];
+        foreach (['title', 'name', 'product', 'product_name', 'price', 'prices', 'images', 'image', 'variants', 'variation', 'variations', 'offers', 'url'] as $k) {
+            if (array_key_exists($k, $dadosBrutos)) {
+                $picked[$k] = $dadosBrutos[$k];
+            }
+        }
+        if (empty($picked)) {
+            $picked = $dadosBrutos;
+        }
+        return (array) $this->truncateForPrompt($picked, 0);
+    }
+
     private function getAssessoriaJobsDir(): string {
         $base = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
         $dir = $base . DIRECTORY_SEPARATOR . 'assessoria_jobs';
@@ -254,6 +308,7 @@ class AssessoriaController extends Controller {
             'status' => 'running',
             'total' => count($links),
             'processed' => 0,
+            'links' => $links,
             'produtos' => [],
             'erros' => [],
             'started_at' => date('Y-m-d H:i:s'),
@@ -286,6 +341,57 @@ class AssessoriaController extends Controller {
         $job['status'] = 'done';
         $job['finished_at'] = date('Y-m-d H:i:s');
         $this->writeJobFile($jobId, $job);
+    }
+
+    public function processarJobPorId(string $jobId): void {
+        $job = $this->readJobFile($jobId);
+        if ($job === null) {
+            return;
+        }
+        $links = $job['links'] ?? [];
+        if (!is_array($links) || empty($links)) {
+            return;
+        }
+        $this->startBackgroundProcessing($links, $jobId);
+    }
+
+    private function trySpawnJobWorker(string $jobId): bool {
+        $root = rtrim((string) dirname(__DIR__, 3), DIRECTORY_SEPARATOR);
+        $worker = $root . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'assessoria_worker.php';
+        if (!file_exists($worker)) {
+            return false;
+        }
+
+        $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+        $cmd = escapeshellcmd($php) . ' ' . escapeshellarg($worker) . ' ' . escapeshellarg($jobId);
+
+        // Linux/Unix background
+        if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+            $cmd .= ' > /dev/null 2>&1 &';
+        }
+
+        try {
+            if (function_exists('proc_open')) {
+                $descriptorspec = [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w']
+                ];
+                $process = @proc_open($cmd, $descriptorspec, $pipes, $root);
+                if (is_resource($process)) {
+                    foreach ($pipes as $p) {
+                        @fclose($p);
+                    }
+                    @proc_close($process);
+                    return true;
+                }
+            }
+
+            @exec($cmd);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
     
     /**
@@ -742,20 +848,43 @@ class AssessoriaController extends Controller {
      */
     public function orcamento(Request $request) {
         session_start();
-        
-        if (!isset($_SESSION['assessoria_orcamento'])) {
+
+        $jobId = (string) $request->getParam('job_id', '');
+        if ($jobId === '') {
+            $jobId = (string) ($_SESSION['assessoria_job_id'] ?? '');
+        }
+
+        if (!isset($_SESSION['assessoria_orcamento']) && $jobId === '') {
             header('Location: /assessoria');
             exit;
         }
-        
-        $orcamento = $_SESSION['assessoria_orcamento'];
+
+        $job = null;
+        if ($jobId !== '') {
+            $job = $this->readJobFile($jobId);
+            if (is_array($job) && (($job['status'] ?? '') === 'done')) {
+                if (!isset($_SESSION['assessoria_orcamento']) || !is_array($_SESSION['assessoria_orcamento'])) {
+                    $_SESSION['assessoria_orcamento'] = [
+                        'produtos' => [],
+                        'erros' => [],
+                        'data_criacao' => date('Y-m-d H:i:s')
+                    ];
+                }
+                $_SESSION['assessoria_orcamento']['produtos'] = $job['produtos'] ?? [];
+                $_SESSION['assessoria_orcamento']['erros'] = $job['erros'] ?? [];
+            }
+        }
+
+        $orcamento = $_SESSION['assessoria_orcamento'] ?? ['produtos' => [], 'erros' => [], 'data_criacao' => date('Y-m-d H:i:s')];
         
         // Calcula totais usando taxas existentes
         $totais = $this->calcularTotaisOrcamento($orcamento['produtos']);
         
         $this->view('assessoria/orcamento', [
             'orcamento' => $orcamento,
-            'totais' => $totais
+            'totais' => $totais,
+            'job_id' => $jobId,
+            'job' => $job
         ]);
     }
     
@@ -1026,46 +1155,56 @@ class AssessoriaController extends Controller {
             throw new \Exception('API Key do ChatGPT não configurada');
         }
         
-        // Preparar o prompt para o ChatGPT
-        $prompt = $this->gerarPromptChatGPT($dadosBrutos, $urlOriginal);
+        $prompt = $this->gerarPromptChatGPT($this->reduceScrapingBeePayload($dadosBrutos), $urlOriginal);
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Prompt-Length: ' . strlen($prompt));
         }
         
-        // Fazer requisição para a API do ChatGPT
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $chatGptApiKey
-            ],
-            CURLOPT_POSTFIELDS => json_encode([
-                'model' => 'gpt-3.5-turbo',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'Você é um especialista em extração de dados de produtos de e-commerce. Analise os dados brutos fornecidos e extraia as informações necessárias no formato JSON exato solicitado.'
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => $prompt
-                    ]
+        $basePayload = [
+            'model' => 'gpt-3.5-turbo',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'Retorne apenas JSON válido, sem comentários e sem marcações.'
                 ],
-                'temperature' => 0.1,
-                'max_tokens' => 1000
-            ]),
-            CURLOPT_TIMEOUT => 45,  // Aumentado para 45 segundos
-            CURLOPT_CONNECTTIMEOUT => 10  // Timeout de conexão 10 segundos
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ],
+            'temperature' => 0.0,
+            'max_tokens' => 800
+        ];
+
+        $payloadWithFormat = $basePayload;
+        $payloadWithFormat['response_format'] = ['type' => 'json_object'];
+
+        $send = function(array $payload) use ($chatGptApiKey) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $chatGptApiKey
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_TIMEOUT => 45,
+                CURLOPT_CONNECTTIMEOUT => 10
+            ]);
+            $resp = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+            return [$resp, $code, $err];
+        };
+
+        [$response, $httpCode, $curlError] = $send($payloadWithFormat);
+        if ($httpCode === 400 && is_string($response) && (stripos($response, 'response_format') !== false || stripos($response, 'json_object') !== false)) {
+            [$response, $httpCode, $curlError] = $send($basePayload);
+        }
         
         if (headers_sent() === false) {
             header('X-ChatGPT-HTTP-Code: ' . $httpCode);
