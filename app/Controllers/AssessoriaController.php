@@ -358,8 +358,8 @@ class AssessoriaController extends Controller {
             'nome' => $nome,
             'descricao' => $descricao,
             'valor' => floatval($valor),
-            // Peso estimado mínimo para permitir salvar
-            'peso' => 0.5,
+            // Regra: se não encontrar peso, usar sempre 1kg
+            'peso' => 1.0,
             'imagens' => $img ? [$img] : [],
             'url_original' => $urlOriginal
         ];
@@ -1544,6 +1544,12 @@ class AssessoriaController extends Controller {
                         $produtoData['imagens'] = [$img];
                         continue;
                     }
+                }
+
+                // Regra: se não encontrar peso, usar sempre 1kg
+                if ($campo === 'peso') {
+                    $produtoData['peso'] = 1.0;
+                    continue;
                 }
 
                 // Fallback para descricao: tentar ScrapingBee e/ou gerar mínima baseada no nome
