@@ -773,6 +773,8 @@ class AssessoriaController extends Controller {
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
+                // Timeout do lado do ScrapingBee (em ms)
+                'timeout' => '120000',
                 // Default mais rápido para evitar timeout no proxy
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
@@ -809,16 +811,18 @@ class AssessoriaController extends Controller {
             return [$response, $httpCode, $curlErrno, $curlError];
         };
 
-        // 1 tentativa (até 60s) por produto
-        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 60);
+        // 1 tentativa (até 150s) por produto (cURL deve ser > timeout do ScrapingBee)
+        [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
 
         // Retry automático em caso de timeout (sites pesados / bloqueios)
         if ($curlErrno === 28 || (is_string($curlError) && stripos($curlError, 'timeout') !== false)) {
             $retryUrl = $buildUrl([
                 // Mais tolerante para páginas pesadas
-                'wait_browser' => 'networkidle',
+                'wait_browser' => 'networkidle2',
                 // Se o site bloquear muito, o premium_proxy ajuda (se sua conta permitir)
-                'premium_proxy' => 'true'
+                'premium_proxy' => 'true',
+                // Aumenta o timeout do lado do ScrapingBee (máx 140000)
+                'timeout' => '140000'
             ]);
 
             if (headers_sent() === false) {
@@ -826,7 +830,8 @@ class AssessoriaController extends Controller {
                 header('X-ScrapingBee-Retry-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
             }
 
-            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 120);
+            // cURL deve ser > timeout do ScrapingBee
+            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 160);
         }
         
         // Log da resposta
