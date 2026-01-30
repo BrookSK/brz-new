@@ -131,6 +131,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
                                 <i class="fas fa-edit"></i> Criar E-mail
                             </button>
+                            <button class="nav-link" id="v-pills-notificacoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-notificacoes" type="button">
+                                <i class="fas fa-bell"></i> Notificações
+                            </button>
                             <button class="nav-link" id="v-pills-pagamentos-tab" data-bs-toggle="pill" data-bs-target="#v-pills-pagamentos" type="button">
                                 <i class="fas fa-credit-card"></i> Pagamentos
                             </button>
@@ -179,6 +182,102 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-notificacoes" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurar Notificações por Webhook</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="formNotificacoes">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Evento</label>
+                                                    <select name="evento" class="form-select" required>
+                                                        <option value="">Selecione um evento...</option>
+                                                        <option value="novo_pedido">Novo Pedido</option>
+                                                        <option value="pedido_aprovado">Pedido Aprovado</option>
+                                                        <option value="pedido_enviado">Pedido Enviado</option>
+                                                        <option value="pedido_entregue">Pedido Entregue</option>
+                                                        <option value="pedido_cancelado">Pedido Cancelado</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">URL do Webhook</label>
+                                                    <input type="url" name="webhook_url" class="form-control" placeholder="https://seu-webhook.com/notificacoes" required>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Método HTTP</label>
+                                                    <select name="webhook_method" class="form-select">
+                                                        <option value="POST">POST</option>
+                                                        <option value="PUT">PUT</option>
+                                                        <option value="PATCH">PATCH</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Headers (JSON)</label>
+                                                    <textarea name="webhook_headers" class="form-control" rows="3" placeholder="{&quot;Authorization&quot;: &quot;Bearer token123&quot;}"></textarea>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Campos Personalizados (JSON)</label>
+                                                    <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana Shop&quot;}"></textarea>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Template da Mensagem</label>
+                                                    <textarea name="webhook_template" class="form-control" rows="4" placeholder="Olá {{nome}}, seu pedido #{{codigo_pedido}} está {{status}}"></textarea>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="webhook_ativo" id="notificacoes_webhook_ativo" checked>
+                                                        <label class="form-check-label" for="notificacoes_webhook_ativo">Webhook Ativo</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="webhook_retries" id="notificacoes_webhook_retries" checked>
+                                                        <label class="form-check-label" for="notificacoes_webhook_retries">Tentativas de Reenvio</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Logs de Envio</label>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Data</th>
+                                                                    <th>Status</th>
+                                                                    <th>Resposta</th>
+                                                                    <th>Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="notificacoes-logs-webhook">
+                                                                <tr>
+                                                                    <td colspan="4" class="text-center">Nenhum log encontrado</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex gap-2">
+                                                    <button type="button" class="btn btn-primary" onclick="salvarNotificacaoAdmin()">
+                                                        <i class="fas fa-save me-2"></i>Salvar Configuração
+                                                    </button>
+                                                    <button type="button" class="btn btn-success" onclick="testarWebhookNotificacoes()">
+                                                        <i class="fas fa-paper-plane me-2"></i>Testar Webhook
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -628,7 +727,7 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . '
 </body>
 </html>';
         exit;
@@ -861,6 +960,161 @@ class AdminConfiguracoesController extends Controller {
         function verDocumentacaoStripe() {
             window.open('https://stripe.com/docs/api', '_blank');
         }
+        </script>
+        <?php
+        return ob_get_clean();
+    }
+
+    private function getNotificacoesJS() {
+        ob_start();
+        ?>
+        <script>
+        function getNotificacoesFormData() {
+            const container = document.getElementById('formNotificacoes');
+            const formData = new FormData();
+            if (!container) {
+                return formData;
+            }
+
+            const fields = container.querySelectorAll('input[name], select[name], textarea[name]');
+            fields.forEach(el => {
+                if (el.type === 'checkbox') {
+                    formData.set(el.name, el.checked ? '1' : '0');
+                } else {
+                    formData.set(el.name, el.value || '');
+                }
+            });
+            return formData;
+        }
+
+        function salvarNotificacaoAdmin() {
+            const formData = getNotificacoesFormData();
+
+            fetch('/admin/salvar-notificacao', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    alert('Configuração de notificação salva com sucesso!');
+                    carregarLogsWebhookNotificacoes();
+                } else {
+                    alert('Erro ao salvar configuração: ' + (data.error || JSON.stringify(data)));
+                }
+            })
+            .catch(error => {
+                alert('Erro ao processar requisição: ' + error.message);
+            });
+        }
+
+        function testarWebhookNotificacoes() {
+            const evento = document.querySelector('#formNotificacoes select[name="evento"]').value;
+            if (!evento) {
+                alert('Selecione um evento.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.set('evento', evento);
+
+            fetch('/admin/testar-webhook', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    alert('Webhook testado com sucesso!\n\nResposta: ' + JSON.stringify(data, null, 2));
+                } else {
+                    alert('Erro ao testar webhook: ' + (data.error || JSON.stringify(data)));
+                }
+                carregarLogsWebhookNotificacoes();
+            })
+            .catch(error => {
+                alert('Erro ao testar webhook: ' + error.message);
+                carregarLogsWebhookNotificacoes();
+            });
+        }
+
+        function carregarLogsWebhookNotificacoes() {
+            fetch('/admin/logs-webhook')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('notificacoes-logs-webhook');
+                    tbody.innerHTML = '';
+
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>${new Date(log.data_envio).toLocaleString('pt-BR')}</td>
+                                <td><span class="badge bg-${log.status == 'sucesso' ? 'success' : 'danger'}">${log.status}</span></td>
+                                <td><small>${log.resposta || 'Sem resposta'}</small></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesLogNotificacoes(${log.id})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum log encontrado</td></tr>';
+                    }
+                })
+                .catch(() => {
+                });
+        }
+
+        function verDetalhesLogNotificacoes(logId) {
+            fetch(`/admin/log-webhook/${logId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.log) {
+                        alert(`Detalhes do Log #${logId}:\n\n` +
+                            `Data: ${new Date(data.log.data_envio).toLocaleString('pt-BR')}\n` +
+                            `Status: ${data.log.status}\n` +
+                            `URL: ${data.log.webhook_url}\n` +
+                            `Método: ${data.log.metodo}\n` +
+                            `Headers: ${data.log.headers}\n` +
+                            `Payload: ${data.log.payload}\n` +
+                            `Resposta: ${data.log.resposta}`);
+                    }
+                });
+        }
+
+        function formatarJSONNotificacoes(textarea) {
+            try {
+                const value = textarea.value;
+                const formatted = JSON.stringify(JSON.parse(value), null, 2);
+                textarea.value = formatted;
+            } catch (e) {
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const tab = document.getElementById('v-pills-notificacoes-tab');
+            if (tab) {
+                tab.addEventListener('shown.bs.tab', function() {
+                    carregarLogsWebhookNotificacoes();
+                });
+            }
+
+            const headersTextarea = document.querySelector('#formNotificacoes textarea[name="webhook_headers"]');
+            const camposTextarea = document.querySelector('#formNotificacoes textarea[name="webhook_campos"]');
+
+            if (headersTextarea) {
+                headersTextarea.addEventListener('blur', function() {
+                    formatarJSONNotificacoes(this);
+                });
+            }
+            if (camposTextarea) {
+                camposTextarea.addEventListener('blur', function() {
+                    formatarJSONNotificacoes(this);
+                });
+            }
+        });
         </script>
         <?php
         return ob_get_clean();
