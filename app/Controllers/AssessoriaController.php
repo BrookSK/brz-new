@@ -90,6 +90,60 @@ class AssessoriaController extends Controller {
             ]);
         }
     }
+
+    public function processarLinkUnico(Request $request) {
+        header('Content-Type: application/json');
+        session_start();
+
+        try {
+            $body = $request->getBody();
+            $link = (string) ($body['link'] ?? '');
+            $reset = (bool) ($body['reset'] ?? false);
+
+            if ($reset || !isset($_SESSION['assessoria_orcamento'])) {
+                $_SESSION['assessoria_orcamento'] = [
+                    'produtos' => [],
+                    'erros' => [],
+                    'data_criacao' => date('Y-m-d H:i:s')
+                ];
+            }
+
+            $link = trim($link);
+            if ($link === '' || !filter_var($link, FILTER_VALIDATE_URL)) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Link inválido'
+                ]);
+                return;
+            }
+
+            $resultado = $this->processarLinkIndividual($link);
+            if ($resultado['success']) {
+                $_SESSION['assessoria_orcamento']['produtos'][] = $resultado['data'];
+            } else {
+                $_SESSION['assessoria_orcamento']['erros'][] = [
+                    'link' => $link,
+                    'error' => $resultado['error']
+                ];
+            }
+
+            $produtos = $_SESSION['assessoria_orcamento']['produtos'] ?? [];
+            $erros = $_SESSION['assessoria_orcamento']['erros'] ?? [];
+
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'total_produtos' => count($produtos),
+                    'total_erros' => count($erros)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erro ao processar link: ' . $e->getMessage()
+            ]);
+        }
+    }
     
     /**
      * Processa um link individual via ScrapingBee
@@ -655,7 +709,7 @@ class AssessoriaController extends Controller {
             'weight' => $peso,
             'status' => 'published',
             'stock' => 999999,
-            'category_id' => 0,
+            'category_id' => null,
             'images' => $produto['imagens'] ?? [],
             'attributes' => [
                 'fonte' => 'assessoria',

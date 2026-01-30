@@ -212,104 +212,131 @@ $(document).ready(function() {
         $('#notificationContainer').empty();
 
         const totalLinks = links.length;
-        let processedLinks = 0;
+        $('#progressBar').css('width', '0%');
 
-        // Simular progresso
-        const progressInterval = setInterval(() => {
-            processedLinks++;
-            const progress = (processedLinks / totalLinks) * 100;
-            $('#progressBar').css('width', progress + '%');
-            
-            if (processedLinks >= totalLinks) {
-                clearInterval(progressInterval);
-            }
-        }, 1000);
+        const requestOne = function(link, reset) {
+            return new Promise(function(resolve, reject) {
+                $.ajax({
+                    url: '/assessoria/processar-um',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ link: link, reset: reset }),
+                    success: function(resp) {
+                        resolve(resp);
+                    },
+                    error: function(xhr, status, error) {
+                        reject({ xhr: xhr, status: status, error: error });
+                    }
+                });
+            });
+        };
 
-        // Enviar requisição AJAX
-        $.ajax({
-            url: '/assessoria/processar',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ links: links }),
-            success: function(response) {
-                clearInterval(progressInterval);
+        const logDebugHeaders = function(xhr) {
+            console.group('🔍 ScrapingBee/ChatGPT Debug Logs');
+            var debugHeaders = [
+                'X-ScrapingBee-Debug',
+                'X-ScrapingBee-Data',
+                'X-ScrapingBee-Error',
+                'X-ScrapingBee-Request-URL',
+                'X-ScrapingBee-HTTP-Code',
+                'X-ScrapingBee-Response-Length',
+                'X-ScrapingBee-Response-Prefix',
+                'X-ScrapingBee-CURL-Error',
+                'X-ScrapingBee-HTTP-Error',
+                'X-ScrapingBee-Empty-Response',
+                'X-ScrapingBee-JSON-Error',
+                'X-ScrapingBee-Response-Raw',
+                'X-ScrapingBee-JSON-Keys',
+                'X-ScrapingBee-JSON-Type',
+                'X-ScrapingBee-Normalization-Error',
+                'X-ChatGPT-Debug',
+                'X-ChatGPT-Error',
+                'X-ChatGPT-Prompt-Length',
+                'X-ChatGPT-HTTP-Code',
+                'X-ChatGPT-Response-Length',
+                'X-ChatGPT-CURL-Error',
+                'X-ChatGPT-HTTP-Error',
+                'X-ChatGPT-JSON-Error',
+                'X-ChatGPT-Content-Length',
+                'X-ChatGPT-Content-Prefix',
+                'X-ChatGPT-Parse-Error',
+                'X-ChatGPT-Raw-Content',
+                'X-ChatGPT-Missing-Field',
+                'X-ChatGPT-Success',
+                'X-ChatGPT-Product-Data'
+            ];
+
+            debugHeaders.forEach(function(header) {
+                var value = xhr.getResponseHeader(header);
+                if (value) {
+                    console.log('📋 ' + header + ':', value);
+                    try {
+                        if (header.includes('Data') || header.includes('Keys') || header.includes('Normalized') || header.includes('Product-Data')) {
+                            var parsed = JSON.parse(value);
+                            console.log('🔍 ' + header + ' (parsed):', parsed);
+                        }
+                    } catch (e) {
+                    }
+                }
+            });
+
+            console.groupEnd();
+        };
+
+        (async function() {
+            try {
+                let processed = 0;
+                let totalSucesso = 0;
+                let totalErros = 0;
+
+                for (let i = 0; i < links.length; i++) {
+                    const link = links[i];
+                    try {
+                        const resp = await requestOne(link, i === 0);
+                        if (!resp || resp.success !== true) {
+                            const msg = resp && resp.message ? resp.message : 'Erro ao processar link';
+                            showNotification('error', 'Erro ao processar produto', `Link: ${link.substring(0, 80)}...<br>Mensagem: ${msg}`);
+                            totalErros++;
+                        } else {
+                            // A API retorna success=true mesmo quando o produto dá erro (ele acumula em sessao).
+                            // Então aqui só contamos como "sucesso de requisição".
+                            // Para o total final, usamos os contadores retornados (se existirem).
+                            if (resp.data && typeof resp.data.total_produtos === 'number') {
+                                totalSucesso = resp.data.total_produtos;
+                            }
+                            if (resp.data && typeof resp.data.total_erros === 'number') {
+                                totalErros = resp.data.total_erros;
+                            }
+                        }
+                    } catch (err) {
+                        if (err && err.xhr) {
+                            logDebugHeaders(err.xhr);
+                        }
+                        showNotification('error', 'Erro ao processar produto', `Link: ${link.substring(0, 80)}...<br>Mensagem: Erro de rede/timeout (tente novamente)`);
+                        totalErros++;
+                    }
+
+                    processed++;
+                    const progress = Math.round((processed / totalLinks) * 100);
+                    $('#progressBar').css('width', progress + '%');
+                }
+
                 $('#progressBar').css('width', '100%');
-                
                 setTimeout(() => {
                     $('#loadingOverlay').addClass('d-none');
                     $('#processBtn').prop('disabled', false);
-                    
-                    if (response.success) {
-                        handleSuccessResponse(response.data);
-                    } else {
-                        handleErrorResponse(response.message);
-                    }
-                }, 500);
-            },
-            error: function(xhr, status, error) {
-                clearInterval(progressInterval);
+                    handleSuccessResponse({
+                        total_produtos: totalSucesso || totalLinks,
+                        total_erros: totalErros,
+                        erros: []
+                    });
+                }, 300);
+            } catch (e) {
                 $('#loadingOverlay').addClass('d-none');
                 $('#processBtn').prop('disabled', false);
-                
-                // Mostrar logs do ScrapingBee no console
-                console.group('🔍 ScrapingBee Debug Logs');
-                
-                // Headers de debug
-                var debugHeaders = [
-                    'X-ScrapingBee-Debug',
-                    'X-ScrapingBee-Data', 
-                    'X-ScrapingBee-Error',
-                    'X-ScrapingBee-Request-URL',
-                    'X-ScrapingBee-HTTP-Code',
-                    'X-ScrapingBee-Response-Length',
-                    'X-ScrapingBee-Response-Prefix',
-                    'X-ScrapingBee-CURL-Error',
-                    'X-ScrapingBee-HTTP-Error',
-                    'X-ScrapingBee-Empty-Response',
-                    'X-ScrapingBee-JSON-Error',
-                    'X-ScrapingBee-Response-Raw',
-                    'X-ScrapingBee-JSON-Keys',
-                    'X-ScrapingBee-JSON-Type',
-                    'X-ScrapingBee-Normalization-Error',
-                    'X-ChatGPT-Debug',
-                    'X-ChatGPT-Error',
-                    'X-ChatGPT-Prompt-Length',
-                    'X-ChatGPT-HTTP-Code',
-                    'X-ChatGPT-Response-Length',
-                    'X-ChatGPT-CURL-Error',
-                    'X-ChatGPT-HTTP-Error',
-                    'X-ChatGPT-JSON-Error',
-                    'X-ChatGPT-Content-Length',
-                    'X-ChatGPT-Content-Prefix',
-                    'X-ChatGPT-Parse-Error',
-                    'X-ChatGPT-Raw-Content',
-                    'X-ChatGPT-Missing-Field',
-                    'X-ChatGPT-Success',
-                    'X-ChatGPT-Product-Data'
-                ];
-                
-                debugHeaders.forEach(function(header) {
-                    var value = xhr.getResponseHeader(header);
-                    if (value) {
-                        console.log('📋 ' + header + ':', value);
-                        
-                        // Tentar fazer parse do JSON
-                        try {
-                            if (header.includes('Data') || header.includes('Keys') || header.includes('Normalized') || header.includes('Product-Data')) {
-                                var parsed = JSON.parse(value);
-                                console.log('🔍 ' + header + ' (parsed):', parsed);
-                            }
-                        } catch (e) {
-                            // Não é JSON, manter como string
-                        }
-                    }
-                });
-                
-                console.groupEnd();
-                
-                handleErrorResponse('Erro ao processar requisição. Verifique o console para detalhes do debug.');
+                handleErrorResponse('Erro ao processar requisição. Verifique o console para detalhes.');
             }
-        });
+        })();
     }
 
     function handleSuccessResponse(data) {

@@ -181,7 +181,7 @@ class Produto extends Model {
             'sku' => $sku,
             'description' => $data['description'] ?? '',
             'short_description' => $data['short_description'] ?? '',
-            'category_id' => $data['category_id'] ?? 0,
+            'category_id' => array_key_exists('category_id', $data) ? $data['category_id'] : 0,
             'price' => floatval($data['price'] ?? 0),
             'cost_price' => floatval($data['cost_price'] ?? 0),
             'sale_price' => floatval($data['sale_price'] ?? 0),
