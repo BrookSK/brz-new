@@ -62,10 +62,6 @@ $router->post('/assessoria/processar', 'AssessoriaController', 'processarLinks')
 $router->get('/assessoria/orcamento', 'AssessoriaController', 'orcamento');
 $router->post('/assessoria/adicionar-ao-carrinho', 'AssessoriaController', 'adicionarAoCarrinho');
 
-// Debug da Assessoria
-$router->get('/assessoria/debug', 'AssessoriaController', 'debug');
-$router->post('/assessoria/debug/test', 'AssessoriaController', 'debugTest');
-
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function() {
     echo '<!DOCTYPE html>

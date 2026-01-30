@@ -752,9 +752,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Assessoria</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/assessoria/debug"><i class="fas fa-bug"></i> Debug</a>
-                    </li>
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">

@@ -251,7 +251,49 @@ $(document).ready(function() {
                 $('#loadingOverlay').addClass('d-none');
                 $('#processBtn').prop('disabled', false);
                 
-                handleErrorResponse('Erro ao processar requisição. Tente novamente.');
+                // Mostrar logs do ScrapingBee no console
+                console.group('🔍 ScrapingBee Debug Logs');
+                
+                // Headers de debug
+                var debugHeaders = [
+                    'X-ScrapingBee-Debug',
+                    'X-ScrapingBee-Data', 
+                    'X-ScrapingBee-Error',
+                    'X-ScrapingBee-Request-URL',
+                    'X-ScrapingBee-HTTP-Code',
+                    'X-ScrapingBee-Response-Length',
+                    'X-ScrapingBee-Response-Prefix',
+                    'X-ScrapingBee-CURL-Error',
+                    'X-ScrapingBee-HTTP-Error',
+                    'X-ScrapingBee-Empty-Response',
+                    'X-ScrapingBee-JSON-Error',
+                    'X-ScrapingBee-Response-Raw',
+                    'X-ScrapingBee-JSON-Keys',
+                    'X-ScrapingBee-JSON-Type',
+                    'X-ScrapingBee-Normalized',
+                    'X-ScrapingBee-Normalization-Error'
+                ];
+                
+                debugHeaders.forEach(function(header) {
+                    var value = xhr.getResponseHeader(header);
+                    if (value) {
+                        console.log('📋 ' + header + ':', value);
+                        
+                        // Tentar fazer parse do JSON
+                        try {
+                            if (header.includes('Data') || header.includes('Keys') || header.includes('Normalized')) {
+                                var parsed = JSON.parse(value);
+                                console.log('🔍 ' + header + ' (parsed):', parsed);
+                            }
+                        } catch (e) {
+                            // Não é JSON, manter como string
+                        }
+                    }
+                });
+                
+                console.groupEnd();
+                
+                handleErrorResponse('Erro ao processar requisição. Verifique o console para detalhes do debug.');
             }
         });
     }
