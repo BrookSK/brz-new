@@ -4,6 +4,315 @@ namespace App\Controllers;
 use App\Core\Request;
 
 class AdminNotificacoesController extends Controller {
+    private function getConfigTableInfo(\PDO $pdo): array {
+        $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        $table = null;
+        foreach ($tableCandidates as $t) {
+            try {
+                $stmtTable = $pdo->prepare("SHOW TABLES LIKE ?");
+                $stmtTable->execute([$t]);
+                if ($stmtTable->fetchColumn()) {
+                    $table = $t;
+                    break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (!$table) {
+            return [];
+        }
+
+        $stmt = $pdo->query('DESCRIBE ' . $table);
+        $describeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $cols = [];
+        foreach ($describeRows as $r) {
+            $field = (string) ($r['Field'] ?? '');
+            if ($field !== '') {
+                $cols[] = $field;
+            }
+        }
+
+        $hasCategoria = in_array('categoria', $cols, true);
+        $hasChave = in_array('chave', $cols, true);
+        if ($hasCategoria && $hasChave) {
+            $valueCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : null);
+            if (!$valueCol) {
+                return ['table' => $table, 'mode' => 'categoria_chave'];
+            }
+            $updatedAtCol = in_array('updated_at', $cols, true) ? 'updated_at' : '';
+            return [
+                'table' => $table,
+                'mode' => 'categoria_chave',
+                'categoriaCol' => 'categoria',
+                'chaveCol' => 'chave',
+                'valueCol' => $valueCol,
+                'updatedAtCol' => $updatedAtCol,
+            ];
+        }
+
+        if (!$hasCategoria && !$hasChave && in_array('id', $cols, true)) {
+            return [
+                'table' => $table,
+                'mode' => 'single_row',
+                'idCol' => 'id',
+                'idVal' => 1,
+                'cols' => $cols,
+            ];
+        }
+
+        $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'];
+        $valueCandidates = ['valor', 'value', 'conteudo', 'content', 'config_value'];
+
+        $keyCol = null;
+        foreach ($keyCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $keyCol = $c;
+                break;
+            }
+        }
+        $valueCol = null;
+        foreach ($valueCandidates as $c) {
+            if (in_array($c, $cols, true)) {
+                $valueCol = $c;
+                break;
+            }
+        }
+        if (!$keyCol || !$valueCol) {
+            return [];
+        }
+
+        $updatedAtCol = in_array('updated_at', $cols, true) ? 'updated_at' : '';
+        return [
+            'table' => $table,
+            'mode' => 'chave_valor',
+            'keyCol' => $keyCol,
+            'valueCol' => $valueCol,
+            'updatedAtCol' => $updatedAtCol,
+        ];
+    }
+
+    private function getEmailConfigFromDb(\PDO $pdo): array {
+        $ti = $this->getConfigTableInfo($pdo);
+        if (!is_array($ti) || empty($ti['table']) || empty($ti['mode'])) {
+            return [];
+        }
+
+        $mode = (string) $ti['mode'];
+        $table = (string) $ti['table'];
+
+        $getByFullKey = function (string $fullKey) use ($pdo, $ti, $table): ?string {
+            $keyCol = (string) ($ti['keyCol'] ?? '');
+            $valueCol = (string) ($ti['valueCol'] ?? '');
+            if ($keyCol === '' || $valueCol === '') {
+                return null;
+            }
+            $st = $pdo->prepare("SELECT {$valueCol} FROM {$table} WHERE {$keyCol} = ? ORDER BY {$keyCol} DESC LIMIT 1");
+            $st->execute([$fullKey]);
+            $v = $st->fetchColumn();
+            return $v !== false ? (string) $v : null;
+        };
+
+        $cfg = [];
+
+        if ($mode === 'categoria_chave') {
+            $catCol = (string) ($ti['categoriaCol'] ?? 'categoria');
+            $keyCol = (string) ($ti['chaveCol'] ?? 'chave');
+            $valueCol = (string) ($ti['valueCol'] ?? 'valor');
+            $get = function (string $chave) use ($pdo, $table, $catCol, $keyCol, $valueCol): ?string {
+                $st = $pdo->prepare("SELECT {$valueCol} FROM {$table} WHERE {$catCol} = 'email' AND {$keyCol} = ? LIMIT 1");
+                $st->execute([$chave]);
+                $v = $st->fetchColumn();
+                return $v !== false ? (string) $v : null;
+            };
+
+            $cfg['driver'] = $get('driver');
+            $cfg['host'] = $get('host');
+            $cfg['port'] = $get('port');
+            $cfg['username'] = $get('username');
+            $cfg['password'] = $get('password');
+            $cfg['encryption'] = $get('encryption');
+            $cfg['from'] = $get('from');
+            $cfg['from_name'] = $get('from_name');
+            return $cfg;
+        }
+
+        if ($mode === 'chave_valor') {
+            $cfg['driver'] = $getByFullKey('email_driver');
+            $cfg['host'] = $getByFullKey('email_host');
+            $cfg['port'] = $getByFullKey('email_port');
+            $cfg['username'] = $getByFullKey('email_username');
+            $cfg['password'] = $getByFullKey('email_password');
+            $cfg['encryption'] = $getByFullKey('email_encryption');
+            $cfg['from'] = $getByFullKey('email_from');
+            $cfg['from_name'] = $getByFullKey('email_from_name');
+
+            if (($cfg['host'] ?? '') === null || (string) ($cfg['host'] ?? '') === '') {
+                $cfg['host'] = $getByFullKey('smtp_host');
+            }
+            if (($cfg['port'] ?? '') === null || (string) ($cfg['port'] ?? '') === '') {
+                $cfg['port'] = $getByFullKey('smtp_port');
+            }
+            if (($cfg['username'] ?? '') === null || (string) ($cfg['username'] ?? '') === '') {
+                $cfg['username'] = $getByFullKey('smtp_usuario');
+            }
+            if (($cfg['password'] ?? '') === null || (string) ($cfg['password'] ?? '') === '') {
+                $cfg['password'] = $getByFullKey('smtp_senha');
+            }
+            if (($cfg['encryption'] ?? '') === null || (string) ($cfg['encryption'] ?? '') === '') {
+                $cfg['encryption'] = $getByFullKey('smtp_criptografia');
+            }
+            if (($cfg['from'] ?? '') === null || (string) ($cfg['from'] ?? '') === '') {
+                $cfg['from'] = $getByFullKey('email_remetente');
+            }
+            if (($cfg['from_name'] ?? '') === null || (string) ($cfg['from_name'] ?? '') === '') {
+                $cfg['from_name'] = $getByFullKey('email_nome_remetente');
+            }
+
+            return $cfg;
+        }
+
+        if ($mode === 'single_row') {
+            try {
+                $idCol = (string) ($ti['idCol'] ?? 'id');
+                $stmt = $pdo->query("SELECT * FROM {$table} ORDER BY {$idCol} ASC LIMIT 1");
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $row = [];
+            }
+
+            $pick = function (array $cands) use ($row): ?string {
+                foreach ($cands as $c) {
+                    if (array_key_exists($c, $row)) {
+                        $v = $row[$c] ?? null;
+                        if ($v !== null && $v !== '') {
+                            return (string) $v;
+                        }
+                    }
+                }
+                foreach ($cands as $c) {
+                    if (array_key_exists($c, $row)) {
+                        $v = $row[$c] ?? null;
+                        return $v !== null ? (string) $v : null;
+                    }
+                }
+                return null;
+            };
+
+            $cfg['driver'] = $pick(['email_driver']);
+            $cfg['host'] = $pick(['email_host', 'smtp_host']);
+            $cfg['port'] = $pick(['email_port', 'smtp_port']);
+            $cfg['username'] = $pick(['email_username', 'smtp_usuario', 'smtp_user', 'smtp_username']);
+            $cfg['password'] = $pick(['email_password', 'smtp_senha', 'smtp_pass', 'smtp_password']);
+            $cfg['encryption'] = $pick(['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption']);
+            $cfg['from'] = $pick(['email_from', 'email_remetente', 'smtp_from']);
+            $cfg['from_name'] = $pick(['email_from_name', 'email_nome_remetente', 'smtp_from_name']);
+            return $cfg;
+        }
+
+        return [];
+    }
+
+    private function smtpReadLine($fp): string {
+        $data = '';
+        while (!feof($fp)) {
+            $line = fgets($fp, 515);
+            if ($line === false) {
+                break;
+            }
+            $data .= $line;
+            if (strlen($line) < 4) {
+                break;
+            }
+            if (preg_match('/^\d{3} /', $line)) {
+                break;
+            }
+        }
+        return $data;
+    }
+
+    private function smtpExpect($fp, array $codes): string {
+        $resp = $this->smtpReadLine($fp);
+        $code = (int) substr(trim($resp), 0, 3);
+        if (!in_array($code, $codes, true)) {
+            throw new \Exception('SMTP resposta inesperada: ' . trim($resp));
+        }
+        return $resp;
+    }
+
+    private function smtpCmd($fp, string $cmd, array $okCodes): string {
+        fwrite($fp, $cmd . "\r\n");
+        return $this->smtpExpect($fp, $okCodes);
+    }
+
+    private function sendSmtpEmail(array $cfg, string $to, string $subject, string $html, string $fromEmail, string $fromName): void {
+        $host = (string) ($cfg['host'] ?? '');
+        $port = (int) ((string) ($cfg['port'] ?? '587'));
+        $user = (string) ($cfg['username'] ?? '');
+        $pass = (string) ($cfg['password'] ?? '');
+        $enc = strtolower(trim((string) ($cfg['encryption'] ?? 'tls')));
+
+        if ($host === '' || $port <= 0) {
+            throw new \Exception('SMTP host/porta não configurados');
+        }
+
+        $remote = $host;
+        $crypto = false;
+        if ($enc === 'ssl') {
+            $remote = 'ssl://' . $host;
+            $crypto = true;
+        }
+
+        $fp = @fsockopen($remote, $port, $errno, $errstr, 15);
+        if (!$fp) {
+            throw new \Exception('Falha ao conectar no SMTP: ' . $errstr . ' (' . $errno . ')');
+        }
+        stream_set_timeout($fp, 15);
+
+        try {
+            $this->smtpExpect($fp, [220]);
+
+            $localhost = 'localhost';
+            $this->smtpCmd($fp, 'EHLO ' . $localhost, [250]);
+
+            if ($enc === 'tls' && !$crypto) {
+                $this->smtpCmd($fp, 'STARTTLS', [220]);
+                $ok = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                if ($ok !== true) {
+                    throw new \Exception('Falha ao iniciar STARTTLS');
+                }
+                $this->smtpCmd($fp, 'EHLO ' . $localhost, [250]);
+            }
+
+            if ($user !== '') {
+                $this->smtpCmd($fp, 'AUTH LOGIN', [334]);
+                $this->smtpCmd($fp, base64_encode($user), [334]);
+                $this->smtpCmd($fp, base64_encode($pass), [235]);
+            }
+
+            $this->smtpCmd($fp, 'MAIL FROM:<' . $fromEmail . '>', [250]);
+            $this->smtpCmd($fp, 'RCPT TO:<' . $to . '>', [250, 251]);
+            $this->smtpCmd($fp, 'DATA', [354]);
+
+            $boundary = 'b' . md5((string) microtime(true));
+            $headers = [];
+            $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . '?= <' . $fromEmail . '>';
+            $headers[] = 'To: <' . $to . '>';
+            $headers[] = 'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=';
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+
+            $data = implode("\r\n", $headers) . "\r\n\r\n" . $html;
+            $data = str_replace("\r\n.", "\r\n..", $data);
+
+            fwrite($fp, $data . "\r\n.\r\n");
+            $this->smtpExpect($fp, [250]);
+            $this->smtpCmd($fp, 'QUIT', [221]);
+        } finally {
+            fclose($fp);
+        }
+    }
+
     private function ensureEventosSistemaTable(\PDO $pdo): void {
         try {
             $pdo->query('SELECT 1 FROM eventos_sistema LIMIT 1');
@@ -654,6 +963,9 @@ class AdminNotificacoesController extends Controller {
 
             $this->ensureEmailTemplatesTable($pdo);
 
+            $emailCfg = $this->getEmailConfigFromDb($pdo);
+            $driver = strtolower(trim((string) ($emailCfg['driver'] ?? 'smtp')));
+
             $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
             $st = $pdo->prepare($sql);
             $st->execute([$evento]);
@@ -673,14 +985,25 @@ class AdminNotificacoesController extends Controller {
             $fromEmail = 'noreply@brazilianashop.com.br';
             $fromName = 'Braziliana Shop';
 
+            if (!empty($emailCfg['from']) && filter_var((string) $emailCfg['from'], FILTER_VALIDATE_EMAIL)) {
+                $fromEmail = (string) $emailCfg['from'];
+            }
+            if (!empty($emailCfg['from_name'])) {
+                $fromName = (string) $emailCfg['from_name'];
+            }
+
             $headers = [];
             $headers[] = 'MIME-Version: 1.0';
             $headers[] = 'Content-Type: text/html; charset=UTF-8';
             $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . '?= <' . $fromEmail . '>';
 
-            $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
-            if (!$ok) {
-                $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+            if ($driver === 'smtp') {
+                $this->sendSmtpEmail($emailCfg, $to, $subject, $html, $fromEmail, $fromName);
+            } else {
+                $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
+                if (!$ok) {
+                    $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+                }
             }
 
             $this->json(['success' => true, 'to' => $to]);
