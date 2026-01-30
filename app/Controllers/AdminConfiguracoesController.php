@@ -315,6 +315,11 @@ class AdminConfiguracoesController extends Controller {
                                                             </tbody>
                                                         </table>
                                                     </div>
+                                                    <div class="d-flex justify-content-end">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="limparLogsWebhookNotificacoes()">
+                                                            <i class="fas fa-trash"></i> Limpar logs
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div class="d-flex gap-2">
@@ -1124,7 +1129,71 @@ class AdminConfiguracoesController extends Controller {
                 tabBtn.addEventListener('hidden.bs.tab', syncSalvarGeralVisibilityNotificacoes);
             }
             syncSalvarGeralVisibilityNotificacoes();
+
+            const eventoSelect = document.querySelector('#formNotificacoes select[name="evento"]');
+            if (eventoSelect) {
+                eventoSelect.addEventListener('change', function() {
+                    carregarNotificacaoPorEvento(eventoSelect.value);
+                });
+                if (eventoSelect.value) {
+                    carregarNotificacaoPorEvento(eventoSelect.value);
+                }
+            }
         });
+
+        function carregarNotificacaoPorEvento(evento) {
+            const container = document.getElementById('formNotificacoes');
+            if (!container) {
+                return;
+            }
+            if (!evento) {
+                const urlEl = container.querySelector('input[name="webhook_url"]');
+                const metodoEl = container.querySelector('select[name="webhook_method"]');
+                const headersEl = container.querySelector('textarea[name="webhook_headers"]');
+                const camposEl = container.querySelector('textarea[name="webhook_campos"]');
+                const tplEl = container.querySelector('textarea[name="webhook_template"]');
+                const ativoEl = container.querySelector('input[name="webhook_ativo"]');
+                const retriesEl = container.querySelector('input[name="webhook_retries"]');
+                if (urlEl) urlEl.value = '';
+                if (metodoEl) metodoEl.value = 'POST';
+                if (headersEl) headersEl.value = '';
+                if (camposEl) camposEl.value = '';
+                if (tplEl) tplEl.value = '';
+                if (ativoEl) ativoEl.checked = true;
+                if (retriesEl) retriesEl.checked = true;
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.set('evento', evento);
+
+            fetch('/admin/notificacao?' + params.toString())
+                .then(async response => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success || !data.notificacao) {
+                        throw new Error(data.error || 'Falha ao carregar configuração');
+                    }
+
+                    const n = data.notificacao;
+                    const urlEl = container.querySelector('input[name="webhook_url"]');
+                    const metodoEl = container.querySelector('select[name="webhook_method"]');
+                    const headersEl = container.querySelector('textarea[name="webhook_headers"]');
+                    const camposEl = container.querySelector('textarea[name="webhook_campos"]');
+                    const tplEl = container.querySelector('textarea[name="webhook_template"]');
+                    const ativoEl = container.querySelector('input[name="webhook_ativo"]');
+                    const retriesEl = container.querySelector('input[name="webhook_retries"]');
+
+                    if (urlEl) urlEl.value = n.url || '';
+                    if (metodoEl) metodoEl.value = (n.metodo || 'POST').toUpperCase();
+                    if (headersEl) headersEl.value = n.headers || '';
+                    if (camposEl) camposEl.value = n.campos || '';
+                    if (tplEl) tplEl.value = n.template || '';
+                    if (ativoEl) ativoEl.checked = (n.ativo || '1') === '1';
+                    if (retriesEl) retriesEl.checked = (n.retries || '1') === '1';
+                })
+                .catch(() => {
+                });
+        }
 
         function salvarNotificacaoAdmin() {
             const formData = getNotificacoesFormData();
@@ -1194,6 +1263,9 @@ class AdminConfiguracoesController extends Controller {
                                     <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesLogNotificacoes(${log.id})">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-1" onclick="excluirLogWebhookNotificacoes(${log.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </td>
                             `;
                             tbody.appendChild(tr);
@@ -1204,6 +1276,48 @@ class AdminConfiguracoesController extends Controller {
                 })
                 .catch(() => {
                 });
+        }
+
+        function excluirLogWebhookNotificacoes(logId) {
+            if (!confirm('Deseja excluir este log?')) {
+                return;
+            }
+
+            fetch(`/admin/log-webhook/${logId}/excluir`, {
+                method: 'POST'
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    carregarLogsWebhookNotificacoes();
+                } else {
+                    alert('Erro ao excluir log: ' + (data.error || JSON.stringify(data)));
+                }
+            })
+            .catch(error => {
+                alert('Erro ao excluir log: ' + error.message);
+            });
+        }
+
+        function limparLogsWebhookNotificacoes() {
+            if (!confirm('Deseja limpar todos os logs?')) {
+                return;
+            }
+
+            fetch('/admin/logs-webhook/limpar', {
+                method: 'POST'
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    carregarLogsWebhookNotificacoes();
+                } else {
+                    alert('Erro ao limpar logs: ' + (data.error || JSON.stringify(data)));
+                }
+            })
+            .catch(error => {
+                alert('Erro ao limpar logs: ' + error.message);
+            });
         }
 
         function verDetalhesLogNotificacoes(logId) {

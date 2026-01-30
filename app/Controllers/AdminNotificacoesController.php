@@ -320,6 +320,88 @@ class AdminNotificacoesController extends Controller {
         }
     }
 
+    public function obterNotificacao(Request $request) {
+        $this->requireAdmin();
+
+        $evento = (string) $request->getParam('evento', '');
+        if ($evento === '') {
+            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureEventosSistemaTable($pdo);
+            $this->ensureWebhooksTable($pdo);
+
+            $sql = 'SELECT w.id, w.url, w.metodo, w.headers, w.payload_template, w.ativo, w.retry_count FROM webhooks w INNER JOIN eventos_sistema e ON e.id = w.evento_id WHERE e.nome = ? ORDER BY w.id DESC LIMIT 1';
+            $st = $pdo->prepare($sql);
+            $st->execute([$evento]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($row['id'])) {
+                $this->json([
+                    'success' => true,
+                    'notificacao' => [
+                        'evento' => $evento,
+                        'url' => '',
+                        'metodo' => 'POST',
+                        'headers' => '',
+                        'campos' => '',
+                        'template' => '',
+                        'ativo' => '1',
+                        'retries' => '1',
+                    ]
+                ]);
+            }
+
+            $template = '';
+            $campos = '';
+            $pt = $row['payload_template'] ?? null;
+            if (is_string($pt) && trim($pt) !== '') {
+                $decoded = json_decode($pt, true);
+                if (is_array($decoded)) {
+                    if (isset($decoded['template']) && is_string($decoded['template'])) {
+                        $template = (string) $decoded['template'];
+                    }
+                    if (isset($decoded['campos']) && is_array($decoded['campos'])) {
+                        $campos = json_encode($decoded['campos'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+                    }
+                }
+            }
+
+            $headers = '';
+            $hdr = $row['headers'] ?? null;
+            if (is_string($hdr) && trim($hdr) !== '') {
+                $decodedHdr = json_decode($hdr, true);
+                if (is_array($decodedHdr)) {
+                    $headers = json_encode($decodedHdr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+                }
+            }
+
+            $ativo = ((string) ($row['ativo'] ?? '1') === '1') ? '1' : '0';
+            $retryCount = (int) ($row['retry_count'] ?? 0);
+            $retries = $retryCount > 0 ? '1' : '0';
+
+            $this->json([
+                'success' => true,
+                'notificacao' => [
+                    'evento' => $evento,
+                    'url' => (string) ($row['url'] ?? ''),
+                    'metodo' => (string) ($row['metodo'] ?? 'POST'),
+                    'headers' => $headers,
+                    'campos' => $campos,
+                    'template' => $template,
+                    'ativo' => $ativo,
+                    'retries' => $retries,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     private function ensureEventosSistemaTable(\PDO $pdo): void {
         try {
             $pdo->query('SELECT 1 FROM eventos_sistema LIMIT 1');
@@ -598,6 +680,47 @@ class AdminNotificacoesController extends Controller {
             $st = $pdo->query($sql);
             $logs = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $this->json(['success' => true, 'logs' => $logs]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function excluirLogWebhook(Request $request, $logId) {
+        $this->requireAdmin();
+
+        $id = (int) $logId;
+        if ($id <= 0) {
+            $this->json(['success' => false, 'error' => 'ID inválido'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureWebhookDisparosTable($pdo);
+
+            $st = $pdo->prepare('DELETE FROM webhook_disparos WHERE id = ?');
+            $st->execute([$id]);
+
+            $this->json(['success' => true, 'deleted' => $st->rowCount()]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function limparLogsWebhook(Request $request) {
+        $this->requireAdmin();
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $this->ensureWebhookDisparosTable($pdo);
+
+            $st = $pdo->prepare('DELETE FROM webhook_disparos');
+            $st->execute();
+
+            $this->json(['success' => true]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }

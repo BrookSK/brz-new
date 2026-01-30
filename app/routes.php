@@ -244,8 +244,11 @@ $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'sa
 
 // Notificações (Webhooks / Email teste)
 $router->post('/admin/salvar-notificacao', 'AdminNotificacoesController', 'salvarNotificacao');
+$router->get('/admin/notificacao', 'AdminNotificacoesController', 'obterNotificacao');
 $router->get('/admin/logs-webhook', 'AdminNotificacoesController', 'logsWebhook');
 $router->get('/admin/log-webhook/{id}', 'AdminNotificacoesController', 'logWebhook');
+$router->post('/admin/log-webhook/{id}/excluir', 'AdminNotificacoesController', 'excluirLogWebhook');
+$router->post('/admin/logs-webhook/limpar', 'AdminNotificacoesController', 'limparLogsWebhook');
 $router->post('/admin/testar-email', 'AdminNotificacoesController', 'testarEmail');
 $router->post('/admin/testar-webhook', 'AdminNotificacoesController', 'testarWebhook');
 
