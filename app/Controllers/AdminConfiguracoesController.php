@@ -143,6 +143,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-seo-tab" data-bs-toggle="pill" data-bs-target="#v-pills-seo" type="button">
                                 <i class="fas fa-search"></i> SEO
                             </button>
+                            <button class="nav-link" id="v-pills-assessoria-tab" data-bs-toggle="pill" data-bs-target="#v-pills-assessoria" type="button">
+                                <i class="fas fa-robot"></i> Assessoria / IA
+                            </button>
                             <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
                                 <i class="fas fa-cogs"></i> Sistema
                             </button>
@@ -550,6 +553,60 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Configurações Assessoria / IA -->
+                                <div class="tab-pane fade" id="v-pills-assessoria" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurações da Assessoria (ScrapingBee + ChatGPT)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h6 class="mb-3">ScrapingBee</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">API Key</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="scrapingbee_api_key" value="' . $this->getConfigValue($config, 'scrapingbee', 'api_key', '') . '" placeholder="Cole a API Key do ScrapingBee">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-6">
+                                                    <h6 class="mb-3">ChatGPT</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">API Key</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="chatgpt_api_key" value="' . $this->getConfigValue($config, 'chatgpt', 'api_key', '') . '" placeholder="Cole a API Key do ChatGPT">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Modelo</label>
+                                                        <input type="text" class="form-control" name="chatgpt_model" value="' . $this->getConfigValue($config, 'chatgpt', 'model', 'gpt-3.5-turbo') . '">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Temperature</label>
+                                                        <input type="text" class="form-control" name="chatgpt_temperature" value="' . $this->getConfigValue($config, 'chatgpt', 'temperature', '0.1') . '">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Max Tokens</label>
+                                                        <input type="number" class="form-control" name="chatgpt_max_tokens" value="' . $this->getConfigValue($config, 'chatgpt', 'max_tokens', '1000') . '">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Margem de peso (%%)</label>
+                                                        <input type="number" class="form-control" name="chatgpt_peso_margem" value="' . $this->getConfigValue($config, 'chatgpt', 'peso_margem', '15') . '">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <!-- Configurações de Pagamentos -->
                                 <div class="tab-pane fade" id="v-pills-pagamentos" role="tabpanel">
@@ -782,7 +839,9 @@ class AdminConfiguracoesController extends Controller {
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
-                'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
+                'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
+                'scrapingbee' => ['api_key'],
+                'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem']
             ];
             
             $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled'];
