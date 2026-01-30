@@ -288,6 +288,80 @@ class AssessoriaController extends Controller {
         return null;
     }
 
+    private function extractNomeFromScrapingBee(array $dadosBrutos): ?string {
+        foreach (['name', 'title', 'product_name'] as $k) {
+            if (!empty($dadosBrutos[$k]) && is_string($dadosBrutos[$k])) {
+                $v = trim($this->cleanJsonText((string) $dadosBrutos[$k]));
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        $queue = [$dadosBrutos];
+        $max = 200;
+        $seen = 0;
+        while (!empty($queue) && $seen < $max) {
+            $node = array_shift($queue);
+            $seen++;
+            if (!is_array($node)) {
+                continue;
+            }
+            foreach ($node as $k => $v) {
+                $ks = strtolower((string) $k);
+                if ((strpos($ks, 'title') !== false || strpos($ks, 'name') !== false) && is_string($v)) {
+                    $vv = trim($this->cleanJsonText($v));
+                    if (strlen($vv) >= 3) {
+                        return $vv;
+                    }
+                }
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extractDescricaoFromScrapingBee(array $dadosBrutos): string {
+        foreach (['description', 'descricao', 'product_description', 'details'] as $k) {
+            if (!empty($dadosBrutos[$k])) {
+                if (is_string($dadosBrutos[$k])) {
+                    return trim($this->cleanJsonText((string) $dadosBrutos[$k]));
+                }
+                if (is_array($dadosBrutos[$k])) {
+                    $txt = json_encode($this->truncateForPrompt($dadosBrutos[$k], 0));
+                    return trim($this->cleanJsonText((string) $txt));
+                }
+            }
+        }
+        return '';
+    }
+
+    private function buildProdutoFallbackFromScrapingBee(array $dadosBrutos, string $urlOriginal): ?array {
+        $nome = $this->extractNomeFromScrapingBee($dadosBrutos);
+        $valor = $this->extractValorFromScrapingBee($dadosBrutos);
+        $img = $this->extractFirstImageUrl($dadosBrutos);
+
+        if ($nome === null || $nome === '' || $valor === null) {
+            return null;
+        }
+
+        $descricao = $this->extractDescricaoFromScrapingBee($dadosBrutos);
+
+        return [
+            'sku' => '',
+            'nome' => $nome,
+            'descricao' => $descricao,
+            'valor' => floatval($valor),
+            // Peso estimado mínimo para permitir salvar
+            'peso' => 0.5,
+            'imagens' => $img ? [$img] : [],
+            'url_original' => $urlOriginal
+        ];
+    }
+
     private function extractValorFromScrapingBee(array $dadosBrutos): ?float {
         $queue = [$dadosBrutos];
         $patterns = ['price', 'amount', 'valor', 'current', 'sale', 'offer', 'low', 'high'];
@@ -1382,14 +1456,24 @@ class AssessoriaController extends Controller {
                         header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e2->getMessage(), 200));
                         header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content2, 0, 500), 500));
                     }
-                    throw $e2;
+                    $fallback = $this->buildProdutoFallbackFromScrapingBee($dadosBrutos, $urlOriginal);
+                    if ($fallback !== null) {
+                        $produtoData = $fallback;
+                    } else {
+                        throw $e2;
+                    }
                 }
             } else {
                 if (headers_sent() === false) {
                     header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e->getMessage(), 200));
                     header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content, 0, 500), 500));
                 }
-                throw $e;
+                $fallback = $this->buildProdutoFallbackFromScrapingBee($dadosBrutos, $urlOriginal);
+                if ($fallback !== null) {
+                    $produtoData = $fallback;
+                } else {
+                    throw $e;
+                }
             }
         }
         
