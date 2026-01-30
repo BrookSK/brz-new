@@ -9,8 +9,11 @@ class AdminNotificacoesController extends Controller {
             session_start();
         }
 
+        $usuarioId = $_SESSION['usuario_id'] ?? ($_SESSION['user_id'] ?? null);
         $logado = $_SESSION['logado'] ?? null;
-        if ($logado !== true) {
+        $temSessao = ($logado === true) || (!empty($usuarioId));
+
+        if (!$temSessao) {
             $this->json(['success' => false, 'error' => 'Não autenticado'], 401);
             exit;
         }
