@@ -20,7 +20,8 @@ class AssessoriaController extends Controller {
         header('Content-Type: application/json');
         
         try {
-            $links = $request->getBody()['links'] ?? [];
+            $body = $request->getBody();
+            $links = $body['links'] ?? [];
             
             if (empty($links)) {
                 echo json_encode([
@@ -315,35 +316,15 @@ class AssessoriaController extends Controller {
     }
     
     /**
-     * Obtém a API Key do ScrapingBee (compatível com múltiplas estruturas)
+     * Obtém a API Key do ScrapingBee
      */
     private function getScriptBeeApiKey(): ?string {
         try {
             $db = \Config\Database::getConnection();
-            
-            // Tentar diferentes estruturas de tabela/colunas
-            $queries = [
-                'SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1',
-                'SELECT valor_config FROM configuracoes_sistema WHERE nome_chave = ? LIMIT 1', 
-                'SELECT config_value FROM config_assessoria WHERE config_key = ? LIMIT 1',
-                'SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1',
-                'SELECT value FROM settings WHERE `key` = ? LIMIT 1'
-            ];
-            
-            foreach ($queries as $query) {
-                try {
-                    $stmt = $db->prepare($query);
-                    $stmt->execute(['scrapingbee_api_key']);
-                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    if ($row && !empty($row)) {
-                        return reset($row); // Pega primeiro valor do array
-                    }
-                } catch (\Exception $e) {
-                    continue; // Tenta próxima query
-                }
-            }
-            
-            return null;
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute(['scrapingbee_api_key']);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $row ? $row['valor'] : null;
         } catch (\Exception $e) {
             return null;
         }
@@ -500,8 +481,9 @@ class AssessoriaController extends Controller {
             return;
         }
         
-        $termosAceitos = $request->getBody()['termos_aceitos'] ?? false;
-        $produtosSelecionados = $request->getBody()['produtos_selecionados'] ?? [];
+        $body = $request->getBody();
+        $termosAceitos = $body['termos_aceitos'] ?? false;
+        $produtosSelecionados = $body['produtos_selecionados'] ?? [];
         
         if (!$termosAceitos) {
             echo json_encode([

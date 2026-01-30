@@ -31,4 +31,27 @@ class Request {
     public function setParam($key, $value) {
         $this->params[$key] = $value;
     }
+    
+    public function getBody() {
+        if ($this->method === 'POST') {
+            // Para POST, verificar se tem JSON
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+            if (strpos($contentType, 'application/json') !== false) {
+                $json = file_get_contents('php://input');
+                return json_decode($json, true) ?: [];
+            }
+            return $_POST;
+        }
+        
+        // Para outros métodos, tentar ler o input
+        $json = file_get_contents('php://input');
+        if ($json) {
+            $decoded = json_decode($json, true);
+            if ($decoded !== null) {
+                return $decoded;
+            }
+        }
+        
+        return [];
+    }
 }
