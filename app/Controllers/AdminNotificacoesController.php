@@ -9,9 +9,18 @@ class AdminNotificacoesController extends Controller {
             session_start();
         }
 
-        $perfil = $_SESSION['usuario_perfil'] ?? null;
-        if ($perfil !== 'admin') {
+        $logado = $_SESSION['logado'] ?? null;
+        if ($logado !== true) {
+            $this->json(['success' => false, 'error' => 'Não autenticado'], 401);
+            exit;
+        }
+
+        $perfil = $_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ($_SESSION['user_perfil'] ?? null));
+        $isAdmin = ($perfil === 'admin') || (!empty($_SESSION['is_admin']) && $_SESSION['is_admin']);
+
+        if (!$isAdmin) {
             $this->json(['success' => false, 'error' => 'Acesso negado'], 403);
+            exit;
         }
     }
 
