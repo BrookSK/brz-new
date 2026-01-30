@@ -258,6 +258,153 @@ class AssessoriaController extends Controller {
         return (array) $this->truncateForPrompt($picked, 0);
     }
 
+    private function findFirstNumeric($value, int $depth = 0): ?float {
+        if ($depth > 6) {
+            return null;
+        }
+        if (is_numeric($value)) {
+            $n = floatval($value);
+            if ($n > 0) {
+                return $n;
+            }
+        }
+        if (is_string($value)) {
+            $s = str_replace([',', '$', 'USD', 'usd'], ['.', '', '', ''], $value);
+            if (preg_match('/(\d+(?:\.\d+)?)/', $s, $m)) {
+                $n = floatval($m[1]);
+                if ($n > 0) {
+                    return $n;
+                }
+            }
+        }
+        if (is_array($value)) {
+            foreach ($value as $v) {
+                $found = $this->findFirstNumeric($v, $depth + 1);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+        }
+        return null;
+    }
+
+    private function extractValorFromScrapingBee(array $dadosBrutos): ?float {
+        $queue = [$dadosBrutos];
+        $patterns = ['price', 'amount', 'valor', 'current', 'sale', 'offer', 'low', 'high'];
+        $max = 200;
+        $seen = 0;
+
+        while (!empty($queue) && $seen < $max) {
+            $node = array_shift($queue);
+            $seen++;
+
+            if (!is_array($node)) {
+                continue;
+            }
+
+            foreach ($node as $k => $v) {
+                $ks = strtolower((string) $k);
+                foreach ($patterns as $p) {
+                    if (strpos($ks, $p) !== false) {
+                        $n = $this->findFirstNumeric($v);
+                        if ($n !== null) {
+                            return $n;
+                        }
+                        break;
+                    }
+                }
+
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extractFirstImageUrl(array $dadosBrutos): ?string {
+        $queue = [$dadosBrutos];
+        $max = 200;
+        $seen = 0;
+
+        while (!empty($queue) && $seen < $max) {
+            $node = array_shift($queue);
+            $seen++;
+            if (!is_array($node)) {
+                continue;
+            }
+
+            foreach ($node as $k => $v) {
+                $ks = strtolower((string) $k);
+                if (strpos($ks, 'image') !== false || strpos($ks, 'img') !== false) {
+                    if (is_string($v) && preg_match('#^https?://#i', $v)) {
+                        return $v;
+                    }
+                    if (is_array($v)) {
+                        foreach ($v as $vv) {
+                            if (is_string($vv) && preg_match('#^https?://#i', $vv)) {
+                                return $vv;
+                            }
+                        }
+                    }
+                }
+
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function buildChatPayload(string $prompt, string $apiKey, bool $jsonOnly): array {
+        $payload = [
+            'model' => 'gpt-3.5-turbo',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'Retorne apenas JSON válido, sem comentários e sem marcações.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ],
+            'temperature' => 0.0,
+            'max_tokens' => 800
+        ];
+        if ($jsonOnly) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
+        return $payload;
+    }
+
+    private function callChatGPT(string $chatGptApiKey, string $prompt, bool $jsonOnly): array {
+        $payload = $this->buildChatPayload($prompt, $chatGptApiKey, $jsonOnly);
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $chatGptApiKey
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CONNECTTIMEOUT => 10
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        return [$response, $httpCode, $curlError];
+    }
+
     private function getAssessoriaJobsDir(): string {
         $base = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
         $dir = $base . DIRECTORY_SEPARATOR . 'assessoria_jobs';
@@ -1155,55 +1302,18 @@ class AssessoriaController extends Controller {
             throw new \Exception('API Key do ChatGPT não configurada');
         }
         
-        $prompt = $this->gerarPromptChatGPT($this->reduceScrapingBeePayload($dadosBrutos), $urlOriginal);
+        $reduced = $this->reduceScrapingBeePayload($dadosBrutos);
+        $prompt = $this->gerarPromptChatGPT($reduced, $urlOriginal);
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Prompt-Length: ' . strlen($prompt));
         }
         
-        $basePayload = [
-            'model' => 'gpt-3.5-turbo',
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => 'Retorne apenas JSON válido, sem comentários e sem marcações.'
-                ],
-                [
-                    'role' => 'user',
-                    'content' => $prompt
-                ]
-            ],
-            'temperature' => 0.0,
-            'max_tokens' => 800
-        ];
-
-        $payloadWithFormat = $basePayload;
-        $payloadWithFormat['response_format'] = ['type' => 'json_object'];
-
-        $send = function(array $payload) use ($chatGptApiKey) {
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $chatGptApiKey
-                ],
-                CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_TIMEOUT => 45,
-                CURLOPT_CONNECTTIMEOUT => 10
-            ]);
-            $resp = curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $err = curl_error($ch);
-            curl_close($ch);
-            return [$resp, $code, $err];
-        };
-
-        [$response, $httpCode, $curlError] = $send($payloadWithFormat);
+        // Tentativa 1: JSON-only (quando suportado)
+        [$response, $httpCode, $curlError] = $this->callChatGPT($chatGptApiKey, $prompt, true);
+        // Fallback: modelo não suportou response_format
         if ($httpCode === 400 && is_string($response) && (stripos($response, 'response_format') !== false || stripos($response, 'json_object') !== false)) {
-            [$response, $httpCode, $curlError] = $send($basePayload);
+            [$response, $httpCode, $curlError] = $this->callChatGPT($chatGptApiKey, $prompt, false);
         }
         
         if (headers_sent() === false) {
@@ -1251,11 +1361,36 @@ class AssessoriaController extends Controller {
         try {
             $produtoData = $this->decodeJsonResilient((string) $content);
         } catch (\Exception $e) {
-            if (headers_sent() === false) {
-                header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e->getMessage(), 200));
-                header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content, 0, 500), 500));
+            // Retry 1: prompt menor para evitar truncamento / syntax error
+            $retryReduced = [
+                'hint' => 'extract only essential fields',
+                'url' => $urlOriginal,
+                'data' => $reduced
+            ];
+            $retryPrompt = $this->gerarPromptChatGPT($retryReduced, $urlOriginal);
+            [$resp2, $code2, $err2] = $this->callChatGPT($chatGptApiKey, $retryPrompt, true);
+            if ($code2 === 400 && is_string($resp2) && (stripos($resp2, 'response_format') !== false || stripos($resp2, 'json_object') !== false)) {
+                [$resp2, $code2, $err2] = $this->callChatGPT($chatGptApiKey, $retryPrompt, false);
             }
-            throw $e;
+            if (!$err2 && $code2 === 200) {
+                $decoded2 = json_decode($resp2, true);
+                $content2 = $decoded2['choices'][0]['message']['content'] ?? '';
+                try {
+                    $produtoData = $this->decodeJsonResilient((string) $content2);
+                } catch (\Exception $e2) {
+                    if (headers_sent() === false) {
+                        header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e2->getMessage(), 200));
+                        header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content2, 0, 500), 500));
+                    }
+                    throw $e2;
+                }
+            } else {
+                if (headers_sent() === false) {
+                    header('X-ChatGPT-Parse-Error: ' . $this->headerSafeValue($e->getMessage(), 200));
+                    header('X-ChatGPT-Raw-Content: ' . $this->headerSafeValue(substr((string) $content, 0, 500), 500));
+                }
+                throw $e;
+            }
         }
         
         // Validar campos obrigatórios
@@ -1265,6 +1400,43 @@ class AssessoriaController extends Controller {
                 if (headers_sent() === false) {
                     header('X-ChatGPT-Missing-Field: ' . $campo);
                 }
+                // Fallback específico para valor
+                if ($campo === 'valor') {
+                    $fallbackValor = $this->extractValorFromScrapingBee($dadosBrutos);
+                    if ($fallbackValor !== null) {
+                        $produtoData['valor'] = $fallbackValor;
+                        continue;
+                    }
+
+                    // 2ª chamada ao ChatGPT apenas para retornar {"valor": number}
+                    $p2 = "A partir dos dados abaixo, retorne APENAS JSON válido com o campo \"valor\" (number, USD). Sem texto.\n\nDADOS:\n" . json_encode($reduced);
+                    [$r3, $c3, $e3] = $this->callChatGPT($chatGptApiKey, $p2, true);
+                    if ($c3 === 400 && is_string($r3) && (stripos($r3, 'response_format') !== false || stripos($r3, 'json_object') !== false)) {
+                        [$r3, $c3, $e3] = $this->callChatGPT($chatGptApiKey, $p2, false);
+                    }
+                    if (!$e3 && $c3 === 200) {
+                        $d3 = json_decode($r3, true);
+                        $c3t = $d3['choices'][0]['message']['content'] ?? '';
+                        try {
+                            $only = $this->decodeJsonResilient((string) $c3t);
+                            if (isset($only['valor']) && floatval($only['valor']) > 0) {
+                                $produtoData['valor'] = floatval($only['valor']);
+                                continue;
+                            }
+                        } catch (\Exception $e4) {
+                        }
+                    }
+                }
+
+                // Fallback para imagens: tentar extrair 1 url
+                if ($campo === 'imagens') {
+                    $img = $this->extractFirstImageUrl($dadosBrutos);
+                    if ($img) {
+                        $produtoData['imagens'] = [$img];
+                        continue;
+                    }
+                }
+
                 throw new \Exception("Campo obrigatório '{$campo}' não encontrado ou vazio");
             }
         }
