@@ -235,6 +235,13 @@ $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', '
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// Notificações (Webhooks / Email teste)
+$router->post('/admin/salvar-notificacao', 'AdminNotificacoesController', 'salvarNotificacao');
+$router->get('/admin/logs-webhook', 'AdminNotificacoesController', 'logsWebhook');
+$router->get('/admin/log-webhook/{id}', 'AdminNotificacoesController', 'logWebhook');
+$router->post('/admin/testar-email', 'AdminNotificacoesController', 'testarEmail');
+$router->post('/admin/testar-webhook', 'AdminNotificacoesController', 'testarWebhook');
+
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
 $router->post('/webhook/stripe', 'WebhookController', 'stripe');

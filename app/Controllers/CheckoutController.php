@@ -580,6 +580,12 @@ class CheckoutController extends Controller {
                 // Registrar pagamento (status inicial)
                 $this->registrarPagamentoPedido($pedidoId, $dados);
 
+                // Notificar criação do pedido
+                try {
+                    $this->pedidoModel->dispararEvento('novo_pedido', (int) $pedidoId);
+                } catch (\Exception $e) {
+                }
+
                 // Processar pagamento (Asaas/Stripe) e persistir referência no pedido
                 try {
                     $dbPay = \Config\Database::getConnection();

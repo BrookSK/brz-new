@@ -1,6 +1,10 @@
 <?php
 namespace App\Models;
 
+use App\Models\Carrinho;
+use App\Models\Produto;
+use App\Services\NotificationService;
+
 class PedidoEcommerce extends Model {
     protected $table = 'pedidos';
 
@@ -164,11 +168,18 @@ class PedidoEcommerce extends Model {
 
     public function mapearStatusParaEvento($status) {
         $mapeamento = [
+            'pagamento' => 'novo_pedido',
+            'pendente' => 'novo_pedido',
+            'pago' => 'pedido_aprovado',
+            'paid' => 'pedido_aprovado',
+            'cancelado' => 'pedido_cancelado',
+            'cancelled' => 'pedido_cancelado',
             'consolidado' => 'pedido_consolidado',
             'rascunho_etiqueta' => 'rascunho_etiqueta_gerado',
             'etiqueta_efetivada' => 'etiqueta_efetivada',
             'enviado' => 'pedido_enviado',
-            'entrega_finalizada' => 'pedido_finalizado'
+            'entregue' => 'pedido_entregue',
+            'entrega_finalizada' => 'pedido_entregue'
         ];
         
         return $mapeamento[$status] ?? null;
@@ -429,8 +440,14 @@ class PedidoEcommerce extends Model {
     }
 
     public function dispararEvento($eventoNome, $pedidoId) {
-        // Aqui será implementada a lógica de disparo de eventos
         // Por enquanto, apenas registrar que o evento ocorreu
         error_log("Evento disparado: {$eventoNome} para pedido #{$pedidoId}");
+
+        try {
+            $service = new NotificationService();
+            $service->notificarEventoPedido(is_string($eventoNome) ? $eventoNome : null, (int) $pedidoId);
+        } catch (\Exception $e) {
+            error_log('[NOTIFICACOES] Falha ao disparar notificacoes: ' . $e->getMessage());
+        }
     }
 }

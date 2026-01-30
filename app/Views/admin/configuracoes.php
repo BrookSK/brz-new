@@ -196,9 +196,11 @@
                                             <label class="form-label">Evento</label>
                                             <select name="evento" class="form-select" required>
                                                 <option value="">Selecione um evento...</option>
-                                                <option value="aniversario">Aniversário</option>
-                                                <option value="compra">Compra</option>
-                                                <option value="atualizacao_status">Atualização de Status</option>
+                                                <option value="novo_pedido">Novo Pedido</option>
+                                                <option value="pedido_aprovado">Pedido Aprovado</option>
+                                                <option value="pedido_enviado">Pedido Enviado</option>
+                                                <option value="pedido_entregue">Pedido Entregue</option>
+                                                <option value="pedido_cancelado">Pedido Cancelado</option>
                                             </select>
                                         </div>
                                         
@@ -430,62 +432,32 @@ function salvarNotificacao() {
 
 function testarWebhook() {
     const evento = document.querySelector('select[name="evento"]').value;
-    const webhookUrl = document.querySelector('input[name="webhook_url"]').value;
     
-    if (!evento || !webhookUrl) {
-        alert('Selecione um evento e informe a URL do webhook.');
+    if (!evento) {
+        alert('Selecione um evento.');
         return;
     }
-    
-    const dadosTeste = {
-        evento: evento,
-        data: new Date().toISOString(),
-        cliente: {
-            nome: 'Cliente Teste',
-            email: 'teste@exemplo.com'
-        },
-        pedido: {
-            id: 'TEST-123',
-            valor_total: 'R$ 99,99',
-            status: 'pago'
-        },
-        teste: true
-    };
-    
-    const headers = {};
-    try {
-        const headersText = document.querySelector('textarea[name="webhook_headers"]').value;
-        if (headersText) {
-            Object.assign(headers, JSON.parse(headersText));
-        }
-    } catch (e) {
-        console.log('Headers inválidos, usando padrão');
-    }
-    
-    const options = {
-        method: document.querySelector('select[name="webhook_method"]').value,
-        headers: {
-            'Content-Type': 'application/json',
-            ...headers
-        },
-        body: JSON.stringify(dadosTeste)
-    };
-    
-    fetch(webhookUrl, options)
-        .then(response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        })
-        .then(data => {
+
+    const formData = new FormData();
+    formData.set('evento', evento);
+
+    fetch('/admin/testar-webhook', {
+        method: 'POST',
+        body: formData
+    })
+    .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.success) {
             alert('Webhook testado com sucesso!\n\nResposta: ' + JSON.stringify(data, null, 2));
-            carregarLogsWebhook();
-        })
-        .catch(error => {
-            alert('Erro ao testar webhook: ' + error.message);
-            carregarLogsWebhook();
-        });
+        } else {
+            alert('Erro ao testar webhook: ' + (data.error || JSON.stringify(data)));
+        }
+        carregarLogsWebhook();
+    })
+    .catch(error => {
+        alert('Erro ao testar webhook: ' + error.message);
+        carregarLogsWebhook();
+    });
 }
 
 function carregarLogsWebhook() {

@@ -1,0 +1,374 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+
+class AdminNotificacoesController extends Controller {
+    private function requireAdmin(): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $perfil = $_SESSION['usuario_perfil'] ?? null;
+        if ($perfil !== 'admin') {
+            $this->json(['success' => false, 'error' => 'Acesso negado'], 403);
+        }
+    }
+
+    public function salvarNotificacao(Request $request) {
+        $this->requireAdmin();
+
+        $evento = (string) $request->getParam('evento', '');
+        $url = (string) $request->getParam('webhook_url', '');
+        $metodo = (string) $request->getParam('webhook_method', 'POST');
+        $headers = (string) $request->getParam('webhook_headers', '');
+        $campos = (string) $request->getParam('webhook_campos', '');
+        $template = (string) $request->getParam('webhook_template', '');
+        $ativo = (string) $request->getParam('webhook_ativo', '1');
+        $retries = (string) $request->getParam('webhook_retries', '1');
+
+        if ($evento === '' || $url === '') {
+            $this->json(['success' => false, 'error' => 'Evento e URL são obrigatórios'], 400);
+        }
+
+        $metodo = strtoupper($metodo);
+        if (!in_array($metodo, ['GET', 'POST', 'PUT', 'PATCH'], true)) {
+            $metodo = 'POST';
+        }
+
+        $ativoBool = ($ativo === '1' || $ativo === 1 || $ativo === true) ? 1 : 0;
+        $retryCount = ($retries === '1' || $retries === 1 || $retries === true) ? 3 : 0;
+
+        $headersJson = null;
+        if (trim($headers) !== '') {
+            $decodedHeaders = json_decode($headers, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedHeaders)) {
+                $this->json(['success' => false, 'error' => 'Headers inválidos (JSON)'], 400);
+            }
+            $headersJson = json_encode($decodedHeaders);
+        }
+
+        $camposJson = null;
+        if (trim($campos) !== '') {
+            $decodedCampos = json_decode($campos, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedCampos)) {
+                $this->json(['success' => false, 'error' => 'Campos personalizados inválidos (JSON)'], 400);
+            }
+            $camposJson = json_encode($decodedCampos);
+        }
+
+        $payloadTemplate = null;
+        if (trim($template) !== '' || $camposJson !== null) {
+            $payloadTemplate = json_encode([
+                'template' => $template,
+                'campos' => $camposJson ? json_decode($camposJson, true) : new \stdClass(),
+            ]);
+        }
+
+        $criadoPor = (int) ($_SESSION['usuario_id'] ?? 1);
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+            $pdo->beginTransaction();
+
+            $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
+            $stmtEv->execute([$evento]);
+            $eventoId = (int) ($stmtEv->fetchColumn() ?: 0);
+
+            if ($eventoId <= 0) {
+                $stmtInsEv = $pdo->prepare('INSERT INTO eventos_sistema (nome, descricao, ativo, created_at) VALUES (?, ?, 1, NOW())');
+                $stmtInsEv->execute([$evento, 'Evento cadastrado via configurações']);
+                $eventoId = (int) $pdo->lastInsertId();
+            }
+
+            $stmtCols = $pdo->query('DESCRIBE webhooks');
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            $hasPatch = in_array('PATCH', $cols, true);
+
+            $stmtW = $pdo->prepare('SELECT id FROM webhooks WHERE evento_id = ? ORDER BY id DESC LIMIT 1');
+            $stmtW->execute([$eventoId]);
+            $webhookId = (int) ($stmtW->fetchColumn() ?: 0);
+
+            if ($webhookId > 0) {
+                $sql = 'UPDATE webhooks SET nome = ?, url = ?, metodo = ?, headers = ?, payload_template = ?, ativo = ?, retry_count = ?, updated_at = NOW() WHERE id = ?';
+                $st = $pdo->prepare($sql);
+                $st->execute([
+                    $evento,
+                    $url,
+                    $metodo,
+                    $headersJson,
+                    $payloadTemplate,
+                    $ativoBool,
+                    $retryCount,
+                    $webhookId,
+                ]);
+            } else {
+                $sql = 'INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, criado_por, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
+                $st = $pdo->prepare($sql);
+                $st->execute([
+                    $evento,
+                    $url,
+                    $eventoId,
+                    $metodo,
+                    $headersJson,
+                    $payloadTemplate,
+                    $ativoBool,
+                    $retryCount,
+                    $criadoPor,
+                ]);
+                $webhookId = (int) $pdo->lastInsertId();
+            }
+
+            $pdo->commit();
+            $this->json(['success' => true, 'webhook_id' => $webhookId, 'evento_id' => $eventoId]);
+        } catch (\Exception $e) {
+            try {
+                if (isset($pdo)) {
+                    $pdo->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function logsWebhook(Request $request) {
+        $this->requireAdmin();
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $stmt = $pdo->query('DESCRIBE webhook_disparos');
+            $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            if (!is_array($cols) || empty($cols) || !in_array('id', $cols, true)) {
+                $this->json(['success' => true, 'logs' => []]);
+            }
+
+            $sql = 'SELECT d.id, d.disparado_em AS data_envio, d.status, d.response_body AS resposta FROM webhook_disparos d ORDER BY d.disparado_em DESC LIMIT 50';
+            $st = $pdo->query($sql);
+            $logs = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $this->json(['success' => true, 'logs' => $logs]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function logWebhook(Request $request, $logId) {
+        $this->requireAdmin();
+
+        $id = (int) $logId;
+        if ($id <= 0) {
+            $this->json(['success' => false, 'error' => 'ID inválido'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $sql = 'SELECT d.id, d.disparado_em AS data_envio, d.status, w.url AS webhook_url, w.metodo, w.headers, d.payload, d.response_code, d.response_body AS resposta FROM webhook_disparos d LEFT JOIN webhooks w ON w.id = d.webhook_id WHERE d.id = ? LIMIT 1';
+            $st = $pdo->prepare($sql);
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                $this->json(['success' => false, 'error' => 'Log não encontrado'], 404);
+            }
+
+            $this->json(['success' => true, 'log' => $row]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function testarEmail(Request $request) {
+        $this->requireAdmin();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $to = (string) ($_SESSION['usuario_email'] ?? '');
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            $this->json(['success' => false, 'error' => 'Email do admin não encontrado na sessão'], 400);
+        }
+
+        $fromEmail = (string) $request->getParam('email_remetente', '');
+        $fromName = (string) $request->getParam('email_nome_remetente', '');
+
+        if ($fromEmail === '' || !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            $fromEmail = $to;
+        }
+        if ($fromName === '') {
+            $fromName = 'Braziliana Shop';
+        }
+
+        $headers = [];
+        $headers[] = 'MIME-Version: 1.0';
+        $headers[] = 'Content-Type: text/html; charset=UTF-8';
+        $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . '?= <' . $fromEmail . '>';
+
+        $subject = 'Teste de e-mail';
+        $html = 'Teste de e-mail enviado em ' . date('Y-m-d H:i:s');
+
+        $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
+        if (!$ok) {
+            $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+        }
+
+        $this->json(['success' => true]);
+    }
+
+    public function testarWebhook(Request $request) {
+        $this->requireAdmin();
+
+        $evento = (string) $request->getParam('evento', '');
+        if ($evento === '') {
+            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $sql = 'SELECT w.id, w.url, w.metodo, w.headers, w.payload_template, w.ativo FROM webhooks w INNER JOIN eventos_sistema e ON e.id = w.evento_id WHERE e.nome = ? ORDER BY w.id DESC LIMIT 1';
+            $st = $pdo->prepare($sql);
+            $st->execute([$evento]);
+            $webhook = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($webhook['id']) || empty($webhook['url'])) {
+                $this->json(['success' => false, 'error' => 'Webhook não configurado para este evento'], 404);
+            }
+
+            if ((string) ($webhook['ativo'] ?? '1') === '0') {
+                $this->json(['success' => false, 'error' => 'Webhook está desativado'], 400);
+            }
+
+            $url = (string) $webhook['url'];
+            $metodo = strtoupper((string) ($webhook['metodo'] ?? 'POST'));
+            if (!in_array($metodo, ['POST', 'PUT', 'PATCH', 'GET'], true)) {
+                $metodo = 'POST';
+            }
+
+            $headers = [
+                'Content-Type: application/json',
+                'User-Agent: brz-new/1.0',
+            ];
+
+            $hdr = $webhook['headers'] ?? null;
+            if (is_string($hdr) && trim($hdr) !== '') {
+                $decoded = json_decode($hdr, true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $k => $v) {
+                        if (is_string($k) && (is_string($v) || is_numeric($v))) {
+                            $headers[] = $k . ': ' . $v;
+                        }
+                    }
+                }
+            }
+
+            $template = '';
+            $campos = [];
+            $pt = $webhook['payload_template'] ?? null;
+            if (is_string($pt) && trim($pt) !== '') {
+                $decoded = json_decode($pt, true);
+                if (is_array($decoded)) {
+                    if (isset($decoded['template']) && is_string($decoded['template'])) {
+                        $template = $decoded['template'];
+                    }
+                    if (isset($decoded['campos']) && is_array($decoded['campos'])) {
+                        $campos = $decoded['campos'];
+                    }
+                }
+            }
+
+            $payload = array_merge([
+                'channel' => 'whatsapp',
+                'evento' => $evento,
+                'to' => '5511999999999',
+                'message' => $template !== '' ? $template : 'Teste de webhook do evento ' . $evento,
+                'vars' => [
+                    'evento' => $evento,
+                    'pedido_id' => 'TEST-123',
+                    'codigo_pedido' => 'TEST-123',
+                    'status' => 'teste',
+                    'nome' => 'Cliente Teste',
+                    'email' => 'teste@exemplo.com',
+                    'telefone' => '5511999999999',
+                    'data' => date('Y-m-d H:i:s'),
+                ],
+            ], $campos);
+
+            $body = json_encode($payload);
+
+            $disparoId = null;
+            try {
+                $sqlIns = 'INSERT INTO webhook_disparos (webhook_id, pedido_id, payload, status, tentativas, disparado_em) VALUES (?, ?, ?, ?, ?, NOW())';
+                $stIns = $pdo->prepare($sqlIns);
+                $stIns->execute([(int) $webhook['id'], null, $body, 'pendente', 1]);
+                $disparoId = (int) $pdo->lastInsertId();
+            } catch (\Exception $e) {
+            }
+
+            $responseBody = '';
+            $responseCode = 0;
+            $status = 'sucesso';
+
+            if (function_exists('curl_init')) {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $metodo);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                if ($metodo !== 'GET') {
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+                }
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                $resp = curl_exec($ch);
+                $err = curl_error($ch);
+                $responseCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if (!empty($err)) {
+                    $status = 'erro';
+                    $responseBody = (string) $err;
+                } else {
+                    $responseBody = (string) $resp;
+                    if ($responseCode < 200 || $responseCode >= 300) {
+                        $status = 'erro';
+                    }
+                }
+            } else {
+                $context = stream_context_create([
+                    'http' => [
+                        'method' => $metodo,
+                        'header' => implode("\r\n", $headers),
+                        'content' => $metodo === 'GET' ? '' : $body,
+                        'ignore_errors' => true,
+                        'timeout' => 15,
+                    ]
+                ]);
+                $resp = @file_get_contents($url, false, $context);
+                $responseBody = (string) $resp;
+            }
+
+            if (!empty($disparoId)) {
+                try {
+                    $sqlUp = 'UPDATE webhook_disparos SET response_code = ?, response_body = ?, status = ? WHERE id = ?';
+                    $stUp = $pdo->prepare($sqlUp);
+                    $stUp->execute([$responseCode ?: null, $responseBody, $status, $disparoId]);
+                } catch (\Exception $e) {
+                }
+            }
+
+            $this->json([
+                'success' => $status === 'sucesso',
+                'status' => $status,
+                'http_code' => $responseCode,
+                'response' => $responseBody,
+                'log_id' => $disparoId,
+            ], $status === 'sucesso' ? 200 : 500);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+}
