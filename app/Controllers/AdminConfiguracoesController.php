@@ -339,10 +339,6 @@ class AdminConfiguracoesController extends Controller {
                                     <div class="card">
                                         <div class="card-header d-flex justify-content-between align-items-center">
                                             <h5 class="mb-0">Criador de E-mail</h5>
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="webhook_enabled" ' . ($this->getConfigValue($config, 'email', 'webhook_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                <label class="form-check-label" for="webhook_enabled">Webhook Ativo</label>
-                                            </div>
                                         </div>
                                         <div class="card-body">
                                             <div class="row">
@@ -371,11 +367,6 @@ class AdminConfiguracoesController extends Controller {
                                                             <small class="text-muted">Selecione um evento para ver as variáveis disponíveis</small>
                                                         </div>
                                                     </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">URL do Webhook</label>
-                                                        <input type="url" class="form-control" id="webhook_url" value="' . $this->getConfigValue($config, 'email', 'webhook_url', '') . '" placeholder="https://sua-api.com/webhook">
-                                                        <small class="text-muted">URL para receber os dados do evento</small>
-                                                    </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
@@ -391,9 +382,6 @@ class AdminConfiguracoesController extends Controller {
                                                         </button>
                                                         <button type="button" class="btn btn-outline-info" onclick="salvarTemplate()">
                                                             <i class="fas fa-save"></i> Salvar Template
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-warning" onclick="testarWebhook()">
-                                                            <i class="fas fa-plug"></i> Testar Webhook
                                                         </button>
                                                     </div>
                                                 </div>
@@ -746,14 +734,14 @@ class AdminConfiguracoesController extends Controller {
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'webhook_enabled', 'webhook_url'],
+                'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'webhook_enabled', 'asaas_enabled', 'stripe_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
@@ -1128,59 +1116,64 @@ class AdminConfiguracoesController extends Controller {
         // Variáveis disponíveis por evento
         const variaveisEvento = {
             "novo_pedido": {
-                "{pedido_id}": "ID do Pedido",
-                "{numero_pedido}": "Número do Pedido",
-                "{cliente_nome}": "Nome do Cliente",
-                "{cliente_email}": "Email do Cliente",
-                "{total}": "Total do Pedido",
-                "{moeda}": "Moeda",
-                "{data_pedido}": "Data do Pedido",
-                "{itens}": "Lista de Itens",
-                "{endereco_entrega}": "Endereço de Entrega"
+                "{{pedido_id}}": "ID do Pedido",
+                "{{codigo_pedido}}": "Código do Pedido",
+                "{{numero_pedido}}": "Número do Pedido",
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{cliente_email}}": "Email do Cliente",
+                "{{valor_total}}": "Total do Pedido",
+                "{{moeda}}": "Moeda",
+                "{{data_pedido}}": "Data do Pedido",
+                "{{itens}}": "Lista de Itens",
+                "{{endereco_entrega}}": "Endereço de Entrega"
             },
             "pedido_aprovado": {
-                "{pedido_id}": "ID do Pedido",
-                "{numero_pedido}": "Número do Pedido",
-                "{cliente_nome}": "Nome do Cliente",
-                "{data_aprovacao}": "Data de Aprovação",
-                "{total}": "Total do Pedido"
+                "{{pedido_id}}": "ID do Pedido",
+                "{{codigo_pedido}}": "Código do Pedido",
+                "{{numero_pedido}}": "Número do Pedido",
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{data_aprovacao}}": "Data de Aprovação",
+                "{{valor_total}}": "Total do Pedido"
             },
             "pedido_enviado": {
-                "{pedido_id}": "ID do Pedido",
-                "{numero_pedido}": "Número do Pedido",
-                "{codigo_rastreamento}": "Código de Rastreamento",
-                "{data_envio}": "Data de Envio",
-                "{transportadora}": "Transportadora"
+                "{{pedido_id}}": "ID do Pedido",
+                "{{codigo_pedido}}": "Código do Pedido",
+                "{{numero_pedido}}": "Número do Pedido",
+                "{{codigo_rastreamento}}": "Código de Rastreamento",
+                "{{data_envio}}": "Data de Envio",
+                "{{transportadora}}": "Transportadora"
             },
             "pedido_entregue": {
-                "{pedido_id}": "ID do Pedido",
-                "{numero_pedido}": "Número do Pedido",
-                "{data_entrega}": "Data de Entrega",
-                "{recebedor}": "Quem Recebeu"
+                "{{pedido_id}}": "ID do Pedido",
+                "{{codigo_pedido}}": "Código do Pedido",
+                "{{numero_pedido}}": "Número do Pedido",
+                "{{data_entrega}}": "Data de Entrega",
+                "{{recebedor}}": "Quem Recebeu"
             },
             "pedido_cancelado": {
-                "{pedido_id}": "ID do Pedido",
-                "{numero_pedido}": "Número do Pedido",
-                "{motivo_cancelamento}": "Motivo do Cancelamento",
-                "{data_cancelamento}": "Data do Cancelamento"
+                "{{pedido_id}}": "ID do Pedido",
+                "{{codigo_pedido}}": "Código do Pedido",
+                "{{numero_pedido}}": "Número do Pedido",
+                "{{motivo_cancelamento}}": "Motivo do Cancelamento",
+                "{{data_cancelamento}}": "Data do Cancelamento"
             },
             "novo_usuario": {
-                "{usuario_nome}": "Nome do Usuário",
-                "{usuario_email}": "Email do Usuário",
-                "{data_cadastro}": "Data de Cadastro",
-                "{token_confirmacao}": "Token de Confirmação"
+                "{{usuario_nome}}": "Nome do Usuário",
+                "{{usuario_email}}": "Email do Usuário",
+                "{{data_cadastro}}": "Data de Cadastro",
+                "{{token_confirmacao}}": "Token de Confirmação"
             },
             "recuperar_senha": {
-                "{usuario_nome}": "Nome do Usuário",
-                "{usuario_email}": "Email do Usuário",
-                "{token_reset}": "Token de Reset",
-                "{data_solicitacao}": "Data da Solicitação"
+                "{{usuario_nome}}": "Nome do Usuário",
+                "{{usuario_email}}": "Email do Usuário",
+                "{{token_reset}}": "Token de Reset",
+                "{{data_solicitacao}}": "Data da Solicitação"
             },
             "contato_contato": {
-                "{nome_contato}": "Nome do Contato",
-                "{email_contato}": "Email do Contato",
-                "{mensagem}": "Mensagem",
-                "{data_contato}": "Data do Contato"
+                "{{nome_contato}}": "Nome do Contato",
+                "{{email_contato}}": "Email do Contato",
+                "{{mensagem}}": "Mensagem",
+                "{{data_contato}}": "Data do Contato"
             }
         };
         
@@ -1272,89 +1265,114 @@ class AdminConfiguracoesController extends Controller {
                 return;
             }
             
-            // Salvar no localStorage (em produção, salvar no banco)
-            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
-            templates[evento] = { assunto, conteudo, data: new Date().toISOString() };
-            localStorage.setItem("email_templates", JSON.stringify(templates));
-            
-            alert("Template salvo com sucesso!");
-            carregarTemplatesSalvos();
+            const formData = new FormData();
+            formData.set('evento', evento);
+            formData.set('assunto', assunto);
+            formData.set('corpo_html', conteudo);
+            formData.set('ativo', '1');
+
+            fetch('/admin/salvar-email-template', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    alert('Template salvo com sucesso!');
+                    carregarTemplatesSalvos();
+                } else {
+                    alert('Erro ao salvar template: ' + (data.error || JSON.stringify(data)));
+                }
+            })
+            .catch(error => {
+                alert('Erro ao processar requisição: ' + error.message);
+            });
         }
         
         function carregarTemplatesSalvos() {
-            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
             const div = document.getElementById("templates_salvos");
-            
-            const eventos = Object.keys(templates);
-            if (eventos.length === 0) {
-                div.innerHTML = "<small class=\"text-muted\">Nenhum template salvo ainda</small>";
-                return;
-            }
-            
-            let html = "<div class=\"row\">";
-            for (const evento of eventos) {
-                const template = templates[evento];
-                html += "<div class=\"col-md-4 mb-3\">";
-                html += "<div class=\"card\">";
-                html += "<div class=\"card-body\">";
-                html += "<h6 class=\"card-title\">" + evento + "</h6>";
-                html += "<p class=\"card-text\"><small>" + template.assunto + "</small></p>";
-                html += "<p class=\"card-text\"><small class=\"text-muted\">" + new Date(template.data).toLocaleDateString() + "</small></p>";
-                html += "<button class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
+
+            div.innerHTML = "<small class=\"text-muted\">Carregando...</small>";
+
+            fetch('/admin/email-templates')
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    div.innerHTML = "<small class=\"text-muted\">Erro ao carregar templates</small>";
+                    return;
+                }
+
+                const templates = Array.isArray(data.templates) ? data.templates : [];
+                if (templates.length === 0) {
+                    div.innerHTML = "<small class=\"text-muted\">Nenhum template salvo ainda</small>";
+                    return;
+                }
+
+                let html = "<div class=\"row\">";
+                for (const tpl of templates) {
+                    const evento = tpl.evento;
+                    html += "<div class=\"col-md-4 mb-3\">";
+                    html += "<div class=\"card\">";
+                    html += "<div class=\"card-body\">";
+                    html += "<h6 class=\"card-title\">" + (evento || '') + "</h6>";
+                    html += "<p class=\"card-text\"><small>" + (tpl.assunto || '') + "</small></p>";
+                    html += "<p class=\"card-text\"><small class=\"text-muted\">" + (tpl.updated_at || '') + "</small></p>";
+                    html += "<div class=\"d-flex gap-2\">";
+                    html += "<button class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
+                    html += "<button class=\"btn btn-sm btn-outline-success\" onclick=\"testarTemplateEmail('" + evento + "')\">Testar</button>";
+                    html += "</div>";
+                    html += "</div>";
+                    html += "</div>";
+                    html += "</div>";
+                }
                 html += "</div>";
-                html += "</div>";
-                html += "</div>";
-            }
-            html += "</div>";
-            div.innerHTML = html;
+                div.innerHTML = html;
+            })
+            .catch(error => {
+                div.innerHTML = "<small class=\"text-muted\">Erro ao carregar templates: " + error.message + "</small>";
+            });
         }
         
         function carregarTemplate(evento) {
-            const templates = JSON.parse(localStorage.getItem("email_templates") || "{}");
-            const template = templates[evento];
-            
-            if (template) {
-                document.getElementById("evento_tipo").value = evento;
-                document.getElementById("email_assunto").value = template.assunto;
-                document.getElementById("email_conteudo").value = template.conteudo;
+            const params = new URLSearchParams();
+            params.set('evento', evento);
+
+            fetch('/admin/email-template?' + params.toString())
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success || !data.template) {
+                    alert('Erro ao carregar template: ' + (data.error || JSON.stringify(data)));
+                    return;
+                }
+                const tpl = data.template;
+                document.getElementById("evento_tipo").value = tpl.evento || evento;
+                document.getElementById("email_assunto").value = tpl.assunto || '';
+                document.getElementById("email_conteudo").value = tpl.corpo_html || '';
                 carregarVariaveis();
-            }
-        }
-        
-        function testarWebhook() {
-            const webhookUrl = document.getElementById("webhook_url").value;
-            const evento = document.getElementById("evento_tipo").value;
-            
-            if (!webhookUrl) {
-                alert("Digite a URL do webhook");
-                return;
-            }
-            
-            if (!evento) {
-                alert("Selecione um evento");
-                return;
-            }
-            
-            // Dados de teste para o webhook
-            const dadosTeste = {
-                evento: evento,
-                timestamp: new Date().toISOString(),
-                dados: variaveisEvento[evento]
-            };
-            
-            fetch(webhookUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(dadosTeste)
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert("Webhook testado com sucesso! Resposta: " + JSON.stringify(data));
             })
             .catch(error => {
-                alert("Erro ao testar webhook: " + error.message);
+                alert('Erro ao carregar template: ' + error.message);
+            });
+        }
+
+        function testarTemplateEmail(evento) {
+            const formData = new FormData();
+            formData.set('evento', evento);
+
+            fetch('/admin/testar-email-template', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    alert('Email de teste enviado para: ' + (data.to || 'admin'));
+                } else {
+                    alert('Erro ao testar e-mail: ' + (data.error || JSON.stringify(data)));
+                }
+            })
+            .catch(error => {
+                alert('Erro ao testar e-mail: ' + error.message);
             });
         }
         

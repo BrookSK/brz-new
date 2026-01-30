@@ -371,4 +371,211 @@ class AdminNotificacoesController extends Controller {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function salvarEmailTemplate(Request $request) {
+        $this->requireAdmin();
+
+        $evento = (string) $request->getParam('evento', '');
+        $assunto = (string) $request->getParam('assunto', '');
+        $corpoHtml = (string) $request->getParam('corpo_html', '');
+        $ativo = (string) $request->getParam('ativo', '1');
+
+        if ($evento === '' || trim($assunto) === '' || trim($corpoHtml) === '') {
+            $this->json(['success' => false, 'error' => 'Evento, assunto e conteúdo são obrigatórios'], 400);
+        }
+
+        $ativoBool = ($ativo === '1' || $ativo === 1 || $ativo === true) ? 1 : 0;
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+            $pdo->beginTransaction();
+
+            $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
+            $stmtEv->execute([$evento]);
+            $eventoId = (int) ($stmtEv->fetchColumn() ?: 0);
+
+            if ($eventoId <= 0) {
+                $stmtInsEv = $pdo->prepare('INSERT INTO eventos_sistema (nome, descricao, ativo, created_at) VALUES (?, ?, 1, NOW())');
+                $stmtInsEv->execute([$evento, 'Evento cadastrado via templates de e-mail']);
+                $eventoId = (int) $pdo->lastInsertId();
+            }
+
+            $stmtTpl = $pdo->prepare('SELECT id FROM email_templates WHERE evento_id = ? AND nome = ? ORDER BY id DESC LIMIT 1');
+            $stmtTpl->execute([$eventoId, $evento]);
+            $templateId = (int) ($stmtTpl->fetchColumn() ?: 0);
+
+            if ($templateId > 0) {
+                $sql = 'UPDATE email_templates SET assunto = ?, corpo_html = ?, ativo = ?, updated_at = NOW() WHERE id = ?';
+                $st = $pdo->prepare($sql);
+                $st->execute([$assunto, $corpoHtml, $ativoBool, $templateId]);
+            } else {
+                $sql = 'INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())';
+                $st = $pdo->prepare($sql);
+                $st->execute([$eventoId, $evento, $assunto, $corpoHtml, $ativoBool]);
+                $templateId = (int) $pdo->lastInsertId();
+            }
+
+            $pdo->commit();
+            $this->json(['success' => true, 'template_id' => $templateId, 'evento_id' => $eventoId]);
+        } catch (\Exception $e) {
+            try {
+                if (isset($pdo)) {
+                    $pdo->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function listarEmailTemplates(Request $request) {
+        $this->requireAdmin();
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $stmt = $pdo->query('DESCRIBE email_templates');
+            $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            if (!is_array($cols) || empty($cols) || !in_array('id', $cols, true)) {
+                $this->json(['success' => true, 'templates' => []]);
+            }
+
+            $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.ativo, t.updated_at FROM email_templates t ORDER BY t.updated_at DESC, t.id DESC LIMIT 100';
+            $st = $pdo->query($sql);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $this->json(['success' => true, 'templates' => $rows]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function obterEmailTemplate(Request $request) {
+        $this->requireAdmin();
+
+        $id = (int) $request->getParam('id', 0);
+        $evento = (string) $request->getParam('evento', '');
+
+        if ($id <= 0 && $evento === '') {
+            $this->json(['success' => false, 'error' => 'Informe id ou evento'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            if ($id > 0) {
+                $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo, t.updated_at FROM email_templates t WHERE t.id = ? LIMIT 1';
+                $st = $pdo->prepare($sql);
+                $st->execute([$id]);
+            } else {
+                $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo, t.updated_at FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
+                $st = $pdo->prepare($sql);
+                $st->execute([$evento]);
+            }
+
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                $this->json(['success' => false, 'error' => 'Template não encontrado'], 404);
+            }
+
+            $this->json(['success' => true, 'template' => $row]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function testarEmailTemplate(Request $request) {
+        $this->requireAdmin();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $to = (string) ($_SESSION['usuario_email'] ?? '');
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            $this->json(['success' => false, 'error' => 'Email do admin não encontrado na sessão'], 400);
+        }
+
+        $evento = (string) $request->getParam('evento', '');
+        if ($evento === '') {
+            $this->json(['success' => false, 'error' => 'Evento é obrigatório'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $sql = 'SELECT t.id, t.nome AS evento, t.assunto, t.corpo_html, t.ativo FROM email_templates t WHERE t.nome = ? ORDER BY t.id DESC LIMIT 1';
+            $st = $pdo->prepare($sql);
+            $st->execute([$evento]);
+            $tpl = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($tpl['id'])) {
+                $this->json(['success' => false, 'error' => 'Template não encontrado para este evento'], 404);
+            }
+            if ((string) ($tpl['ativo'] ?? '1') === '0') {
+                $this->json(['success' => false, 'error' => 'Template está desativado'], 400);
+            }
+
+            $vars = $this->getEmailVarsTeste($evento);
+            $subject = $this->renderMustacheLike((string) ($tpl['assunto'] ?? ''), $vars);
+            $html = $this->renderMustacheLike((string) ($tpl['corpo_html'] ?? ''), $vars);
+
+            $fromEmail = 'noreply@brazilianashop.com.br';
+            $fromName = 'Braziliana Shop';
+
+            $headers = [];
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . '?= <' . $fromEmail . '>';
+
+            $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
+            if (!$ok) {
+                $this->json(['success' => false, 'error' => 'Falha ao enviar e-mail (mail())'], 500);
+            }
+
+            $this->json(['success' => true, 'to' => $to]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function renderMustacheLike(string $tpl, array $vars): string {
+        $out = $tpl;
+        foreach ($vars as $k => $v) {
+            $out = str_replace('{{' . $k . '}}', (string) $v, $out);
+        }
+        return $out;
+    }
+
+    private function getEmailVarsTeste(string $evento): array {
+        $base = [
+            'evento' => $evento,
+            'pedido_id' => 'TEST-123',
+            'codigo_pedido' => 'TEST-123',
+            'numero_pedido' => 'TEST-123',
+            'status' => 'teste',
+            'moeda' => 'BRL',
+            'valor_total' => '199.90',
+            'total' => '199.90',
+            'nome' => 'Cliente Teste',
+            'cliente_nome' => 'Cliente Teste',
+            'email' => 'teste@exemplo.com',
+            'cliente_email' => 'teste@exemplo.com',
+            'telefone' => '5511999999999',
+            'cliente_telefone' => '5511999999999',
+            'data' => date('Y-m-d H:i:s'),
+            'data_pedido' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($evento === 'pedido_enviado') {
+            $base['codigo_rastreamento'] = 'BR123456789BR';
+            $base['transportadora'] = 'Correios';
+            $base['data_envio'] = date('Y-m-d H:i:s');
+        }
+
+        return $base;
+    }
 }

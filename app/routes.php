@@ -242,6 +242,12 @@ $router->get('/admin/log-webhook/{id}', 'AdminNotificacoesController', 'logWebho
 $router->post('/admin/testar-email', 'AdminNotificacoesController', 'testarEmail');
 $router->post('/admin/testar-webhook', 'AdminNotificacoesController', 'testarWebhook');
 
+// Templates de E-mail
+$router->post('/admin/salvar-email-template', 'AdminNotificacoesController', 'salvarEmailTemplate');
+$router->get('/admin/email-templates', 'AdminNotificacoesController', 'listarEmailTemplates');
+$router->get('/admin/email-template', 'AdminNotificacoesController', 'obterEmailTemplate');
+$router->post('/admin/testar-email-template', 'AdminNotificacoesController', 'testarEmailTemplate');
+
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
 $router->post('/webhook/stripe', 'WebhookController', 'stripe');
