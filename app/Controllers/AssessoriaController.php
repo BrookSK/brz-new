@@ -316,16 +316,274 @@ class AssessoriaController extends Controller {
     }
     
     /**
-     * Obtém a API Key do ScrapingBee
+     * Página de debug para analisar respostas do ScrapingBee
      */
+    public function debug(Request $request) {
+        session_start();
+        
+        // Obter logs da sessão
+        $debugLogs = $_SESSION['assessoria_debug_logs'] ?? [];
+        
+        $this->view('assessoria/debug', [
+            'debugLogs' => $debugLogs,
+            'currentConfig' => [
+                'api_key_configured' => !empty($this->getScriptBeeApiKey()),
+                'api_key_preview' => substr($this->getScriptBeeApiKey() ?? '', 0, 8) . '...' . substr($this->getScriptBeeApiKey() ?? '', -4)
+            ]
+        ]);
+    }
+    
+    /**
+     * Teste de debug para uma URL específica
+     */
+    public function debugTest(Request $request) {
+        header('Content-Type: application/json');
+        
+        session_start();
+        
+        try {
+            $body = $request->getBody();
+            $url = $body['url'] ?? '';
+            
+            if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'URL inválida'
+                ]);
+                return;
+            }
+            
+            // Fazer request completo e salvar log
+            $result = $this->processarLinkIndividualDebug($url);
+            
+            // Salvar log na sessão
+            if (!isset($_SESSION['assessoria_debug_logs'])) {
+                $_SESSION['assessoria_debug_logs'] = [];
+            }
+            
+            $_SESSION['assessoria_debug_logs'][] = [
+                'timestamp' => date('Y-m-d H:i:s'),
+                'url' => $url,
+                'result' => $result
+            ];
+            
+            // Manter apenas os últimos 10 logs
+            if (count($_SESSION['assessoria_debug_logs']) > 10) {
+                $_SESSION['assessoria_debug_logs'] = array_slice($_SESSION['assessoria_debug_logs'], -10);
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'result' => $result
+            ]);
+            
+        } catch (\Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+    
+    /**
+     * Processa link individual com debug detalhado
+     */
+    private function processarLinkIndividualDebug(string $url): array {
+        $scriptbeeApiKey = $this->getScriptBeeApiKey();
+        
+        if (!$scriptbeeApiKey) {
+            return [
+                'success' => false,
+                'error' => 'API Key do ScrapingBee não configurada',
+                'debug' => [
+                    'api_key_check' => 'failed',
+                    'api_key_value' => $scriptbeeApiKey
+                ]
+            ];
+        }
+        
+        $requestUrl = 'https://app.scrapingbee.com/api/v1';
+        $params = [
+            'api_key' => $scriptbeeApiKey,
+            'url' => $url,
+            'stealth_proxy' => 'true',
+            'country_code' => 'us',
+            'wait_browser' => 'load',
+            'block_ads' => 'true',
+            'ai_query' => 'Extract all available product information, including product name, image, base price, and all variations. Each variation must include size, weight, or any selectable attribute, its value, and price if different. Preserve measurement units and return missing data as null.'
+        ];
+        
+        $queryString = http_build_query($params);
+        $fullUrl = $requestUrl . '?' . $queryString;
+        
+        // Executa a requisição
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $fullUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => 'GET',
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        $debugInfo = [
+            'request_url' => $fullUrl,
+            'http_code' => $httpCode,
+            'curl_error' => $curlError,
+            'response_raw' => $response,
+            'response_length' => strlen($response)
+        ];
+        
+        if ($curlError) {
+            return [
+                'success' => false,
+                'error' => 'Erro na requisição cURL: ' . $curlError,
+                'debug' => $debugInfo
+            ];
+        }
+        
+        if ($httpCode !== 200) {
+            return [
+                'success' => false,
+                'error' => "Erro HTTP {$httpCode}: " . substr($response, 0, 500),
+                'debug' => $debugInfo
+            ];
+        }
+        
+        if (empty($response)) {
+            return [
+                'success' => false,
+                'error' => 'Resposta vazia da API',
+                'debug' => $debugInfo
+            ];
+        }
+        
+        // Tentar decodificar JSON
+        $decodedResponse = json_decode($response, true);
+        $jsonError = json_last_error();
+        
+        if ($jsonError !== JSON_ERROR_NONE) {
+            return [
+                'success' => false,
+                'error' => 'Resposta não é JSON válido: ' . json_last_error_msg(),
+                'debug' => array_merge($debugInfo, [
+                    'json_error' => $jsonError,
+                    'json_error_message' => json_last_error_msg(),
+                    'response_preview' => substr($response, 0, 1000)
+                ])
+            ];
+        }
+        
+        // Analisar estrutura da resposta
+        $analysis = $this->analyzeResponseStructure($decodedResponse);
+        
+        return [
+            'success' => true,
+            'data' => $decodedResponse,
+            'debug' => array_merge($debugInfo, [
+                'response_structure' => $analysis,
+                'normalization_attempt' => $this->attemptNormalization($decodedResponse, $url)
+            ])
+        ];
+    }
+    
+    /**
+     * Analisa a estrutura da resposta para identificar campos disponíveis
+     */
+    private function analyzeResponseStructure($data): array {
+        $analysis = [
+            'top_level_keys' => array_keys(is_array($data) ? $data : []),
+            'is_array' => is_array($data),
+            'is_object' => is_object($data),
+            'data_type' => gettype($data),
+            'size' => is_array($data) ? count($data) : 0
+        ];
+        
+        if (is_array($data)) {
+            $analysis['sample_keys'] = array_slice(array_keys($data), 0, 10);
+            
+            // Procurar por campos comuns
+            $commonFields = ['title', 'name', 'product', 'price', 'cost', 'image', 'photo', 'description', 'weight', 'size'];
+            $foundFields = [];
+            
+            $this->searchFieldsRecursive($data, $commonFields, $foundFields, '');
+            
+            $analysis['found_common_fields'] = $foundFields;
+        }
+        
+        return $analysis;
+    }
+    
+    /**
+     * Busca recursiva por campos comuns
+     */
+    private function searchFieldsRecursive($data, $commonFields, &$foundFields, $path = '') {
+        if (!is_array($data)) return;
+        
+        foreach ($data as $key => $value) {
+            $currentPath = $path ? "{$path}.{$key}" : $key;
+            
+            // Verificar se o campo atual corresponde a algum campo comum
+            foreach ($commonFields as $field) {
+                if (stripos($key, $field) !== false) {
+                    $foundFields[] = [
+                        'path' => $currentPath,
+                        'key' => $key,
+                        'type' => gettype($value),
+                        'value_preview' => is_string($value) ? substr($value, 0, 100) : (is_array($value) ? 'Array(' . count($value) . ')' : gettype($value)),
+                        'matches_field' => $field
+                    ];
+                }
+            }
+            
+            // Recursão para arrays aninhados
+            if (is_array($value) && $path !== 'found_common_fields') {
+                $this->searchFieldsRecursive($value, $commonFields, $foundFields, $currentPath);
+            }
+        }
+    }
+    
+    /**
+     * Tenta normalizar os dados com base na estrutura encontrada
+     */
+    private function attemptNormalization($data, string $url): array {
+        try {
+            $normalized = $this->normalizarDadosProduto($data, $url);
+            return [
+                'success' => true,
+                'normalized_data' => $normalized,
+                'message' => 'Normalização bem-sucedida'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Falha na normalização'
+            ];
+        }
+    }
     private function getScriptBeeApiKey(): ?string {
         try {
             $db = \Config\Database::getConnection();
             $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
             $stmt->execute(['scrapingbee_api_key']);
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Debug temporário - remover após resolver
+            error_log("ScrapingBee Debug - Row found: " . ($row ? 'yes' : 'no'));
+            error_log("ScrapingBee Debug - Row data: " . json_encode($row));
+            
             return $row ? $row['valor'] : null;
         } catch (\Exception $e) {
+            // Debug temporário - remover após resolver
+            error_log("ScrapingBee Debug - Error: " . $e->getMessage());
             return null;
         }
     }
