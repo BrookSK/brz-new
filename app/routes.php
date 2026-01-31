@@ -294,6 +294,10 @@ $router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerar
 $router->get('/admin/remessa-internacional', 'AdminRemessaInternacionalController', 'index');
 $router->post('/admin/remessa-internacional/gerar/{id}', 'AdminRemessaInternacionalController', 'gerarRemessa');
 $router->post('/admin/remessa-internacional/reenviar-webhook/{id}', 'AdminRemessaInternacionalController', 'reenviarWebhook');
+$router->get('/admin/remessa-internacional/janela/{id}', 'AdminRemessaInternacionalController', 'verJanela');
+$router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaInternacionalController', 'detalhesPedidoJanela');
+$router->post('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-gerada', 'AdminRemessaInternacionalController', 'marcarEtiquetaGerada');
+$router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaInternacionalController', 'fecharJanela');
 
 // Rotas de Remessa Correios
 $router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');

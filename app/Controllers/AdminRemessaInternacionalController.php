@@ -6,27 +6,236 @@ class AdminRemessaInternacionalController extends Controller {
 
     public function __construct() {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+    }
+
+    private function requireAdmin(): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $usuarioId = $_SESSION['usuario_id'] ?? ($_SESSION['user_id'] ?? null);
+        $logado = $_SESSION['logado'] ?? null;
+        $temSessao = ($logado === true) || (!empty($usuarioId));
+
+        if (!$temSessao) {
+            header('Location: /loginadmin');
+            exit;
+        }
+
+        $perfil = $_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ($_SESSION['user_perfil'] ?? null));
+        $isAdmin = ($perfil === 'admin') || (!empty($_SESSION['is_admin']) && $_SESSION['is_admin']);
+        if (!$isAdmin) {
+            header('Location: /admin');
+            exit;
+        }
+    }
+
+    private function ensureTables(): void {
+        $this->connection->exec("CREATE TABLE IF NOT EXISTS remessa_janelas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            data_inicio DATETIME NOT NULL,
+            data_fim DATETIME NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'aberta',
+            closed_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            INDEX idx_remessa_janelas_periodo (data_inicio, data_fim),
+            INDEX idx_remessa_janelas_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $this->connection->exec("CREATE TABLE IF NOT EXISTS remessa_janela_pedidos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            janela_id INT NOT NULL,
+            pedido_id INT NOT NULL,
+            etiqueta_gerada TINYINT(1) NOT NULL DEFAULT 0,
+            etiqueta_gerada_em DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_janela_pedido (janela_id, pedido_id),
+            INDEX idx_rjp_janela (janela_id),
+            INDEX idx_rjp_pedido (pedido_id),
+            CONSTRAINT fk_rjp_janela FOREIGN KEY (janela_id) REFERENCES remessa_janelas(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+
+    private function now(): \DateTime {
+        return new \DateTime('now');
+    }
+
+    private function ensureJanelaAtual(): array {
+        $this->ensureTables();
+
+        $now = $this->now();
+
+        // Atualizar janelas antigas (aberta -> finalizada) e marcar atraso quando aplicável
+        $stAll = $this->connection->query('SELECT id, data_fim, status FROM remessa_janelas ORDER BY data_inicio ASC');
+        $all = $stAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        foreach ($all as $j) {
+            $dataFim = new \DateTime((string) $j['data_fim']);
+            $status = (string) ($j['status'] ?? 'aberta');
+            if ($status === 'aberta' && $dataFim < $now) {
+                $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
+                $stUp->execute([(int) $j['id']]);
+            }
+        }
+
+        // Garantir que existe uma janela que contém o dia atual
+        $st = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE data_inicio <= ? AND data_fim >= ? ORDER BY data_inicio DESC LIMIT 1');
+        $nowStr = $now->format('Y-m-d H:i:s');
+        $st->execute([$nowStr, $nowStr]);
+        $current = $st->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$current) {
+            // Se não existir janela cobrindo hoje, criar sequencial a partir da última janela
+            $stLast = $this->connection->query('SELECT * FROM remessa_janelas ORDER BY data_inicio DESC LIMIT 1');
+            $last = $stLast->fetch(\PDO::FETCH_ASSOC);
+
+            if ($last) {
+                $start = new \DateTime((string) $last['data_fim']);
+                $start->modify('+1 second');
+            } else {
+                $start = new \DateTime($now->format('Y-m-d 00:00:00'));
+            }
+
+            while (true) {
+                $end = (clone $start);
+                $end->modify('+12 days');
+                $end->setTime(23, 59, 59);
+
+                $status = ($end < $now) ? 'finalizada' : 'aberta';
+
+                $stIns = $this->connection->prepare('INSERT INTO remessa_janelas (data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                $stIns->execute([
+                    $start->format('Y-m-d H:i:s'),
+                    $end->format('Y-m-d H:i:s'),
+                    $status,
+                ]);
+
+                if ($start <= $now && $end >= $now) {
+                    break;
+                }
+
+                $start = (clone $end);
+                $start->modify('+1 second');
+            }
+
+            $st->execute([$nowStr, $nowStr]);
+            $current = $st->fetch(\PDO::FETCH_ASSOC);
+        }
+
+        // Sincronizar pedidos dentro da janela atual
+        if ($current && !empty($current['id'])) {
+            $this->syncPedidosParaJanela((int) $current['id']);
+        }
+
+        // Marcar janelas em atraso (finalizadas há mais de 15 dias e ainda não remessa_gerada)
+        $stAtraso = $this->connection->query("SELECT id, data_fim, status FROM remessa_janelas WHERE status IN ('aberta','finalizada')");
+        $cands = $stAtraso->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        foreach ($cands as $j) {
+            $dataFim = new \DateTime((string) $j['data_fim']);
+            $limite = (clone $dataFim);
+            $limite->modify('+15 days');
+            if ($limite < $now) {
+                // Só marca atraso se ainda houver pedidos sem etiqueta
+                $janelaId = (int) $j['id'];
+                $this->syncPedidosParaJanela($janelaId);
+                $stCount = $this->connection->prepare('SELECT COUNT(*) FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
+                $stCount->execute([$janelaId]);
+                $pend = (int) $stCount->fetchColumn();
+                if ($pend > 0) {
+                    $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'atraso', updated_at = NOW() WHERE id = ? AND status <> 'remessa_gerada'");
+                    $stUp->execute([$janelaId]);
+                }
+            }
+        }
+
+        // Fechar janelas que já têm todas as etiquetas
+        $stClose = $this->connection->query("SELECT id FROM remessa_janelas WHERE status IN ('aberta','finalizada','atraso')");
+        $ids = $stClose->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        foreach ($ids as $janelaId) {
+            $this->tryAutoCloseJanela((int) $janelaId);
+        }
+
+        return $current ?: [];
+    }
+
+    private function syncPedidosParaJanela(int $janelaId): void {
+        $stJ = $this->connection->prepare('SELECT id, data_inicio, data_fim FROM remessa_janelas WHERE id = ? LIMIT 1');
+        $stJ->execute([$janelaId]);
+        $j = $stJ->fetch(\PDO::FETCH_ASSOC);
+        if (!$j) {
+            return;
+        }
+
+        $inicio = (string) $j['data_inicio'];
+        $fim = (string) $j['data_fim'];
+
+        // Todos os pedidos dentro do período entram na janela
+        $stP = $this->connection->prepare("SELECT id FROM pedidos WHERE created_at >= ? AND created_at <= ?");
+        $stP->execute([$inicio, $fim]);
+        $pedidoIds = $stP->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+        if (!$pedidoIds) {
+            return;
+        }
+
+        $stIns = $this->connection->prepare('INSERT IGNORE INTO remessa_janela_pedidos (janela_id, pedido_id, created_at) VALUES (?, ?, NOW())');
+        foreach ($pedidoIds as $pid) {
+            $stIns->execute([$janelaId, (int) $pid]);
+        }
+    }
+
+    private function tryAutoCloseJanela(int $janelaId): void {
+        $this->syncPedidosParaJanela($janelaId);
+
+        $stTotal = $this->connection->prepare('SELECT COUNT(*) FROM remessa_janela_pedidos WHERE janela_id = ?');
+        $stTotal->execute([$janelaId]);
+        $total = (int) $stTotal->fetchColumn();
+        if ($total <= 0) {
+            return;
+        }
+
+        $stPend = $this->connection->prepare('SELECT COUNT(*) FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
+        $stPend->execute([$janelaId]);
+        $pend = (int) $stPend->fetchColumn();
+        if ($pend === 0) {
+            $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'remessa_gerada', closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = ?");
+            $stUp->execute([$janelaId]);
+        }
     }
 
     public function index($request) {
+        $this->requireAdmin();
         try {
-            // Buscar janelas de remessa (intervalos de 13 dias)
-            $janelas = $this->getJanelasRemessa();
-            
-            // Buscar pedidos pendentes
-            $pedidosPendentes = $this->getPedidosPendentes();
-            
-            // Buscar pedidos em atraso (15+ dias)
-            $pedidosAtraso = $this->getPedidosAtraso();
-            
-            // Buscar remessas geradas
-            $remessasGeradas = $this->getRemessasGeradas();
+            $janelaAtual = $this->ensureJanelaAtual();
 
-        } catch (\Exception $e) {
-            $janelas = [];
+            $janelasAbertas = $this->getJanelasByStatus(['aberta']);
+            $janelasFinalizadas = $this->getJanelasByStatus(['finalizada']);
+            $janelasAtraso = $this->getJanelasByStatus(['atraso']);
+            $janelasGeradas = $this->getJanelasByStatus(['remessa_gerada']);
+
+            // Mantido por compatibilidade com blocos antigos no HTML (até remover/refatorar)
             $pedidosPendentes = [];
             $pedidosAtraso = [];
             $remessasGeradas = [];
+
+            $stats = [
+                'abertas' => count($janelasAbertas),
+                'finalizadas' => count($janelasFinalizadas),
+                'atraso' => count($janelasAtraso),
+                'geradas' => count($janelasGeradas),
+            ];
+
+        } catch (\Exception $e) {
+            $janelaAtual = [];
+            $janelasAbertas = [];
+            $janelasFinalizadas = [];
+            $janelasAtraso = [];
+            $janelasGeradas = [];
+            $pedidosPendentes = [];
+            $pedidosAtraso = [];
+            $remessasGeradas = [];
+            $stats = ['abertas' => 0, 'finalizadas' => 0, 'atraso' => 0, 'geradas' => 0];
         }
 
         // Incluir o partial do menu lateral
@@ -90,11 +299,11 @@ class AdminRemessaInternacionalController extends Controller {
                 <!-- Estatísticas -->
                 <div class="row mb-4">
                     <div class="col-md-3">
-                        <div class="card card-stats bg-warning text-white">
+                        <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Pendentes</h5>
-                                <h3>' . count($pedidosPendentes) . '</h3>
-                                <small>Aguardando envio</small>
+                                <h5 class="card-title">Abertas</h5>
+                                <h3>' . (int) ($stats['abertas'] ?? 0) . '</h3>
+                                <small>Janelas ativas</small>
                             </div>
                         </div>
                     </div>
@@ -102,42 +311,42 @@ class AdminRemessaInternacionalController extends Controller {
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
                                 <h5 class="card-title">Atraso</h5>
-                                <h3>' . count($pedidosAtraso) . '</h3>
-                                <small>15+ dias</small>
+                                <h3>' . (int) ($stats['atraso'] ?? 0) . '</h3>
+                                <small>Janelas em atraso</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-info text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Geradas</h5>
-                                <h3>' . count($remessasGeradas) . '</h3>
-                                <small>Remessas prontas</small>
+                                <h5 class="card-title">Remessa Gerada</h5>
+                                <h3>' . (int) ($stats['geradas'] ?? 0) . '</h3>
+                                <small>Janelas fechadas</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card card-stats bg-primary text-white">
+                        <div class="card card-stats bg-secondary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Janelas</h5>
-                                <h3>' . count($janelas) . '</h3>
-                                <small>Períodos ativos</small>
+                                <h5 class="card-title">Finalizadas</h5>
+                                <h3>' . (int) ($stats['finalizadas'] ?? 0) . '</h3>
+                                <small>Esperando etiquetas</small>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Janelas de Remessa -->
+                <!-- Janelas Abertas -->
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Janelas de Remessa (13 dias)</h5>
+                                <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Janelas Abertas (13 dias)</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">';
                                 
-                                foreach ($janelas as $janela) {
+                                foreach ($janelasAbertas as $janela) {
                                     $statusClass = $janela['status'] == 'aberta' ? 'success' : 'secondary';
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
@@ -157,13 +366,136 @@ class AdminRemessaInternacionalController extends Controller {
                                     </div>';
                                 }
                                 
-                                if (empty($janelas)) {
+                                if (empty($janelasAbertas)) {
                                     echo '<div class="col-12 text-center py-4">
                                         <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">Nenhuma janela de remessa encontrada</p>
                                     </div>';
                                 }
                                 
+                                echo '</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Janelas Finalizadas -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Janelas Finalizadas</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">';
+
+                                foreach ($janelasFinalizadas as $janela) {
+                                    echo '<div class="col-md-4 mb-3">
+                                        <div class="card janela-card">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <p class="card-text">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
+                                                    </small><br>
+                                                    <span class="badge bg-secondary">Finalizada</span>
+                                                </p>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>';
+                                }
+
+                                if (empty($janelasFinalizadas)) {
+                                    echo '<div class="col-12 text-center py-2">
+                                        <p class="text-muted mb-0">Nenhuma janela finalizada</p>
+                                    </div>';
+                                }
+
+                                echo '</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Janelas em Atraso -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Janelas em Atraso (15+ dias)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">';
+
+                                foreach ($janelasAtraso as $janela) {
+                                    echo '<div class="col-md-4 mb-3">
+                                        <div class="card janela-card">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <p class="card-text">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
+                                                    </small><br>
+                                                    <span class="badge bg-danger">Atraso</span>
+                                                </p>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>';
+                                }
+
+                                if (empty($janelasAtraso)) {
+                                    echo '<div class="col-12 text-center py-2">
+                                        <p class="text-muted mb-0">Nenhuma janela em atraso</p>
+                                    </div>';
+                                }
+
+                                echo '</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remessas Geradas (Janelas Fechadas) -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Remessas Geradas</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">';
+
+                                foreach ($janelasGeradas as $janela) {
+                                    echo '<div class="col-md-4 mb-3">
+                                        <div class="card janela-card">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Janela #' . $janela['id'] . '</h6>
+                                                <p class="card-text">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
+                                                    </small><br>
+                                                    <span class="badge bg-info">Remessa Gerada</span>
+                                                </p>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <i class="fas fa-eye"></i> Ver Pedidos
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>';
+                                }
+
+                                if (empty($janelasGeradas)) {
+                                    echo '<div class="col-12 text-center py-2">
+                                        <p class="text-muted mb-0">Nenhuma remessa gerada</p>
+                                    </div>';
+                                }
+
                                 echo '</div>
                             </div>
                         </div>
@@ -405,7 +737,7 @@ class AdminRemessaInternacionalController extends Controller {
         }
 
         function verJanela(janelaId) {
-            alert("Funcionalidade em desenvolvimento");
+            window.location.href = "/admin/remessa-internacional/janela/" + janelaId;
         }
 
         function verDetalhesRemessa(remessaId) {
@@ -414,6 +746,423 @@ class AdminRemessaInternacionalController extends Controller {
     </script>
 </body>
 </html>';
+        exit;
+    }
+
+    private function getJanelasByStatus(array $statuses): array {
+        $this->ensureTables();
+
+        $statuses = array_values(array_filter(array_map('strval', $statuses)));
+        if (!$statuses) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+        $sql = "SELECT id, data_inicio, data_fim, status, closed_at, created_at, updated_at FROM remessa_janelas WHERE status IN ({$placeholders}) ORDER BY data_inicio DESC LIMIT 50";
+        $st = $this->connection->prepare($sql);
+        $st->execute($statuses);
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function verJanela($request, $id) {
+        $this->requireAdmin();
+
+        $janelaId = (int) $id;
+        if ($janelaId <= 0) {
+            header('Location: /admin/remessa-internacional');
+            exit;
+        }
+
+        $this->ensureTables();
+        $this->syncPedidosParaJanela($janelaId);
+
+        $stJ = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE id = ? LIMIT 1');
+        $stJ->execute([$janelaId]);
+        $janela = $stJ->fetch(\PDO::FETCH_ASSOC);
+        if (!$janela) {
+            header('Location: /admin/remessa-internacional');
+            exit;
+        }
+
+        // Pedidos da janela
+        $sql = "
+            SELECT 
+                rjp.pedido_id,
+                rjp.etiqueta_gerada,
+                rjp.etiqueta_gerada_em,
+                p.created_at,
+                p.total,
+                p.status,
+                u.nome AS cliente_nome,
+                u.email AS cliente_email
+            FROM remessa_janela_pedidos rjp
+            LEFT JOIN pedidos p ON p.id = rjp.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE rjp.janela_id = ?
+            ORDER BY p.created_at ASC
+        ";
+        $st = $this->connection->prepare($sql);
+        $st->execute([$janelaId]);
+        $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Totais
+        $total = count($pedidos);
+        $geradas = 0;
+        foreach ($pedidos as $p) {
+            if ((int) ($p['etiqueta_gerada'] ?? 0) === 1) {
+                $geradas++;
+            }
+        }
+        $pendentes = $total - $geradas;
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Janela de Remessa #' . (int) $janelaId . '</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+<div class="container-fluid">
+  <div class="row">';
+
+        renderAdminSidebar('remessa-internacional');
+
+        $badge = 'secondary';
+        if (($janela['status'] ?? '') === 'aberta') $badge = 'success';
+        if (($janela['status'] ?? '') === 'atraso') $badge = 'danger';
+        if (($janela['status'] ?? '') === 'remessa_gerada') $badge = 'info';
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div>
+                    <h1 class="h3 mb-0">Janela #' . (int) $janelaId . ' <span class="badge bg-' . $badge . '">' . htmlspecialchars((string) ($janela['status'] ?? '')) . '</span></h1>
+                    <div class="text-muted small">' . date('d/m/Y', strtotime((string) $janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime((string) $janela['data_fim'])) . '</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" href="/admin/remessa-internacional"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <button class="btn btn-outline-primary" type="button" onclick="location.reload()"><i class="fas fa-sync"></i> Atualizar</button>
+                    <button class="btn btn-success" type="button" onclick="fecharJanela()" ' . ($pendentes > 0 ? 'disabled' : '') . '><i class="fas fa-check"></i> Fechar Janela</button>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="card"><div class="card-body">
+                        <div class="text-muted">Total pedidos</div>
+                        <div class="h4 mb-0">' . (int) $total . '</div>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card"><div class="card-body">
+                        <div class="text-muted">Etiquetas geradas</div>
+                        <div class="h4 mb-0">' . (int) $geradas . '</div>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card"><div class="card-body">
+                        <div class="text-muted">Pendentes</div>
+                        <div class="h4 mb-0">' . (int) $pendentes . '</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <strong>Pedidos desta janela</strong>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Data</th>
+                                    <th>Total</th>
+                                    <th>Etiqueta</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>';
+
+        if (!$pedidos) {
+            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
+        } else {
+            foreach ($pedidos as $p) {
+                $pid = (int) ($p['pedido_id'] ?? 0);
+                $et = (int) ($p['etiqueta_gerada'] ?? 0);
+                $etBadge = $et === 1 ? 'success' : 'warning';
+                $etLabel = $et === 1 ? 'Gerada' : 'Pendente';
+                $dt = !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-';
+                $totalV = is_numeric($p['total'] ?? null) ? number_format((float) $p['total'], 2, ',', '.') : '-';
+
+                echo '<tr>
+                    <td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>
+                    <td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? 'N/A')) . '<br><small class="text-muted">' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</small></td>
+                    <td>' . $dt . '</td>
+                    <td>R$ ' . $totalV . '</td>
+                    <td><span class="badge bg-' . $etBadge . '">' . $etLabel . '</span></td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $janelaId . '/pedido/' . (int) $pid . '"><i class="fas fa-eye"></i> Detalhes</a>
+                        <button class="btn btn-sm btn-outline-success ms-1" type="button" onclick="marcarEtiquetaGerada(' . (int) $pid . ')" ' . ($et === 1 ? 'disabled' : '') . '><i class="fas fa-tag"></i> Marcar etiqueta</button>
+                    </td>
+                </tr>';
+            }
+        }
+
+        echo '</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const janelaId = ' . (int) $janelaId . ';
+
+function marcarEtiquetaGerada(pedidoId) {
+    if (!confirm("Marcar etiqueta como gerada para este pedido?")) return;
+    fetch("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId + "/etiqueta-gerada", { method: "POST" })
+        .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
+        .then(({ok, data}) => {
+            if (ok && data.success) {
+                location.reload();
+            } else {
+                alert("Erro: " + (data.message || data.error || JSON.stringify(data)));
+            }
+        })
+        .catch(err => alert("Erro: " + err.message));
+}
+
+function fecharJanela() {
+    if (!confirm("Fechar esta janela? (Somente se todas as etiquetas estiverem geradas)")) return;
+    fetch("/admin/remessa-internacional/janela/" + janelaId + "/fechar", { method: "POST" })
+        .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
+        .then(({ok, data}) => {
+            if (ok && data.success) {
+                window.location.href = "/admin/remessa-internacional";
+            } else {
+                alert("Erro: " + (data.message || data.error || JSON.stringify(data)));
+            }
+        })
+        .catch(err => alert("Erro: " + err.message));
+}
+</script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function detalhesPedidoJanela($request, $janelaId, $pedidoId) {
+        $this->requireAdmin();
+        $this->ensureTables();
+
+        $jid = (int) $janelaId;
+        $pid = (int) $pedidoId;
+        if ($jid <= 0 || $pid <= 0) {
+            header('Location: /admin/remessa-internacional');
+            exit;
+        }
+
+        $this->syncPedidosParaJanela($jid);
+
+        $stChk = $this->connection->prepare('SELECT etiqueta_gerada, etiqueta_gerada_em FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
+        $stChk->execute([$jid, $pid]);
+        $rel = $stChk->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        $pedido = $this->getPedidoCompleto($pid);
+        if (!$pedido) {
+            header('Location: /admin/remessa-internacional/janela/' . $jid);
+            exit;
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido #' . (int) $pid . ' - Janela #' . (int) $jid . '</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head>
+<body>
+<div class="container-fluid">
+  <div class="row">';
+        renderAdminSidebar('remessa-internacional');
+
+        $et = (int) ($rel['etiqueta_gerada'] ?? 0);
+        $etBadge = $et === 1 ? 'success' : 'warning';
+        $etLabel = $et === 1 ? 'Gerada' : 'Pendente';
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div>
+                    <h1 class="h3 mb-0">Pedido #' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</h1>
+                    <div class="text-muted small">Janela #' . (int) $jid . ' | Etiqueta: <span class="badge bg-' . $etBadge . '">' . $etLabel . '</span></div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" href="/admin/remessa-internacional/janela/' . (int) $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <button class="btn btn-success" type="button" onclick="gerarEtiqueta()"><i class="fas fa-tag"></i> Gerar etiqueta</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>Cliente</strong></div>
+                        <div class="card-body">
+                            <div><strong>Nome:</strong> ' . htmlspecialchars((string) ($pedido['cliente_nome'] ?? '')) . '</div>
+                            <div><strong>Email:</strong> ' . htmlspecialchars((string) ($pedido['cliente_email'] ?? '')) . '</div>
+                            <div><strong>Telefone:</strong> ' . htmlspecialchars((string) ($pedido['cliente_telefone'] ?? '')) . '</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>Pedido</strong></div>
+                        <div class="card-body">
+                            <div><strong>Data:</strong> ' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string) $pedido['created_at'])) : '-') . '</div>
+                            <div><strong>Total:</strong> R$ ' . (is_numeric($pedido['total'] ?? null) ? number_format((float) $pedido['total'], 2, ',', '.') : '-') . '</div>
+                            <div><strong>Status:</strong> ' . htmlspecialchars((string) ($pedido['status'] ?? '')) . '</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><strong>Endereço</strong></div>
+                <div class="card-body">';
+
+        $end = $pedido['endereco'] ?? null;
+        if (is_array($end) && !empty($end)) {
+            echo htmlspecialchars(trim((string) (($end['logradouro'] ?? '') . ' ' . ($end['numero'] ?? '') . ' ' . ($end['bairro'] ?? '') . ' ' . ($end['cidade'] ?? '') . ' ' . ($end['estado'] ?? '') . ' ' . ($end['cep'] ?? ''))));
+        } else {
+            echo '<span class="text-muted">Não encontrado</span>';
+        }
+
+        echo '</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><strong>Itens</strong></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>Produto</th><th>SKU</th><th>Qtd</th><th>Preço</th></tr></thead>
+                            <tbody>';
+
+        $itens = $pedido['itens'] ?? [];
+        if (!is_array($itens) || !$itens) {
+            echo '<tr><td colspan="4" class="text-center text-muted">Nenhum item.</td></tr>';
+        } else {
+            foreach ($itens as $it) {
+                echo '<tr>
+                    <td>' . htmlspecialchars((string) ($it['produto_nome'] ?? '')) . '</td>
+                    <td>' . htmlspecialchars((string) ($it['sku'] ?? '')) . '</td>
+                    <td>' . (int) ($it['quantidade'] ?? 0) . '</td>
+                    <td>R$ ' . (is_numeric($it['preco'] ?? null) ? number_format((float) $it['preco'], 2, ',', '.') : '-') . '</td>
+                </tr>';
+            }
+        }
+
+        echo '</tbody></table></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const janelaId = ' . (int) $jid . ';
+const pedidoId = ' . (int) $pid . ';
+
+function gerarEtiqueta() {
+    // Integração futura: por enquanto marca como gerada
+    if (!confirm("Gerar etiqueta agora? (Por enquanto isso só marca como gerada)")) return;
+    fetch("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId + "/etiqueta-gerada", { method: "POST" })
+        .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
+        .then(({ok, data}) => {
+            if (ok && data.success) {
+                location.reload();
+            } else {
+                alert("Erro: " + (data.message || data.error || JSON.stringify(data)));
+            }
+        })
+        .catch(err => alert("Erro: " + err.message));
+}
+</script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function marcarEtiquetaGerada($request, $janelaId, $pedidoId) {
+        $this->requireAdmin();
+        $this->ensureTables();
+
+        $jid = (int) $janelaId;
+        $pid = (int) $pedidoId;
+        if ($jid <= 0 || $pid <= 0) {
+            echo json_encode(['success' => false, 'error' => 'Parâmetros inválidos']);
+            exit;
+        }
+
+        try {
+            $this->syncPedidosParaJanela($jid);
+            $st = $this->connection->prepare('UPDATE remessa_janela_pedidos SET etiqueta_gerada = 1, etiqueta_gerada_em = COALESCE(etiqueta_gerada_em, NOW()) WHERE janela_id = ? AND pedido_id = ?');
+            $st->execute([$jid, $pid]);
+
+            $this->tryAutoCloseJanela($jid);
+
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function fecharJanela($request, $id) {
+        $this->requireAdmin();
+        $this->ensureTables();
+
+        $janelaId = (int) $id;
+        if ($janelaId <= 0) {
+            echo json_encode(['success' => false, 'error' => 'ID inválido']);
+            exit;
+        }
+
+        try {
+            $this->syncPedidosParaJanela($janelaId);
+            $stPend = $this->connection->prepare('SELECT COUNT(*) FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
+            $stPend->execute([$janelaId]);
+            $pend = (int) $stPend->fetchColumn();
+            if ($pend > 0) {
+                echo json_encode(['success' => false, 'error' => 'Ainda existem pedidos sem etiqueta nesta janela']);
+                exit;
+            }
+
+            $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'remessa_gerada', closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = ?");
+            $stUp->execute([$janelaId]);
+
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         exit;
     }
 
