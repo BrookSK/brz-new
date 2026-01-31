@@ -236,15 +236,15 @@ class CarrinhoController extends Controller {
 
     public function remover(Request $request) {
         session_start();
-        $produtoId = $request->getParam('id');
-        $produtoIdFallback = $request->getParam('produto_id');
+        $produtoId = $request->getParam('id', null);
+        $produtoIdFallback = $request->getParam('produto_id', null);
         
-        if (!$produtoId && !$produtoIdFallback) {
+        if (($produtoId === null || $produtoId === '') && ($produtoIdFallback === null || $produtoIdFallback === '')) {
             $this->json(['error' => 'Produto não informado'], 400);
             return;
         }
 
-        if (!$produtoId && $produtoIdFallback) {
+        if (($produtoId === null || $produtoId === '') && ($produtoIdFallback !== null && $produtoIdFallback !== '')) {
             $produtoId = $produtoIdFallback;
         }
         
@@ -282,16 +282,16 @@ class CarrinhoController extends Controller {
 
     public function atualizar(Request $request) {
         session_start();
-        $produtoId = $request->getParam('id');
-        $produtoIdFallback = $request->getParam('produto_id');
-        $quantidade = $request->getParam('quantidade');
+        $produtoId = $request->getParam('id', null);
+        $produtoIdFallback = $request->getParam('produto_id', null);
+        $quantidade = $request->getParam('quantidade', null);
         
-        if ((!$produtoId && !$produtoIdFallback) || !$quantidade) {
+        if ((($produtoId === null || $produtoId === '') && ($produtoIdFallback === null || $produtoIdFallback === '')) || ($quantidade === null || $quantidade === '')) {
             $this->json(['error' => 'Dados incompletos'], 400);
             return;
         }
 
-        if (!$produtoId && $produtoIdFallback) {
+        if (($produtoId === null || $produtoId === '') && ($produtoIdFallback !== null && $produtoIdFallback !== '')) {
             $produtoId = $produtoIdFallback;
         }
 
