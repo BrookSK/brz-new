@@ -330,13 +330,18 @@
 </div>
 
 <div id="checkout-loading" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 9999;">
-    <div style="position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); text-align:center; color:#fff;">
-        <div class="spinner-border" role="status" aria-hidden="true"></div>
-        <div style="margin-top: 10px; font-weight: 600;">Processando seu pedido...</div>
+    <div style="position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); text-align:center; color:#fff; width: min(520px, 92vw);">
+        <div style="background: rgba(0,0,0,0.65); border-radius: 16px; padding: 18px;">
+            <div class="tenor-gif-embed" data-postid="12559818558080367823" data-share-method="host" data-aspect-ratio="1" data-width="100%">
+                <a href="https://tenor.com/view/buy-buying-acquire-purchase-get-gif-12559818558080367823">Buy Buying Sticker</a>from <a href="https://tenor.com/search/buy-stickers">Buy Stickers</a>
+            </div>
+            <div style="margin-top: 10px; font-weight: 600;">Processando seu pedido...</div>
+        </div>
     </div>
 </div>
 
-<!-- JavaScript para processar o formulário - no final da página -->
+<script type="text/javascript" async src="https://tenor.com/embed.js"></script>
+
 <script>
 console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
 

@@ -108,16 +108,38 @@ ob_start();
 <!-- Loading Overlay -->
 <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
      style="background: rgba(0,0,0,0.7); z-index: 9999;">
-    <div class="d-flex flex-column justify-content-center align-items-center h-100">
-        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
-        <h4 class="text-white mb-2">Preparando seu orçamento</h4>
-        <p class="text-white-50">Processando os produtos... Isso pode levar alguns instantes.</p>
-        <div class="progress w-50" style="height: 6px;">
-            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                 role="progressbar" style="width: 0%"></div>
+    <div class="d-flex flex-column justify-content-center align-items-center h-100 px-3">
+        <div class="bg-dark rounded-4 p-4" style="max-width: 520px; width: 100%;">
+            <div class="tenor-gif-embed" data-postid="10315617221423366500" data-share-method="host" data-aspect-ratio="1" data-width="100%">
+                <a href="https://tenor.com/view/cart-add-to-cart-shop-shopping-black-friday-gif-10315617221423366500">Cart Add To Cart Sticker</a>from <a href="https://tenor.com/search/cart-stickers">Cart Stickers</a>
+            </div>
+
+            <div class="mt-3" style="height: 34px; overflow: hidden; position: relative;">
+                <div id="assessoriaLoadingPhrase" class="assessoria-loading-phrase text-white fw-semibold"></div>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+ .assessoria-loading-phrase {
+     position: absolute;
+     left: -110%;
+     right: auto;
+     white-space: nowrap;
+     will-change: transform;
+     animation: assessoriaPhraseSlide 2.4s linear infinite;
+ }
+
+ @keyframes assessoriaPhraseSlide {
+     0% { transform: translateX(0); opacity: 0; }
+     8% { opacity: 1; }
+     92% { opacity: 1; }
+     100% { transform: translateX(220%); opacity: 0; }
+ }
+</style>
+
+<script type="text/javascript" async src="https://tenor.com/embed.js"></script>
 
 <!-- Container de Notificações -->
 <div id="notificationContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 9998;">
@@ -127,6 +149,42 @@ ob_start();
 <script>
 $(document).ready(function() {
     let linkCount = 1;
+
+    const assessoriaLoadingPhrases = [
+        'Preparando suas mercadorias',
+        'Fazendo sua cotação',
+        'Finalizando os detalhes'
+    ];
+
+    let assessoriaLoadingIntervalId = null;
+    let assessoriaLoadingPhraseIndex = 0;
+
+    function startAssessoriaLoadingPhrases() {
+        const el = document.getElementById('assessoriaLoadingPhrase');
+        if (!el) return;
+
+        const setPhrase = function() {
+            const phrase = assessoriaLoadingPhrases[assessoriaLoadingPhraseIndex % assessoriaLoadingPhrases.length];
+            assessoriaLoadingPhraseIndex++;
+            el.textContent = phrase;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = '';
+        };
+
+        setPhrase();
+        if (assessoriaLoadingIntervalId) {
+            clearInterval(assessoriaLoadingIntervalId);
+        }
+        assessoriaLoadingIntervalId = setInterval(setPhrase, 2400);
+    }
+
+    function stopAssessoriaLoadingPhrases() {
+        if (assessoriaLoadingIntervalId) {
+            clearInterval(assessoriaLoadingIntervalId);
+            assessoriaLoadingIntervalId = null;
+        }
+    }
 
     const prefillLinks = <?= json_encode(array_values(array_filter(($assessoria_prefill_links ?? []), function($v) { return is_string($v) && trim($v) !== ''; }))) ?>;
 
@@ -319,12 +377,12 @@ $(document).ready(function() {
         // Mostrar loading
         $('#loadingOverlay').removeClass('d-none');
         $('#processBtn').prop('disabled', true);
+        startAssessoriaLoadingPhrases();
         
         // Limpar notificações anteriores
         $('#notificationContainer').empty();
 
         const totalLinks = links.length;
-        $('#progressBar').css('width', '0%');
 
         const enqueue = function(links) {
             return new Promise(function(resolve, reject) {
@@ -423,6 +481,7 @@ $(document).ready(function() {
             } catch (e) {
                 $('#loadingOverlay').addClass('d-none');
                 $('#processBtn').prop('disabled', false);
+                stopAssessoriaLoadingPhrases();
                 handleErrorResponse(e && e.message ? e.message : 'Erro ao processar requisição.');
             }
         })();
