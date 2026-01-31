@@ -453,7 +453,7 @@ $(document).ready(function() {
                 });
                 const disabled = !hasAny;
                 const classes = 'btn btn-sm ' + (isActive ? 'btn-dark' : 'btn-outline-secondary');
-                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + $('<div>').text(k).html() + '" data-value="' + $('<div>').text(v).html() + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
+                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
             });
             html += '</div>';
             html += '</div>';
@@ -544,11 +544,49 @@ $(document).ready(function() {
 
     $(document).on('click', '.variation-btn', function() {
         const index = parseInt($(this).data('index'));
-        const key = $(this).data('key');
-        const value = $(this).data('value');
+        let key = $(this).data('key');
+        let value = $(this).data('value');
         if (isNaN(index) || !key) return;
+        try {
+            key = decodeURIComponent(String(key));
+            value = decodeURIComponent(String(value ?? ''));
+        } catch (e) {
+            key = String(key);
+            value = String(value ?? '');
+        }
         if (!selections[index]) selections[index] = {};
-        selections[index][String(key)] = String(value);
+
+        // Toggle: clicar na opção ativa remove a seleção daquela chave
+        if (String(selections[index][String(key)] ?? '') === String(value)) {
+            delete selections[index][String(key)];
+        } else {
+            selections[index][String(key)] = String(value);
+        }
+
+        // Se alguma seleção atual ficou inválida por causa dessa escolha, limpar
+        const p = produtos[index];
+        const keys = getVariationKeys(index);
+        if (p && Array.isArray(p.variacoes) && keys.length > 0) {
+            keys.forEach(k => {
+                const selv = selections[index][k];
+                if (selv === undefined || selv === null || String(selv).trim() === '') return;
+                const candidate = { ...selections[index] };
+                const hasAny = p.variacoes.some(variant => {
+                    if (!variant || typeof variant !== 'object') return false;
+                    const attrs = variant.atributos || {};
+                    if (!attrs || typeof attrs !== 'object') return false;
+                    for (const kk of keys) {
+                        const want = candidate[kk];
+                        if (want === undefined || want === null || String(want).trim() === '') continue;
+                        if (String((attrs || {})[kk] ?? '') !== String(want)) return false;
+                    }
+                    return true;
+                });
+                if (!hasAny) {
+                    delete selections[index][k];
+                }
+            });
+        }
         updateComboUI(index);
         atualizarCardProduto(index);
         calcularTotaisSelecionados();
