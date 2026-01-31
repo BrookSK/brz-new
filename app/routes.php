@@ -64,6 +64,7 @@ $router->post('/assessoria/enfileirar', 'AssessoriaController', 'enfileirarLinks
 $router->get('/assessoria/status', 'AssessoriaController', 'statusJob');
 $router->get('/assessoria/orcamento', 'AssessoriaController', 'orcamento');
 $router->post('/assessoria/adicionar-ao-carrinho', 'AssessoriaController', 'adicionarAoCarrinho');
+$router->post('/assessoria/aceitar-disclaimer', 'AssessoriaController', 'aceitarDisclaimer');
 
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function() {

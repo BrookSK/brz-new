@@ -12,6 +12,7 @@
                     </div>
                     
                     <form method="POST" action="/login" id="loginForm">
+                        <input type="hidden" name="redirect" value="<?= htmlspecialchars((string) ($_GET['redirect'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="mb-3">
                             <label for="email" class="form-label">E-mail</label>
                             <div class="input-group">

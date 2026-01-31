@@ -130,26 +130,35 @@ require __DIR__ . '/../layouts/main.php';
 $(document).ready(function() {
     let linkCount = 1;
 
-    const DISCLAIMER_KEY = 'assessoria_disclaimer_accepted_v1';
-    function isDisclaimerAccepted() {
-        try {
-            return window.localStorage && window.localStorage.getItem(DISCLAIMER_KEY) === '1';
-        } catch (e) {
+    const isLoggedIn = <?= json_encode((bool) ($assessoria_logged_in ?? false)) ?>;
+    const disclaimerAccepted = <?= json_encode((bool) ($assessoria_disclaimer_accepted ?? false)) ?>;
+
+    async function ensureLoggedIn() {
+        if (isLoggedIn) return true;
+
+        const result = await Swal.fire({
+            icon: 'warning',
+            title: 'Login obrigatório',
+            text: 'Para acessar a Assessoria de Compras, você precisa realizar login.',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: true,
+            confirmButtonText: 'Realizar login',
+            cancelButtonText: 'Voltar',
+            confirmButtonColor: '#0b1f3a'
+        });
+
+        if (result.isConfirmed) {
+            window.location.href = '/login?redirect=' + encodeURIComponent('/assessoria');
             return false;
         }
-    }
 
-    function setDisclaimerAccepted() {
-        try {
-            if (window.localStorage) {
-                window.localStorage.setItem(DISCLAIMER_KEY, '1');
-            }
-        } catch (e) {
-        }
+        window.location.href = '/';
+        return false;
     }
 
     async function ensureDisclaimerAccepted() {
-        if (isDisclaimerAccepted()) return true;
+        if (disclaimerAccepted) return true;
 
         const result = await Swal.fire({
             icon: 'info',
@@ -176,7 +185,13 @@ $(document).ready(function() {
         });
 
         if (result.isConfirmed) {
-            setDisclaimerAccepted();
+            try {
+                await $.ajax({
+                    url: '/assessoria/aceitar-disclaimer',
+                    method: 'POST'
+                });
+            } catch (e) {
+            }
             return true;
         }
 
@@ -184,8 +199,13 @@ $(document).ready(function() {
         return false;
     }
 
-    // Bloquear uso da página até aceitar
-    ensureDisclaimerAccepted();
+    // Gate de acesso
+    (async function() {
+        const okLogin = await ensureLoggedIn();
+        if (!okLogin) return;
+        const okDisc = await ensureDisclaimerAccepted();
+        if (!okDisc) return;
+    })();
 
     // Adicionar novo campo de link
     $('#addLinkBtn').click(function() {
@@ -226,13 +246,13 @@ $(document).ready(function() {
     $('#assessoriaForm').submit(function(e) {
         e.preventDefault();
 
-        // Garantir aceite antes de prosseguir
-        if (!isDisclaimerAccepted()) {
-            ensureDisclaimerAccepted().then(function(ok) {
-                if (ok) {
-                    $('#assessoriaForm').trigger('submit');
-                }
-            });
+        if (!isLoggedIn) {
+            ensureLoggedIn();
+            return;
+        }
+
+        if (!disclaimerAccepted) {
+            ensureDisclaimerAccepted();
             return;
         }
         

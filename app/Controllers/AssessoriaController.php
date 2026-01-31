@@ -3,6 +3,8 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Models\Produto;
+use App\Services\AuthService;
+use App\Models\Usuario;
 
 class AssessoriaController extends Controller {
     
@@ -10,8 +12,64 @@ class AssessoriaController extends Controller {
      * Exibe a página principal de Assessoria
      */
     public function index(Request $request) {
-        session_start();
-        $this->view('assessoria/index');
+        $auth = new AuthService();
+        $isLogged = $auth->estaLogado();
+        $usuario = $isLogged ? $auth->getUsuarioLogado() : null;
+
+        // Exigir login (sem redirecionar imediatamente; UI mostra pop-up e botão de login)
+        $acceptedAt = null;
+        if ($isLogged && is_array($usuario)) {
+            try {
+                $userModel = new Usuario();
+                $full = $userModel->find($usuario['id']);
+                $acceptedAt = $full['assessoria_disclaimer_aceito_em'] ?? null;
+            } catch (\Exception $e) {
+                $acceptedAt = null;
+            }
+        }
+
+        $this->view('assessoria/index', [
+            'assessoria_logged_in' => $isLogged,
+            'assessoria_disclaimer_accepted' => ($acceptedAt !== null && (string) $acceptedAt !== ''),
+        ]);
+    }
+
+    public function aceitarDisclaimer(Request $request) {
+        header('Content-Type: application/json');
+
+        $auth = new AuthService();
+        if (!$auth->estaLogado()) {
+            echo json_encode(['success' => false, 'message' => 'Login obrigatório']);
+            return;
+        }
+
+        $usuario = $auth->getUsuarioLogado();
+        if (!$usuario || !isset($usuario['id'])) {
+            echo json_encode(['success' => false, 'message' => 'Usuário inválido']);
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE usuarios');
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            if (is_array($cols) && in_array('assessoria_disclaimer_aceito_em', $cols, true)) {
+                $stmt = $db->prepare('UPDATE usuarios SET assessoria_disclaimer_aceito_em = NOW() WHERE id = ?');
+                $stmt->execute([(int) $usuario['id']]);
+            }
+
+            echo json_encode(['success' => true]);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao salvar aceite']);
+            return;
+        }
     }
 
     public function enfileirarLinks(Request $request) {

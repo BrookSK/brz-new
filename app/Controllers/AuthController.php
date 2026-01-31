@@ -15,12 +15,20 @@ class AuthController extends Controller {
     }
     
     public function login(Request $request) {
+        $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
+        if ($redirectTo === '') {
+            try {
+                $redirectTo = (string) ($_GET['redirect'] ?? '');
+            } catch (\Exception $e) {
+            }
+        }
+
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
             if ($usuario['perfil'] === 'admin') {
                 $this->redirect('/admin/dashboard');
             } else {
-                $this->redirect('/minha-conta');
+                $this->redirect($redirectTo !== '' ? $redirectTo : '/minha-conta');
             }
             return;
         }
@@ -29,6 +37,10 @@ class AuthController extends Controller {
             $email = $request->getParam('email');
             $senha = $request->getParam('senha');
             $isAdmin = $request->getParam('admin_login') === '1';
+            if ($redirectTo === '') {
+                $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
+            }
+            $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
             
             try {
                 $usuario = $this->authService->autenticar($email, $senha);
@@ -46,20 +58,41 @@ class AuthController extends Controller {
                     if ($isAdmin || $usuario['perfil'] === 'admin') {
                         $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
+                            return;
+                        }
                         $this->redirect('/admin/dashboard');
                     } else {
                         $_SESSION['message'] = 'Bem-vendo de volta, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
-                        $this->redirect('/minha-conta');
+                        $target = $redirectTo !== '' ? $redirectTo : '/minha-conta';
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => true, 'redirect' => $target]);
+                            return;
+                        }
+                        $this->redirect($target);
                     }
                     return;
                 } else {
                     $_SESSION['message'] = 'E-mail ou senha incorretos';
                     $_SESSION['message_type'] = 'danger';
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                        return;
+                    }
                 }
             } catch (\Exception $e) {
                 $_SESSION['message'] = 'Erro ao fazer login: ' . $e->getMessage();
                 $_SESSION['message_type'] = 'danger';
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                    return;
+                }
             }
             
             $this->redirect('/login');
