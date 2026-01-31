@@ -521,6 +521,61 @@ class AssessoriaController extends Controller {
         return array_values($unique);
     }
 
+    private function normalizeVariacoesForOrcamento(array $variacoes, array $dadosBrutos): array {
+        if (empty($variacoes)) {
+            return [];
+        }
+
+        $optionNames = $this->extractOptionNamesFromScrapingBee($dadosBrutos);
+
+        // Se já estiver no formato esperado (atributos), só garante defaults
+        $hasAtributos = false;
+        foreach ($variacoes as $v) {
+            if (is_array($v) && (isset($v['atributos']) || isset($v['attributes']))) {
+                $hasAtributos = true;
+                break;
+            }
+        }
+
+        if ($hasAtributos) {
+            $out = [];
+            foreach ($variacoes as $v) {
+                if (!is_array($v)) {
+                    continue;
+                }
+                if (!isset($v['atributos']) && isset($v['attributes']) && is_array($v['attributes'])) {
+                    $v['atributos'] = $v['attributes'];
+                }
+                if (!isset($v['atributos']) || !is_array($v['atributos'])) {
+                    $v['atributos'] = [];
+                }
+                if (!isset($v['id'])) {
+                    $v['id'] = (string) ($v['sku'] ?? md5((string) ($v['label'] ?? '')));
+                }
+                if (!isset($v['label']) || (string) $v['label'] === '') {
+                    $v['label'] = $this->stringifyVariationLabel($v['atributos']);
+                }
+                if (!array_key_exists('valor', $v)) {
+                    $v['valor'] = null;
+                }
+                if (!isset($v['peso']) || floatval($v['peso']) <= 0) {
+                    $v['peso'] = 1.0;
+                }
+                $out[] = [
+                    'id' => (string) ($v['id'] ?? ''),
+                    'label' => (string) ($v['label'] ?? ''),
+                    'atributos' => $v['atributos'],
+                    'valor' => ($v['valor'] === null ? null : floatval($v['valor'])),
+                    'peso' => floatval($v['peso'])
+                ];
+            }
+            return $this->mergeNormalizedVariacoes($out);
+        }
+
+        // Caso bruto (option1/2/3, price etc.)
+        return $this->normalizeVariacoes($variacoes, $optionNames);
+    }
+
     private function mergeNormalizedVariacoes(array $variacoes): array {
         $unique = [];
         foreach ($variacoes as $v) {
@@ -1964,6 +2019,11 @@ class AssessoriaController extends Controller {
         // Garantir variacoes (se ChatGPT não trouxe)
         if (!isset($produtoData['variacoes']) || !is_array($produtoData['variacoes'])) {
             $produtoData['variacoes'] = $this->extractVariacoesFromScrapingBee($dadosBrutos);
+        }
+
+        // Normalizar variacoes para o formato esperado pelo orçamento (atributos)
+        if (isset($produtoData['variacoes']) && is_array($produtoData['variacoes'])) {
+            $produtoData['variacoes'] = $this->normalizeVariacoesForOrcamento($produtoData['variacoes'], $dadosBrutos);
         }
 
         if (headers_sent() === false) {
