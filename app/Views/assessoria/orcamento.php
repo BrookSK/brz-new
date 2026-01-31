@@ -39,7 +39,99 @@ require __DIR__ . '/../layouts/main.php';
     </div>
     <?php endif; ?>
 
-    <?php if (empty($orcamento['produtos'])): ?>
+    <?php
+        $jobId = (string) ($job_id ?? '');
+        $jobData = is_array(($job ?? null)) ? $job : null;
+        $jobRunning = ($jobId !== '' && is_array($jobData) && (($jobData['status'] ?? '') !== 'done'));
+        $jobTotal = (int) ($jobData['total'] ?? 0);
+        $jobProcessed = (int) ($jobData['processed'] ?? 0);
+    ?>
+
+    <?php if (empty($orcamento['produtos']) && $jobRunning): ?>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-box me-2"></i>Processando produtos</h5>
+                    <span class="badge bg-primary" id="jobProgressText"><?= $jobProcessed ?> / <?= max(1, $jobTotal) ?></span>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress-bar" id="jobProgressBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="jobPlaceholders">
+                        <?php for ($i = 0; $i < max(1, min(5, $jobTotal)); $i++): ?>
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="spinner-border text-primary me-3" role="status" style="width: 1.5rem; height: 1.5rem;"></div>
+                                    <div>
+                                        <div class="fw-bold">Carregando produto...</div>
+                                        <div class="text-muted small">Aguardando análise e extração de dados</div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endfor; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Resumo do Orçamento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted">O orçamento será exibido automaticamente quando finalizar.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var jobId = <?= json_encode($jobId) ?>;
+            var total = <?= json_encode(max(1, $jobTotal)) ?>;
+            var processed = <?= json_encode(max(0, $jobProcessed)) ?>;
+
+            function renderProgress(p, t) {
+                var pct = Math.round((p / t) * 100);
+                var bar = document.getElementById('jobProgressBar');
+                var txt = document.getElementById('jobProgressText');
+                if (bar) bar.style.width = pct + '%';
+                if (txt) txt.textContent = p + ' / ' + t;
+            }
+
+            renderProgress(processed, total);
+
+            function poll() {
+                fetch('/assessoria/status?job_id=' + encodeURIComponent(jobId))
+                    .then(function(r) { return r.json(); })
+                    .then(function(resp) {
+                        if (!resp || resp.success !== true || !resp.data) {
+                            setTimeout(poll, 2000);
+                            return;
+                        }
+
+                        var d = resp.data;
+                        var p = typeof d.processed === 'number' ? d.processed : 0;
+                        var t = typeof d.total === 'number' && d.total > 0 ? d.total : total;
+                        renderProgress(p, t);
+
+                        if (d.status === 'done') {
+                            window.location.href = '/assessoria/orcamento?job_id=' + encodeURIComponent(jobId);
+                            return;
+                        }
+
+                        setTimeout(poll, 2000);
+                    })
+                    .catch(function() {
+                        setTimeout(poll, 3000);
+                    });
+            }
+
+            poll();
+        })();
+    </script>
+    <?php elseif (empty($orcamento['produtos'])): ?>
     <div class="row">
         <div class="col-12">
             <div class="text-center py-5">

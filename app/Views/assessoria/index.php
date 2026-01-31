@@ -214,13 +214,28 @@ $(document).ready(function() {
         const totalLinks = links.length;
         $('#progressBar').css('width', '0%');
 
-        const requestOne = function(link, reset) {
+        const enqueue = function(links) {
             return new Promise(function(resolve, reject) {
                 $.ajax({
-                    url: '/assessoria/processar-um',
+                    url: '/assessoria/enfileirar',
                     method: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ link: link, reset: reset }),
+                    data: JSON.stringify({ links: links }),
+                    success: function(resp) {
+                        resolve(resp);
+                    },
+                    error: function(xhr, status, error) {
+                        reject({ xhr: xhr, status: status, error: error });
+                    }
+                });
+            });
+        };
+
+        const fetchStatus = function(jobId) {
+            return new Promise(function(resolve, reject) {
+                $.ajax({
+                    url: '/assessoria/status?job_id=' + encodeURIComponent(jobId),
+                    method: 'GET',
                     success: function(resp) {
                         resolve(resp);
                     },
@@ -285,56 +300,18 @@ $(document).ready(function() {
 
         (async function() {
             try {
-                let processed = 0;
-                let totalSucesso = 0;
-                let totalErros = 0;
-
-                for (let i = 0; i < links.length; i++) {
-                    const link = links[i];
-                    try {
-                        const resp = await requestOne(link, i === 0);
-                        if (!resp || resp.success !== true) {
-                            const msg = resp && resp.message ? resp.message : 'Erro ao processar link';
-                            showNotification('error', 'Erro ao processar produto', `Link: ${link.substring(0, 80)}...<br>Mensagem: ${msg}`);
-                            totalErros++;
-                        } else {
-                            // A API retorna success=true mesmo quando o produto dá erro (ele acumula em sessao).
-                            // Então aqui só contamos como "sucesso de requisição".
-                            // Para o total final, usamos os contadores retornados (se existirem).
-                            if (resp.data && typeof resp.data.total_produtos === 'number') {
-                                totalSucesso = resp.data.total_produtos;
-                            }
-                            if (resp.data && typeof resp.data.total_erros === 'number') {
-                                totalErros = resp.data.total_erros;
-                            }
-                        }
-                    } catch (err) {
-                        if (err && err.xhr) {
-                            logDebugHeaders(err.xhr);
-                        }
-                        showNotification('error', 'Erro ao processar produto', `Link: ${link.substring(0, 80)}...<br>Mensagem: Erro de rede/timeout (tente novamente)`);
-                        totalErros++;
-                    }
-
-                    processed++;
-                    const progress = Math.round((processed / totalLinks) * 100);
-                    $('#progressBar').css('width', progress + '%');
+                const enqResp = await enqueue(links);
+                if (!enqResp || enqResp.success !== true || !enqResp.data || !enqResp.data.job_id) {
+                    const msg = enqResp && enqResp.message ? enqResp.message : 'Erro ao iniciar processamento';
+                    throw new Error(msg);
                 }
 
-                $('#progressBar').css('width', '100%');
-                setTimeout(() => {
-                    $('#loadingOverlay').addClass('d-none');
-                    $('#processBtn').prop('disabled', false);
-                    handleSuccessResponse({
-                        total_produtos: totalSucesso || totalLinks,
-                        total_erros: totalErros,
-                        erros: []
-                    });
-                }, 300);
+                const jobId = enqResp.data.job_id;
+                window.location.href = '/assessoria/orcamento?job_id=' + encodeURIComponent(jobId);
             } catch (e) {
                 $('#loadingOverlay').addClass('d-none');
                 $('#processBtn').prop('disabled', false);
-                handleErrorResponse('Erro ao processar requisição. Verifique o console para detalhes.');
+                handleErrorResponse(e && e.message ? e.message : 'Erro ao processar requisição.');
             }
         })();
     }

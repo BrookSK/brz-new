@@ -60,6 +60,8 @@ $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 $router->get('/assessoria', 'AssessoriaController', 'index');
 $router->post('/assessoria/processar', 'AssessoriaController', 'processarLinks');
 $router->post('/assessoria/processar-um', 'AssessoriaController', 'processarLinkUnico');
+$router->post('/assessoria/enfileirar', 'AssessoriaController', 'enfileirarLinks');
+$router->get('/assessoria/status', 'AssessoriaController', 'statusJob');
 $router->get('/assessoria/orcamento', 'AssessoriaController', 'orcamento');
 $router->post('/assessoria/adicionar-ao-carrinho', 'AssessoriaController', 'adicionarAoCarrinho');
 
