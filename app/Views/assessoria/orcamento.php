@@ -186,23 +186,7 @@ require __DIR__ . '/../layouts/main.php';
                                     <h6 class="mb-1"><?= htmlspecialchars($produto['nome']) ?></h6>
                                     <p class="text-muted small mb-1"><?= htmlspecialchars($produto['descricao']) ?></p>
                                     <?php if (!empty($produto['variacoes']) && is_array($produto['variacoes'])): ?>
-                                        <div class="mt-2" style="max-width: 420px;">
-                                            <label class="form-label small mb-1" for="variacao_<?= $index ?>">Selecione a variação</label>
-                                            <select class="form-select form-select-sm variation-select" id="variacao_<?= $index ?>" data-index="<?= $index ?>">
-                                                <option value="">Produto simples</option>
-                                                <?php foreach ($produto['variacoes'] as $v): ?>
-                                                    <?php
-                                                        $vid = (string) ($v['id'] ?? '');
-                                                        $vlabel = (string) ($v['label'] ?? 'Variação');
-                                                        $vvalor = isset($v['valor']) ? $v['valor'] : null;
-                                                        $vpeso = isset($v['peso']) ? $v['peso'] : null;
-                                                    ?>
-                                                    <option value="<?= htmlspecialchars($vid) ?>" data-valor="<?= htmlspecialchars((string) ($vvalor === null ? '' : $vvalor)) ?>" data-peso="<?= htmlspecialchars((string) ($vpeso === null ? '' : $vpeso)) ?>">
-                                                        <?= htmlspecialchars($vlabel) ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
+                                        <div class="mt-2 variation-combo" data-index="<?= $index ?>"></div>
                                     <?php endif; ?>
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="badge bg-light text-dark">
@@ -331,30 +315,149 @@ $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
     const totaisOriginais = <?= json_encode($totais) ?>;
 
-    function getProdutoSelecionadoComVariacao(index) {
-        const p = produtos[index];
-        if (!p) return null;
+    const selections = {};
 
-        const sel = document.querySelector('.variation-select[data-index="' + index + '"]');
-        if (!sel || !sel.value) {
-            return { produto: p, variacao_id: null, valor: p.valor, peso: p.peso };
+    function getVariationKeys(index) {
+        const p = produtos[index];
+        if (!p || !Array.isArray(p.variacoes)) return [];
+        const keys = new Set();
+        p.variacoes.forEach(v => {
+            const attrs = v && typeof v === 'object' ? (v.atributos || {}) : {};
+            if (attrs && typeof attrs === 'object') {
+                Object.keys(attrs).forEach(k => {
+                    if (k && String(k).trim() !== '') keys.add(String(k).trim());
+                });
+            }
+        });
+        return Array.from(keys);
+    }
+
+    function getValueSetForKey(index, key, partial) {
+        const p = produtos[index];
+        const out = new Set();
+        if (!p || !Array.isArray(p.variacoes)) return out;
+        p.variacoes.forEach(v => {
+            if (!v || typeof v !== 'object') return;
+            const attrs = v.atributos || {};
+            if (!attrs || typeof attrs !== 'object') return;
+            const val = attrs[key];
+            if (val === undefined || val === null || String(val).trim() === '') return;
+            if (partial && typeof partial === 'object') {
+                for (const pk of Object.keys(partial)) {
+                    if (pk === key) continue;
+                    const pv = partial[pk];
+                    if (pv === null || pv === undefined) continue;
+                    if (String((attrs || {})[pk] ?? '') !== String(pv)) {
+                        return;
+                    }
+                }
+            }
+            out.add(String(val));
+        });
+        return out;
+    }
+
+    function resolveVariant(index) {
+        const p = produtos[index];
+        if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
+            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true };
         }
 
-        const opt = sel.options[sel.selectedIndex];
-        const vValor = opt ? parseFloat(opt.getAttribute('data-valor') || '') : NaN;
-        const vPeso = opt ? parseFloat(opt.getAttribute('data-peso') || '') : NaN;
-        const valor = !isNaN(vValor) && vValor > 0 ? vValor : p.valor;
-        const peso = !isNaN(vPeso) && vPeso > 0 ? vPeso : p.peso;
-        return { produto: p, variacao_id: sel.value, valor, peso };
+        const keys = getVariationKeys(index);
+        if (keys.length === 0) {
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
+        }
+
+        const sel = selections[index] || {};
+        const complete = keys.every(k => sel[k] !== undefined && sel[k] !== null && String(sel[k]).trim() !== '');
+        const matches = p.variacoes.filter(v => {
+            if (!v || typeof v !== 'object') return false;
+            const attrs = v.atributos || {};
+            if (!attrs || typeof attrs !== 'object') return false;
+            for (const k of keys) {
+                const want = sel[k];
+                if (want === undefined || want === null || String(want).trim() === '') return false;
+                if (String((attrs || {})[k] ?? '') !== String(want)) return false;
+            }
+            return true;
+        });
+
+        if (!complete) {
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+        }
+
+        if (matches.length === 1) {
+            const v = matches[0];
+            const valor = v.valor !== null && v.valor !== undefined && !isNaN(parseFloat(v.valor)) && parseFloat(v.valor) > 0 ? parseFloat(v.valor) : p.valor;
+            const peso = v.peso !== null && v.peso !== undefined && !isNaN(parseFloat(v.peso)) && parseFloat(v.peso) > 0 ? parseFloat(v.peso) : p.peso;
+            return { variacao_id: String(v.id ?? ''), valor, peso, complete: true };
+        }
+
+        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+    }
+
+    function updateComboUI(index) {
+        const container = document.querySelector('.variation-combo[data-index="' + index + '"]');
+        if (!container) return;
+        const p = produtos[index];
+        if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const keys = getVariationKeys(index);
+        if (keys.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        if (!selections[index]) selections[index] = {};
+
+        const sel = selections[index];
+        let html = '';
+        keys.forEach((k, i) => {
+            const partial = { ...sel };
+            delete partial[k];
+            const values = Array.from(getValueSetForKey(index, k, partial));
+            values.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+            html += '<div class="mb-2">';
+            html += '<div class="small text-muted mb-1">' + $('<div>').text(k).html() + '</div>';
+            html += '<div class="d-flex flex-wrap gap-2">';
+            values.forEach(v => {
+                const isActive = String(sel[k] ?? '') === String(v);
+                // Disponibilidade depende das escolhas atuais (exceto o próprio key)
+                const candidate = { ...sel, [k]: v };
+                const hasAny = p.variacoes.some(variant => {
+                    if (!variant || typeof variant !== 'object') return false;
+                    const attrs = variant.atributos || {};
+                    if (!attrs || typeof attrs !== 'object') return false;
+                    for (const kk of keys) {
+                        const want = candidate[kk];
+                        if (want === undefined || want === null || String(want).trim() === '') continue;
+                        if (String((attrs || {})[kk] ?? '') !== String(want)) return false;
+                    }
+                    return true;
+                });
+                const disabled = !hasAny;
+                const classes = 'btn btn-sm ' + (isActive ? 'btn-dark' : 'btn-outline-secondary');
+                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + $('<div>').text(k).html() + '" data-value="' + $('<div>').text(v).html() + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
+            });
+            html += '</div>';
+            html += '</div>';
+        });
+
+        const status = resolveVariant(index);
+        if (!status.complete) {
+            html += '<div class="small text-muted">Selecione todas as opções para definir a variação.</div>';
+        }
+        container.innerHTML = html;
     }
 
     function atualizarCardProduto(index) {
-        const item = document.querySelector('#produto_' + index);
         const container = document.getElementById('produto_' + index) ? document.getElementById('produto_' + index).closest('.product-item') : null;
         if (!container) return;
-        const data = getProdutoSelecionadoComVariacao(index);
-        if (!data) return;
-
+        const data = resolveVariant(index);
         const valorEl = container.querySelector('.valor-text');
         const pesoEl = container.querySelector('.peso-text');
         if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
@@ -365,10 +468,12 @@ $(document).ready(function() {
     function calcularTotaisSelecionados() {
         const selecionados = [];
         const selecionadosPayload = [];
+        let allComplete = true;
         $('.product-checkbox:checked').each(function() {
             const index = parseInt($(this).val());
-            const d = getProdutoSelecionadoComVariacao(index);
-            if (!d) return;
+            const p = produtos[index];
+            if (!p) return;
+            const d = resolveVariant(index);
 
             selecionados.push({
                 ...produtos[index],
@@ -380,6 +485,13 @@ $(document).ready(function() {
                 index: index,
                 variacao_id: d.variacao_id
             });
+
+            if (Array.isArray(p.variacoes) && p.variacoes.length > 0) {
+                const keys = getVariationKeys(index);
+                if (keys.length > 0 && !d.complete) {
+                    allComplete = false;
+                }
+            }
         });
 
         const subtotal = selecionados.reduce((sum, p) => sum + p.valor, 0);
@@ -408,7 +520,7 @@ $(document).ready(function() {
         // Habilitar/desabilitar botão
         const termosAceitos = $('#termosAceitos').is(':checked');
         const temSelecionados = selecionados.length > 0;
-        $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados));
+        $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete));
 
         // Cache payload no botão
         $('#addToCartBtn').data('selecionados', selecionadosPayload);
@@ -417,11 +529,16 @@ $(document).ready(function() {
     // Event listeners
     $('.product-checkbox').change(calcularTotaisSelecionados);
     $('#termosAceitos').change(calcularTotaisSelecionados);
-    $('.variation-select').change(function() {
+
+    $(document).on('click', '.variation-btn', function() {
         const index = parseInt($(this).data('index'));
-        if (!isNaN(index)) {
-            atualizarCardProduto(index);
-        }
+        const key = $(this).data('key');
+        const value = $(this).data('value');
+        if (isNaN(index) || !key) return;
+        if (!selections[index]) selections[index] = {};
+        selections[index][String(key)] = String(value);
+        updateComboUI(index);
+        atualizarCardProduto(index);
         calcularTotaisSelecionados();
     });
 
@@ -500,9 +617,10 @@ $(document).ready(function() {
 
     // Inicializar cálculos
     calcularTotaisSelecionados();
-    $('.variation-select').each(function() {
+    $('.variation-combo').each(function() {
         const index = parseInt($(this).data('index'));
         if (!isNaN(index)) {
+            updateComboUI(index);
             atualizarCardProduto(index);
         }
     });
