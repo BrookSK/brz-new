@@ -172,29 +172,43 @@
                                     <?php foreach ($pedidos_recentes as $pedido): ?>
                                     <tr>
                                         <td>
-                                            <strong><?= htmlspecialchars($pedido['codigo_pedido']) ?></strong>
+                                            <?php
+                                            $codigoPedido = $pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? ('PED-' . str_pad((int) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT)));
+                                            ?>
+                                            <strong><?= htmlspecialchars((string) $codigoPedido) ?></strong>
                                         </td>
-                                        <td><?= date('d/m/Y', strtotime($pedido['created_at'])) ?></td>
+                                        <?php
+                                        $dataPedido = $pedido['created_at'] ?? ($pedido['pago_em'] ?? ($pedido['data_aprovacao'] ?? null));
+                                        ?>
+                                        <td><?= $dataPedido ? date('d/m/Y', strtotime((string) $dataPedido)) : '-' ?></td>
                                         <td>
                                             <?php
                                             $statusColors = [
+                                                'selecao' => 'secondary',
                                                 'pendente' => 'warning',
+                                                'pagamento' => 'warning',
                                                 'processando' => 'info',
                                                 'enviado' => 'primary',
                                                 'entregue' => 'success',
                                                 'cancelado' => 'danger'
                                             ];
-                                            $color = $statusColors[$pedido['status']] ?? 'secondary';
+                                            $statusPedido = (string) ($pedido['status'] ?? '');
+                                            $color = $statusColors[$statusPedido] ?? 'secondary';
                                             ?>
                                             <span class="badge bg-<?= $color ?>">
-                                                <?= ucfirst($pedido['status']) ?>
+                                                <?= ucfirst($statusPedido ?: 'selecao') ?>
                                             </span>
                                         </td>
-                                        <td>R$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
+                                        <?php
+                                        $valorPedido = $pedido['valor_total'] ?? ($pedido['total'] ?? 0);
+                                        $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+                                        $prefixo = ($moedaPedido === 'USD') ? 'US$ ' : 'R$ ';
+                                        ?>
+                                        <td><?= $prefixo . number_format((float) $valorPedido, 2, ',', '.') ?></td>
                                         <td>
                                             <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
                                                class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
+                                                Ver
                                             </a>
                                         </td>
                                     </tr>
