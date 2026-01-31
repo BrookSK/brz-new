@@ -128,6 +128,11 @@ class AssessoriaController extends Controller {
             $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
             $_SESSION['assessoria_orcamento_token'] = (string) ($row['public_token'] ?? '');
 
+            // Evitar travar a aplicação por lock de sessão durante processamento/spawn
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
+
             $orcModel->update($orcamentoId, [
                 'job_id' => $newJobId,
                 'produtos_json' => null,
@@ -153,19 +158,6 @@ class AssessoriaController extends Controller {
             $spawned = $this->trySpawnJobWorker($newJobId);
             $job['spawned'] = $spawned ? true : false;
             $this->writeJobFile($newJobId, $job);
-
-            if ($spawned) {
-                $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId);
-                return;
-            }
-
-            // fallback síncrono
-            if (function_exists('fastcgi_finish_request')) {
-                fastcgi_finish_request();
-            }
-            ignore_user_abort(true);
-            @set_time_limit(0);
-            $this->startBackgroundProcessing($links, $newJobId);
 
             $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId);
             return;
@@ -1398,8 +1390,10 @@ class AssessoriaController extends Controller {
         $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
         $cmd = escapeshellcmd($php) . ' ' . escapeshellarg($worker) . ' ' . escapeshellarg($jobId);
 
-        // Linux/Unix background
-        if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+        // Rodar em background (importante no Windows para não travar a request)
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $cmd = 'cmd /c start /B "assessoria_worker" ' . $cmd;
+        } else {
             $cmd .= ' > /dev/null 2>&1 &';
         }
 
