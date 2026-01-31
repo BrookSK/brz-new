@@ -95,6 +95,7 @@ class Produto extends Model {
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.active = 1 
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY p.name ASC
         ");
         $stmt->execute();
@@ -108,6 +109,7 @@ class Produto extends Model {
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.status = 'published' AND p.active = 1 
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY p.created_at DESC 
             LIMIT :limit
         ");
@@ -133,6 +135,7 @@ class Produto extends Model {
             WHERE (p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)
             AND p.status = 'published' AND p.active = 1
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY p.name ASC 
             LIMIT :limit
         ");
@@ -149,6 +152,7 @@ class Produto extends Model {
             SELECT * FROM {$this->table} 
             WHERE category_id = :category_id 
             AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
+            AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY name ASC
         ");
         $stmt->bindParam(':category_id', $categoriaId);
