@@ -360,6 +360,19 @@ class AssessoriaController extends Controller {
 
         $variacoes = $this->extractVariacoesFromScrapingBee($dadosBrutos);
 
+        if (headers_sent() === false) {
+            $attrKeys = [];
+            foreach ($variacoes as $v) {
+                if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
+                    foreach (array_keys($v['atributos']) as $k) {
+                        $attrKeys[(string) $k] = true;
+                    }
+                }
+            }
+            header('X-Assessoria-Variacoes-Fallback-Count: ' . count($variacoes));
+            header('X-Assessoria-Variacoes-Fallback-Keys: ' . $this->headerSafeValue(implode(',', array_keys($attrKeys)), 200));
+        }
+
         return [
             'sku' => '',
             'nome' => $nome,
@@ -1013,7 +1026,7 @@ class AssessoriaController extends Controller {
                 // Default mais rápido para evitar timeout no proxy
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_query' => 'Extract all available product information, including product name, image, base price, and all variations. Each variation must include size, weight, or any selectable attribute, its value, and price if different. Preserve measurement units and return missing data as null.'
+                'ai_query' => 'Extract the product and return structured data. IMPORTANT: include ALL possible variant combinations (e.g., Color, Size, Fit, Style, Model). Return an array "variants" (or "variations") where each item contains: id/sku, attributes as a key-value map (attribute name -> selected value), and the exact price for that variant (USD) when available. Also return product name, description, images. Missing values must be null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -1874,6 +1887,21 @@ class AssessoriaController extends Controller {
         // Garantir variacoes (se ChatGPT não trouxe)
         if (!isset($produtoData['variacoes']) || !is_array($produtoData['variacoes'])) {
             $produtoData['variacoes'] = $this->extractVariacoesFromScrapingBee($dadosBrutos);
+        }
+
+        if (headers_sent() === false) {
+            $attrKeys = [];
+            if (is_array($produtoData['variacoes'])) {
+                foreach ($produtoData['variacoes'] as $v) {
+                    if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
+                        foreach (array_keys($v['atributos']) as $k) {
+                            $attrKeys[(string) $k] = true;
+                        }
+                    }
+                }
+            }
+            header('X-Assessoria-Variacoes-Count: ' . (is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0));
+            header('X-Assessoria-Variacoes-Keys: ' . $this->headerSafeValue(implode(',', array_keys($attrKeys)), 200));
         }
 
         // Garantir url_original e filtrar apenas campos essenciais para persistência
