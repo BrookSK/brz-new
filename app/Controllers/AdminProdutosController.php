@@ -337,8 +337,7 @@ class AdminProdutosController extends Controller {
         renderAdminSidebarStyles();
 
         echo '<style>
-        .product-card { transition: transform 0.2s; }
-        .product-card:hover { transform: translateY(-5px); }
+        .product-card { transition: none; }
         .product-image { height: 200px; object-fit: cover; }
     </style>
 </head>

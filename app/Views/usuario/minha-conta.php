@@ -27,7 +27,9 @@
                     </div>
                     <h5 class="card-title"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted"><?= htmlspecialchars($usuario['email']) ?></p>
-                    <span class="badge bg-primary"><?= ucfirst($usuario['perfil']) ?></span>
+                    <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: #0b1f3a;">
+                        <?= ucfirst($usuario['perfil']) ?>
+                    </span>
                 </div>
             </div>
             
@@ -68,72 +70,80 @@
             <!-- Stats Cards -->
             <div class="row mb-4">
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-primary text-white">
+                    <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <h4 class="mb-0"><?= $total_pedidos ?></h4>
-                                    <small>Total de Pedidos</small>
+                                    <small class="text-muted d-block mb-1">Total de Pedidos</small>
+                                    <h4 class="mb-0 text-dark"><?= $total_pedidos ?></h4>
                                 </div>
-                                <i class="fas fa-shopping-bag fa-2x opacity-75"></i>
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: #0b1f3a;">
+                                    <i class="fas fa-shopping-bag"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-success text-white">
+                    <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <h4 class="mb-0">
+                                    <small class="text-muted d-block mb-1">Pedidos Ativos</small>
+                                    <h4 class="mb-0 text-dark">
                                         <?php 
                                         echo (int) ($pedidos_ativos ?? 0);
                                         ?>
                                     </h4>
-                                    <small>Pedidos Ativos</small>
                                 </div>
-                                <i class="fas fa-truck fa-2x opacity-75"></i>
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                    <i class="fas fa-truck"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <h4 class="mb-0">
+                                    <small class="text-muted d-block mb-1">Total Gasto</small>
+                                    <h6 class="mb-0 text-dark" style="line-height: 1.2;">
                                         <?php 
                                         $tgBRL = floatval($total_gasto_brl ?? 0);
                                         $tgUSD = floatval($total_gasto_usd ?? 0);
                                         if ($tgUSD > 0 && $tgBRL > 0) {
-                                            echo 'R$ ' . number_format($tgBRL, 2, ',', '.') . '<br><span class="text-white-50" style="font-size: 0.85rem;">US$ ' . number_format($tgUSD, 2, ',', '.') . '</span>';
+                                            echo 'R$ ' . number_format($tgBRL, 2, ',', '.') . '<br><span class="text-muted" style="font-size: 0.85rem;">US$ ' . number_format($tgUSD, 2, ',', '.') . '</span>';
                                         } elseif ($tgUSD > 0) {
                                             echo 'US$ ' . number_format($tgUSD, 2, ',', '.');
                                         } else {
                                             echo 'R$ ' . number_format($tgBRL, 2, ',', '.');
                                         }
                                         ?>
-                                    </h4>
-                                    <small>Total Gasto</small>
+                                    </h6>
                                 </div>
-                                <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.18); color: rgba(124, 45, 18, 1);">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-info text-white">
+                    <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex align-items-start justify-content-between">
                                 <div>
-                                    <h4 class="mb-0"><?= count($enderecos) ?></h4>
-                                    <small>Endereços</small>
+                                    <small class="text-muted d-block mb-1">Endereços</small>
+                                    <h4 class="mb-0 text-dark"><?= count($enderecos) ?></h4>
                                 </div>
-                                <i class="fas fa-map-marker-alt fa-2x opacity-75"></i>
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.18); color: rgba(11, 31, 58, 1);">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -184,18 +194,46 @@
                                         <td>
                                             <?php
                                             $statusColors = [
-                                                'selecao' => 'secondary',
-                                                'pendente' => 'warning',
-                                                'pagamento' => 'warning',
-                                                'processando' => 'info',
-                                                'enviado' => 'primary',
-                                                'entregue' => 'success',
-                                                'cancelado' => 'danger'
+                                                'selecao' => [
+                                                    'bg' => 'rgba(148, 163, 184, 0.18)',
+                                                    'border' => 'rgba(148, 163, 184, 0.35)',
+                                                    'color' => 'rgba(15, 23, 42, 0.82)'
+                                                ],
+                                                'pendente' => [
+                                                    'bg' => 'rgba(245, 158, 11, 0.14)',
+                                                    'border' => 'rgba(245, 158, 11, 0.35)',
+                                                    'color' => 'rgba(124, 45, 18, 1)'
+                                                ],
+                                                'pagamento' => [
+                                                    'bg' => 'rgba(245, 158, 11, 0.14)',
+                                                    'border' => 'rgba(245, 158, 11, 0.35)',
+                                                    'color' => 'rgba(124, 45, 18, 1)'
+                                                ],
+                                                'processando' => [
+                                                    'bg' => 'rgba(56, 189, 248, 0.12)',
+                                                    'border' => 'rgba(56, 189, 248, 0.22)',
+                                                    'color' => 'rgba(11, 31, 58, 1)'
+                                                ],
+                                                'enviado' => [
+                                                    'bg' => 'rgba(11, 31, 58, 0.08)',
+                                                    'border' => 'rgba(11, 31, 58, 0.14)',
+                                                    'color' => 'rgba(11, 31, 58, 1)'
+                                                ],
+                                                'entregue' => [
+                                                    'bg' => 'rgba(16, 185, 129, 0.10)',
+                                                    'border' => 'rgba(16, 185, 129, 0.18)',
+                                                    'color' => 'rgba(6, 78, 59, 1)'
+                                                ],
+                                                'cancelado' => [
+                                                    'bg' => 'rgba(239, 68, 68, 0.10)',
+                                                    'border' => 'rgba(239, 68, 68, 0.18)',
+                                                    'color' => 'rgba(185, 28, 28, 1)'
+                                                ]
                                             ];
                                             $statusPedido = (string) ($pedido['status'] ?? '');
-                                            $color = $statusColors[$statusPedido] ?? 'secondary';
+                                            $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
                                             ?>
-                                            <span class="badge bg-<?= $color ?>">
+                                            <span class="badge" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                 <?= ucfirst($statusPedido ?: 'selecao') ?>
                                             </span>
                                         </td>
@@ -265,9 +303,9 @@
                                             <td><?= !empty($o['created_at']) ? date('d/m/Y H:i', strtotime($o['created_at'])) : '-' ?></td>
                                             <td>
                                                 <?php if ($isPago): ?>
-                                                    <span class="badge bg-success">Pago</span>
+                                                    <span class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">Pago</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-secondary">Rascunho</span>
+                                                    <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);">Rascunho</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -300,7 +338,7 @@
                                                             Reprocessar
                                                         </a>
                                                     <?php else: ?>
-                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-success">
+                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-primary">
                                                             Finalizar orçamento
                                                         </a>
                                                     <?php endif; ?>
@@ -341,46 +379,6 @@
             })();
             </script>
         </div>
-            <!-- Quick Actions -->
-            <div class="row mt-4">
-                <div class="col-md-6">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="card-title"><i class="fas fa-bolt"></i> Ações Rápidas</h6>
-                            <div class="d-grid gap-2">
-                                <a href="/produtos" class="btn btn-outline-primary">
-                                    <i class="fas fa-shopping-cart me-2"></i> Comprar Produtos
-                                </a>
-                                <a href="/carrinho" class="btn btn-outline-success">
-                                    <i class="fas fa-shopping-basket me-2"></i> Ver Carrinho
-                                </a>
-                                <a href="/rastreamento" class="btn btn-outline-info">
-                                    <i class="fas fa-search-location me-2"></i> Rastrear Pedido
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="card-title"><i class="fas fa-user-cog"></i> Configurações</h6>
-                            <div class="d-grid gap-2">
-                                <a href="/meus-dados" class="btn btn-outline-secondary">
-                                    <i class="fas fa-user-edit me-2"></i> Editar Perfil
-                                </a>
-                                <a href="/meus-pedidos" class="btn btn-outline-secondary">
-                                    <i class="fas fa-history me-2"></i> Histórico
-                                </a>
-                                <a href="/contato" class="btn btn-outline-secondary">
-                                    <i class="fas fa-headset me-2"></i> Suporte
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -390,7 +388,8 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: var(--primary-gradient);
+    background: rgba(11, 31, 58, 0.10);
+    border: 1px solid rgba(11, 31, 58, 0.14);
     color: white;
     display: flex;
     align-items: center;
@@ -415,21 +414,13 @@
 
 .nav-link:hover {
     background-color: #f8f9fa;
-    transform: translateX(5px);
+    transform: none;
 }
 
 .nav-link.active {
-    background: var(--primary-gradient);
-    color: white !important;
-}
-
-.card {
-    border: none;
-    transition: transform 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
+    background: rgba(11, 31, 58, 0.08);
+    border: 1px solid rgba(11, 31, 58, 0.14);
+    color: rgba(11, 31, 58, 1) !important;
 }
 
 .table th {

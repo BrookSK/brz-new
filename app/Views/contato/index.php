@@ -194,25 +194,20 @@ function showAlert(type, message) {
 
 <style>
 .card {
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 .card:hover {
-    transform: translateY(-2px);
+    transform: none;
 }
 
 .btn-primary {
-    background: var(--primary-gradient);
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: 12px 30px;
-    font-weight: 600;
-    transition: all 0.3s ease;
+    transition: none;
 }
 
 .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    transform: none;
+    box-shadow: none;
 }
 
 </style>

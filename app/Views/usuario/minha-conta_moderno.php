@@ -29,7 +29,9 @@
                     </div>
                     <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email']) ?></p>
-                    <span class="badge bg-primary px-3 py-2"><?= ucfirst($usuario['perfil']) ?></span>
+                    <span class="badge px-3 py-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                        <?= ucfirst($usuario['perfil']) ?>
+                    </span>
                 </div>
             </div>
             
@@ -50,7 +52,9 @@
                         <a class="nav-link mb-2" href="/carrinho">
                             <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
                             <?php if (!empty($_SESSION['carrinho'])): ?>
-                                <span class="badge bg-danger rounded-pill ms-auto"><?= count($_SESSION['carrinho']) ?></span>
+                                <span class="badge rounded-pill ms-auto" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                    <?= count($_SESSION['carrinho']) ?>
+                                </span>
                             <?php endif; ?>
                         </a>
                         <hr class="my-3">
@@ -324,21 +328,22 @@
 .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
-    transform: translateX(5px);
+    transform: none;
 }
 
 .nav-link.active {
-    background: var(--primary-gradient);
-    color: white !important;
+    background: rgba(11, 31, 58, 0.08);
+    border: 1px solid rgba(11, 31, 58, 0.14);
+    color: rgba(11, 31, 58, 1) !important;
 }
 
 .card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: none;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: none;
+    box-shadow: none;
 }
 
 .table th {

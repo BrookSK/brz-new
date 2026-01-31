@@ -12,7 +12,7 @@
     <!-- Cards de Estatísticas -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card border-0 shadow-sm h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -28,7 +28,7 @@
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
+            <div class="card border-0 shadow-sm h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -44,7 +44,7 @@
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
+            <div class="card border-0 shadow-sm h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -60,7 +60,7 @@
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card border-0 shadow-sm h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -80,7 +80,7 @@
     <div class="row">
         <!-- Pedidos por Status -->
         <div class="col-lg-6 mb-4">
-            <div class="card shadow">
+            <div class="card border-0 shadow-sm">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Pedidos por Status</h6>
                 </div>
@@ -102,7 +102,7 @@
 
         <!-- Pedidos Recentes -->
         <div class="col-lg-6 mb-4">
-            <div class="card shadow">
+            <div class="card border-0 shadow-sm">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-primary">Pedidos Recentes</h6>
                     <div class="dropdown no-arrow">
@@ -136,7 +136,20 @@
                                     <td><?= htmlspecialchars($pedido['cliente_nome']) ?></td>
                                     <td>$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
                                     <td>
-                                        <span class="badge bg-<?= getStatusColor($pedido['status']) ?>">
+                                        <?php
+                                            $dashStatus = (string) ($pedido['status'] ?? '');
+                                            $dashBadgeStyle = 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;';
+                                            if ($dashStatus === 'pago') {
+                                                $dashBadgeStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } elseif ($dashStatus === 'rascunho_etiqueta' || $dashStatus === 'aguardando_lib_alfandegaria') {
+                                                $dashBadgeStyle = 'background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.22); color: #7c2d12;';
+                                            } elseif ($dashStatus === 'entrega_finalizada') {
+                                                $dashBadgeStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } else {
+                                                $dashBadgeStyle = 'background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.22); color: #0b1f3a;';
+                                            }
+                                        ?>
+                                        <span class="badge" style="<?= $dashBadgeStyle ?>">
                                             <?= getStatusLabel($pedido['status']) ?>
                                         </span>
                                     </td>
@@ -153,7 +166,7 @@
     <!-- Ações Rápidas -->
     <div class="row">
         <div class="col-12">
-            <div class="card shadow">
+            <div class="card border-0 shadow-sm">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Ações Rápidas</h6>
                 </div>

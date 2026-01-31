@@ -17,7 +17,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="card mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -52,11 +52,11 @@
     </div>
 
     <!-- Lista de Usuários -->
-    <div class="card">
+    <div class="card border-0 shadow-sm">
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover">
-                    <thead class="table-dark">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Nome</th>
@@ -87,12 +87,25 @@
                                     <td><?= htmlspecialchars($usuario['documento']) ?></td>
                                     <td><?= htmlspecialchars($usuario['telefone']) ?></td>
                                     <td>
-                                        <span class="badge badge-<?= $usuario['perfil'] == 'admin' ? 'danger' : 'primary' ?>">
+                                        <?php $perfilStyle = ($usuario['perfil'] == 'admin')
+                                            ? 'background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.22); color: #7f1d1d;'
+                                            : 'background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);'; ?>
+                                        <span class="badge" style="<?= $perfilStyle ?>">
                                             <?= ucfirst($usuario['perfil']) ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<?= $usuario['status'] == 'ativo' ? 'success' : ($usuario['status'] == 'inativo' ? 'secondary' : 'warning') ?>">
+                                        <?php
+                                            $statusStyle = 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;';
+                                            if (($usuario['status'] ?? '') == 'ativo') {
+                                                $statusStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } elseif (($usuario['status'] ?? '') == 'bloqueado') {
+                                                $statusStyle = 'background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.22); color: #7c2d12;';
+                                            } elseif (($usuario['status'] ?? '') == 'inativo') {
+                                                $statusStyle = 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;';
+                                            }
+                                        ?>
+                                        <span class="badge" style="<?= $statusStyle ?>">
                                             <?= ucfirst($usuario['status']) ?>
                                         </span>
                                     </td>

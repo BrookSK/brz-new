@@ -88,7 +88,7 @@ function renderAdminSidebarStyles() {
 
         .sidebar { 
             min-height: 100vh; 
-            background: linear-gradient(180deg, #0b1f3a 10%, #1d4ed8 100%); 
+            background: #0b1f3a;
         }
         .sidebar .nav-link { 
             color: rgba(255, 255, 255, 0.8); 
@@ -105,10 +105,7 @@ function renderAdminSidebarStyles() {
             padding: 1rem; 
         }
         .card-stats { 
-            transition: transform 0.2s; 
-        }
-        .card-stats:hover { 
-            transform: translateY(-5px); 
+            transition: none;
         }
 
         @media (max-width: 767.98px) {

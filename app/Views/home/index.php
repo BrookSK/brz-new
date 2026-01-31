@@ -56,8 +56,8 @@
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
                 <div class="feature-card card h-100 p-4">
                     <div class="text-center mb-3">
-                        <div class="feature-icon bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
-                            <i class="fas fa-shield-alt fa-2x text-primary"></i>
+                        <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
+                            <i class="fas fa-shield-alt fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
                         <h5>Compra Segura</h5>
                     </div>
@@ -68,8 +68,8 @@
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
                 <div class="feature-card card h-100 p-4">
                     <div class="text-center mb-3">
-                        <div class="feature-icon bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
-                            <i class="fas fa-truck fa-2x text-success"></i>
+                        <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
+                            <i class="fas fa-truck fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
                         <h5>Logística Completa</h5>
                     </div>
@@ -80,8 +80,8 @@
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
                 <div class="feature-card card h-100 p-4">
                     <div class="text-center mb-3">
-                        <div class="feature-icon bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
-                            <i class="fas fa-calculator fa-2x text-warning"></i>
+                        <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
+                            <i class="fas fa-calculator fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
                         <h5>Preços Transparentes</h5>
                     </div>
@@ -125,7 +125,7 @@
                 <div class="timeline">
                     <!-- Step 1 -->
                     <div class="timeline-item d-flex mb-4" data-aos="fade-right">
-                        <div class="timeline-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px;">
+                        <div class="timeline-number rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                             <span class="fw-bold">1</span>
                         </div>
                         <div class="timeline-content">
@@ -136,7 +136,7 @@
                     
                     <!-- Step 2 -->
                     <div class="timeline-item d-flex mb-4" data-aos="fade-left">
-                        <div class="timeline-number bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px;">
+                        <div class="timeline-number rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                             <span class="fw-bold">2</span>
                         </div>
                         <div class="timeline-content">
@@ -147,7 +147,7 @@
                     
                     <!-- Step 3 -->
                     <div class="timeline-item d-flex mb-4" data-aos="fade-right">
-                        <div class="timeline-number bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px;">
+                        <div class="timeline-number rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                             <span class="fw-bold">3</span>
                         </div>
                         <div class="timeline-content">
@@ -158,7 +158,7 @@
                     
                     <!-- Step 4 -->
                     <div class="timeline-item d-flex mb-4" data-aos="fade-left">
-                        <div class="timeline-number bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px;">
+                        <div class="timeline-number rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                             <span class="fw-bold">4</span>
                         </div>
                         <div class="timeline-content">
@@ -185,7 +185,7 @@
                 <div class="testimonial-card">
                     <div class="d-flex mb-3">
                         <div class="flex-shrink-0">
-                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 50px; height: 50px;">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                                 <span class="fw-bold">JD</span>
                             </div>
                         </div>
@@ -209,7 +209,7 @@
                 <div class="testimonial-card">
                     <div class="d-flex mb-3">
                         <div class="flex-shrink-0">
-                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 50px; height: 50px;">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                                 <span class="fw-bold">MS</span>
                             </div>
                         </div>
@@ -233,7 +233,7 @@
                 <div class="testimonial-card">
                     <div class="d-flex mb-3">
                         <div class="flex-shrink-0">
-                            <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 50px; height: 50px;">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                                 <span class="fw-bold">PC</span>
                             </div>
                         </div>
@@ -257,17 +257,17 @@
 </section>
 
 <!-- CTA Section -->
-<section class="py-5 bg-primary text-white">
+<section class="py-5">
     <div class="container text-center">
         <div class="row">
             <div class="col-lg-8 mx-auto" data-aos="zoom-in">
                 <h2 class="mb-4">Pronto para começar a importar?</h2>
                 <p class="lead mb-4">Junte-se a milhares de clientes que economizam comprando diretamente dos EUA</p>
                 <div class="d-flex gap-3 justify-content-center">
-                    <a href="/register" class="btn btn-light btn-lg">
+                    <a href="/register" class="btn btn-primary btn-lg">
                         <i class="fas fa-user-plus me-2"></i> Criar Conta Gratuita
                     </a>
-                    <a href="/produtos" class="btn btn-outline-light btn-lg">
+                    <a href="/produtos" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-eye me-2"></i> Ver Produtos
                     </a>
                 </div>
@@ -293,7 +293,7 @@ $(document).ready(function() {
                                     <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
                                          class="product-image card-img-top">
-                                    ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge bg-warning">Últimas unidades</span>' : ''}
+                                    ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">Últimas unidades</span>' : ''}
                                 </div>
                                 <div class="card-body">
                                     <h6 class="card-title">${produto.nome}</h6>
@@ -337,7 +337,7 @@ $(document).ready(function() {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(11, 31, 58, 0.18) 0%, rgba(29, 78, 216, 0.14) 55%, rgba(255, 255, 255, 0.06) 100%);
+    background: rgba(255, 255, 255, 0.06);
     pointer-events: none;
 }
 
@@ -348,7 +348,7 @@ $(document).ready(function() {
     border-radius: 18px;
     box-shadow: 0 14px 38px rgba(11, 31, 58, 0.30);
     filter: saturate(1.08) contrast(1.02);
-    transform: translateZ(0);
+    transform: none;
 }
 
 .timeline {
@@ -362,7 +362,7 @@ $(document).ready(function() {
     top: 0;
     bottom: 0;
     width: 2px;
-    background: #e9ecef;
+    background: rgba(148, 163, 184, 0.35);
 }
 
 .timeline-item {
@@ -377,7 +377,7 @@ $(document).ready(function() {
     width: 4px;
     height: 4px;
     background: white;
-    border: 2px solid #6c757d;
+    border: 2px solid rgba(148, 163, 184, 0.65);
     border-radius: 50%;
 }
 

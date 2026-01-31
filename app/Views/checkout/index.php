@@ -56,10 +56,7 @@
                                                     data-cidade="<?= htmlspecialchars($endereco['cidade']) ?>"
                                                     data-estado="<?= htmlspecialchars($endereco['estado']) ?>"
                                                     <?= $endereco['principal'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($endereco['endereco']) ?>, <?= htmlspecialchars($endereco['numero']) ?> - <?= htmlspecialchars($endereco['bairro']) ?>, <?= htmlspecialchars($endereco['cidade']) ?>/<?= htmlspecialchars($endereco['estado']) ?>
-                                                <?php if ($endereco['principal']): ?>
-                                                    <span class="badge bg-primary ms-2">Principal</span>
-                                                <?php endif; ?>
+                                                <?= htmlspecialchars($endereco['endereco']) ?>, <?= htmlspecialchars($endereco['numero']) ?> - <?= htmlspecialchars($endereco['bairro']) ?>, <?= htmlspecialchars($endereco['cidade']) ?>/<?= htmlspecialchars($endereco['estado']) ?><?= $endereco['principal'] ? ' (Principal)' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -147,7 +144,7 @@
         <div class="col-lg-4">
             <div class="checkout-sticky">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-light">
+                    <div class="card-header">
                         <h6 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h6>
                     </div>
                     <div class="card-body">
@@ -170,7 +167,7 @@
                             <!-- Informações de Pagamento -->
                             <div class="mb-3">
                                 <h6><i class="fas fa-credit-card"></i> Informações de Pagamento</h6>
-                                <div class="border rounded p-3 bg-light">
+                                <div class="border rounded p-3" style="background: rgba(248, 250, 252, 0.85);">
                                     <div class="row g-2">
                                         <div class="col-12">
                                             <label class="form-label">Forma de Pagamento</label>
@@ -1263,10 +1260,6 @@ document.addEventListener('DOMContentLoaded', function() {
 @media (max-width: 768px) {
     .container-fluid {
         padding: 0;
-    }
-    
-    .card {
-        border-radius: 0;
     }
     
     .sticky-top {

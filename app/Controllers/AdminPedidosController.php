@@ -77,12 +77,8 @@ class AdminPedidosController extends Controller {
         
         echo '<style>
         .order-card { 
-            transition: all 0.3s ease; 
+            transition: none;
             border-left: 4px solid #dee2e6;
-        }
-        .order-card:hover { 
-            transform: translateX(5px); 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .order-card .badge {
             font-size: 1.2rem;

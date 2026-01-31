@@ -1,5 +1,5 @@
 <?php ob_start(); ?>
-<div class="container py-5">
+<div class="container py-4">
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="text-center mb-5">
@@ -255,5 +255,32 @@ function filtrarCategoria(categoria) {
     event.target.classList.add('btn-primary');
 }
 </script>
+
+<style>
+.accordion-item {
+    border: 0;
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+}
+
+.accordion-button {
+    border-radius: 14px;
+}
+
+.accordion-button:not(.collapsed) {
+    color: rgba(11, 31, 58, 1);
+    background: rgba(11, 31, 58, 0.06);
+    box-shadow: none;
+}
+
+.accordion-button:focus {
+    border-color: rgba(11, 31, 58, 0.20);
+    box-shadow: 0 0 0 0.25rem rgba(11, 31, 58, 0.10);
+}
+
+.accordion-body {
+    color: rgba(15, 23, 42, 0.88);
+}
+</style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

@@ -81,33 +81,36 @@ $router->get('/admin', function() {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary: #0b1f3a;
+            --bg-surface: #f6f8fb;
+            --radius-md: 16px;
+            --shadow-sm: 0 10px 28px rgba(15, 23, 42, 0.10);
+        }
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-surface);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .admin-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            background: #ffffff;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
             padding: 3rem;
             max-width: 800px;
             width: 100%;
         }
         .admin-logo {
             font-size: 3rem;
-            color: #667eea;
+            color: var(--primary);
             margin-bottom: 1rem;
         }
         .admin-title {
             font-size: 2.5rem;
             font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--primary);
             margin-bottom: 2rem;
         }
         .admin-menu {
@@ -117,18 +120,17 @@ $router->get('/admin', function() {
             margin-top: 2rem;
         }
         .admin-menu-item {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--primary);
+            color: #ffffff;
             padding: 1.5rem;
-            border-radius: 15px;
+            border-radius: var(--radius-md);
             text-decoration: none;
-            transition: all 0.3s ease;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
             text-align: center;
         }
         .admin-menu-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-            color: white;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+            color: #ffffff;
         }
         .admin-menu-item i {
             font-size: 2rem;

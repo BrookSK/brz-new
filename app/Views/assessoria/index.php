@@ -59,24 +59,24 @@ ob_start();
             </div>
 
             <!-- Card de Informações -->
-            <div class="card mt-4 border-0 bg-light">
-                <div class="card-body">
+            <div class="card mt-4 border-0 shadow-sm">
+                <div class="card-body p-4">
                     <h5 class="card-title">
-                        <i class="fas fa-info-circle text-primary me-2"></i>Como Funciona
+                        <i class="fas fa-info-circle text-muted me-2"></i>Como Funciona
                     </h5>
                     <div class="row">
                         <div class="col-md-6">
                             <ul class="list-unstyled">
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Adicione quantos links desejar
                                 </li>
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Processamos cada produto individualmente
                                 </li>
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Aplicamos taxas e impostos automáticos
                                 </li>
                             </ul>
@@ -84,15 +84,15 @@ ob_start();
                         <div class="col-md-6">
                             <ul class="list-unstyled">
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Orçamento detalhado com todos os custos
                                 </li>
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Escolha os produtos que deseja comprar
                                 </li>
                                 <li class="mb-2">
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-muted me-2"></i>
                                     Integração direta com o checkout
                                 </li>
                             </ul>

@@ -27,7 +27,7 @@
         </div>
     <?php endif; ?>
 
-    <div class="card">
+    <div class="card border-0 shadow-sm">
         <div class="card-body">
             <form method="POST" action="/admin/atualizar-produto/<?= $produto['id'] ?>" enctype="multipart/form-data">
                 <input type="hidden" name="id" value="<?= $produto['id'] ?>">
@@ -104,9 +104,7 @@
                                 <a href="<?= $fotoUrl ?>" target="_blank" class="text-decoration-none">
                                     <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
                                          alt="Imagem atual" 
-                                         style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s;"
-                                         onmouseover="this.style.transform='scale(1.05)'"
-                                         onmouseout="this.style.transform='scale(1)'"
+                                         style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;"
                                          title="Clique para ver imagem em tamanho real">
                                 </a>
                                 <div class="mt-2">
@@ -132,7 +130,7 @@
                         <div class="row g-3">
                             <?php foreach ($galeria as $foto): ?>
                                 <div class="col-md-3 col-sm-4 col-6">
-                                    <div class="card border-secondary">
+                                    <div class="card border-0 shadow-sm">
                                         <?php if ($foto['arquivo_existe']): ?>
                                             <a href="<?= $foto['url_completa'] ?>" target="_blank" class="text-decoration-none">
                                                 <img src="<?= $foto['url_completa'] ?>?v=<?= time() ?>" 
@@ -141,7 +139,7 @@
                                                      style="height: 150px; object-fit: cover; cursor: pointer;"
                                                      title="<?= $foto['principal'] ? 'Imagem Principal' : 'Imagem da Galeria' ?>">
                                                 <?php if ($foto['principal']): ?>
-                                                    <span class="position-absolute top-0 start-0 badge bg-primary">Principal</span>
+                                                    <span class="position-absolute top-0 start-0 badge" style="margin: 10px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">Principal</span>
                                                 <?php endif; ?>
                                             </a>
                                             <div class="card-body p-2">

@@ -18,12 +18,12 @@
             --success-color: #10b981;
             --danger-color: #ef4444;
 
-            --bg-gradient: linear-gradient(180deg, #f8fafc 0%, #eef2f7 45%, #ffffff 100%);
-            --surface-gradient: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-            --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
-            --primary-btn-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 100%);
-            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-            --info-gradient: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
+            --bg-gradient: #f6f8fb;
+            --surface-gradient: #ffffff;
+            --primary-gradient: #0b1f3a;
+            --primary-btn-gradient: #0b1f3a;
+            --danger-gradient: #ef4444;
+            --info-gradient: #38bdf8;
 
             --radius-sm: 10px;
             --radius-md: 14px;
@@ -37,7 +37,7 @@
 
             --header-surface: rgba(255, 255, 255, 0.86);
             --header-border: rgba(148, 163, 184, 0.35);
-            --footer-bg: linear-gradient(135deg, #0b1f3a 0%, #0f2b57 45%, #1d4ed8 110%);
+            --footer-bg: #0b1f3a;
             --footer-border: rgba(255, 255, 255, 0.10);
         }
         
@@ -73,8 +73,8 @@
         }
 
         .navbar .btn.btn-primary {
-            background: var(--primary-btn-gradient);
-            border: none;
+            background: var(--primary-color);
+            border: 1px solid rgba(11, 31, 58, 0.22);
             box-shadow: var(--shadow-sm);
         }
 
@@ -84,14 +84,14 @@
         }
 
         .navbar .btn.btn-outline-danger:hover {
-            background: var(--danger-gradient);
-            border-color: transparent;
+            background: rgba(239, 68, 68, 0.10);
+            border-color: rgba(239, 68, 68, 0.55);
             color: #fff;
             box-shadow: var(--shadow-sm);
         }
 
         .navbar .cart-badge {
-            background: var(--danger-gradient) !important;
+            background: var(--danger-color) !important;
         }
 
         .site-footer {
@@ -132,7 +132,7 @@
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.14);
             color: rgba(255, 255, 255, 0.92);
-            transition: transform 0.2s ease, background-color 0.2s ease;
+            transition: background-color 0.2s ease;
         }
 
         .site-footer .social-link:hover,
@@ -142,7 +142,6 @@
         }
 
         .site-footer .social-link:hover {
-            transform: translateY(-1px);
             background: rgba(255, 255, 255, 0.16);
         }
 
@@ -273,43 +272,44 @@
         }
 
         .btn:not(:disabled):not(.disabled):hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-sm);
+            transform: none;
+            box-shadow: none;
         }
 
         .btn:not(:disabled):not(.disabled):active {
-            transform: translateY(0);
+            transform: none;
             box-shadow: none;
         }
 
         .btn-primary {
-            border: none;
-            background: var(--primary-btn-gradient);
-            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(11, 31, 58, 0.22);
+            background: var(--primary-color);
+            box-shadow: none;
             color: #ffffff;
         }
 
         .btn-primary:hover {
-            filter: brightness(1.03);
-            box-shadow: var(--shadow-md);
+            background: #0a1a31;
+            border-color: rgba(11, 31, 58, 0.28);
+            box-shadow: none;
         }
 
         .btn-success {
-            border: none;
-            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
-            color: #064e3b;
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            background: rgba(16, 185, 129, 0.12);
+            color: rgba(6, 78, 59, 1);
         }
 
         .btn-info {
-            border: none;
-            background: var(--info-gradient);
-            color: #0b1f3a;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            background: rgba(56, 189, 248, 0.12);
+            color: rgba(11, 31, 58, 1);
         }
 
         .btn-warning {
-            border: none;
-            background: linear-gradient(135deg, #f59e0b 0%, #fff7ed 100%);
-            color: #7c2d12;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            background: rgba(245, 158, 11, 0.14);
+            color: rgba(124, 45, 18, 1);
         }
 
         .btn-secondary {
@@ -320,42 +320,43 @@
 
         .btn-dark {
             border: none;
-            background: linear-gradient(135deg, #0b1f3a 0%, #0f172a 100%);
+            background: #0b1f3a;
+            color: #ffffff;
         }
 
         .btn-danger {
-            border: none;
-            background: var(--danger-gradient);
-            color: #ffffff;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.12);
+            color: rgba(185, 28, 28, 1);
         }
 
         .btn-outline-primary {
-            border-color: rgba(29, 78, 216, 0.45);
-            color: #1d4ed8;
+            border-color: rgba(11, 31, 58, 0.28);
+            color: var(--primary-color);
         }
 
         .btn-outline-primary:hover {
-            background: var(--info-gradient);
-            border-color: rgba(29, 78, 216, 0.35);
-            color: #0b1f3a;
+            background: rgba(11, 31, 58, 0.06);
+            border-color: rgba(11, 31, 58, 0.28);
+            color: var(--primary-color);
         }
 
         .btn-outline-danger:hover {
-            background: var(--danger-gradient);
-            border-color: rgba(239, 68, 68, 0.35);
-            color: #ffffff;
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.45);
+            color: rgba(185, 28, 28, 1);
         }
 
         .btn-outline-info:hover {
-            background: var(--info-gradient);
-            border-color: rgba(56, 189, 248, 0.35);
-            color: #0b1f3a;
+            background: rgba(56, 189, 248, 0.10);
+            border-color: rgba(56, 189, 248, 0.45);
+            color: rgba(11, 31, 58, 1);
         }
 
         .btn-outline-success:hover {
-            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
-            border-color: rgba(16, 185, 129, 0.35);
-            color: #064e3b;
+            background: rgba(16, 185, 129, 0.10);
+            border-color: rgba(16, 185, 129, 0.45);
+            color: rgba(6, 78, 59, 1);
         }
 
         .btn-outline-secondary:hover {
@@ -388,35 +389,33 @@
         }
         
         .feature-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: none;
             border: none;
             height: 100%;
         }
         
         .feature-card:hover {
-            transform: translateY(-5px);
             box-shadow: var(--shadow-md);
         }
         
         .product-card {
-            transition: all 0.3s ease;
+            transition: none;
             border: none;
             overflow: hidden;
         }
         
         .product-card:hover {
-            transform: translateY(-3px);
             box-shadow: var(--shadow-md);
         }
         
         .product-image {
             height: 200px;
             object-fit: cover;
-            transition: transform 0.3s ease;
+            transition: none;
         }
         
         .product-card:hover .product-image {
-            transform: scale(1.05);
+            transform: none;
         }
         
         .cart-badge {
@@ -440,11 +439,11 @@
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-            transition: transform 0.3s ease;
+            transition: none;
         }
         
         .stats-card:hover {
-            transform: translateY(-3px);
+            transform: none;
         }
         
         .testimonial-card {
@@ -456,21 +455,19 @@
         }
         
         .cta-button {
-            background: var(--primary-btn-gradient);
+            background: var(--primary-color);
             color: white;
             padding: 15px 40px;
             border-radius: 50px;
             font-weight: 600;
             text-decoration: none;
             display: inline-block;
-            transition: all 0.3s ease;
+            transition: filter 0.2s ease, background-color 0.2s ease;
             border: none;
         }
         
         .cta-button:hover {
             filter: brightness(1.03);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
             color: white;
         }
         
@@ -502,11 +499,10 @@
             color: white;
             font-size: 1.5rem;
             box-shadow: 0 5px 20px rgba(37, 99, 235, 0.4);
-            transition: all 0.3s ease;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
         }
         
         .floating-cart button:hover {
-            transform: scale(1.1);
             box-shadow: 0 8px 30px rgba(37, 99, 235, 0.6);
         }
         

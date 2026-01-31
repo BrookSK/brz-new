@@ -17,7 +17,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="card mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -57,11 +57,11 @@
     </div>
 
     <!-- Lista de Pedidos -->
-    <div class="card">
+    <div class="card border-0 shadow-sm">
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover">
-                    <thead class="table-dark">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Cliente</th>
@@ -88,8 +88,21 @@
                                     </td>
                                     <td><?= date('d/m/Y H:i', strtotime($pedido['data_criacao'])) ?></td>
                                     <td>
-                                        <span class="badge badge-<?= $pedido['status'] == 'pago' ? 'success' : ($pedido['status'] == 'pendente' ? 'warning' : ($pedido['status'] == 'cancelado' ? 'danger' : 'info')) ?>">
-                                            <?= ucfirst($pedido['status']) ?>
+                                        <?php
+                                            $pedidoStatus = (string) ($pedido['status'] ?? '');
+                                            $badgeStyle = 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;';
+                                            if ($pedidoStatus === 'pago') {
+                                                $badgeStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } elseif ($pedidoStatus === 'pendente') {
+                                                $badgeStyle = 'background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.22); color: #7c2d12;';
+                                            } elseif ($pedidoStatus === 'cancelado') {
+                                                $badgeStyle = 'background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.22); color: #7f1d1d;';
+                                            } else {
+                                                $badgeStyle = 'background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.22); color: #0b1f3a;';
+                                            }
+                                        ?>
+                                        <span class="badge" style="<?= $badgeStyle ?>">
+                                            <?= ucfirst($pedidoStatus) ?>
                                         </span>
                                     </td>
                                     <td>
@@ -1088,7 +1101,7 @@ function carregarLogsCreditos() {
                     <td>${log.usuario_nome}</td>
                     <td>R$ ${number_format(log.valor, 2, ',', '.')}</td>
                     <td>${new Date(log.data_criacao).toLocaleString('pt-BR')}</td>
-                    <td><span class="badge badge-${log.status == 'ativo' ? 'success' : 'danger'}">${log.status}</span></td>
+                    <td><span class="badge" style="background: ${log.status == 'ativo' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'}; border: 1px solid ${log.status == 'ativo' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)'}; color: ${log.status == 'ativo' ? '#065f46' : '#7f1d1d'};">${log.status}</span></td>
                     <td>
                         <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesCredito(${log.id})">
                             <i class="fas fa-eye"></i>

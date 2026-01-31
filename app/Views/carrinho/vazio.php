@@ -43,24 +43,22 @@
 }
 
 .feature-card {
-    transition: all 0.3s ease;
+    transition: none;
     border: none;
     overflow: hidden;
 }
 
 .feature-card:hover {
-    transform: translateY(-5px);
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
 .product-card {
-    transition: all 0.3s ease;
+    transition: none;
     border: none;
     overflow: hidden;
 }
 
 .product-card:hover {
-    transform: translateY(-5px);
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
@@ -73,11 +71,11 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 .product-card:hover .product-image-container img {
-    transform: scale(1.05);
+    transform: none;
 }
 
 .card-img-top {

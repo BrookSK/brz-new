@@ -3,9 +3,9 @@
     <!-- Header de Sucesso -->
     <div class="text-center mb-5">
         <div class="success-icon mb-4">
-            <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+            <i class="fas fa-check-circle" style="font-size: 4rem; color: var(--primary-color);"></i>
         </div>
-        <h1 class="display-4 fw-bold text-success">Pedido Confirmado!</h1>
+        <h1 class="display-4 fw-bold" style="color: var(--primary-color);">Pedido Confirmado!</h1>
         <p class="lead text-muted">Seu pedido foi processado com sucesso e está sendo preparado.</p>
     </div>
 
@@ -13,7 +13,7 @@
     <div class="row">
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h5>
                 </div>
                 <div class="card-body">
@@ -31,7 +31,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <strong>Status:</strong>
-                            <span class="badge bg-warning text-dark">Pendente</span>
+                            <span class="badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">Pendente</span>
                         </div>
                         <div class="col-md-6">
                             <strong>Moeda:</strong>
@@ -91,7 +91,7 @@
         <div class="col-lg-4">
             <!-- Valores Totais -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-success text-white">
+                <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-calculator"></i> Valores</h5>
                 </div>
                 <div class="card-body">
@@ -114,14 +114,14 @@
                     <hr>
                     <div class="d-flex justify-content-between">
                         <strong>Total:</strong>
-                        <strong class="text-success"><?= $pedido['moeda'] ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
+                        <strong style="color: var(--primary-color);"><?= $pedido['moeda'] ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
                     </div>
                 </div>
             </div>
 
             <!-- Forma de Pagamento -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-info text-white">
+                <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-credit-card"></i> Pagamento</h5>
                 </div>
                 <div class="card-body">
@@ -161,7 +161,7 @@
                     ?>
 
                     <p class="mb-2 text-muted">
-                        <small>Status do pagamento: <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($statusLabel) ?></span></small>
+                        <small>Status do pagamento: <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
                     </p>
 
                     <?php
@@ -205,7 +205,7 @@
 
     <!-- Timeline de Próximas Etapas -->
     <div class="card shadow-sm mt-4">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header">
             <h5 class="mb-0"><i class="fas fa-clock"></i> Próximas Etapas</h5>
         </div>
         <div class="card-body">
@@ -263,21 +263,7 @@
 
 <style>
 .success-icon {
-    animation: scaleIn 0.5s ease-in-out;
-}
-
-@keyframes scaleIn {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    50% {
-        transform: scale(1.2);
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
+    animation: none;
 }
 
 .step-icon {

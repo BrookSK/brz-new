@@ -1,22 +1,19 @@
 <?php ob_start(); ?>
-<div class="row mb-4">
-    <div class="col-lg-8">
-        <h2><i class="fas fa-search-location"></i> Rastreamento de Pedido</h2>
-    </div>
-    <div class="col-lg-4 text-end">
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+        <h1 class="h4 mb-0"><i class="fas fa-search-location"></i> Rastreamento de Pedido</h1>
         <a href="/rastreamento" class="btn btn-outline-primary">
             <i class="fas fa-search"></i> Buscar Outro
         </a>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="fas fa-box"></i> Dados do Pedido #<?= $pedido['id'] ?></h5>
-            </div>
-            <div class="card-body">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-box"></i> Dados do Pedido #<?= $pedido['id'] ?></h5>
+                </div>
+                <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
                         <p><strong>Cliente:</strong> <?= htmlspecialchars($pedido['cliente_nome']) ?></p>
@@ -33,16 +30,17 @@
                                 'concluido' => 'Concluído'
                             ];
                             $statusColors = [
-                                'selecao' => 'secondary',
-                                'cobranca' => 'info',
-                                'despacho' => 'warning',
-                                'transito' => 'primary',
-                                'aduana' => 'warning',
-                                'entrega' => 'success',
-                                'concluido' => 'success'
+                                'selecao' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
+                                'cobranca' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                'despacho' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                'aduana' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                'entrega' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
                             ];
                             ?>
-                            <span class="badge bg-<?= $statusColors[$pedido['status']] ?? 'secondary' ?>">
+                            <?php $statusBadge = $statusColors[$pedido['status']] ?? $statusColors['selecao']; ?>
+                            <span class="badge" style="background: <?= $statusBadge['bg'] ?>; border: 1px solid <?= $statusBadge['border'] ?>; color: <?= $statusBadge['color'] ?>;">
                                 <?= $statusLabels[$pedido['status']] ?? $pedido['status'] ?>
                             </span>
                         </p>
@@ -57,7 +55,7 @@
             </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5><i class="fas fa-list"></i> Itens do Pedido</h5>
             </div>
@@ -88,12 +86,14 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="fas fa-route"></i> Fluxo do Processo</h5>
-            </div>
-            <div class="card-body">
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-route"></i> Fluxo do Processo</h5>
+                </div>
+                <div class="card-body">
                 <div class="timeline">
                     <?php 
                     $etapas = [
@@ -149,7 +149,7 @@
 
 <div class="row">
     <div class="col-lg-12">
-        <div class="card">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5><i class="fas fa-history"></i> Histórico de Rastreamento</h5>
             </div>
@@ -205,7 +205,7 @@
     top: 0;
     bottom: 0;
     width: 2px;
-    background-color: #dee2e6;
+    background-color: rgba(148, 163, 184, 0.35);
 }
 
 .timeline-vertical-item {
@@ -220,17 +220,18 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background-color: #007bff;
+    background-color: rgba(11, 31, 58, 0.85);
     border: 2px solid #fff;
-    box-shadow: 0 0 0 2px #dee2e6;
+    box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.35);
 }
 
 .timeline-vertical-content {
-    background-color: #f8f9fa;
+    background-color: rgba(248, 250, 252, 0.85);
     padding: 15px;
     border-radius: 5px;
-    border-left: 3px solid #007bff;
+    border-left: 3px solid rgba(11, 31, 58, 0.85);
 }
 </style>
+</div>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

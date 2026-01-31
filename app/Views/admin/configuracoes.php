@@ -472,7 +472,7 @@ function carregarLogsWebhook() {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${new Date(log.data_envio).toLocaleString('pt-BR')}</td>
-                        <td><span class="badge badge-${log.status == 'sucesso' ? 'success' : 'danger'}">${log.status}</span></td>
+                        <td><span class="badge" style="background: ${log.status == 'sucesso' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'}; border: 1px solid ${log.status == 'sucesso' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)'}; color: ${log.status == 'sucesso' ? '#065f46' : '#7f1d1d'};">${log.status}</span></td>
                         <td><small>${log.resposta || 'Sem resposta'}</small></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhesLog(${log.id})">

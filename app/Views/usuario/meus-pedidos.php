@@ -29,7 +29,9 @@
                     </div>
                     <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome']) ?></h5>
                     <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email']) ?></p>
-                    <span class="badge bg-primary px-3 py-2"><?= ucfirst($usuario['perfil']) ?></span>
+                    <span class="badge px-3 py-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                        <?= ucfirst($usuario['perfil']) ?>
+                    </span>
                 </div>
             </div>
             
@@ -50,7 +52,9 @@
                         <a class="nav-link mb-2" href="/carrinho">
                             <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
                             <?php if (!empty($_SESSION['carrinho'])): ?>
-                                <span class="badge bg-danger rounded-pill ms-auto"><?= count($_SESSION['carrinho']) ?></span>
+                                <span class="badge rounded-pill ms-auto" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                    <?= count($_SESSION['carrinho']) ?>
+                                </span>
                             <?php endif; ?>
                         </a>
                         <hr class="my-3">
@@ -261,22 +265,22 @@
                                         <td>
                                             <?php
                                             $statusColors = [
-                                                'pendente' => 'warning',
-                                                'processando' => 'info',
-                                                'enviado' => 'primary',
-                                                'entregue' => 'success',
-                                                'cancelado' => 'danger',
-                                                'pago' => 'success',
-                                                'paid' => 'success',
-                                                'aprovado' => 'success',
-                                                'approved' => 'success',
-                                                'selecao' => 'secondary',
-                                                'cobranca' => 'warning',
-                                                'despacho' => 'info',
-                                                'transito' => 'primary',
-                                                'aduana' => 'primary',
-                                                'entrega' => 'primary',
-                                                'concluido' => 'success'
+                                                'pendente' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                'processando' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'enviado' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'entregue' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                'cancelado' => ['bg' => 'rgba(239, 68, 68, 0.10)', 'border' => 'rgba(239, 68, 68, 0.18)', 'color' => 'rgba(185, 28, 28, 1)'],
+                                                'pago' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                'paid' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                'aprovado' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                'approved' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                'selecao' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
+                                                'cobranca' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                'despacho' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'aduana' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'entrega' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
                                             ];
                                             $statusLabels = [
                                                 'pendente' => 'Pendente',
@@ -296,10 +300,10 @@
                                                 'entrega' => 'Entrega',
                                                 'concluido' => 'Concluído'
                                             ];
-                                            $color = $statusColors[$statusPedido] ?? 'secondary';
+                                            $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
                                             $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
                                             ?>
-                                            <span class="badge bg-<?= $color ?> px-3 py-2">
+                                            <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                 <?= $label ?>
                                             </span>
                                         </td>
@@ -399,21 +403,22 @@
 .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
-    transform: translateX(5px);
+    transform: none;
 }
 
 .nav-link.active {
-    background: var(--primary-gradient);
-    color: white !important;
+    background: rgba(11, 31, 58, 0.08);
+    border: 1px solid rgba(11, 31, 58, 0.14);
+    color: rgba(11, 31, 58, 1) !important;
 }
 
 .card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: none;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: none;
+    box-shadow: none;
 }
 
 .table th {
@@ -450,8 +455,9 @@
 }
 
 .pagination .page-item.active .page-link {
-    background: var(--primary-gradient);
-    border-color: rgba(29, 78, 216, 0.35);
+    background: rgba(11, 31, 58, 0.08);
+    border-color: rgba(11, 31, 58, 0.14);
+    color: rgba(11, 31, 58, 1);
 }
 
 @media (max-width: 991.98px) {

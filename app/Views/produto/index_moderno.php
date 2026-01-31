@@ -148,34 +148,34 @@
 
 <style>
 .product-card-modern {
-    transition: all 0.3s ease;
+    transition: none;
     border-radius: 15px;
 }
 
 .product-card-modern:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    transform: none;
+    box-shadow: var(--shadow-md);
 }
 
 .product-image-modern {
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 .product-card-modern:hover .product-image-modern {
-    transform: scale(1.05);
+    transform: none;
 }
 
 .bg-gradient-primary {
-    background: var(--primary-gradient);
+    background: var(--primary-color);
 }
 
 .btn-adicionar-modern {
-    transition: all 0.3s ease;
+    transition: none;
 }
 
 .btn-adicionar-modern:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
+    transform: none;
+    box-shadow: none;
 }
 
 .cart-badge {
@@ -196,18 +196,7 @@
 }
 
 .alert {
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+    animation: none;
 }
 </style>
 

@@ -31,8 +31,8 @@
                             </div>
                         </div>
                         <div class="ms-3">
-                            <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                                <i class="fas fa-shopping-cart text-primary fs-4"></i>
+                            <div class="rounded-circle p-3" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                                <i class="fas fa-shopping-cart fs-4"></i>
                             </div>
                         </div>
                     </div>
@@ -53,8 +53,8 @@
                             </div>
                         </div>
                         <div class="ms-3">
-                            <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                                <i class="fas fa-dollar-sign text-success fs-4"></i>
+                            <div class="rounded-circle p-3" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;">
+                                <i class="fas fa-dollar-sign fs-4"></i>
                             </div>
                         </div>
                     </div>
@@ -75,8 +75,8 @@
                             </div>
                         </div>
                         <div class="ms-3">
-                            <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                                <i class="fas fa-dollar-sign text-info fs-4"></i>
+                            <div class="rounded-circle p-3" style="background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.22); color: rgba(11, 31, 58, 1);">
+                                <i class="fas fa-dollar-sign fs-4"></i>
                             </div>
                         </div>
                     </div>
@@ -97,8 +97,8 @@
                             </div>
                         </div>
                         <div class="ms-3">
-                            <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                                <i class="fas fa-receipt text-warning fs-4"></i>
+                            <div class="rounded-circle p-3" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.22); color: #7c2d12;">
+                                <i class="fas fa-receipt fs-4"></i>
                             </div>
                         </div>
                     </div>
@@ -168,15 +168,28 @@
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-2">
-                                                <i class="fas fa-user text-primary fs-6"></i>
+                                            <div class="rounded-circle p-2 me-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                                                <i class="fas fa-user fs-6"></i>
                                             </div>
                                             <?= htmlspecialchars($pedido['cliente_nome']) ?>
                                         </div>
                                     </td>
                                     <td class="fw-semibold">$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
                                     <td>
-                                        <span class="badge bg-<?= $this->getStatusColor($pedido['status']) ?> px-3 py-2">
+                                        <?php
+                                            $dashStatus = (string) ($pedido['status'] ?? '');
+                                            $dashBadgeStyle = 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;';
+                                            if ($dashStatus === 'pago') {
+                                                $dashBadgeStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } elseif ($dashStatus === 'rascunho_etiqueta' || $dashStatus === 'aguardando_lib_alfandegaria') {
+                                                $dashBadgeStyle = 'background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.22); color: #7c2d12;';
+                                            } elseif ($dashStatus === 'entrega_finalizada') {
+                                                $dashBadgeStyle = 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;';
+                                            } else {
+                                                $dashBadgeStyle = 'background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.22); color: #0b1f3a;';
+                                            }
+                                        ?>
+                                        <span class="badge px-3 py-2" style="<?= $dashBadgeStyle ?>">
                                             <?= $this->getStatusLabel($pedido['status']) ?>
                                         </span>
                                     </td>

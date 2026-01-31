@@ -113,10 +113,8 @@ class AdminDashboardController extends Controller {
         renderAdminSidebarStyles();
         
         echo '<style>
-        .stat-card { transition: transform 0.2s; }
-        .stat-card:hover { transform: translateY(-2px); }
-        .quick-action-card { transition: all 0.3s; cursor: pointer; }
-        .quick-action-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .stat-card { transition: none; }
+        .quick-action-card { transition: none; cursor: pointer; }
     </style>
 </head>
 <body>

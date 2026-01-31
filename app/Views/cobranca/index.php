@@ -1,18 +1,15 @@
 <?php ob_start(); ?>
-<div class="row mb-4">
-    <div class="col-lg-8">
-        <h2><i class="fas fa-calculator"></i> Cálculo de Cobrança</h2>
-    </div>
-    <div class="col-lg-4 text-end">
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+        <h1 class="h4 mb-0"><i class="fas fa-calculator"></i> Cálculo de Cobrança</h1>
         <a href="/produtos" class="btn btn-outline-primary">
             <i class="fas fa-arrow-left"></i> Continuar Comprando
         </a>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card mb-4">
+    <div class="row g-4">
+        <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5><i class="fas fa-shopping-cart"></i> Itens do Carrinho</h5>
             </div>
@@ -41,7 +38,7 @@
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot>
-                                <tr class="table-primary">
+                                <tr style="background: rgba(11, 31, 58, 0.06);">
                                     <th colspan="3">Subtotal Produtos:</th>
                                     <th>R$ <?= number_format($subtotal, 2, ',', '.') ?></th>
                                 </tr>
@@ -52,7 +49,7 @@
             </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5><i class="fas fa-cogs"></i> Serviços Adicionais</h5>
             </div>
@@ -90,7 +87,7 @@
             </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5><i class="fas fa-user"></i> Dados do Cliente</h5>
             </div>
@@ -125,9 +122,11 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
-        <div class="card sticky-top" style="top: 20px;">
-            <div class="card-header bg-primary text-white">
+        </div>
+
+        <div class="col-lg-4">
+        <div class="card sticky-top border-0 shadow-sm" style="top: 20px;">
+            <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h5>
             </div>
             <div class="card-body">
@@ -155,12 +154,14 @@
                     <i class="fas fa-calculator"></i> Calcular Total
                 </button>
                 
-                <button type="button" id="btn-processar" class="btn btn-success w-100" disabled>
+                <button type="button" id="btn-processar" class="btn btn-primary w-100" disabled>
                     <i class="fas fa-check"></i> Processar Pedido
                 </button>
             </div>
         </div>
     </div>
+</div>
+
 </div>
 
 <script>

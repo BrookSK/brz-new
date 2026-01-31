@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
-            background: linear-gradient(135deg, #ef4444 0%, #fee2e2 100%);
+            background: #f6f8fb;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -18,15 +18,14 @@
         
         .error-container {
             text-align: center;
-            color: white;
+            color: #0b1f3a;
         }
         
         .error-code {
             font-size: 8rem;
             font-weight: bold;
             margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            animation: shake 0.5s;
+            text-shadow: none;
         }
         
         .error-title {
@@ -38,37 +37,29 @@
         .error-description {
             font-size: 1.2rem;
             margin-bottom: 2rem;
-            opacity: 0.9;
+            opacity: 1;
         }
         
         .btn-home {
-            background: white;
-            color: #7f1d1d;
+            background: #0b1f3a;
+            color: #ffffff;
             padding: 12px 30px;
             border-radius: 50px;
             text-decoration: none;
             font-weight: 500;
-            transition: all 0.3s ease;
+            transition: background-color 0.2s ease, filter 0.2s ease;
             display: inline-block;
             margin: 0 10px;
         }
         
         .btn-home:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            color: #7f1d1d;
+            filter: brightness(1.03);
         }
-        
+
         .error-icon {
             font-size: 4rem;
             margin-bottom: 1rem;
-            opacity: 0.8;
-        }
-        
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
+            opacity: 1;
         }
     </style>
 </head>

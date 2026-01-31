@@ -54,9 +54,7 @@
                                  src="<?= $fotoAbsUrl ?>?v=<?= time() ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
-                                 style="cursor: pointer; transition: transform 0.2s;"
-                                 onmouseover="this.style.transform='scale(1.02)'"
-                                 onmouseout="this.style.transform='scale(1)'"
+                                 style="cursor: pointer;"
                                  title="Clique para ver imagem em tamanho real">
                         </a>
                     <?php else: ?>
@@ -99,7 +97,7 @@
                                      data-main-image="<?= $miniaturaAbsUrl ?>"
                                      title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
                                 <?php if ($foto['principal']): ?>
-                                    <span class="position-absolute top-0 start-0 badge bg-primary" style="font-size: 0.6em;">Principal</span>
+                                    <span class="position-absolute top-0 start-0 badge" style="font-size: 0.6em; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">Principal</span>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <div class="img-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 80px;">
@@ -179,9 +177,13 @@
                                 <td><strong>Estoque:</strong></td>
                                 <td>
                                     <?php if ($produto['estoque'] > 0): ?>
-                                        <span class="badge bg-success"><?= $produto['estoque'] ?> unidades</span>
+                                        <span class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                            <?= $produto['estoque'] ?> unidades
+                                        </span>
                                     <?php else: ?>
-                                        <span class="badge bg-danger">Fora de estoque</span>
+                                        <span class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                            Fora de estoque
+                                        </span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -243,7 +245,7 @@
                         <div class="card-body">
                             <h6 class="card-title text-dark"><?= htmlspecialchars($relacionado['nome']) ?></h6>
                             <p class="card-text">
-                                <span class="text-primary fw-bold">
+                                <span class="fw-bold" style="color: var(--primary-color);">
                                     <?php
                                     $relCurrencyCode = strtoupper((string) ($relacionado['moeda'] ?? ''));
                                     $relCurrencyLabel = $currencySymbols[$relCurrencyCode] ?? $relCurrencyCode;
@@ -276,12 +278,7 @@
 .main-product-image {
     width: 100%;
     height: auto;
-    transition: transform 0.3s ease;
     cursor: zoom-in;
-}
-
-.main-product-image:hover {
-    transform: scale(1.05);
 }
 
 .thumbnail-image {
@@ -293,14 +290,14 @@
 .thumbnail-image:hover,
 .thumbnail-image.active {
     opacity: 1;
-    border-color: #007bff !important;
-    transform: scale(1.05);
+    border-color: rgba(11, 31, 58, 0.28) !important;
+    transform: none;
 }
 
 .current-price {
     font-size: 2rem;
     font-weight: bold;
-    color: #007bff;
+    color: var(--primary-color);
 }
 
 .currency {
@@ -309,26 +306,26 @@
 }
 
 .product-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: none;
 }
 
 .product-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transform: none;
+    box-shadow: none;
 }
 
 .thumbnail-image {
     border: 2px solid transparent;
-    transition: border-color 0.3s ease, transform 0.2s ease;
+    transition: border-color 0.3s ease;
 }
 
 .thumbnail-image:hover {
-    transform: scale(1.05);
-    border-color: #1d4ed8;
+    transform: none;
+    border-color: rgba(11, 31, 58, 0.28);
 }
 
 .thumbnail-image.border-primary {
-    border-color: #1d4ed8 !important;
+    border-color: rgba(11, 31, 58, 0.28) !important;
 }
 
 .product-image-container {
@@ -340,11 +337,6 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.product-card:hover .product-image {
-    transform: scale(1.1);
 }
 
 /* Zoom no clique */

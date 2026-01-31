@@ -13,9 +13,8 @@
             --secondary-color: #94a3b8;
             --danger-color: #ef4444;
 
-            --bg-gradient: linear-gradient(180deg, #0b1f3a 0%, #eef2f7 55%, #ffffff 100%);
-            --primary-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
-            --primary-btn-gradient: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 100%);
+            --bg-surface: #f6f8fb;
+            --primary-btn: #0b1f3a;
 
             --radius-md: 14px;
             --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
@@ -32,7 +31,7 @@
             display: flex;
             flex-direction: column;
             margin: 0;
-            background: var(--bg-gradient);
+            background: var(--bg-surface);
             color: #0f172a;
         }
 
@@ -46,7 +45,7 @@
         }
 
         .card {
-            border: 1px solid rgba(148, 163, 184, 0.35);
+            border: 0;
             box-shadow: var(--shadow-sm);
         }
 
@@ -62,37 +61,27 @@
             box-shadow: var(--shadow-lg) !important;
         }
 
-        .btn:not(:disabled):not(.disabled):hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .btn:not(:disabled):not(.disabled):active {
-            transform: translateY(0);
-            box-shadow: none;
-        }
-
         .btn-success {
-            border: none;
-            background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
-            color: #064e3b;
+            border: 1px solid rgba(16, 185, 129, 0.22);
+            background: rgba(16, 185, 129, 0.10);
+            color: #065f46;
         }
 
         .btn-info {
-            border: none;
-            background: linear-gradient(135deg, #38bdf8 0%, #ffffff 100%);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            background: rgba(56, 189, 248, 0.10);
             color: #0b1f3a;
         }
 
         .btn-warning {
-            border: none;
-            background: linear-gradient(135deg, #f59e0b 0%, #fff7ed 100%);
+            border: 1px solid rgba(245, 158, 11, 0.22);
+            background: rgba(245, 158, 11, 0.12);
             color: #7c2d12;
         }
 
         .btn-primary {
             border: none;
-            background: var(--primary-btn-gradient);
+            background: var(--primary-btn);
             color: #ffffff;
         }
 
@@ -110,7 +99,7 @@
 
         .sidebar {
             min-height: 100vh;
-            background: linear-gradient(180deg, #0b1f3a 10%, #1d4ed8 100%);
+            background: #0b1f3a;
         }
         
         .sidebar .nav-link {

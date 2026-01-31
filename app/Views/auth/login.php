@@ -181,11 +181,11 @@ function showAlert(type, message) {
 .auth-page .card {
     border: none;
     border-radius: 15px;
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 .auth-page .card:hover {
-    transform: translateY(-2px);
+    transform: none;
 }
 
 .auth-page .input-group-text {
@@ -199,18 +199,18 @@ function showAlert(type, message) {
 }
 
 .auth-page .btn-primary {
-    background: var(--primary-btn-gradient);
-    border: none;
+    background: var(--primary-color);
+    border: 1px solid rgba(11, 31, 58, 0.22);
     border-radius: var(--radius-lg);
     padding: 12px 30px;
     font-weight: 600;
     color: #ffffff;
-    transition: all 0.3s ease;
+    transition: filter 0.2s ease, background-color 0.2s ease;
 }
 
 .auth-page .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    transform: none;
+    box-shadow: none;
 }
 
 .auth-page .auth-alert {

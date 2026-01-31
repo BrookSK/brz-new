@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
-            background: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
+            background: #f6f8fb;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -18,15 +18,14 @@
         
         .error-container {
             text-align: center;
-            color: white;
+            color: #0b1f3a;
         }
         
         .error-code {
             font-size: 8rem;
             font-weight: bold;
             margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            animation: pulse 2s infinite;
+            text-shadow: none;
         }
         
         .error-title {
@@ -38,37 +37,29 @@
         .error-description {
             font-size: 1.2rem;
             margin-bottom: 2rem;
-            opacity: 0.9;
+            opacity: 1;
         }
         
         .btn-home {
-            background: white;
-            color: #0b1f3a;
+            background: #0b1f3a;
+            color: #ffffff;
             padding: 12px 30px;
             border-radius: 50px;
             text-decoration: none;
             font-weight: 500;
-            transition: all 0.3s ease;
+            transition: background-color 0.2s ease, filter 0.2s ease;
             display: inline-block;
             margin: 0 10px;
         }
         
         .btn-home:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            color: #1d4ed8;
+            filter: brightness(1.03);
         }
         
         .error-icon {
             font-size: 4rem;
             margin-bottom: 1rem;
-            opacity: 0.8;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+            opacity: 1;
         }
         
         .particles {
@@ -86,12 +77,6 @@
             background: white;
             border-radius: 50%;
             opacity: 0.3;
-            animation: float 6s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
         }
     </style>
 </head>
@@ -156,17 +141,6 @@
         
         // Inicializar partículas quando a página carregar
         document.addEventListener('DOMContentLoaded', createParticles);
-        
-        // Adicionar efeito de parallax no mouse move
-        document.addEventListener('mousemove', (e) => {
-            const x = e.clientX / window.innerWidth;
-            const y = e.clientY / window.innerHeight;
-            
-            const errorCode = document.querySelector('.error-code');
-            if (errorCode) {
-                errorCode.style.transform = `translate(${x * 10}px, ${y * 10}px)`;
-            }
-        });
     </script>
 </body>
 </html>

@@ -97,11 +97,11 @@ $(document).ready(function() {
 .auth-page .card {
     border: none;
     border-radius: 15px;
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 .auth-page .card:hover {
-    transform: translateY(-2px);
+    transform: none;
 }
 
 .auth-page .input-group-text {
@@ -115,18 +115,19 @@ $(document).ready(function() {
 }
 
 .auth-page .btn-danger {
-    background: var(--danger-gradient);
-    border: none;
+    background: #0b1f3a;
+    border: 1px solid rgba(11, 31, 58, 0.22);
     border-radius: 50px;
     padding: 12px 30px;
     font-weight: 600;
     color: #ffffff;
-    transition: all 0.3s ease;
+    transition: filter 0.2s ease, background-color 0.2s ease;
 }
 
 .auth-page .btn-danger:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    transform: none;
+    box-shadow: none;
+    filter: brightness(1.03);
 }
 
 .auth-page .auth-alert {

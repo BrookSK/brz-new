@@ -8,7 +8,7 @@
             <h2><i class="fas fa-box"></i> Produtos Disponíveis</h2>
         </div>
         <div class="col-lg-4 text-end">
-            <a href="/carrinho" class="btn btn-success">
+            <a href="/carrinho" class="btn btn-outline-primary">
                 <i class="fas fa-shopping-cart"></i> Ver Carrinho
             </a>
         </div>
@@ -47,7 +47,7 @@
         <?php else: ?>
             <?php foreach ($produtos as $produto): ?>
             <div class="col-lg-4 col-md-6 mb-4">
-                <div class="card h-100 product-card">
+                <div class="card shadow-sm border-0 h-100 product-card">
                     <a href="/produto/detalhes/<?= $produto['id'] ?>" class="text-decoration-none">
                         <div class="product-image-container">
                             <?php 
@@ -55,14 +55,10 @@
                             $fotoUrl = !empty($produto['foto_principal']) ? $produto['foto_principal'] : null;
                             ?>
                             <?php if ($fotoUrl): ?>
-                                <a href="<?= $fotoUrl ?>" target="_blank" class="text-decoration-none">
-                                    <img src="<?= $fotoUrl ?>" 
-                                         alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                         class="card-img-top product-image"
-                                         style="cursor: pointer; transition: transform 0.2s;"
-                                         onmouseover="this.style.transform='scale(1.05)'"
-                                         onmouseout="this.style.transform='scale(1)'">
-                                </a>
+                                <img src="<?= $fotoUrl ?>" 
+                                     alt="<?= htmlspecialchars($produto['nome']) ?>"
+                                     class="card-img-top product-image"
+                                     style="cursor: pointer;">
                             <?php else: ?>
                                 <div class="card-img-top product-image d-flex align-items-center justify-content-center bg-light">
                                     <i class="fas fa-image text-muted fa-2x"></i>
@@ -71,7 +67,7 @@
                              
                             <!-- Badge de estoque -->
                             <?php if ($produto['estoque'] <= 5): ?>
-                                <span class="position-absolute top-0 end-0 m-2 badge bg-warning">
+                                <span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">
                                     <?= $produto['estoque'] ?> unidades
                                 </span>
                             <?php endif; ?>
@@ -108,18 +104,7 @@
     </div>
 </div>
 
-<div id="alert-container"></div>
-
 <style>
-.product-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.product-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
 .product-image-container {
     height: 200px;
     overflow: hidden;
@@ -130,17 +115,12 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.product-card:hover .product-image {
-    transform: scale(1.05);
 }
 
 .current-price {
-    font-size: 1.25rem;
-    font-weight: bold;
-    color: #007bff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-color);
 }
 
 .currency {

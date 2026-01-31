@@ -17,7 +17,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="card mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -54,11 +54,11 @@
     </div>
 
     <!-- Lista de Produtos -->
-    <div class="card">
+    <div class="card border-0 shadow-sm">
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover">
-                    <thead class="table-dark">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Imagem</th>
@@ -90,9 +90,7 @@
                                                 <img src="<?= $fotoUrl ?>" 
                                                      alt="<?= htmlspecialchars($produto['nome']) ?>"
                                                      class="img-thumbnail"
-                                                     style="width: 60px; height: 60px; object-fit: cover; cursor: pointer; transition: transform 0.2s;"
-                                                     onmouseover="this.style.transform='scale(1.1)'"
-                                                     onmouseout="this.style.transform='scale(1)'"
+                                                     style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
                                                      title="Clique para ver imagem em tamanho real">
                                             </a>
                                         <?php else: ?>
@@ -112,18 +110,26 @@
                                     <td><?= htmlspecialchars($produto['sku']) ?></td>
                                     <td><?= htmlspecialchars($produto['categoria_nome']) ?></td>
                                     <td>
-                                        <span class="badge bg-primary product-price" data-original-value="<?= $produto['valor'] ?>">$ <?= number_format($produto['valor'], 2, '.', ',') ?> USD</span>
+                                        <span class="badge product-price" data-original-value="<?= $produto['valor'] ?>" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                                            $ <?= number_format($produto['valor'], 2, '.', ',') ?> USD
+                                        </span>
                                         <?php if ($produto['moeda'] === 'BRL'): ?>
                                         <br><small class="text-warning">⚠️ Moeda incorreta: BRL</small>
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<?= $produto['estoque'] > 0 ? 'success' : 'danger' ?>">
+                                        <?php $estoqueStyle = ($produto['estoque'] ?? 0) > 0
+                                            ? 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;'
+                                            : 'background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.22); color: #7f1d1d;'; ?>
+                                        <span class="badge" style="<?= $estoqueStyle ?>">
                                             <?= $produto['estoque'] ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<?= $produto['status'] == 'ativo' ? 'success' : 'secondary' ?>">
+                                        <?php $statusStyle = ($produto['status'] ?? '') == 'ativo'
+                                            ? 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.22); color: #065f46;'
+                                            : 'background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #334155;'; ?>
+                                        <span class="badge" style="<?= $statusStyle ?>">
                                             <?= ucfirst($produto['status']) ?>
                                         </span>
                                     </td>

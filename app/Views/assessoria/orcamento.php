@@ -52,7 +52,9 @@ ob_start();
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-box me-2"></i>Processando produtos</h5>
-                    <span class="badge bg-primary" id="jobProgressText"><?= $jobProcessed ?> / <?= max(1, $jobTotal) ?></span>
+                    <span class="badge" id="jobProgressText" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                        <?= $jobProcessed ?> / <?= max(1, $jobTotal) ?>
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="progress mb-3" style="height: 10px;">
@@ -76,7 +78,7 @@ ob_start();
         </div>
         <div class="col-lg-4">
             <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header py-3">
                     <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Resumo do Orçamento</h5>
                 </div>
                 <div class="card-body">
@@ -152,7 +154,9 @@ ob_start();
                     <div class="card-header bg-white py-3">
                         <h5 class="mb-0">
                             <i class="fas fa-box me-2"></i>Produtos Disponíveis
-                            <span class="badge bg-primary ms-2"><?= count($orcamento['produtos']) ?></span>
+                            <span class="badge ms-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
+                                <?= count($orcamento['produtos']) ?>
+                            </span>
                         </h5>
                     </div>
                     <div class="card-body">
@@ -221,7 +225,7 @@ ob_start();
 
                 <!-- Termos e Condições -->
                 <div class="card shadow-sm border-0">
-                    <div class="card-header bg-warning bg-opacity-10 py-3">
+                    <div class="card-header py-3">
                         <h5 class="mb-0">
                             <i class="fas fa-exclamation-triangle me-2"></i>Termos Importantes
                         </h5>
@@ -252,7 +256,7 @@ ob_start();
             <div class="col-lg-4">
                 <!-- Resumo do Orçamento -->
                 <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
-                    <div class="card-header bg-primary text-white py-3">
+                    <div class="card-header py-3">
                         <h5 class="mb-0">
                             <i class="fas fa-calculator me-2"></i>Resumo do Orçamento
                         </h5>
@@ -455,7 +459,7 @@ $(document).ready(function() {
                     return true;
                 });
                 const disabled = !hasAny;
-                const classes = 'btn btn-sm ' + (isActive ? 'btn-dark' : 'btn-outline-secondary');
+                const classes = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-secondary');
                 html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
             });
             html += '</div>';

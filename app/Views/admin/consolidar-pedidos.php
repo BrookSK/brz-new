@@ -14,7 +14,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="card mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="POST" id="formConsolidar">
                 <div class="row g-3">
@@ -48,7 +48,7 @@
 
     <!-- Resultados -->
     <div id="resultados" style="display: none;">
-        <div class="card">
+        <div class="card border-0 shadow-sm">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="fas fa-chart-bar me-2"></i>
@@ -58,7 +58,7 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3">
-                        <div class="card text-center">
+                        <div class="card border-0 shadow-sm text-center">
                             <div class="card-body">
                                 <h3 class="text-primary" id="totalPedidos">0</h3>
                                 <p class="text-muted">Total de Pedidos</p>
@@ -66,7 +66,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-center">
+                        <div class="card border-0 shadow-sm text-center">
                             <div class="card-body">
                                 <h3 class="text-success" id="valorTotal">R$ 0,00</h3>
                                 <p class="text-muted">Valor Total</p>
@@ -74,7 +74,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-center">
+                        <div class="card border-0 shadow-sm text-center">
                             <div class="card-body">
                                 <h3 class="text-info" id="pesoTotal">0 kg</h3>
                                 <p class="text-muted">Peso Total</p>
@@ -82,7 +82,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card text-center">
+                        <div class="card border-0 shadow-sm text-center">
                             <div class="card-body">
                                 <h3 class="text-warning" id="totalItens">0</h3>
                                 <p class="text-muted">Total de Itens</p>
@@ -94,7 +94,7 @@
         </div>
 
         <!-- Tabela de Pedidos -->
-        <div class="card mt-4">
+        <div class="card border-0 shadow-sm mt-4">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="fas fa-list me-2"></i>
@@ -104,7 +104,7 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead class="table-dark">
+                        <thead class="table-light">
                             <tr>
                                 <th>ID</th>
                                 <th>Cliente</th>
@@ -124,7 +124,7 @@
         </div>
 
         <!-- Ações -->
-        <div class="card mt-4">
+        <div class="card border-0 shadow-sm mt-4">
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
@@ -194,7 +194,7 @@ document.getElementById('formConsolidar').addEventListener('submit', function(e)
                     <td>R$ ${number_format(pedido.valor_total, 2, ',', '.')}</td>
                     <td>${number_format(pedido.peso_total, 3, ',', '.')} kg</td>
                     <td>${pedido.total_itens}</td>
-                    <td><span class="badge badge-${pedido.status == 'pago' ? 'success' : 'warning'}">${pedido.status}</span></td>
+                    <td><span class="badge" style="background: ${pedido.status == 'pago' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)'}; border: 1px solid ${pedido.status == 'pago' ? 'rgba(16, 185, 129, 0.22)' : 'rgba(245, 158, 11, 0.22)'}; color: ${pedido.status == 'pago' ? '#065f46' : '#7c2d12'};">${pedido.status}</span></td>
                 `;
                 tbody.appendChild(row);
             });

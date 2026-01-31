@@ -1,13 +1,13 @@
 <?php ob_start(); ?>
 <?php use App\Core\Url; ?>
-<div class="container py-5">
+<div class="container py-4">
     <div class="row">
         <div class="col-lg-8">
             <?php if (empty($carrinho)): ?>
                 <?php include __DIR__ . '/vazio.php'; ?>
             <?php else: ?>
                 <!-- Itens do Carrinho -->
-                <div class="card">
+                <div class="card shadow-sm border-0">
                     <div class="card-body">
                         <?php foreach ($carrinho as $index => $item): ?>
                         <div class="cart-item border-bottom pb-3 mb-3">
@@ -151,7 +151,7 @@
         <div class="col-lg-4">
             <?php if (empty($carrinho)): ?>
                 <!-- Resumo do Pedido (Carrinho vazio) -->
-                <div class="card">
+                <div class="card shadow-sm border-0">
                     <div class="card-header">
                         <h5 class="mb-0">Resumo do Pedido</h5>
                     </div>
@@ -191,7 +191,7 @@
                 </div>
 
                 <!-- Informações Importantes -->
-                <div class="card mt-3">
+                <div class="card shadow-sm border-0 mt-3">
                     <div class="card-body">
                         <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
                         <ul class="small text-muted mb-0">
@@ -205,7 +205,7 @@
                 </div>
             <?php else: ?>
                 <!-- Resumo do Pedido -->
-                <div class="card">
+                <div class="card shadow-sm border-0">
                     <div class="card-header">
                         <h5 class="mb-0">Resumo do Pedido</h5>
                     </div>
@@ -254,7 +254,7 @@
             </div>
             
                 <!-- Informações Importantes -->
-                <div class="card mt-3">
+                <div class="card shadow-sm border-0 mt-3">
                     <div class="card-body">
                         <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
                         <ul class="small text-muted mb-0">

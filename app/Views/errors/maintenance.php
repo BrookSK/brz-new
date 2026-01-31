@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
-            background: linear-gradient(135deg, #0b1f3a 0%, #1d4ed8 55%, #e2e8f0 120%);
+            background: #f6f8fb;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -18,14 +18,13 @@
         
         .maintenance-container {
             text-align: center;
-            color: white;
+            color: #0b1f3a;
             max-width: 600px;
         }
         
         .maintenance-icon {
             font-size: 5rem;
             margin-bottom: 2rem;
-            animation: spin 3s linear infinite;
         }
         
         .maintenance-title {
@@ -37,39 +36,28 @@
         .maintenance-description {
             font-size: 1.2rem;
             margin-bottom: 2rem;
-            opacity: 0.9;
+            opacity: 1;
         }
         
         .progress {
             height: 8px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(148, 163, 184, 0.28);
             border-radius: 4px;
             overflow: hidden;
             margin: 2rem 0;
         }
         
         .progress-bar {
-            background: white;
-            animation: progress 5s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes progress {
-            0% { width: 0%; }
-            50% { width: 70%; }
-            100% { width: 100%; }
+            background: #0b1f3a;
         }
         
         .contact-info {
             margin-top: 3rem;
             padding: 1.5rem;
-            background: rgba(255,255,255,0.1);
+            background: #ffffff;
             border-radius: 10px;
-            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
         }
     </style>
 </head>
