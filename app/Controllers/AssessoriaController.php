@@ -191,6 +191,11 @@ class AssessoriaController extends Controller {
     }
 
     private function decodeJsonResilient(string $raw): array {
+        $raw = trim($raw);
+        if ($raw === '') {
+            throw new \Exception('Resposta vazia do ChatGPT');
+        }
+
         $candidate = $this->normalizePossibleJson($raw);
 
         $data = json_decode($candidate, true);
@@ -353,6 +358,8 @@ class AssessoriaController extends Controller {
             $descricao = 'Produto importado automaticamente: ' . $nome;
         }
 
+        $variacoes = $this->extractVariacoesFromScrapingBee($dadosBrutos);
+
         return [
             'sku' => '',
             'nome' => $nome,
@@ -361,8 +368,135 @@ class AssessoriaController extends Controller {
             // Regra: se não encontrar peso, usar sempre 1kg
             'peso' => 1.0,
             'imagens' => $img ? [$img] : [],
+            'variacoes' => $variacoes,
             'url_original' => $urlOriginal
         ];
+    }
+
+    private function stringifyVariationLabel(array $atributos): string {
+        $parts = [];
+        foreach ($atributos as $k => $v) {
+            $k = trim((string) $k);
+            $v = trim((string) $v);
+            if ($k === '' || $v === '') {
+                continue;
+            }
+            $parts[] = $k . ': ' . $v;
+        }
+        return implode(' | ', $parts);
+    }
+
+    private function normalizeVariacoes(array $variacoesBrutas): array {
+        $out = [];
+        foreach ($variacoesBrutas as $v) {
+            if (!is_array($v)) {
+                continue;
+            }
+
+            $atributos = [];
+            foreach (['attributes', 'atributos', 'options', 'option', 'selected_options'] as $ak) {
+                if (isset($v[$ak]) && is_array($v[$ak])) {
+                    $atributos = $v[$ak];
+                    break;
+                }
+            }
+
+            // Alguns retornos vem como lista de pares
+            if (!empty($atributos) && array_keys($atributos) === range(0, count($atributos) - 1)) {
+                $attrs2 = [];
+                foreach ($atributos as $pair) {
+                    if (is_array($pair)) {
+                        $name = $pair['name'] ?? $pair['key'] ?? null;
+                        $value = $pair['value'] ?? $pair['val'] ?? null;
+                        if (is_string($name) && $name !== '' && (is_string($value) || is_numeric($value))) {
+                            $attrs2[(string) $name] = (string) $value;
+                        }
+                    }
+                }
+                $atributos = $attrs2;
+            }
+
+            $valor = null;
+            foreach (['price', 'valor', 'amount', 'current_price'] as $pk) {
+                if (isset($v[$pk])) {
+                    $valor = $this->findFirstNumeric($v[$pk]);
+                    if ($valor !== null) {
+                        break;
+                    }
+                }
+            }
+
+            $peso = null;
+            foreach (['weight', 'peso'] as $wk) {
+                if (isset($v[$wk])) {
+                    $peso = $this->findFirstNumeric($v[$wk]);
+                    if ($peso !== null) {
+                        break;
+                    }
+                }
+            }
+
+            if ($peso === null || floatval($peso) <= 0) {
+                $peso = 1.0;
+            }
+
+            $label = $this->stringifyVariationLabel(is_array($atributos) ? $atributos : []);
+            if ($label === '') {
+                $label = (string) ($v['name'] ?? $v['title'] ?? $v['sku'] ?? 'Variação');
+            }
+
+            $id = (string) ($v['id'] ?? $v['variation_id'] ?? $v['sku'] ?? md5($label));
+            $out[] = [
+                'id' => $id,
+                'label' => $label,
+                'atributos' => is_array($atributos) ? $atributos : [],
+                'valor' => $valor !== null ? floatval($valor) : null,
+                'peso' => floatval($peso)
+            ];
+        }
+
+        // Remover duplicados por id
+        $unique = [];
+        foreach ($out as $v) {
+            $unique[(string) ($v['id'] ?? '')] = $v;
+        }
+        return array_values($unique);
+    }
+
+    private function extractVariacoesFromScrapingBee(array $dadosBrutos): array {
+        foreach (['variations', 'variants', 'variation', 'variant', 'offers'] as $k) {
+            if (!empty($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
+                $n = $this->normalizeVariacoes($dadosBrutos[$k]);
+                if (!empty($n)) {
+                    return $n;
+                }
+            }
+        }
+
+        // Busca recursiva leve
+        $queue = [$dadosBrutos];
+        $max = 200;
+        $seen = 0;
+        while (!empty($queue) && $seen < $max) {
+            $node = array_shift($queue);
+            $seen++;
+            if (!is_array($node)) {
+                continue;
+            }
+            foreach ($node as $k => $v) {
+                $ks = strtolower((string) $k);
+                if (in_array($ks, ['variations', 'variants', 'offers'], true) && is_array($v)) {
+                    $n = $this->normalizeVariacoes($v);
+                    if (!empty($n)) {
+                        return $n;
+                    }
+                }
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+        return [];
     }
 
     private function extractValorFromScrapingBee(array $dadosBrutos): ?float {
@@ -1318,12 +1452,49 @@ class AssessoriaController extends Controller {
             $produtosAdicionados = 0;
             
             foreach ($produtosSelecionados as $produtoIndex) {
-                if (isset($orcamento['produtos'][$produtoIndex])) {
-                    $produto = $orcamento['produtos'][$produtoIndex];
+                $index = null;
+                $variacaoId = null;
+                if (is_array($produtoIndex)) {
+                    $index = $produtoIndex['index'] ?? null;
+                    $variacaoId = $produtoIndex['variacao_id'] ?? null;
+                } else {
+                    $index = $produtoIndex;
+                }
+
+                if ($index !== null && isset($orcamento['produtos'][$index])) {
+                    $produto = $orcamento['produtos'][$index];
+
+                    // Aplicar variação escolhida (preço/peso) se existir
+                    if ($variacaoId !== null && isset($produto['variacoes']) && is_array($produto['variacoes'])) {
+                        foreach ($produto['variacoes'] as $v) {
+                            if (is_array($v) && (string) ($v['id'] ?? '') === (string) $variacaoId) {
+                                if (isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0) {
+                                    $produto['valor'] = floatval($v['valor']);
+                                }
+                                if (isset($v['peso']) && floatval($v['peso']) > 0) {
+                                    $produto['peso'] = floatval($v['peso']);
+                                }
+
+                                $label = (string) ($v['label'] ?? '');
+                                if ($label !== '') {
+                                    $produto['nome'] = (string) ($produto['nome'] ?? '') . ' (' . $label . ')';
+                                }
+                                $produto['variacao_selecionada'] = [
+                                    'id' => (string) ($v['id'] ?? ''),
+                                    'label' => $label,
+                                    'atributos' => is_array($v['atributos'] ?? null) ? $v['atributos'] : []
+                                ];
+                                break;
+                            }
+                        }
+                    }
 
                     $produtoId = $this->criarOuReutilizarProdutoNoSistema($produto);
 
                     $itemKey = (string) $produtoId;
+                    if (!empty($produto['variacao_selecionada']['id'])) {
+                        $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
+                    }
                     $quantidade = 1;
 
                     if (isset($_SESSION['carrinho'][$itemKey])) {
@@ -1339,6 +1510,10 @@ class AssessoriaController extends Controller {
                             'quantidade' => $quantidade,
                             'subtotal' => $quantidade * $preco
                         ];
+
+                        if (!empty($produto['variacao_selecionada'])) {
+                            $_SESSION['carrinho'][$itemKey]['variacao'] = $produto['variacao_selecionada'];
+                        }
                     }
                     
                     $produtosAdicionados++;
@@ -1386,7 +1561,7 @@ class AssessoriaController extends Controller {
         }
 
         $preco = floatval($produto['valor'] ?? 0);
-        $peso = floatval($produto['peso'] ?? 0.5);
+        $peso = floatval($produto['peso'] ?? 1.0);
         $descricao = (string) ($produto['descricao'] ?? '');
 
         $produtoModel = new Produto();
@@ -1400,6 +1575,7 @@ class AssessoriaController extends Controller {
             'stock' => 999999,
             'category_id' => null,
             'images' => $produto['imagens'] ?? [],
+            'variations' => $produto['variacoes'] ?? [],
             'attributes' => [
                 'fonte' => 'assessoria',
                 'url_original' => (string) ($produto['url_original'] ?? '')
@@ -1594,6 +1770,11 @@ class AssessoriaController extends Controller {
             }
         }
 
+        // Garantir variacoes (se ChatGPT não trouxe)
+        if (!isset($produtoData['variacoes']) || !is_array($produtoData['variacoes'])) {
+            $produtoData['variacoes'] = $this->extractVariacoesFromScrapingBee($dadosBrutos);
+        }
+
         // Garantir url_original e filtrar apenas campos essenciais para persistência
         if (!isset($produtoData['url_original']) || (string) $produtoData['url_original'] === '') {
             $produtoData['url_original'] = $urlOriginal;
@@ -1612,6 +1793,7 @@ class AssessoriaController extends Controller {
             'valor' => floatval($produtoData['valor'] ?? 0),
             'peso' => floatval($produtoData['peso'] ?? 0),
             'imagens' => $produtoData['imagens'] ?? [],
+            'variacoes' => is_array($produtoData['variacoes'] ?? null) ? $produtoData['variacoes'] : [],
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
         
@@ -1647,12 +1829,17 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"valor\": 99.99,
     \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
+    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
 REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
+1.1 VARIAÇÕES:
+   - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
+   - Cada variação deve ter pelo menos: id (ou string vazia), atributos (mapa), e valor quando houver.
+   - Se não existirem variações, retorne \"variacoes\": []
 2. PESO (kg): 
    - Se não encontrar o peso exato, ESTIME com base no tipo de produto
    - Adicione 15% de margem de segurança sobre o peso estimado

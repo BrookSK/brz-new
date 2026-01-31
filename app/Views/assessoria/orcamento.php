@@ -185,12 +185,31 @@ require __DIR__ . '/../layouts/main.php';
                                 <div class="col">
                                     <h6 class="mb-1"><?= htmlspecialchars($produto['nome']) ?></h6>
                                     <p class="text-muted small mb-1"><?= htmlspecialchars($produto['descricao']) ?></p>
+                                    <?php if (!empty($produto['variacoes']) && is_array($produto['variacoes'])): ?>
+                                        <div class="mt-2" style="max-width: 420px;">
+                                            <label class="form-label small mb-1" for="variacao_<?= $index ?>">Selecione a variação</label>
+                                            <select class="form-select form-select-sm variation-select" id="variacao_<?= $index ?>" data-index="<?= $index ?>">
+                                                <option value="">Produto simples</option>
+                                                <?php foreach ($produto['variacoes'] as $v): ?>
+                                                    <?php
+                                                        $vid = (string) ($v['id'] ?? '');
+                                                        $vlabel = (string) ($v['label'] ?? 'Variação');
+                                                        $vvalor = isset($v['valor']) ? $v['valor'] : null;
+                                                        $vpeso = isset($v['peso']) ? $v['peso'] : null;
+                                                    ?>
+                                                    <option value="<?= htmlspecialchars($vid) ?>" data-valor="<?= htmlspecialchars((string) ($vvalor === null ? '' : $vvalor)) ?>" data-peso="<?= htmlspecialchars((string) ($vpeso === null ? '' : $vpeso)) ?>">
+                                                        <?= htmlspecialchars($vlabel) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    <?php endif; ?>
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="badge bg-light text-dark">
                                             <i class="fas fa-tag me-1"></i><?= htmlspecialchars($produto['sku']) ?>
                                         </span>
                                         <span class="badge bg-light text-dark">
-                                            <i class="fas fa-weight me-1"></i><?= number_format($produto['peso'], 2) ?> kg
+                                            <i class="fas fa-weight me-1"></i><span class="peso-text" data-base-peso="<?= htmlspecialchars((string) $produto['peso']) ?>"><?= number_format($produto['peso'], 2) ?></span> kg
                                         </span>
                                         <small class="text-muted">
                                             <i class="fas fa-link me-1"></i>
@@ -203,7 +222,7 @@ require __DIR__ . '/../layouts/main.php';
                                 </div>
                                 <div class="col-auto text-end">
                                     <div class="fw-bold text-primary h5">
-                                        $<?= number_format($produto['valor'], 2) ?>
+                                        $<span class="valor-text" data-base-valor="<?= htmlspecialchars((string) $produto['valor']) ?>"><?= number_format($produto['valor'], 2) ?></span>
                                     </div>
                                     <small class="text-muted">USD</small>
                                 </div>
@@ -312,12 +331,55 @@ $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
     const totaisOriginais = <?= json_encode($totais) ?>;
 
+    function getProdutoSelecionadoComVariacao(index) {
+        const p = produtos[index];
+        if (!p) return null;
+
+        const sel = document.querySelector('.variation-select[data-index="' + index + '"]');
+        if (!sel || !sel.value) {
+            return { produto: p, variacao_id: null, valor: p.valor, peso: p.peso };
+        }
+
+        const opt = sel.options[sel.selectedIndex];
+        const vValor = opt ? parseFloat(opt.getAttribute('data-valor') || '') : NaN;
+        const vPeso = opt ? parseFloat(opt.getAttribute('data-peso') || '') : NaN;
+        const valor = !isNaN(vValor) && vValor > 0 ? vValor : p.valor;
+        const peso = !isNaN(vPeso) && vPeso > 0 ? vPeso : p.peso;
+        return { produto: p, variacao_id: sel.value, valor, peso };
+    }
+
+    function atualizarCardProduto(index) {
+        const item = document.querySelector('#produto_' + index);
+        const container = document.getElementById('produto_' + index) ? document.getElementById('produto_' + index).closest('.product-item') : null;
+        if (!container) return;
+        const data = getProdutoSelecionadoComVariacao(index);
+        if (!data) return;
+
+        const valorEl = container.querySelector('.valor-text');
+        const pesoEl = container.querySelector('.peso-text');
+        if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
+        if (pesoEl) pesoEl.textContent = (data.peso || 0).toFixed(2);
+    }
+
     // Calcular totais baseado nos produtos selecionados
     function calcularTotaisSelecionados() {
         const selecionados = [];
+        const selecionadosPayload = [];
         $('.product-checkbox:checked').each(function() {
             const index = parseInt($(this).val());
-            selecionados.push(produtos[index]);
+            const d = getProdutoSelecionadoComVariacao(index);
+            if (!d) return;
+
+            selecionados.push({
+                ...produtos[index],
+                valor: d.valor,
+                peso: d.peso
+            });
+
+            selecionadosPayload.push({
+                index: index,
+                variacao_id: d.variacao_id
+            });
         });
 
         const subtotal = selecionados.reduce((sum, p) => sum + p.valor, 0);
@@ -347,11 +409,21 @@ $(document).ready(function() {
         const termosAceitos = $('#termosAceitos').is(':checked');
         const temSelecionados = selecionados.length > 0;
         $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados));
+
+        // Cache payload no botão
+        $('#addToCartBtn').data('selecionados', selecionadosPayload);
     }
 
     // Event listeners
     $('.product-checkbox').change(calcularTotaisSelecionados);
     $('#termosAceitos').change(calcularTotaisSelecionados);
+    $('.variation-select').change(function() {
+        const index = parseInt($(this).data('index'));
+        if (!isNaN(index)) {
+            atualizarCardProduto(index);
+        }
+        calcularTotaisSelecionados();
+    });
 
     // Submit do formulário
     $('#orcamentoForm').submit(function(e) {
@@ -367,10 +439,13 @@ $(document).ready(function() {
             return;
         }
 
-        const selecionados = [];
-        $('.product-checkbox:checked').each(function() {
-            selecionados.push(parseInt($(this).val()));
-        });
+        let selecionados = $('#addToCartBtn').data('selecionados') || [];
+        if (!Array.isArray(selecionados) || selecionados.length === 0) {
+            selecionados = [];
+            $('.product-checkbox:checked').each(function() {
+                selecionados.push({ index: parseInt($(this).val()), variacao_id: null });
+            });
+        }
 
         if (selecionados.length === 0) {
             Swal.fire({
@@ -425,5 +500,11 @@ $(document).ready(function() {
 
     // Inicializar cálculos
     calcularTotaisSelecionados();
+    $('.variation-select').each(function() {
+        const index = parseInt($(this).data('index'));
+        if (!isNaN(index)) {
+            atualizarCardProduto(index);
+        }
+    });
 });
 </script>
