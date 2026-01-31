@@ -277,6 +277,8 @@ class AssessoriaController extends Controller {
             'limit_minutes' => $limitMinutes,
             'deleted_produtos' => 0,
             'deleted_produto_fotos' => 0,
+            'deleted_carrinho_itens' => 0,
+            'archived_produtos' => 0,
             'expired_orcamentos' => 0,
             'errors' => []
         ];
@@ -301,8 +303,25 @@ class AssessoriaController extends Controller {
                 $itensTable = null;
             }
 
+            // Descobrir tabela de itens do carrinho (carrinho_itens vs carrinho_items)
+            $carrinhoItensTable = null;
+            try {
+                $stmtCT = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stmtCT->execute(['carrinho_itens']);
+                if ((int) $stmtCT->fetchColumn() > 0) {
+                    $carrinhoItensTable = 'carrinho_itens';
+                } else {
+                    $stmtCT->execute(['carrinho_items']);
+                    if ((int) $stmtCT->fetchColumn() > 0) {
+                        $carrinhoItensTable = 'carrinho_items';
+                    }
+                }
+            } catch (\Exception $e) {
+                $carrinhoItensTable = null;
+            }
+
             // Buscar produtos temporários vencidos
-            $stmt = $db->prepare("SELECT id FROM produtos WHERE sku LIKE 'ASS-%' AND created_at < DATE_SUB(NOW(), INTERVAL {$limitMinutes} MINUTE) LIMIT 200");
+            $stmt = $db->prepare("\n                SELECT id\n                FROM produtos\n                WHERE (sku LIKE 'ASS-%' OR attributes LIKE '%\\\"fonte\\\":\\\"assessoria\\\"%')\n                AND COALESCE(created_at, updated_at, NOW()) < DATE_SUB(NOW(), INTERVAL {$limitMinutes} MINUTE)\n                LIMIT 200\n            ");
             $stmt->execute();
             $produtoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
@@ -311,6 +330,8 @@ class AssessoriaController extends Controller {
                 if ($pid <= 0) {
                     continue;
                 }
+
+                $db->beginTransaction();
 
                 // Se já virou compra concluída, não remover
                 $isPaid = false;
@@ -325,7 +346,19 @@ class AssessoriaController extends Controller {
                     }
                 }
                 if ($isPaid) {
+                    $db->rollBack();
                     continue;
+                }
+
+                // Remover itens do carrinho que referenciam o produto (para evitar travar o DELETE)
+                if ($carrinhoItensTable !== null) {
+                    try {
+                        $stDelC = $db->prepare("DELETE FROM {$carrinhoItensTable} WHERE produto_id = ?");
+                        $stDelC->execute([$pid]);
+                        $out['deleted_carrinho_itens'] += (int) $stDelC->rowCount();
+                    } catch (\Exception $e) {
+                        $out['errors'][] = 'Falha ao remover carrinho item produto_id=' . $pid . ': ' . $e->getMessage();
+                    }
                 }
 
                 // Remover fotos do produto
@@ -334,6 +367,7 @@ class AssessoriaController extends Controller {
                     $stDelF->execute([$pid]);
                     $out['deleted_produto_fotos'] += (int) $stDelF->rowCount();
                 } catch (\Exception $e) {
+                    $out['errors'][] = 'Falha ao remover produto_fotos produto_id=' . $pid . ': ' . $e->getMessage();
                 }
 
                 // Remover produto
@@ -341,7 +375,23 @@ class AssessoriaController extends Controller {
                     $stDelP = $db->prepare('DELETE FROM produtos WHERE id = ?');
                     $stDelP->execute([$pid]);
                     $out['deleted_produtos'] += (int) $stDelP->rowCount();
+                    $db->commit();
                 } catch (\Exception $e) {
+                    // Fallback: arquivar/inativar caso exista vínculo (FK) impedindo o DELETE
+                    try {
+                        $stArch = $db->prepare("UPDATE produtos SET active = 0, status = 'archived', updated_at = NOW() WHERE id = ?");
+                        $stArch->execute([$pid]);
+                        if ($stArch->rowCount() > 0) {
+                            $out['archived_produtos'] += 1;
+                        }
+                        $db->commit();
+                    } catch (\Exception $e2) {
+                        try {
+                            $db->rollBack();
+                        } catch (\Exception $e3) {
+                        }
+                        $out['errors'][] = 'Falha ao remover/arquivar produto_id=' . $pid . ': ' . $e->getMessage();
+                    }
                 }
             }
 
