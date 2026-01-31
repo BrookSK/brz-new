@@ -519,15 +519,22 @@ class AdminPedidosController extends Controller {
                                             $variacaoLabel = (string) ($item['variacao_label'] ?? '');
                                             $variacaoAttrs = $item['variacao_atributos'] ?? null;
 
+                                            $nomeHtml = '';
+                                            if ($urlOriginal !== '') {
+                                                $nomeHtml = '<a href="' . htmlspecialchars($urlOriginal) . '" target="_blank" class="text-decoration-none">' . htmlspecialchars($nomeProduto) . '</a>';
+                                            } else {
+                                                $nomeHtml = htmlspecialchars($nomeProduto);
+                                            }
+
                                             $extraHtml = '';
                                             if ($sku !== '') {
                                                 $extraHtml .= '<div class="small text-muted">SKU/Ref: ' . htmlspecialchars($sku) . '</div>';
                                             }
                                             if ($urlOriginal !== '') {
-                                                $extraHtml .= '<div class="small"><a href="' . htmlspecialchars($urlOriginal) . '" target="_blank" class="text-decoration-none">Link original</a></div>';
+                                                $extraHtml .= '<div class="small text-muted">link de acesso original</div>';
                                             }
                                             if ($variacaoLabel !== '') {
-                                                $extraHtml .= '<div class="small text-muted">Variação: ' . htmlspecialchars($variacaoLabel) . '</div>';
+                                                $extraHtml .= '<div style="font-weight: 700; font-size: 1.05rem;">Variação: ' . htmlspecialchars($variacaoLabel) . '</div>';
                                             }
                                             if (is_array($variacaoAttrs) && !empty($variacaoAttrs)) {
                                                 $pairs = [];
@@ -536,12 +543,12 @@ class AdminPedidosController extends Controller {
                                                     $pairs[] = (string) $k . ': ' . (string) $v;
                                                 }
                                                 if (!empty($pairs)) {
-                                                    $extraHtml .= '<div class="small text-muted">' . htmlspecialchars(implode(' | ', $pairs)) . '</div>';
+                                                    $extraHtml .= '<div style="font-weight: 700; font-size: 1.05rem;">' . htmlspecialchars(implode(' | ', $pairs)) . '</div>';
                                                 }
                                             }
 
                                             echo '</td>
-                                                <td>' . htmlspecialchars($nomeProduto) . $extraHtml . '</td>
+                                                <td>' . $nomeHtml . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>

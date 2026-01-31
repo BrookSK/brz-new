@@ -203,6 +203,10 @@ require __DIR__ . '/../layouts/main.php';
                                             </a>
                                         </small>
                                     </div>
+                                    <div class="mt-2">
+                                        <label class="form-label small text-muted mb-1" for="quantidade_<?= $index ?>">Quantidade</label>
+                                        <input type="number" class="form-control form-control-sm quantidade-input" id="quantidade_<?= $index ?>" data-index="<?= $index ?>" value="1" min="1" step="1" style="max-width: 110px;">
+                                    </div>
                                 </div>
                                 <div class="col-auto text-end">
                                     <div class="fw-bold text-primary h5">
@@ -487,15 +491,24 @@ $(document).ready(function() {
             if (!p) return;
             const d = resolveVariant(index);
 
+            const qEl = document.querySelector('.quantidade-input[data-index="' + index + '"]');
+            let quantidade = 1;
+            if (qEl) {
+                const qv = parseInt(qEl.value, 10);
+                quantidade = !isNaN(qv) && qv > 0 ? qv : 1;
+            }
+
             selecionados.push({
                 ...produtos[index],
                 valor: d.valor,
-                peso: d.peso
+                peso: d.peso,
+                quantidade: quantidade
             });
 
             selecionadosPayload.push({
                 index: index,
-                variacao_id: d.variacao_id
+                variacao_id: d.variacao_id,
+                quantidade: quantidade
             });
 
             if (Array.isArray(p.variacoes) && p.variacoes.length > 0) {
@@ -506,8 +519,8 @@ $(document).ready(function() {
             }
         });
 
-        const subtotal = selecionados.reduce((sum, p) => sum + p.valor, 0);
-        const pesoTotal = selecionados.reduce((sum, p) => sum + p.peso, 0);
+        const subtotal = selecionados.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0);
+        const pesoTotal = selecionados.reduce((sum, p) => sum + (p.peso * (p.quantidade || 1)), 0);
         
         // Recalcular taxas proporcionalmente
         const taxaServicoOriginal = totaisOriginais.taxa_servico;
@@ -541,6 +554,7 @@ $(document).ready(function() {
     // Event listeners
     $('.product-checkbox').change(calcularTotaisSelecionados);
     $('#termosAceitos').change(calcularTotaisSelecionados);
+    $(document).on('input change', '.quantidade-input', calcularTotaisSelecionados);
 
     $(document).on('click', '.variation-btn', function() {
         const index = parseInt($(this).data('index'));

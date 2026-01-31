@@ -1700,11 +1700,17 @@ class AssessoriaController extends Controller {
             foreach ($produtosSelecionados as $produtoIndex) {
                 $index = null;
                 $variacaoId = null;
+                $quantidade = 1;
                 if (is_array($produtoIndex)) {
                     $index = $produtoIndex['index'] ?? null;
                     $variacaoId = $produtoIndex['variacao_id'] ?? null;
+                    $quantidade = (int) ($produtoIndex['quantidade'] ?? 1);
                 } else {
                     $index = $produtoIndex;
+                }
+
+                if ($quantidade <= 0) {
+                    $quantidade = 1;
                 }
 
                 if ($index !== null && isset($orcamento['produtos'][$index])) {
@@ -1741,7 +1747,6 @@ class AssessoriaController extends Controller {
                     if (!empty($produto['variacao_selecionada']['id'])) {
                         $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
                     }
-                    $quantidade = 1;
 
                     if (isset($_SESSION['carrinho'][$itemKey])) {
                         $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
@@ -1756,6 +1761,11 @@ class AssessoriaController extends Controller {
                             'quantidade' => $quantidade,
                             'subtotal' => $quantidade * $preco
                         ];
+
+                        // Persistir URL original informada pelo usuário
+                        if (!empty($produto['url_original'])) {
+                            $_SESSION['carrinho'][$itemKey]['url_original'] = (string) $produto['url_original'];
+                        }
 
                         if (!empty($produto['variacao_selecionada'])) {
                             $_SESSION['carrinho'][$itemKey]['variacao'] = $produto['variacao_selecionada'];
