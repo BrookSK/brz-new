@@ -1,6 +1,6 @@
 <?php
 $title = 'Assessoria de Compras - Braziliana Shop';
-require __DIR__ . '/../layouts/main.php';
+ob_start();
 ?>
 
 <div class="container-fluid py-4">
@@ -260,6 +260,7 @@ $(document).ready(function() {
         updateRemoveButtons();
     });
 
+
     function updateRemoveButtons() {
         $('.remove-link').toggle(linkCount > 1);
     }
@@ -502,3 +503,8 @@ $(document).ready(function() {
     }
 });
 </script>
+
+<?php
+$content = ob_get_clean();
+require __DIR__ . '/../layouts/main.php';
+?>
