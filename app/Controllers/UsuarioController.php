@@ -71,8 +71,30 @@ class UsuarioController extends Controller {
 
             $clienteId = null;
             if (is_array($colsPedidos) && in_array('cliente_id', $colsPedidos, true)) {
+                $colsClientes = [];
+                try {
+                    $stmtColsCli = $db->query('DESCRIBE clientes');
+                    $colsClientes = $stmtColsCli ? $stmtColsCli->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsClientes = [];
+                }
+
+                // 1) Match por clientes.usuario_id (quando existir)
+                if (!$clienteId && is_array($colsClientes) && in_array('usuario_id', $colsClientes, true)) {
+                    try {
+                        $stmtCli = $db->prepare('SELECT id FROM clientes WHERE usuario_id = ? ORDER BY id DESC LIMIT 1');
+                        $stmtCli->execute([(int) $usuario['id']]);
+                        $cid = $stmtCli->fetchColumn();
+                        if ($cid) {
+                            $clienteId = (int) $cid;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                // 2) Match por email
                 $email = (string) ($usuario['email'] ?? '');
-                if ($email !== '') {
+                if (!$clienteId && $email !== '' && is_array($colsClientes) && in_array('email', $colsClientes, true)) {
                     try {
                         $stmtCli = $db->prepare('SELECT id FROM clientes WHERE email = ? ORDER BY id DESC LIMIT 1');
                         $stmtCli->execute([$email]);
@@ -81,6 +103,72 @@ class UsuarioController extends Controller {
                             $clienteId = (int) $cid;
                         }
                     } catch (\Exception $e) {
+                    }
+                }
+
+                // 3) Match por documento/cpf
+                $documento = (string) ($usuario['cpf_cnpj'] ?? ($usuario['documento'] ?? ($usuario['cpf'] ?? '')));
+                $documento = preg_replace('/\D+/', '', $documento);
+                if (!$clienteId && $documento !== '') {
+                    $docCol = null;
+                    foreach (['cpf_cnpj', 'documento', 'cpf', 'cnpj'] as $c) {
+                        if (is_array($colsClientes) && in_array($c, $colsClientes, true)) {
+                            $docCol = $c;
+                            break;
+                        }
+                    }
+                    if ($docCol !== null) {
+                        try {
+                            $stmtCli = $db->prepare('SELECT id FROM clientes WHERE REPLACE(REPLACE(REPLACE(' . $docCol . ", '.', ''), '-', ''), '/', '') = ? ORDER BY id DESC LIMIT 1");
+                            $stmtCli->execute([$documento]);
+                            $cid = $stmtCli->fetchColumn();
+                            if ($cid) {
+                                $clienteId = (int) $cid;
+                            }
+                        } catch (\Exception $e) {
+                            // fallback simples sem replace
+                            try {
+                                $stmtCli = $db->prepare('SELECT id FROM clientes WHERE ' . $docCol . ' = ? ORDER BY id DESC LIMIT 1');
+                                $stmtCli->execute([$documento]);
+                                $cid = $stmtCli->fetchColumn();
+                                if ($cid) {
+                                    $clienteId = (int) $cid;
+                                }
+                            } catch (\Exception $e2) {
+                            }
+                        }
+                    }
+                }
+
+                // 4) Match por telefone
+                $telefone = (string) ($usuario['celular'] ?? ($usuario['telefone'] ?? ''));
+                $telefone = preg_replace('/\D+/', '', $telefone);
+                $telCol = null;
+                foreach (['celular', 'telefone'] as $c) {
+                    if (is_array($colsClientes) && in_array($c, $colsClientes, true)) {
+                        $telCol = $c;
+                        break;
+                    }
+                }
+
+                if (!$clienteId && $telefone !== '' && $telCol !== null) {
+                    try {
+                        $stmtCli = $db->prepare('SELECT id FROM clientes WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(' . $telCol . ', "(", ""), ")", ""), "-", ""), " ", ""), "+", "") = ? ORDER BY id DESC LIMIT 1');
+                        $stmtCli->execute([$telefone]);
+                        $cid = $stmtCli->fetchColumn();
+                        if ($cid) {
+                            $clienteId = (int) $cid;
+                        }
+                    } catch (\Exception $e) {
+                        try {
+                            $stmtCli = $db->prepare('SELECT id FROM clientes WHERE ' . $telCol . ' = ? ORDER BY id DESC LIMIT 1');
+                            $stmtCli->execute([$telefone]);
+                            $cid = $stmtCli->fetchColumn();
+                            if ($cid) {
+                                $clienteId = (int) $cid;
+                            }
+                        } catch (\Exception $e2) {
+                        }
                     }
                 }
             }
