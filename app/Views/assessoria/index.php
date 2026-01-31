@@ -1,5 +1,4 @@
 <?php
-$title = 'Assessoria de Compras - Braziliana Shop';
 ob_start();
 ?>
 
