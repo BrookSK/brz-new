@@ -521,6 +521,40 @@ class AssessoriaController extends Controller {
         return array_values($unique);
     }
 
+    private function mergeNormalizedVariacoes(array $variacoes): array {
+        $unique = [];
+        foreach ($variacoes as $v) {
+            if (!is_array($v)) {
+                continue;
+            }
+            $id = (string) ($v['id'] ?? '');
+            $label = (string) ($v['label'] ?? '');
+            $k = $id !== '' ? $id : md5($label);
+
+            if (!isset($unique[$k])) {
+                $unique[$k] = $v;
+                continue;
+            }
+
+            // Preferir item que tenha preço
+            $cur = $unique[$k];
+            $curHasPrice = isset($cur['valor']) && $cur['valor'] !== null && floatval($cur['valor']) > 0;
+            $newHasPrice = isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0;
+            if (!$curHasPrice && $newHasPrice) {
+                $unique[$k] = $v;
+                continue;
+            }
+
+            // Preferir item que tenha atributos
+            $curHasAttrs = isset($cur['atributos']) && is_array($cur['atributos']) && !empty($cur['atributos']);
+            $newHasAttrs = isset($v['atributos']) && is_array($v['atributos']) && !empty($v['atributos']);
+            if (!$curHasAttrs && $newHasAttrs) {
+                $unique[$k] = $v;
+            }
+        }
+        return array_values($unique);
+    }
+
     private function extractOptionNamesFromScrapingBee(array $dadosBrutos): array {
         $candidates = [];
 
@@ -609,8 +643,8 @@ class AssessoriaController extends Controller {
             return [];
         }
 
-        // Consolidar
-        return $this->normalizeVariacoes($all, $optionNames);
+        // $all aqui já está normalizado; consolidar sem re-normalizar
+        return $this->mergeNormalizedVariacoes($all);
     }
 
     private function extractValorFromScrapingBee(array $dadosBrutos): ?float {
@@ -663,13 +697,38 @@ class AssessoriaController extends Controller {
             foreach ($node as $k => $v) {
                 $ks = strtolower((string) $k);
                 if (strpos($ks, 'image') !== false || strpos($ks, 'img') !== false) {
-                    if (is_string($v) && preg_match('#^https?://#i', $v)) {
-                        return $v;
+                    if (is_string($v)) {
+                        $vv = trim($v);
+                        if (preg_match('#^https?://#i', $vv)) {
+                            return $vv;
+                        }
+                        if (strpos($vv, '//') === 0) {
+                            return 'https:' . $vv;
+                        }
                     }
                     if (is_array($v)) {
                         foreach ($v as $vv) {
-                            if (is_string($vv) && preg_match('#^https?://#i', $vv)) {
-                                return $vv;
+                            if (is_string($vv)) {
+                                $vvv = trim($vv);
+                                if (preg_match('#^https?://#i', $vvv)) {
+                                    return $vvv;
+                                }
+                                if (strpos($vvv, '//') === 0) {
+                                    return 'https:' . $vvv;
+                                }
+                            }
+                            if (is_array($vv)) {
+                                foreach (['url', 'src', 'href'] as $ik) {
+                                    if (!empty($vv[$ik]) && is_string($vv[$ik])) {
+                                        $u = trim((string) $vv[$ik]);
+                                        if (preg_match('#^https?://#i', $u)) {
+                                            return $u;
+                                        }
+                                        if (strpos($u, '//') === 0) {
+                                            return 'https:' . $u;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
