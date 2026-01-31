@@ -79,8 +79,10 @@ class CarrinhoController extends Controller {
         $produtosDetalhados = [];
         $subtotal = 0;
         $pesoTotal = 0;
+
+        $removedExpired = false;
         
-        foreach ($carrinho as $item) {
+        foreach ($carrinho as $k => $item) {
             $this->debugLog('[CARRINHO] Processando item: ' . json_encode($item));
             
             $produto = $this->produtoModel->find($item['produto_id']);
@@ -123,6 +125,23 @@ class CarrinhoController extends Controller {
                 $pesoTotal += $item['quantidade'] * floatval($produto['peso'] ?? 0.5);
             } else {
                 $this->debugLog('[CARRINHO] Produto nao encontrado: ' . $item['produto_id']);
+
+                // Produto expirou/foi removido (ex.: temporário da assessoria). Remove do carrinho.
+                if (isset($_SESSION['carrinho'][$k])) {
+                    unset($_SESSION['carrinho'][$k]);
+                    $removedExpired = true;
+                }
+            }
+        }
+
+        if ($removedExpired) {
+            $_SESSION['message'] = 'Alguns itens do carrinho expiraram e foram removidos. Se eram itens da Assessoria, reprocessse o orçamento para gerar novos valores e produtos.';
+            $_SESSION['message_type'] = 'warning';
+
+            $carrinho = $_SESSION['carrinho'] ?? [];
+            if (empty($carrinho)) {
+                $this->view('carrinho/vazio');
+                return;
             }
         }
         

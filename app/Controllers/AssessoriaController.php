@@ -87,6 +87,204 @@ class AssessoriaController extends Controller {
             return true;
         }
     }
+
+    public function reprocessarOrcamento(Request $request) {
+        session_start();
+        $orcamentoId = (int) $request->getParam('orcamento_id', 0);
+
+        if ($orcamentoId <= 0) {
+            $_SESSION['message'] = 'Orçamento inválido.';
+            $_SESSION['message_type'] = 'warning';
+            $this->redirect('/minha-conta');
+            return;
+        }
+
+        try {
+            $orcModel = new AssessoriaOrcamento();
+            $row = $orcModel->find($orcamentoId);
+            if (!is_array($row) || empty($row['id'])) {
+                $_SESSION['message'] = 'Orçamento não encontrado.';
+                $_SESSION['message_type'] = 'warning';
+                $this->redirect('/minha-conta');
+                return;
+            }
+
+            // Se já é pago, apenas abrir
+            if (($row['status'] ?? '') === 'pago') {
+                $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId);
+                return;
+            }
+
+            $links = $this->parseDbJson($row['links_json'] ?? null);
+            if (empty($links)) {
+                $_SESSION['message'] = 'Este orçamento não possui links para reprocessar.';
+                $_SESSION['message_type'] = 'warning';
+                $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId);
+                return;
+            }
+
+            $newJobId = bin2hex(random_bytes(16));
+            $_SESSION['assessoria_job_id'] = $newJobId;
+            $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
+            $_SESSION['assessoria_orcamento_token'] = (string) ($row['public_token'] ?? '');
+
+            $orcModel->update($orcamentoId, [
+                'job_id' => $newJobId,
+                'produtos_json' => null,
+                'erros_json' => null,
+                'totais_json' => null,
+                'updated_at' => date('Y-m-d H:i:s'),
+                'webhook_conclusao_disparado_em' => null,
+            ]);
+
+            $job = [
+                'job_id' => $newJobId,
+                'status' => 'queued',
+                'total' => count($links),
+                'processed' => 0,
+                'links' => $links,
+                'produtos' => [],
+                'erros' => [],
+                'started_at' => null,
+                'finished_at' => null
+            ];
+            $this->writeJobFile($newJobId, $job);
+
+            $spawned = $this->trySpawnJobWorker($newJobId);
+            $job['spawned'] = $spawned ? true : false;
+            $this->writeJobFile($newJobId, $job);
+
+            if ($spawned) {
+                $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId);
+                return;
+            }
+
+            // fallback síncrono
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            ignore_user_abort(true);
+            @set_time_limit(0);
+            $this->startBackgroundProcessing($links, $newJobId);
+
+            $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId);
+            return;
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao reprocessar orçamento: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'warning';
+            $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId);
+            return;
+        }
+    }
+
+    public function cronLimparTemporarios(Request $request) {
+        header('Content-Type: application/json');
+
+        $limitMinutes = 15;
+        $out = [
+            'success' => true,
+            'limit_minutes' => $limitMinutes,
+            'deleted_produtos' => 0,
+            'deleted_produto_fotos' => 0,
+            'expired_orcamentos' => 0,
+            'errors' => []
+        ];
+
+        try {
+            $db = \Config\Database::getConnection();
+
+            // Descobrir tabela de itens do pedido (pedido_itens vs pedido_items)
+            $itensTable = null;
+            try {
+                $stmtT = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stmtT->execute(['pedido_itens']);
+                if ((int) $stmtT->fetchColumn() > 0) {
+                    $itensTable = 'pedido_itens';
+                } else {
+                    $stmtT->execute(['pedido_items']);
+                    if ((int) $stmtT->fetchColumn() > 0) {
+                        $itensTable = 'pedido_items';
+                    }
+                }
+            } catch (\Exception $e) {
+                $itensTable = null;
+            }
+
+            // Buscar produtos temporários vencidos
+            $stmt = $db->prepare("SELECT id FROM produtos WHERE sku LIKE 'ASS-%' AND created_at < DATE_SUB(NOW(), INTERVAL {$limitMinutes} MINUTE) LIMIT 200");
+            $stmt->execute();
+            $produtoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            foreach ($produtoIds as $pidRaw) {
+                $pid = (int) $pidRaw;
+                if ($pid <= 0) {
+                    continue;
+                }
+
+                // Se já virou compra concluída, não remover
+                $isPaid = false;
+                if ($itensTable !== null) {
+                    try {
+                        $sqlPaid = "SELECT 1 FROM {$itensTable} i INNER JOIN pedidos p ON p.id = i.pedido_id WHERE i.produto_id = ? AND p.status IN ('pago','paid','aprovado','approved','enviado','entregue') LIMIT 1";
+                        $stPaid = $db->prepare($sqlPaid);
+                        $stPaid->execute([$pid]);
+                        $isPaid = $stPaid->fetchColumn() ? true : false;
+                    } catch (\Exception $e) {
+                        $isPaid = false;
+                    }
+                }
+                if ($isPaid) {
+                    continue;
+                }
+
+                // Remover fotos do produto
+                try {
+                    $stDelF = $db->prepare('DELETE FROM produto_fotos WHERE produto_id = ?');
+                    $stDelF->execute([$pid]);
+                    $out['deleted_produto_fotos'] += (int) $stDelF->rowCount();
+                } catch (\Exception $e) {
+                }
+
+                // Remover produto
+                try {
+                    $stDelP = $db->prepare('DELETE FROM produtos WHERE id = ?');
+                    $stDelP->execute([$pid]);
+                    $out['deleted_produtos'] += (int) $stDelP->rowCount();
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Expirar orçamentos antigos (limpa produtos/erros/totais) para exigir reprocessamento
+            try {
+                $stmtOrc = $db->prepare("SELECT id, last_processed_at FROM assessoria_orcamentos WHERE status <> 'pago' AND last_processed_at IS NOT NULL AND last_processed_at < DATE_SUB(NOW(), INTERVAL {$limitMinutes} MINUTE) LIMIT 200");
+                $stmtOrc->execute();
+                $orcRows = $stmtOrc->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($orcRows as $r) {
+                    $oid = (int) ($r['id'] ?? 0);
+                    if ($oid <= 0) {
+                        continue;
+                    }
+                    try {
+                        $stmtUpd = $db->prepare("UPDATE assessoria_orcamentos SET produtos_json = NULL, erros_json = NULL, totais_json = NULL, updated_at = NOW() WHERE id = ?");
+                        $stmtUpd->execute([$oid]);
+                        if ($stmtUpd->rowCount() > 0) {
+                            $out['expired_orcamentos']++;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
+            echo json_encode($out);
+            return;
+        } catch (\Exception $e) {
+            $out['success'] = false;
+            $out['errors'][] = $e->getMessage();
+            echo json_encode($out);
+            return;
+        }
+    }
     
     /**
      * Exibe a página principal de Assessoria

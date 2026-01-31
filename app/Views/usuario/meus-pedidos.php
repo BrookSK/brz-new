@@ -161,8 +161,24 @@
                                 <div class="flex-grow-1">
                                     <h4 class="mb-1 fw-bold">
                                         <?php 
-                                        $totalGasto = array_sum(array_column($pedidos, 'valor_total'));
-                                        echo 'R$ ' . number_format($totalGasto, 2, ',', '.');
+                                        $totalGastoBRL = 0.0;
+                                        $totalGastoUSD = 0.0;
+                                        foreach (($pedidos ?? []) as $p) {
+                                            $moedaP = strtoupper((string) ($p['moeda'] ?? ($p['currency'] ?? 'BRL')));
+                                            $v = $p['valor_total'] ?? $p['total'] ?? $p['valor'] ?? $p['amount'] ?? 0;
+                                            if ($moedaP === 'USD') {
+                                                $totalGastoUSD += floatval($v);
+                                            } else {
+                                                $totalGastoBRL += floatval($v);
+                                            }
+                                        }
+                                        if ($totalGastoUSD > 0 && $totalGastoBRL > 0) {
+                                            echo 'R$ ' . number_format($totalGastoBRL, 2, ',', '.') . '<br><span class="text-muted small">US$ ' . number_format($totalGastoUSD, 2, ',', '.') . '</span>';
+                                        } elseif ($totalGastoUSD > 0) {
+                                            echo 'US$ ' . number_format($totalGastoUSD, 2, ',', '.');
+                                        } else {
+                                            echo 'R$ ' . number_format($totalGastoBRL, 2, ',', '.');
+                                        }
                                         ?>
                                     </h4>
                                     <p class="text-muted small mb-0">Total Gasto</p>
@@ -210,15 +226,29 @@
                                 </thead>
                                 <tbody>
                                     <?php foreach ($pedidos as $pedido): ?>
-                                    <tr data-status="<?= $pedido['status'] ?>">
+                                    <?php
+                                        $codigoPedido = (string) (
+                                            $pedido['codigo_pedido'] ??
+                                            $pedido['numero_pedido'] ??
+                                            $pedido['codigo'] ??
+                                            ('#' . (string) ($pedido['id'] ?? ''))
+                                        );
+                                        $statusPedido = (string) ($pedido['status'] ?? '');
+                                        if ($statusPedido === '') {
+                                            $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
+                                        }
+                                        $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
+                                        $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
+                                    ?>
+                                    <tr data-status="<?= htmlspecialchars($statusPedido) ?>">
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
                                                     <i class="fas fa-receipt text-primary fs-6"></i>
                                                 </div>
                                                 <div>
-                                                    <strong><?= htmlspecialchars($pedido['codigo_pedido']) ?></strong>
-                                                    <div class="text-muted small">#<?= str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) ?></div>
+                                                    <strong><?= htmlspecialchars($codigoPedido) ?></strong>
+                                                    <div class="text-muted small">#<?= str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></div>
                                                 </div>
                                             </div>
                                         </td>
@@ -235,23 +265,51 @@
                                                 'processando' => 'info',
                                                 'enviado' => 'primary',
                                                 'entregue' => 'success',
-                                                'cancelado' => 'danger'
+                                                'cancelado' => 'danger',
+                                                'pago' => 'success',
+                                                'paid' => 'success',
+                                                'aprovado' => 'success',
+                                                'approved' => 'success',
+                                                'selecao' => 'secondary',
+                                                'cobranca' => 'warning',
+                                                'despacho' => 'info',
+                                                'transito' => 'primary',
+                                                'aduana' => 'primary',
+                                                'entrega' => 'primary',
+                                                'concluido' => 'success'
                                             ];
                                             $statusLabels = [
                                                 'pendente' => 'Pendente',
                                                 'processando' => 'Processando',
                                                 'enviado' => 'Enviado',
                                                 'entregue' => 'Entregue',
-                                                'cancelado' => 'Cancelado'
+                                                'cancelado' => 'Cancelado',
+                                                'pago' => 'Pago',
+                                                'paid' => 'Pago',
+                                                'aprovado' => 'Pago',
+                                                'approved' => 'Pago',
+                                                'selecao' => 'Seleção',
+                                                'cobranca' => 'Cobrança',
+                                                'despacho' => 'Despacho',
+                                                'transito' => 'Trânsito',
+                                                'aduana' => 'Aduana',
+                                                'entrega' => 'Entrega',
+                                                'concluido' => 'Concluído'
                                             ];
-                                            $color = $statusColors[$pedido['status']] ?? 'secondary';
-                                            $label = $statusLabels[$pedido['status']] ?? ucfirst($pedido['status']);
+                                            $color = $statusColors[$statusPedido] ?? 'secondary';
+                                            $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
                                             ?>
                                             <span class="badge bg-<?= $color ?> px-3 py-2">
                                                 <?= $label ?>
                                             </span>
                                         </td>
-                                        <td class="fw-semibold">R$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
+                                        <td class="fw-semibold">
+                                            <?php if ($moeda === 'USD'): ?>
+                                                US$ <?= number_format($totalPedido, 2, ',', '.') ?>
+                                            <?php else: ?>
+                                                R$ <?= number_format($totalPedido, 2, ',', '.') ?>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <i class="fas fa-box text-muted me-2"></i>

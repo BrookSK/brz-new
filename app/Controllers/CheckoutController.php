@@ -537,6 +537,36 @@ class CheckoutController extends Controller {
             $this->json(['error' => 'Carrinho vazio'], 400);
             return;
         }
+
+        // Se algum item (principalmente temporário da assessoria) expirou e foi removido do banco, bloquear checkout
+        try {
+            $db = \Config\Database::getConnection();
+            $removedExpired = false;
+            foreach ($carrinho as $k => $item) {
+                $pid = $item['produto_id'] ?? null;
+                if (empty($pid)) {
+                    continue;
+                }
+                try {
+                    $stmtP = $db->prepare('SELECT id FROM produtos WHERE id = ? LIMIT 1');
+                    $stmtP->execute([(int) $pid]);
+                    $exists = $stmtP->fetchColumn();
+                    if (!$exists) {
+                        unset($_SESSION['carrinho'][$k]);
+                        $removedExpired = true;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($removedExpired) {
+                $this->json([
+                    'error' => 'Alguns itens do carrinho expiraram e foram removidos. Se eram itens da Assessoria, reprocessse o orçamento para gerar novos valores e produtos.'
+                ], 400);
+                return;
+            }
+        } catch (\Exception $e) {
+        }
         
         try {
             // Obter usuário logado

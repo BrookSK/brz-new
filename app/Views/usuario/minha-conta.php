@@ -224,6 +224,7 @@
                                         <th>ID</th>
                                         <th>Data</th>
                                         <th>Status</th>
+                                        <th>Tempo</th>
                                         <th>Pedido</th>
                                         <th></th>
                                     </tr>
@@ -234,6 +235,10 @@
                                             $status = (string) ($o['status'] ?? 'rascunho');
                                             $isPago = ($status === 'pago');
                                             $pedidoId = (int) ($o['pedido_id'] ?? 0);
+                                            $createdAt = !empty($o['created_at']) ? strtotime((string) $o['created_at']) : null;
+                                            $expiresAt = ($createdAt !== null) ? ($createdAt + (15 * 60)) : null;
+                                            $remaining = ($expiresAt !== null) ? max(0, $expiresAt - time()) : 0;
+                                            $isExpired = (!$isPago) && ($expiresAt !== null) && ($remaining <= 0);
                                         ?>
                                         <tr>
                                             <td>#<?= (int) ($o['id'] ?? 0) ?></td>
@@ -246,6 +251,15 @@
                                                 <?php endif; ?>
                                             </td>
                                             <td>
+                                                <?php if ($isPago): ?>
+                                                    -
+                                                <?php else: ?>
+                                                    <span class="assessoria-timer" data-remaining="<?= (int) $remaining ?>" style="color: #dc3545; font-weight: 700;">
+                                                        <?= $isExpired ? '00:00' : gmdate('i:s', $remaining) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
                                                 <?php if ($pedidoId > 0): ?>
                                                     <a href="/pedido/detalhes/<?= $pedidoId ?>" class="text-decoration-none">#<?= $pedidoId ?></a>
                                                 <?php else: ?>
@@ -253,9 +267,27 @@
                                                 <?php endif; ?>
                                             </td>
                                             <td class="text-end">
-                                                <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
-                                                    Abrir
-                                                </a>
+                                                <?php if ($isPago): ?>
+                                                    <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
+                                                        Abrir
+                                                    </a>
+                                                <?php else: ?>
+                                                    <?php if ($isExpired): ?>
+                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
+                                                            Ver orçamento
+                                                        </a>
+                                                        <a href="/assessoria/reprocessar?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-primary">
+                                                            Reprocessar
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
+                                                            Ver orçamento
+                                                        </a>
+                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-success">
+                                                            Pagar
+                                                        </a>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -265,7 +297,33 @@
                     <?php endif; ?>
                 </div>
             </div>
-            
+
+            <script>
+            (function() {
+                function pad2(n) {
+                    return (n < 10 ? '0' : '') + n;
+                }
+
+                function tick() {
+                    document.querySelectorAll('.assessoria-timer').forEach(function(el) {
+                        var r = parseInt(el.getAttribute('data-remaining') || '0', 10);
+                        if (isNaN(r) || r <= 0) {
+                            el.textContent = '00:00';
+                            el.setAttribute('data-remaining', '0');
+                            return;
+                        }
+                        r = r - 1;
+                        el.setAttribute('data-remaining', String(r));
+                        var m = Math.floor(r / 60);
+                        var s = r % 60;
+                        el.textContent = pad2(m) + ':' + pad2(s);
+                    });
+                }
+
+                setInterval(tick, 1000);
+            })();
+            </script>
+        </div>
             <!-- Quick Actions -->
             <div class="row mt-4">
                 <div class="col-md-6">
