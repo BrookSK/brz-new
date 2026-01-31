@@ -488,9 +488,39 @@ class Produto extends Model {
     }
     
     public function getCategorias() {
-        $stmt = $this->getConnection()->prepare("SELECT DISTINCT category_id FROM {$this->table} WHERE category_id IS NOT NULL ORDER BY category_id");
-        $stmt->execute();
-        $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $categoriaIds = [];
+        try {
+            // Preferir excluir por nome da categoria e também filtrar produtos da Assessoria (ASS-*)
+            $stmt = $this->getConnection()->prepare("
+                SELECT DISTINCT p.category_id
+                FROM {$this->table} p
+                LEFT JOIN categorias c ON p.category_id = c.id
+                WHERE p.category_id IS NOT NULL
+                AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+                AND (c.name IS NULL OR c.name <> 'Assessoria')
+                ORDER BY p.category_id
+            ");
+            $stmt->execute();
+            $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        } catch (\Exception $e) {
+            try {
+                $stmt = $this->getConnection()->prepare("
+                    SELECT DISTINCT p.category_id
+                    FROM {$this->table} p
+                    LEFT JOIN categorias c ON p.category_id = c.id
+                    WHERE p.category_id IS NOT NULL
+                    AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+                    AND (c.nome IS NULL OR c.nome <> 'Assessoria')
+                    ORDER BY p.category_id
+                ");
+                $stmt->execute();
+                $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            } catch (\Exception $e2) {
+                $stmt = $this->getConnection()->prepare("SELECT DISTINCT category_id FROM {$this->table} WHERE category_id IS NOT NULL ORDER BY category_id");
+                $stmt->execute();
+                $categoriaIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            }
+        }
         
         $categorias = [];
         foreach ($categoriaIds as $id) {

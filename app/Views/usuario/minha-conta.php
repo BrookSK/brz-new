@@ -88,8 +88,7 @@
                                 <div>
                                     <h4 class="mb-0">
                                         <?php 
-                                        $ativos = array_filter($pedidos, fn($p) => in_array($p['status'], ['pendente', 'processando', 'enviado']));
-                                        echo count($ativos);
+                                        echo (int) ($pedidos_ativos ?? 0);
                                         ?>
                                     </h4>
                                     <small>Pedidos Ativos</small>
@@ -107,8 +106,15 @@
                                 <div>
                                     <h4 class="mb-0">
                                         <?php 
-                                        $totalGasto = array_sum(array_column($pedidos, 'valor_total'));
-                                        echo 'R$ ' . number_format($totalGasto, 2, ',', '.');
+                                        $tgBRL = floatval($total_gasto_brl ?? 0);
+                                        $tgUSD = floatval($total_gasto_usd ?? 0);
+                                        if ($tgUSD > 0 && $tgBRL > 0) {
+                                            echo 'R$ ' . number_format($tgBRL, 2, ',', '.') . '<br><span class="text-white-50" style="font-size: 0.85rem;">US$ ' . number_format($tgUSD, 2, ',', '.') . '</span>';
+                                        } elseif ($tgUSD > 0) {
+                                            echo 'US$ ' . number_format($tgUSD, 2, ',', '.');
+                                        } else {
+                                            echo 'R$ ' . number_format($tgBRL, 2, ',', '.');
+                                        }
                                         ?>
                                     </h4>
                                     <small>Total Gasto</small>
@@ -280,11 +286,8 @@
                                                             Reprocessar
                                                         </a>
                                                     <?php else: ?>
-                                                        <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
-                                                            Ver orçamento
-                                                        </a>
                                                         <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-success">
-                                                            Pagar
+                                                            Finalizar orçamento
                                                         </a>
                                                     <?php endif; ?>
                                                 <?php endif; ?>

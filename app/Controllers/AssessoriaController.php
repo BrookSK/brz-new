@@ -9,6 +9,131 @@ use App\Models\AssessoriaOrcamento;
 
 class AssessoriaController extends Controller {
 
+    private function slugify(string $value): string {
+        $value = trim(mb_strtolower($value));
+        $value = preg_replace('/[\s\_]+/u', '-', $value);
+        $value = preg_replace('/[^a-z0-9\-]/', '', $value);
+        $value = preg_replace('/\-+/', '-', $value);
+        return trim($value, '-');
+    }
+
+    private function getOrCreateCategoriaAssessoriaId(): ?int {
+        try {
+            $db = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE categorias');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $nameCol = null;
+            foreach (['name', 'nome'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $nameCol = $c;
+                    break;
+                }
+            }
+            if ($nameCol === null) {
+                return null;
+            }
+
+            $stmtFind = $db->prepare('SELECT id FROM categorias WHERE ' . $nameCol . ' = ? LIMIT 1');
+            $stmtFind->execute(['Assessoria']);
+            $existing = $stmtFind->fetchColumn();
+            if ($existing) {
+                return (int) $existing;
+            }
+
+            $fields = [$nameCol];
+            $values = ['Assessoria'];
+            if (in_array('slug', $cols, true)) {
+                $fields[] = 'slug';
+                $values[] = 'assessoria';
+            }
+            if (in_array('status', $cols, true)) {
+                $fields[] = 'status';
+                $values[] = 'ativo';
+            }
+            if (in_array('descricao', $cols, true)) {
+                $fields[] = 'descricao';
+                $values[] = 'Produtos gerados pela Assessoria';
+            }
+            if (in_array('created_at', $cols, true)) {
+                $fields[] = 'created_at';
+                $values[] = date('Y-m-d H:i:s');
+            }
+            if (in_array('updated_at', $cols, true)) {
+                $fields[] = 'updated_at';
+                $values[] = date('Y-m-d H:i:s');
+            }
+
+            $ph = rtrim(str_repeat('?,', count($fields)), ',');
+            $sqlIns = 'INSERT INTO categorias (' . implode(', ', $fields) . ') VALUES (' . $ph . ')';
+            $stmtIns = $db->prepare($sqlIns);
+            $stmtIns->execute($values);
+            $id = (int) $db->lastInsertId();
+            return $id > 0 ? $id : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function ensureLojaFromUrl(?string $url): ?string {
+        $url = trim((string) ($url ?? ''));
+        if ($url === '') {
+            return null;
+        }
+
+        $host = '';
+        try {
+            $parts = parse_url($url);
+            if (is_array($parts) && !empty($parts['host'])) {
+                $host = (string) $parts['host'];
+            }
+        } catch (\Exception $e) {
+            $host = '';
+        }
+
+        $host = strtolower(trim($host));
+        if ($host === '') {
+            return null;
+        }
+        $host = preg_replace('/^www\./i', '', $host);
+
+        $nome = $host;
+        $slug = $this->slugify($host);
+        if ($slug === '') {
+            return null;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+
+            try {
+                $stmtFind = $db->prepare('SELECT id FROM lojas WHERE slug = ? LIMIT 1');
+                $stmtFind->execute([$slug]);
+                $existing = $stmtFind->fetchColumn();
+                if ($existing) {
+                    return $nome;
+                }
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $stmtIns = $db->prepare('INSERT INTO lojas (nome, slug, ativo, created_at) VALUES (?, ?, 1, NOW())');
+                $stmtIns->execute([$nome, $slug]);
+            } catch (\Exception $e) {
+            }
+
+            return $nome;
+        } catch (\Exception $e) {
+            return $nome;
+        }
+    }
+
     private function getConfigValue(string $chave, $default = null) {
         try {
             $db = \Config\Database::getConnection();
@@ -123,43 +248,17 @@ class AssessoriaController extends Controller {
                 return;
             }
 
-            $newJobId = bin2hex(random_bytes(16));
-            $_SESSION['assessoria_job_id'] = $newJobId;
-            $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
-            $_SESSION['assessoria_orcamento_token'] = (string) ($row['public_token'] ?? '');
+            // Não processar aqui. Apenas pré-preencher a tela original (/assessoria)
+            // para o usuário clicar em "Gerar Orçamento" (rota original) e garantir efetividade.
+            $_SESSION['assessoria_prefill_links'] = array_values($links);
+            $_SESSION['assessoria_prefill_from_orcamento_id'] = $orcamentoId;
 
-            // Evitar travar a aplicação por lock de sessão durante processamento/spawn
+            // Evitar travar a aplicação por lock de sessão
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_write_close();
             }
 
-            $orcModel->update($orcamentoId, [
-                'job_id' => $newJobId,
-                'produtos_json' => null,
-                'erros_json' => null,
-                'totais_json' => null,
-                'updated_at' => date('Y-m-d H:i:s'),
-                'webhook_conclusao_disparado_em' => null,
-            ]);
-
-            $job = [
-                'job_id' => $newJobId,
-                'status' => 'queued',
-                'total' => count($links),
-                'processed' => 0,
-                'links' => $links,
-                'produtos' => [],
-                'erros' => [],
-                'started_at' => null,
-                'finished_at' => null
-            ];
-            $this->writeJobFile($newJobId, $job);
-
-            $spawned = $this->trySpawnJobWorker($newJobId);
-            $job['spawned'] = $spawned ? true : false;
-            $this->writeJobFile($newJobId, $job);
-
-            $this->redirect('/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId);
+            $this->redirect('/assessoria');
             return;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao reprocessar orçamento: ' . $e->getMessage();
@@ -286,6 +385,15 @@ class AssessoriaController extends Controller {
         $isLogged = $auth->estaLogado();
         $usuario = $isLogged ? $auth->getUsuarioLogado() : null;
 
+        session_start();
+        $prefillLinks = $_SESSION['assessoria_prefill_links'] ?? [];
+        if (!is_array($prefillLinks)) {
+            $prefillLinks = [];
+        }
+        // Consumir prefill para não ficar reaparecendo
+        unset($_SESSION['assessoria_prefill_links']);
+        unset($_SESSION['assessoria_prefill_from_orcamento_id']);
+
         // Exigir login (sem redirecionar imediatamente; UI mostra pop-up e botão de login)
         $acceptedAt = null;
         if ($isLogged && is_array($usuario)) {
@@ -301,6 +409,7 @@ class AssessoriaController extends Controller {
         $this->view('assessoria/index', [
             'assessoria_logged_in' => $isLogged,
             'assessoria_disclaimer_accepted' => ($acceptedAt !== null && (string) $acceptedAt !== ''),
+            'assessoria_prefill_links' => $prefillLinks,
         ]);
     }
 
@@ -2153,59 +2262,14 @@ class AssessoriaController extends Controller {
                 if (is_array($row) && !empty($row['id'])) {
                     $expired = $this->isOlderThanMinutes($row['last_processed_at'] ?? null, 15);
                     if ($expired) {
-                        $links = $this->parseDbJson($row['links_json'] ?? null);
-                        if (!empty($links)) {
-                            $newJobId = bin2hex(random_bytes(16));
-                            $_SESSION['assessoria_job_id'] = $newJobId;
-                            $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
-                            $_SESSION['assessoria_orcamento_token'] = (string) ($row['public_token'] ?? '');
+                        session_write_close();
 
-                            $orcModel->update($orcamentoId, [
-                                'job_id' => $newJobId,
-                                'produtos_json' => null,
-                                'erros_json' => null,
-                                'totais_json' => null,
-                                'updated_at' => date('Y-m-d H:i:s'),
-                                'webhook_conclusao_disparado_em' => null,
-                            ]);
-
-                            $job = [
-                                'job_id' => $newJobId,
-                                'status' => 'queued',
-                                'total' => count($links),
-                                'processed' => 0,
-                                'links' => $links,
-                                'produtos' => [],
-                                'erros' => [],
-                                'started_at' => null,
-                                'finished_at' => null
-                            ];
-                            $this->writeJobFile($newJobId, $job);
-
-                            session_write_close();
-
-                            echo json_encode([
-                                'success' => false,
-                                'message' => 'Orçamento expirado. Reprocessando produtos para atualizar valores e variações...',
-                                'redirect' => '/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId
-                            ]);
-
-                            $spawned = $this->trySpawnJobWorker($newJobId);
-                            $job['spawned'] = $spawned ? true : false;
-                            $this->writeJobFile($newJobId, $job);
-                            if ($spawned) {
-                                return;
-                            }
-
-                            if (function_exists('fastcgi_finish_request')) {
-                                fastcgi_finish_request();
-                            }
-                            ignore_user_abort(true);
-                            @set_time_limit(0);
-
-                            $this->startBackgroundProcessing($links, $newJobId);
-                            return;
-                        }
+                        echo json_encode([
+                            'success' => false,
+                            'message' => 'Orçamento expirado. Refaça o processamento para atualizar valores e variações.',
+                            'redirect' => '/assessoria/reprocessar?orcamento_id=' . $orcamentoId
+                        ]);
+                        return;
                     }
                 }
             } catch (\Exception $e) {
@@ -2376,6 +2440,9 @@ class AssessoriaController extends Controller {
         $peso = floatval($produto['peso'] ?? 1.0);
         $descricao = (string) ($produto['descricao'] ?? '');
 
+        $categoriaAssessoriaId = $this->getOrCreateCategoriaAssessoriaId();
+        $lojaNome = $this->ensureLojaFromUrl((string) ($produto['url_original'] ?? ''));
+
         $produtoModel = new Produto();
         $newId = (int) $produtoModel->create([
             'name' => $nome,
@@ -2385,7 +2452,7 @@ class AssessoriaController extends Controller {
             'weight' => $peso,
             'status' => 'published',
             'stock' => 999999,
-            'category_id' => null,
+            'category_id' => $categoriaAssessoriaId,
             'images' => $produto['imagens'] ?? [],
             'variations' => $produto['variacoes'] ?? [],
             'attributes' => [
@@ -2396,6 +2463,25 @@ class AssessoriaController extends Controller {
 
         if ($newId <= 0) {
             throw new \Exception('Falha ao criar produto no sistema');
+        }
+
+        // Preencher campo loja (string) quando existir na tabela
+        if (!empty($lojaNome)) {
+            try {
+                $colsProd = [];
+                try {
+                    $stmtCols = $db->query('DESCRIBE produtos');
+                    $colsProd = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsProd = [];
+                }
+
+                if (is_array($colsProd) && in_array('loja', $colsProd, true)) {
+                    $stmtUpdLoja = $db->prepare('UPDATE produtos SET loja = ?, updated_at = NOW() WHERE id = ?');
+                    $stmtUpdLoja->execute([(string) $lojaNome, (int) $newId]);
+                }
+            } catch (\Exception $e) {
+            }
         }
 
         // Persistir imagens também em produto_fotos e definir foto_principal (admin/listagem usa isso)

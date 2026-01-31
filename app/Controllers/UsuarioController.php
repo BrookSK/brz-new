@@ -64,7 +64,71 @@ class UsuarioController extends Controller {
         }
         
         $pedidos_recentes = array_slice($pedidos, 0, 5);
-        $total_pedidos = count($pedidos);
+
+        // Estatísticas reais (sem depender da lista limitada)
+        $stats = [
+            'total_pedidos' => 0,
+            'pedidos_ativos' => 0,
+            'total_gasto_brl' => 0.0,
+            'total_gasto_usd' => 0.0,
+        ];
+        try {
+            $db = \Config\Database::getConnection();
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE pedidos');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $totalCol = null;
+            foreach (['valor_total', 'total', 'amount'] as $c) {
+                if (is_array($cols) && in_array($c, $cols, true)) {
+                    $totalCol = $c;
+                    break;
+                }
+            }
+            if ($totalCol === null) {
+                $totalCol = 'valor_total';
+            }
+
+            $moedaCol = null;
+            foreach (['moeda', 'currency'] as $c) {
+                if (is_array($cols) && in_array($c, $cols, true)) {
+                    $moedaCol = $c;
+                    break;
+                }
+            }
+
+            $stmtTotal = $db->prepare('SELECT COUNT(*) FROM pedidos WHERE usuario_id = ?');
+            $stmtTotal->execute([(int) $usuario['id']]);
+            $stats['total_pedidos'] = (int) $stmtTotal->fetchColumn();
+
+            $stmtAtivos = $db->prepare("SELECT COUNT(*) FROM pedidos WHERE usuario_id = ? AND status IN ('pendente','processando','enviado')");
+            $stmtAtivos->execute([(int) $usuario['id']]);
+            $stats['pedidos_ativos'] = (int) $stmtAtivos->fetchColumn();
+
+            if ($moedaCol !== null) {
+                $stmtSum = $db->prepare("SELECT UPPER(COALESCE({$moedaCol}, 'BRL')) AS moeda, SUM(COALESCE({$totalCol},0)) AS total FROM pedidos WHERE usuario_id = ? GROUP BY UPPER(COALESCE({$moedaCol}, 'BRL'))");
+                $stmtSum->execute([(int) $usuario['id']]);
+                $rows = $stmtSum->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $m = strtoupper((string) ($r['moeda'] ?? 'BRL'));
+                    $t = floatval($r['total'] ?? 0);
+                    if ($m === 'USD') {
+                        $stats['total_gasto_usd'] += $t;
+                    } else {
+                        $stats['total_gasto_brl'] += $t;
+                    }
+                }
+            } else {
+                $stmtSum = $db->prepare("SELECT SUM(COALESCE({$totalCol},0)) AS total FROM pedidos WHERE usuario_id = ?");
+                $stmtSum->execute([(int) $usuario['id']]);
+                $stats['total_gasto_brl'] = floatval($stmtSum->fetchColumn() ?: 0);
+            }
+        } catch (\Exception $e) {
+        }
 
         $orcamentosAssessoria = [];
         try {
@@ -79,7 +143,10 @@ class UsuarioController extends Controller {
             'enderecos' => $enderecos,
             'pedidos' => $pedidos,
             'pedidos_recentes' => $pedidos_recentes,
-            'total_pedidos' => $total_pedidos,
+            'total_pedidos' => (int) ($stats['total_pedidos'] ?? 0),
+            'total_gasto_brl' => (float) ($stats['total_gasto_brl'] ?? 0),
+            'total_gasto_usd' => (float) ($stats['total_gasto_usd'] ?? 0),
+            'pedidos_ativos' => (int) ($stats['pedidos_ativos'] ?? 0),
             'orcamentos_assessoria' => $orcamentosAssessoria
         ]);
     }

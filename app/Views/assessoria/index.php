@@ -130,6 +130,8 @@ require __DIR__ . '/../layouts/main.php';
 $(document).ready(function() {
     let linkCount = 1;
 
+    const prefillLinks = <?= json_encode(array_values(array_filter(($assessoria_prefill_links ?? []), function($v) { return is_string($v) && trim($v) !== ''; }))) ?>;
+
     const isLoggedIn = <?= json_encode((bool) ($assessoria_logged_in ?? false)) ?>;
     const disclaimerAccepted = <?= json_encode((bool) ($assessoria_disclaimer_accepted ?? false)) ?>;
 
@@ -231,6 +233,26 @@ $(document).ready(function() {
         updateRemoveButtons();
     });
 
+    function fillPrefillLinks() {
+        if (!Array.isArray(prefillLinks) || prefillLinks.length === 0) {
+            return;
+        }
+
+        // Garante quantidade de inputs
+        const desired = prefillLinks.length;
+        const current = $('.link-input').length;
+        for (let i = current; i < desired; i++) {
+            $('#addLinkBtn').trigger('click');
+        }
+
+        // Preenche os valores
+        $('.link-input').each(function(idx) {
+            if (idx < prefillLinks.length) {
+                $(this).val(String(prefillLinks[idx]));
+            }
+        });
+    }
+
     // Remover campo de link
     $(document).on('click', '.remove-link', function() {
         $(this).closest('.link-input-group').remove();
@@ -241,6 +263,10 @@ $(document).ready(function() {
     function updateRemoveButtons() {
         $('.remove-link').toggle(linkCount > 1);
     }
+
+    // Aplicar prefill (quando veio do botão Reprocessar)
+    fillPrefillLinks();
+    updateRemoveButtons();
 
     // Processar formulário
     $('#assessoriaForm').submit(function(e) {
