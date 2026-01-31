@@ -277,6 +277,11 @@ class AdminProdutosController extends Controller {
 
                 $fotoCapa = $produto['foto_principal'] ?? null;
                 if (!empty($fotoCapa)) {
+                    // Se for URL externa, usar diretamente
+                    if (is_string($fotoCapa) && preg_match('#^https?://#i', $fotoCapa)) {
+                        $produto['imagem'] = $fotoCapa;
+                        continue;
+                    }
                     $filePath = $this->resolveUploadsPublicPath((string) $fotoCapa);
                     if ($filePath) {
                         $produto['imagem'] = Url::absolute((string) $fotoCapa);
@@ -291,6 +296,11 @@ class AdminProdutosController extends Controller {
                 $foto = $stmtFotos->fetch(\PDO::FETCH_ASSOC);
 
                 if ($foto && !empty($foto['nome_arquivo'])) {
+                    // Se for URL externa, usar diretamente
+                    if (is_string($foto['nome_arquivo']) && preg_match('#^https?://#i', (string) $foto['nome_arquivo'])) {
+                        $produto['imagem'] = (string) $foto['nome_arquivo'];
+                        continue;
+                    }
                     $filePath = $this->resolveUploadsPublicPath($foto['nome_arquivo']);
                     if ($filePath) {
                         $produto['imagem'] = Url::absolute($foto['nome_arquivo']);
