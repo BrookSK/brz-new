@@ -54,11 +54,46 @@ class UsuarioController extends Controller {
         // Obter enderecos do usuário
         $enderecos = $this->usuarioModel->getEnderecos($usuario['id']);
         
-        // Obter pedidos reais do usuário
+        // Obter pedidos reais do usuário (usuario_id ou cliente_id)
+        $pedidos = [];
+        $pedidosWhere = 'p.usuario_id = ?';
+        $pedidosParams = [(int) $usuario['id']];
         try {
-            $pedidos = $this->pedidoModel->getPedidos($usuario['id'], 10, 0);
+            $db = \Config\Database::getConnection();
+
+            $colsPedidos = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $clienteId = null;
+            if (is_array($colsPedidos) && in_array('cliente_id', $colsPedidos, true)) {
+                $email = (string) ($usuario['email'] ?? '');
+                if ($email !== '') {
+                    try {
+                        $stmtCli = $db->prepare('SELECT id FROM clientes WHERE email = ? ORDER BY id DESC LIMIT 1');
+                        $stmtCli->execute([$email]);
+                        $cid = $stmtCli->fetchColumn();
+                        if ($cid) {
+                            $clienteId = (int) $cid;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+
+            if ($clienteId) {
+                $pedidosWhere = '(p.usuario_id = ? OR p.cliente_id = ?)';
+                $pedidosParams = [(int) $usuario['id'], (int) $clienteId];
+            }
+
+            $stmtPedidos = $db->prepare('SELECT p.* FROM pedidos p WHERE ' . $pedidosWhere . ' ORDER BY p.created_at DESC LIMIT 10 OFFSET 0');
+            $stmtPedidos->execute($pedidosParams);
+            $pedidos = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
-            // Se houver erro, usar array vazio e registrar log
             error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
@@ -101,17 +136,17 @@ class UsuarioController extends Controller {
                 }
             }
 
-            $stmtTotal = $db->prepare('SELECT COUNT(*) FROM pedidos WHERE usuario_id = ?');
-            $stmtTotal->execute([(int) $usuario['id']]);
+            $stmtTotal = $db->prepare('SELECT COUNT(*) FROM pedidos p WHERE ' . $pedidosWhere);
+            $stmtTotal->execute($pedidosParams);
             $stats['total_pedidos'] = (int) $stmtTotal->fetchColumn();
 
-            $stmtAtivos = $db->prepare("SELECT COUNT(*) FROM pedidos WHERE usuario_id = ? AND status IN ('pendente','processando','enviado')");
-            $stmtAtivos->execute([(int) $usuario['id']]);
+            $stmtAtivos = $db->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$pedidosWhere} AND p.status IN ('pendente','processando','enviado')");
+            $stmtAtivos->execute($pedidosParams);
             $stats['pedidos_ativos'] = (int) $stmtAtivos->fetchColumn();
 
             if ($moedaCol !== null) {
-                $stmtSum = $db->prepare("SELECT UPPER(COALESCE({$moedaCol}, 'BRL')) AS moeda, SUM(COALESCE({$totalCol},0)) AS total FROM pedidos WHERE usuario_id = ? GROUP BY UPPER(COALESCE({$moedaCol}, 'BRL'))");
-                $stmtSum->execute([(int) $usuario['id']]);
+                $stmtSum = $db->prepare("SELECT UPPER(COALESCE(p.{$moedaCol}, 'BRL')) AS moeda, SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere} GROUP BY UPPER(COALESCE(p.{$moedaCol}, 'BRL'))");
+                $stmtSum->execute($pedidosParams);
                 $rows = $stmtSum->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 foreach ($rows as $r) {
                     $m = strtoupper((string) ($r['moeda'] ?? 'BRL'));
@@ -123,8 +158,8 @@ class UsuarioController extends Controller {
                     }
                 }
             } else {
-                $stmtSum = $db->prepare("SELECT SUM(COALESCE({$totalCol},0)) AS total FROM pedidos WHERE usuario_id = ?");
-                $stmtSum->execute([(int) $usuario['id']]);
+                $stmtSum = $db->prepare("SELECT SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere}");
+                $stmtSum->execute($pedidosParams);
                 $stats['total_gasto_brl'] = floatval($stmtSum->fetchColumn() ?: 0);
             }
         } catch (\Exception $e) {
