@@ -386,11 +386,23 @@ $(document).ready(function() {
             return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
         }
 
-        if (matches.length === 1) {
-            const v = matches[0];
-            const valor = v.valor !== null && v.valor !== undefined && !isNaN(parseFloat(v.valor)) && parseFloat(v.valor) > 0 ? parseFloat(v.valor) : p.valor;
-            const peso = v.peso !== null && v.peso !== undefined && !isNaN(parseFloat(v.peso)) && parseFloat(v.peso) > 0 ? parseFloat(v.peso) : p.peso;
-            return { variacao_id: String(v.id ?? ''), valor, peso, complete: true };
+        if (matches.length >= 1) {
+            // Alguns sites retornam variantes duplicadas para a mesma combinação;
+            // escolher a melhor (com preço/peso) ao invés de falhar.
+            const best = matches.reduce((acc, cur) => {
+                if (!acc) return cur;
+                const accPrice = acc && acc.valor !== null && acc.valor !== undefined && !isNaN(parseFloat(acc.valor)) ? parseFloat(acc.valor) : 0;
+                const curPrice = cur && cur.valor !== null && cur.valor !== undefined && !isNaN(parseFloat(cur.valor)) ? parseFloat(cur.valor) : 0;
+                if (accPrice <= 0 && curPrice > 0) return cur;
+                const accWeight = acc && acc.peso !== null && acc.peso !== undefined && !isNaN(parseFloat(acc.peso)) ? parseFloat(acc.peso) : 0;
+                const curWeight = cur && cur.peso !== null && cur.peso !== undefined && !isNaN(parseFloat(cur.peso)) ? parseFloat(cur.peso) : 0;
+                if (accWeight <= 0 && curWeight > 0) return cur;
+                return acc;
+            }, null);
+
+            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
+            const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
+            return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }
 
         return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
