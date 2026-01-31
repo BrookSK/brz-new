@@ -833,6 +833,24 @@ class AssessoriaController extends Controller {
             // cURL deve ser > timeout do ScrapingBee
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 160);
         }
+
+        // Retry automático em caso de bloqueio/indisponibilidade (HTML 503/429/403)
+        if (!$curlError && in_array((int) $httpCode, [503, 429, 403], true)) {
+            $retryUrl = $buildUrl([
+                // Compatível e mais permissivo
+                'wait_browser' => 'load',
+                'premium_proxy' => 'true',
+                'timeout' => '140000'
+            ]);
+
+            if (headers_sent() === false) {
+                header('X-ScrapingBee-Retry-HTTP: true');
+                header('X-ScrapingBee-Retry-HTTP-Code: ' . (int) $httpCode);
+                header('X-ScrapingBee-Retry-HTTP-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
+            }
+
+            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 160);
+        }
         
         // Log da resposta
         if (headers_sent() === false) {
@@ -865,6 +883,13 @@ class AssessoriaController extends Controller {
         if ($httpCode !== 200) {
             if (headers_sent() === false) {
                 header('X-ScrapingBee-HTTP-Error: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
+            }
+
+            if (in_array((int) $httpCode, [503, 429, 403], true)) {
+                return [
+                    'success' => false,
+                    'error' => "Site bloqueou/limitou o acesso no momento (HTTP {$httpCode}). Tente novamente mais tarde ou use outro link."
+                ];
             }
             return [
                 'success' => false,
