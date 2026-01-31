@@ -97,7 +97,7 @@
                                 <div class="col-8 col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= json_encode((string) $index) ?>, <?= json_encode((string) $item['produto_id']) ?>, <?= max(1, $item['quantidade'] - 1) ?>)">
+                                        <button class="btn btn-outline-secondary" onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
                                         </button>
                                         <input type="number" class="form-control text-center" 
@@ -105,8 +105,8 @@
                                                min="1" 
                                                max="999"
                                                id="quantidade-<?= htmlspecialchars((string) $index) ?>"
-                                               onchange="atualizarQuantidade(<?= json_encode((string) $index) ?>, <?= json_encode((string) $item['produto_id']) ?>, this.value)">
-                                        <button class="btn btn-outline-secondary" onclick="atualizarQuantidade(<?= json_encode((string) $index) ?>, <?= json_encode((string) $item['produto_id']) ?>, <?= $item['quantidade'] + 1 ?>)">
+                                               onchange='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, this.value)'>
+                                        <button class="btn btn-outline-secondary" onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= $item['quantidade'] + 1 ?>)'>
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -125,7 +125,7 @@
                                     </small>
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removerItem(<?= json_encode((string) $index) ?>, <?= json_encode((string) $item['produto_id']) ?>)">
+                                    <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
