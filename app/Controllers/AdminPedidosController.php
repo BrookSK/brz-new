@@ -407,6 +407,13 @@ class AdminPedidosController extends Controller {
             
             // Obter itens do pedido (já vem com dados do produto adaptados)
             $itens = $pedido['items'] ?? [];
+
+            $quantidadeTotalItens = 0;
+            if (is_array($itens)) {
+                foreach ($itens as $it) {
+                    $quantidadeTotalItens += (int) ($it['quantidade'] ?? 0);
+                }
+            }
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
@@ -588,6 +595,7 @@ class AdminPedidosController extends Controller {
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
                                             <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
                                             <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
+                                            <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>
                                             <tr><td><strong>Subtotal</strong></td><td>R$ ' . number_format($pedido['subtotal'], 2, ',', '.') . '</td></tr>
                                             <tr><td><strong>Serviços</strong></td><td>R$ ' . number_format($pedido['servicos'], 2, ',', '.') . '</td></tr>
                                             <tr><td><strong>Impostos</strong></td><td>R$ ' . number_format($pedido['impostos'], 2, ',', '.') . '</td></tr>

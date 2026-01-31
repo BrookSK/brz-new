@@ -237,10 +237,15 @@ class CarrinhoController extends Controller {
     public function remover(Request $request) {
         session_start();
         $produtoId = $request->getParam('id');
+        $produtoIdFallback = $request->getParam('produto_id');
         
-        if (!$produtoId) {
+        if (!$produtoId && !$produtoIdFallback) {
             $this->json(['error' => 'Produto não informado'], 400);
             return;
+        }
+
+        if (!$produtoId && $produtoIdFallback) {
+            $produtoId = $produtoIdFallback;
         }
         
         $keyToRemove = null;
@@ -278,11 +283,16 @@ class CarrinhoController extends Controller {
     public function atualizar(Request $request) {
         session_start();
         $produtoId = $request->getParam('id');
+        $produtoIdFallback = $request->getParam('produto_id');
         $quantidade = $request->getParam('quantidade');
         
-        if (!$produtoId || !$quantidade) {
+        if ((!$produtoId && !$produtoIdFallback) || !$quantidade) {
             $this->json(['error' => 'Dados incompletos'], 400);
             return;
+        }
+
+        if (!$produtoId && $produtoIdFallback) {
+            $produtoId = $produtoIdFallback;
         }
 
         $quantidade = (int) $quantidade;
@@ -292,19 +302,23 @@ class CarrinhoController extends Controller {
         }
         
         $itemKey = null;
+        $produtoIdDb = $produtoId;
         if (isset($_SESSION['carrinho'][$produtoId])) {
+            // Quando vier a chave real do item (ex: "123:VAR"), atualizar por ela
             $itemKey = $produtoId;
+            $produtoIdDb = (string) ($_SESSION['carrinho'][$itemKey]['produto_id'] ?? $produtoId);
         } else {
             foreach (($_SESSION['carrinho'] ?? []) as $k => $item) {
                 if (is_array($item) && array_key_exists('produto_id', $item) && (string) $item['produto_id'] === (string) $produtoId) {
                     $itemKey = $k;
+                    $produtoIdDb = (string) ($item['produto_id'] ?? $produtoId);
                     break;
                 }
             }
         }
 
         if ($itemKey !== null) {
-            $produto = $this->produtoModel->find($produtoId);
+            $produto = $this->produtoModel->find($produtoIdDb);
             
             $produtoStock = intval($produto['estoque'] ?? 0);
             if ($produtoStock < $quantidade) {

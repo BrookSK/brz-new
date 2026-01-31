@@ -130,6 +130,63 @@ require __DIR__ . '/../layouts/main.php';
 $(document).ready(function() {
     let linkCount = 1;
 
+    const DISCLAIMER_KEY = 'assessoria_disclaimer_accepted_v1';
+    function isDisclaimerAccepted() {
+        try {
+            return window.localStorage && window.localStorage.getItem(DISCLAIMER_KEY) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function setDisclaimerAccepted() {
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(DISCLAIMER_KEY, '1');
+            }
+        } catch (e) {
+        }
+    }
+
+    async function ensureDisclaimerAccepted() {
+        if (isDisclaimerAccepted()) return true;
+
+        const result = await Swal.fire({
+            icon: 'info',
+            title: 'Aviso importante - Assessoria',
+            html: `
+                <div class="text-start">
+                    <p><strong>Este é um processo inovador</strong> e, por conta disso, pode apresentar alguma inconsistência.</p>
+                    <p>Caso isso ocorra, a <strong>equipe de revisão</strong> entrará em contato para:</p>
+                    <div>
+                        - cobrança de diferenças que possam existir<br>
+                        - e/ou devolução/estorno de valores
+                    </div>
+                    <hr>
+                    <p><strong>Promoções e estoque</strong>: se valores promocionais e/ou estoques esgotarem, sua compra poderá ser <strong>estornada</strong> ou será necessário <strong>pagar a diferença</strong> para seguir com o pedido, até que o processamento seja concluído.</p>
+                    <p><strong>Prazo</strong>: nosso prazo é de <strong>48h úteis</strong> para processamento e efetivação do pedido.</p>
+                </div>
+            `,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: true,
+            confirmButtonText: 'Li e aceito',
+            cancelButtonText: 'Não aceito',
+            confirmButtonColor: '#0b1f3a'
+        });
+
+        if (result.isConfirmed) {
+            setDisclaimerAccepted();
+            return true;
+        }
+
+        window.location.href = '/';
+        return false;
+    }
+
+    // Bloquear uso da página até aceitar
+    ensureDisclaimerAccepted();
+
     // Adicionar novo campo de link
     $('#addLinkBtn').click(function() {
         linkCount++;
@@ -168,6 +225,16 @@ $(document).ready(function() {
     // Processar formulário
     $('#assessoriaForm').submit(function(e) {
         e.preventDefault();
+
+        // Garantir aceite antes de prosseguir
+        if (!isDisclaimerAccepted()) {
+            ensureDisclaimerAccepted().then(function(ok) {
+                if (ok) {
+                    $('#assessoriaForm').trigger('submit');
+                }
+            });
+            return;
+        }
         
         const links = [];
         $('.link-input').each(function() {
