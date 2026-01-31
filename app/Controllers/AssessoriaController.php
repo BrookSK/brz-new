@@ -1026,7 +1026,8 @@ class AssessoriaController extends Controller {
                 // Default mais rápido para evitar timeout no proxy
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_query' => 'Extract the product and return structured data. IMPORTANT: include ALL possible variant combinations (e.g., Color, Size, Fit, Style, Model). Return an array "variants" (or "variations") where each item contains: id/sku, attributes as a key-value map (attribute name -> selected value), and the exact price for that variant (USD) when available. Also return product name, description, images. Missing values must be null.'
+                // Limite do ScrapingBee: ai_query <= 300 chars
+                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -1061,6 +1062,23 @@ class AssessoriaController extends Controller {
 
         // 1 tentativa (até 150s) por produto (cURL deve ser > timeout do ScrapingBee)
         [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
+
+        // Se ai_query falhar (tamanho/validação), refazer sem ai_query
+        if (!$curlError && (int) $httpCode === 400 && is_string($response) && stripos($response, 'ai_query') !== false) {
+            $retryUrl = $buildUrl([
+                'ai_query' => null
+            ]);
+            // Remove parâmetros nulos (http_build_query inclui ai_query=)
+            $retryUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $retryUrl);
+            $retryUrl = rtrim($retryUrl, '&?');
+
+            if (headers_sent() === false) {
+                header('X-ScrapingBee-Retry-No-AIQuery: true');
+                header('X-ScrapingBee-Retry-No-AIQuery-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
+            }
+
+            [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 150);
+        }
 
         // Retry automático em caso de timeout (sites pesados / bloqueios)
         if ($curlErrno === 28 || (is_string($curlError) && stripos($curlError, 'timeout') !== false)) {
