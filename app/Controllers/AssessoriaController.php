@@ -386,7 +386,7 @@ class AssessoriaController extends Controller {
         return implode(' | ', $parts);
     }
 
-    private function normalizeVariacoes(array $variacoesBrutas): array {
+    private function normalizeVariacoes(array $variacoesBrutas, array $optionNames = []): array {
         $out = [];
         foreach ($variacoesBrutas as $v) {
             if (!is_array($v)) {
@@ -398,6 +398,28 @@ class AssessoriaController extends Controller {
                 if (isset($v[$ak]) && is_array($v[$ak])) {
                     $atributos = $v[$ak];
                     break;
+                }
+            }
+
+            // Padrão Shopify/semelhantes: option1/option2/option3
+            if (empty($atributos)) {
+                $o1 = $v['option1'] ?? $v['option_1'] ?? null;
+                $o2 = $v['option2'] ?? $v['option_2'] ?? null;
+                $o3 = $v['option3'] ?? $v['option_3'] ?? null;
+
+                $names = $optionNames;
+                $n1 = (string) ($names[0] ?? 'Opção 1');
+                $n2 = (string) ($names[1] ?? 'Opção 2');
+                $n3 = (string) ($names[2] ?? 'Opção 3');
+
+                if (is_string($o1) && trim($o1) !== '') {
+                    $atributos[$n1] = trim($o1);
+                }
+                if (is_string($o2) && trim($o2) !== '') {
+                    $atributos[$n2] = trim($o2);
+                }
+                if (is_string($o3) && trim($o3) !== '') {
+                    $atributos[$n3] = trim($o3);
                 }
             }
 
@@ -417,11 +439,23 @@ class AssessoriaController extends Controller {
             }
 
             $valor = null;
-            foreach (['price', 'valor', 'amount', 'current_price'] as $pk) {
+            foreach (['price', 'valor', 'amount', 'current_price', 'compare_at_price', 'sale_price', 'final_price', 'regular_price', 'unit_price', 'salePrice'] as $pk) {
                 if (isset($v[$pk])) {
                     $valor = $this->findFirstNumeric($v[$pk]);
                     if ($valor !== null) {
                         break;
+                    }
+                }
+            }
+
+            // Alguns formatos tem price como array/objeto: {amount:..} ou {value:..}
+            if ($valor === null && isset($v['price']) && is_array($v['price'])) {
+                foreach (['amount', 'value', 'current', 'usd'] as $pk2) {
+                    if (isset($v['price'][$pk2])) {
+                        $valor = $this->findFirstNumeric($v['price'][$pk2]);
+                        if ($valor !== null) {
+                            break;
+                        }
                     }
                 }
             }
@@ -445,7 +479,7 @@ class AssessoriaController extends Controller {
                 $label = (string) ($v['name'] ?? $v['title'] ?? $v['sku'] ?? 'Variação');
             }
 
-            $id = (string) ($v['id'] ?? $v['variation_id'] ?? $v['sku'] ?? md5($label));
+            $id = (string) ($v['id'] ?? $v['variation_id'] ?? $v['variant_id'] ?? $v['variantId'] ?? $v['item_id'] ?? $v['itemId'] ?? $v['sku'] ?? md5($label));
             $out[] = [
                 'id' => $id,
                 'label' => $label,
@@ -458,22 +492,86 @@ class AssessoriaController extends Controller {
         // Remover duplicados por id
         $unique = [];
         foreach ($out as $v) {
-            $unique[(string) ($v['id'] ?? '')] = $v;
+            $k = (string) ($v['id'] ?? '');
+            if ($k === '') {
+                $k = md5((string) ($v['label'] ?? ''));
+            }
+            if (!isset($unique[$k])) {
+                $unique[$k] = $v;
+                continue;
+            }
+            // Preferir variação que tenha preço
+            if (($unique[$k]['valor'] ?? null) === null && ($v['valor'] ?? null) !== null) {
+                $unique[$k] = $v;
+            }
         }
         return array_values($unique);
     }
 
-    private function extractVariacoesFromScrapingBee(array $dadosBrutos): array {
-        foreach (['variations', 'variants', 'variation', 'variant', 'offers'] as $k) {
-            if (!empty($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
-                $n = $this->normalizeVariacoes($dadosBrutos[$k]);
-                if (!empty($n)) {
-                    return $n;
-                }
+    private function extractOptionNamesFromScrapingBee(array $dadosBrutos): array {
+        $candidates = [];
+
+        // Formatos comuns: options: [{name: "Size", values:[...]}, ...]
+        foreach (['options', 'product_options'] as $k) {
+            if (isset($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
+                $candidates[] = $dadosBrutos[$k];
             }
         }
 
-        // Busca recursiva leve
+        // Aninhado em product
+        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
+            if (isset($dadosBrutos['product']['options']) && is_array($dadosBrutos['product']['options'])) {
+                $candidates[] = $dadosBrutos['product']['options'];
+            }
+        }
+
+        foreach ($candidates as $opts) {
+            $names = [];
+            foreach ($opts as $opt) {
+                if (!is_array($opt)) {
+                    continue;
+                }
+                $n = $opt['name'] ?? $opt['label'] ?? null;
+                if (is_string($n) && trim($n) !== '') {
+                    $names[] = trim($n);
+                }
+            }
+            if (!empty($names)) {
+                return array_values(array_slice($names, 0, 3));
+            }
+        }
+
+        return [];
+    }
+
+    private function extractVariacoesFromScrapingBee(array $dadosBrutos): array {
+        $optionNames = $this->extractOptionNamesFromScrapingBee($dadosBrutos);
+
+        $all = [];
+        $append = function(array $list) use (&$all) {
+            foreach ($list as $it) {
+                if (is_array($it)) {
+                    $all[] = $it;
+                }
+            }
+        };
+
+        foreach (['variations', 'variants', 'variation', 'variant', 'offers'] as $k) {
+            if (!empty($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
+                $append($this->normalizeVariacoes($dadosBrutos[$k], $optionNames));
+            }
+        }
+
+        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
+            if (isset($dadosBrutos['product']['variants']) && is_array($dadosBrutos['product']['variants'])) {
+                $append($this->normalizeVariacoes($dadosBrutos['product']['variants'], $optionNames));
+            }
+            if (isset($dadosBrutos['product']['offers']) && is_array($dadosBrutos['product']['offers'])) {
+                $append($this->normalizeVariacoes($dadosBrutos['product']['offers'], $optionNames));
+            }
+        }
+
+        // Busca recursiva leve (agrega)
         $queue = [$dadosBrutos];
         $max = 200;
         $seen = 0;
@@ -486,17 +584,20 @@ class AssessoriaController extends Controller {
             foreach ($node as $k => $v) {
                 $ks = strtolower((string) $k);
                 if (in_array($ks, ['variations', 'variants', 'offers'], true) && is_array($v)) {
-                    $n = $this->normalizeVariacoes($v);
-                    if (!empty($n)) {
-                        return $n;
-                    }
+                    $append($this->normalizeVariacoes($v, $optionNames));
                 }
                 if (is_array($v)) {
                     $queue[] = $v;
                 }
             }
         }
-        return [];
+
+        if (empty($all)) {
+            return [];
+        }
+
+        // Consolidar
+        return $this->normalizeVariacoes($all, $optionNames);
     }
 
     private function extractValorFromScrapingBee(array $dadosBrutos): ?float {
