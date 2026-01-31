@@ -670,6 +670,15 @@ class CheckoutController extends Controller {
     
     private function salvarItensPedido($pedidoId, $carrinho) {
         $db = \Config\Database::getConnection();
+
+        // Descobrir colunas disponíveis em pedido_itens (compatibilidade entre schemas)
+        $colsItens = [];
+        try {
+            $stmtCols = $db->query('DESCRIBE pedido_itens');
+            $colsItens = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+            $colsItens = [];
+        }
         
         foreach ($carrinho as $item) {
             $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
@@ -691,6 +700,45 @@ class CheckoutController extends Controller {
             }
             
             $this->debugLog('[CHECKOUT_ITENS] Produto ID ' . $produtoId . ' validado');
+
+            // Buscar dados do produto para persistir no pedido
+            $produtoRow = null;
+            try {
+                $stmtP = $db->prepare('SELECT id, name, nome, sku, url_original FROM produtos WHERE id = ? LIMIT 1');
+                $stmtP->execute([$produtoId]);
+                $produtoRow = $stmtP->fetch(\PDO::FETCH_ASSOC);
+            } catch (\Exception $e) {
+                $produtoRow = null;
+            }
+
+            $nomeProduto = (string) (
+                $item['nome'] ??
+                $item['name'] ??
+                ($item['produto_nome'] ?? null) ??
+                ($produtoRow['nome'] ?? ($produtoRow['name'] ?? ''))
+            );
+            if (trim($nomeProduto) === '') {
+                $nomeProduto = 'Produto #' . $produtoId;
+            }
+            $skuProduto = (string) (
+                $item['sku'] ??
+                ($item['referencia'] ?? null) ??
+                ($produtoRow['sku'] ?? '')
+            );
+            $urlOriginal = (string) (
+                $item['url_original'] ??
+                ($item['url'] ?? null) ??
+                ($produtoRow['url_original'] ?? '')
+            );
+
+            $variacaoId = null;
+            $variacaoLabel = null;
+            $variacaoAtributos = null;
+            if (isset($item['variacao']) && is_array($item['variacao'])) {
+                $variacaoId = $item['variacao']['id'] ?? null;
+                $variacaoLabel = $item['variacao']['label'] ?? null;
+                $variacaoAtributos = $item['variacao']['atributos'] ?? null;
+            }
             
             // Verificar diferentes campos de preço
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
@@ -698,19 +746,45 @@ class CheckoutController extends Controller {
             
             $this->debugLog('[CHECKOUT_ITENS] Preco unitario: ' . $precoUnitario . ', Quantidade: ' . $quantidade);
             
-            $sql = "INSERT INTO pedido_itens (
-                pedido_id, produto_id, quantidade, preco_unitario, 
-                subtotal, created_at
-            ) VALUES (?, ?, ?, ?, ?, NOW())";
-            
+            $cols = ['pedido_id', 'produto_id', 'quantidade', 'preco_unitario', 'subtotal', 'created_at'];
+            $vals = [$pedidoId, $produtoId, $quantidade, $precoUnitario, $precoUnitario * $quantidade];
+            $placeholders = ['?', '?', '?', '?', '?', 'NOW()'];
+
+            // Campos de auditoria para o admin (se existirem no schema)
+            if (is_array($colsItens) && in_array('nome_produto', $colsItens, true)) {
+                $cols[] = 'nome_produto';
+                $vals[] = $nomeProduto;
+                $placeholders[] = '?';
+            }
+            if (is_array($colsItens) && in_array('nome_produto_sku', $colsItens, true)) {
+                $cols[] = 'nome_produto_sku';
+                $vals[] = $skuProduto;
+                $placeholders[] = '?';
+            }
+            if (is_array($colsItens) && in_array('url_original', $colsItens, true)) {
+                $cols[] = 'url_original';
+                $vals[] = $urlOriginal;
+                $placeholders[] = '?';
+            }
+            if (is_array($colsItens) && in_array('variacao_id', $colsItens, true)) {
+                $cols[] = 'variacao_id';
+                $vals[] = $variacaoId;
+                $placeholders[] = '?';
+            }
+            if (is_array($colsItens) && in_array('variacao_label', $colsItens, true)) {
+                $cols[] = 'variacao_label';
+                $vals[] = $variacaoLabel;
+                $placeholders[] = '?';
+            }
+            if (is_array($colsItens) && in_array('variacao_atributos', $colsItens, true)) {
+                $cols[] = 'variacao_atributos';
+                $vals[] = (is_array($variacaoAtributos) ? json_encode($variacaoAtributos) : null);
+                $placeholders[] = '?';
+            }
+
+            $sql = 'INSERT INTO pedido_itens (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
             $stmt = $db->prepare($sql);
-            $stmt->execute([
-                $pedidoId,
-                $produtoId,
-                $quantidade,
-                $precoUnitario,
-                $precoUnitario * $quantidade
-            ]);
+            $stmt->execute($vals);
             
             $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
         }

@@ -214,6 +214,15 @@ class ProdutoController extends Controller {
             return null;
         }
 
+        // URLs externas devem ser preservadas (usado por produtos importados)
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+
+        if (strpos($path, '//') === 0) {
+            return 'https:' . $path;
+        }
+
         if ($path[0] !== '/') {
             $path = '/' . $path;
         }
@@ -226,6 +235,11 @@ class ProdutoController extends Controller {
     }
 
     private function produtoImagemExiste(string $path): bool {
+        // URL externa: não há como validar via file_exists
+        if (preg_match('#^https?://#i', $path)) {
+            return true;
+        }
+
         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
         if ($docRoot === '') {
             return false;

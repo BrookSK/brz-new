@@ -312,6 +312,22 @@ class PedidoEcommerce extends Model {
         if ($pedido) {
             // Obter itens do pedido com dados do produto
             try {
+                // Descobrir colunas disponíveis em pedido_itens para evitar SQL quebrar
+                $colsItens = [];
+                try {
+                    $stmtCols = $this->connection->query('DESCRIBE pedido_itens');
+                    $colsItens = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                } catch (\Exception $e) {
+                    $colsItens = [];
+                }
+
+                $selectExtrasItens = '';
+                foreach (['url_original', 'variacao_id', 'variacao_label', 'variacao_atributos'] as $c) {
+                    if (is_array($colsItens) && in_array($c, $colsItens, true)) {
+                        $selectExtrasItens .= ', pi.' . $c;
+                    }
+                }
+
                 // Buscar itens diretamente com as colunas que criamos
                 $stmt = $this->connection->prepare("
                     SELECT 
@@ -339,6 +355,12 @@ class PedidoEcommerce extends Model {
                     WHERE pi.pedido_id = :id 
                     ORDER BY pi.id
                 ");
+                // Injetar colunas extras de forma segura
+                if ($selectExtrasItens !== '') {
+                    $sql = $stmt->queryString;
+                    $sql = str_replace('pi.created_at,', 'pi.created_at' . $selectExtrasItens . ',', $sql);
+                    $stmt = $this->connection->prepare($sql);
+                }
                 $stmt->bindParam(':id', $pedidoId);
                 $stmt->execute();
                 $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -348,6 +370,13 @@ class PedidoEcommerce extends Model {
                     $item['referencia'] = $item['referencia'] ?? $item['nome_produto_sku'] ?? '';
                     $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
                     $item['descricao_produto'] = $item['descricao_produto'] ?? '';
+
+                    if (isset($item['variacao_atributos']) && is_string($item['variacao_atributos']) && $item['variacao_atributos'] !== '') {
+                        $decoded = json_decode($item['variacao_atributos'], true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $item['variacao_atributos'] = $decoded;
+                        }
+                    }
                     
                     // Se não tiver nome_produto, usar fallback
                     if (empty($item['nome_produto'])) {

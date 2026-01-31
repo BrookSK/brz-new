@@ -1832,6 +1832,37 @@ class AssessoriaController extends Controller {
             throw new \Exception('Falha ao criar produto no sistema');
         }
 
+        // Persistir imagens também em produto_fotos e definir foto_principal (admin/listagem usa isso)
+        $imagens = $produto['imagens'] ?? [];
+        if (is_array($imagens) && !empty($imagens)) {
+            $imagens = array_values(array_filter($imagens, function($u) {
+                return is_string($u) && trim($u) !== '';
+            }));
+
+            if (!empty($imagens)) {
+                try {
+                    // Definir capa do produto se o método existir
+                    if (method_exists($produtoModel, 'updateFotoPrincipal')) {
+                        $produtoModel->updateFotoPrincipal($newId, (string) $imagens[0]);
+                    } else {
+                        // Fallback: tentar update direto
+                        $stmtCover = $db->prepare('UPDATE produtos SET foto_principal = ?, updated_at = NOW() WHERE id = ?');
+                        $stmtCover->execute([(string) $imagens[0], $newId]);
+                    }
+                } catch (\Exception $e) {
+                }
+
+                try {
+                    $fotoModel = new \App\Models\ProdutoFoto();
+                    foreach ($imagens as $idx => $url) {
+                        $isPrincipal = ($idx === 0);
+                        $fotoModel->adicionarFoto($newId, (string) $url, (string) $url, null, $isPrincipal);
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
         return $newId;
     }
     

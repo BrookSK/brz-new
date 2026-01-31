@@ -494,18 +494,54 @@ class AdminPedidosController extends Controller {
                                             
                                             // Mostrar imagem apenas se existir
                                             if (!empty($item['imagem']) && $item['imagem'] !== 'default.jpg') {
-                                                // Remover caminho duplicado se existir
-                                                $imagemPath = $item['imagem'];
-                                                if (strpos($imagemPath, 'uploads/produtos/') !== false) {
-                                                    $imagemPath = str_replace('uploads/produtos/', '', $imagemPath);
+                                                $img = (string) $item['imagem'];
+                                                // Se já for URL externa, usar diretamente
+                                                if (preg_match('#^https?://#i', $img) || strpos($img, '//') === 0) {
+                                                    if (strpos($img, '//') === 0) {
+                                                        $img = 'https:' . $img;
+                                                    }
+                                                    echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
+                                                } else {
+                                                    // Remover caminho duplicado se existir
+                                                    $imagemPath = $img;
+                                                    if (strpos($imagemPath, 'uploads/produtos/') !== false) {
+                                                        $imagemPath = str_replace('uploads/produtos/', '', $imagemPath);
+                                                    }
+                                                    echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
                                                 }
-                                                
-                                                echo '<img src="/uploads/produtos/' . htmlspecialchars($imagemPath) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
-                                                     style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
                                             }
                                             
+                                            $nomeProduto = (string) ($item['nome_produto'] ?? 'Produto #' . $item['produto_id']);
+                                            $sku = (string) ($item['nome_produto_sku'] ?? $item['referencia'] ?? '');
+                                            $urlOriginal = (string) ($item['url_original'] ?? '');
+                                            $variacaoLabel = (string) ($item['variacao_label'] ?? '');
+                                            $variacaoAttrs = $item['variacao_atributos'] ?? null;
+
+                                            $extraHtml = '';
+                                            if ($sku !== '') {
+                                                $extraHtml .= '<div class="small text-muted">SKU/Ref: ' . htmlspecialchars($sku) . '</div>';
+                                            }
+                                            if ($urlOriginal !== '') {
+                                                $extraHtml .= '<div class="small"><a href="' . htmlspecialchars($urlOriginal) . '" target="_blank" class="text-decoration-none">Link original</a></div>';
+                                            }
+                                            if ($variacaoLabel !== '') {
+                                                $extraHtml .= '<div class="small text-muted">Variação: ' . htmlspecialchars($variacaoLabel) . '</div>';
+                                            }
+                                            if (is_array($variacaoAttrs) && !empty($variacaoAttrs)) {
+                                                $pairs = [];
+                                                foreach ($variacaoAttrs as $k => $v) {
+                                                    if ($k === '' || $v === null) continue;
+                                                    $pairs[] = (string) $k . ': ' . (string) $v;
+                                                }
+                                                if (!empty($pairs)) {
+                                                    $extraHtml .= '<div class="small text-muted">' . htmlspecialchars(implode(' | ', $pairs)) . '</div>';
+                                                }
+                                            }
+
                                             echo '</td>
-                                                <td>' . htmlspecialchars($item['nome_produto'] ?? 'Produto #' . $item['produto_id']) . '</td>
+                                                <td>' . htmlspecialchars($nomeProduto) . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>

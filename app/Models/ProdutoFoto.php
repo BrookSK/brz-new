@@ -10,6 +10,14 @@ class ProdutoFoto extends Model {
             return null;
         }
 
+        if (preg_match('#^https?://#i', $nomeArquivo)) {
+            return $nomeArquivo;
+        }
+
+        if (strpos($nomeArquivo, '//') === 0) {
+            return 'https:' . $nomeArquivo;
+        }
+
         if (str_starts_with($nomeArquivo, '/')) {
             return $nomeArquivo;
         }
