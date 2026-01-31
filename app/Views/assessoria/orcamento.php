@@ -644,6 +644,7 @@ $(document).ready(function() {
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
+                orcamento_id: <?= json_encode((int) ($orcamento_id ?? 0)) ?>,
                 termos_aceitos: true,
                 produtos_selecionados: selecionados
             }),
@@ -665,6 +666,10 @@ $(document).ready(function() {
                         title: 'Erro',
                         text: response.message,
                         confirmButtonColor: '#0b1f3a'
+                    }).then(() => {
+                        if (response.redirect) {
+                            window.location.href = response.redirect;
+                        }
                     });
                 }
             },

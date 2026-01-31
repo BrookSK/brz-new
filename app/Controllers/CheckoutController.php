@@ -8,6 +8,7 @@ use App\Models\Carrinho;
 use App\Models\Usuario;
 use App\Models\Endereco;
 use App\Models\PedidoEcommerce;
+use App\Models\AssessoriaOrcamento;
 
 // Garantir que as classes sejam carregadas
 require_once __DIR__ . '/../Models/Model.php';
@@ -15,6 +16,7 @@ require_once __DIR__ . '/../Models/Endereco.php';
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Carrinho.php';
 require_once __DIR__ . '/../Models/PedidoEcommerce.php';
+require_once __DIR__ . '/../Models/AssessoriaOrcamento.php';
 
 class CheckoutController extends Controller {
     private $authService;
@@ -600,6 +602,25 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                     // Se pagamento falhar, manter pedido como aguardando pagamento e retornar erro amigável
                     throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
+                }
+
+                // Se veio da Assessoria, vincular orçamento ao pedido (pago)
+                try {
+                    $orcId = (int) ($_SESSION['checkout_assessoria_orcamento_id'] ?? 0);
+                    if ($orcId > 0) {
+                        $orcModel = new AssessoriaOrcamento();
+                        $rowOrc = $orcModel->find($orcId);
+                        if (is_array($rowOrc) && !empty($rowOrc['id'])) {
+                            $orcModel->update($orcId, [
+                                'status' => 'pago',
+                                'pedido_id' => (int) $pedidoId,
+                                'paid_at' => date('Y-m-d H:i:s'),
+                                'updated_at' => date('Y-m-d H:i:s'),
+                            ]);
+                        }
+                    }
+                    unset($_SESSION['checkout_assessoria_orcamento_id']);
+                } catch (\Exception $e) {
                 }
                 
                 // Limpar carrinho

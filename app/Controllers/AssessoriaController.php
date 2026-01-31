@@ -5,8 +5,88 @@ use App\Core\Request;
 use App\Models\Produto;
 use App\Services\AuthService;
 use App\Models\Usuario;
+use App\Models\AssessoriaOrcamento;
 
 class AssessoriaController extends Controller {
+
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function enviarWebhookAssessoria(string $tipo, array $payload): void {
+        $url = '';
+        if ($tipo === 'inicio') {
+            $url = (string) $this->getConfigValue('assessoria_webhook_inicio_url', '');
+        } elseif ($tipo === 'conclusao') {
+            $url = (string) $this->getConfigValue('assessoria_webhook_conclusao_url', '');
+        }
+        $url = trim($url);
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return;
+        }
+
+        $body = json_encode($payload);
+        if ($body === false) {
+            return;
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'User-Agent: brz-new/1.0']);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_exec($ch);
+            curl_close($ch);
+            return;
+        }
+
+        @file_get_contents($url, false, stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\nUser-Agent: brz-new/1.0",
+                'content' => $body,
+                'timeout' => 15,
+                'ignore_errors' => true,
+            ]
+        ]));
+    }
+
+    private function parseDbJson(?string $json): array {
+        $json = (string) ($json ?? '');
+        if (trim($json) === '') {
+            return [];
+        }
+        $decoded = json_decode($json, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function isOlderThanMinutes(?string $dt, int $minutes): bool {
+        $dt = (string) ($dt ?? '');
+        if ($dt === '') {
+            return true;
+        }
+        try {
+            $ts = strtotime($dt);
+            if (!$ts) {
+                return true;
+            }
+            return (time() - $ts) > ($minutes * 60);
+        } catch (\Exception $e) {
+            return true;
+        }
+    }
     
     /**
      * Exibe a página principal de Assessoria
@@ -76,6 +156,12 @@ class AssessoriaController extends Controller {
         header('Content-Type: application/json');
         session_start();
 
+        $auth = new AuthService();
+        if (!$auth->estaLogado()) {
+            echo json_encode(['success' => false, 'message' => 'Login obrigatório', 'redirect' => '/login?redirect=/assessoria']);
+            return;
+        }
+
         try {
             $body = $request->getBody();
             $links = $body['links'] ?? [];
@@ -107,6 +193,28 @@ class AssessoriaController extends Controller {
             $jobId = bin2hex(random_bytes(16));
             $_SESSION['assessoria_job_id'] = $jobId;
 
+            $usuario = $auth->getUsuarioLogado();
+            $usuarioId = (int) ($usuario['id'] ?? 0);
+            $token = bin2hex(random_bytes(24));
+
+            $orcamentoId = null;
+            try {
+                $orcamentoModel = new AssessoriaOrcamento();
+                $orcamentoId = (int) $orcamentoModel->create([
+                    'usuario_id' => $usuarioId,
+                    'status' => 'rascunho',
+                    'public_token' => $token,
+                    'job_id' => $jobId,
+                    'links_json' => json_encode($cleanLinks),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
+                $_SESSION['assessoria_orcamento_token'] = $token;
+            } catch (\Exception $e) {
+                $orcamentoId = null;
+            }
+
             $job = [
                 'job_id' => $jobId,
                 'status' => 'queued',
@@ -120,13 +228,46 @@ class AssessoriaController extends Controller {
             ];
             $this->writeJobFile($jobId, $job);
 
+            // Webhook de início (idempotente via coluna no orçamento)
+            if (!empty($orcamentoId)) {
+                try {
+                    $db = \Config\Database::getConnection();
+                    $stmt = $db->prepare('SELECT webhook_inicio_disparado_em FROM assessoria_orcamentos WHERE id = ? LIMIT 1');
+                    $stmt->execute([(int) $orcamentoId]);
+                    $sentAt = $stmt->fetchColumn();
+
+                    if (empty($sentAt)) {
+                        $payload = [
+                            'evento' => 'assessoria_orcamento_inicio',
+                            'orcamento_id' => (int) $orcamentoId,
+                            'orcamento_token' => (string) ($token ?? ''),
+                            'orcamento_url' => '/assessoria/orcamento?orcamento_id=' . (int) $orcamentoId,
+                            'job_id' => $jobId,
+                            'usuario_id' => $usuarioId,
+                            'nome' => (string) ($usuario['nome'] ?? ''),
+                            'telefone' => (string) ($usuario['telefone'] ?? ''),
+                            'links' => $cleanLinks,
+                            'data' => date('Y-m-d H:i:s'),
+                        ];
+                        $this->enviarWebhookAssessoria('inicio', $payload);
+
+                        $stmtUpd = $db->prepare('UPDATE assessoria_orcamentos SET webhook_inicio_disparado_em = NOW(), updated_at = NOW() WHERE id = ?');
+                        $stmtUpd->execute([(int) $orcamentoId]);
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
             session_write_close();
 
             echo json_encode([
                 'success' => true,
                 'data' => [
                     'job_id' => $jobId,
-                    'total' => count($cleanLinks)
+                    'total' => count($cleanLinks),
+                    'orcamento_id' => $orcamentoId,
+                    'orcamento_token' => $token,
+                    'orcamento_url' => '/assessoria/orcamento?orcamento_id=' . (int) $orcamentoId
                 ]
             ]);
 
@@ -182,6 +323,56 @@ class AssessoriaController extends Controller {
 
             $_SESSION['assessoria_orcamento']['produtos'] = $job['produtos'] ?? [];
             $_SESSION['assessoria_orcamento']['erros'] = $job['erros'] ?? [];
+
+            // Persistir no DB e disparar webhook de conclusão (idempotente)
+            try {
+                $orcamentoModel = new AssessoriaOrcamento();
+                $row = $orcamentoModel->findByJobId((string) $jobId);
+                if (is_array($row) && !empty($row['id'])) {
+                    $orcId = (int) $row['id'];
+                    $produtos = is_array($job['produtos'] ?? null) ? $job['produtos'] : [];
+                    $erros = is_array($job['erros'] ?? null) ? $job['erros'] : [];
+                    $totais = $this->calcularTotaisOrcamento($produtos);
+
+                    $orcamentoModel->update($orcId, [
+                        'produtos_json' => json_encode($produtos),
+                        'erros_json' => json_encode($erros),
+                        'totais_json' => json_encode($totais),
+                        'last_processed_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+
+                    $db = \Config\Database::getConnection();
+                    $stmt = $db->prepare('SELECT webhook_conclusao_disparado_em, usuario_id, public_token, pedido_id FROM assessoria_orcamentos WHERE id = ? LIMIT 1');
+                    $stmt->execute([$orcId]);
+                    $row2 = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $sentAt = $row2['webhook_conclusao_disparado_em'] ?? null;
+                    if (empty($sentAt)) {
+                        $userModel = new Usuario();
+                        $u = $userModel->find((int) ($row2['usuario_id'] ?? 0)) ?: [];
+                        $payload = [
+                            'evento' => 'assessoria_orcamento_concluido',
+                            'orcamento_id' => $orcId,
+                            'orcamento_token' => (string) ($row2['public_token'] ?? ''),
+                            'orcamento_url' => '/assessoria/orcamento?orcamento_id=' . $orcId,
+                            'job_id' => $jobId,
+                            'usuario_id' => (int) ($row2['usuario_id'] ?? 0),
+                            'nome' => (string) ($u['nome'] ?? ($u['name'] ?? '')),
+                            'telefone' => (string) ($u['telefone'] ?? ''),
+                            'pedido_id' => (string) ($row2['pedido_id'] ?? ''),
+                            'total_produtos' => is_array($produtos) ? count($produtos) : 0,
+                            'total_erros' => is_array($erros) ? count($erros) : 0,
+                            'totais' => $totais,
+                            'data' => date('Y-m-d H:i:s'),
+                        ];
+                        $this->enviarWebhookAssessoria('conclusao', $payload);
+
+                        $stmtUpd = $db->prepare('UPDATE assessoria_orcamentos SET webhook_conclusao_disparado_em = NOW(), updated_at = NOW() WHERE id = ?');
+                        $stmtUpd->execute([$orcId]);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
         }
 
         echo json_encode([
@@ -1558,6 +1749,30 @@ class AssessoriaController extends Controller {
     public function orcamento(Request $request) {
         session_start();
 
+        $orcamentoIdParam = (int) $request->getParam('orcamento_id', 0);
+        $tokenParam = (string) $request->getParam('token', '');
+        $dbOrcamento = null;
+
+        if ($orcamentoIdParam > 0 || $tokenParam !== '') {
+            try {
+                $orcModel = new AssessoriaOrcamento();
+                if ($orcamentoIdParam > 0) {
+                    $dbOrcamento = $orcModel->find($orcamentoIdParam);
+                } elseif ($tokenParam !== '') {
+                    $dbOrcamento = $orcModel->findByToken($tokenParam);
+                }
+                if (is_array($dbOrcamento) && !empty($dbOrcamento['id'])) {
+                    $_SESSION['assessoria_orcamento_id'] = (int) $dbOrcamento['id'];
+                    $_SESSION['assessoria_orcamento_token'] = (string) ($dbOrcamento['public_token'] ?? '');
+                    if (!empty($dbOrcamento['job_id'])) {
+                        $_SESSION['assessoria_job_id'] = (string) $dbOrcamento['job_id'];
+                    }
+                }
+            } catch (\Exception $e) {
+                $dbOrcamento = null;
+            }
+        }
+
         $jobId = (string) $request->getParam('job_id', '');
         if ($jobId === '') {
             $jobId = (string) ($_SESSION['assessoria_job_id'] ?? '');
@@ -1585,6 +1800,16 @@ class AssessoriaController extends Controller {
         }
 
         $orcamento = $_SESSION['assessoria_orcamento'] ?? ['produtos' => [], 'erros' => [], 'data_criacao' => date('Y-m-d H:i:s')];
+
+        if (is_array($dbOrcamento) && !empty($dbOrcamento['id'])) {
+            $prodDb = $this->parseDbJson($dbOrcamento['produtos_json'] ?? null);
+            $errDb = $this->parseDbJson($dbOrcamento['erros_json'] ?? null);
+            if (!empty($prodDb) || !empty($errDb)) {
+                $orcamento['produtos'] = $prodDb;
+                $orcamento['erros'] = $errDb;
+                $orcamento['data_criacao'] = (string) ($dbOrcamento['created_at'] ?? $orcamento['data_criacao']);
+            }
+        }
         
         // Calcula totais usando taxas existentes
         $totais = $this->calcularTotaisOrcamento($orcamento['produtos']);
@@ -1593,7 +1818,8 @@ class AssessoriaController extends Controller {
             'orcamento' => $orcamento,
             'totais' => $totais,
             'job_id' => $jobId,
-            'job' => $job
+            'job' => $job,
+            'orcamento_id' => (is_array($dbOrcamento) && !empty($dbOrcamento['id'])) ? (int) $dbOrcamento['id'] : (int) ($_SESSION['assessoria_orcamento_id'] ?? 0)
         ]);
     }
     
@@ -1717,6 +1943,82 @@ class AssessoriaController extends Controller {
         header('Content-Type: application/json');
         
         session_start();
+
+        $orcamentoId = (int) ($_SESSION['assessoria_orcamento_id'] ?? 0);
+        try {
+            $body0 = $request->getBody();
+            if (is_array($body0) && isset($body0['orcamento_id'])) {
+                $orcamentoId = (int) $body0['orcamento_id'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Regra 15 minutos: se orçamento persistido estiver expirado, reprocessar antes de permitir carrinho
+        if ($orcamentoId > 0) {
+            try {
+                $orcModel = new AssessoriaOrcamento();
+                $row = $orcModel->find($orcamentoId);
+                if (is_array($row) && !empty($row['id'])) {
+                    $expired = $this->isOlderThanMinutes($row['last_processed_at'] ?? null, 15);
+                    if ($expired) {
+                        $links = $this->parseDbJson($row['links_json'] ?? null);
+                        if (!empty($links)) {
+                            $newJobId = bin2hex(random_bytes(16));
+                            $_SESSION['assessoria_job_id'] = $newJobId;
+                            $_SESSION['assessoria_orcamento_id'] = $orcamentoId;
+                            $_SESSION['assessoria_orcamento_token'] = (string) ($row['public_token'] ?? '');
+
+                            $orcModel->update($orcamentoId, [
+                                'job_id' => $newJobId,
+                                'produtos_json' => null,
+                                'erros_json' => null,
+                                'totais_json' => null,
+                                'updated_at' => date('Y-m-d H:i:s'),
+                                'webhook_conclusao_disparado_em' => null,
+                            ]);
+
+                            $job = [
+                                'job_id' => $newJobId,
+                                'status' => 'queued',
+                                'total' => count($links),
+                                'processed' => 0,
+                                'links' => $links,
+                                'produtos' => [],
+                                'erros' => [],
+                                'started_at' => null,
+                                'finished_at' => null
+                            ];
+                            $this->writeJobFile($newJobId, $job);
+
+                            session_write_close();
+
+                            echo json_encode([
+                                'success' => false,
+                                'message' => 'Orçamento expirado. Reprocessando produtos para atualizar valores e variações...',
+                                'redirect' => '/assessoria/orcamento?orcamento_id=' . $orcamentoId . '&job_id=' . $newJobId
+                            ]);
+
+                            $spawned = $this->trySpawnJobWorker($newJobId);
+                            $job['spawned'] = $spawned ? true : false;
+                            $this->writeJobFile($newJobId, $job);
+                            if ($spawned) {
+                                return;
+                            }
+
+                            if (function_exists('fastcgi_finish_request')) {
+                                fastcgi_finish_request();
+                            }
+                            ignore_user_abort(true);
+                            @set_time_limit(0);
+
+                            $this->startBackgroundProcessing($links, $newJobId);
+                            return;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
         
         if (!isset($_SESSION['assessoria_orcamento'])) {
             echo json_encode([
@@ -1836,6 +2138,10 @@ class AssessoriaController extends Controller {
             
             // Limpa orçamento da sessão
             unset($_SESSION['assessoria_orcamento']);
+
+            if ($orcamentoId > 0) {
+                $_SESSION['checkout_assessoria_orcamento_id'] = $orcamentoId;
+            }
             
             echo json_encode([
                 'success' => true,

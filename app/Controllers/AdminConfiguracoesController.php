@@ -614,6 +614,23 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-md-12">
+                                                    <h6 class="mb-3">Webhooks da Assessoria</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Webhook - Início do processamento do orçamento (URL)</label>
+                                                        <input type="url" class="form-control" name="assessoria_webhook_inicio_url" value="' . $this->getConfigValue($config, 'assessoria', 'webhook_inicio_url', '') . '" placeholder="https://seu-webhook.com/assessoria/inicio">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Webhook - Conclusão do processamento do orçamento (URL)</label>
+                                                        <input type="url" class="form-control" name="assessoria_webhook_conclusao_url" value="' . $this->getConfigValue($config, 'assessoria', 'webhook_conclusao_url', '') . '" placeholder="https://seu-webhook.com/assessoria/concluido">
+                                                    </div>
+                                                    <small class="text-muted">O sistema enviará POST em JSON com dados do usuário e do orçamento quando o processamento iniciar e quando finalizar.</small>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -851,7 +868,8 @@ class AdminConfiguracoesController extends Controller {
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
-                'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem']
+                'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
+                'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
             $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled'];

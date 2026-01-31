@@ -7,6 +7,7 @@ use App\Services\PaymentService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
 use App\Models\Carrinho;
+use App\Models\AssessoriaOrcamento;
 
 class UsuarioController extends Controller {
     private $authService;
@@ -64,13 +65,22 @@ class UsuarioController extends Controller {
         
         $pedidos_recentes = array_slice($pedidos, 0, 5);
         $total_pedidos = count($pedidos);
+
+        $orcamentosAssessoria = [];
+        try {
+            $orcModel = new AssessoriaOrcamento();
+            $orcamentosAssessoria = $orcModel->getByUsuarioId((int) $usuario['id'], 10);
+        } catch (\Exception $e) {
+            $orcamentosAssessoria = [];
+        }
         
         $this->view('usuario/minha-conta', [
             'usuario' => $usuario,
             'enderecos' => $enderecos,
             'pedidos' => $pedidos,
             'pedidos_recentes' => $pedidos_recentes,
-            'total_pedidos' => $total_pedidos
+            'total_pedidos' => $total_pedidos,
+            'orcamentos_assessoria' => $orcamentosAssessoria
         ]);
     }
 

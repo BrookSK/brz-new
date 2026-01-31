@@ -199,6 +199,72 @@
                     <?php endif; ?>
                 </div>
             </div>
+
+            <div class="card shadow-sm mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-robot"></i> Orçamentos da Assessoria</h5>
+                    <a href="/assessoria" class="btn btn-sm btn-outline-primary">Novo Orçamento</a>
+                </div>
+                <div class="card-body">
+                    <?php $orcamentosAssessoria = $orcamentos_assessoria ?? []; ?>
+                    <?php if (empty($orcamentosAssessoria)): ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
+                            <h6>Nenhum orçamento ainda</h6>
+                            <p class="text-muted">Gere um orçamento pela Assessoria para aparecer aqui.</p>
+                            <a href="/assessoria" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i> Criar Orçamento
+                            </a>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Data</th>
+                                        <th>Status</th>
+                                        <th>Pedido</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($orcamentosAssessoria as $o): ?>
+                                        <?php
+                                            $status = (string) ($o['status'] ?? 'rascunho');
+                                            $isPago = ($status === 'pago');
+                                            $pedidoId = (int) ($o['pedido_id'] ?? 0);
+                                        ?>
+                                        <tr>
+                                            <td>#<?= (int) ($o['id'] ?? 0) ?></td>
+                                            <td><?= !empty($o['created_at']) ? date('d/m/Y H:i', strtotime($o['created_at'])) : '-' ?></td>
+                                            <td>
+                                                <?php if ($isPago): ?>
+                                                    <span class="badge bg-success">Pago</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">Rascunho</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($pedidoId > 0): ?>
+                                                    <a href="/pedido/detalhes/<?= $pedidoId ?>" class="text-decoration-none">#<?= $pedidoId ?></a>
+                                                <?php else: ?>
+                                                    -
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-end">
+                                                <a href="/assessoria/orcamento?orcamento_id=<?= (int) ($o['id'] ?? 0) ?>" class="btn btn-sm btn-outline-primary">
+                                                    Abrir
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
             
             <!-- Quick Actions -->
             <div class="row mt-4">
