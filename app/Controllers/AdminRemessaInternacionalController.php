@@ -183,6 +183,7 @@ class AdminRemessaInternacionalController extends Controller {
 
     public function index($request) {
         $this->requireAdmin();
+        $errorMsg = null;
         try {
             $janelaAtual = $this->ensureJanelaAtual();
 
@@ -204,6 +205,7 @@ class AdminRemessaInternacionalController extends Controller {
             ];
 
         } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
             $janelaAtual = [];
             $janelasAbertas = [];
             $janelasFinalizadas = [];
@@ -268,8 +270,17 @@ class AdminRemessaInternacionalController extends Controller {
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
-                </div>
+                </div>';
 
+        if (!empty($errorMsg)) {
+            echo '<div class="alert alert-danger">'
+                . '<strong>Erro ao carregar Remessa Internacional:</strong> '
+                . htmlspecialchars((string) $errorMsg)
+                . '<br><small class="text-muted">Verifique se você rodou as migrations de remessa (ex: database/migrations/016_create_remessa_janelas.sql) e se a tabela/colunas existem.</small>'
+                . '</div>';
+        }
+
+        echo '
                 <!-- Estatísticas -->
                 <div class="row mb-4">
                     <div class="col-md-3">

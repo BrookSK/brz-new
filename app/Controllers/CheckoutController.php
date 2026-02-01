@@ -163,6 +163,11 @@ class CheckoutController extends Controller {
                 $params['status'] = 'pago';
             }
 
+            if ($statusPago && in_array('pago_em', $colsP, true) && !array_key_exists('pago_em', $params)) {
+                $set[] = 'pago_em = :pago_em';
+                $params['pago_em'] = date('Y-m-d H:i:s');
+            }
+
             if (empty($set)) {
                 return;
             }
