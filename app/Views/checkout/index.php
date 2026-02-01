@@ -74,9 +74,18 @@
                             <div id="endereco-form" <?= (!empty($usuario) && !empty($enderecos)) ? 'style="display: none;"' : '' ?>>
                                 <div class="row">
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">CEP *</label>
+                                        <label class="form-label">País *</label>
+                                        <select class="form-select" name="pais" id="pais" required>
+                                            <option value="BR" selected>Brasil</option>
+                                            <option value="US">Estados Unidos</option>
+                                            <option value="DE">Alemanha</option>
+                                            <option value="AU">Austrália</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label" id="label-cep">CEP *</label>
                                         <input type="text" class="form-control" name="cep" required 
-                                               id="cep" maxlength="9"
+                                               id="cep" maxlength="12"
                                                value="<?= htmlspecialchars($enderecos[0]['cep'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-9 mb-3">
@@ -105,7 +114,7 @@
                                                value="<?= htmlspecialchars($enderecos[0]['cidade'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Estado *</label>
+                                        <label class="form-label" id="label-estado">Estado *</label>
                                         <select class="form-select" name="estado" required id="estado">
                                             <option value="">Selecione...</option>
                                             <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
@@ -115,6 +124,7 @@
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <input type="text" class="form-control" name="estado_text" id="estado_text" style="display:none;" placeholder="State / Province">
                                     </div>
                                 </div>
                             </div>
@@ -335,6 +345,78 @@
 
 <script>
 console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
+
+function atualizarEnderecoPorPais() {
+    const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+    const labelCep = document.getElementById('label-cep');
+    const labelEstado = document.getElementById('label-estado');
+    const cep = document.getElementById('cep');
+    const estadoSelect = document.getElementById('estado');
+    const estadoText = document.getElementById('estado_text');
+
+    if (labelCep) {
+        if (pais === 'US') labelCep.textContent = 'ZIP Code *';
+        else if (pais === 'DE' || pais === 'AU') labelCep.textContent = 'Postal Code *';
+        else labelCep.textContent = 'CEP *';
+    }
+
+    if (labelEstado) {
+        if (pais === 'US') labelEstado.textContent = 'State *';
+        else if (pais === 'DE') labelEstado.textContent = 'State / Region *';
+        else if (pais === 'AU') labelEstado.textContent = 'State / Territory *';
+        else labelEstado.textContent = 'Estado *';
+    }
+
+    if (cep) {
+        if (pais === 'BR') {
+            cep.placeholder = '00000-000';
+            cep.maxLength = 9;
+        } else if (pais === 'US') {
+            cep.placeholder = '00000';
+            cep.maxLength = 10;
+        } else {
+            cep.placeholder = '';
+            cep.maxLength = 12;
+        }
+    }
+
+    // BR: select de UF. Outros países: campo texto.
+    // IMPORTANTE: manter o backend recebendo SEMPRE em dados['estado'].
+    // Para isso, alternamos o atributo name entre o select e o input texto.
+    if (estadoSelect && estadoText) {
+        if (pais === 'BR') {
+            estadoSelect.style.display = '';
+            estadoText.style.display = 'none';
+
+            estadoSelect.name = 'estado';
+            estadoSelect.required = true;
+            estadoSelect.disabled = false;
+
+            estadoText.name = 'estado_text';
+            estadoText.required = false;
+            estadoText.disabled = true;
+        } else {
+            estadoSelect.style.display = 'none';
+            estadoText.style.display = '';
+
+            estadoSelect.name = 'estado_ui';
+            estadoSelect.required = false;
+            estadoSelect.disabled = true;
+
+            estadoText.name = 'estado';
+            estadoText.required = true;
+            estadoText.disabled = false;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    const paisSel = document.getElementById('pais');
+    if (paisSel) {
+        paisSel.addEventListener('change', atualizarEnderecoPorPais);
+    }
+    atualizarEnderecoPorPais();
+});
 
 function showCheckoutLoading() {
     const el = document.getElementById('checkout-loading');

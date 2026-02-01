@@ -1214,7 +1214,7 @@ class CheckoutController extends Controller {
             'bairro' => $dados['bairro'],
             'cidade' => $dados['cidade'],
             'estado' => $dados['estado'],
-            'pais' => 'BR',
+            'pais' => (string) ($dados['pais'] ?? 'BR'),
             'principal' => false
         ];
         
