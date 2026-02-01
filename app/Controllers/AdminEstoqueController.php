@@ -1124,7 +1124,7 @@ class AdminEstoqueController extends Controller {
         $this->renderFlashIfAny();
 
                 // Cards de Estatísticas
-                echo '<div class="container py-4">';
+                echo '<div class="container py-4"><div class="row g-3">';
                     echo '<div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
@@ -1161,7 +1161,7 @@ class AdminEstoqueController extends Controller {
                             </div>
                         </div>
                     </div>
-                </div>';
+                </div></div>';
 
                 // Tabela de Estoque
                 echo '<div class="card">
