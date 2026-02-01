@@ -232,6 +232,9 @@ $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'ex
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
+$router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
+$router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
+$router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');

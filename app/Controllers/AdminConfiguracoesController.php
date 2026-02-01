@@ -900,6 +900,19 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
                                             
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <h6 class="mb-3">Webhook - Pedido Manual</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Webhook - Link de Pagamento do Pedido Manual (URL)</label>
+                                                        <input type="url" class="form-control" name="pagamentos_webhook_link_pagamento_pedido_manual_url" value="' . $this->getConfigValue($config, 'pagamentos', 'webhook_link_pagamento_pedido_manual_url', '') . '" placeholder="https://seu-webhook.com/pedidos/manual/link-pagamento">
+                                                        <small class="text-muted">O sistema enviará POST em JSON com dados do pedido, cliente e link de pagamento assim que o link for gerado.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <!-- Status dos Gateways -->
                                             <div class="row mt-4">
                                                 <div class="col-12">
@@ -1032,7 +1045,7 @@ class AdminConfiguracoesController extends Controller {
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'webhook_link_pagamento_pedido_manual_url'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
@@ -2068,6 +2081,7 @@ class AdminConfiguracoesController extends Controller {
                         'stripe_ambiente' => 'stripe_ambiente',
                         'stripe_publishable_key' => 'stripe_publishable_key',
                         'stripe_secret_key' => 'stripe_secret_key',
+                        'webhook_link_pagamento_pedido_manual_url' => 'webhook_link_pagamento_pedido_manual_url',
                     ],
                 ];
 
