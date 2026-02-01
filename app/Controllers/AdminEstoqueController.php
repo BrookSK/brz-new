@@ -312,8 +312,11 @@ class AdminEstoqueController extends Controller {
         }
 
         try {
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            $selectPedido = $temPedidoEmLista ? ', pedido_id' : '';
             $stmt = $this->connection->prepare(
                 "SELECT id, quantidade_faltante
+                 {$selectPedido}
                  FROM lista_compras
                  WHERE produto_id = :produto_id AND status = 'pendente'
                  ORDER BY COALESCE(data_solicitacao, created_at) ASC, id ASC"
@@ -321,6 +324,13 @@ class AdminEstoqueController extends Controller {
             $stmt->execute([':produto_id' => $produtoId]);
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $restante = $quantidadeEntrada;
+
+            $podeReservar = $this->tableExists('estoque_reservas')
+                && $this->columnExists('estoque_reservas', 'produto_id')
+                && $this->columnExists('estoque_reservas', 'quantidade_reservada')
+                && $this->columnExists('estoque_reservas', 'status');
+
+            $temPedidoEmReserva = $this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id');
 
             foreach ($rows as $r) {
                 if ($restante <= 0) {
@@ -332,8 +342,52 @@ class AdminEstoqueController extends Controller {
                     continue;
                 }
 
+                $consumir = ($falt <= $restante) ? $falt : $restante;
+                $pedidoId = $temPedidoEmLista ? (int) ($r['pedido_id'] ?? 0) : 0;
+
+                // Quando entra estoque, a pendência (faltante) só pode diminuir se conseguirmos manter o "reservado" apontando
+                // (convertendo a parte atendida em reserva real). Se não existir estoque_reservas, NÃO baixamos a pendência.
+                if ($podeReservar && $consumir > 0) {
+                    try {
+                        if ($temPedidoEmReserva && $pedidoId > 0) {
+                            $stmtChk = $this->connection->prepare(
+                                "SELECT id, quantidade_reservada FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa' LIMIT 1"
+                            );
+                            $stmtChk->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                            $ex = $stmtChk->fetch(\PDO::FETCH_ASSOC);
+                            if ($ex && (int) ($ex['id'] ?? 0) > 0) {
+                                $stmtUpRes = $this->connection->prepare(
+                                    "UPDATE estoque_reservas SET quantidade_reservada = (COALESCE(quantidade_reservada,0) + :q) WHERE id = :id LIMIT 1"
+                                );
+                                $stmtUpRes->execute([':q' => $consumir, ':id' => (int) $ex['id']]);
+                            } else {
+                                $cols = ['produto_id', 'pedido_id', 'quantidade_reservada', 'status'];
+                                $vals = [':produto_id', ':pedido_id', ':q', "'ativa'"];
+                                $params = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':q' => $consumir];
+                                $stmtInsRes = $this->connection->prepare(
+                                    'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
+                                );
+                                $stmtInsRes->execute($params);
+                            }
+                        } else {
+                            // Sem pedido_id disponível: cria uma reserva genérica (mantém o "reservado" apontando)
+                            $cols = ['produto_id', 'quantidade_reservada', 'status'];
+                            $vals = [':produto_id', ':q', "'ativa'"];
+                            $params = [':produto_id' => $produtoId, ':q' => $consumir];
+                            $stmtInsRes = $this->connection->prepare(
+                                'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
+                            );
+                            $stmtInsRes->execute($params);
+                        }
+                    } catch (\Exception $e) {
+                    }
+                } else {
+                    // Sem suporte a reserva real: manter a demanda na lista de compras para não zerar o reservado.
+                    continue;
+                }
+
                 if ($falt <= $restante) {
-                    $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = 0, status = 'cancelado' WHERE id = :id LIMIT 1");
+                    $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = 0 WHERE id = :id LIMIT 1");
                     $stmtUpd->execute([':id' => $id]);
                     $restante -= $falt;
                 } else {
@@ -1070,8 +1124,8 @@ class AdminEstoqueController extends Controller {
         $this->renderFlashIfAny();
 
                 // Cards de Estatísticas
-                echo '<div class="row mb-4">
-                    <div class="col-md-3">
+                echo '<div class="container py-4">';
+                    echo '<div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
                                 <h5 class="card-title">Total Produtos</h5>
@@ -1902,57 +1956,116 @@ class AdminEstoqueController extends Controller {
                 . '<input type="hidden" name="estoque_id" id="del_estoque_id" value="">'
                 . '</form>';
 
+            echo '<div class="modal fade" id="modalConfirmEstoque" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Confirmação</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="confirmEstoqueMessage" style="white-space:pre-wrap;"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmEstoqueOk">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>';
+
             echo '<script>
-                function excluirEntradaEstoque(produtoId, estoqueId) {
+                (function(){
                     var reservadoTotal = ' . (int) $totalReservado . ';
                     var totalAtual = ' . (int) $totalEstoque . ';
                     var qtdMap = ' . json_encode($qtdMap) . ';
-                    var qtdRemover = 0;
-                    if (qtdMap && Object.prototype.hasOwnProperty.call(qtdMap, String(estoqueId))) {
-                        qtdRemover = Number(qtdMap[String(estoqueId)] || 0);
+                    var pendingAction = null;
+
+                    function showConfirmModal(message, onConfirm) {
+                        var modalEl = document.getElementById("modalConfirmEstoque");
+                        var msgEl = document.getElementById("confirmEstoqueMessage");
+                        var btnOk = document.getElementById("confirmEstoqueOk");
+                        if (!modalEl || !msgEl || !btnOk || typeof bootstrap === "undefined") {
+                            if (window.confirm(message)) onConfirm();
+                            return;
+                        }
+                        msgEl.textContent = message;
+                        pendingAction = onConfirm;
+                        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.show();
                     }
-                    var novoTotal = totalAtual - qtdRemover;
-                    if (reservadoTotal > 0 && novoTotal < reservadoTotal) {
-                        if (!confirm("ATENÇÃO: esta exclusão deixará o estoque total (" + novoTotal + ") abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?")) {
-                            return false;
-                        }
-                    } else {
-                        if (!confirm("Excluir esta localização do estoque? Esta ação será registrada no log.")) {
-                            return false;
-                        }
-                    }
 
-                    var f = document.getElementById("form_del_global");
-                    var p = document.getElementById("del_produto_id");
-                    var e = document.getElementById("del_estoque_id");
-                    if (!f || !p || !e) return false;
-                    p.value = String(produtoId);
-                    e.value = String(estoqueId);
-                    f.submit();
-                    return false;
-                }
-
-                document.addEventListener("DOMContentLoaded", function(){
-                    var reservadoTotal = ' . (int) $totalReservado . ';
-                    var form = document.getElementById("form_editar_estoque");
-                    if (!form) return;
-
-                    form.addEventListener("submit", function(ev){
-                        if (reservadoTotal <= 0) return;
-                        var inputs = form.querySelectorAll("input[name=\"quantidade[]\"]");
-                        var total = 0;
-                        for (var i = 0; i < inputs.length; i++) {
-                            var n = parseInt(inputs[i].value || "0", 10);
-                            if (!isNaN(n)) total += n;
+                    document.addEventListener("DOMContentLoaded", function(){
+                        var btnOk = document.getElementById("confirmEstoqueOk");
+                        if (btnOk) {
+                            btnOk.addEventListener("click", function(){
+                                var fn = pendingAction;
+                                pendingAction = null;
+                                try {
+                                    var modalEl = document.getElementById("modalConfirmEstoque");
+                                    if (modalEl && typeof bootstrap !== "undefined") {
+                                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                                    }
+                                } catch (e) {}
+                                if (typeof fn === "function") fn();
+                            });
                         }
-                        if (total < reservadoTotal) {
-                            if (!confirm("ATENÇÃO: ao salvar, o estoque total ficará em " + total + ", abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?")) {
-                                ev.preventDefault();
-                                return false;
-                            }
+
+                        var form = document.getElementById("form_editar_estoque");
+                        if (form) {
+                            form.addEventListener("submit", function(ev){
+                                if (reservadoTotal <= 0) return;
+                                var inputs = form.querySelectorAll("input[name=\"quantidade[]\"]");
+                                var total = 0;
+                                for (var i = 0; i < inputs.length; i++) {
+                                    var n = parseInt(inputs[i].value || "0", 10);
+                                    if (!isNaN(n)) total += n;
+                                }
+                                if (total < reservadoTotal) {
+                                    ev.preventDefault();
+                                    showConfirmModal(
+                                        "ATENÇÃO: ao salvar, o estoque total ficará em " + total + ", abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?",
+                                        function(){ form.submit(); }
+                                    );
+                                    return false;
+                                }
+                            });
                         }
                     });
-                });
+
+                    window.excluirEntradaEstoque = function(produtoId, estoqueId) {
+                        try {
+                            var qtdRemover = 0;
+                            if (qtdMap && Object.prototype.hasOwnProperty.call(qtdMap, String(estoqueId))) {
+                                qtdRemover = Number(qtdMap[String(estoqueId)] || 0);
+                            }
+                            var novoTotal = totalAtual - qtdRemover;
+
+                            var f = document.getElementById("form_del_global");
+                            var p = document.getElementById("del_produto_id");
+                            var e = document.getElementById("del_estoque_id");
+                            if (!f || !p || !e) return false;
+                            p.value = String(produtoId);
+                            e.value = String(estoqueId);
+
+                            if (reservadoTotal > 0 && novoTotal < reservadoTotal) {
+                                showConfirmModal(
+                                    "ATENÇÃO: esta exclusão deixará o estoque total (" + novoTotal + ") abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?",
+                                    function(){ f.submit(); }
+                                );
+                                return false;
+                            }
+
+                            showConfirmModal(
+                                "Excluir esta localização do estoque? Esta ação será registrada no log.",
+                                function(){ f.submit(); }
+                            );
+                            return false;
+                        } catch (e) {
+                            return window.confirm("Excluir esta localização do estoque?");
+                        }
+                    };
+                })();
             </script>';
         }
 

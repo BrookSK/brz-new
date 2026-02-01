@@ -1129,22 +1129,9 @@ class AdminComprasController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
                     <div>
-                        <a class="btn btn-success me-2" href="/admin/estoque/compras/novo" target="_blank" ' . ($statusView !== 'pendente' ? 'aria-disabled="true" style="pointer-events:none;opacity:.65;"' : '') . '>
-                            <i class="fas fa-plus me-1"></i>Novo Item
-                        </a>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
                         </button>
-                        ';
-
-        if ($statusView === 'pendente') {
-            echo '<form method="POST" action="/admin/estoque/compras/concluir" class="d-inline">
-                            <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
-                            <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
-                            <button type="button" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#modalConcluirCompras">
-                                <i class="fas fa-check-double me-1"></i>Concluir compras
-                            </button>
-                        </form>';
         } else {
             echo '<form method="POST" action="/admin/estoque/compras/reabrir" class="d-inline">
                             <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
