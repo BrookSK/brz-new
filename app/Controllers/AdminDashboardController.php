@@ -94,6 +94,9 @@ class AdminDashboardController extends Controller {
             // Alertas: validade próxima (até 30 dias)
             $validade_alertas = [];
             $validade_alertas_pedidos = [];
+            $pendencias_pagamento = [];
+            $pendencias_pagamento_total = 0;
+            $pendencias_pagamento_valor = 0.0;
             if ($this->tableExists($pdo, 'estoque_interno') && $produtoNomeCol) {
                 try {
                     $stmt = $pdo->prepare("\
@@ -156,6 +159,35 @@ class AdminDashboardController extends Controller {
                     $validade_alertas_pedidos = [];
                 }
             }
+
+            // Pendências de pagamento (diferença)
+            try {
+                if ($this->tableExists($pdo, 'pedidos')
+                    && $this->columnExists($pdo, 'pedidos', 'payment_diferenca_id')
+                    && $this->columnExists($pdo, 'pedidos', 'payment_diferenca_valor')
+                    && $this->columnExists($pdo, 'pedidos', 'payment_diferenca_paid_at')) {
+                    $sqlDif = "SELECT id, codigo_pedido, usuario_id, payment_diferenca_valor, payment_diferenca_status, payment_diferenca_invoice_url, payment_diferenca_bank_slip_url, payment_diferenca_created_at
+                              FROM pedidos
+                              WHERE payment_diferenca_id IS NOT NULL
+                                AND payment_diferenca_id <> ''
+                                AND COALESCE(payment_diferenca_valor,0) > 0
+                                AND (payment_diferenca_paid_at IS NULL OR payment_diferenca_paid_at = '')
+                              ORDER BY COALESCE(payment_diferenca_created_at, created_at) DESC
+                              LIMIT 20";
+                    $stmtDif = $pdo->query($sqlDif);
+                    $pendencias_pagamento = $stmtDif ? ($stmtDif->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                    $pendencias_pagamento_total = is_array($pendencias_pagamento) ? count($pendencias_pagamento) : 0;
+                    if ($pendencias_pagamento_total > 0) {
+                        foreach ($pendencias_pagamento as $pp) {
+                            $pendencias_pagamento_valor += (float) ($pp['payment_diferenca_valor'] ?? 0);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $pendencias_pagamento = [];
+                $pendencias_pagamento_total = 0;
+                $pendencias_pagamento_valor = 0.0;
+            }
             
         } catch (\Exception $e) {
             $stats = ['produtos_total' => 0, 'produtos_ativos' => 0, 'pedidos_total' => 0, 'usuarios_total' => 0, 'faturamento_total' => 0];
@@ -163,6 +195,9 @@ class AdminDashboardController extends Controller {
             $produtos_mais_vendidos = [];
             $validade_alertas = [];
             $validade_alertas_pedidos = [];
+            $pendencias_pagamento = [];
+            $pendencias_pagamento_total = 0;
+            $pendencias_pagamento_valor = 0.0;
         }
         
         // Incluir o partial do menu lateral
@@ -263,6 +298,51 @@ class AdminDashboardController extends Controller {
 
                 <div class="row mb-4">
                     <div class="col-12">
+                        ' . ($pendencias_pagamento_total > 0 ? ('
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-danger"><i class="fas fa-circle-dollar-to-slot me-2"></i>Pendências de pagamento (diferença)</h6>
+                                <a href="/admin/pedidos" class="btn btn-sm btn-outline-danger">Ver pedidos</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <span class="badge bg-danger">' . (int) $pendencias_pagamento_total . ' pendência(s)</span>
+                                    <span class="badge bg-warning text-dark">R$ ' . number_format((float) $pendencias_pagamento_valor, 2, ',', '.') . '</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead><tr><th>Pedido</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+                                        <tbody>
+                        '): '') . '
+                        ';
+
+        if (!empty($pendencias_pagamento)) {
+            foreach ($pendencias_pagamento as $pp) {
+                $pid = (int) ($pp['id'] ?? 0);
+                $codigo = (string) ($pp['codigo_pedido'] ?? $pid);
+                $valor = (float) ($pp['payment_diferenca_valor'] ?? 0);
+                $st = (string) ($pp['payment_diferenca_status'] ?? '');
+                $link = (string) ($pp['payment_diferenca_bank_slip_url'] ?? '');
+                if ($link === '') {
+                    $link = (string) ($pp['payment_diferenca_invoice_url'] ?? '');
+                }
+                echo '<tr>'
+                    . '<td><a class="text-decoration-none" href="/admin/pedidos/detalhes/' . $pid . '">#' . htmlspecialchars($codigo) . '</a></td>'
+                    . '<td><strong>R$ ' . number_format($valor, 2, ',', '.') . '</strong></td>'
+                    . '<td>' . ($st !== '' ? '<span class="badge bg-warning text-dark">' . htmlspecialchars($st) . '</span>' : '-') . '</td>'
+                    . '<td class="text-end">'
+                        . '<a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '">Detalhes</a> '
+                        . ($link !== '' ? '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">Abrir cobrança</a>' : '')
+                    . '</td>'
+                    . '</tr>';
+            }
+        }
+
+        echo ($pendencias_pagamento_total > 0)
+            ? '</tbody></table></div></div></div>'
+            : '';
+
+        echo '
                         <div class="card shadow">
                             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                                 <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-triangle-exclamation me-2"></i>Validade (próximos 30 dias)</h6>

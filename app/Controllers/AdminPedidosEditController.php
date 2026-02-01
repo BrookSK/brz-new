@@ -212,6 +212,9 @@ class AdminPedidosEditController {
                 echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
+
+            $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
+            $bloquearEdicao = ($statusAtual === 'pago');
             
             // Buscar itens do pedido
             $stmt = $this->connection->prepare("
@@ -279,11 +282,13 @@ class AdminPedidosEditController {
                         <a href="/admin/pedidos/detalhes/' . $id . '" class="btn btn-secondary me-2">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
                         </a>
-                        <button type="button" class="btn btn-success" onclick="salvarPedido()">
+                        <button type="button" class="btn btn-success" onclick="salvarPedido()" ' . ($bloquearEdicao ? 'disabled' : '') . '>
                             <i class="fas fa-save me-1"></i>Salvar
                         </button>
                     </div>
                 </div>
+
+                ' . ($bloquearEdicao ? '<div class="alert alert-warning">Este pedido está com status <strong>Pago</strong>. Para editar/adicionar itens e calcular a diferença corretamente, altere primeiro o status para <strong>Pendente</strong> e então edite novamente.</div>' : '') . '
                 
                 <div class="row">
                     <div class="col-md-4">
@@ -530,6 +535,10 @@ class AdminPedidosEditController {
         }
         
         function salvarPedido() {
+            if (' . ($bloquearEdicao ? 'true' : 'false') . ') {
+                alert("Este pedido está com status Pago. Altere para Pendente antes de editar para calcular a diferença corretamente.");
+                return;
+            }
             let itens = [];
             document.querySelectorAll(".item-row").forEach(function(row) {
                 let item = {
@@ -607,6 +616,14 @@ class AdminPedidosEditController {
                 $oldStatus = (string) ($stmtOld->fetchColumn() ?: '');
             } catch (\Exception $e) {
                 $oldStatus = '';
+            }
+
+            if (strtolower(trim($oldStatus)) === 'pago') {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Pedido está com status Pago. Altere para Pendente antes de editar/adicionar itens para calcular a diferença corretamente.'
+                ]);
+                return;
             }
 
             $newStatus = (string) ($dados['status'] ?? '');

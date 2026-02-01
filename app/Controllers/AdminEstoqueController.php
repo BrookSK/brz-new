@@ -1204,8 +1204,10 @@ class AdminEstoqueController extends Controller {
                                     $qtd = (int) ($item['quantidade_estoque'] ?? 0);
                                     $reservado = (int) ($item['reservado'] ?? 0);
                                     $disponivel = $qtd - $reservado;
-                                    if ($disponivel < 0) $disponivel = 0;
                                     $status = (string) ($item['status_estoque'] ?? '');
+                                    if ($reservado > $qtd) {
+                                        $status = 'reposicao';
+                                    }
                                     $loc = (string) ($item['localizacao'] ?? '');
                                     $validade = $item['validade_mais_proxima'] ?? null;
 
@@ -1233,10 +1235,12 @@ class AdminEstoqueController extends Controller {
                                         . '</div>';
 
                                     $reservadoBadge = $reservado > 0 ? '<span class="badge bg-dark">' . (int) $reservado . '</span>' : '-';
-                                    $dispBadge = '<span class="badge bg-secondary">' . (int) $disponivel . '</span>';
+                                    $dispClass = ($disponivel < 0) ? 'danger' : 'secondary';
+                                    $dispBadge = '<span class="badge bg-' . $dispClass . '">' . (int) $disponivel . '</span>';
 
-                                    $status_class = $status == 'crítico' ? 'danger' : 
-                                                   ($status == 'baixo' ? 'warning' : 'success');
+                                    $status_class = $status == 'crítico' ? 'danger' :
+                                                   ($status == 'baixo' ? 'warning' :
+                                                   ($status == 'reposicao' ? 'danger' : 'success'));
 
                                     echo '<tr data-search="' . htmlspecialchars($rowSearch) . '">
                                         <td>
@@ -1255,7 +1259,7 @@ class AdminEstoqueController extends Controller {
                                         <td>' . $reservadoBadge . '</td>
                                         <td>' . $dispBadge . '</td>
                                         <td>
-                                            <span class="badge bg-' . $status_class . '">' . ucfirst($status) . '</span>
+                                            <span class="badge bg-' . $status_class . '">' . ($status === 'reposicao' ? 'Reposição' : ucfirst($status)) . '</span>
                                         </td>
                                         <td>' . (!empty($loc) ? htmlspecialchars($loc) : '-') . '</td>
                                         <td>' . (!empty($validade) ? date('d/m/Y', strtotime($validade)) : '-') . '</td>
@@ -1794,7 +1798,7 @@ class AdminEstoqueController extends Controller {
             $totalReservado = $totalReservadoReal + $pendenciaCompra;
 
             $totalDisponivel = $totalEstoque - $totalReservado;
-            if ($totalDisponivel < 0) $totalDisponivel = 0;
+            $statusReposicao = ($totalReservado > $totalEstoque);
 
             $reservasAtivas = [];
             if ($this->tableExists('estoque_reservas')) {
@@ -1880,13 +1884,14 @@ class AdminEstoqueController extends Controller {
                     <div class="row g-3">
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Estoque total</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reservado</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservado . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;">' . (int) $totalDisponivel . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reserva (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
-                        <a class="btn btn-outline-primary" href="/admin/estoque/compras?status=pendente" target="_blank">Abrir lista de compras</a>
-                        ' . ($totalReservado > 0 ? '<button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '"><i class="fas fa-eye me-1"></i>Ver reservas</button>' : '') . '
+                        <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">Abrir lista de compras</a>
+                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas">Ver reservas</button>
                     </div>
+                    ' . ($statusReposicao ? '<div class="alert alert-warning mt-3 mb-0">Status: <strong>Reposição</strong>. Reservado acima do estoque; o disponível fica negativo até entrada.</div>' : '') . '
                 </div>
             </div>';
 

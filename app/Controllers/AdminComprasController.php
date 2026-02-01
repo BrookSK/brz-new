@@ -582,59 +582,25 @@ class AdminComprasController extends Controller {
         header('Content-Type: application/json; charset=utf-8');
 
         $pedidoId = (int) $request->getParam('pedido_id', 0);
-        $valor = (float) $request->getParam('valor', 0);
 
-        if ($pedidoId <= 0 || $valor <= 0) {
+        if ($pedidoId <= 0) {
             echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
             return;
         }
 
         try {
-            // Buscar pedido e identificar cobrança Asaas existente para reaproveitar o customer
-            $stmt = $this->connection->prepare('SELECT id, codigo_pedido, payment_gateway, payment_id FROM pedidos WHERE id = :id LIMIT 1');
-            $stmt->execute([':id' => $pedidoId]);
-            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if (!$pedido) {
-                echo json_encode(['success' => false, 'message' => 'Pedido não encontrado.']);
-                return;
-            }
+            $svc = new \App\Services\PedidoDiferencaAsaasService($this->connection);
+            $result = $svc->gerarCobrancaDiferenca($pedidoId);
 
-            $gateway = strtolower((string) ($pedido['payment_gateway'] ?? ''));
-            $paymentId = (string) ($pedido['payment_id'] ?? '');
-            if ($gateway !== 'asaas' || $paymentId === '') {
-                echo json_encode(['success' => false, 'message' => 'Pedido sem pagamento Asaas vinculado.']);
-                return;
-            }
-
-            $customerId = '';
-            try {
-                $pg = new \App\Services\PaymentService();
-                $payment = $pg->obterPagamentoAsaas($paymentId);
-                $customerId = (string) ($payment['customer'] ?? '');
-            } catch (\Exception $e) {
-                $customerId = '';
-            }
-
-            if ($customerId === '') {
-                echo json_encode(['success' => false, 'message' => 'Não foi possível identificar o cliente no Asaas para este pedido.']);
-                return;
-            }
-
-            $codigo = (string) ($pedido['codigo_pedido'] ?? '');
-            $descricao = 'Diferença do pedido #' . ($codigo !== '' ? $codigo : (string) $pedidoId);
-
-            $svc = new \App\Services\AsaasLinkService();
-            $created = $svc->criarCobrancaDiferenca(
-                $customerId,
-                $valor,
-                $descricao,
-                date('Y-m-d', strtotime('+1 day')),
-                (string) $pedidoId,
-                'BOLETO'
-            );
+            $created = is_array($result['created'] ?? null) ? $result['created'] : [];
 
             echo json_encode([
                 'success' => true,
+                'pedido_id' => $pedidoId,
+                'novo_total' => $result['novo_total'] ?? null,
+                'valor_ja_pago' => $result['valor_ja_pago'] ?? null,
+                'diferenca' => $result['diferenca'] ?? null,
+                'billingType' => $result['billingType'] ?? null,
                 'payment_id' => $created['id'] ?? null,
                 'status' => $created['status'] ?? null,
                 'invoiceUrl' => $created['invoiceUrl'] ?? null,

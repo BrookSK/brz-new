@@ -475,6 +475,46 @@ class AdminPedidosController extends Controller {
                     </a>
                 </div>
             </div>';
+
+            // Destaque: pendência de pagamento (diferença)
+            $colsPedido = [];
+            try {
+                $pdoCols = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                $stmtColsP = $pdoCols->query('DESCRIBE pedidos');
+                $colsPedido = $stmtColsP ? $stmtColsP->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedido = [];
+            }
+            $temDif = is_array($colsPedido) && in_array('payment_diferenca_id', $colsPedido, true);
+            $difId = $temDif ? (string) ($pedido['payment_diferenca_id'] ?? '') : '';
+            $difStatus = $temDif ? (string) ($pedido['payment_diferenca_status'] ?? '') : '';
+            $difValor = $temDif ? (float) ($pedido['payment_diferenca_valor'] ?? 0) : 0.0;
+            $difInvoiceUrl = $temDif ? (string) ($pedido['payment_diferenca_invoice_url'] ?? '') : '';
+            $difBoletoUrl = $temDif ? (string) ($pedido['payment_diferenca_bank_slip_url'] ?? '') : '';
+            $difPaidAt = $temDif ? (string) ($pedido['payment_diferenca_paid_at'] ?? '') : '';
+
+            $temDebito = ($difId !== '' && $difValor > 0 && $difPaidAt === '');
+            if ($temDebito) {
+                $link = $difBoletoUrl !== '' ? $difBoletoUrl : $difInvoiceUrl;
+                echo '<div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <div style="font-weight:800;">Pendência de pagamento (diferença)</div>
+                            <div class="small">Valor: <strong>R$ ' . number_format($difValor, 2, ',', '.') . '</strong>'
+                                . ($difStatus !== '' ? (' | Status: <strong>' . htmlspecialchars($difStatus) . '</strong>') : '')
+                                . '</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            ' . ($link !== '' ? '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">Abrir link de pagamento</a>' : '') . '
+                        </div>
+                    </div>';
+            } elseif ($temDif && $difId !== '' && $difPaidAt !== '') {
+                echo '<div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <div style="font-weight:800;">Diferença quitada</div>
+                            <div class="small">Pago em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($difPaidAt))) . '</strong></div>
+                        </div>
+                    </div>';
+            }
             
             // Conteúdo principal
             echo '<div class="row">
