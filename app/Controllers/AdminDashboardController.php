@@ -90,11 +90,79 @@ class AdminDashboardController extends Controller {
             } else {
                 $produtos_mais_vendidos = [];
             }
+
+            // Alertas: validade próxima (até 30 dias)
+            $validade_alertas = [];
+            $validade_alertas_pedidos = [];
+            if ($this->tableExists($pdo, 'estoque_interno') && $produtoNomeCol) {
+                try {
+                    $stmt = $pdo->prepare("\
+                        SELECT\
+                            e.produto_id,\
+                            pr.{$produtoNomeCol} AS produto_nome,\
+                            MIN(e.data_validade) AS validade_mais_proxima,\
+                            SUM(e.quantidade) AS quantidade_total\
+                        FROM estoque_interno e\
+                        JOIN produtos pr ON pr.id = e.produto_id\
+                        WHERE e.quantidade > 0\
+                          AND e.is_alimenticio = 1\
+                          AND e.data_validade IS NOT NULL\
+                          AND e.data_validade BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)\
+                        GROUP BY e.produto_id, pr.{$produtoNomeCol}\
+                        ORDER BY validade_mais_proxima ASC\
+                    ");
+                    $stmt->execute();
+                    $validade_alertas = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    if (!empty($validade_alertas) && $itensTable && $this->tableExists($pdo, 'pedidos') && $this->tableExists($pdo, 'usuarios')) {
+                        $ids = array_map(static fn($r) => (int) ($r['produto_id'] ?? 0), $validade_alertas);
+                        $ids = array_values(array_filter($ids, static fn($v) => $v > 0));
+                        if (!empty($ids)) {
+                            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                            $userNomeCol = $usuarioNomeCol ?: ($this->columnExists($pdo, 'usuarios', 'nome') ? 'nome' : ($this->columnExists($pdo, 'usuarios', 'name') ? 'name' : null));
+                            $userNomeExpr = $userNomeCol ? ('u.' . $userNomeCol) : "''";
+
+                            $sqlPedidos = "\
+                                SELECT\
+                                    ip.produto_id,\
+                                    p.id AS pedido_id,\
+                                    p.created_at AS pedido_data,\
+                                    p.status AS pedido_status,\
+                                    u.id AS usuario_id,\
+                                    {$userNomeExpr} AS usuario_nome\
+                                FROM {$itensTable} ip\
+                                JOIN pedidos p ON p.id = ip.pedido_id\
+                                LEFT JOIN usuarios u ON u.id = p.usuario_id\
+                                WHERE ip.produto_id IN ({$placeholders})\
+                                ORDER BY p.created_at DESC\
+                            ";
+                            $stmtPedidos = $pdo->prepare($sqlPedidos);
+                            $stmtPedidos->execute($ids);
+                            $rowsPedidos = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($rowsPedidos as $rp) {
+                                $pid = (int) ($rp['produto_id'] ?? 0);
+                                if ($pid <= 0) {
+                                    continue;
+                                }
+                                if (!isset($validade_alertas_pedidos[$pid])) {
+                                    $validade_alertas_pedidos[$pid] = [];
+                                }
+                                $validade_alertas_pedidos[$pid][] = $rp;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $validade_alertas = [];
+                    $validade_alertas_pedidos = [];
+                }
+            }
             
         } catch (\Exception $e) {
             $stats = ['produtos_total' => 0, 'produtos_ativos' => 0, 'pedidos_total' => 0, 'usuarios_total' => 0, 'faturamento_total' => 0];
             $pedidos_recentes = [];
             $produtos_mais_vendidos = [];
+            $validade_alertas = [];
+            $validade_alertas_pedidos = [];
         }
         
         // Incluir o partial do menu lateral
@@ -192,6 +260,100 @@ class AdminDashboardController extends Controller {
                         </div>
                     </div>
                 </div>
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-triangle-exclamation me-2"></i>Validade (próximos 30 dias)</h6>
+                                <a href="/admin/estoque" class="btn btn-sm btn-outline-primary">Ver Estoque</a>
+                            </div>
+                            <div class="card-body">';
+
+                            if (empty($validade_alertas)) {
+                                echo '<p class="text-muted mb-0">Nenhum produto com validade a vencer nos próximos 30 dias.</p>';
+                            } else {
+                                $totalProdutos = count($validade_alertas);
+                                $totalUnidades = 0;
+                                foreach ($validade_alertas as $va) {
+                                    $totalUnidades += (int) ($va['quantidade_total'] ?? 0);
+                                }
+
+                                echo '<div class="mb-3">'
+                                    . '<span class="badge bg-warning">' . $totalProdutos . ' produto(s)</span> '
+                                    . '<span class="badge bg-info">' . $totalUnidades . ' unidade(s)</span>'
+                                    . '</div>';
+
+                                echo '<div class="table-responsive">'
+                                    . '<table class="table table-hover">'
+                                    . '<thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th><th>Pedidos que contém</th></tr></thead><tbody>';
+
+                                foreach ($validade_alertas as $va) {
+                                    $produtoId = (int) ($va['produto_id'] ?? 0);
+                                    $produtoNome = (string) ($va['produto_nome'] ?? '');
+                                    $validade = (string) ($va['validade_mais_proxima'] ?? '');
+                                    $qtd = (int) ($va['quantidade_total'] ?? 0);
+                                    $dias = null;
+                                    if ($validade !== '') {
+                                        $dias = (int) floor((strtotime($validade) - strtotime(date('Y-m-d'))) / 86400);
+                                    }
+                                    $badgeStyle = 'bg-info';
+                                    if ($dias !== null && $dias <= 7) {
+                                        $badgeStyle = 'bg-danger';
+                                    } elseif ($dias !== null && $dias <= 15) {
+                                        $badgeStyle = 'bg-warning';
+                                    }
+
+                                    $rowsP = $validade_alertas_pedidos[$produtoId] ?? [];
+                                    $countPedidos = is_array($rowsP) ? count($rowsP) : 0;
+
+                                    echo '<tr>'
+                                        . '<td><strong>' . htmlspecialchars($produtoNome) . '</strong><br><small class="text-muted">ID: ' . $produtoId . '</small></td>'
+                                        . '<td>'
+                                        . '<span class="badge ' . $badgeStyle . '">' . ($validade !== '' ? date('d/m/Y', strtotime($validade)) : '-') . '</span>'
+                                        . ($dias !== null ? '<br><small class="text-muted">em ' . $dias . ' dia(s)</small>' : '')
+                                        . '</td>'
+                                        . '<td><span class="badge bg-info">' . $qtd . '</span></td>'
+                                        . '<td>';
+
+                                    if ($countPedidos === 0) {
+                                        echo '<span class="text-muted">Nenhum</span>';
+                                    } else {
+                                        echo '<div class="mb-1"><span class="badge bg-warning">' . $countPedidos . '</span></div>';
+                                        echo '<div class="small">';
+                                        foreach (array_slice($rowsP, 0, 6) as $rp) {
+                                            $pedidoId = (int) ($rp['pedido_id'] ?? 0);
+                                            $pedidoData = (string) ($rp['pedido_data'] ?? '');
+                                            $usuarioId = (int) ($rp['usuario_id'] ?? 0);
+                                            $usuarioNome = (string) ($rp['usuario_nome'] ?? '');
+                                            $pedidoHref = '/admin/pedidos/detalhes/' . $pedidoId;
+                                            $usuarioHref = '/admin/usuarios/detalhes/' . $usuarioId;
+                                            echo '<div class="d-flex justify-content-between gap-2">'
+                                                . '<div>'
+                                                . '<a href="' . htmlspecialchars($pedidoHref) . '" class="text-decoration-none">Pedido #' . $pedidoId . '</a>'
+                                                . ($pedidoData !== '' ? ' <span class="text-muted">(' . date('d/m/Y', strtotime($pedidoData)) . ')</span>' : '')
+                                                . '</div>'
+                                                . '<div>'
+                                                . ($usuarioId > 0 ? '<a href="' . htmlspecialchars($usuarioHref) . '" class="text-decoration-none">' . htmlspecialchars($usuarioNome !== '' ? $usuarioNome : ('Cliente #' . $usuarioId)) . '</a>' : '<span class="text-muted">Cliente</span>')
+                                                . '</div>'
+                                                . '</div>';
+                                        }
+                                        if ($countPedidos > 6) {
+                                            echo '<div class="text-muted">+ ' . ($countPedidos - 6) . ' pedido(s)</div>';
+                                        }
+                                        echo '</div>';
+                                    }
+
+                                    echo '</td></tr>';
+                                }
+
+                                echo '</tbody></table></div>';
+                            }
+
+                            echo '</div>
+                        </div>
+                    </div>
+                </div>';
                 
                 <div class="row mb-4">
                     <div class="col-12">

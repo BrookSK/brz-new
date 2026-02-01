@@ -771,6 +771,18 @@ class AdminEstoqueController extends Controller {
                 $dataValidade = '';
             }
 
+            if ($isAlimenticio === 1 && $dataValidade !== '') {
+                $validadeTs = strtotime($dataValidade);
+                if ($validadeTs !== false) {
+                    $minTs = strtotime('+90 days');
+                    if ($minTs !== false && $validadeTs < $minTs) {
+                        $this->setFlash('Produto com validade menor que 90 dias. O produto deve ser trocado antes de cadastrar novamente.', 'danger');
+                        header('Location: /admin/estoque/entrada?produto_id=' . (int) $produtoId);
+                        exit;
+                    }
+                }
+            }
+
             if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao')) {
                 $this->setFlash('Tabelas de estoque não encontradas no banco. Rode a migration 020_create_estoque_profissional_fix.sql no banco do servidor.', 'danger');
                 header('Location: /admin/estoque/entrada');
