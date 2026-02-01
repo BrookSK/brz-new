@@ -315,15 +315,15 @@ class AdminEstoqueController extends Controller {
 
     <script>
         function preencherProdutoEstoque(produtoId) {
-            var el = document.getElementById('estoque_produto_id');
+            var el = document.getElementById("estoque_produto_id");
             if (!el) return;
             el.value = String(produtoId);
         }
         function toggleValidade() {
-            var chk = document.getElementById('estoque_is_alimenticio');
-            var grp = document.getElementById('grupo_validade');
+            var chk = document.getElementById("estoque_is_alimenticio");
+            var grp = document.getElementById("grupo_validade");
             if (!chk || !grp) return;
-            grp.style.display = chk.checked ? '' : 'none';
+            grp.style.display = chk.checked ? "" : "none";
         }
     </script>';
 
