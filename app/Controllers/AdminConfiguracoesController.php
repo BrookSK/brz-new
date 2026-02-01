@@ -665,6 +665,46 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            <hr>
+
+                                            <h6 class="mb-3">Correios (Rastreamento)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ativo</label>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="correios_tracking_enabled" name="entrega_correios_tracking_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'correios_tracking_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="correios_tracking_enabled">Habilitar rastreamento via API</label>
+                                                        </div>
+                                                        <small class="text-muted">Ative apenas quando tiver o token/API key e o endpoint.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Header do Token</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_tracking_header" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_header', 'Authorization') . '" placeholder="Authorization">
+                                                        <small class="text-muted">Ex.: Authorization (Bearer), x-api-key, etc.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Base URL do Rastreamento</label>
+                                                <input type="text" class="form-control" name="entrega_correios_tracking_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_base_url', '') . '" placeholder="Ex.: https://api.correios.com.br/srorastro/v1/objetos/{codigo}">
+                                                <small class="text-muted">Você pode usar {codigo} para interpolar o código de rastreio.</small>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Token / API Key</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" name="entrega_correios_tracking_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_token', '') . '" placeholder="Cole o token/API key">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1004,7 +1044,7 @@ class AdminConfiguracoesController extends Controller {
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
@@ -1012,7 +1052,7 @@ class AdminConfiguracoesController extends Controller {
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled', 'sigep_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {

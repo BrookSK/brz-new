@@ -7,7 +7,27 @@
         </a>
     </div>
 
+    <?php if (!empty($codigo_rastreio)): ?>
+        <div class="alert alert-light border">
+            <strong>Código de rastreio:</strong> <?= htmlspecialchars($codigo_rastreio) ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($tracking_error)): ?>
+        <div class="alert alert-warning">
+            <?= htmlspecialchars($tracking_error) ?>
+        </div>
+
+        <?php if (!empty($tracking_raw)): ?>
+            <details class="mb-4">
+                <summary>Ver resposta bruta (debug)</summary>
+                <pre class="mt-2" style="white-space: pre-wrap;"><?= htmlspecialchars(json_encode($tracking_raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>
+            </details>
+        <?php endif; ?>
+    <?php endif; ?>
+
     <div class="row g-4">
+        <?php if (!empty($pedido)): ?>
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header">
@@ -144,6 +164,18 @@
                 </div>
             </div>
         </div>
+        <?php else: ?>
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Rastreamento</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-0">Consulta realizada pelo código de rastreio informado.</p>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
