@@ -283,6 +283,8 @@ $router->get('/api/frete/calcular', 'ApiController', 'calcularFrete');
 
 // Rotas do Módulo de Estoque Interno
 $router->get('/admin/estoque', 'AdminEstoqueController', 'index');
+$router->get('/admin/estoque/entrada', 'AdminEstoqueController', 'entrada');
+$router->get('/admin/estoque/buscar-produtos', 'AdminEstoqueController', 'buscarProdutos');
 $router->post('/admin/estoque/salvar', 'AdminEstoqueController', 'salvar');
 $router->post('/admin/estoque/marcar-comprado', 'AdminEstoqueController', 'marcarComprado');
 
