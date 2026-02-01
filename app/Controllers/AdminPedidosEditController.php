@@ -462,6 +462,62 @@ class AdminPedidosEditController {
         </main>
     </div>
 
+    <div class="modal fade" id="modalAdicionarProduto" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Adicionar Produto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="busca_produto" placeholder="Buscar produto..." oninput="buscarProdutos()">
+                    </div>
+                    <div class="row" id="lista_produtos">';
+
+            foreach (($produtos ?? []) as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $nome = (string) ($p['name'] ?? '');
+                $preco = (float) ($p['price'] ?? 0);
+                $sku = (string) ($p['sku'] ?? '');
+                $loja = (string) ($p['loja'] ?? '');
+
+                $jsNome = json_encode($nome, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $jsSku = json_encode($sku, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $jsLoja = json_encode($loja, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+                echo '<div class="col-md-6 mb-2">'
+                    . '<div class="card">'
+                    . '<div class="card-body">'
+                    . '<div class="d-flex justify-content-between align-items-start gap-2">'
+                    . '<div>'
+                    . '<div style="font-weight:700;">' . htmlspecialchars($nome) . '</div>'
+                    . '<div class="small text-muted">SKU: ' . htmlspecialchars($sku !== '' ? $sku : 'N/A') . '</div>'
+                    . (!empty($loja) ? ('<div class="small text-muted">Loja: ' . htmlspecialchars($loja) . '</div>') : '')
+                    . '</div>'
+                    . '<div class="text-end">'
+                    . '<div class="small text-muted">R$</div>'
+                    . '<div style="font-weight:800;">' . number_format($preco, 2, ',', '.') . '</div>'
+                    . '</div>'
+                    . '</div>'
+                    . '<div class="mt-2">'
+                    . '<button type="button" class="btn btn-sm btn-primary" onclick="selecionarProduto(' . (int) $pid . ', ' . $jsNome . ', ' . (float) $preco . ', ' . $jsSku . ', ' . $jsLoja . ')">Adicionar</button>'
+                    . '</div>'
+                    . '</div>'
+                    . '</div>'
+                    . '</div>';
+            }
+
+            echo '        </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (function(){
