@@ -545,7 +545,11 @@ class AdminEstoqueController extends Controller {
                 JOIN (
                     SELECT
                         e.produto_id,
-                        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(e.galpao, ''), ' - Prateleira ', COALESCE(e.prateleira, '')) SEPARATOR ', ') AS localizacao,
+                        GROUP_CONCAT(DISTINCT CONCAT(
+                            COALESCE(e.galpao, ''),
+                            CASE WHEN COALESCE(e.galpao, '') <> '' AND COALESCE(e.prateleira, '') <> '' THEN ' - ' ELSE '' END,
+                            COALESCE(e.prateleira, '')
+                        ) SEPARATOR ', ') AS localizacao,
                         MAX(e.data_compra) AS data_compra_mais_recente,
                         MIN(CASE WHEN e.is_alimenticio = 1 AND e.data_validade IS NOT NULL THEN e.data_validade ELSE NULL END) AS validade_mais_proxima
                     FROM estoque_interno e
@@ -665,6 +669,17 @@ class AdminEstoqueController extends Controller {
                         <h5><i class="fas fa-list me-2"></i>Estoque Atual</h5>
                     </div>
                     <div class="card-body">
+                        <div class="row g-2 align-items-center mb-3">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" id="estoque_busca" placeholder="Buscar por produto, SKU, loja, localização ou status..." oninput="filtrarTabelaEstoque()">
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-md-end">
+                                <small class="text-muted" id="estoque_busca_info"></small>
+                            </div>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -680,7 +695,7 @@ class AdminEstoqueController extends Controller {
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody>';
+                                <tbody id="estoque_tbody">';
                                 
                                 foreach ($status_geral as $item) {
                                     $status_class = $item['status_estoque'] == 'crítico' ? 'danger' : 
@@ -694,7 +709,15 @@ class AdminEstoqueController extends Controller {
                                         ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06);">'
                                         : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
                                     
-                                    echo '<tr>
+                                    $rowSearch = strtolower(
+                                        (string) ($item['produto_nome'] ?? '') . ' ' .
+                                        (string) ($item['sku'] ?? '') . ' ' .
+                                        (string) ($item['loja'] ?? '') . ' ' .
+                                        (string) ($item['localizacao'] ?? '') . ' ' .
+                                        (string) ($item['status_estoque'] ?? '')
+                                    );
+
+                                    echo '<tr data-search="' . htmlspecialchars($rowSearch) . '">
                                         <td>
                                             <div class="d-flex gap-2 align-items-center">
                                                 ' . $imgTag . '
@@ -735,6 +758,29 @@ class AdminEstoqueController extends Controller {
                     </div>
                 </div>';
 
+                echo '<script>
+                    function filtrarTabelaEstoque() {
+                        var input = document.getElementById("estoque_busca");
+                        var tbody = document.getElementById("estoque_tbody");
+                        var info = document.getElementById("estoque_busca_info");
+                        if (!input || !tbody) return;
+                        var q = (input.value || "").toLowerCase().trim();
+                        var rows = tbody.querySelectorAll("tr");
+                        var vis = 0;
+                        for (var i = 0; i < rows.length; i++) {
+                            var r = rows[i];
+                            var hay = (r.getAttribute("data-search") || "").toLowerCase();
+                            var show = (q === "") || (hay.indexOf(q) !== -1);
+                            r.style.display = show ? "" : "none";
+                            if (show) vis++;
+                        }
+                        if (info) {
+                            info.textContent = q === "" ? ("Exibindo " + vis + " item(ns).") : ("Encontrado(s) " + vis + " item(ns). ");
+                        }
+                    }
+                    document.addEventListener("DOMContentLoaded", function() { filtrarTabelaEstoque(); });
+                </script>';
+
                 echo '</main>
         </div>
     </div>';
@@ -756,6 +802,20 @@ class AdminEstoqueController extends Controller {
             $galpao = trim((string) $request->getParam('galpao', ''));
             $prateleira = trim((string) $request->getParam('prateleira', ''));
             $observacao = trim((string) $request->getParam('observacao', ''));
+
+            // Normalizar campos de localização para evitar duplicidade e repetição (ex.: "Prateleira Prateleira 2")
+            if ($galpao !== '') {
+                $galpao = preg_replace('/\s+/', ' ', $galpao);
+                $galpao = trim($galpao);
+            }
+            if ($prateleira !== '') {
+                $prateleira = preg_replace('/^\s*prateleira\s+/i', '', $prateleira);
+                $prateleira = preg_replace('/\s+/', ' ', $prateleira);
+                $prateleira = trim($prateleira);
+                if ($prateleira !== '' && stripos($prateleira, 'prateleira') !== 0) {
+                    $prateleira = 'Prateleira ' . $prateleira;
+                }
+            }
 
             if ($produtoId <= 0) {
                 $this->setFlash('Selecione um produto válido.', 'danger');
@@ -799,6 +859,81 @@ class AdminEstoqueController extends Controller {
             }
 
             $this->connection->beginTransaction();
+
+            // Se já existe um registro para a mesma localização (produto + galpão + prateleira), não duplicar: somar quantidade.
+            $stmtExist = $this->connection->prepare('
+                SELECT id, quantidade
+                FROM estoque_interno
+                WHERE produto_id = :produto_id
+                  AND COALESCE(galpao, \'\') = :galpao
+                  AND COALESCE(prateleira, \'\') = :prateleira
+                ORDER BY id ASC
+                LIMIT 1
+            ');
+            $stmtExist->execute([
+                ':produto_id' => $produtoId,
+                ':galpao' => $galpao,
+                ':prateleira' => $prateleira,
+            ]);
+            $existRow = $stmtExist->fetch(\PDO::FETCH_ASSOC);
+
+            if ($existRow && isset($existRow['id'])) {
+                $estoqueId = (int) $existRow['id'];
+                $quantidadeAnterior = (int) ($existRow['quantidade'] ?? 0);
+                $quantidadeNova = $quantidadeAnterior + $quantidade;
+
+                $stmtUpd = $this->connection->prepare('
+                    UPDATE estoque_interno
+                    SET
+                        quantidade = :quantidade,
+                        data_compra = COALESCE(:data_compra, data_compra),
+                        data_validade = COALESCE(:data_validade, data_validade),
+                        is_alimenticio = :is_alimenticio,
+                        observacao = COALESCE(NULLIF(:observacao, \'\'), observacao)
+                    WHERE id = :id
+                    LIMIT 1
+                ');
+                $stmtUpd->execute([
+                    ':quantidade' => $quantidadeNova,
+                    ':data_compra' => ($dataCompra !== '' ? $dataCompra : null),
+                    ':data_validade' => ($dataValidade !== '' ? $dataValidade : null),
+                    ':is_alimenticio' => $isAlimenticio,
+                    ':observacao' => $observacao,
+                    ':id' => $estoqueId,
+                ]);
+
+                $stmtMov = $this->connection->prepare('
+                    INSERT INTO estoque_movimentacao (
+                        produto_id,
+                        tipo_movimentacao,
+                        quantidade,
+                        quantidade_anterior,
+                        quantidade_nova,
+                        motivo
+                    ) VALUES (
+                        :produto_id,
+                        :tipo_movimentacao,
+                        :quantidade,
+                        :quantidade_anterior,
+                        :quantidade_nova,
+                        :motivo
+                    )
+                ');
+                $stmtMov->execute([
+                    ':produto_id' => $produtoId,
+                    ':tipo_movimentacao' => 'entrada',
+                    ':quantidade' => $quantidade,
+                    ':quantidade_anterior' => $quantidadeAnterior,
+                    ':quantidade_nova' => $quantidadeNova,
+                    ':motivo' => 'Entrada no galpão (atualização de quantidade)',
+                ]);
+
+                $this->connection->commit();
+
+                $this->setFlash('Quantidade atualizada com sucesso (sem duplicar localização).', 'success');
+                header('Location: /admin/estoque');
+                exit;
+            }
 
             $stmtEstoque = $this->connection->prepare('
                 INSERT INTO estoque_interno (
