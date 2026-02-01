@@ -7,11 +7,11 @@
                     <h5 class="mb-0"><i class="fas fa-search-location"></i> Rastrear Pedido</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted mb-4">Digite o número do seu pedido para acompanhar o status de entrega.</p>
+                    <p class="text-muted mb-4">Digite o código de rastreio dos Correios (ex.: AA123456789BR) ou o número do seu pedido.</p>
                     
                     <form method="GET" action="/rastreamento">
                         <div class="input-group mb-3">
-                            <input type="text" class="form-control" name="id" placeholder="Número do pedido" required>
+                            <input type="text" class="form-control" name="codigo" placeholder="Código de rastreio (AA123456789BR) ou nº do pedido" required>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-search"></i> Rastrear
                             </button>
