@@ -144,12 +144,14 @@ class AdminPedidosManualController extends Controller {
             </div>
         </main>
     </div>
-</div>
+</div>';
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-const PRODUTOS = ' . json_encode($produtos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
-const PEDIDO_ID = ' . (int) $pedidoId . ';
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+        echo "<script>\n";
+        echo 'const PRODUTOS = ' . json_encode($produtos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
+
+        echo <<<'JS'
 
 function formatMoney(v){
     const n = Number(v || 0);
@@ -254,7 +256,10 @@ function gerarLinkPagamento(){
 document.addEventListener('DOMContentLoaded', function(){
     addItemRow();
 });
-</script>';
+
+JS;
+
+        echo "</script>";
 
         renderAdminScripts();
 
