@@ -291,14 +291,18 @@ $router->post('/admin/estoque/editar/salvar', 'AdminEstoqueController', 'salvarE
 $router->post('/admin/estoque/editar/excluir', 'AdminEstoqueController', 'excluirEntrada');
 $router->post('/admin/estoque/salvar', 'AdminEstoqueController', 'salvar');
 $router->post('/admin/estoque/marcar-comprado', 'AdminEstoqueController', 'marcarComprado');
+$router->get('/admin/estoque/reservas', 'AdminEstoqueController', 'reservasProduto');
 
 // Rotas de Lista de Compras
 $router->get('/admin/estoque/compras', 'AdminComprasController', 'index');
+$router->get('/admin/estoque/compras/novo', 'AdminComprasController', 'novoItem');
+$router->get('/admin/estoque/compras/pedidos-usuario', 'AdminComprasController', 'pedidosUsuario');
 $router->post('/admin/estoque/compras/salvar', 'AdminComprasController', 'salvar');
 $router->post('/admin/estoque/compras/editar-item', 'AdminComprasController', 'editarItem');
 $router->post('/admin/estoque/compras/remover-item', 'AdminComprasController', 'removerItem');
 $router->post('/admin/estoque/compras/reabrir', 'AdminComprasController', 'reabrirCompras');
 $router->get('/admin/estoque/compras/pedidos', 'AdminComprasController', 'pedidosItem');
+$router->post('/admin/estoque/compras/gerar-link-diferenca', 'AdminComprasController', 'gerarLinkDiferenca');
 $router->post('/admin/estoque/compras/definir-loja', 'AdminComprasController', 'definirLojaProduto');
 $router->post('/admin/estoque/compras/mudar-status', 'AdminComprasController', 'mudarStatus');
 $router->post('/admin/estoque/compras/concluir', 'AdminComprasController', 'concluirCompras');

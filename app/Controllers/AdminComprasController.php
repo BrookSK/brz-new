@@ -5,7 +5,384 @@ class AdminComprasController extends Controller {
     private $connection;
 
     public function __construct() {
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection = \Config\Database::getConnection();
+    }
+
+    private function findPedidoItensTable(): ?string {
+        try {
+            $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmtT->execute(['pedido_itens']);
+            if ((int) $stmtT->fetchColumn() > 0) {
+                return 'pedido_itens';
+            }
+            $stmtT->execute(['pedido_items']);
+            if ((int) $stmtT->fetchColumn() > 0) {
+                return 'pedido_items';
+            }
+        } catch (\Exception $e) {
+        }
+        return null;
+    }
+
+    private function pedidoEstaPago(array $pedidoRow): bool {
+        $st = strtolower(trim((string) ($pedidoRow['status'] ?? '')));
+        if (in_array($st, ['pago', 'paid', 'aprovado', 'approved'], true)) {
+            return true;
+        }
+        $ps = strtolower(trim((string) ($pedidoRow['payment_status'] ?? '')));
+        if (in_array($ps, ['approved', 'aprovado', 'paid', 'pago'], true)) {
+            return true;
+        }
+        if (!empty($pedidoRow['pago_em'])) {
+            return true;
+        }
+        return false;
+    }
+
+    private function fetchProdutosSelect(): array {
+        try {
+            $nomeCol = $this->columnExists('produtos', 'name') ? 'name' : ($this->columnExists('produtos', 'nome') ? 'nome' : null);
+            $selectNome = $nomeCol ? ('p.' . $nomeCol . ' as produto_nome') : "'' as produto_nome";
+            $cols = ['p.id as produto_id', 'p.sku as sku', $selectNome];
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM produtos p ORDER BY produto_nome ASC, p.id DESC LIMIT 2000';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function fetchPedidosSelect(): array {
+        try {
+            $cols = ['id', 'codigo_pedido', 'status', 'valor_total', 'created_at', 'pago_em', 'payment_status'];
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM pedidos ORDER BY id DESC LIMIT 500';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function fetchUsuariosSelect(): array {
+        if (!$this->tableExists('usuarios')) {
+            return [];
+        }
+        try {
+            $temName = $this->columnExists('usuarios', 'name');
+            $temNome = $this->columnExists('usuarios', 'nome');
+            $nomeExpr = $temName ? 'u.name' : ($temNome ? 'u.nome' : "''");
+
+            $cols = ['u.id as id', $nomeExpr . ' as nome'];
+            if ($this->columnExists('usuarios', 'email')) {
+                $cols[] = 'u.email as email';
+            } else {
+                $cols[] = "'' as email";
+            }
+
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM usuarios u ORDER BY nome ASC, u.id DESC LIMIT 2000';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function novoItem($request) {
+        try {
+            $usuarios = $this->fetchUsuariosSelect();
+            $produtosSelect = $this->fetchProdutosSelect();
+        } catch (\Exception $e) {
+            $usuarios = [];
+            $produtosSelect = [];
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Item - Lista de Compras</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+        renderAdminSidebar('compras');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-plus me-2"></i>Novo Item na Lista de Compras</h1>
+                <div>
+                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="/admin/estoque/compras/salvar" id="formNovoItem">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Usuário *</label>
+                                <select class="form-select" name="usuario_id" id="novo_usuario_id" required>
+                                    <option value="">Selecione...</option>';
+
+        foreach ($usuarios as $u) {
+            $uid = (int) ($u['id'] ?? 0);
+            if ($uid <= 0) continue;
+            $nome = (string) ($u['nome'] ?? '');
+            $email = (string) ($u['email'] ?? '');
+            $label = trim($nome) !== '' ? $nome : ('Usuário #' . $uid);
+            if ($email !== '') $label .= ' - ' . $email;
+            echo '<option value="' . $uid . '">' . htmlspecialchars($label) . '</option>';
+        }
+
+        echo '                 </select>
+                                <div class="form-text">Selecione o usuário para carregar os pedidos.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Pedido *</label>
+                                <select class="form-select" name="pedido_id" id="novo_pedido_id" required disabled>
+                                    <option value="">Selecione um usuário primeiro...</option>
+                                </select>
+                                <div class="form-text">Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Produto *</label>
+                                <select class="form-select" name="produto_id" required>
+                                    <option value="">Selecione...</option>';
+
+        foreach ($produtosSelect as $p) {
+            $pid = (int) ($p['produto_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $pn = (string) ($p['produto_nome'] ?? '');
+            $sku = (string) ($p['sku'] ?? '');
+            $label = trim($pn) !== '' ? $pn : ('Produto #' . $pid);
+            if ($sku !== '') $label .= ' - ' . $sku;
+            echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
+        }
+
+        echo '                 </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Quantidade *</label>
+                                <input type="number" class="form-control" name="quantidade" min="1" required>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Valor pendente (diferença) *</label>
+                                <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Prioridade</label>
+                                <select class="form-select" name="prioridade">
+                                    <option value="media" selected>Média</option>
+                                    <option value="baixa">Baixa</option>
+                                    <option value="alta">Alta</option>
+                                    <option value="urgente">Urgente</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>Salvar</button>
+                                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank">Cancelar</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+        </div>
+    </div>';
+
+        renderAdminScripts();
+
+        echo '<script>
+            function escapeHtml(str){
+                if (str === null || str === undefined) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/\'/g, "&#039;");
+            }
+
+            function formatMoney(v){
+                if (v === null || v === undefined || v === "") return "-";
+                var n = Number(v);
+                if (isNaN(n)) return String(v);
+                return "$ " + n.toFixed(2);
+            }
+
+            function loadPedidosDoUsuario(usuarioId){
+                var sel = document.getElementById("novo_pedido_id");
+                if (!sel) return;
+                sel.disabled = true;
+                sel.innerHTML = "<option value=\"\">Carregando...</option>";
+
+                fetch("/admin/estoque/compras/pedidos-usuario?usuario_id=" + encodeURIComponent(String(usuarioId)), {
+                    headers: { "Accept": "application/json" }
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (!data || !data.success) {
+                        sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                        return;
+                    }
+                    var pedidos = data.pedidos || [];
+                    if (!pedidos.length) {
+                        sel.innerHTML = "<option value=\"\">Nenhum pedido para este usuário</option>";
+                        return;
+                    }
+                    var html = "<option value=\"\">Selecione...</option>";
+                    pedidos.forEach(function(p){
+                        var pid = p.id || 0;
+                        if (!pid) return;
+                        var label = "Pedido #" + pid;
+                        if (p.codigo_pedido) label += " (" + p.codigo_pedido + ")";
+                        if (p.status) label += " - " + p.status;
+                        if (p.valor_total !== null && p.valor_total !== undefined) label += " - " + formatMoney(p.valor_total);
+                        html += "<option value=\"" + escapeHtml(pid) + "\">" + escapeHtml(label) + "</option>";
+                    });
+                    sel.innerHTML = html;
+                    sel.disabled = false;
+                })
+                .catch(function(){
+                    sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                });
+            }
+
+            var userSel = document.getElementById("novo_usuario_id");
+            if (userSel) {
+                userSel.addEventListener("change", function(){
+                    var uid = this.value || "";
+                    if (!uid) {
+                        var sel = document.getElementById("novo_pedido_id");
+                        if (sel) {
+                            sel.disabled = true;
+                            sel.innerHTML = "<option value=\"\">Selecione um usuário primeiro...</option>";
+                        }
+                        return;
+                    }
+                    loadPedidosDoUsuario(uid);
+                });
+            }
+        </script>';
+
+        echo '</body></html>';
+    }
+
+    public function pedidosUsuario($request) {
+        header('Content-Type: application/json; charset=utf-8');
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
+
+        if ($usuarioId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            return;
+        }
+
+        try {
+            $cols = ['id', 'codigo_pedido', 'status', 'valor_total', 'created_at', 'pago_em', 'payment_status'];
+            $colsReal = [];
+            foreach ($cols as $c) {
+                if ($this->columnExists('pedidos', $c)) {
+                    $colsReal[] = $c;
+                }
+            }
+            if (empty($colsReal)) {
+                $colsReal = ['id'];
+            }
+
+            $stmt = $this->connection->prepare('SELECT ' . implode(', ', $colsReal) . ' FROM pedidos WHERE usuario_id = :uid ORDER BY id DESC LIMIT 200');
+            $stmt->execute([':uid' => $usuarioId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            echo json_encode(['success' => true, 'pedidos' => $rows]);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao buscar pedidos do usuário.']);
+            return;
+        }
+    }
+
+    public function gerarLinkDiferenca($request) {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $valor = (float) $request->getParam('valor', 0);
+
+        if ($pedidoId <= 0 || $valor <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            return;
+        }
+
+        try {
+            // Buscar pedido e identificar cobrança Asaas existente para reaproveitar o customer
+            $stmt = $this->connection->prepare('SELECT id, codigo_pedido, payment_gateway, payment_id FROM pedidos WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $pedidoId]);
+            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                echo json_encode(['success' => false, 'message' => 'Pedido não encontrado.']);
+                return;
+            }
+
+            $gateway = strtolower((string) ($pedido['payment_gateway'] ?? ''));
+            $paymentId = (string) ($pedido['payment_id'] ?? '');
+            if ($gateway !== 'asaas' || $paymentId === '') {
+                echo json_encode(['success' => false, 'message' => 'Pedido sem pagamento Asaas vinculado.']);
+                return;
+            }
+
+            $customerId = '';
+            try {
+                $pg = new \App\Services\PaymentService();
+                $payment = $pg->obterPagamentoAsaas($paymentId);
+                $customerId = (string) ($payment['customer'] ?? '');
+            } catch (\Exception $e) {
+                $customerId = '';
+            }
+
+            if ($customerId === '') {
+                echo json_encode(['success' => false, 'message' => 'Não foi possível identificar o cliente no Asaas para este pedido.']);
+                return;
+            }
+
+            $codigo = (string) ($pedido['codigo_pedido'] ?? '');
+            $descricao = 'Diferença do pedido #' . ($codigo !== '' ? $codigo : (string) $pedidoId);
+
+            $svc = new \App\Services\AsaasLinkService();
+            $created = $svc->criarCobrancaDiferenca(
+                $customerId,
+                $valor,
+                $descricao,
+                date('Y-m-d', strtotime('+1 day')),
+                (string) $pedidoId,
+                'BOLETO'
+            );
+
+            echo json_encode([
+                'success' => true,
+                'payment_id' => $created['id'] ?? null,
+                'status' => $created['status'] ?? null,
+                'invoiceUrl' => $created['invoiceUrl'] ?? null,
+                'bankSlipUrl' => $created['bankSlipUrl'] ?? null,
+            ]);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao gerar link: ' . $e->getMessage()]);
+            return;
+        }
     }
 
     public function pedidosItem($request) {
@@ -282,6 +659,9 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
+            $produtosSelect = $this->fetchProdutosSelect();
+            $pedidosSelect = $this->fetchPedidosSelect();
+
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
             $temCost = $this->columnExists('produtos', 'cost_price');
@@ -349,11 +729,79 @@ class AdminComprasController extends Controller {
             // Estatísticas: itens/valor pendente
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
+            $valorTotalPago = 0.0;
             foreach ($compras as $c) {
                 $qf = (int) ($c['quantidade_faltante'] ?? $c['quantidade_necessaria'] ?? 0);
                 $totalItensPendentes += $qf;
                 $cost = isset($c['cost_price']) ? (float) $c['cost_price'] : 0.0;
                 $valorTotalPendente += ($qf * $cost);
+            }
+
+            // Total efetivamente pago (somando subtotais dos itens em pedidos pagos)
+            $itensTable = $this->findPedidoItensTable();
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            if ($itensTable && $temPedidoEmLista && !empty($compras)) {
+                $produtoIds = [];
+                foreach ($compras as $c) {
+                    $pid = (int) ($c['produto_id'] ?? 0);
+                    if ($pid > 0) {
+                        $produtoIds[$pid] = true;
+                    }
+                }
+                $produtoIds = array_keys($produtoIds);
+
+                if (!empty($produtoIds)) {
+                    $inProdutos = implode(',', array_fill(0, count($produtoIds), '?'));
+
+                    $produtoIdsList = $produtoIds;
+                    $lcParams = array_map('intval', $produtoIdsList);
+
+                    $lcSql = "SELECT DISTINCT pedido_id FROM lista_compras WHERE pedido_id IS NOT NULL AND pedido_id <> 0 AND produto_id IN ($inProdutos)";
+                    if ($statusView === 'concluidas') {
+                        $lcSql .= " AND status IN ('comprado','cancelado')";
+                    } else {
+                        $lcSql .= " AND status = 'pendente'";
+                    }
+                    if ($temLojaIdEmLista) {
+                        if ($semLoja) {
+                            $lcSql .= " AND (loja_id IS NULL OR loja_id = 0)";
+                        } elseif ($lojaIdFilter > 0) {
+                            $lcSql .= " AND loja_id = ?";
+                            $lcParams[] = (int) $lojaIdFilter;
+                        }
+                    }
+
+                    $stmtLc = $this->connection->prepare($lcSql);
+                    $stmtLc->execute($lcParams);
+                    $pedidoIds = $stmtLc->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+                    if (!empty($pedidoIds)) {
+                        $pedidoIds = array_values(array_unique(array_map('intval', $pedidoIds)));
+                        $inPedidos = implode(',', array_fill(0, count($pedidoIds), '?'));
+
+                        $stmtPedidos = $this->connection->prepare("SELECT id, status, pago_em, payment_status FROM pedidos WHERE id IN ($inPedidos)");
+                        $stmtPedidos->execute($pedidoIds);
+                        $pedidoRows = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        $pedidoPago = [];
+                        foreach ($pedidoRows as $pr) {
+                            $pedidoPago[(int) $pr['id']] = $this->pedidoEstaPago($pr);
+                        }
+
+                        $stmtItens = $this->connection->prepare(
+                            "SELECT i.pedido_id, i.produto_id, COALESCE(i.subtotal, (COALESCE(i.preco_unitario, i.valor_unitario, 0) * COALESCE(i.quantidade,0))) as subtotal
+                             FROM {$itensTable} i
+                             WHERE i.pedido_id IN ($inPedidos) AND i.produto_id IN ($inProdutos)"
+                        );
+                        $stmtItens->execute(array_merge($pedidoIds, array_map('intval', $produtoIdsList)));
+                        $itRows = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($itRows as $ir) {
+                            $pid = (int) ($ir['pedido_id'] ?? 0);
+                            if ($pid <= 0) continue;
+                            if (empty($pedidoPago[$pid])) continue;
+                            $valorTotalPago += (float) ($ir['subtotal'] ?? 0);
+                        }
+                    }
+                }
             }
 
             // Contadores gerais
@@ -370,6 +818,8 @@ class AdminComprasController extends Controller {
             $statusView = 'pendente';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
+            $produtosSelect = [];
+            $pedidosSelect = [];
         }
 
         // Incluir o partial do menu lateral
@@ -399,9 +849,9 @@ class AdminComprasController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" disabled>
+                        <a class="btn btn-success me-2" href="/admin/estoque/compras/novo" target="_blank" ' . ($statusView !== 'pendente' ? 'aria-disabled="true" style="pointer-events:none;opacity:.65;"' : '') . '>
                             <i class="fas fa-plus me-1"></i>Novo Item
-                        </button>
+                        </a>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
                         </button>
@@ -453,7 +903,8 @@ class AdminComprasController extends Controller {
                     . '</div>'
                     . '<div class="text-end">'
                     . '<div><strong>Total ' . ($statusView === 'pendente' ? 'pendente' : 'concluído') . ' (itens):</strong> ' . number_format($totalItensPendentes) . '</div>'
-                    . '<div><strong>Valor total ' . ($statusView === 'pendente' ? 'pendente' : 'concluído') . ':</strong> $ ' . number_format($valorTotalPendente, 2, '.', ',') . '</div>'
+                    . '<div><strong>Custo total:</strong> $ ' . number_format($valorTotalPendente, 2, '.', ',') . '</div>'
+                    . '<div><strong>Total efetivamente pago (itens):</strong> $ ' . number_format($valorTotalPago, 2, '.', ',') . '</div>'
                     . '</div>'
                     . '</div>'
                     . '</div>';
@@ -746,12 +1197,52 @@ class AdminComprasController extends Controller {
                             html += "<div><strong>Cliente:</strong> " + escapeHtml(cliente) + "</div>";
                             html += "<div><strong>Criado em:</strong> " + criado + "</div>";
                             if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
-                            html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
+                            var stLow = String(p.status || "").toLowerCase();
+                            var pago = (stLow === "pago" || stLow === "paid" || stLow === "aprovado" || stLow === "approved" || (p.pago_em && String(p.pago_em).trim() !== ""));
+
+                            html += "<div class=\"mt-2 d-flex flex-wrap gap-2\">";
+                            html += "<a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a>";
+                            if (!pago) {
+                                html += "<div class=\"input-group input-group-sm\" style=\"max-width:320px;\">";
+                                html += "<span class=\"input-group-text\">$</span>";
+                                html += "<input type=\"number\" step=\"0.01\" min=\"0\" class=\"form-control\" placeholder=\"Valor da diferença\" id=\"diff_val_" + pid + "\">";
+                                html += "<button type=\"button\" class=\"btn btn-outline-success\" onclick=\"gerarLinkDiferenca(" + pid + ")\">Gerar link</button>";
+                                html += "</div>";
+                            }
+                            html += "</div>";
+                            html += "<div class=\"mt-2\" id=\"diff_out_" + pid + "\"></div>";
                             html += "</div>";
                             html += itensHtml;
                             html += "</div></div></div>";
-
                             acc.insertAdjacentHTML("beforeend", html);
+                        });
+                    }
+
+                    function gerarLinkDiferenca(pedidoId){
+                        var out = document.getElementById("diff_out_" + pedidoId);
+                        if (out) out.innerHTML = "<div class=\"text-muted\">Gerando link...</div>";
+                        var inp = document.getElementById("diff_val_" + pedidoId);
+                        var val = inp ? inp.value : "";
+                        fetch("/admin/estoque/compras/gerar-link-diferenca", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                            body: "pedido_id=" + encodeURIComponent(String(pedidoId)) + "&valor=" + encodeURIComponent(String(val))
+                        })
+                        .then(function(r){ return r.json(); })
+                        .then(function(data){
+                            if (!data || !data.success) {
+                                if (out) out.innerHTML = "<div class=\"alert alert-danger\">" + escapeHtml((data && data.message) ? data.message : "Erro ao gerar link") + "</div>";
+                                return;
+                            }
+                            var url = data.invoiceUrl || data.bankSlipUrl || "";
+                            if (out) {
+                                out.innerHTML = url
+                                    ? ("<div class=\"alert alert-success\">Link gerado: <a href=\"" + escapeHtml(url) + "\" target=\"_blank\">Abrir cobrança</a></div>")
+                                    : ("<div class=\"alert alert-success\">Link gerado com sucesso.</div>");
+                            }
+                        })
+                        .catch(function(){
+                            if (out) out.innerHTML = "<div class=\"alert alert-danger\">Erro ao gerar link</div>";
                         });
                     }
 
@@ -759,7 +1250,10 @@ class AdminComprasController extends Controller {
                     if (modalPedidosItem) {
                         modalPedidosItem.addEventListener("show.bs.modal", function (event) {
                             var button = event.relatedTarget;
-                            var produtoId = button.getAttribute("data-produto-id") || "";
+                            var produtoId = button.getAttribute("data-produto-id");
+                            var lojaId = button.getAttribute("data-loja-id");
+                            var semLoja = button.getAttribute("data-sem-loja");
+                            var produtoNome = button.getAttribute("data-produto-nome");
                             var lojaId = button.getAttribute("data-loja-id") || "0";
                             var semLoja = button.getAttribute("data-sem-loja") || "0";
                             var produtoNome = button.getAttribute("data-produto-nome") || "";
@@ -1041,7 +1535,140 @@ class AdminComprasController extends Controller {
     }
 
     public function salvar($request) {
-        echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
+        $quantidade = (int) $request->getParam('quantidade', 0);
+        $valorPendente = (float) $request->getParam('valor_pendente', 0);
+        $prioridade = (string) $request->getParam('prioridade', 'media');
+        $prioridade = in_array($prioridade, ['baixa', 'media', 'alta', 'urgente'], true) ? $prioridade : 'media';
+
+        if ($produtoId <= 0 || $pedidoId <= 0 || $quantidade <= 0) {
+            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+
+        try {
+            $this->connection->beginTransaction();
+
+            $stmtPedido = $this->connection->prepare('SELECT id, status, pago_em, payment_status, valor_total, valor_total_brl FROM pedidos WHERE id = :id LIMIT 1');
+            $stmtPedido->execute([':id' => $pedidoId]);
+            $pedido = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                $this->connection->rollBack();
+                $_SESSION['message'] = 'Pedido não encontrado.';
+                $_SESSION['message_type'] = 'danger';
+                header('Location: /admin/estoque/compras');
+                exit;
+            }
+
+            $pedidoPago = $this->pedidoEstaPago($pedido);
+
+            if ($usuarioId > 0 && $this->columnExists('pedidos', 'usuario_id')) {
+                try {
+                    $stmtChk = $this->connection->prepare('SELECT usuario_id FROM pedidos WHERE id = :id LIMIT 1');
+                    $stmtChk->execute([':id' => $pedidoId]);
+                    $uPed = (int) ($stmtChk->fetchColumn() ?: 0);
+                    if ($uPed > 0 && $uPed !== $usuarioId) {
+                        $this->connection->rollBack();
+                        $_SESSION['message'] = 'Pedido não pertence ao usuário selecionado.';
+                        $_SESSION['message_type'] = 'danger';
+                        header('Location: /admin/estoque/compras/novo');
+                        exit;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Atualizar o valor do pedido apenas se estiver pendente
+            $colsPedidos = [];
+            try {
+                $stmtCols = $this->connection->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!$pedidoPago && $valorPendente > 0) {
+                $set = [];
+                $params = [':id' => $pedidoId];
+
+                if (in_array('valor_total', $colsPedidos, true)) {
+                    $set[] = 'valor_total = COALESCE(valor_total,0) + :vp';
+                    $params[':vp'] = $valorPendente;
+                }
+                if (in_array('valor_total_brl', $colsPedidos, true)) {
+                    $set[] = 'valor_total_brl = COALESCE(valor_total_brl,0) + :vp_brl';
+                    $params[':vp_brl'] = $valorPendente;
+                }
+
+                if (!empty($set)) {
+                    $stmtUpd = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id LIMIT 1');
+                    $stmtUpd->execute($params);
+                }
+            }
+
+            // Inserir item na lista de compras
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            $cols = ['produto_id', 'quantidade_necessaria', 'quantidade_faltante', 'prioridade', 'status', 'data_solicitacao'];
+            $vals = [':produto_id', ':q', ':q', ':prioridade', "'pendente'", 'CURDATE()'];
+            $insertParams = [':produto_id' => $produtoId, ':q' => $quantidade, ':prioridade' => $prioridade];
+
+            if ($temPedidoEmLista) {
+                $cols[] = 'pedido_id';
+                $vals[] = ':pedido_id';
+                $insertParams[':pedido_id'] = $pedidoId;
+            }
+
+            if ($temLojaIdEmLista) {
+                // tentar inferir loja pelo produto
+                $lojaId = 0;
+                try {
+                    if ($this->columnExists('produtos', 'loja_id')) {
+                        $stmtL = $this->connection->prepare('SELECT loja_id FROM produtos WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $produtoId]);
+                        $lojaId = (int) $stmtL->fetchColumn();
+                    }
+                } catch (\Exception $e) {
+                    $lojaId = 0;
+                }
+
+                $cols[] = 'loja_id';
+                if ($lojaId > 0) {
+                    $vals[] = ':loja_id';
+                    $insertParams[':loja_id'] = $lojaId;
+                } else {
+                    $vals[] = 'NULL';
+                }
+            }
+
+            $stmtIns = $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
+            $stmtIns->execute($insertParams);
+
+            $this->connection->commit();
+
+            if ($pedidoPago) {
+                $_SESSION['message'] = 'Item adicionado na lista. Pedido está pago: total do pedido não foi alterado.';
+                $_SESSION['message_type'] = 'warning';
+            } else {
+                $_SESSION['message'] = 'Item adicionado na lista e valor do pedido atualizado.';
+                $_SESSION['message_type'] = 'success';
+            }
+            header('Location: /admin/estoque/compras');
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            $_SESSION['message'] = 'Erro ao salvar novo item.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
     }
 
     public function editarItem($request) {
