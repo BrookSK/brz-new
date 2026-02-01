@@ -970,6 +970,60 @@ class AdminPedidosController extends Controller {
                 echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
+
+            if ((string) $novoStatus === 'produto_consolidado') {
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['estoque_reservas']);
+                    $temReservas = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temReservas = false;
+                }
+
+                if (!empty($temReservas)) {
+                    try {
+                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'pedido_id'");
+                        $stmtC->execute();
+                        $temPedidoId = ((int) $stmtC->fetchColumn() > 0);
+                    } catch (\Exception $e) {
+                        $temPedidoId = false;
+                    }
+
+                    if (!empty($temPedidoId)) {
+                        try {
+                            $stmtDel = $pdo->prepare('DELETE FROM estoque_reservas WHERE pedido_id = ?');
+                            $stmtDel->execute([(int) $id]);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['lista_compras']);
+                    $temLista = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temLista = false;
+                }
+
+                if (!empty($temLista)) {
+                    try {
+                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'lista_compras' AND column_name = 'pedido_id'");
+                        $stmtC->execute();
+                        $temPedidoIdLista = ((int) $stmtC->fetchColumn() > 0);
+                    } catch (\Exception $e) {
+                        $temPedidoIdLista = false;
+                    }
+
+                    if (!empty($temPedidoIdLista)) {
+                        try {
+                            $stmtDel = $pdo->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
+                            $stmtDel->execute([(int) $id]);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            }
             
             header('Location: /admin/pedidos/detalhes/' . $id . '?success=1');
             exit;
