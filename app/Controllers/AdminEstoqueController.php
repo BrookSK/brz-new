@@ -1818,12 +1818,13 @@ class AdminEstoqueController extends Controller {
         if (empty($entradas)) {
             echo '<p class="text-muted mb-0">Nenhuma entrada encontrada para este produto no estoque interno.</p>';
         } else {
-            echo '<form method="POST" action="/admin/estoque/editar/salvar">'
+            echo '<form method="POST" action="/admin/estoque/editar/salvar" id="form_editar_estoque">'
                 . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
                 . '<div class="table-responsive">'
                 . '<table class="table table-hover">'
                 . '<thead><tr><th>Localização</th><th>Qtd</th><th>Data compra</th><th>Validade</th><th>Obs.</th><th style="width:120px;">Ações</th></tr></thead><tbody>';
 
+            $qtdMap = [];
             foreach ($entradas as $e) {
                 $eid = (int) ($e['id'] ?? 0);
                 $loc = trim((string) ($e['galpao'] ?? ''));
@@ -1835,6 +1836,9 @@ class AdminEstoqueController extends Controller {
                     $locFull = $pr;
                 }
                 $qtd = (int) ($e['quantidade'] ?? 0);
+                if ($eid > 0) {
+                    $qtdMap[$eid] = $qtd;
+                }
                 $dc = (string) ($e['data_compra'] ?? '');
                 $dv = (string) ($e['data_validade'] ?? '');
                 $obs = (string) ($e['observacao'] ?? '');
@@ -1873,9 +1877,24 @@ class AdminEstoqueController extends Controller {
 
             echo '<script>
                 function excluirEntradaEstoque(produtoId, estoqueId) {
-                    if (!confirm("Excluir esta localização do estoque? Esta ação será registrada no log.")) {
-                        return false;
+                    var reservadoTotal = ' . (int) $totalReservado . ';
+                    var totalAtual = ' . (int) $totalEstoque . ';
+                    var qtdMap = ' . json_encode($qtdMap) . ';
+                    var qtdRemover = 0;
+                    if (qtdMap && Object.prototype.hasOwnProperty.call(qtdMap, String(estoqueId))) {
+                        qtdRemover = Number(qtdMap[String(estoqueId)] || 0);
                     }
+                    var novoTotal = totalAtual - qtdRemover;
+                    if (reservadoTotal > 0 && novoTotal < reservadoTotal) {
+                        if (!confirm("ATENÇÃO: esta exclusão deixará o estoque total (" + novoTotal + ") abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?")) {
+                            return false;
+                        }
+                    } else {
+                        if (!confirm("Excluir esta localização do estoque? Esta ação será registrada no log.")) {
+                            return false;
+                        }
+                    }
+
                     var f = document.getElementById("form_del_global");
                     var p = document.getElementById("del_produto_id");
                     var e = document.getElementById("del_estoque_id");
@@ -1885,6 +1904,28 @@ class AdminEstoqueController extends Controller {
                     f.submit();
                     return false;
                 }
+
+                document.addEventListener("DOMContentLoaded", function(){
+                    var reservadoTotal = ' . (int) $totalReservado . ';
+                    var form = document.getElementById("form_editar_estoque");
+                    if (!form) return;
+
+                    form.addEventListener("submit", function(ev){
+                        if (reservadoTotal <= 0) return;
+                        var inputs = form.querySelectorAll("input[name=\"quantidade[]\"]");
+                        var total = 0;
+                        for (var i = 0; i < inputs.length; i++) {
+                            var n = parseInt(inputs[i].value || "0", 10);
+                            if (!isNaN(n)) total += n;
+                        }
+                        if (total < reservadoTotal) {
+                            if (!confirm("ATENÇÃO: ao salvar, o estoque total ficará em " + total + ", abaixo do reservado (" + reservadoTotal + ").\n\nDeseja continuar mesmo assim?")) {
+                                ev.preventDefault();
+                                return false;
+                            }
+                        }
+                    });
+                });
             </script>';
         }
 
