@@ -897,6 +897,46 @@ class AdminPedidosController extends Controller {
                 echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
+
+            $statusColsToCheck = [];
+            foreach (['status', 'status_pedido', 'pedido_status'] as $cand) {
+                if (is_array($cols) && in_array($cand, $cols, true)) {
+                    $statusColsToCheck[] = $cand;
+                }
+            }
+            if (empty($statusColsToCheck)) {
+                $statusColsToCheck[] = $statusCol;
+            }
+
+            $selectCols = array_values(array_unique($statusColsToCheck));
+            $stmtCheck = $pdo->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+            $stmtCheck->execute([$id]);
+            $row = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
+
+            $persistiu = false;
+            if (is_array($row)) {
+                foreach ($selectCols as $c) {
+                    if (isset($row[$c]) && (string) $row[$c] === (string) $novoStatus) {
+                        $persistiu = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!$persistiu) {
+                echo '<div class="alert alert-danger">O status foi enviado como <strong>' . htmlspecialchars((string) $novoStatus) . '</strong>, mas n\u00e3o permaneceu gravado no banco ap\u00f3s o UPDATE.</div>';
+                echo '<div class="alert alert-secondary"><strong>Diagn\u00f3stico</strong><br>Coluna atualizada: <strong>' . htmlspecialchars($statusCol) . '</strong><br>';
+                if (is_array($row)) {
+                    foreach ($selectCols as $c) {
+                        echo htmlspecialchars($c) . ': <strong>' . htmlspecialchars((string) ($row[$c] ?? 'NULL')) . '</strong><br>';
+                    }
+                } else {
+                    echo 'N\u00e3o foi poss\u00edvel reler o registro ap\u00f3s o UPDATE.';
+                }
+                echo '</div>';
+                echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
             
             header('Location: /admin/pedidos/detalhes/' . $id . '?success=1');
             exit;
