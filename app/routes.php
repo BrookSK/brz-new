@@ -287,6 +287,7 @@ $router->get('/admin/estoque/entrada', 'AdminEstoqueController', 'entrada');
 $router->get('/admin/estoque/buscar-produtos', 'AdminEstoqueController', 'buscarProdutos');
 $router->get('/admin/estoque/editar/{produto_id}', 'AdminEstoqueController', 'editar');
 $router->post('/admin/estoque/editar/salvar', 'AdminEstoqueController', 'salvarEdicao');
+$router->post('/admin/estoque/editar/excluir', 'AdminEstoqueController', 'excluirEntrada');
 $router->post('/admin/estoque/salvar', 'AdminEstoqueController', 'salvar');
 $router->post('/admin/estoque/marcar-comprado', 'AdminEstoqueController', 'marcarComprado');
 

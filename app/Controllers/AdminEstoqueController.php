@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Services\AuthService;
+
 class AdminEstoqueController extends Controller {
     private $connection;
 
@@ -39,6 +41,29 @@ class AdminEstoqueController extends Controller {
             return (bool) $stmt->fetchColumn();
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    private function columnExists(string $table, string $column): bool {
+        try {
+            $stmt = $this->connection->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE ?');
+            $stmt->execute([$column]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getLoggedUser(): ?array {
+        try {
+            $auth = new AuthService();
+            $u = $auth->getUsuarioLogado();
+            if (!$u) {
+                return null;
+            }
+            return $u;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 
@@ -1176,7 +1201,7 @@ class AdminEstoqueController extends Controller {
                 . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
                 . '<div class="table-responsive">'
                 . '<table class="table table-hover">'
-                . '<thead><tr><th>Localização</th><th>Qtd</th><th>Data compra</th><th>Validade</th><th>Obs.</th></tr></thead><tbody>';
+                . '<thead><tr><th>Localização</th><th>Qtd</th><th>Data compra</th><th>Validade</th><th>Obs.</th><th style="width:120px;">Ações</th></tr></thead><tbody>';
 
             foreach ($entradas as $e) {
                 $eid = (int) ($e['id'] ?? 0);
@@ -1207,7 +1232,16 @@ class AdminEstoqueController extends Controller {
                     . '<input type="hidden" name="is_alimenticio[]" value="' . $isAli . '">'
                     . '<input type="date" class="form-control" name="data_validade[]" value="' . htmlspecialchars($dv) . '"></td>'
                     . '<td><input type="text" class="form-control" name="observacao[]" value="' . htmlspecialchars($obs) . '"></td>'
+                    . '<td>'
+                    . '<button type="submit" class="btn btn-sm btn-outline-danger" form="form_del_' . $eid . '" onclick="return confirm(\'Excluir esta localização do estoque? Esta ação será registrada no log.\');"><i class="fas fa-trash"></i></button>'
+                    . '</td>'
                     . '</tr>';
+
+                // Formulário separado para exclusão (evita <form> dentro de <form>)
+                echo '<form id="form_del_' . $eid . '" method="POST" action="/admin/estoque/editar/excluir" style="display:none;">'
+                    . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
+                    . '<input type="hidden" name="estoque_id" value="' . $eid . '">'
+                    . '</form>';
             }
 
             echo '</tbody></table></div>'
@@ -1234,6 +1268,7 @@ class AdminEstoqueController extends Controller {
                 $nov = (string) ($l['quantidade_nova'] ?? '');
                 $motivo = (string) ($l['motivo'] ?? '');
                 $data = (string) ($l['data_movimentacao'] ?? '');
+                $who = (string) ($l['usuario_login'] ?? ($l['usuario_id'] ?? ''));
                 $badge = 'bg-info';
                 if ($tipo === 'entrada') $badge = 'bg-success';
                 if ($tipo === 'saida') $badge = 'bg-danger';
@@ -1244,6 +1279,7 @@ class AdminEstoqueController extends Controller {
                     . '<span class="text-muted small">' . ($data !== '' ? date('d/m/Y H:i', strtotime($data)) : '-') . '</span>'
                     . '</div>'
                     . '<div class="small">Qtd: ' . htmlspecialchars($qtd) . ' (de ' . htmlspecialchars($ant) . ' para ' . htmlspecialchars($nov) . ')</div>'
+                    . ($who !== '' ? '<div class="text-muted small">Por: ' . htmlspecialchars((string) $who) . '</div>' : '')
                     . ($motivo !== '' ? '<div class="text-muted small">' . htmlspecialchars($motivo) . '</div>' : '')
                     . '</div>';
             }
@@ -1300,25 +1336,32 @@ class AdminEstoqueController extends Controller {
                 WHERE id = :id AND produto_id = :produto_id
                 LIMIT 1
             ');
-            $stmtMov = $this->connection->prepare('
+            $hasUsuarioLogin = $this->columnExists('estoque_movimentacao', 'usuario_login');
+            $sqlMov = '
                 INSERT INTO estoque_movimentacao (
                     produto_id,
                     tipo_movimentacao,
                     quantidade,
                     quantidade_anterior,
                     quantidade_nova,
-                    motivo
+                    motivo,
+                    usuario_id' . ($hasUsuarioLogin ? ', usuario_login' : '') . '
                 ) VALUES (
                     :produto_id,
                     :tipo_movimentacao,
                     :quantidade,
                     :quantidade_anterior,
                     :quantidade_nova,
-                    :motivo
+                    :motivo,
+                    :usuario_id' . ($hasUsuarioLogin ? ', :usuario_login' : '') . '
                 )
-            ');
+            ';
+            $stmtMov = $this->connection->prepare($sqlMov);
 
             $changedAny = false;
+            $logged = $this->getLoggedUser();
+            $loggedId = $logged ? (int) ($logged['id'] ?? 0) : 0;
+            $loggedLogin = $logged ? (string) ($logged['email'] ?? ($logged['nome'] ?? '')) : '';
             for ($i = 0; $i < count($ids); $i++) {
                 $estoqueId = (int) ($ids[$i] ?? 0);
                 if ($estoqueId <= 0) {
@@ -1382,14 +1425,19 @@ class AdminEstoqueController extends Controller {
                 ]);
 
                 $motivo = 'Edição manual (' . ($locFull !== '' ? $locFull : 'Sem localização') . '): ' . implode(' | ', $diffs);
-                $stmtMov->execute([
+                $paramsMov = [
                     ':produto_id' => $produtoId,
                     ':tipo_movimentacao' => 'ajuste',
                     ':quantidade' => ($newQtd - $oldQtd),
                     ':quantidade_anterior' => $oldQtd,
                     ':quantidade_nova' => $newQtd,
                     ':motivo' => $motivo,
-                ]);
+                    ':usuario_id' => ($loggedId > 0 ? $loggedId : null),
+                ];
+                if ($hasUsuarioLogin) {
+                    $paramsMov[':usuario_login'] = ($loggedLogin !== '' ? $loggedLogin : null);
+                }
+                $stmtMov->execute($paramsMov);
                 $changedAny = true;
             }
 
@@ -1408,6 +1456,96 @@ class AdminEstoqueController extends Controller {
             }
             error_log('Erro ao salvar edição de estoque: ' . $e->getMessage());
             $this->setFlash('Erro ao salvar edição de estoque: ' . $e->getMessage(), 'danger');
+            header('Location: /admin/estoque');
+            exit;
+        }
+    }
+
+    public function excluirEntrada($request) {
+        try {
+            $produtoId = (int) $request->getParam('produto_id');
+            $estoqueId = (int) $request->getParam('estoque_id');
+            if ($produtoId <= 0 || $estoqueId <= 0) {
+                $this->setFlash('Parâmetros inválidos para exclusão.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            $this->connection->beginTransaction();
+
+            $stmtGet = $this->connection->prepare('SELECT * FROM estoque_interno WHERE id = :id AND produto_id = :produto_id LIMIT 1');
+            $stmtGet->execute([':id' => $estoqueId, ':produto_id' => $produtoId]);
+            $old = $stmtGet->fetch(\PDO::FETCH_ASSOC);
+            if (!$old) {
+                $this->connection->rollBack();
+                $this->setFlash('Entrada não encontrada.', 'danger');
+                header('Location: /admin/estoque/editar/' . (int) $produtoId);
+                exit;
+            }
+
+            $oldQtd = (int) ($old['quantidade'] ?? 0);
+            $gal = trim((string) ($old['galpao'] ?? ''));
+            $pra = trim((string) ($old['prateleira'] ?? ''));
+            $locFull = $gal;
+            if ($gal !== '' && $pra !== '') {
+                $locFull .= ' - ' . $pra;
+            } elseif ($pra !== '') {
+                $locFull = $pra;
+            }
+
+            $stmtDel = $this->connection->prepare('DELETE FROM estoque_interno WHERE id = :id AND produto_id = :produto_id LIMIT 1');
+            $stmtDel->execute([':id' => $estoqueId, ':produto_id' => $produtoId]);
+
+            $logged = $this->getLoggedUser();
+            $loggedId = $logged ? (int) ($logged['id'] ?? 0) : 0;
+            $loggedLogin = $logged ? (string) ($logged['email'] ?? ($logged['nome'] ?? '')) : '';
+
+            $hasUsuarioLogin = $this->columnExists('estoque_movimentacao', 'usuario_login');
+            $sqlMov = '
+                INSERT INTO estoque_movimentacao (
+                    produto_id,
+                    tipo_movimentacao,
+                    quantidade,
+                    quantidade_anterior,
+                    quantidade_nova,
+                    motivo,
+                    usuario_id' . ($hasUsuarioLogin ? ', usuario_login' : '') . '
+                ) VALUES (
+                    :produto_id,
+                    :tipo_movimentacao,
+                    :quantidade,
+                    :quantidade_anterior,
+                    :quantidade_nova,
+                    :motivo,
+                    :usuario_id' . ($hasUsuarioLogin ? ', :usuario_login' : '') . '
+                )
+            ';
+            $stmtMov = $this->connection->prepare($sqlMov);
+            $paramsMov = [
+                ':produto_id' => $produtoId,
+                ':tipo_movimentacao' => 'ajuste',
+                ':quantidade' => (0 - $oldQtd),
+                ':quantidade_anterior' => $oldQtd,
+                ':quantidade_nova' => 0,
+                ':motivo' => 'Exclusão da localização (' . ($locFull !== '' ? $locFull : 'Sem localização') . ') do estoque interno.',
+                ':usuario_id' => ($loggedId > 0 ? $loggedId : null),
+            ];
+            if ($hasUsuarioLogin) {
+                $paramsMov[':usuario_login'] = ($loggedLogin !== '' ? $loggedLogin : null);
+            }
+            $stmtMov->execute($paramsMov);
+
+            $this->connection->commit();
+
+            $this->setFlash('Localização excluída e registrada no log.', 'success');
+            header('Location: /admin/estoque/editar/' . (int) $produtoId);
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            error_log('Erro ao excluir entrada de estoque: ' . $e->getMessage());
+            $this->setFlash('Erro ao excluir entrada de estoque: ' . $e->getMessage(), 'danger');
             header('Location: /admin/estoque');
             exit;
         }
