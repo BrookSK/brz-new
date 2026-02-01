@@ -744,8 +744,8 @@ class AdminEstoqueController extends Controller {
                                         </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <a class="btn btn-outline-success" href="/admin/estoque/entrada?produto_id=' . (int) $item['produto_id'] . '">
-                                                    <i class="fas fa-plus"></i>
+                                                <a class="btn btn-outline-primary" href="/admin/estoque/editar/' . (int) $item['produto_id'] . '">
+                                                    <i class="fas fa-pen"></i>
                                                 </a>
                                             </div>
                                         </td>
@@ -1037,5 +1037,379 @@ class AdminEstoqueController extends Controller {
 
     public function marcarComprado($request) {
         echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+    }
+
+    public function editar($request) {
+        try {
+            $produtoId = (int) $request->getParam('produto_id');
+            if ($produtoId <= 0) {
+                $this->setFlash('Produto inválido.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao')) {
+                $this->setFlash('Tabelas de estoque não encontradas no banco. Rode as migrations de estoque no banco do servidor.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            // Produto
+            $schema = $this->getProdutosSchema();
+            $nameCol = $schema['nameCol'] ?? null;
+            $skuCol = $schema['skuCol'] ?? null;
+            $priceCol = $schema['priceCol'] ?? null;
+            $imgCol = $schema['imgCol'] ?? null;
+
+            $select = ['id'];
+            $select[] = ($nameCol ? ($nameCol . ' AS nome') : "CAST(id AS CHAR) AS nome");
+            $select[] = ($skuCol ? ($skuCol . ' AS sku') : "'' AS sku");
+            $select[] = ($priceCol ? ($priceCol . ' AS preco') : "NULL AS preco");
+            $select[] = ($imgCol ? ($imgCol . ' AS imagem_raw') : "'' AS imagem_raw");
+
+            $stmtP = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = :id LIMIT 1');
+            $stmtP->execute([':id' => $produtoId]);
+            $produto = $stmtP->fetch(\PDO::FETCH_ASSOC);
+            if (!$produto) {
+                $this->setFlash('Produto não encontrado.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            $imgUrl = null;
+            if (!empty($produto['imagem_raw'])) {
+                $imgUrl = $this->resolveProdutoImagem(['imagem_raw' => (string) $produto['imagem_raw']], 'imagem_raw');
+            }
+
+            // Entradas existentes (localizações)
+            $stmtE = $this->connection->prepare('
+                SELECT *
+                FROM estoque_interno
+                WHERE produto_id = :produto_id
+                ORDER BY id ASC
+            ');
+            $stmtE->execute([':produto_id' => $produtoId]);
+            $entradas = $stmtE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Logs
+            $stmtL = $this->connection->prepare('
+                SELECT *
+                FROM estoque_movimentacao
+                WHERE produto_id = :produto_id
+                ORDER BY data_movimentacao DESC, id DESC
+                LIMIT 50
+            ');
+            $stmtL->execute([':produto_id' => $produtoId]);
+            $logs = $stmtL->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        } catch (\Exception $e) {
+            $this->setFlash('Erro ao carregar edição de estoque: ' . $e->getMessage(), 'danger');
+            header('Location: /admin/estoque');
+            exit;
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Estoque - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('estoque');
+
+        $produtoNome = (string) ($produto['nome'] ?? '');
+        $produtoSku = (string) ($produto['sku'] ?? '');
+        $produtoPreco = isset($produto['preco']) ? (float) $produto['preco'] : null;
+
+        $imgTag = $imgUrl
+            ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:14px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06);">'
+            : '<div style="width:56px;height:56px;border-radius:14px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <div>
+                        <h1 class="h2 mb-0"><i class="fas fa-pen me-2"></i>Editar Estoque</h1>
+                        <div class="text-muted">Produto #' . (int) $produtoId . '</div>
+                    </div>
+                    <div>
+                        <a class="btn btn-outline-secondary" href="/admin/estoque"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                        <a class="btn btn-success ms-2" href="/admin/estoque/entrada?produto_id=' . (int) $produtoId . '"><i class="fas fa-plus me-1"></i>Adicionar localização</a>
+                    </div>
+                </div>';
+
+        $this->renderFlashIfAny();
+
+        echo '<div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex gap-3 align-items-center">
+                        ' . $imgTag . '
+                        <div>
+                            <div style="font-weight:800;color:#0f172a;">' . htmlspecialchars($produtoNome) . '</div>
+                            <div class="text-muted small">SKU: ' . htmlspecialchars($produtoSku !== '' ? $produtoSku : '-') . '</div>
+                            <div class="small" style="color:#0b1f3a;font-weight:700;">' . ($produtoPreco !== null ? 'R$ ' . number_format($produtoPreco, 2, ',', '.') : '') . '</div>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+
+        echo '<div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header"><h5 class="mb-0">Informações do produto no estoque</h5></div>
+                        <div class="card-body">';
+
+        if (empty($entradas)) {
+            echo '<p class="text-muted mb-0">Nenhuma entrada encontrada para este produto no estoque interno.</p>';
+        } else {
+            echo '<form method="POST" action="/admin/estoque/editar/salvar">'
+                . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
+                . '<div class="table-responsive">'
+                . '<table class="table table-hover">'
+                . '<thead><tr><th>Localização</th><th>Qtd</th><th>Data compra</th><th>Validade</th><th>Obs.</th></tr></thead><tbody>';
+
+            foreach ($entradas as $e) {
+                $eid = (int) ($e['id'] ?? 0);
+                $loc = trim((string) ($e['galpao'] ?? ''));
+                $pr = trim((string) ($e['prateleira'] ?? ''));
+                $locFull = $loc;
+                if ($loc !== '' && $pr !== '') {
+                    $locFull .= ' - ' . $pr;
+                } elseif ($pr !== '') {
+                    $locFull = $pr;
+                }
+                $qtd = (int) ($e['quantidade'] ?? 0);
+                $dc = (string) ($e['data_compra'] ?? '');
+                $dv = (string) ($e['data_validade'] ?? '');
+                $obs = (string) ($e['observacao'] ?? '');
+                $isAli = (int) ($e['is_alimenticio'] ?? 0);
+
+                echo '<tr>'
+                    . '<td>'
+                    . '<input type="hidden" name="estoque_id[]" value="' . $eid . '">'
+                    . '<input type="hidden" name="galpao[]" value="' . htmlspecialchars($loc) . '">'
+                    . '<input type="hidden" name="prateleira[]" value="' . htmlspecialchars($pr) . '">'
+                    . '<span class="fw-semibold">' . htmlspecialchars($locFull !== '' ? $locFull : '-') . '</span>'
+                    . '</td>'
+                    . '<td style="max-width:140px;"><input type="number" class="form-control" name="quantidade[]" min="0" step="1" value="' . $qtd . '" required></td>'
+                    . '<td style="max-width:170px;"><input type="date" class="form-control" name="data_compra[]" value="' . htmlspecialchars($dc) . '"></td>'
+                    . '<td style="max-width:170px;">'
+                    . '<input type="hidden" name="is_alimenticio[]" value="' . $isAli . '">'
+                    . '<input type="date" class="form-control" name="data_validade[]" value="' . htmlspecialchars($dv) . '"></td>'
+                    . '<td><input type="text" class="form-control" name="observacao[]" value="' . htmlspecialchars($obs) . '"></td>'
+                    . '</tr>';
+            }
+
+            echo '</tbody></table></div>'
+                . '<button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar alterações</button>'
+                . '</form>';
+        }
+
+        echo '        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header"><h5 class="mb-0">Logs de alterações</h5></div>
+                        <div class="card-body" style="max-height: 560px; overflow:auto;">';
+
+        if (empty($logs)) {
+            echo '<p class="text-muted mb-0">Nenhum log encontrado.</p>';
+        } else {
+            foreach ($logs as $l) {
+                $tipo = (string) ($l['tipo_movimentacao'] ?? '');
+                $qtd = (string) ($l['quantidade'] ?? '');
+                $ant = (string) ($l['quantidade_anterior'] ?? '');
+                $nov = (string) ($l['quantidade_nova'] ?? '');
+                $motivo = (string) ($l['motivo'] ?? '');
+                $data = (string) ($l['data_movimentacao'] ?? '');
+                $badge = 'bg-info';
+                if ($tipo === 'entrada') $badge = 'bg-success';
+                if ($tipo === 'saida') $badge = 'bg-danger';
+                if ($tipo === 'ajuste') $badge = 'bg-warning';
+                echo '<div class="mb-3">'
+                    . '<div class="d-flex justify-content-between">'
+                    . '<span class="badge ' . $badge . '">' . htmlspecialchars($tipo) . '</span>'
+                    . '<span class="text-muted small">' . ($data !== '' ? date('d/m/Y H:i', strtotime($data)) : '-') . '</span>'
+                    . '</div>'
+                    . '<div class="small">Qtd: ' . htmlspecialchars($qtd) . ' (de ' . htmlspecialchars($ant) . ' para ' . htmlspecialchars($nov) . ')</div>'
+                    . ($motivo !== '' ? '<div class="text-muted small">' . htmlspecialchars($motivo) . '</div>' : '')
+                    . '</div>';
+            }
+        }
+
+        echo '        </div>
+                    </div>
+                </div>
+            </div>
+
+            </main>
+        </div>
+    </div>';
+
+        renderAdminScripts();
+        echo '</body></html>';
+        exit;
+    }
+
+    public function salvarEdicao($request) {
+        try {
+            $produtoId = (int) $request->getParam('produto_id');
+            if ($produtoId <= 0) {
+                $this->setFlash('Produto inválido.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            $ids = $request->getParam('estoque_id', []);
+            $qtds = $request->getParam('quantidade', []);
+            $dcs = $request->getParam('data_compra', []);
+            $dvs = $request->getParam('data_validade', []);
+            $obsArr = $request->getParam('observacao', []);
+            $galpoes = $request->getParam('galpao', []);
+            $prats = $request->getParam('prateleira', []);
+            $isAliArr = $request->getParam('is_alimenticio', []);
+
+            if (!is_array($ids) || empty($ids)) {
+                $this->setFlash('Nenhuma entrada para atualizar.', 'warning');
+                header('Location: /admin/estoque/editar/' . (int) $produtoId);
+                exit;
+            }
+
+            $this->connection->beginTransaction();
+
+            $stmtGet = $this->connection->prepare('SELECT * FROM estoque_interno WHERE id = :id AND produto_id = :produto_id LIMIT 1');
+            $stmtUpd = $this->connection->prepare('
+                UPDATE estoque_interno
+                SET
+                    quantidade = :quantidade,
+                    data_compra = :data_compra,
+                    data_validade = :data_validade,
+                    observacao = :observacao
+                WHERE id = :id AND produto_id = :produto_id
+                LIMIT 1
+            ');
+            $stmtMov = $this->connection->prepare('
+                INSERT INTO estoque_movimentacao (
+                    produto_id,
+                    tipo_movimentacao,
+                    quantidade,
+                    quantidade_anterior,
+                    quantidade_nova,
+                    motivo
+                ) VALUES (
+                    :produto_id,
+                    :tipo_movimentacao,
+                    :quantidade,
+                    :quantidade_anterior,
+                    :quantidade_nova,
+                    :motivo
+                )
+            ');
+
+            $changedAny = false;
+            for ($i = 0; $i < count($ids); $i++) {
+                $estoqueId = (int) ($ids[$i] ?? 0);
+                if ($estoqueId <= 0) {
+                    continue;
+                }
+                $stmtGet->execute([':id' => $estoqueId, ':produto_id' => $produtoId]);
+                $old = $stmtGet->fetch(\PDO::FETCH_ASSOC);
+                if (!$old) {
+                    continue;
+                }
+
+                $oldQtd = (int) ($old['quantidade'] ?? 0);
+                $newQtd = (int) ($qtds[$i] ?? 0);
+                $newDc = trim((string) ($dcs[$i] ?? ''));
+                $newDv = trim((string) ($dvs[$i] ?? ''));
+                $newObs = trim((string) ($obsArr[$i] ?? ''));
+                $gal = trim((string) ($galpoes[$i] ?? ''));
+                $pra = trim((string) ($prats[$i] ?? ''));
+                $isAli = (int) ($isAliArr[$i] ?? 0);
+
+                if ($isAli === 0) {
+                    $newDv = '';
+                }
+
+                $oldDc = (string) ($old['data_compra'] ?? '');
+                $oldDv = (string) ($old['data_validade'] ?? '');
+                $oldObs = (string) ($old['observacao'] ?? '');
+
+                $locFull = $gal;
+                if ($gal !== '' && $pra !== '') {
+                    $locFull .= ' - ' . $pra;
+                } elseif ($pra !== '') {
+                    $locFull = $pra;
+                }
+
+                $diffs = [];
+                if ($newQtd !== $oldQtd) {
+                    $diffs[] = 'Quantidade: ' . $oldQtd . ' -> ' . $newQtd;
+                }
+                if ($newDc !== $oldDc) {
+                    $diffs[] = 'Data compra: ' . ($oldDc !== '' ? $oldDc : '-') . ' -> ' . ($newDc !== '' ? $newDc : '-');
+                }
+                if ($newDv !== $oldDv) {
+                    $diffs[] = 'Validade: ' . ($oldDv !== '' ? $oldDv : '-') . ' -> ' . ($newDv !== '' ? $newDv : '-');
+                }
+                if ($newObs !== $oldObs) {
+                    $diffs[] = 'Obs.: ' . ($oldObs !== '' ? $oldObs : '-') . ' -> ' . ($newObs !== '' ? $newObs : '-');
+                }
+
+                if (empty($diffs)) {
+                    continue;
+                }
+
+                $stmtUpd->execute([
+                    ':quantidade' => $newQtd,
+                    ':data_compra' => ($newDc !== '' ? $newDc : null),
+                    ':data_validade' => ($newDv !== '' ? $newDv : null),
+                    ':observacao' => ($newObs !== '' ? $newObs : null),
+                    ':id' => $estoqueId,
+                    ':produto_id' => $produtoId,
+                ]);
+
+                $motivo = 'Edição manual (' . ($locFull !== '' ? $locFull : 'Sem localização') . '): ' . implode(' | ', $diffs);
+                $stmtMov->execute([
+                    ':produto_id' => $produtoId,
+                    ':tipo_movimentacao' => 'ajuste',
+                    ':quantidade' => ($newQtd - $oldQtd),
+                    ':quantidade_anterior' => $oldQtd,
+                    ':quantidade_nova' => $newQtd,
+                    ':motivo' => $motivo,
+                ]);
+                $changedAny = true;
+            }
+
+            $this->connection->commit();
+
+            if ($changedAny) {
+                $this->setFlash('Alterações salvas e registradas no log.', 'success');
+            } else {
+                $this->setFlash('Nenhuma alteração para salvar.', 'info');
+            }
+            header('Location: /admin/estoque/editar/' . (int) $produtoId);
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            error_log('Erro ao salvar edição de estoque: ' . $e->getMessage());
+            $this->setFlash('Erro ao salvar edição de estoque: ' . $e->getMessage(), 'danger');
+            header('Location: /admin/estoque');
+            exit;
+        }
     }
 }
