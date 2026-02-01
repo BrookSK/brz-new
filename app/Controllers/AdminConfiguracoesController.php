@@ -692,7 +692,7 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label">Base URL do Rastreamento</label>
-                                                <input type="text" class="form-control" name="entrega_correios_tracking_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_base_url', '') . '" placeholder="Ex.: https://api.correios.com.br/srorastro/v1/objetos/{codigo}">
+                                                <input type="text" class="form-control" name="entrega_correios_tracking_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_base_url', '') . '" placeholder="Homolog: https://apihom.correios.com.br/packet/v1/packages?trackingNumber= | Produção: https://api.correios.com.br/packet/v1/packages?trackingNumber=">
                                                 <small class="text-muted">Você pode usar {codigo} para interpolar o código de rastreio.</small>
                                             </div>
 
