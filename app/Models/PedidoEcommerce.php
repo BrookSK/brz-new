@@ -479,6 +479,7 @@ class PedidoEcommerce extends Model {
         $selectPagamentos = '';
         $selectFormaPagamento = '';
         $selectExtras = '';
+        $selectClienteSuite = '';
         $colsP = [];
         $temJoinPagamentos = false;
 
@@ -487,6 +488,17 @@ class PedidoEcommerce extends Model {
             $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
             if (is_array($colsP) && in_array('forma_pagamento', $colsP, true)) {
                 $selectFormaPagamento = ', p.forma_pagamento as forma_pagamento';
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmtColsU = $this->connection->query('DESCRIBE usuarios');
+            $colsU = $stmtColsU ? $stmtColsU->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($colsU) && in_array('suite', $colsU, true)) {
+                $selectClienteSuite = ', u.suite AS cliente_suite';
+            } elseif (is_array($colsU) && in_array('switch', $colsU, true)) {
+                $selectClienteSuite = ', u.`switch` AS cliente_suite';
             }
         } catch (\Exception $e) {
         }
@@ -581,7 +593,7 @@ class PedidoEcommerce extends Model {
             SELECT p.*, 
                    COALESCE(c.nome_razao_social, u.nome, u.name, p.nome) as cliente_nome,
                    COALESCE(c.email, u.email) as cliente_email,
-                   COALESCE(c.telefone, u.telefone) as cliente_telefone{$selectExtras},
+                   COALESCE(c.telefone, u.telefone) as cliente_telefone{$selectClienteSuite}{$selectExtras},
                    e_ent.cep as cep_entrega, e_ent.endereco as endereco_entrega, 
                    e_ent.numero as numero_entrega, e_ent.complemento as complemento_entrega,
                    e_ent.bairro as bairro_entrega, e_ent.cidade as cidade_entrega, e_ent.estado as estado_entrega,
