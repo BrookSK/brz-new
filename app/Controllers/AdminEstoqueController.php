@@ -735,7 +735,7 @@ class AdminEstoqueController extends Controller {
                     </div>
                 </div>';
 
-            </main>
+                echo '</main>
         </div>
     </div>';
 
