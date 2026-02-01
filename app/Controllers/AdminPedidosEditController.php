@@ -249,103 +249,46 @@ class AdminPedidosEditController {
 
     public function editar($request) {
         try {
-            // Extrair ID do Request
-            $id = $request->getParam('id');
+            $id = (int) $request->getParam('id');
+            if ($id <= 0) {
+                echo '<div class="alert alert-danger">Pedido inválido</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
 
-            $colsPedidos = $this->getColsFromTable('pedidos');
-            $colStatus = $this->pickFirstExistingColumn($colsPedidos, ['status', 'status_pedido', 'pedido_status']);
-            $colCodigo = $this->pickFirstExistingColumn($colsPedidos, ['codigo_pedido', 'numero_pedido', 'codigo', 'numero']);
-            
-            // Buscar pedido diretamente - usando colunas que existem
-            $stmt = $this->connection->prepare("
-                SELECT p.*, 
-                       u.nome as cliente_nome, u.email as cliente_email
-                FROM pedidos p
-                LEFT JOIN usuarios u ON p.usuario_id = u.id
-                WHERE p.id = :id
-            ");
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
+            $pedidoModel = new \App\Models\PedidoEcommerce();
+            $pedido = $pedidoModel->getComDetalhes($id);
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
                 echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
 
-            // Normalizar chaves para evitar dependência do schema
-            if (!isset($pedido['status']) || $pedido['status'] === null || $pedido['status'] === '') {
-                if ($colStatus !== '' && isset($pedido[$colStatus])) {
-                    $pedido['status'] = $pedido[$colStatus];
-                }
-            }
-            if (!isset($pedido['codigo_pedido']) || $pedido['codigo_pedido'] === null || $pedido['codigo_pedido'] === '') {
-                if ($colCodigo !== '' && isset($pedido[$colCodigo])) {
-                    $pedido['codigo_pedido'] = $pedido[$colCodigo];
-                }
-            }
-            if (!isset($pedido['codigo_pedido']) || $pedido['codigo_pedido'] === null || $pedido['codigo_pedido'] === '') {
-                $pedido['codigo_pedido'] = (string) $pedido['id'];
+            $itens = $pedido['items'] ?? [];
+            if (!is_array($itens)) {
+                $itens = [];
             }
 
-            $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
-            $bloquearEdicao = ($statusAtual === 'pago');
-
-            $itensTable = $this->getItensTableForPedido((int) $id);
-            
-            // Buscar itens do pedido
-            $stmt = $this->connection->prepare("
-                SELECT 
-                    pi.id,
-                    pi.pedido_id,
-                    pi.produto_id,
-                    pi.quantidade,
-                    pi.preco_unitario,
-                    pi.subtotal,
-                    pi.nome_produto,
-                    pi.nome_produto_sku,
-                    pi.loja,
-                    pi.created_at,
-                    (SELECT pf.nome_arquivo 
-                     FROM produto_fotos pf 
-                     WHERE pf.produto_id = pi.produto_id 
-                     ORDER BY pf.principal DESC, pf.ordem ASC 
-                     LIMIT 1) as imagem_principal
-                FROM {$itensTable} pi 
-                WHERE pi.pedido_id = :id 
-                ORDER BY pi.id
-            ");
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Processar itens
-            foreach ($itens as &$item) {
-                $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
-                if (empty($item['nome_produto'])) {
-                    $item['nome_produto'] = 'Produto #' . $item['produto_id'];
-                }
-            }
-            
-            $pedido['items'] = $itens;
-            
-            // Obter todos os produtos para adicionar
             $stmt = $this->connection->prepare("SELECT id, name, price, sku, loja FROM produtos WHERE active = 1 ORDER BY name");
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-        } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
-            exit;
-        }
-        
-        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
-        $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $id);
+            $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedido['numero_pedido'] ?? $pedido['codigo'] ?? $pedido['numero'] ?? $id);
+            if ($codigoPedido === '') {
+                $codigoPedido = (string) $id;
+            }
 
-        echo '<!DOCTYPE html>
+            $statusLower = strtolower((string) ($pedido['status'] ?? ''));
+            $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
+            $canEditItens = ($statusLower !== 'pago');
+
+            $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? ''));
+            $transacao = (string) ($pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '');
+            $temPagamentoAsaas = ($gatewayPedido === 'asaas' && $transacao !== '');
+
+            include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+            echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -354,17 +297,17 @@ class AdminPedidosEditController {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
-        renderAdminSidebarStyles();
+            renderAdminSidebarStyles();
 
-        echo '
+            echo '
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">';
 
-        renderAdminSidebar('pedidos');
+            renderAdminSidebar('pedidos');
 
-        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h2>
                     <div class="d-flex gap-2">
@@ -397,7 +340,7 @@ class AdminPedidosEditController {
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-4">
                         <div class="card shadow-sm mb-4">
@@ -429,7 +372,7 @@ class AdminPedidosEditController {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-success text-white">
                                 <h5><i class="fas fa-calculator me-2"></i>Financeiro</h5>
@@ -441,7 +384,7 @@ class AdminPedidosEditController {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Frete</label>
-                                    <input type="number" class="form-control" id="valor_frete" value="' . ($pedido['frete'] ?? 0) . '" step="0.01" onchange="calcularTotal()">
+                                    <input type="number" class="form-control" id="valor_frete" value="' . (float) ($pedido['frete'] ?? 0) . '" step="0.01" onchange="calcularTotal()">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Desconto (%)</label>
@@ -459,7 +402,7 @@ class AdminPedidosEditController {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-8">
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-success text-white">
@@ -479,37 +422,35 @@ class AdminPedidosEditController {
                                             </tr>
                                         </thead>
                                         <tbody id="itens_pedido">';
-                                        
-                                        foreach ($itens as $item) {
-                                            echo '<tr class="item-row" data-item-id="' . $item['id'] . '" data-produto-id="' . $item['produto_id'] . '" data-nome-produto="' . htmlspecialchars($item['nome_produto']) . '" data-nome-produto-sku="' . htmlspecialchars($item['nome_produto_sku'] ?? '') . '">
-                                                <td>
-                                                    <strong>' . htmlspecialchars($item['nome_produto']) . '</strong>
-                                                    <br><small class="text-muted">SKU: ' . htmlspecialchars($item['nome_produto_sku'] ?? 'N/A') . '</small>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-' . ($item['loja'] == 'sams' ? 'primary' : ($item['loja'] == 'costco' ? 'success' : 'secondary')) . '">
-                                                        ' . ucfirst($item['loja'] ?? 'outro') . '
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <input type="number" class="form-control form-control-sm quantidade" value="' . (int) $item['quantidade'] . '" min="1" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
-                                                </td>
-                                                <td>
-                                                    <input type="number" class="form-control form-control-sm preco_unitario" value="' . (float) $item['preco_unitario'] . '" min="0" step="0.01" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
-                                                </td>
-                                                <td class="subtotal">' . number_format($item['subtotal'], 2, ',', '.') . '</td>
-                                                <td>
-                                                    <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)" ' . (!$canEditItens ? 'disabled' : '') . '>
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>';
-                                        }
-                                        
-                                        echo '</tbody>
+
+            foreach ($itens as $item) {
+                echo '<tr class="item-row" data-item-id="' . (int) ($item['id'] ?? 0) . '" data-produto-id="' . (int) ($item['produto_id'] ?? 0) . '" data-nome-produto="' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '" data-nome-produto-sku="' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? '')) . '" data-loja="' . htmlspecialchars((string) ($item['loja'] ?? 'outro')) . '">
+                        <td>
+                            <strong>' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '</strong>
+                            <br><small class="text-muted">SKU: ' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? 'N/A')) . '</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">' . ucfirst((string) ($item['loja'] ?? 'outro')) . '</span>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm quantidade" value="' . (int) ($item['quantidade'] ?? 0) . '" min="1" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm preco_unitario" value="' . (float) ($item['preco_unitario'] ?? 0) . '" min="0" step="0.01" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
+                        </td>
+                        <td class="subtotal">R$ ' . number_format((float) ($item['subtotal'] ?? 0), 2, ',', '.') . '</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)" ' . (!$canEditItens ? 'disabled' : '') . '>
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>';
+            }
+
+            echo '</tbody>
                                     </table>
                                 </div>
-                                
+
                                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto" ' . (!$canEditItens ? 'disabled' : '') . '>
                                     <i class="fas fa-plus me-2"></i>Adicionar Produto
                                 </button>
@@ -518,233 +459,18 @@ class AdminPedidosEditController {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
-    
-    <!-- Modal Adicionar Produto -->
-    <div class="modal fade" id="modalAdicionarProduto">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5><i class="fas fa-plus me-2"></i>Adicionar Produto</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="text" class="form-control mb-3" id="busca_produto" placeholder="Buscar produto..." onkeyup="buscarProdutos()">
-                    <div class="row" id="lista_produtos">';
-                    
-                    foreach ($produtos as $produto) {
-                    $lojaBadge = '';
-                    $lojaClass = 'secondary';
-                    if ($produto['loja'] == 'sams') {
-                        $lojaBadge = 'Sams';
-                        $lojaClass = 'primary';
-                    } elseif ($produto['loja'] == 'costco') {
-                        $lojaBadge = 'Costco';
-                        $lojaClass = 'success';
-                    } else {
-                        $lojaBadge = 'Outro';
-                    }
-                    
-                    echo '<div class="col-md-6 mb-3">
-                        <div class="card product-card" onclick="selecionarProduto(' . $produto['id'] . ', \'' . htmlspecialchars($produto['name']) . '\', ' . $produto['price'] . ', \'' . htmlspecialchars($produto['sku']) . '\', \'' . $produto['loja'] . '\')">
-                            <div class="card-body">
-                                <h6>' . htmlspecialchars($produto['name']) . '</h6>
-                                <p class="mb-0">
-                                    <small class="text-muted">SKU: ' . htmlspecialchars($produto['sku']) . '</small><br>
-                                    <span class="badge bg-' . $lojaClass . '">' . $lojaBadge . '</span><br>
-                                    <strong>R$ ' . number_format($produto['price'], 2, ',', '.') . '</strong>
-                                </p>
-                            </div>
-                        </div>
-                    </div>';
-                }
-                    
-                    echo '</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let pedidoId = ' . $id . ';
-        const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
-        const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
-        
-        function calcularTotal() {
-            let subtotal = 0;
-            document.querySelectorAll(".item-row").forEach(function(row) {
-                let qtd = parseFloat(row.querySelector(".quantidade").value) || 0;
-                let preco = parseFloat(row.querySelector(".preco_unitario").value) || 0;
-                subtotal += qtd * preco;
-            });
-            
-            let frete = parseFloat(document.getElementById("valor_frete").value) || 0;
-            let desconto = parseFloat(document.getElementById("percentual_desconto").value) || 0;
-            let valorDesconto = subtotal * (desconto / 100);
-            let total = subtotal + frete - valorDesconto;
-            
-            document.getElementById("subtotal_produtos").value = "R$ " + subtotal.toFixed(2).replace(".", ",");
-            document.getElementById("valor_desconto").value = "R$ " + valorDesconto.toFixed(2).replace(".", ",");
-            document.getElementById("valor_total").value = "R$ " + total.toFixed(2).replace(".", ",");
-        }
-        
-        function atualizarSubtotal(input) {
-            let row = input.closest(".item-row");
-            let qtd = parseFloat(row.querySelector(".quantidade").value) || 0;
-            let preco = parseFloat(row.querySelector(".preco_unitario").value) || 0;
-            let subtotal = qtd * preco;
-            row.querySelector(".subtotal").textContent = "R$ " + subtotal.toFixed(2).replace(".", ",");
-            calcularTotal();
-        }
-        
-        function removerItem(btn) {
-            if (!canEditItens) return;
-            if (confirm("Tem certeza que deseja remover este item?")) {
-                btn.closest(".item-row").remove();
-                calcularTotal();
-            }
-        }
-        
-        function buscarProdutos() {
-            let termo = document.getElementById("busca_produto").value.toLowerCase();
-            document.querySelectorAll("#lista_produtos .col-md-6").forEach(function(card) {
-                let texto = card.textContent.toLowerCase();
-                card.style.display = texto.includes(termo) ? "block" : "none";
-            });
-        }
-        
-        function selecionarProduto(id, nome, preco, sku, loja) {
-            if (!canEditItens) return;
-            let tbody = document.getElementById("itens_pedido");
-            let newRow = tbody.insertRow();
-            newRow.className = "item-row";
-            newRow.setAttribute("data-produto-id", id);
-            newRow.setAttribute("data-nome-produto", nome);
-            newRow.setAttribute("data-nome-produto-sku", sku);
-            newRow.setAttribute("data-loja", loja || "outro");
-            
-            let lojaBadge = "";
-            let lojaClass = "secondary";
-            if (loja === "sams") {
-                lojaBadge = "Sams";
-                lojaClass = "primary";
-            } else if (loja === "costco") {
-                lojaBadge = "Costco";
-                lojaClass = "success";
-            } else {
-                lojaBadge = "Outro";
-            }
-            
-            newRow.innerHTML = 
-                "<td><strong>" + nome + "</strong><br><small class=\"text-muted\">SKU: " + sku + "</small></td>" +
-                "<td><span class=\"badge bg-" + lojaClass + "\">" + lojaBadge + "</span></td>" +
-                "<td><input type=\"number\" class=\"form-control form-control-sm quantidade\" value=\"1\" min=\"1\" onchange=\"atualizarSubtotal(this)\"></td>" +
-                "<td><input type=\"number\" class=\"form-control form-control-sm preco_unitario\" value=\"" + preco + "\" min=\"0\" step=\"0.01\" onchange=\"atualizarSubtotal(this)\"></td>" +
-                "<td class=\"subtotal\">R$ " + preco.toFixed(2).replace(".", ",") + "</td>" +
-                "<td><button type=\"button\" class=\"btn btn-sm btn-danger\" onclick=\"removerItem(this)\"><i class=\"fas fa-trash\"></i></button></td>";
-            
-            bootstrap.Modal.getInstance(document.getElementById("modalAdicionarProduto")).hide();
-            calcularTotal();
-        }
-        
-        function salvarPedido() {
-            if (!canEditItens) return;
-            let itens = [];
-            document.querySelectorAll(".item-row").forEach(function(row) {
-                let item = {
-                    quantidade: row.querySelector(".quantidade").value,
-                    preco_unitario: row.querySelector(".preco_unitario").value
-                };
-                
-                // Se for um item existente, tem data-item-id
-                if (row.dataset.itemId) {
-                    item.id = row.dataset.itemId;
-                    item.produto_id = row.dataset.produtoId || "";
-                    item.nome_produto = row.dataset.nomeProduto || "";
-                    item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
-                    item.loja = row.dataset.loja || "outro";
-                } else {
-                    // Se for um item novo, pegar dos atributos data
-                    item.produto_id = row.dataset.produtoId || "";
-                    item.nome_produto = row.dataset.nomeProduto || "";
-                    item.nome_produto_sku = row.dataset.nomeProdutoSku || "";
-                    item.loja = row.dataset.loja || "outro";
-                }
-                
-                itens.push(item);
-            });
-            
-            let dados = {
-                pedido_id: pedidoId,
-                status: document.getElementById("pedido_status").value,
-                frete: document.getElementById("valor_frete").value,
-                desconto: document.getElementById("percentual_desconto").value,
-                itens: itens
-            };
-            
-            fetch("/admin/pedidos/salvar", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(dados)
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    alert("Pedido salvo com sucesso!");
-                    window.location.href = "/admin/pedidos/detalhes/" + pedidoId;
-                } else {
-                    alert("Erro: " + data.message);
-                }
-            })
-            .catch(function(error) {
-                console.error("Erro:", error);
-                alert("Erro ao salvar pedido");
-            });
-        }
-        
-        // Inicializar
-        calcularTotal();
-
-        function atualizarSomenteStatus() {
-            const status = document.getElementById("pedido_status").value;
-            if (!status) return;
-            window.location.href = "/admin/pedidos/atualizar-status/" + pedidoId + "/" + status;
-        }
-
-        function gerarCobrancaDiferenca() {
-            if (!temPagamentoAsaas) return;
-            const box = document.getElementById("box_link_diferenca");
-            box.style.display = "block";
-            box.className = "alert alert-info";
-            box.textContent = "Gerando link...";
-
-            fetch("/admin/estoque/compras/gerar-link-diferenca?pedido_id=" + pedidoId)
-                .then(function(r){ return r.json(); })
-                .then(function(data){
-                    if (!data.success) {
-                        box.className = "alert alert-warning";
-                        box.textContent = data.message || "Não foi possível gerar a cobrança.";
-                        return;
-                    }
-
-                    const link = data.bankSlipUrl || data.invoiceUrl || "";
-                    box.className = "alert alert-success";
-                    box.innerHTML = "<div class=\"fw-bold\">Cobrança gerada</div>" +
-                        (data.diferenca ? ("<div class=\"small\">Diferença: <strong>R$ " + Number(data.diferenca).toFixed(2).replace(".", ",") + "</strong></div>") : "") +
-                        (link ? ("<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-dark\" href=\"" + link + "\" target=\"_blank\" rel=\"noopener\">Abrir link</a></div>") : "");
-                })
-                .catch(function(){
-                    box.className = "alert alert-danger";
-                    box.textContent = "Erro ao gerar a cobrança.";
-                });
-        }
-    </script>
 </body>
 </html>';
+
+    } catch (\Exception $e) {
+        echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+        echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+        exit;
+
     }
-    
+
     public function salvar($request) {
         try {
             $dados = json_decode(file_get_contents('php://input'), true);
@@ -783,12 +509,12 @@ class AdminPedidosEditController {
                 'entregue',
             ], true);
             $statusReserva = $cicloFechado ? 'finalizada' : 'ativa';
-            
+
             $this->connection->beginTransaction();
 
             // Recalcular reservas/pendências baseado no novo estado do pedido
             $this->limparReservasEPendenciasDoPedido($pedidoId);
-            
+
             // Primeiro, remover todos os itens existentes do pedido (sincronizar tabelas quando ambas existirem)
             $itensTables = [];
             if ($this->tableExists('pedido_itens')) $itensTables[] = 'pedido_itens';
@@ -799,11 +525,11 @@ class AdminPedidosEditController {
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             }
-            
+
             // Calcular subtotal e inserir novos itens
             $subtotal = 0;
-            foreach ($dados['itens'] as $item) {
-                $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
+            foreach (($dados['itens'] ?? []) as $item) {
+                $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
                 $subtotal += $subtotalItem;
 
                 // Inserir novo item em todas as tabelas existentes (com colunas dinâmicas)
@@ -875,14 +601,14 @@ class AdminPedidosEditController {
                     }
                 }
             }
-            
+
             // Calcular valores
-            $frete = floatval($dados['frete']);
-            $percentualDesconto = floatval($dados['desconto']);
+            $frete = (float) ($dados['frete'] ?? 0);
+            $percentualDesconto = (float) ($dados['desconto'] ?? 0);
             $valorDesconto = $subtotal * ($percentualDesconto / 100);
             $total = $subtotal + $frete - $valorDesconto;
-            
-            // Atualizar pedido - usando colunas corretas (sem updated_at)
+
+            // Atualizar pedido
             $stmt = $this->connection->prepare("
                 UPDATE pedidos SET 
                     status = :status,
@@ -891,24 +617,26 @@ class AdminPedidosEditController {
                     total = :total
                 WHERE id = :pedido_id
             ");
-            $stmt->bindParam(':status', $dados['status']);
+            $stmt->bindParam(':status', $newStatus);
             $stmt->bindParam(':frete', $frete);
             $stmt->bindParam(':subtotal', $subtotal);
             $stmt->bindParam(':total', $total);
-            $stmt->bindParam(':pedido_id', $dados['pedido_id']);
+            $stmt->bindParam(':pedido_id', $pedidoId);
             $stmt->execute();
 
-            // Fechar ciclo: a partir de "Produto Consolidado" o pedido deixa de contar como demanda.
             if ($cicloFechado) {
                 $this->finalizarCicloPedido($pedidoId);
             }
-            
+
             $this->connection->commit();
-            
             echo json_encode(['success' => true, 'message' => 'Pedido atualizado com sucesso']);
-            
         } catch (\Exception $e) {
-            $this->connection->rollback();
+            try {
+                if ($this->connection && $this->connection->inTransaction()) {
+                    $this->connection->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }

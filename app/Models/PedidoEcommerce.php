@@ -632,11 +632,54 @@ class PedidoEcommerce extends Model {
         if ($pedido) {
             // Obter itens do pedido com dados do produto
             try {
-                // Descobrir colunas disponíveis em pedido_itens para evitar SQL quebrar
+                // Detectar tabela de itens (pedido_itens vs pedido_items)
+                $itensTable = 'pedido_itens';
                 $colsItens = [];
+                $temPedidoItens = false;
+                $temPedidoItems = false;
                 try {
-                    $stmtCols = $this->connection->query('DESCRIBE pedido_itens');
-                    $colsItens = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                    $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['pedido_itens']);
+                    $temPedidoItens = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temPedidoItens = false;
+                }
+                try {
+                    $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['pedido_items']);
+                    $temPedidoItems = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temPedidoItems = false;
+                }
+
+                if ($temPedidoItens && $temPedidoItems) {
+                    $c1 = 0;
+                    $c2 = 0;
+                    try {
+                        $st = $this->connection->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = :id');
+                        $st->execute([':id' => $pedidoId]);
+                        $c1 = (int) ($st->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $c1 = 0;
+                    }
+                    try {
+                        $st = $this->connection->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = :id');
+                        $st->execute([':id' => $pedidoId]);
+                        $c2 = (int) ($st->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $c2 = 0;
+                    }
+                    $itensTable = ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+                } elseif ($temPedidoItems) {
+                    $itensTable = 'pedido_items';
+                } else {
+                    $itensTable = 'pedido_itens';
+                }
+
+                // Descobrir colunas disponíveis na tabela escolhida para evitar SQL quebrar
+                try {
+                    $stmtCols = $this->connection->query('DESCRIBE ' . $itensTable);
+                    $colsItens = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
                 } catch (\Exception $e) {
                     $colsItens = [];
                 }
@@ -671,7 +714,7 @@ class PedidoEcommerce extends Model {
                          WHERE pf.produto_id = pi.produto_id 
                          ORDER BY pf.principal DESC, pf.ordem ASC 
                          LIMIT 1) as imagem_principal
-                    FROM pedido_itens pi 
+                    FROM {$itensTable} pi 
                     WHERE pi.pedido_id = :id 
                     ORDER BY pi.id
                 ");
