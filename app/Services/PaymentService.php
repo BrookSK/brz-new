@@ -515,6 +515,18 @@ class PaymentService {
 
             if ($aprovado) {
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedidoId);
+                $pagoEm = null;
+                if (!empty($params['pago_em'])) {
+                    try {
+                        $pagoEm = new \DateTime((string) $params['pago_em']);
+                    } catch (\Exception $e) {
+                        $pagoEm = null;
+                    }
+                }
+                if (!$pagoEm) {
+                    $pagoEm = new \DateTime('now');
+                }
+                $this->inserirPedidoNaJanelaRemessa($db, (int) $pedidoId, $pagoEm);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
@@ -527,6 +539,65 @@ class PaymentService {
             return;
         }
         $this->atualizarPagamentoPedidoPorGateway((string) $paymentId, (string) $gateway, 'approved', 'CONFIRMED');
+    }
+
+    private function ensureRemessaJanelaForDate(\PDO $db, \DateTime $dt): ?int {
+        try {
+            $dtStr = $dt->format('Y-m-d H:i:s');
+            $stmt = $db->prepare('SELECT id FROM remessa_janelas WHERE data_inicio <= ? AND data_fim >= ? ORDER BY data_inicio DESC LIMIT 1');
+            $stmt->execute([$dtStr, $dtStr]);
+            $id = (int) ($stmt->fetchColumn() ?: 0);
+            if ($id > 0) {
+                return $id;
+            }
+
+            $stmtLast = $db->query('SELECT data_fim FROM remessa_janelas ORDER BY data_inicio DESC LIMIT 1');
+            $lastFim = $stmtLast ? $stmtLast->fetchColumn() : null;
+
+            if (!empty($lastFim)) {
+                $start = new \DateTime((string) $lastFim);
+                $start->modify('+1 second');
+            } else {
+                $start = new \DateTime($dt->format('Y-m-d 00:00:00'));
+            }
+
+            while (true) {
+                $end = (clone $start);
+                $end->modify('+12 days');
+                $end->setTime(23, 59, 59);
+
+                $status = ($end < $dt) ? 'finalizada' : 'aberta';
+
+                $stIns = $db->prepare('INSERT INTO remessa_janelas (data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                $stIns->execute([
+                    $start->format('Y-m-d H:i:s'),
+                    $end->format('Y-m-d H:i:s'),
+                    $status,
+                ]);
+
+                if ($start <= $dt && $end >= $dt) {
+                    $newId = (int) $db->lastInsertId();
+                    return $newId > 0 ? $newId : null;
+                }
+
+                $start = (clone $end);
+                $start->modify('+1 second');
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function inserirPedidoNaJanelaRemessa(\PDO $db, int $pedidoId, \DateTime $pagoEm): void {
+        try {
+            $janelaId = $this->ensureRemessaJanelaForDate($db, $pagoEm);
+            if (empty($janelaId)) {
+                return;
+            }
+            $st = $db->prepare('INSERT IGNORE INTO remessa_janela_pedidos (janela_id, pedido_id, created_at) VALUES (?, ?, NOW())');
+            $st->execute([(int) $janelaId, (int) $pedidoId]);
+        } catch (\Exception $e) {
+        }
     }
 
     public function obterPagamentoAsaas(string $paymentId): array {

@@ -148,7 +148,7 @@ class AdminRemessaInternacionalController extends Controller {
         $fim = (string) $j['data_fim'];
 
         // Todos os pedidos dentro do período entram na janela
-        $stP = $this->connection->prepare("SELECT id FROM pedidos WHERE created_at >= ? AND created_at <= ?");
+        $stP = $this->connection->prepare("SELECT id FROM pedidos WHERE pago_em IS NOT NULL AND pago_em >= ? AND pago_em <= ?");
         $stP->execute([$inicio, $fim]);
         $pedidoIds = $stP->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
