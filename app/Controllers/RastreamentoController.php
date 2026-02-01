@@ -146,11 +146,23 @@ class RastreamentoController extends Controller {
             }
         };
 
+        $enabled = $get('entrega', 'correios_tracking_enabled', '0');
+        $token = $get('entrega', 'correios_tracking_token', '');
+
+        // Automático: URL do Packet Service baseado no ambiente (reaproveita sigep_ambiente)
+        $amb = $get('entrega', 'sigep_ambiente', 'homologacao');
+        $baseUrl = ($amb === 'producao')
+            ? 'https://api.correios.com.br/packet/v1/packages?trackingNumber='
+            : 'https://apihom.correios.com.br/packet/v1/packages?trackingNumber=';
+
+        // Automático: header padrão
+        $header = 'Authorization';
+
         return [
-            'enabled' => $get('entrega', 'correios_tracking_enabled', '0'),
-            'base_url' => $get('entrega', 'correios_tracking_base_url', ''),
-            'token' => $get('entrega', 'correios_tracking_token', ''),
-            'header' => $get('entrega', 'correios_tracking_header', 'Authorization'),
+            'enabled' => $enabled,
+            'base_url' => $baseUrl,
+            'token' => $token,
+            'header' => $header,
         ];
     }
 
