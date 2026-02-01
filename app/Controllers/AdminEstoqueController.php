@@ -20,7 +20,49 @@ class AdminEstoqueController extends Controller {
         try {
             $produtos = [];
             try {
-                $stmtProdutos = $this->connection->prepare("SELECT id, name, sku FROM produtos WHERE active = 1 ORDER BY name");
+                $cols = [];
+                try {
+                    $stmtCols = $this->connection->query('DESCRIBE produtos');
+                    $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $cols = [];
+                }
+
+                $nameCol = null;
+                foreach (['name', 'nome'] as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $nameCol = $c;
+                        break;
+                    }
+                }
+                $skuCol = in_array('sku', $cols, true) ? 'sku' : null;
+                $activeCol = null;
+                foreach (['active', 'ativo'] as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $activeCol = $c;
+                        break;
+                    }
+                }
+
+                $selectCols = ['id'];
+                if ($nameCol) {
+                    $selectCols[] = $nameCol . ' AS nome_exibicao';
+                } else {
+                    $selectCols[] = "CAST(id AS CHAR) AS nome_exibicao";
+                }
+                if ($skuCol) {
+                    $selectCols[] = $skuCol . ' AS sku_exibicao';
+                } else {
+                    $selectCols[] = "'' AS sku_exibicao";
+                }
+
+                $sqlProdutos = 'SELECT ' . implode(', ', $selectCols) . ' FROM produtos';
+                if ($activeCol) {
+                    $sqlProdutos .= ' WHERE ' . $activeCol . ' = 1';
+                }
+                $sqlProdutos .= ' ORDER BY nome_exibicao';
+
+                $stmtProdutos = $this->connection->prepare($sqlProdutos);
                 $stmtProdutos->execute();
                 $produtos = $stmtProdutos->fetchAll(\PDO::FETCH_ASSOC);
             } catch (\Exception $e) {
@@ -255,11 +297,18 @@ class AdminEstoqueController extends Controller {
                         <div class="row g-3">
                             <div class="col-md-8">
                                 <label class="form-label">Produto</label>
+                                <input type="text" class="form-control mb-2" id="estoque_busca_produto" placeholder="Buscar produto por nome ou SKU..." oninput="filtrarProdutosEstoque()">
                                 <select class="form-select" name="produto_id" id="estoque_produto_id" required>
                                     <option value="">Selecione...</option>';
 
         foreach (($produtos ?? []) as $p) {
-            echo '<option value="' . (int) $p['id'] . '">' . htmlspecialchars($p['name'] . ' (' . $p['sku'] . ')') . '</option>';
+            $nomeExibicao = (string) ($p['nome_exibicao'] ?? '');
+            $skuExibicao = (string) ($p['sku_exibicao'] ?? '');
+            $label = $nomeExibicao;
+            if ($skuExibicao !== '') {
+                $label .= ' (' . $skuExibicao . ')';
+            }
+            echo '<option value="' . (int) $p['id'] . '">' . htmlspecialchars($label) . '</option>';
         }
 
         echo '                </select>
@@ -319,6 +368,23 @@ class AdminEstoqueController extends Controller {
             if (!el) return;
             el.value = String(produtoId);
         }
+
+        function filtrarProdutosEstoque() {
+            var input = document.getElementById("estoque_busca_produto");
+            var select = document.getElementById("estoque_produto_id");
+            if (!input || !select) return;
+            var q = (input.value || "").toLowerCase();
+            for (var i = 0; i < select.options.length; i++) {
+                var opt = select.options[i];
+                if (opt.value === "") {
+                    opt.hidden = false;
+                    continue;
+                }
+                var txt = (opt.text || "").toLowerCase();
+                opt.hidden = q !== "" && txt.indexOf(q) === -1;
+            }
+        }
+
         function toggleValidade() {
             var chk = document.getElementById("estoque_is_alimenticio");
             var grp = document.getElementById("grupo_validade");
