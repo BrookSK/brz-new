@@ -32,8 +32,8 @@
                     <span class="badge px-3 py-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
                         <?= ucfirst($usuario['perfil']) ?>
                     </span>
-                    <?php if (!empty($usuario['switch'])): ?>
-                        <div class="mt-2 small text-muted">Switch: <strong><?= (int) $usuario['switch'] ?></strong></div>
+                    <?php if (!empty($usuario['suite'])): ?>
+                        <div class="mt-2 small text-muted">Suite: <strong><?= (int) $usuario['suite'] ?></strong></div>
                     <?php endif; ?>
                 </div>
             </div>

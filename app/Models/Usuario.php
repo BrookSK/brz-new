@@ -107,11 +107,11 @@ class Usuario extends Model {
         $id = parent::create($data);
 
         try {
-            if (empty($data['switch'])) {
+            if (empty($data['suite'])) {
                 $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
                 $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
-                if (is_array($cols) && in_array('switch', $cols, true)) {
-                    $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET `switch` = :sw WHERE id = :id AND (`switch` IS NULL OR `switch` = 0)");
+                if (is_array($cols) && in_array('suite', $cols, true)) {
+                    $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET `suite` = :sw WHERE id = :id AND (`suite` IS NULL OR `suite` = 0)");
                     $stmt->bindValue(':sw', (int) $id, \PDO::PARAM_INT);
                     $stmt->bindValue(':id', (int) $id, \PDO::PARAM_INT);
                     $stmt->execute();
