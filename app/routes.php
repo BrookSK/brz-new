@@ -297,6 +297,7 @@ $router->post('/admin/estoque/compras/salvar', 'AdminComprasController', 'salvar
 $router->post('/admin/estoque/compras/editar-item', 'AdminComprasController', 'editarItem');
 $router->post('/admin/estoque/compras/remover-item', 'AdminComprasController', 'removerItem');
 $router->post('/admin/estoque/compras/reabrir', 'AdminComprasController', 'reabrirCompras');
+$router->get('/admin/estoque/compras/pedidos', 'AdminComprasController', 'pedidosItem');
 $router->post('/admin/estoque/compras/definir-loja', 'AdminComprasController', 'definirLojaProduto');
 $router->post('/admin/estoque/compras/mudar-status', 'AdminComprasController', 'mudarStatus');
 $router->post('/admin/estoque/compras/concluir', 'AdminComprasController', 'concluirCompras');

@@ -8,6 +8,130 @@ class AdminComprasController extends Controller {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
+    public function pedidosItem($request) {
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $lojaId = (int) $request->getParam('loja_id', 0);
+        $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($produtoId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            return;
+        }
+
+        try {
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            if (!$temPedidoEmLista) {
+                echo json_encode(['success' => true, 'pedidos' => []]);
+                return;
+            }
+
+            // Detectar tabela de itens do pedido
+            $itensTable = null;
+            try {
+                $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stmtT->execute(['pedido_itens']);
+                if ((int) $stmtT->fetchColumn() > 0) {
+                    $itensTable = 'pedido_itens';
+                } else {
+                    $stmtT->execute(['pedido_items']);
+                    if ((int) $stmtT->fetchColumn() > 0) {
+                        $itensTable = 'pedido_items';
+                    }
+                }
+            } catch (\Exception $e) {
+                $itensTable = null;
+            }
+
+            $whereLoja = '';
+            $params = [':produto_id' => $produtoId];
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $whereLoja = ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                }
+            }
+
+            $stmt = $this->connection->prepare(
+                "SELECT DISTINCT lc.pedido_id
+                 FROM lista_compras lc
+                 WHERE lc.produto_id = :produto_id
+                   AND lc.pedido_id IS NOT NULL
+                   AND lc.pedido_id <> 0" . $whereLoja .
+                " ORDER BY lc.pedido_id DESC"
+            );
+            $stmt->execute($params);
+            $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            if (empty($pedidoIds)) {
+                echo json_encode(['success' => true, 'pedidos' => []]);
+                return;
+            }
+
+            $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+            $stmtPedidos = $this->connection->prepare(
+                "SELECT p.*, u.name as cliente_nome, u.email as cliente_email
+                 FROM pedidos p
+                 LEFT JOIN usuarios u ON u.id = p.usuario_id
+                 WHERE p.id IN ($in)"
+            );
+            $stmtPedidos->execute(array_map('intval', $pedidoIds));
+            $pedidosRows = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $pedidos = [];
+            foreach ($pedidosRows as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $pedidos[$pid] = [
+                    'id' => $pid,
+                    'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ''),
+                    'status' => (string) ($p['status'] ?? ''),
+                    'valor_total' => isset($p['valor_total']) ? (float) $p['valor_total'] : null,
+                    'moeda' => (string) ($p['moeda'] ?? ''),
+                    'created_at' => (string) ($p['created_at'] ?? ''),
+                    'pago_em' => isset($p['pago_em']) ? (string) $p['pago_em'] : '',
+                    'cliente_nome' => (string) ($p['cliente_nome'] ?? ''),
+                    'cliente_email' => (string) ($p['cliente_email'] ?? ''),
+                    'itens' => [],
+                ];
+            }
+
+            if ($itensTable) {
+                $stmtItens = $this->connection->prepare(
+                    "SELECT i.*
+                     FROM $itensTable i
+                     WHERE i.pedido_id IN ($in) AND i.produto_id = ?"
+                );
+                $vals = array_map('intval', $pedidoIds);
+                $vals[] = $produtoId;
+                $stmtItens->execute($vals);
+                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($itens as $it) {
+                    $pid = (int) ($it['pedido_id'] ?? 0);
+                    if (!isset($pedidos[$pid])) continue;
+                    $pedidos[$pid]['itens'][] = [
+                        'produto_id' => (int) ($it['produto_id'] ?? 0),
+                        'quantidade' => (int) ($it['quantidade'] ?? 0),
+                        'preco_unitario' => isset($it['preco_unitario']) ? (float) $it['preco_unitario'] : null,
+                        'subtotal' => isset($it['subtotal']) ? (float) $it['subtotal'] : null,
+                        'nome_produto' => (string) ($it['nome_produto'] ?? ''),
+                        'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ''),
+                    ];
+                }
+            }
+
+            echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao buscar pedidos.']);
+            return;
+        }
+    }
+
     public function reabrirCompras($request) {
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
@@ -452,6 +576,13 @@ class AdminComprasController extends Controller {
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
                                         . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
                                         . '><i class="fas fa-trash"></i></button>';
+                                    $btnVerPedidos = '<button type="button" class="btn btn-outline-dark"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalPedidosItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-sem-loja="' . ($missingLoja ? '1' : '0') . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . '><i class="fas fa-eye"></i></button>';
                                     $btnReabrirItem = '<button type="button" class="btn btn-outline-secondary"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalReabrirItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
@@ -479,6 +610,7 @@ class AdminComprasController extends Controller {
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
+                                        . $btnVerPedidos
                                         . ($statusView === 'pendente' ? $btnEditItem : '')
                                         . ($statusView === 'pendente' ? $btnLoja : '')
                                         . ($statusView === 'pendente'
@@ -529,6 +661,151 @@ class AdminComprasController extends Controller {
                             </div>
                         </div>
                     </div>';
+
+                // Modal: Pedidos do item
+                echo '<div class="modal fade" id="modalPedidosItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Pedidos relacionados</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-2 text-muted" id="pedidos_produto_nome"></div>
+                                    <div id="pedidos_loading" class="text-muted">Carregando...</div>
+                                    <div id="pedidos_empty" class="alert alert-warning d-none">Nenhum pedido encontrado para este item.</div>
+                                    <div class="accordion" id="accordionPedidos"></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+
+                echo '<script>
+                    function escapeHtml(str){
+                        if (str === null || str === undefined) return "";
+                        return String(str)
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/\"/g, "&quot;")
+                            .replace(/\'/g, "&#039;");
+                    }
+
+                    function formatMoney(v){
+                        if (v === null || v === undefined || v === "") return "-";
+                        var n = Number(v);
+                        if (isNaN(n)) return String(v);
+                        return "$ " + n.toFixed(2);
+                    }
+
+                    function renderPedidosAccordion(pedidos){
+                        var acc = document.getElementById("accordionPedidos");
+                        if (!acc) return;
+                        acc.innerHTML = "";
+
+                        pedidos.forEach(function(p, idx){
+                            var pid = p.id || 0;
+                            var headId = "pedidoHead_" + pid;
+                            var bodyId = "pedidoBody_" + pid;
+                            var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney(p.valor_total) : "-";
+                            var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
+                            var criado = p.created_at ? escapeHtml(p.created_at) : "";
+                            var pagoEm = p.pago_em ? escapeHtml(p.pago_em) : "";
+                            var status = p.status ? escapeHtml(p.status) : "";
+                            var codigo = p.codigo_pedido ? escapeHtml(p.codigo_pedido) : "";
+
+                            var itensHtml = "";
+                            if (Array.isArray(p.itens) && p.itens.length > 0) {
+                                itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
+                                itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
+                                p.itens.forEach(function(it){
+                                    itensHtml += "<tr>";
+                                    itensHtml += "<td>" + escapeHtml(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
+                                    itensHtml += "<td>" + escapeHtml(it.quantidade || 0) + "</td>";
+                                    itensHtml += "<td>" + formatMoney(it.preco_unitario) + "</td>";
+                                    itensHtml += "<td>" + formatMoney(it.subtotal) + "</td>";
+                                    itensHtml += "</tr>";
+                                });
+                                itensHtml += "</tbody></table></div>";
+                            } else {
+                                itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
+                            }
+
+                            var html = "";
+                            html += "<div class=\"accordion-item\">";
+                            html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
+                            html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
+                            html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
+                            html += "</button></h2>";
+                            html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionPedidos\">";
+                            html += "<div class=\"accordion-body\">";
+                            html += "<div class=\"mb-2\">";
+                            html += "<div><strong>Cliente:</strong> " + escapeHtml(cliente) + "</div>";
+                            html += "<div><strong>Criado em:</strong> " + criado + "</div>";
+                            if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
+                            html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
+                            html += "</div>";
+                            html += itensHtml;
+                            html += "</div></div></div>";
+
+                            acc.insertAdjacentHTML("beforeend", html);
+                        });
+                    }
+
+                    var modalPedidosItem = document.getElementById("modalPedidosItem");
+                    if (modalPedidosItem) {
+                        modalPedidosItem.addEventListener("show.bs.modal", function (event) {
+                            var button = event.relatedTarget;
+                            var produtoId = button.getAttribute("data-produto-id") || "";
+                            var lojaId = button.getAttribute("data-loja-id") || "0";
+                            var semLoja = button.getAttribute("data-sem-loja") || "0";
+                            var produtoNome = button.getAttribute("data-produto-nome") || "";
+
+                            var label = document.getElementById("pedidos_produto_nome");
+                            if (label) label.textContent = produtoNome;
+
+                            var loading = document.getElementById("pedidos_loading");
+                            var empty = document.getElementById("pedidos_empty");
+                            var acc = document.getElementById("accordionPedidos");
+                            if (loading) loading.classList.remove("d-none");
+                            if (empty) empty.classList.add("d-none");
+                            if (acc) acc.innerHTML = "";
+
+                            var url = "/admin/estoque/compras/pedidos?produto_id=" + encodeURIComponent(produtoId)
+                                + "&loja_id=" + encodeURIComponent(lojaId)
+                                + "&sem_loja=" + encodeURIComponent(semLoja);
+
+                            fetch(url, { headers: { "Accept": "application/json" } })
+                                .then(function(r){ return r.json(); })
+                                .then(function(data){
+                                    if (loading) loading.classList.add("d-none");
+                                    if (!data || !data.success) {
+                                        if (empty) {
+                                            empty.classList.remove("d-none");
+                                            empty.textContent = (data && data.message) ? data.message : "Erro ao buscar pedidos.";
+                                        }
+                                        return;
+                                    }
+                                    var pedidos = data.pedidos || [];
+                                    if (!pedidos.length) {
+                                        if (empty) empty.classList.remove("d-none");
+                                        return;
+                                    }
+                                    renderPedidosAccordion(pedidos);
+                                })
+                                .catch(function(){
+                                    if (loading) loading.classList.add("d-none");
+                                    if (empty) {
+                                        empty.classList.remove("d-none");
+                                        empty.textContent = "Erro ao buscar pedidos.";
+                                    }
+                                });
+                        });
+                    }
+                </script>';
 
                 // Modal: Reabrir compras (tudo do filtro)
                 echo '<div class="modal fade" id="modalReabrirCompras" tabindex="-1" aria-hidden="true">
