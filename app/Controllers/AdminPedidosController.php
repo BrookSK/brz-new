@@ -600,6 +600,7 @@ class AdminPedidosController extends Controller {
                                             <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
                                             <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
                                             <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>Suite Cliente</strong></td><td>' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</td></tr>
                                             <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
                                             <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
@@ -683,6 +684,7 @@ class AdminPedidosController extends Controller {
                                 <p><strong>Nome:</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</p>
                                 <p><strong>Email:</strong> ' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                 <p><strong>Telefone:</strong> ' . htmlspecialchars($pedido['cliente_telefone'] ?? 'N/A') . '</p>
+                                <p><strong>Suite:</strong> ' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</p>
                                 <hr>
                                 <p><strong>Endereço:</strong><br>' .
                                     htmlspecialchars(

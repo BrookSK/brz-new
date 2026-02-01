@@ -161,7 +161,7 @@ class AdminUsuariosHelper {
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
-            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'switch', $dados['switch'] ?? null);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'suite', $dados['suite'] ?? null);
 
             if (in_array('ativo', $colunas)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
@@ -180,9 +180,9 @@ class AdminUsuariosHelper {
             
             $usuarioId = $this->pdo->lastInsertId();
 
-            if (in_array('switch', $colunas, true) && empty($dados['switch'])) {
+            if (in_array('suite', $colunas, true) && empty($dados['suite'])) {
                 try {
-                    $stmtSw = $this->pdo->prepare('UPDATE usuarios SET `switch` = ? WHERE id = ? AND (`switch` IS NULL OR `switch` = 0)');
+                    $stmtSw = $this->pdo->prepare('UPDATE usuarios SET `suite` = ? WHERE id = ? AND (`suite` IS NULL OR `suite` = 0)');
                     $stmtSw->execute([(int) $usuarioId, (int) $usuarioId]);
                 } catch (\Exception $e) {
                 }
