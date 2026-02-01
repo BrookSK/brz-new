@@ -85,7 +85,7 @@ class AdminPedidosEditController {
                 $id = (int) ($stmtChk->fetchColumn() ?: 0);
                 if ($id > 0) {
                     $stmtUpd = $this->connection->prepare('UPDATE estoque_reservas SET quantidade_reservada = :q, status = :status WHERE id = :id LIMIT 1');
-                    $stmtUpd->execute([':q' => $qtd, ':id' => $id]);
+                    $stmtUpd->execute([':q' => $qtd, ':status' => $status, ':id' => $id]);
                     return;
                 }
             }

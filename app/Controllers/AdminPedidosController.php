@@ -115,6 +115,11 @@ class AdminPedidosController extends Controller {
                             <option value="">Todos status</option>
                             <option value="pendente" ' . ($status === 'pendente' ? 'selected' : '') . '>Pendente</option>
                             <option value="pago" ' . ($status === 'pago' ? 'selected' : '') . '>Pago</option>
+                            <option value="processando" ' . ($status === 'processando' ? 'selected' : '') . '>Processando</option>
+                            <option value="produto_consolidado" ' . ($status === 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                            <option value="em_transporte" ' . ($status === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                            <option value="aguardando_liberacao_aduaneira" ' . ($status === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                            <option value="enviado_ao_destinatario" ' . ($status === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
                             <option value="enviado" ' . ($status === 'enviado' ? 'selected' : '') . '>Enviado</option>
                             <option value="entregue" ' . ($status === 'entregue' ? 'selected' : '') . '>Entregue</option>
                             <option value="cancelado" ' . ($status === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
@@ -188,13 +193,16 @@ class AdminPedidosController extends Controller {
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
                                         </div>
                                     </div>
@@ -435,6 +443,11 @@ class AdminPedidosController extends Controller {
         echo '<style>
         .status-pendente { background-color: #ffc107; }
         .status-pago { background-color: #28a745; }
+        .status-processando { background-color: #0d6efd; }
+        .status-produto_consolidado { background-color: #212529; }
+        .status-em_transporte { background-color: #17a2b8; }
+        .status-aguardando_liberacao_aduaneira { background-color: #6c757d; }
+        .status-enviado_ao_destinatario { background-color: #17a2b8; }
         .status-cancelado { background-color: #dc3545; }
         .status-enviado { background-color: #17a2b8; }
         .status-entregue { background-color: #6f42c1; }
@@ -585,7 +598,7 @@ class AdminPedidosController extends Controller {
                                         <tbody>
                                             <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
                                             <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
-                                            <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></td></tr>
+                                            <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
                                             <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
                                             <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
@@ -616,7 +629,7 @@ class AdminPedidosController extends Controller {
                                 <h5 class="mb-0">Informações do Pedido</h5>
                             </div>
                             <div class="card-body">
-                                <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . ucfirst($pedido['status']) . '</span></p>
+                                <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
                                 <p><strong>Frete:</strong> R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</p>
@@ -648,6 +661,11 @@ class AdminPedidosController extends Controller {
                                         <option value="">Selecione...</option>
                                         <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                        <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                        <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                        <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
                                         <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
                                         <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                         <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
@@ -730,30 +748,70 @@ class AdminPedidosController extends Controller {
             return 'R$ ' . number_format($valor, 2, ',', '.');
         }
     }
+
+    private function getStatusLabel(string $status): string {
+        $map = [
+            'pendente' => 'Pendente',
+            'pago' => 'Pago',
+            'processando' => 'Processando',
+            'produto_consolidado' => 'Produto Consolidado',
+            'em_transporte' => 'Em Transporte',
+            'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
+            'enviado_ao_destinatario' => 'Enviado ao Destinatário',
+            'enviado' => 'Enviado',
+            'entregue' => 'Entregue',
+            'cancelado' => 'Cancelado',
+
+            // legado
+            'pagamento' => 'Pagamento',
+            'aprovado' => 'Aprovado',
+            'separacao' => 'Separação',
+        ];
+        $status = trim($status);
+        return $map[$status] ?? ($status !== '' ? ucfirst($status) : '');
+    }
     
     private function getStatusIcon($status) {
         $icons = [
             'pendente' => 'fas fa-clock',
-            'pagamento' => 'fas fa-credit-card',
-            'aprovado' => 'fas fa-check-circle',
-            'separacao' => 'fas fa-box',
+            'pago' => 'fas fa-check-circle',
+            'processando' => 'fas fa-cogs',
+            'produto_consolidado' => 'fas fa-boxes-stacked',
+            'em_transporte' => 'fas fa-truck-moving',
+            'aguardando_liberacao_aduaneira' => 'fas fa-passport',
+            'enviado_ao_destinatario' => 'fas fa-route',
             'enviado' => 'fas fa-truck',
             'entregue' => 'fas fa-check-double',
             'cancelado' => 'fas fa-times-circle'
         ];
+        // legado
+        if (!isset($icons[$status])) {
+            $icons['pagamento'] = 'fas fa-credit-card';
+            $icons['aprovado'] = 'fas fa-check-circle';
+            $icons['separacao'] = 'fas fa-box';
+        }
         return $icons[$status] ?? 'fas fa-question-circle';
     }
     
     private function getStatusColor($status) {
         $colors = [
             'pendente' => 'warning',
-            'pagamento' => 'info',
-            'aprovado' => 'success',
-            'separacao' => 'primary',
+            'pago' => 'success',
+            'processando' => 'primary',
+            'produto_consolidado' => 'dark',
+            'em_transporte' => 'info',
+            'aguardando_liberacao_aduaneira' => 'secondary',
+            'enviado_ao_destinatario' => 'info',
             'enviado' => 'info',
             'entregue' => 'success',
             'cancelado' => 'danger'
         ];
+        // legado
+        if (!isset($colors[$status])) {
+            $colors['pagamento'] = 'info';
+            $colors['aprovado'] = 'success';
+            $colors['separacao'] = 'primary';
+        }
         return $colors[$status] ?? 'secondary';
     }
     
