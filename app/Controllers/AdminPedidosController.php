@@ -872,7 +872,17 @@ class AdminPedidosController extends Controller {
                 $cols = [];
             }
 
-            $set = ['status = ?'];
+            $statusCol = 'status';
+            if (is_array($cols) && !in_array('status', $cols, true)) {
+                foreach (['status_pedido', 'pedido_status'] as $cand) {
+                    if (in_array($cand, $cols, true)) {
+                        $statusCol = $cand;
+                        break;
+                    }
+                }
+            }
+
+            $set = [$statusCol . ' = ?'];
             $params = [$novoStatus];
             if (is_array($cols) && in_array('updated_at', $cols, true)) {
                 $set[] = 'updated_at = NOW()';

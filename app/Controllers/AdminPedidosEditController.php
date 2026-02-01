@@ -66,6 +66,15 @@ class AdminPedidosEditController {
         }
     }
 
+    private function pickFirstExistingColumn(array $cols, array $candidates): string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return '';
+    }
+
     private function columnExists(string $table, string $column): bool {
         try {
             $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
@@ -242,6 +251,10 @@ class AdminPedidosEditController {
         try {
             // Extrair ID do Request
             $id = $request->getParam('id');
+
+            $colsPedidos = $this->getColsFromTable('pedidos');
+            $colStatus = $this->pickFirstExistingColumn($colsPedidos, ['status', 'status_pedido', 'pedido_status']);
+            $colCodigo = $this->pickFirstExistingColumn($colsPedidos, ['codigo_pedido', 'numero_pedido', 'codigo', 'numero']);
             
             // Buscar pedido diretamente - usando colunas que existem
             $stmt = $this->connection->prepare("
@@ -259,6 +272,21 @@ class AdminPedidosEditController {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
                 echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
                 exit;
+            }
+
+            // Normalizar chaves para evitar dependência do schema
+            if (!isset($pedido['status']) || $pedido['status'] === null || $pedido['status'] === '') {
+                if ($colStatus !== '' && isset($pedido[$colStatus])) {
+                    $pedido['status'] = $pedido[$colStatus];
+                }
+            }
+            if (!isset($pedido['codigo_pedido']) || $pedido['codigo_pedido'] === null || $pedido['codigo_pedido'] === '') {
+                if ($colCodigo !== '' && isset($pedido[$colCodigo])) {
+                    $pedido['codigo_pedido'] = $pedido[$colCodigo];
+                }
+            }
+            if (!isset($pedido['codigo_pedido']) || $pedido['codigo_pedido'] === null || $pedido['codigo_pedido'] === '') {
+                $pedido['codigo_pedido'] = (string) $pedido['id'];
             }
 
             $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
@@ -315,12 +343,14 @@ class AdminPedidosEditController {
         
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $id);
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Pedido #' . $pedido['codigo_pedido'] . '</title>
+    <title>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -334,14 +364,9 @@ class AdminPedidosEditController {
 
         renderAdminSidebar('pedidos');
 
-        $statusLower = strtolower((string) ($pedido['status'] ?? ''));
-        $canEditItens = ($statusLower !== 'pago');
-        $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? ''));
-        $temPagamentoAsaas = ($gatewayPedido === 'asaas' && !empty($pedido['payment_id'] ?? ''));
-
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . htmlspecialchars((string) $pedido['codigo_pedido']) . '</h2>
+                    <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h2>
                     <div class="d-flex gap-2">
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
@@ -382,7 +407,7 @@ class AdminPedidosEditController {
                             <div class="card-body">
                                 <div class="mb-3">
                                     <label class="form-label">Código</label>
-                                    <input type="text" class="form-control" value="' . $pedido['codigo_pedido'] . '" readonly>
+                                    <input type="text" class="form-control" value="' . htmlspecialchars($codigoPedido) . '" readonly>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Status</label>
