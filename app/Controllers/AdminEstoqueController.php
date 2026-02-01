@@ -8,26 +8,65 @@ class AdminEstoqueController extends Controller {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
+    private function setFlash(string $message, string $type = 'success'): void {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $_SESSION['message'] = $message;
+        $_SESSION['message_type'] = $type;
+    }
+
     public function index($request) {
         try {
-            // Buscar status geral do estoque
-            $stmt = $this->connection->prepare("SELECT * FROM vw_status_geral_estoque ORDER BY produto_nome");
+            $produtos = [];
+            try {
+                $stmtProdutos = $this->connection->prepare("SELECT id, name, sku FROM produtos WHERE active = 1 ORDER BY name");
+                $stmtProdutos->execute();
+                $produtos = $stmtProdutos->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (\Exception $e) {
+                $produtos = [];
+            }
+
+            // Buscar status geral do estoque (apenas itens com quantidade no galpão)
+            $stmt = $this->connection->prepare("
+                SELECT
+                    v.*, 
+                    loc.localizacao,
+                    loc.data_compra_mais_recente,
+                    loc.validade_mais_proxima
+                FROM vw_status_geral_estoque v
+                JOIN (
+                    SELECT
+                        e.produto_id,
+                        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(e.galpao, ''), ' - Prateleira ', COALESCE(e.prateleira, '')) SEPARATOR ', ') AS localizacao,
+                        MAX(e.data_compra) AS data_compra_mais_recente,
+                        MIN(CASE WHEN e.is_alimenticio = 1 AND e.data_validade IS NOT NULL THEN e.data_validade ELSE NULL END) AS validade_mais_proxima
+                    FROM estoque_interno e
+                    WHERE e.quantidade > 0
+                    GROUP BY e.produto_id
+                ) loc ON loc.produto_id = v.produto_id
+                ORDER BY v.produto_nome
+            ");
             $stmt->execute();
             $status_geral = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // Estatísticas
-            $stmt = $this->connection->prepare("
-                SELECT 
+            $stmt = $this->connection->prepare("SELECT
                     COUNT(*) as total_produtos,
                     SUM(CASE WHEN status_estoque = 'crítico' THEN 1 ELSE 0 END) as criticos,
                     SUM(CASE WHEN status_estoque = 'baixo' THEN 1 ELSE 0 END) as baixos,
                     SUM(CASE WHEN status_estoque = 'normal' THEN 1 ELSE 0 END) as normais
-                FROM vw_status_geral_estoque
+                FROM (
+                    SELECT v.*
+                    FROM vw_status_geral_estoque v
+                    JOIN (SELECT DISTINCT produto_id FROM estoque_interno WHERE quantidade > 0) e ON e.produto_id = v.produto_id
+                ) t
             ");
             $stmt->execute();
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         } catch (\Exception $e) {
+            $produtos = [];
             $status_geral = [];
             $estatisticas = ['total_produtos' => 0, 'criticos' => 0, 'baixos' => 0, 'normais' => 0];
         }
@@ -59,7 +98,7 @@ class AdminEstoqueController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-warehouse me-2"></i>Estoque Interno</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
+                        <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#modalNovoItem">
                             <i class="fas fa-plus me-1"></i>Novo Item
                         </button>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
@@ -124,7 +163,10 @@ class AdminEstoqueController extends Controller {
                                         <th>Produto</th>
                                         <th>SKU</th>
                                         <th>Loja</th>
-                                        <th>Estoque</th>
+                                        <th>Disponível</th>
+                                        <th>Data compra</th>
+                                        <th>Validade</th>
+                                        <th>Localização</th>
                                         <th>Status</th>
                                         <th>Ações</th>
                                     </tr>
@@ -149,12 +191,15 @@ class AdminEstoqueController extends Controller {
                                         <td>
                                             <span class="badge bg-' . $status_class . '">' . $item['quantidade_estoque'] . '</span>
                                         </td>
+                                        <td>' . (!empty($item['data_compra_mais_recente']) ? date('d/m/Y', strtotime($item['data_compra_mais_recente'])) : '-') . '</td>
+                                        <td>' . (!empty($item['validade_mais_proxima']) ? date('d/m/Y', strtotime($item['validade_mais_proxima'])) : '-') . '</td>
+                                        <td>' . (!empty($item['localizacao']) ? htmlspecialchars($item['localizacao']) : '-') . '</td>
                                         <td>
                                             <span class="badge bg-' . $status_class . '">' . ucfirst($item['status_estoque']) . '</span>
                                         </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn btn-outline-success" onclick="alert(\'Adicionar estoque para: ' . htmlspecialchars($item['produto_nome']) . '\')">
+                                                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalNovoItem" onclick="preencherProdutoEstoque(' . (int)$item['produto_id'] . ')">
                                                     <i class="fas fa-plus"></i>
                                                 </button>
                                             </div>
@@ -196,7 +241,91 @@ class AdminEstoqueController extends Controller {
 
             </main>
         </div>
-    </div>';
+    </div>
+
+    <div class="modal fade" id="modalNovoItem" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="/admin/estoque/salvar">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Entrada de Estoque (Galpão)</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Produto</label>
+                                <select class="form-select" name="produto_id" id="estoque_produto_id" required>
+                                    <option value="">Selecione...</option>';
+
+        foreach (($produtos ?? []) as $p) {
+            echo '<option value="' . (int) $p['id'] . '">' . htmlspecialchars($p['name'] . ' (' . $p['sku'] . ')') . '</option>';
+        }
+
+        echo '                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Quantidade disponível</label>
+                                <input type="number" class="form-control" name="quantidade" min="1" step="1" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Data da compra</label>
+                                <input type="date" class="form-control" name="data_compra">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Alimentício</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" value="1" id="estoque_is_alimenticio" name="is_alimenticio" onchange="toggleValidade()">
+                                    <label class="form-check-label" for="estoque_is_alimenticio">Controlar validade</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4" id="grupo_validade" style="display:none;">
+                                <label class="form-label">Data de validade</label>
+                                <input type="date" class="form-control" name="data_validade">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Galpão</label>
+                                <input type="text" class="form-control" name="galpao" placeholder="Ex: Galpão A">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Prateleira</label>
+                                <input type="text" class="form-control" name="prateleira" placeholder="Ex: 3">
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Observação</label>
+                                <input type="text" class="form-control" name="observacao" placeholder="Opcional">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar entrada</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function preencherProdutoEstoque(produtoId) {
+            var el = document.getElementById('estoque_produto_id');
+            if (!el) return;
+            el.value = String(produtoId);
+        }
+        function toggleValidade() {
+            var chk = document.getElementById('estoque_is_alimenticio');
+            var grp = document.getElementById('grupo_validade');
+            if (!chk || !grp) return;
+            grp.style.display = chk.checked ? '' : 'none';
+        }
+    </script>';
 
     // Renderizar scripts
     renderAdminScripts();
@@ -206,7 +335,138 @@ class AdminEstoqueController extends Controller {
     }
 
     public function salvar($request) {
-        echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+        try {
+            $produtoId = (int) $request->getParam('produto_id');
+            $quantidade = (int) $request->getParam('quantidade');
+            $dataCompra = trim((string) $request->getParam('data_compra', ''));
+            $isAlimenticio = $request->getParam('is_alimenticio', '0') ? 1 : 0;
+            $dataValidade = trim((string) $request->getParam('data_validade', ''));
+            $galpao = trim((string) $request->getParam('galpao', ''));
+            $prateleira = trim((string) $request->getParam('prateleira', ''));
+            $observacao = trim((string) $request->getParam('observacao', ''));
+
+            if ($produtoId <= 0) {
+                $this->setFlash('Selecione um produto válido.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+            if ($quantidade <= 0) {
+                $this->setFlash('Informe uma quantidade válida.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+            if ($isAlimenticio === 0) {
+                $dataValidade = '';
+            }
+
+            // Validar produto existente
+            $stmtProduto = $this->connection->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
+            $stmtProduto->execute([':id' => $produtoId]);
+            if (!$stmtProduto->fetchColumn()) {
+                $this->setFlash('Produto não encontrado.', 'danger');
+                header('Location: /admin/estoque');
+                exit;
+            }
+
+            $this->connection->beginTransaction();
+
+            $stmtEstoque = $this->connection->prepare('
+                INSERT INTO estoque_interno (
+                    produto_id,
+                    quantidade,
+                    data_compra,
+                    data_validade,
+                    is_alimenticio,
+                    galpao,
+                    prateleira,
+                    observacao
+                ) VALUES (
+                    :produto_id,
+                    :quantidade,
+                    :data_compra,
+                    :data_validade,
+                    :is_alimenticio,
+                    :galpao,
+                    :prateleira,
+                    :observacao
+                )
+            ');
+
+            $stmtEstoque->execute([
+                ':produto_id' => $produtoId,
+                ':quantidade' => $quantidade,
+                ':data_compra' => ($dataCompra !== '' ? $dataCompra : null),
+                ':data_validade' => ($dataValidade !== '' ? $dataValidade : null),
+                ':is_alimenticio' => $isAlimenticio,
+                ':galpao' => ($galpao !== '' ? $galpao : null),
+                ':prateleira' => ($prateleira !== '' ? $prateleira : null),
+                ':observacao' => ($observacao !== '' ? $observacao : null),
+            ]);
+
+            // Registrar movimentação (entrada)
+            $stmtMov = $this->connection->prepare('
+                INSERT INTO estoque_movimentacao (
+                    produto_id,
+                    tipo_movimentacao,
+                    quantidade,
+                    quantidade_anterior,
+                    quantidade_nova,
+                    motivo,
+                    usuario_id
+                ) VALUES (
+                    :produto_id,
+                    :tipo_movimentacao,
+                    :quantidade,
+                    :quantidade_anterior,
+                    :quantidade_nova,
+                    :motivo,
+                    :usuario_id
+                )
+            ');
+
+            $stmtAtual = $this->connection->prepare('SELECT COALESCE(SUM(quantidade),0) as total FROM estoque_interno WHERE produto_id = :produto_id');
+            $stmtAtual->execute([':produto_id' => $produtoId]);
+            $atual = (int) ($stmtAtual->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+            $anterior = $atual - $quantidade;
+
+            $usuarioId = null;
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            if (!empty($_SESSION['user_id'])) {
+                $usuarioId = (int) $_SESSION['user_id'];
+            } elseif (!empty($_SESSION['usuario_id'])) {
+                $usuarioId = (int) $_SESSION['usuario_id'];
+            }
+
+            $motivo = 'Entrada de estoque (galpão)';
+            if ($galpao !== '' || $prateleira !== '') {
+                $motivo .= ' - ' . trim($galpao . ' - Prateleira ' . $prateleira);
+            }
+
+            $stmtMov->execute([
+                ':produto_id' => $produtoId,
+                ':tipo_movimentacao' => 'entrada',
+                ':quantidade' => $quantidade,
+                ':quantidade_anterior' => $anterior,
+                ':quantidade_nova' => $atual,
+                ':motivo' => $motivo,
+                ':usuario_id' => $usuarioId,
+            ]);
+
+            $this->connection->commit();
+
+            $this->setFlash('Entrada de estoque registrada com sucesso.', 'success');
+            header('Location: /admin/estoque');
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            $this->setFlash('Erro ao registrar entrada de estoque.', 'danger');
+            header('Location: /admin/estoque');
+            exit;
+        }
     }
 
     public function marcarComprado($request) {
