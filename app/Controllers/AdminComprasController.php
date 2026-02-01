@@ -8,6 +8,229 @@ class AdminComprasController extends Controller {
         $this->connection = \Config\Database::getConnection();
     }
 
+    private function renderFlashIfAny(): void {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (!isset($_SESSION['message'])) {
+            return;
+        }
+        $type = (string) ($_SESSION['message_type'] ?? 'info');
+        $msg = (string) $_SESSION['message'];
+        unset($_SESSION['message'], $_SESSION['message_type']);
+        echo '<div class="alert alert-' . htmlspecialchars($type) . ' alert-dismissible fade show mt-3" role="alert">'
+            . htmlspecialchars($msg)
+            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>'
+            . '</div>';
+    }
+
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $stmt = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function getTaxaServicoPorKg(): float {
+        return floatval($this->getConfigValue('entrega_taxa_servico_kg', '39'));
+    }
+
+    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
+        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
+        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
+        if (!$calcularAutomatico) {
+            return 0.0;
+        }
+
+        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
+        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
+            return 0.0;
+        }
+
+        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
+        if ($fretePorKg <= 0) {
+            return 0.0;
+        }
+
+        $pesoArredondado = ceil($pesoTotal);
+        return $fretePorKg * $pesoArredondado;
+    }
+
+    private function getPedidoMoeda(array $pedidoRow): string {
+        $candidates = ['moeda', 'moeda_original', 'moeda_padrao'];
+        foreach ($candidates as $c) {
+            if (!empty($pedidoRow[$c])) {
+                return strtoupper(trim((string) $pedidoRow[$c]));
+            }
+        }
+        return 'BRL';
+    }
+
+    private function getPedidoTotalAtual(array $pedidoRow, array $colsPedidos): float {
+        $candidates = ['valor_total', 'total'];
+        foreach ($candidates as $c) {
+            if (in_array($c, $colsPedidos, true) && isset($pedidoRow[$c])) {
+                return (float) $pedidoRow[$c];
+            }
+        }
+        // fallback
+        if (isset($pedidoRow['valor_total'])) return (float) $pedidoRow['valor_total'];
+        if (isset($pedidoRow['total'])) return (float) $pedidoRow['total'];
+        return 0.0;
+    }
+
+    private function getProdutoInfo(int $produtoId): ?array {
+        try {
+            $cols = [];
+            $stmtCols = $this->connection->query('DESCRIBE produtos');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            $nomeCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : null);
+            $skuCol = in_array('sku', $cols, true) ? 'sku' : null;
+            $pesoCol = in_array('peso', $cols, true) ? 'peso' : null;
+
+            $priceCol = null;
+            foreach (['price', 'valor', 'value', 'preco'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $priceCol = $c;
+                    break;
+                }
+            }
+
+            $select = ['id'];
+            $select[] = $skuCol ? ('`' . $skuCol . '` as sku') : "'' as sku";
+            $select[] = $nomeCol ? ('`' . $nomeCol . '` as nome') : "'' as nome";
+            $select[] = $pesoCol ? ('`' . $pesoCol . '` as peso') : '0 as peso';
+            $select[] = $priceCol ? ('`' . $priceCol . '` as preco') : '0 as preco';
+
+            $stmt = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $produtoId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function inserirItemNoPedido(string $itensTable, int $pedidoId, int $produtoId, int $quantidade, float $precoUnitario, float $subtotal, array $produtoInfo): void {
+        // Inserção flexível para suportar pedido_itens e pedido_items
+        $cols = [];
+        try {
+            $stmtCols = $this->connection->query('DESCRIBE ' . $itensTable);
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $insCols = [];
+        $ph = [];
+        $vals = [];
+
+        $map = [
+            'pedido_id' => $pedidoId,
+            'produto_id' => $produtoId,
+            'quantidade' => $quantidade,
+        ];
+
+        if (in_array('preco_unitario', $cols, true)) {
+            $map['preco_unitario'] = $precoUnitario;
+        }
+        if (in_array('valor_unitario', $cols, true)) {
+            $map['valor_unitario'] = $precoUnitario;
+        }
+        if (in_array('subtotal', $cols, true)) {
+            $map['subtotal'] = $subtotal;
+        }
+        if (in_array('sku', $cols, true)) {
+            $map['sku'] = (string) ($produtoInfo['sku'] ?? '');
+        }
+        if (in_array('nome_produto', $cols, true)) {
+            $map['nome_produto'] = (string) ($produtoInfo['nome'] ?? '');
+        }
+        if (in_array('nome_produto_sku', $cols, true)) {
+            $nome = (string) ($produtoInfo['nome'] ?? '');
+            $sku = (string) ($produtoInfo['sku'] ?? '');
+            $map['nome_produto_sku'] = trim($nome . ($sku !== '' ? (' - ' . $sku) : ''));
+        }
+        if (in_array('created_at', $cols, true)) {
+            // alguns schemas aceitam NOW() via default; mas aqui mantemos simples com bind
+            $map['created_at'] = date('Y-m-d H:i:s');
+        }
+
+        foreach ($map as $c => $v) {
+            if (!in_array($c, $cols, true)) {
+                continue;
+            }
+            $insCols[] = $c;
+            $ph[] = '?';
+            $vals[] = $v;
+        }
+
+        if (empty($insCols)) {
+            return;
+        }
+
+        $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $ph) . ')';
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($vals);
+    }
+
+    private function recalcularTotaisPedido(int $pedidoId, string $moeda, array $colsPedidos): array {
+        $itensTable = $this->findPedidoItensTable();
+        if (!$itensTable) {
+            return ['subtotal' => 0.0, 'peso' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'frete' => 0.0, 'total' => 0.0];
+        }
+
+        // subtotal
+        $subtotal = 0.0;
+        try {
+            $stmt = $this->connection->prepare(
+                "SELECT COALESCE(SUM(COALESCE(i.subtotal, (COALESCE(i.preco_unitario, i.valor_unitario, 0) * COALESCE(i.quantidade,0)))),0) as subtotal
+                 FROM {$itensTable} i
+                 WHERE i.pedido_id = :pedido_id"
+            );
+            $stmt->execute([':pedido_id' => $pedidoId]);
+            $subtotal = (float) ($stmt->fetch(\PDO::FETCH_ASSOC)['subtotal'] ?? 0);
+        } catch (\Exception $e) {
+            $subtotal = 0.0;
+        }
+
+        // peso total
+        $pesoTotal = 0.0;
+        try {
+            $stmt = $this->connection->prepare(
+                "SELECT COALESCE(SUM(COALESCE(p.peso,0) * COALESCE(i.quantidade,0)),0) as peso
+                 FROM {$itensTable} i
+                 JOIN produtos p ON p.id = i.produto_id
+                 WHERE i.pedido_id = :pedido_id"
+            );
+            $stmt->execute([':pedido_id' => $pedidoId]);
+            $pesoTotal = (float) ($stmt->fetch(\PDO::FETCH_ASSOC)['peso'] ?? 0);
+        } catch (\Exception $e) {
+            $pesoTotal = 0.0;
+        }
+
+        $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, $moeda);
+        $impostos = $subtotal * 0.80;
+        $total = $subtotal + $taxaServico + $impostos + $frete;
+
+        return [
+            'subtotal' => $subtotal,
+            'peso' => $pesoTotal,
+            'taxa_servico' => $taxaServico,
+            'impostos' => $impostos,
+            'frete' => $frete,
+            'total' => $total,
+        ];
+    }
+
     private function findPedidoItensTable(): ?string {
         try {
             $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -91,6 +314,9 @@ class AdminComprasController extends Controller {
     }
 
     public function novoItem($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         try {
             $usuarios = $this->fetchUsuariosSelect();
             $produtosSelect = $this->fetchProdutosSelect();
@@ -123,6 +349,12 @@ class AdminComprasController extends Controller {
                     <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
                 </div>
             </div>
+
+            ';
+
+        $this->renderFlashIfAny();
+
+        echo '
 
             <div class="card">
                 <div class="card-body">
@@ -179,7 +411,8 @@ class AdminComprasController extends Controller {
 
                             <div class="col-md-3">
                                 <label class="form-label">Valor pendente (diferença) *</label>
-                                <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" required>
+                                <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" value="0" readonly>
+                                <div class="form-text">Calculado automaticamente ao salvar (regras padrão).</div>
                             </div>
 
                             <div class="col-md-4">
@@ -652,6 +885,9 @@ class AdminComprasController extends Controller {
     }
 
     public function index($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         try {
             $lojas = $this->fetchLojas();
             $lojaIdFilter = (int) $request->getParam('loja_id', 0);
@@ -709,7 +945,7 @@ class AdminComprasController extends Controller {
                 . '   GROUP BY produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(loja_id,0), status' : '0, status')
                 . ' ) agg'
-                . ' JOIN produtos p ON agg.produto_id = p.id';
+                . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
             $params = [];
             if ($temLojaIdEmLista) {
@@ -731,7 +967,10 @@ class AdminComprasController extends Controller {
             $valorTotalPendente = 0.0;
             $valorTotalPago = 0.0;
             foreach ($compras as $c) {
-                $qf = (int) ($c['quantidade_faltante'] ?? $c['quantidade_necessaria'] ?? 0);
+                $qfRaw = isset($c['quantidade_faltante']) ? (int) $c['quantidade_faltante'] : null;
+                $qf = ($qfRaw !== null && $qfRaw > 0)
+                    ? $qfRaw
+                    : (int) ($c['quantidade_necessaria'] ?? 0);
                 $totalItensPendentes += $qf;
                 $cost = isset($c['cost_price']) ? (float) $c['cost_price'] : 0.0;
                 $valorTotalPendente += ($qf * $cost);
@@ -810,6 +1049,11 @@ class AdminComprasController extends Controller {
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         } catch (\Exception $e) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['message'] = 'Erro ao carregar lista de compras: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
             $compras = [];
             $estatisticas = ['total_itens' => 0, 'pendentes' => 0, 'comprados' => 0, 'cancelados' => 0];
             $lojas = [];
@@ -882,9 +1126,18 @@ class AdminComprasController extends Controller {
                     </div>
                 </div>';
 
+                $this->renderFlashIfAny();
+
+                $qsLoja = '';
+                if ($semLoja) {
+                    $qsLoja = '&sem_loja=1';
+                } elseif ($lojaIdFilter > 0) {
+                    $qsLoja = '&loja_id=' . (int) $lojaIdFilter;
+                }
+
                 echo '<div class="d-flex flex-wrap gap-2 mb-2">'
-                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente">Pendentes</a>'
-                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas">Concluídas</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">Pendentes</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
                     . '</div>';
 
                 echo '<div class="card mb-4">
@@ -1535,6 +1788,9 @@ class AdminComprasController extends Controller {
     }
 
     public function salvar($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         $produtoId = (int) $request->getParam('produto_id', 0);
         $pedidoId = (int) $request->getParam('pedido_id', 0);
         $usuarioId = (int) $request->getParam('usuario_id', 0);
@@ -1553,7 +1809,15 @@ class AdminComprasController extends Controller {
         try {
             $this->connection->beginTransaction();
 
-            $stmtPedido = $this->connection->prepare('SELECT id, status, pago_em, payment_status, valor_total, valor_total_brl FROM pedidos WHERE id = :id LIMIT 1');
+            $colsPedidos = [];
+            try {
+                $stmtCols = $this->connection->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $stmtPedido = $this->connection->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
             $stmtPedido->execute([':id' => $pedidoId]);
             $pedido = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
             if (!$pedido) {
@@ -1582,32 +1846,97 @@ class AdminComprasController extends Controller {
                 }
             }
 
-            // Atualizar o valor do pedido apenas se estiver pendente
-            $colsPedidos = [];
-            try {
-                $stmtCols = $this->connection->query('DESCRIBE pedidos');
-                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
-            } catch (\Exception $e) {
-                $colsPedidos = [];
+            // Inserir também no pedido (item real) e recalcular diferença automaticamente
+            $produtoInfo = $this->getProdutoInfo($produtoId);
+            if (!$produtoInfo) {
+                $this->connection->rollBack();
+                $_SESSION['message'] = 'Produto não encontrado.';
+                $_SESSION['message_type'] = 'danger';
+                header('Location: /admin/estoque/compras/novo');
+                exit;
             }
 
-            if (!$pedidoPago && $valorPendente > 0) {
-                $set = [];
-                $params = [':id' => $pedidoId];
+            $precoUnit = (float) ($produtoInfo['preco'] ?? 0);
+            $subtotalNovoItem = $precoUnit * $quantidade;
 
-                if (in_array('valor_total', $colsPedidos, true)) {
-                    $set[] = 'valor_total = COALESCE(valor_total,0) + :vp';
-                    $params[':vp'] = $valorPendente;
-                }
-                if (in_array('valor_total_brl', $colsPedidos, true)) {
-                    $set[] = 'valor_total_brl = COALESCE(valor_total_brl,0) + :vp_brl';
-                    $params[':vp_brl'] = $valorPendente;
-                }
+            $itensTable = $this->findPedidoItensTable();
+            if ($itensTable) {
+                $this->inserirItemNoPedido($itensTable, $pedidoId, $produtoId, $quantidade, $precoUnit, $subtotalNovoItem, $produtoInfo);
+            }
 
-                if (!empty($set)) {
-                    $stmtUpd = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id LIMIT 1');
-                    $stmtUpd->execute($params);
+            $moedaPedido = $this->getPedidoMoeda($pedido);
+            $oldTotal = $this->getPedidoTotalAtual($pedido, $colsPedidos);
+            $novos = $this->recalcularTotaisPedido($pedidoId, $moedaPedido, $colsPedidos);
+            $newTotal = (float) ($novos['total'] ?? 0);
+            $valorPendente = $newTotal - $oldTotal;
+            if ($valorPendente < 0) {
+                $valorPendente = 0.0;
+            }
+
+            // Atualizar totais no pedido sempre (regras padrão)
+            $set = [];
+            $params = [':id' => $pedidoId];
+
+            if (in_array('subtotal_produtos', $colsPedidos, true)) {
+                $set[] = 'subtotal_produtos = :sub';
+                $params[':sub'] = (float) ($novos['subtotal'] ?? 0);
+            } elseif (in_array('subtotal', $colsPedidos, true)) {
+                $set[] = 'subtotal = :sub';
+                $params[':sub'] = (float) ($novos['subtotal'] ?? 0);
+            }
+
+            if (in_array('taxa_servico', $colsPedidos, true)) {
+                $set[] = 'taxa_servico = :ts';
+                $params[':ts'] = (float) ($novos['taxa_servico'] ?? 0);
+            } elseif (in_array('servicos', $colsPedidos, true)) {
+                $set[] = 'servicos = :ts';
+                $params[':ts'] = (float) ($novos['taxa_servico'] ?? 0);
+            }
+
+            if (in_array('valor_impostos', $colsPedidos, true)) {
+                $set[] = 'valor_impostos = :imp';
+                $params[':imp'] = (float) ($novos['impostos'] ?? 0);
+            } elseif (in_array('impostos', $colsPedidos, true)) {
+                $set[] = 'impostos = :imp';
+                $params[':imp'] = (float) ($novos['impostos'] ?? 0);
+            }
+
+            if (in_array('valor_frete', $colsPedidos, true)) {
+                $set[] = 'valor_frete = :frete';
+                $params[':frete'] = (float) ($novos['frete'] ?? 0);
+            } elseif (in_array('frete', $colsPedidos, true)) {
+                $set[] = 'frete = :frete';
+                $params[':frete'] = (float) ($novos['frete'] ?? 0);
+            }
+
+            if (in_array('peso_total', $colsPedidos, true)) {
+                $set[] = 'peso_total = :peso';
+                $params[':peso'] = (float) ($novos['peso'] ?? 0);
+            }
+
+            if (in_array('valor_total', $colsPedidos, true)) {
+                $set[] = 'valor_total = :total';
+                $params[':total'] = $newTotal;
+            } elseif (in_array('total', $colsPedidos, true)) {
+                $set[] = 'total = :total';
+                $params[':total'] = $newTotal;
+            }
+
+            if (in_array('valor_total_brl', $colsPedidos, true)) {
+                $taxaConv = 1.0;
+                if (in_array('taxa_conversao_utilizada', $colsPedidos, true) && isset($pedido['taxa_conversao_utilizada'])) {
+                    $taxaConv = (float) $pedido['taxa_conversao_utilizada'];
+                } elseif (in_array('taxa_conversao', $colsPedidos, true) && isset($pedido['taxa_conversao'])) {
+                    $taxaConv = (float) $pedido['taxa_conversao'];
                 }
+                $totalBrl = ($moedaPedido === 'BRL') ? $newTotal : ($newTotal * $taxaConv);
+                $set[] = 'valor_total_brl = :total_brl';
+                $params[':total_brl'] = $totalBrl;
+            }
+
+            if (!empty($set)) {
+                $stmtUpd = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id LIMIT 1');
+                $stmtUpd->execute($params);
             }
 
             // Inserir item na lista de compras
@@ -1652,10 +1981,10 @@ class AdminComprasController extends Controller {
             $this->connection->commit();
 
             if ($pedidoPago) {
-                $_SESSION['message'] = 'Item adicionado na lista. Pedido está pago: total do pedido não foi alterado.';
+                $_SESSION['message'] = 'Item inserido no pedido e na lista de compras. Pedido está pago: diferença calculada em $ ' . number_format($valorPendente, 2, '.', ',') . '.';
                 $_SESSION['message_type'] = 'warning';
             } else {
-                $_SESSION['message'] = 'Item adicionado na lista e valor do pedido atualizado.';
+                $_SESSION['message'] = 'Item inserido no pedido e na lista. Diferença calculada automaticamente: $ ' . number_format($valorPendente, 2, '.', ',') . '.';
                 $_SESSION['message_type'] = 'success';
             }
             header('Location: /admin/estoque/compras');
@@ -1664,7 +1993,7 @@ class AdminComprasController extends Controller {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
-            $_SESSION['message'] = 'Erro ao salvar novo item.';
+            $_SESSION['message'] = 'Erro ao salvar novo item: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
