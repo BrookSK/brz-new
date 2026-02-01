@@ -87,7 +87,6 @@ class AdminComprasController extends Controller {
             $temLojaText = $this->columnExists('produtos', 'loja');
 
             $selectCols = [
-                'lc.*',
                 'p.id as produto_id',
                 'p.sku as sku',
             ];
@@ -450,7 +449,6 @@ class AdminComprasController extends Controller {
         }
 
         $selectCols = [
-            'lc.*',
             'p.id as produto_id',
             'p.sku as sku',
         ];
