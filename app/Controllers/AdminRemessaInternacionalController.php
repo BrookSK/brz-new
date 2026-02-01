@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use Config\Database;
 use App\Services\WExpressService;
+use App\Models\PedidoEcommerce;
 
 class AdminRemessaInternacionalController extends Controller {
     private $connection;
@@ -1180,6 +1181,14 @@ function gerarEtiqueta() {
             ]);
 
             $this->tryAutoCloseJanela($jid);
+
+            if ($etiquetaGerada) {
+                try {
+                    $pedidoModel = new PedidoEcommerce();
+                    $pedidoModel->atualizarStatus((int) $pid, 'em_transporte', 'Etiqueta internacional gerada (W-Express)', $_SESSION['usuario_id'] ?? null);
+                } catch (\Exception $e) {
+                }
+            }
 
             if ($errorMsg !== null) {
                 echo json_encode(['success' => false, 'error' => $errorMsg]);

@@ -1,11 +1,200 @@
 <?php
 namespace App\Controllers;
 
+use Config\Database;
+use App\Models\PedidoEcommerce;
+
 class AdminRemessaCorreiosController extends Controller {
     private $connection;
 
     public function __construct() {
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection = Database::getConnection();
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $stmt->execute([$table]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getConfigEntregaValue(string $key, $default = '') {
+        // supports both:
+        // - key/value schema (configuracoes_sistema with columns chave/valor)
+        // - single-row schema (configuracoes_sistema with columns sigep_*)
+        try {
+            if (!$this->tableExists('configuracoes_sistema')) {
+                return $default;
+            }
+
+            $cols = [];
+            try {
+                $st = $this->connection->query('DESCRIBE configuracoes_sistema');
+                $cols = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $k = (string) $key;
+
+            if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $fullKey = 'entrega_' . $k;
+                $stmt = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                $stmt->execute([$fullKey]);
+                $v = $stmt->fetchColumn();
+                if ($v === false || $v === null) {
+                    return $default;
+                }
+                return $v;
+            }
+
+            // single-row/columns
+            $colName = (strpos($k, 'sigep_') === 0) ? $k : ('sigep_' . $k);
+            if (in_array($colName, $cols, true)) {
+                $stmt = $this->connection->query('SELECT ' . $colName . ' FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                $v = $stmt->fetchColumn();
+                if ($v === false || $v === null) {
+                    return $default;
+                }
+                return $v;
+            }
+
+            return $default;
+        } catch (\Exception $e) {
+            return $default;
+        }
+    }
+
+    private function getSigepConfig(): array {
+        $enabled = (string) $this->getConfigEntregaValue('sigep_enabled', '0');
+
+        return [
+            'enabled' => ($enabled === '1' || $enabled === 'true' || $enabled === 'on'),
+            'ambiente' => (string) $this->getConfigEntregaValue('sigep_ambiente', 'homologacao'),
+            'usuario' => (string) $this->getConfigEntregaValue('sigep_usuario', ''),
+            'senha' => (string) $this->getConfigEntregaValue('sigep_senha', ''),
+            'contrato' => (string) $this->getConfigEntregaValue('sigep_numero_contrato', ''),
+            'cartao' => (string) $this->getConfigEntregaValue('sigep_cartao_postagem', ''),
+            'cnpj' => (string) $this->getConfigEntregaValue('sigep_cnpj', ''),
+            'servico' => (string) $this->getConfigEntregaValue('sigep_servico', 'PAC'),
+            'servico_codigo' => (string) $this->getConfigEntregaValue('sigep_servico_codigo', ''),
+        ];
+    }
+
+    private function solicitarEtiquetaSigep(array $cfg): string {
+        if (empty($cfg['usuario']) || empty($cfg['senha']) || empty($cfg['cartao']) || empty($cfg['contrato']) || empty($cfg['servico_codigo'])) {
+            throw new \Exception('SIGEP: preencha usuário/senha/contrato/cartão/código do serviço no Admin');
+        }
+
+        if (!class_exists('\\SoapClient')) {
+            throw new \Exception('SIGEP: extensão SOAP não disponível no PHP do servidor');
+        }
+
+        $amb = strtolower(trim((string) ($cfg['ambiente'] ?? 'homologacao')));
+        $wsdl = ($amb === 'producao' || $amb === 'production')
+            ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
+            : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+
+        $client = new \SoapClient($wsdl, [
+            'exceptions' => true,
+            'trace' => false,
+            'cache_wsdl' => WSDL_CACHE_BOTH,
+            'connection_timeout' => 20,
+        ]);
+
+        // Observação: o SIGEP varia por contrato. Aqui tentamos usar solicitaEtiquetas.
+        // Para funcionar em definitivo, o admin deve preencher o código do serviço do contrato.
+        $params = [
+            'tipoDestinatario' => 'C',
+            'identificador' => (string) ($cfg['cnpj'] ?? ''),
+            'idServico' => (string) ($cfg['servico_codigo'] ?? ''),
+            'qtdEtiquetas' => 1,
+            'usuario' => (string) ($cfg['usuario'] ?? ''),
+            'senha' => (string) ($cfg['senha'] ?? ''),
+        ];
+
+        $resp = $client->__soapCall('solicitaEtiquetas', [$params]);
+
+        // Normalização best-effort
+        $raw = null;
+        if (is_object($resp)) {
+            if (isset($resp->return)) {
+                $raw = $resp->return;
+            } elseif (isset($resp->return->return)) {
+                $raw = $resp->return->return;
+            }
+        }
+
+        if (is_array($raw) && !empty($raw[0])) {
+            return (string) $raw[0];
+        }
+        if (is_string($raw) && trim($raw) !== '') {
+            return trim($raw);
+        }
+
+        throw new \Exception('SIGEP: resposta inesperada ao solicitar etiqueta');
+    }
+
+    private function normalizarEtiquetaCorreios(string $code): string {
+        $c = strtoupper(trim($code));
+        $c = preg_replace('/\s+/', '', $c);
+        return (string) $c;
+    }
+
+    private function calcularDvEtiqueta(string $semDv): string {
+        $c = $this->normalizarEtiquetaCorreios($semDv);
+        if (!preg_match('/^[A-Z]{2}[0-9]{8}[A-Z]{2}$/', $c)) {
+            throw new \Exception('SIGEP: etiqueta sem DV em formato inválido');
+        }
+
+        $num = substr($c, 2, 8);
+        $pesos = [8, 6, 4, 2, 3, 5, 9, 7];
+        $soma = 0;
+        for ($i = 0; $i < 8; $i++) {
+            $dig = (int) $num[$i];
+            $soma += $dig * $pesos[$i];
+        }
+        $resto = $soma % 11;
+        $dv = 11 - $resto;
+        if ($dv === 10) {
+            $dv = 0;
+        } elseif ($dv === 11) {
+            $dv = 5;
+        }
+        return (string) $dv;
+    }
+
+    private function completarEtiquetaComDv(string $code): array {
+        $c = $this->normalizarEtiquetaCorreios($code);
+
+        if (preg_match('/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/', $c)) {
+            return [
+                'etiqueta' => $c,
+                'sem_dv' => substr($c, 0, 2) . substr($c, 2, 8) . substr($c, 11, 2),
+                'dv' => substr($c, 10, 1),
+            ];
+        }
+
+        if (preg_match('/^[A-Z]{2}[0-9]{8}[A-Z]{2}$/', $c)) {
+            $dv = $this->calcularDvEtiqueta($c);
+            $full = substr($c, 0, 10) . $dv . substr($c, 10, 2);
+            return ['etiqueta' => $full, 'sem_dv' => $c, 'dv' => $dv];
+        }
+
+        // Se vier em um formato diferente, não inventar
+        return ['etiqueta' => $c, 'sem_dv' => null, 'dv' => null];
+    }
+
+    private function getColsCorreiosEtiquetas(): array {
+        try {
+            $st = $this->connection->query('DESCRIBE correios_etiquetas');
+            return $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     public function index($request) {
@@ -162,18 +351,18 @@ class AdminRemessaCorreiosController extends Controller {
                                         
                                         foreach ($remessasProntas as $remessa) {
                                             echo '<tr class="remessa-card">
-                                                <td><input type="checkbox" class="remessa-checkbox" value="' . $remessa['id'] . '"></td>
-                                                <td><strong>#' . str_pad($remessa['id'], 6, '0', STR_PAD_LEFT) . '</strong></td>
+                                                <td><input type="checkbox" class="remessa-checkbox" value="' . (int) ($remessa['pedido_id'] ?? 0) . '"></td>
+                                                <td><strong>#' . str_pad((int) ($remessa['janela_id'] ?? 0), 6, '0', STR_PAD_LEFT) . '</strong></td>
                                                 <td>#' . str_pad($remessa['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
                                                 <td>' . number_format($remessa['peso_total'] ?? 1.0, 3, ',', '.') . ' kg</td>
                                                 <td>R$ ' . number_format($remessa['valor_total'] ?? 0, 2, ',', '.') . '</td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . $remessa['id'] . ')">
+                                                    <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-tags"></i> Gerar Etiqueta
                                                     </button>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesRemessa(' . $remessa['id'] . ')">
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesRemessa(' . (int) ($remessa['janela_id'] ?? 0) . ', ' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </td>
@@ -413,8 +602,8 @@ class AdminRemessaCorreiosController extends Controller {
             }
         }
 
-        function verDetalhesRemessa(remessaId) {
-            window.open("/admin/remessa-internacional/detalhes/" + remessaId, "_blank");
+        function verDetalhesRemessa(janelaId, pedidoId) {
+            window.open("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId, "_blank");
         }
     </script>
 </body>
@@ -422,51 +611,309 @@ class AdminRemessaCorreiosController extends Controller {
         exit;
     }
 
+    public function gerarLoteEtiquetas($request) {
+        try {
+            $raw = file_get_contents('php://input');
+            $payload = json_decode((string) $raw, true);
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+
+            $ids = $payload['remessas'] ?? $payload['pedidos'] ?? [];
+            if (!is_array($ids) || empty($ids)) {
+                echo json_encode(['success' => false, 'message' => 'Nenhum pedido selecionado']);
+                exit;
+            }
+
+            $ok = 0;
+            $erros = [];
+
+            foreach ($ids as $id) {
+                $pid = (int) $id;
+                if ($pid <= 0) {
+                    continue;
+                }
+                try {
+                    $this->connection->beginTransaction();
+                    $this->criarEtiquetaCorreiosParaPedido($pid);
+                    $this->connection->commit();
+                    $ok++;
+                } catch (\Exception $e) {
+                    try {
+                        $this->connection->rollBack();
+                    } catch (\Exception $e2) {
+                    }
+                    $erros[] = 'Pedido #' . $pid . ': ' . $e->getMessage();
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Etiquetas geradas: ' . $ok,
+                'errors' => $erros,
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function imprimirTodasEtiquetas($request) {
+        try {
+            $stmt = $this->connection->prepare("SELECT * FROM correios_etiquetas WHERE status IN ('gerada','impressa') ORDER BY created_at DESC");
+            $stmt->execute();
+            $etiquetas = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // best-effort: marcar como impressa
+            try {
+                $stmtUp = $this->connection->prepare("UPDATE correios_etiquetas SET status = 'impressa', data_impressao = COALESCE(data_impressao, NOW()) WHERE status = 'gerada'");
+                $stmtUp->execute();
+            } catch (\Exception $e) {
+            }
+
+            echo '<!DOCTYPE html><html><head><title>Etiquetas Correios</title><style>body{font-family:Arial,sans-serif;margin:20px}.etiqueta{border:2px solid #000;padding:20px;width:400px;margin:0 auto 20px}.header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.codigo{font-size:18px;font-weight:bold;text-align:center;margin-bottom:20px}.section{margin-bottom:15px}.label{font-weight:bold}@media print{body{margin:0}}</style></head><body>';
+
+            foreach ($etiquetas as $etiqueta) {
+                $dadosRemetente = json_decode((string) ($etiqueta['dados_remetente'] ?? ''), true);
+                $dadosDestinatario = json_decode((string) ($etiqueta['dados_destinatario'] ?? ''), true);
+                if (!is_array($dadosRemetente)) $dadosRemetente = [];
+                if (!is_array($dadosDestinatario)) $dadosDestinatario = [];
+
+                echo '<div class="etiqueta">'
+                    . '<div class="header"><h3>CORREIOS - ETIQUETA DE POSTAGEM</h3></div>'
+                    . '<div class="codigo">CÓDIGO: ' . htmlspecialchars((string) ($etiqueta['codigo_etiqueta'] ?? '')) . '</div>'
+                    . '<div class="section"><div class="label">REMETENTE:</div>'
+                    . '<div>' . htmlspecialchars((string) ($dadosRemetente['nome'] ?? '')) . '</div>'
+                    . '<div>' . htmlspecialchars((string) ($dadosRemetente['endereco'] ?? '')) . '</div>'
+                    . '<div>' . htmlspecialchars((string) (($dadosRemetente['cidade'] ?? '') . '/' . ($dadosRemetente['estado'] ?? ''))) . ' - CEP: ' . htmlspecialchars((string) ($dadosRemetente['cep'] ?? '')) . '</div>'
+                    . '</div>'
+                    . '<div class="section"><div class="label">DESTINATÁRIO:</div>'
+                    . '<div>' . htmlspecialchars((string) ($dadosDestinatario['nome'] ?? '')) . '</div>'
+                    . '<div>' . htmlspecialchars((string) ($dadosDestinatario['endereco'] ?? '')) . '</div>'
+                    . '<div>' . htmlspecialchars((string) (($dadosDestinatario['cidade'] ?? '') . '/' . ($dadosDestinatario['estado'] ?? ''))) . ' - CEP: ' . htmlspecialchars((string) ($dadosDestinatario['cep'] ?? '')) . '</div>'
+                    . '</div>'
+                    . '</div>';
+            }
+
+            echo '<script>window.onload=function(){window.print();}</script></body></html>';
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        }
+        exit;
+    }
+
+    public function rastrearEtiqueta($request) {
+        $etiquetaId = (int) $request->getParam('id');
+        try {
+            $stmt = $this->connection->prepare('SELECT codigo_etiqueta FROM correios_etiquetas WHERE id = ? LIMIT 1');
+            $stmt->execute([$etiquetaId]);
+            $codigo = (string) ($stmt->fetchColumn() ?: '');
+            if ($codigo === '') {
+                echo '<div class="alert alert-danger">Etiqueta não encontrada</div>';
+                exit;
+            }
+
+            $url = 'https://rastreamento.correios.com.br/app/index.php?objeto=' . urlencode($codigo);
+            header('Location: ' . $url);
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        }
+        exit;
+    }
+
+    private function criarEtiquetaCorreiosParaPedido(int $pedidoId): array {
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido');
+        }
+
+        $stmtExiste = $this->connection->prepare('SELECT id, codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? LIMIT 1');
+        $stmtExiste->execute([$pedidoId]);
+        $rowExiste = $stmtExiste->fetch(\PDO::FETCH_ASSOC);
+        if (is_array($rowExiste) && !empty($rowExiste['id'])) {
+            throw new \Exception('Já existe etiqueta Correios para este pedido');
+        }
+
+        $pedidoModel = new PedidoEcommerce();
+        $pedido = null;
+        try {
+            $pedido = $pedidoModel->getComDetalhes($pedidoId);
+        } catch (\Exception $e) {
+            $pedido = null;
+        }
+
+        if (!is_array($pedido) || empty($pedido['id'])) {
+            throw new \Exception('Pedido não encontrado');
+        }
+
+        $cfg = $this->getSigepConfig();
+        $colsCE = $this->getColsCorreiosEtiquetas();
+
+        $sigepUsed = 0;
+        $sigepReq = null;
+        $sigepResp = null;
+        $sigepErr = null;
+        $sigepAmb = (string) ($cfg['ambiente'] ?? '');
+        $sigepSemDv = null;
+        $sigepDv = null;
+
+        $codigoEtiqueta = '';
+        if (!empty($cfg['enabled'])) {
+            $hasMin = !empty($cfg['usuario']) && !empty($cfg['senha']) && !empty($cfg['contrato']) && !empty($cfg['cartao']) && !empty($cfg['servico_codigo']);
+            if ($hasMin) {
+                $sigepUsed = 1;
+                $sigepReq = [
+                    'ambiente' => $sigepAmb,
+                    'usuario' => (string) ($cfg['usuario'] ?? ''),
+                    'contrato' => (string) ($cfg['contrato'] ?? ''),
+                    'cartao' => (string) ($cfg['cartao'] ?? ''),
+                    'cnpj' => (string) ($cfg['cnpj'] ?? ''),
+                    'servico_codigo' => (string) ($cfg['servico_codigo'] ?? ''),
+                ];
+                try {
+                    $raw = $this->solicitarEtiquetaSigep($cfg);
+                    $sigepResp = ['raw' => $raw];
+                    $packed = $this->completarEtiquetaComDv($raw);
+                    $codigoEtiqueta = (string) ($packed['etiqueta'] ?? $raw);
+                    $sigepSemDv = $packed['sem_dv'] ?? null;
+                    $sigepDv = $packed['dv'] ?? null;
+                } catch (\Exception $e) {
+                    $sigepErr = $e->getMessage();
+                    throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
+                }
+            } else {
+                $codigoEtiqueta = $this->gerarCodigoEtiqueta();
+            }
+        } else {
+            $codigoEtiqueta = $this->gerarCodigoEtiqueta();
+        }
+
+        $cols = ['pedido_id', 'codigo_etiqueta', 'dados_remetente', 'dados_destinatario', 'status', 'created_at'];
+        $vals = [$pedidoId, $codigoEtiqueta, json_encode($this->getDadosRemetente()), json_encode($this->getDadosDestinatario($pedido))];
+        $ph = ['?', '?', '?', '?', "'gerada'", 'NOW()'];
+
+        if (in_array('sigep_enabled_used', $colsCE, true)) {
+            $cols[] = 'sigep_enabled_used';
+            $vals[] = $sigepUsed;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_ambiente', $colsCE, true)) {
+            $cols[] = 'sigep_ambiente';
+            $vals[] = $sigepAmb;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_etiqueta_sem_dv', $colsCE, true)) {
+            $cols[] = 'sigep_etiqueta_sem_dv';
+            $vals[] = $sigepSemDv;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_dv', $colsCE, true)) {
+            $cols[] = 'sigep_dv';
+            $vals[] = $sigepDv;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_last_request_json', $colsCE, true)) {
+            $cols[] = 'sigep_last_request_json';
+            $vals[] = $sigepReq !== null ? json_encode($sigepReq) : null;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_last_response_json', $colsCE, true)) {
+            $cols[] = 'sigep_last_response_json';
+            $vals[] = $sigepResp !== null ? json_encode($sigepResp) : null;
+            $ph[] = '?';
+        }
+        if (in_array('sigep_error', $colsCE, true)) {
+            $cols[] = 'sigep_error';
+            $vals[] = $sigepErr;
+            $ph[] = '?';
+        }
+
+        $stmt = $this->connection->prepare('INSERT INTO correios_etiquetas (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')');
+        $stmt->execute($vals);
+
+        $etiquetaId = (int) $this->connection->lastInsertId();
+
+        try {
+            $pedidoModel->atualizarStatus((int) $pedidoId, 'enviado', 'Etiqueta Correios gerada (remessa Brasil)', $_SESSION['usuario_id'] ?? null);
+        } catch (\Exception $e) {
+        }
+
+        return ['etiqueta_id' => $etiquetaId, 'codigo_etiqueta' => $codigoEtiqueta];
+    }
+
     private function getRemessasProntas() {
         $stmt = $this->connection->prepare("
-            SELECT r.*, p.usuario_id, u.nome as cliente_nome, p.total as valor_total
-            FROM remessas_internacionais r 
-            LEFT JOIN pedidos p ON r.pedido_id = p.id 
-            LEFT JOIN usuarios u ON p.usuario_id = u.id 
-            WHERE r.status = 'remessa_gerada' 
-            AND r.etiqueta_gerada = 0
-            ORDER BY r.created_at ASC
+            SELECT
+                rjp.pedido_id,
+                rjp.janela_id,
+                u.nome as cliente_nome,
+                p.usuario_id,
+                p.created_at,
+                p.total as valor_total
+            FROM remessa_janela_pedidos rjp
+            INNER JOIN remessa_janelas j ON j.id = rjp.janela_id
+            INNER JOIN pedidos p ON p.id = rjp.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            LEFT JOIN correios_etiquetas ce ON ce.pedido_id = rjp.pedido_id
+            WHERE j.status = 'remessa_gerada'
+              AND rjp.etiqueta_gerada = 1
+              AND ce.id IS NULL
+            ORDER BY rjp.etiqueta_gerada_em ASC
         ");
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        foreach ($rows as &$r) {
+            $r['id'] = (int) ($r['pedido_id'] ?? 0);
+            $r['pedido_id'] = (int) ($r['pedido_id'] ?? 0);
+            $r['valor_total'] = $r['valor_total'] ?? null;
+            $r['peso_total'] = $r['peso_total'] ?? null;
+            $r['created_at'] = $r['created_at'] ?? null;
+        }
+        unset($r);
+        return $rows;
     }
 
     private function getEtiquetasGeradas() {
-        $stmt = $this->connection->prepare("
-            SELECT e.*, r.remessa_id, r.pedido_id, u.nome as cliente_nome
-            FROM etiquetas_correios e 
-            LEFT JOIN remessas_internacionais r ON e.remessa_id = r.id 
-            LEFT JOIN usuarios u ON r.usuario_id = u.id 
-            WHERE e.status = 'gerada' 
-            AND e.data_impressao IS NULL
-            ORDER BY e.created_at DESC
+        $stmt = $this->connection->prepare(" 
+            SELECT ce.*, p.usuario_id, u.nome as cliente_nome
+            FROM correios_etiquetas ce
+            LEFT JOIN pedidos p ON p.id = ce.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE ce.status = 'gerada'
+              AND ce.data_impressao IS NULL
+            ORDER BY ce.created_at DESC
         ");
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$r) {
+            $r['remessa_id'] = (int) ($r['pedido_id'] ?? 0);
+        }
+        unset($r);
+        return $rows;
     }
 
     private function getEtiquetasImpressas() {
-        $stmt = $this->connection->prepare("
-            SELECT e.*, r.remessa_id, r.pedido_id, u.nome as cliente_nome
-            FROM etiquetas_correios e 
-            LEFT JOIN remessas_internacionais r ON e.remessa_id = r.id 
-            LEFT JOIN usuarios u ON r.usuario_id = u.id 
-            WHERE e.status = 'impressa' 
-            AND e.data_postagem IS NULL
-            ORDER BY e.data_impressao DESC
+        $stmt = $this->connection->prepare(" 
+            SELECT ce.*, p.usuario_id, u.nome as cliente_nome
+            FROM correios_etiquetas ce
+            LEFT JOIN pedidos p ON p.id = ce.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE ce.status = 'impressa'
+              AND ce.data_postagem IS NULL
+            ORDER BY ce.data_impressao DESC
         ");
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$r) {
+            $r['remessa_id'] = (int) ($r['pedido_id'] ?? 0);
+        }
+        unset($r);
+        return $rows;
     }
 
     private function getTotalPostadas() {
-        $stmt = $this->connection->prepare("
-            SELECT COUNT(*) as total FROM etiquetas_correios 
+        $stmt = $this->connection->prepare(" 
+            SELECT COUNT(*) as total FROM correios_etiquetas 
             WHERE status = 'postada'
         ");
         $stmt->execute();
@@ -475,51 +922,14 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function gerarEtiqueta($request) {
-        $remessaId = $request->getParam('id');
+        $pedidoId = (int) $request->getParam('id');
         
         try {
             $this->connection->beginTransaction();
-            
-            // Buscar dados da remessa
-            $stmt = $this->connection->prepare("
-                SELECT r.*, p.codigo_pedido, p.usuario_id, u.nome as cliente_nome, u.email as cliente_email
-                FROM remessas_internacionais r 
-                LEFT JOIN pedidos p ON r.pedido_id = p.id 
-                LEFT JOIN usuarios u ON p.usuario_id = u.id 
-                WHERE r.id = ?
-            ");
-            $stmt->execute([$remessaId]);
-            $remessa = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
-            if (!$remessa) {
-                echo json_encode(['success' => false, 'message' => 'Remessa não encontrada']);
-                exit;
-            }
-            
-            // Gerar código da etiqueta (simulação)
-            $codigoEtiqueta = $this->gerarCodigoEtiqueta();
-            
-            // Criar etiqueta
-            $stmt = $this->connection->prepare("
-                INSERT INTO etiquetas_correios 
-                (remessa_id, pedido_id, codigo_etiqueta, dados_remetente, dados_destinatario, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, 'gerada', NOW())
-            ");
-            $stmt->execute([
-                $remessaId,
-                $remessa['pedido_id'],
-                $codigoEtiqueta,
-                json_encode($this->getDadosRemetente()),
-                json_encode($this->getDadosDestinatario($remessa))
-            ]);
-            
-            $etiquetaId = $this->connection->lastInsertId();
-            
-            // Atualizar remessa
-            $stmt = $this->connection->prepare("
-                UPDATE remessas_internacionais SET etiqueta_gerada = 1 WHERE id = ?
-            ");
-            $stmt->execute([$remessaId]);
+
+            $r = $this->criarEtiquetaCorreiosParaPedido((int) $pedidoId);
+            $etiquetaId = (int) ($r['etiqueta_id'] ?? 0);
+            $codigoEtiqueta = (string) ($r['codigo_etiqueta'] ?? '');
             
             $this->connection->commit();
             
@@ -554,17 +964,33 @@ class AdminRemessaCorreiosController extends Controller {
         ];
     }
 
-    private function getDadosDestinatario($remessa) {
-        $dadosPedido = json_decode($remessa['dados_pedido'], true);
-        
+    private function getDadosDestinatario($pedido) {
+        $nome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+        $email = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
+
+        $endereco = 'Endereço não disponível';
+        $cidade = 'Cidade';
+        $estado = 'SP';
+        $cep = '00000-000';
+        $telefone = '';
+
+        if (isset($pedido['endereco']) && is_array($pedido['endereco'])) {
+            $end = $pedido['endereco'];
+            $endereco = (string) ($end['endereco'] ?? ($end['logradouro'] ?? $endereco));
+            $cidade = (string) ($end['cidade'] ?? $cidade);
+            $estado = (string) ($end['estado'] ?? $estado);
+            $cep = (string) ($end['cep'] ?? $cep);
+            $telefone = (string) ($end['telefone'] ?? $telefone);
+        }
+
         return [
-            'nome' => $remessa['cliente_nome'],
-            'email' => $remessa['cliente_email'],
-            'endereco' => $dadosPedido['endereco']['endereco'] ?? 'Endereço não disponível',
-            'cidade' => $dadosPedido['endereco']['cidade'] ?? 'Cidade',
-            'estado' => $dadosPedido['endereco']['estado'] ?? 'SP',
-            'cep' => $dadosPedido['endereco']['cep'] ?? '00000-000',
-            'telefone' => $dadosPedido['endereco']['telefone'] ?? ''
+            'nome' => $nome,
+            'email' => $email,
+            'endereco' => $endereco,
+            'cidade' => $cidade,
+            'estado' => $estado,
+            'cep' => $cep,
+            'telefone' => $telefone
         ];
     }
 
@@ -572,12 +998,23 @@ class AdminRemessaCorreiosController extends Controller {
         $etiquetaId = $request->getParam('id');
         
         try {
-            $stmt = $this->connection->prepare("
-                UPDATE etiquetas_correios 
+            $stmt = $this->connection->prepare(" 
+                UPDATE correios_etiquetas 
                 SET status = 'postada', data_postagem = NOW() 
                 WHERE id = ?
             ");
             $stmt->execute([$etiquetaId]);
+
+            try {
+                $stmtP = $this->connection->prepare('SELECT pedido_id FROM correios_etiquetas WHERE id = ? LIMIT 1');
+                $stmtP->execute([$etiquetaId]);
+                $pid = (int) ($stmtP->fetchColumn() ?: 0);
+                if ($pid > 0) {
+                    $pedidoModel = new PedidoEcommerce();
+                    $pedidoModel->atualizarStatus($pid, 'enviado', 'Postagem Correios confirmada', $_SESSION['usuario_id'] ?? null);
+                }
+            } catch (\Exception $e) {
+            }
             
             echo json_encode(['success' => true, 'message' => 'Postagem confirmada com sucesso!']);
             
@@ -591,8 +1028,8 @@ class AdminRemessaCorreiosController extends Controller {
         $etiquetaId = $request->getParam('id');
         
         try {
-            $stmt = $this->connection->prepare("
-                SELECT * FROM etiquetas_correios WHERE id = ?
+            $stmt = $this->connection->prepare(" 
+                SELECT * FROM correios_etiquetas WHERE id = ?
             ");
             $stmt->execute([$etiquetaId]);
             $etiqueta = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -603,8 +1040,8 @@ class AdminRemessaCorreiosController extends Controller {
             }
             
             // Marcar como impressa
-            $stmt = $this->connection->prepare("
-                UPDATE etiquetas_correios 
+            $stmt = $this->connection->prepare(" 
+                UPDATE correios_etiquetas 
                 SET status = 'impressa', data_impressao = NOW() 
                 WHERE id = ?
             ");
