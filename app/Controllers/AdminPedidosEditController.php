@@ -483,9 +483,9 @@ class AdminPedidosEditController {
                 $sku = (string) ($p['sku'] ?? '');
                 $loja = (string) ($p['loja'] ?? '');
 
-                $jsNome = json_encode($nome, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $jsSku = json_encode($sku, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $jsLoja = json_encode($loja, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $jsNome = htmlspecialchars(json_encode($nome, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
+                $jsSku = htmlspecialchars(json_encode($sku, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
+                $jsLoja = htmlspecialchars(json_encode($loja, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
 
                 echo '<div class="col-md-6 mb-2">'
                     . '<div class="card">'
