@@ -104,7 +104,23 @@ class Usuario extends Model {
                 $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
             }
         }
-        return parent::create($data);
+        $id = parent::create($data);
+
+        try {
+            if (empty($data['switch'])) {
+                $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($cols) && in_array('switch', $cols, true)) {
+                    $stmt = $this->getConnection()->prepare("UPDATE {$this->table} SET `switch` = :sw WHERE id = :id AND (`switch` IS NULL OR `switch` = 0)");
+                    $stmt->bindValue(':sw', (int) $id, \PDO::PARAM_INT);
+                    $stmt->bindValue(':id', (int) $id, \PDO::PARAM_INT);
+                    $stmt->execute();
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $id;
     }
 
     public function updatePassword($id, $novaSenha) {
