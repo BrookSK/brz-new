@@ -451,7 +451,7 @@ class AdminPedidosEditController {
                                     </table>
                                 </div>
 
-                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto" ' . (!$canEditItens ? 'disabled' : '') . '>
+                                <button type="button" class="btn btn-primary" onclick="abrirModalAdicionarProduto()" ' . (!$canEditItens ? 'disabled' : '') . '>
                                     <i class="fas fa-plus me-2"></i>Adicionar Produto
                                 </button>
                             </div>
@@ -524,6 +524,21 @@ class AdminPedidosEditController {
             const pedidoId = ' . (int) $id . ';
             const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
             const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
+
+            window.abrirModalAdicionarProduto = function(){
+                if (!canEditItens) return;
+                const el = document.getElementById("modalAdicionarProduto");
+                if (!el) {
+                    alert("Modal de produto não encontrado na página. Atualize a página com Ctrl+F5 e tente novamente.");
+                    return;
+                }
+                try {
+                    const inst = bootstrap.Modal.getOrCreateInstance(el);
+                    inst.show();
+                } catch (e) {
+                    console.error(e);
+                }
+            };
 
             window.calcularTotal = function(){
                 let subtotal = 0;
