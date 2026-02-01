@@ -68,7 +68,7 @@
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                     <input type="password" class="form-control" id="confirmar_senha" 
-                                           placeholder="Confirme sua senha" required>
+                                           name="senha_confirmacao" placeholder="Confirme sua senha" required>
                                 </div>
                             </div>
                         </div>
