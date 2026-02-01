@@ -1,9 +1,9 @@
 <?php ob_start(); ?>
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
-    <div class="row g-0">
+    <div class="row g-4 align-items-start">
         <!-- Formulário Principal -->
-        <div class="col-lg-8">
+        <div class="col-lg-8 mb-4 mb-lg-0">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
                         <!-- Campo oculto para moeda -->
@@ -329,11 +329,12 @@
                                 <i class="fas fa-bug"></i> Debug Botão
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    </form>
 </div>
 
 <div id="checkout-loading" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 9999;">
