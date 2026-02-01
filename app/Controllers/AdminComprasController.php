@@ -105,21 +105,38 @@ class AdminComprasController extends Controller {
             if ($temFoto) $selectCols[] = 'p.foto_principal as foto_principal';
             if ($temImages) $selectCols[] = 'p.images as images';
 
-            $sql = 'SELECT ' . implode(', ', $selectCols) . ' FROM lista_compras lc JOIN produtos p ON lc.produto_id = p.id';
-            if ($this->tableExists('lojas') && $temLojaIdEmLista) {
-                $sql .= ' LEFT JOIN lojas l ON l.id = lc.loja_id';
-            }
-            $sql .= " WHERE lc.status = 'pendente'";
+            // Consolidar por produto + loja (para não repetir linhas)
+            $rankExpr = "CASE lc.prioridade WHEN 'urgente' THEN 4 WHEN 'alta' THEN 3 WHEN 'media' THEN 2 WHEN 'baixa' THEN 1 ELSE 0 END";
+            $sql = 'SELECT ' . implode(', ', $selectCols)
+                . ', agg.quantidade_faltante as quantidade_faltante'
+                . ', agg.quantidade_necessaria as quantidade_necessaria'
+                . ', agg.prioridade as prioridade'
+                . ', agg.data_solicitacao as data_solicitacao'
+                . ', agg.loja_id as loja_id'
+                . ", 'pendente' as status"
+                . ' FROM ('
+                . '   SELECT produto_id, '
+                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+                . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
+                . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
+                . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
+                . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
+                . "   FROM lista_compras lc WHERE lc.status = 'pendente'"
+                . '   GROUP BY produto_id, '
+                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0)' : '0')
+                . ' ) agg'
+                . ' JOIN produtos p ON agg.produto_id = p.id';
+
             $params = [];
             if ($temLojaIdEmLista) {
                 if ($semLoja) {
-                    $sql .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                    $sql .= ' WHERE agg.loja_id = 0';
                 } elseif ($lojaIdFilter > 0) {
-                    $sql .= ' AND lc.loja_id = :loja_id';
+                    $sql .= ' WHERE agg.loja_id = :loja_id';
                     $params[':loja_id'] = $lojaIdFilter;
                 }
             }
-            $sql .= ' ORDER BY lc.prioridade DESC, lc.data_solicitacao ASC';
+            $sql .= ' ORDER BY agg.prioridade DESC, agg.data_solicitacao ASC';
 
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
@@ -314,6 +331,7 @@ class AdminComprasController extends Controller {
 
                                     $missingLoja = ($lojaIdRow <= 0);
                                      
+                                    $btnEditProduto = '<a class="btn btn-outline-primary" href="/admin/produtos/editar/' . (int) $item['produto_id'] . '" target="_blank"><i class="fas fa-pen"></i></a>';
                                     $btnLoja = $missingLoja
                                         ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"><i class="fas fa-store"></i></button>'
                                         : '';
@@ -335,6 +353,7 @@ class AdminComprasController extends Controller {
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
+                                        . $btnEditProduto
                                         . $btnLoja
                                         . '<button type="button" class="btn btn-outline-success" onclick="alert(\'Marcar como comprado: ' . htmlspecialchars($item['produto_nome']) . '\')"><i class="fas fa-check"></i></button>'
                                         . '<button type="button" class="btn btn-outline-danger" onclick="alert(\'Cancelar item: ' . htmlspecialchars($item['produto_nome']) . '\')"><i class="fas fa-times"></i></button>'
@@ -446,13 +465,34 @@ class AdminComprasController extends Controller {
         if ($temFoto) $selectCols[] = 'p.foto_principal as foto_principal';
         if ($temImages) $selectCols[] = 'p.images as images';
 
-        $sql = 'SELECT ' . implode(', ', $selectCols) . ' FROM lista_compras lc JOIN produtos p ON lc.produto_id = p.id WHERE lc.status = \'pendente\'';
+        // PDF consolidado por produto + loja
+        $rankExpr = "CASE lc.prioridade WHEN 'urgente' THEN 4 WHEN 'alta' THEN 3 WHEN 'media' THEN 2 WHEN 'baixa' THEN 1 ELSE 0 END";
+        $sql = 'SELECT ' . implode(', ', $selectCols)
+            . ', agg.quantidade_faltante as quantidade_faltante'
+            . ', agg.quantidade_necessaria as quantidade_necessaria'
+            . ', agg.data_solicitacao as data_solicitacao'
+            . ', agg.loja_id as loja_id'
+            . ', agg.prioridade as prioridade'
+            . ", 'pendente' as status"
+            . ' FROM ('
+            . '   SELECT produto_id, '
+            . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+            . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
+            . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
+            . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
+            . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
+            . "   FROM lista_compras lc WHERE lc.status = 'pendente'"
+            . '   GROUP BY produto_id, '
+            . ($temLojaIdEmLista ? 'COALESCE(loja_id,0)' : '0')
+            . ' ) agg'
+            . ' JOIN produtos p ON agg.produto_id = p.id';
+
         $params = [];
         if ($lojaId > 0 && $temLojaIdEmLista) {
-            $sql .= ' AND lc.loja_id = :loja_id';
+            $sql .= ' WHERE agg.loja_id = :loja_id';
             $params[':loja_id'] = $lojaId;
         }
-        $sql .= ' ORDER BY lc.prioridade DESC, lc.data_solicitacao ASC';
+        $sql .= ' ORDER BY agg.prioridade DESC, agg.data_solicitacao ASC';
         $stmt = $this->connection->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
