@@ -1128,11 +1128,13 @@ class AdminComprasController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
-                    <div>
-                        <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
+                    <div>';
+
+        echo '<button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
-                        </button>
-        } else {
+                        </button>';
+
+        if ($statusView !== 'pendente') {
             echo '<form method="POST" action="/admin/estoque/compras/reabrir" class="d-inline">
                             <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                             <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
@@ -1142,8 +1144,7 @@ class AdminComprasController extends Controller {
                         </form>';
         }
 
-        echo '
-                        <button type="button" class="btn btn-info" onclick="location.reload()">
+        echo '<button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
