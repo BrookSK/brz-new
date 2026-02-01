@@ -5,7 +5,7 @@ class AdminComprasController extends Controller {
     private $connection;
 
     public function __construct() {
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection = \Config\Database::getConnection();
     }
 
     private function findPedidoItensTable(): ?string {
@@ -62,6 +62,257 @@ class AdminComprasController extends Controller {
             return $rows ?: [];
         } catch (\Exception $e) {
             return [];
+        }
+    }
+
+    private function fetchUsuariosSelect(): array {
+        if (!$this->tableExists('usuarios')) {
+            return [];
+        }
+        try {
+            $temName = $this->columnExists('usuarios', 'name');
+            $temNome = $this->columnExists('usuarios', 'nome');
+            $nomeExpr = $temName ? 'u.name' : ($temNome ? 'u.nome' : "''");
+
+            $cols = ['u.id as id', $nomeExpr . ' as nome'];
+            if ($this->columnExists('usuarios', 'email')) {
+                $cols[] = 'u.email as email';
+            } else {
+                $cols[] = "'' as email";
+            }
+
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM usuarios u ORDER BY nome ASC, u.id DESC LIMIT 2000';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function novoItem($request) {
+        try {
+            $usuarios = $this->fetchUsuariosSelect();
+            $produtosSelect = $this->fetchProdutosSelect();
+        } catch (\Exception $e) {
+            $usuarios = [];
+            $produtosSelect = [];
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Item - Lista de Compras</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+        renderAdminSidebar('compras');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-plus me-2"></i>Novo Item na Lista de Compras</h1>
+                <div>
+                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="/admin/estoque/compras/salvar" id="formNovoItem">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Usuário *</label>
+                                <select class="form-select" name="usuario_id" id="novo_usuario_id" required>
+                                    <option value="">Selecione...</option>';
+
+        foreach ($usuarios as $u) {
+            $uid = (int) ($u['id'] ?? 0);
+            if ($uid <= 0) continue;
+            $nome = (string) ($u['nome'] ?? '');
+            $email = (string) ($u['email'] ?? '');
+            $label = trim($nome) !== '' ? $nome : ('Usuário #' . $uid);
+            if ($email !== '') $label .= ' - ' . $email;
+            echo '<option value="' . $uid . '">' . htmlspecialchars($label) . '</option>';
+        }
+
+        echo '                 </select>
+                                <div class="form-text">Selecione o usuário para carregar os pedidos.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Pedido *</label>
+                                <select class="form-select" name="pedido_id" id="novo_pedido_id" required disabled>
+                                    <option value="">Selecione um usuário primeiro...</option>
+                                </select>
+                                <div class="form-text">Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Produto *</label>
+                                <select class="form-select" name="produto_id" required>
+                                    <option value="">Selecione...</option>';
+
+        foreach ($produtosSelect as $p) {
+            $pid = (int) ($p['produto_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $pn = (string) ($p['produto_nome'] ?? '');
+            $sku = (string) ($p['sku'] ?? '');
+            $label = trim($pn) !== '' ? $pn : ('Produto #' . $pid);
+            if ($sku !== '') $label .= ' - ' . $sku;
+            echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
+        }
+
+        echo '                 </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Quantidade *</label>
+                                <input type="number" class="form-control" name="quantidade" min="1" required>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Valor pendente (diferença) *</label>
+                                <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Prioridade</label>
+                                <select class="form-select" name="prioridade">
+                                    <option value="media" selected>Média</option>
+                                    <option value="baixa">Baixa</option>
+                                    <option value="alta">Alta</option>
+                                    <option value="urgente">Urgente</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>Salvar</button>
+                                    <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank">Cancelar</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+        </div>
+    </div>';
+
+        renderAdminScripts();
+
+        echo '<script>
+            function escapeHtml(str){
+                if (str === null || str === undefined) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/\'/g, "&#039;");
+            }
+
+            function formatMoney(v){
+                if (v === null || v === undefined || v === "") return "-";
+                var n = Number(v);
+                if (isNaN(n)) return String(v);
+                return "$ " + n.toFixed(2);
+            }
+
+            function loadPedidosDoUsuario(usuarioId){
+                var sel = document.getElementById("novo_pedido_id");
+                if (!sel) return;
+                sel.disabled = true;
+                sel.innerHTML = "<option value=\"\">Carregando...</option>";
+
+                fetch("/admin/estoque/compras/pedidos-usuario?usuario_id=" + encodeURIComponent(String(usuarioId)), {
+                    headers: { "Accept": "application/json" }
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (!data || !data.success) {
+                        sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                        return;
+                    }
+                    var pedidos = data.pedidos || [];
+                    if (!pedidos.length) {
+                        sel.innerHTML = "<option value=\"\">Nenhum pedido para este usuário</option>";
+                        return;
+                    }
+                    var html = "<option value=\"\">Selecione...</option>";
+                    pedidos.forEach(function(p){
+                        var pid = p.id || 0;
+                        if (!pid) return;
+                        var label = "Pedido #" + pid;
+                        if (p.codigo_pedido) label += " (" + p.codigo_pedido + ")";
+                        if (p.status) label += " - " + p.status;
+                        if (p.valor_total !== null && p.valor_total !== undefined) label += " - " + formatMoney(p.valor_total);
+                        html += "<option value=\"" + escapeHtml(pid) + "\">" + escapeHtml(label) + "</option>";
+                    });
+                    sel.innerHTML = html;
+                    sel.disabled = false;
+                })
+                .catch(function(){
+                    sel.innerHTML = "<option value=\"\">Erro ao carregar pedidos</option>";
+                });
+            }
+
+            var userSel = document.getElementById("novo_usuario_id");
+            if (userSel) {
+                userSel.addEventListener("change", function(){
+                    var uid = this.value || "";
+                    if (!uid) {
+                        var sel = document.getElementById("novo_pedido_id");
+                        if (sel) {
+                            sel.disabled = true;
+                            sel.innerHTML = "<option value=\"\">Selecione um usuário primeiro...</option>";
+                        }
+                        return;
+                    }
+                    loadPedidosDoUsuario(uid);
+                });
+            }
+        </script>';
+
+        echo '</body></html>';
+    }
+
+    public function pedidosUsuario($request) {
+        header('Content-Type: application/json; charset=utf-8');
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
+
+        if ($usuarioId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+            return;
+        }
+
+        try {
+            $cols = ['id', 'codigo_pedido', 'status', 'valor_total', 'created_at', 'pago_em', 'payment_status'];
+            $colsReal = [];
+            foreach ($cols as $c) {
+                if ($this->columnExists('pedidos', $c)) {
+                    $colsReal[] = $c;
+                }
+            }
+            if (empty($colsReal)) {
+                $colsReal = ['id'];
+            }
+
+            $stmt = $this->connection->prepare('SELECT ' . implode(', ', $colsReal) . ' FROM pedidos WHERE usuario_id = :uid ORDER BY id DESC LIMIT 200');
+            $stmt->execute([':uid' => $usuarioId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            echo json_encode(['success' => true, 'pedidos' => $rows]);
+            return;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erro ao buscar pedidos do usuário.']);
+            return;
         }
     }
 
@@ -598,9 +849,9 @@ class AdminComprasController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#modalNovoItem" ' . ($statusView !== 'pendente' ? 'disabled' : '') . '>
+                        <a class="btn btn-success me-2" href="/admin/estoque/compras/novo" target="_blank" ' . ($statusView !== 'pendente' ? 'aria-disabled="true" style="pointer-events:none;opacity:.65;"' : '') . '>
                             <i class="fas fa-plus me-1"></i>Novo Item
-                        </button>
+                        </a>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
                         </button>
@@ -856,81 +1107,6 @@ class AdminComprasController extends Controller {
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                                         <button type="submit" class="btn btn-primary">Salvar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>';
-
-                // Modal: Novo item (manual)
-                echo '<div class="modal fade" id="modalNovoItem" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="/admin/estoque/compras/salvar">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Novo item na lista</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="mb-2">
-                                            <label class="form-label">Produto *</label>
-                                            <select class="form-select" name="produto_id" required>
-                                                <option value="">Selecione...</option>';
-
-                foreach ($produtosSelect as $p) {
-                    $pid = (int) ($p['produto_id'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $pn = (string) ($p['produto_nome'] ?? '');
-                    $sku = (string) ($p['sku'] ?? '');
-                    $label = trim($pn) !== '' ? $pn : ('Produto #' . $pid);
-                    if ($sku !== '') $label .= ' - ' . $sku;
-                    echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
-                }
-
-                echo '            </select>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label">Quantidade *</label>
-                                            <input type="number" class="form-control" name="quantidade" min="1" required>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label">Pedido *</label>
-                                            <select class="form-select" name="pedido_id" required>
-                                                <option value="">Selecione...</option>';
-
-                foreach ($pedidosSelect as $p) {
-                    $pid = (int) ($p['id'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $codigo = (string) ($p['codigo_pedido'] ?? '');
-                    $st = (string) ($p['status'] ?? '');
-                    $vt = isset($p['valor_total']) ? (float) $p['valor_total'] : null;
-                    $label = 'Pedido #' . $pid;
-                    if ($codigo !== '') $label .= ' (' . $codigo . ')';
-                    if ($st !== '') $label .= ' - ' . $st;
-                    if ($vt !== null) $label .= ' - $ ' . number_format($vt, 2, '.', ',');
-                    echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
-                }
-
-                echo '            </select>
-                                            <div class="form-text">Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).</div>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label">Valor pendente (diferença) *</label>
-                                            <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" required>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label">Prioridade</label>
-                                            <select class="form-select" name="prioridade">
-                                                <option value="media" selected>Média</option>
-                                                <option value="baixa">Baixa</option>
-                                                <option value="alta">Alta</option>
-                                                <option value="urgente">Urgente</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Salvar</button>
                                     </div>
                                 </form>
                             </div>
@@ -1361,6 +1537,7 @@ class AdminComprasController extends Controller {
     public function salvar($request) {
         $produtoId = (int) $request->getParam('produto_id', 0);
         $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
         $quantidade = (int) $request->getParam('quantidade', 0);
         $valorPendente = (float) $request->getParam('valor_pendente', 0);
         $prioridade = (string) $request->getParam('prioridade', 'media');
@@ -1388,6 +1565,22 @@ class AdminComprasController extends Controller {
             }
 
             $pedidoPago = $this->pedidoEstaPago($pedido);
+
+            if ($usuarioId > 0 && $this->columnExists('pedidos', 'usuario_id')) {
+                try {
+                    $stmtChk = $this->connection->prepare('SELECT usuario_id FROM pedidos WHERE id = :id LIMIT 1');
+                    $stmtChk->execute([':id' => $pedidoId]);
+                    $uPed = (int) ($stmtChk->fetchColumn() ?: 0);
+                    if ($uPed > 0 && $uPed !== $usuarioId) {
+                        $this->connection->rollBack();
+                        $_SESSION['message'] = 'Pedido não pertence ao usuário selecionado.';
+                        $_SESSION['message_type'] = 'danger';
+                        header('Location: /admin/estoque/compras/novo');
+                        exit;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
 
             // Atualizar o valor do pedido apenas se estiver pendente
             $colsPedidos = [];
