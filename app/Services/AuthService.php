@@ -46,7 +46,7 @@ class AuthService {
         session_start();
         
         $_SESSION['usuario_id'] = $usuario['id'];
-        $_SESSION['usuario_nome'] = $usuario['nome'];
+        $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
         $_SESSION['usuario_email'] = $usuario['email'];
         $_SESSION['usuario_perfil'] = $usuario['perfil'];
         $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];

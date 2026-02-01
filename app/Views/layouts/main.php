@@ -771,6 +771,23 @@
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
                     $usuarioLogado = $isLoggedIn ? $_SESSION['usuario_nome'] : null;
                     $usuarioAvatar = $isLoggedIn ? ($_SESSION['usuario_avatar'] ?? null) : null;
+                    if ($isLoggedIn && (empty($usuarioLogado) || !is_string($usuarioLogado))) {
+                        try {
+                            $uModel = new \App\Models\Usuario();
+                            $u = $uModel->find($_SESSION['usuario_id'] ?? 0);
+                            if (is_array($u)) {
+                                $nameCandidates = ['nome', 'name', 'full_name', 'fullname', 'usuario_nome'];
+                                foreach ($nameCandidates as $c) {
+                                    if (!empty($u[$c]) && is_string($u[$c])) {
+                                        $usuarioLogado = $u[$c];
+                                        $_SESSION['usuario_nome'] = $usuarioLogado;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
                     if ($isLoggedIn && (empty($usuarioAvatar) || !is_string($usuarioAvatar))) {
                         try {
                             $uModel = new \App\Models\Usuario();
