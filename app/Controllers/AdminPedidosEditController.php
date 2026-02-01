@@ -669,20 +669,25 @@ class AdminPedidosEditController {
                 window.location.href = "/admin/pedidos/atualizar-status/" + pedidoId + "/" + st;
             };
 
-            window.gerarCobrancaDiferenca = function(){
-                if (!temPagamentoAsaas) return;
-                const box = document.getElementById("box_link_diferenca");
+            window.gerarLinkDiferenca = function(){
+                const box = document.getElementById("diferenca_link_box");
                 if (!box) return;
-                box.style.display = "block";
                 box.className = "alert alert-info";
                 box.textContent = "Gerando link...";
 
-                fetch("/admin/estoque/compras/gerar-link-diferenca?pedido_id=" + pedidoId)
+                var inp = document.getElementById("diferenca_valor");
+                var val = inp ? inp.value : "";
+
+                fetch("/admin/estoque/compras/gerar-link-diferenca", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: "pedido_id=" + encodeURIComponent(String(pedidoId)) + "&valor=" + encodeURIComponent(String(val))
+                })
                     .then(function(r){ return r.json(); })
                     .then(function(data){
-                        if (!data.success) {
-                            box.className = "alert alert-warning";
-                            box.textContent = data.message || "Não foi possível gerar a cobrança.";
+                        if (!data || !data.success) {
+                            box.className = "alert alert-danger";
+                            box.textContent = (data && data.message) ? data.message : "Erro ao gerar link";
                             return;
                         }
                         const link = data.bankSlipUrl || data.invoiceUrl || "";
@@ -695,6 +700,10 @@ class AdminPedidosEditController {
                         box.className = "alert alert-danger";
                         box.textContent = "Erro ao gerar a cobrança.";
                     });
+            };
+
+            window.gerarCobrancaDiferenca = function(){
+                return window.gerarLinkDiferenca();
             };
 
             window.calcularTotal();
