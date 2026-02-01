@@ -1460,8 +1460,9 @@ function gerarEtiqueta() {
         if (!$pedido) return null;
         
         // Buscar itens do pedido
+        $produtoNomeCol = $this->getProdutosNomeColumn();
         $stmt = $this->connection->prepare("
-            SELECT pi.*, pr.nome as produto_nome, pr.sku 
+            SELECT pi.*, pr.{$produtoNomeCol} as produto_nome, pr.sku 
             FROM pedido_itens pi 
             LEFT JOIN produtos pr ON pi.produto_id = pr.id 
             WHERE pi.pedido_id = ?
@@ -1488,6 +1489,33 @@ function gerarEtiqueta() {
         }
 
         return $pedido;
+    }
+
+    private function getProdutosNomeColumn() {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+
+        $candidates = ['nome', 'titulo', 'nome_produto', 'name', 'title'];
+        try {
+            $db = (string) $this->connection->query('SELECT DATABASE()')->fetchColumn();
+            if ($db !== '') {
+                $placeholders = implode(',', array_fill(0, count($candidates), '?'));
+                $sql = "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'produtos' AND COLUMN_NAME IN ({$placeholders}) ORDER BY FIELD(COLUMN_NAME, {$placeholders}) LIMIT 1";
+                $params = array_merge([$db], $candidates, $candidates);
+                $st = $this->connection->prepare($sql);
+                $st->execute($params);
+                $col = (string) ($st->fetchColumn() ?: '');
+                if ($col !== '') {
+                    $cached = $col;
+                    return $cached;
+                }
+            }
+        } catch (\Exception $e) {
+            // ignore and fallback below
+        }
+
+        $cached = 'nome';
+        return $cached;
     }
 
     private function enviarWebhook($remessaId, $pedido) {
