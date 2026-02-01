@@ -330,8 +330,9 @@ class AdminPedidosEditController {
                                     <div class="fw-bold">Cobrança de diferença</div>
                                     <div class="text-muted small">Gera automaticamente: <strong>(novo total) - (valor já pago)</strong> no Asaas.</div>
                                 </div>
-                                <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-outline-dark" onclick="gerarCobrancaDiferenca()" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <input type="number" step="0.01" min="0" class="form-control" id="diferenca_valor" placeholder="Valor (opcional)" style="max-width: 180px;" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
+                                    <button type="button" class="btn btn-outline-dark" onclick="gerarLinkDiferenca()" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
                                         <i class="fas fa-link me-1"></i>Gerar link da diferença
                                     </button>
                                 </div>
@@ -670,8 +671,9 @@ class AdminPedidosEditController {
             };
 
             window.gerarLinkDiferenca = function(){
-                const box = document.getElementById("diferenca_link_box");
+                const box = document.getElementById("box_link_diferenca");
                 if (!box) return;
+                box.style.display = "block";
                 box.className = "alert alert-info";
                 box.textContent = "Gerando link...";
 
