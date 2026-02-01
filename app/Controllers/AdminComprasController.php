@@ -393,7 +393,7 @@ class AdminComprasController extends Controller {
                     }
                 </script>';
 
-            </main>
+                echo '</main>
         </div>
     </div>';
 
