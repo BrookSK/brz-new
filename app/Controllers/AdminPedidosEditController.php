@@ -18,6 +18,12 @@ class AdminPedidosEditController {
         }
     }
 
+    private function getItensTable(): string {
+        if ($this->tableExists('pedido_itens')) return 'pedido_itens';
+        if ($this->tableExists('pedido_items')) return 'pedido_items';
+        return 'pedido_itens';
+    }
+
     private function columnExists(string $table, string $column): bool {
         try {
             $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
@@ -215,6 +221,8 @@ class AdminPedidosEditController {
 
             $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
             $bloquearEdicao = ($statusAtual === 'pago');
+
+            $itensTable = $this->getItensTable();
             
             // Buscar itens do pedido
             $stmt = $this->connection->prepare("
@@ -234,7 +242,7 @@ class AdminPedidosEditController {
                      WHERE pf.produto_id = pi.produto_id 
                      ORDER BY pf.principal DESC, pf.ordem ASC 
                      LIMIT 1) as imagem_principal
-                FROM pedido_itens pi 
+                FROM {$itensTable} pi 
                 WHERE pi.pedido_id = :id 
                 ORDER BY pi.id
             ");
@@ -263,32 +271,65 @@ class AdminPedidosEditController {
             exit;
         }
         
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editar Pedido #' . $pedido['codigo_pedido'] . '</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '
 </head>
-<body class="bg-light">
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-12">
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('pedidos');
+
+        $statusLower = strtolower((string) ($pedido['status'] ?? ''));
+        $canEditItens = ($statusLower !== 'pago');
+        $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? ''));
+        $temPagamentoAsaas = ($gatewayPedido === 'asaas' && !empty($pedido['payment_id'] ?? ''));
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . $pedido['codigo_pedido'] . '</h2>
-                    <div>
-                        <a href="/admin/pedidos/detalhes/' . $id . '" class="btn btn-secondary me-2">
+                    <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . htmlspecialchars((string) $pedido['codigo_pedido']) . '</h2>
+                    <div class="d-flex gap-2">
+                        <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
                         </a>
-                        <button type="button" class="btn btn-success" onclick="salvarPedido()" ' . ($bloquearEdicao ? 'disabled' : '') . '>
+                        <button type="button" class="btn btn-success" onclick="salvarPedido()" ' . (!$canEditItens ? 'disabled' : '') . '>
                             <i class="fas fa-save me-1"></i>Salvar
                         </button>
                     </div>
                 </div>
 
-                ' . ($bloquearEdicao ? '<div class="alert alert-warning">Este pedido está com status <strong>Pago</strong>. Para editar/adicionar itens e calcular a diferença corretamente, altere primeiro o status para <strong>Pendente</strong> e então edite novamente.</div>' : '') . '
+                ' . (!$canEditItens ? '<div class="alert alert-warning">Este pedido está com status <strong>Pago</strong>. Você pode <strong>alterar o status</strong> abaixo, mas não pode editar/adicionar itens até voltar para <strong>Pendente</strong>.</div>' : '') . '
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card mb-4">
+                            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="fw-bold">Cobrança de diferença</div>
+                                    <div class="text-muted small">Gera automaticamente: <strong>(novo total) - (valor já pago)</strong> no Asaas.</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-dark" onclick="gerarCobrancaDiferenca()" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
+                                        <i class="fas fa-link me-1"></i>Gerar link da diferença
+                                    </button>
+                                </div>
+                                <div id="box_link_diferenca" class="w-100 mt-2" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="row">
                     <div class="col-md-4">
@@ -304,17 +345,20 @@ class AdminPedidosEditController {
                                 <div class="mb-3">
                                     <label class="form-label">Status</label>
                                     <select class="form-select" id="pedido_status">
-                                        <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                        <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                        <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
-                                        <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                                        <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                                        <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                        <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
-                                        <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                        <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                                        <option value="pendente" ' . ($statusAtual === 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                        <option value="pago" ' . ($statusAtual === 'pago' ? 'selected' : '') . '>Pago</option>
+                                        <option value="processando" ' . ($statusAtual === 'processando' ? 'selected' : '') . '>Processando</option>
+                                        <option value="produto_consolidado" ' . ($statusAtual === 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="em_transporte" ' . ($statusAtual === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                        <option value="aguardando_liberacao_aduaneira" ' . ($statusAtual === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                        <option value="enviado_ao_destinatario" ' . ($statusAtual === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                        <option value="enviado" ' . ($statusAtual === 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                        <option value="entregue" ' . ($statusAtual === 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                        <option value="cancelado" ' . ($statusAtual === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>
+                                    <button type="button" class="btn btn-outline-primary w-100 mt-2" onclick="atualizarSomenteStatus()">
+                                        <i class="fas fa-rotate me-1"></i>Atualizar Status
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -381,14 +425,14 @@ class AdminPedidosEditController {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <input type="number" class="form-control form-control-sm quantidade" value="' . $item['quantidade'] . '" min="1" onchange="atualizarSubtotal(this)">
+                                                    <input type="number" class="form-control form-control-sm quantidade" value="' . (int) $item['quantidade'] . '" min="1" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
                                                 </td>
                                                 <td>
-                                                    <input type="number" class="form-control form-control-sm preco_unitario" value="' . $item['preco_unitario'] . '" min="0" step="0.01" onchange="atualizarSubtotal(this)">
+                                                    <input type="number" class="form-control form-control-sm preco_unitario" value="' . (float) $item['preco_unitario'] . '" min="0" step="0.01" onchange="atualizarSubtotal(this)" ' . (!$canEditItens ? 'readonly' : '') . '>
                                                 </td>
                                                 <td class="subtotal">' . number_format($item['subtotal'], 2, ',', '.') . '</td>
                                                 <td>
-                                                    <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)">
+                                                    <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)" ' . (!$canEditItens ? 'disabled' : '') . '>
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </td>
@@ -399,7 +443,7 @@ class AdminPedidosEditController {
                                     </table>
                                 </div>
                                 
-                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto">
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarProduto" ' . (!$canEditItens ? 'disabled' : '') . '>
                                     <i class="fas fa-plus me-2"></i>Adicionar Produto
                                 </button>
                             </div>
@@ -455,9 +499,11 @@ class AdminPedidosEditController {
         </div>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let pedidoId = ' . $id . ';
+        const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
+        const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
         
         function calcularTotal() {
             let subtotal = 0;
@@ -487,6 +533,7 @@ class AdminPedidosEditController {
         }
         
         function removerItem(btn) {
+            if (!canEditItens) return;
             if (confirm("Tem certeza que deseja remover este item?")) {
                 btn.closest(".item-row").remove();
                 calcularTotal();
@@ -502,6 +549,7 @@ class AdminPedidosEditController {
         }
         
         function selecionarProduto(id, nome, preco, sku, loja) {
+            if (!canEditItens) return;
             let tbody = document.getElementById("itens_pedido");
             let newRow = tbody.insertRow();
             newRow.className = "item-row";
@@ -535,10 +583,7 @@ class AdminPedidosEditController {
         }
         
         function salvarPedido() {
-            if (' . ($bloquearEdicao ? 'true' : 'false') . ') {
-                alert("Este pedido está com status Pago. Altere para Pendente antes de editar para calcular a diferença corretamente.");
-                return;
-            }
+            if (!canEditItens) return;
             let itens = [];
             document.querySelectorAll(".item-row").forEach(function(row) {
                 let item = {
@@ -594,6 +639,40 @@ class AdminPedidosEditController {
         
         // Inicializar
         calcularTotal();
+
+        function atualizarSomenteStatus() {
+            const status = document.getElementById("pedido_status").value;
+            if (!status) return;
+            window.location.href = "/admin/pedidos/atualizar-status/" + pedidoId + "/" + status;
+        }
+
+        function gerarCobrancaDiferenca() {
+            if (!temPagamentoAsaas) return;
+            const box = document.getElementById("box_link_diferenca");
+            box.style.display = "block";
+            box.className = "alert alert-info";
+            box.textContent = "Gerando link...";
+
+            fetch("/admin/estoque/compras/gerar-link-diferenca?pedido_id=" + pedidoId)
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (!data.success) {
+                        box.className = "alert alert-warning";
+                        box.textContent = data.message || "Não foi possível gerar a cobrança.";
+                        return;
+                    }
+
+                    const link = data.bankSlipUrl || data.invoiceUrl || "";
+                    box.className = "alert alert-success";
+                    box.innerHTML = "<div class=\"fw-bold\">Cobrança gerada</div>" +
+                        (data.diferenca ? ("<div class=\"small\">Diferença: <strong>R$ " + Number(data.diferenca).toFixed(2).replace(".", ",") + "</strong></div>") : "") +
+                        (link ? ("<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-dark\" href=\"" + link + "\" target=\"_blank\" rel=\"noopener\">Abrir link</a></div>") : "");
+                })
+                .catch(function(){
+                    box.className = "alert alert-danger";
+                    box.textContent = "Erro ao gerar a cobrança.";
+                });
+        }
     </script>
 </body>
 </html>';
@@ -618,10 +697,11 @@ class AdminPedidosEditController {
                 $oldStatus = '';
             }
 
+            // Se estiver pago, não permite editar itens aqui (apenas via rota atualizar-status).
             if (strtolower(trim($oldStatus)) === 'pago') {
                 echo json_encode([
                     'success' => false,
-                    'message' => 'Pedido está com status Pago. Altere para Pendente antes de editar/adicionar itens para calcular a diferença corretamente.'
+                    'message' => 'Pedido está com status Pago. Para editar itens, altere para Pendente primeiro. Para alterar apenas o status, use o botão "Atualizar Status".'
                 ]);
                 return;
             }
@@ -643,7 +723,8 @@ class AdminPedidosEditController {
             $this->limparReservasEPendenciasDoPedido($pedidoId);
             
             // Primeiro, remover todos os itens existentes do pedido
-            $stmt = $this->connection->prepare("DELETE FROM pedido_itens WHERE pedido_id = :pedido_id");
+            $itensTable = $this->getItensTable();
+            $stmt = $this->connection->prepare("DELETE FROM {$itensTable} WHERE pedido_id = :pedido_id");
             $stmt->bindParam(':pedido_id', $dados['pedido_id']);
             $stmt->execute();
             
@@ -655,7 +736,7 @@ class AdminPedidosEditController {
                 
                 // Inserir novo item
                 $stmt = $this->connection->prepare("
-                    INSERT INTO pedido_itens (
+                    INSERT INTO {$itensTable} (
                         pedido_id, produto_id, quantidade, preco_unitario, subtotal,
                         nome_produto, nome_produto_sku, loja, created_at
                     ) VALUES (
