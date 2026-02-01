@@ -354,8 +354,8 @@ class AdminDashboardController extends Controller {
                         </div>
                     </div>
                 </div>';
-                
-                <div class="row mb-4">
+
+                            echo '<div class="row mb-4">
                     <div class="col-12">
                         <h3 class="h5 mb-3">Ações Rápidas</h3>
                         <div class="row">
