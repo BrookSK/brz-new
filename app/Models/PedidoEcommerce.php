@@ -781,6 +781,24 @@ class PedidoEcommerce extends Model {
             
             // Garantir que o pedido tenha todos os campos necessários
             $pedido['codigo_pedido'] = $pedido['numero_pedido'] ?? 'PED-' . str_pad($pedidoId, 6, '0', STR_PAD_LEFT);
+
+            // Normalizar status: alguns schemas usam status_pedido ou pedido_status
+            $statusPedidoCol = 'status';
+            if (isset($colsP) && is_array($colsP) && !in_array('status', $colsP, true)) {
+                foreach (['status_pedido', 'pedido_status'] as $cand) {
+                    if (in_array($cand, $colsP, true)) {
+                        $statusPedidoCol = $cand;
+                        break;
+                    }
+                }
+            }
+
+            if (!isset($pedido['status']) || $pedido['status'] === null || $pedido['status'] === '') {
+                if (!empty($statusPedidoCol) && isset($pedido[$statusPedidoCol])) {
+                    $pedido['status'] = $pedido[$statusPedidoCol];
+                }
+            }
+
             $pedido['status'] = $pedido['status'] ?? 'pendente';
             if (empty($pedido['status'])) {
                 $pedido['status'] = 'pendente';
