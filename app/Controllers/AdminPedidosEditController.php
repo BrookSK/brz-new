@@ -471,6 +471,8 @@ class AdminPedidosEditController {
 
     }
 
+    }
+
     public function salvar($request) {
         try {
             $dados = json_decode(file_get_contents('php://input'), true);
