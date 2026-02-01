@@ -18,6 +18,46 @@ class AdminComprasController extends Controller {
         }
     }
 
+    public function removerItem($request) {
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $lojaId = (int) $request->getParam('loja_id', 0);
+
+        if ($produtoId <= 0) {
+            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+
+        try {
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            $whereLoja = '';
+            $params = [':produto_id' => $produtoId];
+            if ($temLojaIdEmLista) {
+                if ($lojaId > 0) {
+                    $whereLoja = ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                } else {
+                    $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                }
+            }
+
+            $stmt = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja);
+            $stmt->execute($params);
+
+            $_SESSION['message'] = 'Item removido da lista.';
+            $_SESSION['message_type'] = 'success';
+            header('Location: /admin/estoque/compras');
+            exit;
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao remover item.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+    }
+
     private function columnExists(string $table, string $column): bool {
         try {
             $stmt = $this->connection->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE ?');
@@ -193,12 +233,19 @@ class AdminComprasController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
+                        <button type="button" class="btn btn-success me-2" disabled>
                             <i class="fas fa-plus me-1"></i>Novo Item
                         </button>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
                         </button>
+                        <form method="POST" action="/admin/estoque/compras/concluir" class="d-inline">
+                            <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
+                            <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
+                            <button type="button" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#modalConcluirCompras">
+                                <i class="fas fa-check-double me-1"></i>Concluir compras
+                            </button>
+                        </form>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
@@ -330,7 +377,20 @@ class AdminComprasController extends Controller {
 
                                     $missingLoja = ($lojaIdRow <= 0);
                                      
-                                    $btnEditProduto = '<a class="btn btn-outline-primary" href="/admin/produtos/editar/' . (int) $item['produto_id'] . '" target="_blank"><i class="fas fa-pen"></i></a>';
+                                    $btnEditItem = '<button type="button" class="btn btn-outline-primary"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalEditarItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-quantidade="' . (int) $qf . '"'
+                                        . ' data-prioridade="' . htmlspecialchars((string) ($item['prioridade'] ?? 'media')) . '"'
+                                        . '><i class="fas fa-pen"></i></button>';
+                                    $btnRemoverItem = '<button type="button" class="btn btn-outline-danger"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalRemoverItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . '><i class="fas fa-trash"></i></button>';
                                     $btnLoja = $missingLoja
                                         ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"><i class="fas fa-store"></i></button>'
                                         : '';
@@ -352,10 +412,15 @@ class AdminComprasController extends Controller {
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
-                                        . $btnEditProduto
+                                        . $btnEditItem
                                         . $btnLoja
-                                        . '<button type="button" class="btn btn-outline-success" onclick="alert(\'Marcar como comprado: ' . htmlspecialchars($item['produto_nome']) . '\')"><i class="fas fa-check"></i></button>'
-                                        . '<button type="button" class="btn btn-outline-danger" onclick="alert(\'Cancelar item: ' . htmlspecialchars($item['produto_nome']) . '\')"><i class="fas fa-times"></i></button>'
+                                        . '<button type="button" class="btn btn-outline-success"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . '><i class="fas fa-check"></i></button>'
+                                        . $btnRemoverItem
                                         . '</div>'
                                         . '</td>'
                                         . '</tr>';
@@ -411,6 +476,151 @@ class AdminComprasController extends Controller {
                     }
                 </script>';
 
+                // Modal: Editar item
+                echo '<div class="modal fade" id="modalEditarItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/editar-item">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Editar item da lista</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" name="produto_id" id="edit_produto_id" value="">
+                                        <input type="hidden" name="loja_id" id="edit_loja_id" value="0">
+                                        <div class="mb-2 text-muted" id="edit_produto_nome"></div>
+                                        <label class="form-label">Quantidade *</label>
+                                        <input type="number" class="form-control" name="quantidade" id="edit_quantidade" min="0" required>
+                                        <label class="form-label mt-3">Prioridade *</label>
+                                        <select class="form-select" name="prioridade" id="edit_prioridade" required>
+                                            <option value="baixa">Baixa</option>
+                                            <option value="media">Média</option>
+                                            <option value="alta">Alta</option>
+                                            <option value="urgente">Urgente</option>
+                                        </select>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                echo '<script>
+                    var modalEditarItem = document.getElementById("modalEditarItem");
+                    if (modalEditarItem) {
+                        modalEditarItem.addEventListener("show.bs.modal", function (event) {
+                            var button = event.relatedTarget;
+                            document.getElementById("edit_produto_id").value = button.getAttribute("data-produto-id") || "";
+                            document.getElementById("edit_loja_id").value = button.getAttribute("data-loja-id") || "0";
+                            document.getElementById("edit_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                            document.getElementById("edit_quantidade").value = button.getAttribute("data-quantidade") || "0";
+                            document.getElementById("edit_prioridade").value = button.getAttribute("data-prioridade") || "media";
+                        });
+                    }
+                </script>';
+
+                // Modal: Remover item (cancelar pendência na lista)
+                echo '<div class="modal fade" id="modalRemoverItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/remover-item">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Remover item da lista</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" name="produto_id" id="remover_produto_id" value="">
+                                        <input type="hidden" name="loja_id" id="remover_loja_id" value="0">
+                                        <div class="alert alert-warning mb-0">
+                                            Tem certeza que deseja remover da lista o item <strong id="remover_produto_nome"></strong>?
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger">Remover</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                echo '<script>
+                    var modalRemoverItem = document.getElementById("modalRemoverItem");
+                    if (modalRemoverItem) {
+                        modalRemoverItem.addEventListener("show.bs.modal", function (event) {
+                            var button = event.relatedTarget;
+                            document.getElementById("remover_produto_id").value = button.getAttribute("data-produto-id") || "";
+                            document.getElementById("remover_loja_id").value = button.getAttribute("data-loja-id") || "0";
+                            document.getElementById("remover_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                        });
+                    }
+                </script>';
+
+                // Modal: Concluir item
+                echo '<div class="modal fade" id="modalConcluirItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/concluir">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Concluir item</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" name="produto_id" id="concluir_produto_id" value="">
+                                        <input type="hidden" name="loja_id" id="concluir_loja_id" value="0">
+                                        <div class="alert alert-success mb-0">
+                                            Marcar como comprado: <strong id="concluir_produto_nome"></strong>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Concluir</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                echo '<script>
+                    var modalConcluirItem = document.getElementById("modalConcluirItem");
+                    if (modalConcluirItem) {
+                        modalConcluirItem.addEventListener("show.bs.modal", function (event) {
+                            var button = event.relatedTarget;
+                            document.getElementById("concluir_produto_id").value = button.getAttribute("data-produto-id") || "";
+                            document.getElementById("concluir_loja_id").value = button.getAttribute("data-loja-id") || "0";
+                            document.getElementById("concluir_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                        });
+                    }
+                </script>';
+
+                // Modal: Concluir compras (tudo do filtro)
+                echo '<div class="modal fade" id="modalConcluirCompras" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/concluir">
+                                    <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
+                                    <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Concluir compras</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-success mb-0">
+                                            Deseja marcar como <strong>comprado</strong> todos os itens pendentes deste filtro?
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Concluir</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
                 echo '</main>
         </div>
     </div>';
@@ -426,8 +636,109 @@ class AdminComprasController extends Controller {
         echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
     }
 
+    public function editarItem($request) {
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $lojaId = (int) $request->getParam('loja_id', 0);
+        $quantidade = (int) $request->getParam('quantidade', 0);
+        $prioridade = (string) $request->getParam('prioridade', 'media');
+        $prioridade = in_array($prioridade, ['baixa', 'media', 'alta', 'urgente'], true) ? $prioridade : 'media';
+
+        if ($produtoId <= 0) {
+            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+
+        try {
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            $this->connection->beginTransaction();
+            $whereLoja = '';
+            $params = [':produto_id' => $produtoId];
+            if ($temLojaIdEmLista) {
+                if ($lojaId > 0) {
+                    $whereLoja = ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                } else {
+                    $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                }
+            }
+
+            $stmt = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja);
+            $stmt->execute($params);
+
+            $cols = ['produto_id', 'quantidade_necessaria', 'quantidade_faltante', 'prioridade', 'status', 'data_solicitacao'];
+            $vals = [':produto_id', ':q', ':q', ':prioridade', "'pendente'", 'CURDATE()'];
+            $insertParams = [':produto_id' => $produtoId, ':q' => $quantidade, ':prioridade' => $prioridade];
+            if ($temLojaIdEmLista) {
+                $cols[] = 'loja_id';
+                if ($lojaId > 0) {
+                    $vals[] = ':ins_loja_id';
+                    $insertParams[':ins_loja_id'] = $lojaId;
+                } else {
+                    $vals[] = 'NULL';
+                }
+            }
+
+            $stmt = $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
+            $stmt->execute($insertParams);
+
+            $this->connection->commit();
+            $_SESSION['message'] = 'Item atualizado.';
+            $_SESSION['message_type'] = 'success';
+            header('Location: /admin/estoque/compras');
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            $_SESSION['message'] = 'Erro ao atualizar item.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+    }
+
     public function mudarStatus($request) {
         echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+    }
+
+    public function concluirCompras($request) {
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $lojaId = (int) $request->getParam('loja_id', 0);
+        $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
+        $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+        try {
+            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado' WHERE lc.status = 'pendente'";
+            $params = [];
+            if ($produtoId > 0) {
+                $sql .= ' AND lc.produto_id = :produto_id';
+                $params[':produto_id'] = $produtoId;
+            }
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $sql .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $sql .= ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                }
+            }
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
+
+            $_SESSION['message'] = 'Compras concluídas.';
+            $_SESSION['message_type'] = 'success';
+            header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+            exit;
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao concluir compras.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
     }
 
     public function gerarPDF($request) {
