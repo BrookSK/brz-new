@@ -39,6 +39,32 @@ class AdminComprasController extends Controller {
         return false;
     }
 
+    private function fetchProdutosSelect(): array {
+        try {
+            $nomeCol = $this->columnExists('produtos', 'name') ? 'name' : ($this->columnExists('produtos', 'nome') ? 'nome' : null);
+            $selectNome = $nomeCol ? ('p.' . $nomeCol . ' as produto_nome') : "'' as produto_nome";
+            $cols = ['p.id as produto_id', 'p.sku as sku', $selectNome];
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM produtos p ORDER BY produto_nome ASC, p.id DESC LIMIT 2000';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function fetchPedidosSelect(): array {
+        try {
+            $cols = ['id', 'codigo_pedido', 'status', 'valor_total', 'created_at', 'pago_em', 'payment_status'];
+            $sql = 'SELECT ' . implode(', ', $cols) . ' FROM pedidos ORDER BY id DESC LIMIT 500';
+            $stmt = $this->connection->query($sql);
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            return $rows ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
     public function gerarLinkDiferenca($request) {
         header('Content-Type: application/json; charset=utf-8');
 
@@ -382,6 +408,9 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
+            $produtosSelect = $this->fetchProdutosSelect();
+            $pedidosSelect = $this->fetchPedidosSelect();
+
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
             $temCost = $this->columnExists('produtos', 'cost_price');
@@ -538,6 +567,8 @@ class AdminComprasController extends Controller {
             $statusView = 'pendente';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
+            $produtosSelect = [];
+            $pedidosSelect = [];
         }
 
         // Incluir o partial do menu lateral
@@ -567,7 +598,7 @@ class AdminComprasController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" disabled>
+                        <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#modalNovoItem" ' . ($statusView !== 'pendente' ? 'disabled' : '') . '>
                             <i class="fas fa-plus me-1"></i>Novo Item
                         </button>
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
@@ -825,6 +856,81 @@ class AdminComprasController extends Controller {
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                                         <button type="submit" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                // Modal: Novo item (manual)
+                echo '<div class="modal fade" id="modalNovoItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/salvar">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Novo item na lista</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-2">
+                                            <label class="form-label">Produto *</label>
+                                            <select class="form-select" name="produto_id" required>
+                                                <option value="">Selecione...</option>';
+
+                foreach ($produtosSelect as $p) {
+                    $pid = (int) ($p['produto_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $pn = (string) ($p['produto_nome'] ?? '');
+                    $sku = (string) ($p['sku'] ?? '');
+                    $label = trim($pn) !== '' ? $pn : ('Produto #' . $pid);
+                    if ($sku !== '') $label .= ' - ' . $sku;
+                    echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
+                }
+
+                echo '            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Quantidade *</label>
+                                            <input type="number" class="form-control" name="quantidade" min="1" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Pedido *</label>
+                                            <select class="form-select" name="pedido_id" required>
+                                                <option value="">Selecione...</option>';
+
+                foreach ($pedidosSelect as $p) {
+                    $pid = (int) ($p['id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $codigo = (string) ($p['codigo_pedido'] ?? '');
+                    $st = (string) ($p['status'] ?? '');
+                    $vt = isset($p['valor_total']) ? (float) $p['valor_total'] : null;
+                    $label = 'Pedido #' . $pid;
+                    if ($codigo !== '') $label .= ' (' . $codigo . ')';
+                    if ($st !== '') $label .= ' - ' . $st;
+                    if ($vt !== null) $label .= ' - $ ' . number_format($vt, 2, '.', ',');
+                    echo '<option value="' . $pid . '">' . htmlspecialchars($label) . '</option>';
+                }
+
+                echo '            </select>
+                                            <div class="form-text">Ao salvar, se o pedido estiver pendente, o sistema soma o valor pendente ao total do pedido (sem chamar gateway automaticamente).</div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Valor pendente (diferença) *</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" name="valor_pendente" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Prioridade</label>
+                                            <select class="form-select" name="prioridade">
+                                                <option value="media" selected>Média</option>
+                                                <option value="baixa">Baixa</option>
+                                                <option value="alta">Alta</option>
+                                                <option value="urgente">Urgente</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success">Salvar</button>
                                     </div>
                                 </form>
                             </div>
@@ -1253,7 +1359,123 @@ class AdminComprasController extends Controller {
     }
 
     public function salvar($request) {
-        echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $quantidade = (int) $request->getParam('quantidade', 0);
+        $valorPendente = (float) $request->getParam('valor_pendente', 0);
+        $prioridade = (string) $request->getParam('prioridade', 'media');
+        $prioridade = in_array($prioridade, ['baixa', 'media', 'alta', 'urgente'], true) ? $prioridade : 'media';
+
+        if ($produtoId <= 0 || $pedidoId <= 0 || $quantidade <= 0) {
+            $_SESSION['message'] = 'Parâmetros inválidos.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
+
+        try {
+            $this->connection->beginTransaction();
+
+            $stmtPedido = $this->connection->prepare('SELECT id, status, pago_em, payment_status, valor_total, valor_total_brl FROM pedidos WHERE id = :id LIMIT 1');
+            $stmtPedido->execute([':id' => $pedidoId]);
+            $pedido = $stmtPedido->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                $this->connection->rollBack();
+                $_SESSION['message'] = 'Pedido não encontrado.';
+                $_SESSION['message_type'] = 'danger';
+                header('Location: /admin/estoque/compras');
+                exit;
+            }
+
+            $pedidoPago = $this->pedidoEstaPago($pedido);
+
+            // Atualizar o valor do pedido apenas se estiver pendente
+            $colsPedidos = [];
+            try {
+                $stmtCols = $this->connection->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!$pedidoPago && $valorPendente > 0) {
+                $set = [];
+                $params = [':id' => $pedidoId];
+
+                if (in_array('valor_total', $colsPedidos, true)) {
+                    $set[] = 'valor_total = COALESCE(valor_total,0) + :vp';
+                    $params[':vp'] = $valorPendente;
+                }
+                if (in_array('valor_total_brl', $colsPedidos, true)) {
+                    $set[] = 'valor_total_brl = COALESCE(valor_total_brl,0) + :vp_brl';
+                    $params[':vp_brl'] = $valorPendente;
+                }
+
+                if (!empty($set)) {
+                    $stmtUpd = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id LIMIT 1');
+                    $stmtUpd->execute($params);
+                }
+            }
+
+            // Inserir item na lista de compras
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            $cols = ['produto_id', 'quantidade_necessaria', 'quantidade_faltante', 'prioridade', 'status', 'data_solicitacao'];
+            $vals = [':produto_id', ':q', ':q', ':prioridade', "'pendente'", 'CURDATE()'];
+            $insertParams = [':produto_id' => $produtoId, ':q' => $quantidade, ':prioridade' => $prioridade];
+
+            if ($temPedidoEmLista) {
+                $cols[] = 'pedido_id';
+                $vals[] = ':pedido_id';
+                $insertParams[':pedido_id'] = $pedidoId;
+            }
+
+            if ($temLojaIdEmLista) {
+                // tentar inferir loja pelo produto
+                $lojaId = 0;
+                try {
+                    if ($this->columnExists('produtos', 'loja_id')) {
+                        $stmtL = $this->connection->prepare('SELECT loja_id FROM produtos WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $produtoId]);
+                        $lojaId = (int) $stmtL->fetchColumn();
+                    }
+                } catch (\Exception $e) {
+                    $lojaId = 0;
+                }
+
+                $cols[] = 'loja_id';
+                if ($lojaId > 0) {
+                    $vals[] = ':loja_id';
+                    $insertParams[':loja_id'] = $lojaId;
+                } else {
+                    $vals[] = 'NULL';
+                }
+            }
+
+            $stmtIns = $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
+            $stmtIns->execute($insertParams);
+
+            $this->connection->commit();
+
+            if ($pedidoPago) {
+                $_SESSION['message'] = 'Item adicionado na lista. Pedido está pago: total do pedido não foi alterado.';
+                $_SESSION['message_type'] = 'warning';
+            } else {
+                $_SESSION['message'] = 'Item adicionado na lista e valor do pedido atualizado.';
+                $_SESSION['message_type'] = 'success';
+            }
+            header('Location: /admin/estoque/compras');
+            exit;
+        } catch (\Exception $e) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+            $_SESSION['message'] = 'Erro ao salvar novo item.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras');
+            exit;
+        }
     }
 
     public function editarItem($request) {
