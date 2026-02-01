@@ -226,6 +226,7 @@ class AuthController extends Controller {
         }
         
         if ($request->getMethod() === 'POST') {
+            $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
             $dados = $request->getParams();
             
             // Validar dados
@@ -256,12 +257,29 @@ class AuthController extends Controller {
                         if ($usuarioId) {
                             // Fazer login automático
                             $usuario = $this->authService->login($dados['email'], $dados['senha']);
+                            if ($isAjax) {
+                                header('Content-Type: application/json; charset=utf-8');
+                                echo json_encode(['success' => true, 'redirect' => '/minha-conta']);
+                                return;
+                            }
                             $this->redirect('/minha-conta');
+                            return;
+                        } else {
+                            $erros[] = 'Erro ao criar conta';
                         }
                     }
                 } catch (\Exception $e) {
                     $erros[] = 'Erro ao criar conta: ' . $e->getMessage();
                 }
+            }
+
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => false,
+                    'error' => $erros[0] ?? 'Erro ao criar conta'
+                ]);
+                return;
             }
             
             $this->view('auth/register', [
