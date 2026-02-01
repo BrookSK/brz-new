@@ -480,6 +480,7 @@ class PedidoEcommerce extends Model {
         $selectFormaPagamento = '';
         $selectExtras = '';
         $selectClienteSuite = '';
+        $joinUsuarioCliente = '';
         $colsP = [];
         $temJoinPagamentos = false;
 
@@ -495,10 +496,27 @@ class PedidoEcommerce extends Model {
         try {
             $stmtColsU = $this->connection->query('DESCRIBE usuarios');
             $colsU = $stmtColsU ? $stmtColsU->fetchAll(\PDO::FETCH_COLUMN) : [];
+            $colsC = [];
+            try {
+                $stmtColsC = $this->connection->query('DESCRIBE clientes');
+                $colsC = $stmtColsC ? $stmtColsC->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsC = [];
+            }
+
+            $temClienteUsuarioId = (is_array($colsC) && in_array('usuario_id', $colsC, true));
+            if ($temClienteUsuarioId) {
+                $joinUsuarioCliente = 'LEFT JOIN usuarios uc ON c.usuario_id = uc.id';
+            }
+
             if (is_array($colsU) && in_array('suite', $colsU, true)) {
-                $selectClienteSuite = ', u.suite AS cliente_suite';
+                $selectClienteSuite = $temClienteUsuarioId
+                    ? ', COALESCE(u.suite, uc.suite) AS cliente_suite'
+                    : ', u.suite AS cliente_suite';
             } elseif (is_array($colsU) && in_array('switch', $colsU, true)) {
-                $selectClienteSuite = ', u.`switch` AS cliente_suite';
+                $selectClienteSuite = $temClienteUsuarioId
+                    ? ', COALESCE(u.`switch`, uc.`switch`) AS cliente_suite'
+                    : ', u.`switch` AS cliente_suite';
             }
         } catch (\Exception $e) {
         }
@@ -601,6 +619,7 @@ class PedidoEcommerce extends Model {
             FROM {$this->table} p
             LEFT JOIN usuarios u ON p.usuario_id = u.id
             LEFT JOIN clientes c ON p.cliente_id = c.id
+            {$joinUsuarioCliente}
             {$joinPagamentos}
             LEFT JOIN enderecos e_ent ON p.endereco_entrega_id = e_ent.id
             LEFT JOIN enderecos e_cob ON p.endereco_cobranca_id = e_cob.id
