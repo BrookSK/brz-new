@@ -8,6 +8,188 @@ class AdminPedidosEditController {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmt->execute([$table]);
+            return (int) $stmt->fetchColumn() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function columnExists(string $table, string $column): bool {
+        try {
+            $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
+            $stmt->execute([$table, $column]);
+            return (int) $stmt->fetchColumn() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getTotalEstoqueProduto(int $produtoId): int {
+        if ($produtoId <= 0 || !$this->tableExists('estoque_interno')) {
+            return 0;
+        }
+        try {
+            $stmt = $this->connection->prepare('SELECT COALESCE(SUM(quantidade),0) as total FROM estoque_interno WHERE produto_id = :produto_id');
+            $stmt->execute([':produto_id' => $produtoId]);
+            return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    private function getTotalReservadoAtivoProdutoSemPedido(int $produtoId, int $pedidoId): int {
+        if ($produtoId <= 0 || !$this->tableExists('estoque_reservas')) {
+            return 0;
+        }
+        if (!$this->columnExists('estoque_reservas', 'produto_id') || !$this->columnExists('estoque_reservas', 'quantidade_reservada') || !$this->columnExists('estoque_reservas', 'status')) {
+            return 0;
+        }
+        $temPedido = $this->columnExists('estoque_reservas', 'pedido_id');
+        try {
+            $sql = "SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'";
+            $params = [':produto_id' => $produtoId];
+            if ($temPedido) {
+                $sql .= ' AND (pedido_id IS NULL OR pedido_id <> :pedido_id)';
+                $params[':pedido_id'] = $pedidoId;
+            }
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
+            return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    private function upsertReserva(int $pedidoId, int $produtoId, int $qtd, string $status = 'ativa'): void {
+        if ($pedidoId <= 0 || $produtoId <= 0 || $qtd <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_reservas')) {
+            return;
+        }
+        if (!$this->columnExists('estoque_reservas', 'produto_id') || !$this->columnExists('estoque_reservas', 'quantidade_reservada') || !$this->columnExists('estoque_reservas', 'status')) {
+            return;
+        }
+        $temPedido = $this->columnExists('estoque_reservas', 'pedido_id');
+
+        $status = trim($status) !== '' ? trim($status) : 'ativa';
+
+        try {
+            if ($temPedido) {
+                $stmtChk = $this->connection->prepare("SELECT id FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = :status LIMIT 1");
+                $stmtChk->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':status' => $status]);
+                $id = (int) ($stmtChk->fetchColumn() ?: 0);
+                if ($id > 0) {
+                    $stmtUpd = $this->connection->prepare('UPDATE estoque_reservas SET quantidade_reservada = :q, status = :status WHERE id = :id LIMIT 1');
+                    $stmtUpd->execute([':q' => $qtd, ':id' => $id]);
+                    return;
+                }
+            }
+
+            $cols = ['produto_id', 'quantidade_reservada', 'status'];
+            $vals = [':produto_id', ':q', ':status'];
+            $params = [':produto_id' => $produtoId, ':q' => $qtd, ':status' => $status];
+            if ($temPedido) {
+                $cols[] = 'pedido_id';
+                $vals[] = ':pedido_id';
+                $params[':pedido_id'] = $pedidoId;
+            }
+            $stmtIns = $this->connection->prepare('INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
+            $stmtIns->execute($params);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function upsertPendenciaCompra(int $pedidoId, int $produtoId, int $qtdFaltante): void {
+        if ($pedidoId <= 0 || $produtoId <= 0 || $qtdFaltante <= 0) {
+            return;
+        }
+        if (!$this->tableExists('lista_compras')) {
+            return;
+        }
+
+        $temPedido = $this->columnExists('lista_compras', 'pedido_id');
+        try {
+            $sqlSel = "SELECT id, quantidade_faltante FROM lista_compras WHERE produto_id = :produto_id AND status = 'pendente'";
+            $params = [':produto_id' => $produtoId];
+            if ($temPedido) {
+                $sqlSel .= ' AND pedido_id = :pedido_id';
+                $params[':pedido_id'] = $pedidoId;
+            }
+            $sqlSel .= ' ORDER BY COALESCE(data_solicitacao, created_at) ASC, id ASC LIMIT 1';
+            $stmtSel = $this->connection->prepare($sqlSel);
+            $stmtSel->execute($params);
+            $row = $stmtSel->fetch(\PDO::FETCH_ASSOC);
+            if ($row && (int) ($row['id'] ?? 0) > 0) {
+                $stmtUpd = $this->connection->prepare('UPDATE lista_compras SET quantidade_faltante = :q, quantidade_necessaria = GREATEST(COALESCE(quantidade_necessaria,0), :q) WHERE id = :id LIMIT 1');
+                $stmtUpd->execute([':q' => $qtdFaltante, ':id' => (int) $row['id']]);
+                return;
+            }
+
+            $cols = ['produto_id', 'quantidade_necessaria', 'quantidade_faltante', 'prioridade', 'status', 'data_solicitacao'];
+            $vals = [':produto_id', ':q', ':q', "'media'", "'pendente'", 'CURDATE()'];
+            $params = [':produto_id' => $produtoId, ':q' => $qtdFaltante];
+            if ($temPedido) {
+                $cols[] = 'pedido_id';
+                $vals[] = ':pedido_id';
+                $params[':pedido_id'] = $pedidoId;
+            }
+            $stmtIns = $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
+            $stmtIns->execute($params);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function limparReservasEPendenciasDoPedido(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        // Reservas
+        if ($this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id')) {
+            try {
+                $stmt = $this->connection->prepare("DELETE FROM estoque_reservas WHERE pedido_id = :pedido_id");
+                $stmt->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
+            }
+        }
+
+        // Pendências geradas por pedido (se existir coluna)
+        if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
+            try {
+                $stmt = $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = :pedido_id");
+                $stmt->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
+            }
+        }
+    }
+
+    private function finalizarCicloPedido(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        if ($this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id') && $this->columnExists('estoque_reservas', 'status')) {
+            try {
+                $stmt = $this->connection->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = :pedido_id");
+                $stmt->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
+            }
+        }
+
+        if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id') && $this->columnExists('lista_compras', 'status')) {
+            try {
+                $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'cancelado', quantidade_faltante = 0 WHERE pedido_id = :pedido_id");
+                $stmt->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
+            }
+        }
+    }
+
     public function editar($request) {
         try {
             // Extrair ID do Request
@@ -120,6 +302,10 @@ class AdminPedidosEditController {
                                         <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
                                         <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                        <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                        <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
                                         <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
                                         <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                         <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
@@ -407,8 +593,37 @@ class AdminPedidosEditController {
     public function salvar($request) {
         try {
             $dados = json_decode(file_get_contents('php://input'), true);
+
+            $pedidoId = (int) ($dados['pedido_id'] ?? 0);
+            if ($pedidoId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Pedido inválido']);
+                return;
+            }
+
+            $oldStatus = '';
+            try {
+                $stmtOld = $this->connection->prepare('SELECT status FROM pedidos WHERE id = :id LIMIT 1');
+                $stmtOld->execute([':id' => $pedidoId]);
+                $oldStatus = (string) ($stmtOld->fetchColumn() ?: '');
+            } catch (\Exception $e) {
+                $oldStatus = '';
+            }
+
+            $newStatus = (string) ($dados['status'] ?? '');
+            $cicloFechado = in_array($newStatus, [
+                'produto_consolidado',
+                'em_transporte',
+                'aguardando_liberacao_aduaneira',
+                'enviado_ao_destinatario',
+                'enviado',
+                'entregue',
+            ], true);
+            $statusReserva = $cicloFechado ? 'finalizada' : 'ativa';
             
             $this->connection->beginTransaction();
+
+            // Recalcular reservas/pendências baseado no novo estado do pedido
+            $this->limparReservasEPendenciasDoPedido($pedidoId);
             
             // Primeiro, remover todos os itens existentes do pedido
             $stmt = $this->connection->prepare("DELETE FROM pedido_itens WHERE pedido_id = :pedido_id");
@@ -440,6 +655,30 @@ class AdminPedidosEditController {
                 $stmt->bindParam(':nome_produto_sku', $item['nome_produto_sku']);
                 $stmt->bindParam(':loja', $item['loja']);
                 $stmt->execute();
+
+                // Estoque: reservar o que houver disponível e gerar pendência só para o que faltar
+                $produtoId = (int) ($item['produto_id'] ?? 0);
+                $qtdPedido = (int) ($item['quantidade'] ?? 0);
+                if ($produtoId > 0 && $qtdPedido > 0) {
+                    $estoqueTotal = $this->getTotalEstoqueProduto($produtoId);
+                    $reservadoOutros = $this->getTotalReservadoAtivoProdutoSemPedido($produtoId, $pedidoId);
+                    $disponivel = $estoqueTotal - $reservadoOutros;
+                    if ($disponivel < 0) {
+                        $disponivel = 0;
+                    }
+
+                    $reservar = $qtdPedido;
+                    if ($reservar > $disponivel) {
+                        $reservar = $disponivel;
+                    }
+                    if ($reservar > 0) {
+                        $this->upsertReserva($pedidoId, $produtoId, $reservar, $statusReserva);
+                    }
+                    $faltante = $qtdPedido - $reservar;
+                    if (!$cicloFechado && $faltante > 0) {
+                        $this->upsertPendenciaCompra($pedidoId, $produtoId, $faltante);
+                    }
+                }
             }
             
             // Calcular valores
@@ -463,6 +702,11 @@ class AdminPedidosEditController {
             $stmt->bindParam(':total', $total);
             $stmt->bindParam(':pedido_id', $dados['pedido_id']);
             $stmt->execute();
+
+            // Fechar ciclo: a partir de "Produto Consolidado" o pedido deixa de contar como demanda.
+            if ($cicloFechado) {
+                $this->finalizarCicloPedido($pedidoId);
+            }
             
             $this->connection->commit();
             
