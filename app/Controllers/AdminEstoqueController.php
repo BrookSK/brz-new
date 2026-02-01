@@ -24,16 +24,33 @@ class AdminEstoqueController extends Controller {
     }
 
     private function getTotalReservadoProduto(int $produtoId): int {
-        if ($produtoId <= 0 || !$this->tableExists('estoque_reservas')) {
+        if ($produtoId <= 0) {
             return 0;
         }
-        try {
-            $stmt = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
-            $stmt->execute([':produto_id' => $produtoId]);
-            return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
-        } catch (\Exception $e) {
-            return 0;
+
+        $total = 0;
+
+        // Reservas reais
+        if ($this->tableExists('estoque_reservas')) {
+            try {
+                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
+                $stmt->execute([':produto_id' => $produtoId]);
+                $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+            } catch (\Exception $e) {
+            }
         }
+
+        // Demanda pendente (lista de compras)
+        if ($this->tableExists('lista_compras')) {
+            try {
+                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(COALESCE(quantidade_faltante,0)),0) as total FROM lista_compras WHERE produto_id = :produto_id AND status = 'pendente'");
+                $stmt->execute([':produto_id' => $produtoId]);
+                $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $total;
     }
 
     private function getTotalPendenciaCompraProduto(int $produtoId): int {
@@ -932,24 +949,32 @@ class AdminEstoqueController extends Controller {
             }
 
             // Buscar status geral do estoque (apenas itens com quantidade no galpão)
-            $reservaJoin = "
-                LEFT JOIN (
-                    SELECT produto_id, SUM(COALESCE(quantidade_faltante,0)) as reservado
-                    FROM lista_compras
-                    WHERE status = 'pendente'
-                    GROUP BY produto_id
-                ) res ON res.produto_id = v.produto_id
-            ";
+            // Regra: Reservado = reservas reais (estoque_reservas ativa) + demanda pendente (lista_compras pendente)
+            $reservaJoin = '';
+            $reservadoSelectExpr = '0';
+
+            if ($this->tableExists('lista_compras')) {
+                $reservaJoin .= "
+                    LEFT JOIN (
+                        SELECT produto_id, SUM(COALESCE(quantidade_faltante,0)) as reservado
+                        FROM lista_compras
+                        WHERE status = 'pendente'
+                        GROUP BY produto_id
+                    ) res_lc ON res_lc.produto_id = v.produto_id
+                ";
+                $reservadoSelectExpr = 'COALESCE(res_lc.reservado, 0)';
+            }
 
             if ($this->tableExists('estoque_reservas')) {
-                $reservaJoin = "
+                $reservaJoin .= "
                     LEFT JOIN (
                         SELECT produto_id, SUM(COALESCE(quantidade_reservada,0)) as reservado
                         FROM estoque_reservas
                         WHERE status = 'ativa'
                         GROUP BY produto_id
-                    ) res ON res.produto_id = v.produto_id
+                    ) res_er ON res_er.produto_id = v.produto_id
                 ";
+                $reservadoSelectExpr = '(' . $reservadoSelectExpr . ' + COALESCE(res_er.reservado, 0))';
             }
 
             $stmt = $this->connection->prepare("
@@ -958,7 +983,7 @@ class AdminEstoqueController extends Controller {
                     loc.localizacao,
                     loc.data_compra_mais_recente,
                     loc.validade_mais_proxima,
-                    COALESCE(res.reservado, 0) as reservado,
+                    {$reservadoSelectExpr} as reservado,
                     {$imgSelect}
                 FROM vw_status_geral_estoque v
                 JOIN produtos p ON p.id = v.produto_id
@@ -1690,19 +1715,16 @@ class AdminEstoqueController extends Controller {
                 $totalEstoque = 0;
             }
 
-            $totalReservado = 0;
+            $totalReservadoReal = 0;
             if ($this->tableExists('estoque_reservas')) {
                 try {
                     $stmtRes = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
                     $stmtRes->execute([':produto_id' => $produtoId]);
-                    $totalReservado = (int) (($stmtRes->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+                    $totalReservadoReal = (int) (($stmtRes->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
                 } catch (\Exception $e) {
-                    $totalReservado = 0;
+                    $totalReservadoReal = 0;
                 }
             }
-
-            $totalDisponivel = $totalEstoque - $totalReservado;
-            if ($totalDisponivel < 0) $totalDisponivel = 0;
 
             $pendenciaCompra = 0;
             if ($this->tableExists('lista_compras')) {
@@ -1714,6 +1736,11 @@ class AdminEstoqueController extends Controller {
                     $pendenciaCompra = 0;
                 }
             }
+
+            $totalReservado = $totalReservadoReal + $pendenciaCompra;
+
+            $totalDisponivel = $totalEstoque - $totalReservado;
+            if ($totalDisponivel < 0) $totalDisponivel = 0;
 
             $reservasAtivas = [];
             if ($this->tableExists('estoque_reservas')) {
@@ -1798,9 +1825,9 @@ class AdminEstoqueController extends Controller {
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Estoque total</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reservado (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservado . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reservado</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservado . '</div></div></div>
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;">' . (int) $totalDisponivel . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Pendência na lista de compras</div><div style="font-weight:900;font-size:20px;">' . (int) $pendenciaCompra . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reserva (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
                         <a class="btn btn-outline-primary" href="/admin/estoque/compras?status=pendente" target="_blank">Abrir lista de compras</a>
@@ -2042,6 +2069,7 @@ class AdminEstoqueController extends Controller {
 
             $changedAny = false;
             $saidaTotal = 0;
+            $entradaTotal = 0;
             $logged = $this->getLoggedUser();
             $loggedId = $logged ? (int) ($logged['id'] ?? 0) : 0;
             $loggedLogin = $logged ? (string) ($logged['email'] ?? ($logged['nome'] ?? '')) : '';
@@ -2060,6 +2088,8 @@ class AdminEstoqueController extends Controller {
                 $newQtd = (int) ($qtds[$i] ?? 0);
                 if ($newQtd < $oldQtd) {
                     $saidaTotal += ($oldQtd - $newQtd);
+                } elseif ($newQtd > $oldQtd) {
+                    $entradaTotal += ($newQtd - $oldQtd);
                 }
                 $newDc = trim((string) ($dcs[$i] ?? ''));
                 $newDv = trim((string) ($dvs[$i] ?? ''));
@@ -2171,6 +2201,11 @@ class AdminEstoqueController extends Controller {
                 }
                 $stmtMov->execute($paramsMov);
                 $changedAny = true;
+            }
+
+            if ($entradaTotal > 0) {
+                // Se houve aumento manual, tratar como entrada e dar baixa automática na lista de compras.
+                $this->ajustarListaComprasAposEntrada($produtoId, $entradaTotal);
             }
 
             if ($saidaTotal > 0) {
