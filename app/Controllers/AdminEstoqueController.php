@@ -952,7 +952,7 @@ class AdminEstoqueController extends Controller {
                 ";
             }
 
-            $stmt = Config\Database::getConnection()->prepare("
+            $stmt = $this->connection->prepare("
                 SELECT
                     v.*, 
                     loc.localizacao,
