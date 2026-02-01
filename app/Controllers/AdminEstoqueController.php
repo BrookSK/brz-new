@@ -525,14 +525,23 @@ class AdminEstoqueController extends Controller {
         try {
             // Esta tela é apenas para listagem. A entrada é feita em /admin/estoque/entrada.
 
+            $schemaProdutos = $this->getProdutosSchema();
+            $imgCol = $schemaProdutos['imgCol'] ?? null;
+            $imgSelect = "'' AS imagem_raw";
+            if (is_string($imgCol) && $imgCol !== '') {
+                $imgSelect = 'p.' . $imgCol . ' AS imagem_raw';
+            }
+
             // Buscar status geral do estoque (apenas itens com quantidade no galpão)
             $stmt = $this->connection->prepare("
                 SELECT
                     v.*, 
                     loc.localizacao,
                     loc.data_compra_mais_recente,
-                    loc.validade_mais_proxima
+                    loc.validade_mais_proxima,
+                    {$imgSelect}
                 FROM vw_status_geral_estoque v
+                JOIN produtos p ON p.id = v.produto_id
                 JOIN (
                     SELECT
                         e.produto_id,
@@ -676,11 +685,24 @@ class AdminEstoqueController extends Controller {
                                 foreach ($status_geral as $item) {
                                     $status_class = $item['status_estoque'] == 'crítico' ? 'danger' : 
                                                    ($item['status_estoque'] == 'baixo' ? 'warning' : 'success');
+
+                                    $imgUrl = null;
+                                    if (!empty($item['imagem_raw'])) {
+                                        $imgUrl = $this->resolveProdutoImagem(['imagem_raw' => (string) $item['imagem_raw']], 'imagem_raw');
+                                    }
+                                    $imgTag = $imgUrl
+                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06);">'
+                                        : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
                                     
                                     echo '<tr>
                                         <td>
-                                            <strong>' . htmlspecialchars($item['produto_nome']) . '</strong>
-                                            <br><small class="text-muted">ID: ' . $item['produto_id'] . '</small>
+                                            <div class="d-flex gap-2 align-items-center">
+                                                ' . $imgTag . '
+                                                <div>
+                                                    <strong>' . htmlspecialchars($item['produto_nome']) . '</strong>
+                                                    <br><small class="text-muted">ID: ' . $item['produto_id'] . '</small>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>' . htmlspecialchars($item['sku']) . '</td>
                                         <td>
@@ -712,32 +734,6 @@ class AdminEstoqueController extends Controller {
                         </div>
                     </div>
                 </div>';
-
-                // Informações do Sistema
-                echo '<div class="card mt-4">
-                    <div class="card-header">
-                        <h5><i class="fas fa-info-circle me-2"></i>Informações do Sistema</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Módulo:</strong> Estoque Interno</p>
-                                <p><strong>Status:</strong> <span class="badge bg-success">Ativo</span></p>
-                                <p><strong>Última Atualização:</strong> ' . date('d/m/Y H:i:s') . '</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Funcionalidades Disponíveis:</strong></p>
-                                <ul class="list-unstyled">
-                                    <li>✅ Visualização de estoque</li>
-                                    <li>✅ Estatísticas em tempo real</li>
-                                    <li>✅ Filtros e busca</li>
-                                    <li>🚧 Adição de itens (em desenvolvimento)</li>
-                                    <li>🚧 Edição de itens (em desenvolvimento)</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
             </main>
         </div>
