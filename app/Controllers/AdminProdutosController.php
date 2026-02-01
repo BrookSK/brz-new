@@ -469,7 +469,7 @@ HTML;
 
         if (!empty($lojas)) {
             foreach ($lojas as $l) {
-                echo '<option value="' . htmlspecialchars($l['slug']) . '">' . htmlspecialchars($l['nome']) . '</option>';
+                echo '<option value="' . htmlspecialchars($l['id']) . '">' . htmlspecialchars($l['nome']) . '</option>';
             }
         } else {
             echo '<option value="sams">Sams</option>';
@@ -697,7 +697,32 @@ HTML;
             }
 
             if (in_array('sku', $cols, true)) $data['sku'] = $request->getParam('sku');
-            if (in_array('loja', $cols, true)) $data['loja'] = $request->getParam('loja');
+            $lojaParam = $request->getParam('loja');
+            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
+            if (in_array('loja_id', $cols, true) && $lojaId > 0) {
+                $data['loja_id'] = $lojaId;
+            }
+            if (in_array('loja', $cols, true)) {
+                // manter compatibilidade: salvar slug também quando possível
+                $lojaSlug = null;
+                if ($lojaId > 0) {
+                    try {
+                        $stmtT = $pdo->query("SHOW TABLES LIKE 'lojas'");
+                        if ($stmtT && $stmtT->fetchColumn()) {
+                            $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = :id LIMIT 1');
+                            $stmtL->execute([':id' => $lojaId]);
+                            $lojaSlug = $stmtL->fetchColumn();
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                if ($lojaSlug !== null && $lojaSlug !== false && (string) $lojaSlug !== '') {
+                    $data['loja'] = (string) $lojaSlug;
+                } else {
+                    $data['loja'] = $lojaParam;
+                }
+            }
             if (in_array('ncm', $cols, true)) $data['ncm'] = $request->getParam('ncm');
             if (in_array('short_description', $cols, true)) $data['short_description'] = $request->getParam('short_description');
             if (in_array('description', $cols, true)) $data['description'] = $request->getParam('description');
@@ -903,6 +928,7 @@ HTML;
                                             <option value="">Selecione...</option>';
 
         if (!empty($lojas)) {
+            $produtoLojaId = (int) ($produto['loja_id'] ?? 0);
             $produtoLoja = trim((string) ($produto['loja'] ?? ''));
             $produtoLojaNorm = strtolower($produtoLoja);
             foreach ($lojas as $l) {
@@ -914,12 +940,15 @@ HTML;
                 $lojaIdNorm = strtolower(trim($lojaId));
                 $lojaNomeNorm = strtolower(trim($lojaNome));
 
-                $selected = ($produtoLojaNorm !== '' && (
-                    $produtoLojaNorm === $lojaSlugNorm ||
-                    $produtoLojaNorm === $lojaIdNorm ||
-                    $produtoLojaNorm === $lojaNomeNorm
-                )) ? 'selected' : '';
-                echo '<option value="' . htmlspecialchars($l['slug']) . '" ' . $selected . '>' . htmlspecialchars($l['nome']) . '</option>';
+                $selected = ($produtoLojaId > 0 && (string) $produtoLojaId === (string) $l['id']) ? 'selected' : '';
+                if ($selected === '') {
+                    $selected = ($produtoLojaNorm !== '' && (
+                        $produtoLojaNorm === $lojaSlugNorm ||
+                        $produtoLojaNorm === $lojaIdNorm ||
+                        $produtoLojaNorm === $lojaNomeNorm
+                    )) ? 'selected' : '';
+                }
+                echo '<option value="' . htmlspecialchars($l['id']) . '" ' . $selected . '>' . htmlspecialchars($l['nome']) . '</option>';
             }
         } else {
             echo '<option value="sams" ' . (($produto['loja'] ?? '') === 'sams' ? 'selected' : '') . '>Sams</option>';
@@ -1208,6 +1237,7 @@ HTMLSCRIPT;
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
+            $cols = $this->getTableColumns($pdo, 'produtos');
             
             $price = $this->parseMoneyToDb($request->getParam('price'));
             $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
@@ -1225,6 +1255,24 @@ HTMLSCRIPT;
                 $categoryId = null;
             }
             
+            $lojaParam = $request->getParam('loja');
+            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
+            $lojaSlug = $lojaParam;
+            if ($lojaId > 0) {
+                try {
+                    $stmtT = $pdo->query("SHOW TABLES LIKE 'lojas'");
+                    if ($stmtT && $stmtT->fetchColumn()) {
+                        $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $lojaId]);
+                        $tmpSlug = $stmtL->fetchColumn();
+                        if ($tmpSlug !== false && (string) $tmpSlug !== '') {
+                            $lojaSlug = (string) $tmpSlug;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
             $stmt = $pdo->prepare("
                 UPDATE produtos SET 
                     name = ?, sku = ?, loja = ?, ncm = ?, description = ?, short_description = ?, category_id = ?, 
@@ -1236,7 +1284,7 @@ HTMLSCRIPT;
             $stmt->execute([
                 $request->getParam('name'),
                 $request->getParam('sku'),
-                $request->getParam('loja'),
+                $lojaSlug,
                 $request->getParam('ncm'),
                 $request->getParam('description'),
                 $request->getParam('short_description'),
@@ -1252,6 +1300,11 @@ HTMLSCRIPT;
                 $request->getParam('featured') ?: 0,
                 $id
             ]);
+
+            if (in_array('loja_id', $cols, true) && $lojaId > 0) {
+                $stmtLojaId = $pdo->prepare('UPDATE produtos SET loja_id = ? WHERE id = ?');
+                $stmtLojaId->execute([$lojaId, $id]);
+            }
 
             $rowsUpdated = $stmt->rowCount();
             $stmtWarnings = $pdo->query('SHOW WARNINGS');

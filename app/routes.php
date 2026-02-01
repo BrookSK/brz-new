@@ -294,6 +294,7 @@ $router->post('/admin/estoque/marcar-comprado', 'AdminEstoqueController', 'marca
 // Rotas de Lista de Compras
 $router->get('/admin/estoque/compras', 'AdminComprasController', 'index');
 $router->post('/admin/estoque/compras/salvar', 'AdminComprasController', 'salvar');
+$router->post('/admin/estoque/compras/definir-loja', 'AdminComprasController', 'definirLojaProduto');
 $router->post('/admin/estoque/compras/mudar-status', 'AdminComprasController', 'mudarStatus');
 $router->get('/admin/estoque/compras/pdf', 'AdminComprasController', 'gerarPDF');
 $router->get('/admin/estoque/verificar-estoque/{produto_id}', 'AdminComprasController', 'verificarEstoque');

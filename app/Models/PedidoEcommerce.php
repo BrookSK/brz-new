@@ -8,6 +8,260 @@ use App\Services\NotificationService;
 class PedidoEcommerce extends Model {
     protected $table = 'pedidos';
 
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function columnExists(string $table, string $column): bool {
+        try {
+            $stmt = $this->connection->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE ?');
+            $stmt->execute([$column]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function consumirEstoqueInternoEGerarCompras(int $pedidoId, int $usuarioId, array $itens): void {
+        // Este método é best-effort: se tabelas não existirem, não interrompe a criação do pedido
+        try {
+            if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao') || !$this->tableExists('lista_compras')) {
+                return;
+            }
+
+            $temLojaEmProdutos = $this->columnExists('produtos', 'loja');
+            $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
+            $temPedidoEmMov = $this->columnExists('estoque_movimentacao', 'pedido_id');
+            $temUsuarioLoginEmMov = $this->columnExists('estoque_movimentacao', 'usuario_login');
+            $temLojaEmLista = $this->columnExists('lista_compras', 'loja');
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+
+            $usuarioLogin = null;
+            try {
+                if (session_status() !== PHP_SESSION_ACTIVE) {
+                    @session_start();
+                }
+                if (!empty($_SESSION['usuario_email'])) {
+                    $usuarioLogin = (string) $_SESSION['usuario_email'];
+                }
+            } catch (\Exception $e) {
+            }
+
+            // Prepared statements
+            $stmtLocs = $this->connection->prepare('
+                SELECT id, quantidade, galpao, prateleira
+                FROM estoque_interno
+                WHERE produto_id = :produto_id AND quantidade > 0
+                ORDER BY
+                    CASE WHEN data_compra IS NULL THEN 1 ELSE 0 END ASC,
+                    data_compra ASC,
+                    id ASC
+            ');
+            $stmtUpdStock = $this->connection->prepare('UPDATE estoque_interno SET quantidade = :quantidade WHERE id = :id LIMIT 1');
+
+            $sqlMovCols = 'produto_id, tipo_movimentacao, quantidade, quantidade_anterior, quantidade_nova, motivo, usuario_id';
+            $sqlMovVals = ':produto_id, :tipo_movimentacao, :quantidade, :quantidade_anterior, :quantidade_nova, :motivo, :usuario_id';
+            if ($temPedidoEmMov) {
+                $sqlMovCols .= ', pedido_id';
+                $sqlMovVals .= ', :pedido_id';
+            }
+            if ($temUsuarioLoginEmMov) {
+                $sqlMovCols .= ', usuario_login';
+                $sqlMovVals .= ', :usuario_login';
+            }
+            $stmtMov = $this->connection->prepare('INSERT INTO estoque_movimentacao (' . $sqlMovCols . ') VALUES (' . $sqlMovVals . ')');
+
+            $sqlListaSelect = 'SELECT id, quantidade_necessaria, quantidade_faltante FROM lista_compras WHERE produto_id = :produto_id AND status = \'pendente\'';
+            if ($temLojaIdEmLista) {
+                $sqlListaSelect .= ' AND COALESCE(loja_id, 0) = :loja_id';
+            } elseif ($temLojaEmLista) {
+                $sqlListaSelect .= ' AND COALESCE(loja, \'\') = :loja';
+            }
+            $sqlListaSelect .= ' LIMIT 1';
+            $stmtListaGet = $this->connection->prepare($sqlListaSelect);
+
+            $stmtListaUpd = null;
+            $stmtListaIns = null;
+            // update
+            $sqlUpd = 'UPDATE lista_compras SET quantidade_necessaria = :quantidade_necessaria, quantidade_faltante = :quantidade_faltante';
+            if ($temPedidoEmLista) {
+                $sqlUpd .= ', pedido_id = :pedido_id';
+            }
+            $sqlUpd .= ' WHERE id = :id LIMIT 1';
+            $stmtListaUpd = $this->connection->prepare($sqlUpd);
+            // insert
+            $cols = ['produto_id'];
+            $vals = [':produto_id'];
+            if ($temLojaIdEmLista) {
+                $cols[] = 'loja_id';
+                $vals[] = ':loja_id';
+            } elseif ($temLojaEmLista) {
+                $cols[] = 'loja';
+                $vals[] = ':loja';
+            }
+            if ($temPedidoEmLista) {
+                $cols[] = 'pedido_id';
+                $vals[] = ':pedido_id';
+            }
+            $cols[] = 'quantidade_necessaria';
+            $vals[] = ':quantidade_necessaria';
+            $cols[] = 'quantidade_faltante';
+            $vals[] = ':quantidade_faltante';
+            $cols[] = 'prioridade';
+            $vals[] = ':prioridade';
+            $cols[] = 'status';
+            $vals[] = '\'pendente\'';
+            $cols[] = 'data_solicitacao';
+            $vals[] = 'CURDATE()';
+            $stmtListaIns = $this->connection->prepare('INSERT INTO lista_compras (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')');
+
+            $stmtProdutoLoja = null;
+            if ($temLojaEmProdutos || $temLojaIdEmProdutos) {
+                $selectParts = [];
+                if ($temLojaIdEmProdutos) {
+                    $selectParts[] = 'COALESCE(loja_id, 0) as loja_id';
+                } else {
+                    $selectParts[] = '0 as loja_id';
+                }
+                if ($temLojaEmProdutos) {
+                    $selectParts[] = 'COALESCE(loja, \'\') as loja';
+                } else {
+                    $selectParts[] = '\'\' as loja';
+                }
+                $stmtProdutoLoja = $this->connection->prepare('SELECT ' . implode(', ', $selectParts) . ' FROM produtos WHERE id = :id LIMIT 1');
+            }
+
+            foreach ($itens as $item) {
+                $produtoId = (int) ($item['produto_id'] ?? 0);
+                $qtdPedido = (int) ($item['quantidade'] ?? 0);
+                if ($produtoId <= 0 || $qtdPedido <= 0) {
+                    continue;
+                }
+
+                $loja = '';
+                $lojaId = 0;
+                if ($stmtProdutoLoja) {
+                    $stmtProdutoLoja->execute([':id' => $produtoId]);
+                    $rowLoja = $stmtProdutoLoja->fetch(\PDO::FETCH_ASSOC);
+                    if (is_array($rowLoja)) {
+                        $lojaId = (int) ($rowLoja['loja_id'] ?? 0);
+                        $loja = (string) ($rowLoja['loja'] ?? '');
+                    }
+                }
+
+                $restante = $qtdPedido;
+
+                // Consumir estoque interno
+                $stmtLocs->execute([':produto_id' => $produtoId]);
+                $locs = $stmtLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($locs as $loc) {
+                    if ($restante <= 0) {
+                        break;
+                    }
+
+                    $estoqueId = (int) ($loc['id'] ?? 0);
+                    $qtdDisponivel = (int) ($loc['quantidade'] ?? 0);
+                    if ($estoqueId <= 0 || $qtdDisponivel <= 0) {
+                        continue;
+                    }
+
+                    $tirar = min($qtdDisponivel, $restante);
+                    $novo = $qtdDisponivel - $tirar;
+                    $stmtUpdStock->execute([':quantidade' => $novo, ':id' => $estoqueId]);
+
+                    $gal = trim((string) ($loc['galpao'] ?? ''));
+                    $pra = trim((string) ($loc['prateleira'] ?? ''));
+                    $locFull = $gal;
+                    if ($gal !== '' && $pra !== '') {
+                        $locFull .= ' - ' . $pra;
+                    } elseif ($pra !== '') {
+                        $locFull = $pra;
+                    }
+
+                    $motivo = 'Saída para pedido #' . $pedidoId;
+                    if ($locFull !== '') {
+                        $motivo .= ' (' . $locFull . ')';
+                    }
+
+                    $params = [
+                        ':produto_id' => $produtoId,
+                        ':tipo_movimentacao' => 'saida',
+                        ':quantidade' => $tirar,
+                        ':quantidade_anterior' => $qtdDisponivel,
+                        ':quantidade_nova' => $novo,
+                        ':motivo' => $motivo,
+                        ':usuario_id' => $usuarioId,
+                    ];
+                    if ($temPedidoEmMov) {
+                        $params[':pedido_id'] = $pedidoId;
+                    }
+                    if ($temUsuarioLoginEmMov) {
+                        $params[':usuario_login'] = $usuarioLogin;
+                    }
+                    $stmtMov->execute($params);
+
+                    $restante -= $tirar;
+                }
+
+                // Gerar/atualizar lista de compras para faltante
+                if ($restante > 0) {
+                    $paramsGet = [':produto_id' => $produtoId];
+                    if ($temLojaIdEmLista) {
+                        $paramsGet[':loja_id'] = $lojaId;
+                    } elseif ($temLojaEmLista) {
+                        $paramsGet[':loja'] = $loja;
+                    }
+                    $stmtListaGet->execute($paramsGet);
+                    $row = $stmtListaGet->fetch(\PDO::FETCH_ASSOC);
+
+                    if ($row && isset($row['id'])) {
+                        $id = (int) $row['id'];
+                        $qn = (int) ($row['quantidade_necessaria'] ?? 0);
+                        $qf = (int) ($row['quantidade_faltante'] ?? 0);
+                        $qn += $qtdPedido;
+                        $qf += $restante;
+
+                        $paramsUpd = [
+                            ':quantidade_necessaria' => $qn,
+                            ':quantidade_faltante' => $qf,
+                            ':id' => $id,
+                        ];
+                        if ($temPedidoEmLista) {
+                            $paramsUpd[':pedido_id'] = $pedidoId;
+                        }
+                        $stmtListaUpd->execute($paramsUpd);
+                    } else {
+                        $paramsIns = [
+                            ':produto_id' => $produtoId,
+                            ':quantidade_necessaria' => $qtdPedido,
+                            ':quantidade_faltante' => $restante,
+                            ':prioridade' => 'alta',
+                        ];
+                        if ($temLojaIdEmLista) {
+                            $paramsIns[':loja_id'] = $lojaId;
+                        } elseif ($temLojaEmLista) {
+                            $paramsIns[':loja'] = $loja;
+                        }
+                        if ($temPedidoEmLista) {
+                            $paramsIns[':pedido_id'] = $pedidoId;
+                        }
+                        $stmtListaIns->execute($paramsIns);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Não interromper fluxo do pedido; registrar para diagnóstico
+            error_log('Erro ao consumir estoque interno/gerar lista de compras: ' . $e->getMessage());
+        }
+    }
+
     public function getPedidos($usuarioId = null, $limite = 10, $offset = 0) {
         $sql = "SELECT p.* FROM {$this->table} p";
         $where = [];
@@ -81,6 +335,7 @@ class PedidoEcommerce extends Model {
             $pedidoId = $this->connection->lastInsertId();
             
             // Criar itens do pedido
+            $pedidoItens = [];
             foreach ($items as $item) {
                 $itemData = [
                     'pedido_id' => $pedidoId,
@@ -93,6 +348,11 @@ class PedidoEcommerce extends Model {
                     INSERT INTO pedido_items (pedido_id, produto_id, quantidade, preco_unitario, subtotal)
                     VALUES (:pedido_id, :produto_id, :quantidade, :preco_unitario, :subtotal)
                 ")->execute($itemData);
+
+                $pedidoItens[] = [
+                    'produto_id' => (int) $item['produto_id'],
+                    'quantidade' => (int) $item['quantidade'],
+                ];
                 
                 // Atualizar estoque
                 $produtoModel = new Produto();
@@ -102,6 +362,9 @@ class PedidoEcommerce extends Model {
             // Adicionar histórico de status
             $this->adicionarHistoricoStatus($pedidoId, null, 'pago', 'Pedido criado e pago com sucesso', $usuarioId);
             
+            // Consumir estoque interno e gerar lista de compras por loja
+            $this->consumirEstoqueInternoEGerarCompras((int) $pedidoId, (int) $usuarioId, $pedidoItens);
+
             $this->connection->commit();
             
             // Disparar evento
