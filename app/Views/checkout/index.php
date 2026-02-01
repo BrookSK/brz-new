@@ -74,7 +74,7 @@
                             <div id="endereco-form" <?= (!empty($usuario) && !empty($enderecos)) ? 'style="display: none;"' : '' ?>>
                                 <div class="row">
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">País *</label>
+                                        <label class="form-label">País / Country *</label>
                                         <select class="form-select" name="pais" id="pais" required>
                                             <option value="BR" selected>Brasil</option>
                                             <option value="US">Estados Unidos</option>
@@ -83,38 +83,38 @@
                                         </select>
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="label-cep">CEP *</label>
+                                        <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
                                         <input type="text" class="form-control" name="cep" required 
                                                id="cep" maxlength="12"
                                                value="<?= htmlspecialchars($enderecos[0]['cep'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-9 mb-3">
-                                        <label class="form-label">Endereço *</label>
+                                        <label class="form-label">Rua / Street *</label>
                                         <input type="text" class="form-control" name="endereco" required id="endereco"
                                                value="<?= htmlspecialchars($enderecos[0]['endereco'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Número *</label>
+                                        <label class="form-label">Número / Number *</label>
                                         <input type="text" class="form-control" name="numero" required
                                                value="<?= htmlspecialchars($enderecos[0]['numero'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Complemento</label>
+                                        <label class="form-label">Complemento / Complement</label>
                                         <input type="text" class="form-control" name="complemento"
                                                value="<?= htmlspecialchars($enderecos[0]['complemento'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Bairro *</label>
+                                        <label class="form-label">Bairro / District *</label>
                                         <input type="text" class="form-control" name="bairro" required id="bairro"
                                                value="<?= htmlspecialchars($enderecos[0]['bairro'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Cidade *</label>
+                                        <label class="form-label">Cidade / City *</label>
                                         <input type="text" class="form-control" name="cidade" required id="cidade"
                                                value="<?= htmlspecialchars($enderecos[0]['cidade'] ?? '') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="label-estado">Estado *</label>
+                                        <label class="form-label" id="label-estado">Estado / State *</label>
                                         <select class="form-select" name="estado" required id="estado">
                                             <option value="">Selecione...</option>
                                             <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
@@ -348,24 +348,9 @@ console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
 
 function atualizarEnderecoPorPais() {
     const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
-    const labelCep = document.getElementById('label-cep');
-    const labelEstado = document.getElementById('label-estado');
     const cep = document.getElementById('cep');
     const estadoSelect = document.getElementById('estado');
     const estadoText = document.getElementById('estado_text');
-
-    if (labelCep) {
-        if (pais === 'US') labelCep.textContent = 'ZIP Code *';
-        else if (pais === 'DE' || pais === 'AU') labelCep.textContent = 'Postal Code *';
-        else labelCep.textContent = 'CEP *';
-    }
-
-    if (labelEstado) {
-        if (pais === 'US') labelEstado.textContent = 'State *';
-        else if (pais === 'DE') labelEstado.textContent = 'State / Region *';
-        else if (pais === 'AU') labelEstado.textContent = 'State / Territory *';
-        else labelEstado.textContent = 'Estado *';
-    }
 
     if (cep) {
         if (pais === 'BR') {
