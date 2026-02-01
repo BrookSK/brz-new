@@ -1084,7 +1084,17 @@ class AdminPedidosController extends Controller {
                     }
                 }
 
-                // Para cada item, pendenciar somente o faltante (qtd_pedido - qtd_reservada)
+                // Verificar suporte ao estoque_interno (para dar baixa do que foi realmente reservado)
+                $temEstoqueInterno = false;
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['estoque_interno']);
+                    $temEstoqueInterno = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temEstoqueInterno = false;
+                }
+
+                // Para cada item, pendenciar somente o faltante (qtd_pedido - qtd_reservada) e dar baixa no estoque pelo reservado
                 if ($temPedidoIdLista && $temProdutoIdLista && is_array($itens)) {
                     foreach ($itens as $it) {
                         $produtoId = (int) ($it['produto_id'] ?? 0);
@@ -1108,6 +1118,31 @@ class AdminPedidosController extends Controller {
                         }
 
                         $faltante = $qtdPedido - $qtdReservada;
+
+                        // Baixa fsica do estoque: consome apenas o que estava reservado (o que de fato existia)
+                        if ($temEstoqueInterno && $qtdReservada > 0) {
+                            $restante = $qtdReservada;
+                            try {
+                                $stmtLocs = $pdo->prepare(
+                                    'SELECT id, quantidade FROM estoque_interno WHERE produto_id = ? AND quantidade > 0 ORDER BY CASE WHEN data_compra IS NULL THEN 1 ELSE 0 END ASC, data_compra ASC, id ASC'
+                                );
+                                $stmtLocs->execute([$produtoId]);
+                                $locs = $stmtLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                                foreach ($locs as $loc) {
+                                    if ($restante <= 0) break;
+                                    $locId = (int) ($loc['id'] ?? 0);
+                                    $qAtual = (int) ($loc['quantidade'] ?? 0);
+                                    if ($locId <= 0 || $qAtual <= 0) continue;
+                                    $consumir = ($qAtual <= $restante) ? $qAtual : $restante;
+                                    $novoQ = $qAtual - $consumir;
+                                    $stmtUpd = $pdo->prepare('UPDATE estoque_interno SET quantidade = ? WHERE id = ? LIMIT 1');
+                                    $stmtUpd->execute([$novoQ, $locId]);
+                                    $restante -= $consumir;
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+
                         if ($faltante <= 0) {
                             continue;
                         }
@@ -1153,6 +1188,57 @@ class AdminPedidosController extends Controller {
                     if (!empty($temPedidoId)) {
                         try {
                             $stmtDel = $pdo->prepare('DELETE FROM estoque_reservas WHERE pedido_id = ?');
+                            $stmtDel->execute([(int) $id]);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            }
+
+            if ((string) $novoStatus === 'cancelado') {
+                // Cancelamento: liberar reservas e remover pendancias do pedido
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['estoque_reservas']);
+                    $temReservas = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temReservas = false;
+                }
+                if (!empty($temReservas)) {
+                    try {
+                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'pedido_id'");
+                        $stmtC->execute();
+                        $temPedidoId = ((int) $stmtC->fetchColumn() > 0);
+                    } catch (\Exception $e) {
+                        $temPedidoId = false;
+                    }
+                    if (!empty($temPedidoId)) {
+                        try {
+                            $stmtDel = $pdo->prepare('DELETE FROM estoque_reservas WHERE pedido_id = ?');
+                            $stmtDel->execute([(int) $id]);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['lista_compras']);
+                    $temLista = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temLista = false;
+                }
+                if (!empty($temLista)) {
+                    try {
+                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'lista_compras' AND column_name = 'pedido_id'");
+                        $stmtC->execute();
+                        $temPedidoIdLista = ((int) $stmtC->fetchColumn() > 0);
+                    } catch (\Exception $e) {
+                        $temPedidoIdLista = false;
+                    }
+                    if (!empty($temPedidoIdLista)) {
+                        try {
+                            $stmtDel = $pdo->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
                             $stmtDel->execute([(int) $id]);
                         } catch (\Exception $e) {
                         }
