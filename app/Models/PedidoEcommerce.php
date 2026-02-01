@@ -60,15 +60,41 @@ class PedidoEcommerce extends Model {
             }
             
             // Inserir pedido
-            $stmt = $this->connection->prepare("
-                INSERT INTO {$this->table} (
-                    usuario_id, codigo_pedido, status, subtotal, valor_total, 
-                    moeda, endereco_entrega_id, endereco_cobranca_id, created_at
-                ) VALUES (
-                    :usuario_id, :codigo_pedido, 'pago', :subtotal, :valor_total,
-                    :moeda, :endereco_entrega_id, :endereco_cobranca_id, NOW()
-                )
-            ");
+            $cols = [];
+            try {
+                $stmtCols = $this->connection->query("DESCRIBE {$this->table}");
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $insertCols = [
+                'usuario_id',
+                'codigo_pedido',
+                'status',
+                'subtotal',
+                'valor_total',
+                'moeda',
+                'endereco_entrega_id',
+                'endereco_cobranca_id',
+                'created_at',
+            ];
+
+            $sql = 'INSERT INTO ' . $this->table . ' (' . implode(', ', $insertCols) . ') VALUES (';
+            $placeholders = [
+                ':usuario_id',
+                ':codigo_pedido',
+                "'pendente'",
+                ':subtotal',
+                ':valor_total',
+                ':moeda',
+                ':endereco_entrega_id',
+                ':endereco_cobranca_id',
+                'NOW()',
+            ];
+            $sql .= implode(', ', $placeholders) . ')';
+
+            $stmt = $this->connection->prepare($sql);
             $stmt->bindParam(':usuario_id', $usuarioId);
             $stmt->bindParam(':codigo_pedido', $codigoPedido);
             $stmt->bindParam(':subtotal', $subtotal);
@@ -100,12 +126,12 @@ class PedidoEcommerce extends Model {
             }
             
             // Adicionar histórico de status
-            $this->adicionarHistoricoStatus($pedidoId, null, 'pago', 'Pedido criado e pago com sucesso', $usuarioId);
+            $this->adicionarHistoricoStatus($pedidoId, null, 'pendente', 'Pedido criado aguardando confirmação do pagamento', $usuarioId);
             
             $this->connection->commit();
             
             // Disparar evento
-            $this->dispararEvento('pagamento_aprovado', $pedidoId);
+            $this->dispararEvento('novo_pedido', $pedidoId);
             
             return $pedidoId;
             
