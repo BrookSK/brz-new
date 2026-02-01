@@ -980,6 +980,167 @@ class AdminPedidosController extends Controller {
                     $temReservas = false;
                 }
 
+                // Determinar tabela de itens do pedido (pedido_itens vs pedido_items)
+                $itensTable = null;
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['pedido_itens']);
+                    $temPedidoItens = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temPedidoItens = false;
+                }
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['pedido_items']);
+                    $temPedidoItems = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temPedidoItems = false;
+                }
+                if ($temPedidoItens && !$temPedidoItems) {
+                    $itensTable = 'pedido_itens';
+                } elseif ($temPedidoItems && !$temPedidoItens) {
+                    $itensTable = 'pedido_items';
+                } elseif ($temPedidoItens && $temPedidoItems) {
+                    // escolher a tabela com mais itens para este pedido
+                    $c1 = 0;
+                    $c2 = 0;
+                    try {
+                        $st = $pdo->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
+                        $st->execute([(int) $id]);
+                        $c1 = (int) ($st->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $c1 = 0;
+                    }
+                    try {
+                        $st = $pdo->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
+                        $st->execute([(int) $id]);
+                        $c2 = (int) ($st->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $c2 = 0;
+                    }
+                    $itensTable = ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+                }
+
+                // Recalcular faltantes: pedido - reservado (e manter pendancias)
+                $itens = [];
+                if (!empty($itensTable)) {
+                    try {
+                        $st = $pdo->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                        $st->execute([(int) $id]);
+                        $itens = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {
+                        $itens = [];
+                    }
+                }
+
+                $temLista = false;
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['lista_compras']);
+                    $temLista = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temLista = false;
+                }
+
+                $colsLista = [];
+                if ($temLista) {
+                    try {
+                        $st = $pdo->query('DESCRIBE lista_compras');
+                        $colsLista = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    } catch (\Exception $e) {
+                        $colsLista = [];
+                    }
+                }
+                $temPedidoIdLista = $temLista && is_array($colsLista) && in_array('pedido_id', $colsLista, true);
+                $temProdutoIdLista = $temLista && is_array($colsLista) && in_array('produto_id', $colsLista, true);
+
+                // limpar pendancias antigas deste pedido para regravar somente o que faltar
+                if ($temPedidoIdLista) {
+                    try {
+                        $stmtDel = $pdo->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
+                        $stmtDel->execute([(int) $id]);
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                // preparar leitura de reservas do pedido (quantidade efetivamente reservada)
+                $temPedidoIdReserva = false;
+                $temProdutoIdReserva = false;
+                $temQtdReserva = false;
+                $temStatusReserva = false;
+                if (!empty($temReservas)) {
+                    try {
+                        $st = $pdo->query('DESCRIBE estoque_reservas');
+                        $colsRes = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+                        $temPedidoIdReserva = is_array($colsRes) && in_array('pedido_id', $colsRes, true);
+                        $temProdutoIdReserva = is_array($colsRes) && in_array('produto_id', $colsRes, true);
+                        $temQtdReserva = is_array($colsRes) && in_array('quantidade_reservada', $colsRes, true);
+                        $temStatusReserva = is_array($colsRes) && in_array('status', $colsRes, true);
+                    } catch (\Exception $e) {
+                        $temPedidoIdReserva = false;
+                        $temProdutoIdReserva = false;
+                        $temQtdReserva = false;
+                        $temStatusReserva = false;
+                    }
+                }
+
+                // Para cada item, pendenciar somente o faltante (qtd_pedido - qtd_reservada)
+                if ($temPedidoIdLista && $temProdutoIdLista && is_array($itens)) {
+                    foreach ($itens as $it) {
+                        $produtoId = (int) ($it['produto_id'] ?? 0);
+                        $qtdPedido = (int) ($it['quantidade'] ?? 0);
+                        if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                        $qtdReservada = 0;
+                        if ($temPedidoIdReserva && $temProdutoIdReserva && $temQtdReserva) {
+                            try {
+                                $sql = 'SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ?';
+                                $params = [(int) $id, $produtoId];
+                                if ($temStatusReserva) {
+                                    $sql .= " AND status = 'ativa'";
+                                }
+                                $st = $pdo->prepare($sql);
+                                $st->execute($params);
+                                $qtdReservada = (int) ($st->fetchColumn() ?: 0);
+                            } catch (\Exception $e) {
+                                $qtdReservada = 0;
+                            }
+                        }
+
+                        $faltante = $qtdPedido - $qtdReservada;
+                        if ($faltante <= 0) {
+                            continue;
+                        }
+
+                        // inserir pendancia na lista_compras com o que faltar
+                        try {
+                            $cols = ['produto_id', 'pedido_id'];
+                            $vals = [':produto_id', ':pedido_id'];
+                            $params = [':produto_id' => $produtoId, ':pedido_id' => (int) $id];
+
+                            if (in_array('quantidade_faltante', $colsLista, true)) {
+                                $cols[] = 'quantidade_faltante';
+                                $vals[] = ':q';
+                                $params[':q'] = $faltante;
+                            } elseif (in_array('quantidade_necessaria', $colsLista, true)) {
+                                $cols[] = 'quantidade_necessaria';
+                                $vals[] = ':q';
+                                $params[':q'] = $faltante;
+                            }
+
+                            if (in_array('status', $colsLista, true)) {
+                                $cols[] = 'status';
+                                $vals[] = "'pendente'";
+                            }
+
+                            $sql = 'INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')';
+                            $st = $pdo->prepare($sql);
+                            $st->execute($params);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
                 if (!empty($temReservas)) {
                     try {
                         $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'pedido_id'");
@@ -992,32 +1153,6 @@ class AdminPedidosController extends Controller {
                     if (!empty($temPedidoId)) {
                         try {
                             $stmtDel = $pdo->prepare('DELETE FROM estoque_reservas WHERE pedido_id = ?');
-                            $stmtDel->execute([(int) $id]);
-                        } catch (\Exception $e) {
-                        }
-                    }
-                }
-
-                try {
-                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
-                    $stmtT->execute(['lista_compras']);
-                    $temLista = ((int) $stmtT->fetchColumn() > 0);
-                } catch (\Exception $e) {
-                    $temLista = false;
-                }
-
-                if (!empty($temLista)) {
-                    try {
-                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'lista_compras' AND column_name = 'pedido_id'");
-                        $stmtC->execute();
-                        $temPedidoIdLista = ((int) $stmtC->fetchColumn() > 0);
-                    } catch (\Exception $e) {
-                        $temPedidoIdLista = false;
-                    }
-
-                    if (!empty($temPedidoIdLista)) {
-                        try {
-                            $stmtDel = $pdo->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
                             $stmtDel->execute([(int) $id]);
                         } catch (\Exception $e) {
                         }
