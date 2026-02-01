@@ -250,6 +250,7 @@ $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', '
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
+$router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
 
 // Notificações (Webhooks / Email teste)
 $router->post('/admin/salvar-notificacao', 'AdminNotificacoesController', 'salvarNotificacao');

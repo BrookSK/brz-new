@@ -2,12 +2,13 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use Config\Database;
 
 class AdminConfiguracoesController extends Controller {
     
     public function index(Request $request) {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = Database::getConnection();
             
             // Buscar configurações
             $tableInfo = $this->getConfigTableInfo($pdo);
@@ -578,6 +579,92 @@ class AdminConfiguracoesController extends Controller {
                                                 <textarea class="form-control" name="entrega_wexpress_sender_json" rows="6" placeholder="{\n  \"first_name\": \"Tim\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'wexpress_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
                                                 <small class="text-muted">Dados do remetente (EUA). Pode colar o objeto sender do exemplo oficial da W-Express.</small>
                                             </div>
+
+                                            <hr>
+
+                                            <h6 class="mb-3">Correios (SIGEP Web)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ativo</label>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="sigep_enabled" name="entrega_sigep_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'sigep_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="sigep_enabled">Habilitar SIGEP Web</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente</label>
+                                                        <select class="form-select" name="entrega_sigep_ambiente">
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'sigep_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                        <small class="text-muted">Use Homologação até validar contrato/cartão e serviços.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Usuário</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_usuario" value="' . $this->getConfigValue($config, 'entrega', 'sigep_usuario', '') . '" placeholder="Usuário SIGEP">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Senha</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_sigep_senha" value="' . $this->getConfigValue($config, 'entrega', 'sigep_senha', '') . '" placeholder="Senha SIGEP">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Contrato</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_numero_contrato" value="' . $this->getConfigValue($config, 'entrega', 'sigep_numero_contrato', '') . '" placeholder="Número do contrato">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Cartão de Postagem</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_cartao_postagem" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cartao_postagem', '') . '" placeholder="Cartão de postagem">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">CNPJ</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_cnpj" value="' . $this->getConfigValue($config, 'entrega', 'sigep_cnpj', '') . '" placeholder="CNPJ do contrato">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Serviço</label>
+                                                        <select class="form-select" name="entrega_sigep_servico">
+                                                            <option value="PAC" ' . ($this->getConfigValue($config, 'entrega', 'sigep_servico', 'PAC') === 'PAC' ? 'selected' : '') . '>PAC</option>
+                                                            <option value="SEDEX" ' . ($this->getConfigValue($config, 'entrega', 'sigep_servico', '') === 'SEDEX' ? 'selected' : '') . '>SEDEX</option>
+                                                        </select>
+                                                        <small class="text-muted">Você pode ajustar quando tiver o contrato em mãos.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Código do Serviço no Contrato</label>
+                                                        <input type="text" class="form-control" name="entrega_sigep_servico_codigo" value="' . $this->getConfigValue($config, 'entrega', 'sigep_servico_codigo', '') . '" placeholder="Ex.: 04162 (depende do contrato)">
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -896,7 +983,7 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . '
 </body>
 </html>';
         exit;
@@ -904,7 +991,7 @@ class AdminConfiguracoesController extends Controller {
     
     public function salvar(Request $request) {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = Database::getConnection();
             $pdo->beginTransaction();
 
             $tableInfo = $this->getConfigTableInfo($pdo);
@@ -917,7 +1004,7 @@ class AdminConfiguracoesController extends Controller {
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
@@ -925,7 +1012,7 @@ class AdminConfiguracoesController extends Controller {
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled', 'sigep_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
@@ -1067,6 +1154,146 @@ class AdminConfiguracoesController extends Controller {
         }
     }
     
+    public function testarSigep(Request $request) {
+        try {
+            $pdo = Database::getConnection();
+            $tableInfo = $this->getConfigTableInfo($pdo);
+            $table = $tableInfo['table'];
+
+            $get = function(string $cat, string $key, string $default = '') use ($pdo, $tableInfo, $table): string {
+                try {
+                    $mode = (string) ($tableInfo['mode'] ?? '');
+                    if ($mode === 'single_row') {
+                        $cols = [];
+                        try {
+                            $st = $pdo->query('DESCRIBE ' . $table);
+                            $cols = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                        } catch (\Exception $e) {
+                            $cols = [];
+                        }
+
+                        $col = null;
+                        $map = $tableInfo['columnMap'] ?? [];
+                        if (isset($map[$cat]) && isset($map[$cat][$key])) {
+                            $col = $map[$cat][$key];
+                        } else {
+                            $guess = $key;
+                            if (in_array($guess, $cols, true)) {
+                                $col = $guess;
+                            }
+                        }
+
+                        if (!$col || !preg_match('/^[a-zA-Z0-9_]+$/', (string) $col)) {
+                            return $default;
+                        }
+
+                        $idCol = (string) ($tableInfo['idCol'] ?? 'id');
+                        $stmt = $pdo->query('SELECT ' . $col . ' FROM ' . $table . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                        $v = $stmt->fetchColumn();
+                        return ($v === false || $v === null) ? $default : (string) $v;
+                    }
+
+                    if ($mode === 'categoria_chave') {
+                        $catCol = $tableInfo['categoriaCol'];
+                        $keyCol = $tableInfo['chaveCol'];
+                        $valCol = $tableInfo['valueCol'];
+                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE ' . $catCol . ' = ? AND ' . $keyCol . ' = ? LIMIT 1');
+                        $stmt->execute([$cat, $key]);
+                        $v = $stmt->fetchColumn();
+                        return ($v === false || $v === null) ? $default : (string) $v;
+                    }
+
+                    $keyCol = $tableInfo['keyCol'];
+                    $valCol = $tableInfo['valueCol'];
+                    $fullKey = $cat . '_' . $key;
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute([$fullKey]);
+                    $v = $stmt->fetchColumn();
+                    return ($v === false || $v === null) ? $default : (string) $v;
+                } catch (\Exception $e) {
+                    return $default;
+                }
+            };
+
+            $enabled = $get('entrega', 'sigep_enabled', '0');
+            if ($enabled !== '1') {
+                echo json_encode(['success' => false, 'error' => 'SIGEP está desabilitado nas configurações.']);
+                exit;
+            }
+
+            $ambiente = $get('entrega', 'sigep_ambiente', 'homologacao');
+            $usuario = $get('entrega', 'sigep_usuario', '');
+            $senha = $get('entrega', 'sigep_senha', '');
+            $cnpj = $get('entrega', 'sigep_cnpj', '');
+            $servicoCodigo = $get('entrega', 'sigep_servico_codigo', '');
+            $contrato = $get('entrega', 'sigep_numero_contrato', '');
+            $cartao = $get('entrega', 'sigep_cartao_postagem', '');
+
+            if ($usuario === '' || $senha === '' || $contrato === '' || $cartao === '' || $servicoCodigo === '') {
+                echo json_encode(['success' => false, 'error' => 'Preencha usuário, senha, contrato, cartão de postagem e código do serviço.']);
+                exit;
+            }
+
+            if (!class_exists('\\SoapClient')) {
+                echo json_encode(['success' => false, 'error' => 'Extensão SOAP não disponível no PHP do servidor.']);
+                exit;
+            }
+
+            $amb = strtolower(trim((string) $ambiente));
+            $wsdl = ($amb === 'producao' || $amb === 'production')
+                ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
+                : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+
+            $client = new \SoapClient($wsdl, [
+                'exceptions' => true,
+                'trace' => false,
+                'cache_wsdl' => WSDL_CACHE_BOTH,
+                'connection_timeout' => 20,
+            ]);
+
+            $params = [
+                'tipoDestinatario' => 'C',
+                'identificador' => $cnpj,
+                'idServico' => $servicoCodigo,
+                'qtdEtiquetas' => 1,
+                'usuario' => $usuario,
+                'senha' => $senha,
+            ];
+
+            $resp = $client->__soapCall('solicitaEtiquetas', [$params]);
+
+            echo json_encode([
+                'success' => true,
+                'ambiente' => $ambiente,
+                'response' => $resp,
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function getEntregaJS() {
+        ob_start();
+        ?>
+        <script>
+        function testarSigepAPI() {
+            fetch('/admin/configuracoes/testar-sigep', { method: 'POST' })
+                .then(async response => {
+                    const data = await response.json().catch(() => ({}));
+                    if (response.ok && data.success) {
+                        alert('✅ SIGEP OK (' + (data.ambiente || '') + ')\n\nResposta: ' + JSON.stringify(data.response));
+                    } else {
+                        alert('❌ SIGEP falhou: ' + (data.error || JSON.stringify(data)));
+                    }
+                })
+                .catch(err => alert('❌ Erro ao testar SIGEP: ' + err.message));
+        }
+        </script>
+        <?php
+        return ob_get_clean();
+    }
+
     // JavaScript para pagamentos
     private function getPagamentosJS() {
         ob_start();
