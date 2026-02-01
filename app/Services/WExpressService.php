@@ -2,137 +2,178 @@
 namespace App\Services;
 
 class WExpressService {
-    private $apiKey;
-    private $baseUrl = 'https://api.wexpress.com/v1';
+    private string $apiKey;
+    private string $ambiente;
+    private string $serviceCode;
+    private ?array $sender;
+    private int $lastHttpCode = 0;
 
     public function __construct() {
-        $this->apiKey = $_ENV['WEXPRESS_API_KEY'] ?? 'test_key';
+        $this->apiKey = (string) $this->getConfig('entrega', 'wexpress_api_key', '');
+        $this->ambiente = (string) $this->getConfig('entrega', 'wexpress_ambiente', 'sandbox');
+        $this->serviceCode = (string) $this->getConfig('entrega', 'wexpress_service_code', 'wexpress_correios_std');
+
+        $senderJson = (string) $this->getConfig('entrega', 'wexpress_sender_json', '');
+        $decoded = $senderJson !== '' ? json_decode($senderJson, true) : null;
+        $this->sender = is_array($decoded) ? $decoded : null;
     }
 
-    public function criarEnvio($dados) {
-        $endpoint = $this->baseUrl . '/shipments';
-        
-        $payload = [
-            'origin' => [
-                'address' => $dados['endereco_origem'],
-                'city' => $dados['cidade_origem'],
-                'state' => $dados['estado_origem'],
-                'zip' => $dados['cep_origem'],
-                'country' => 'US'
-            ],
-            'destination' => [
-                'address' => $dados['endereco_destino'],
-                'city' => $dados['cidade_destino'],
-                'state' => $dados['estado_destino'],
-                'zip' => $dados['cep_destino'],
-                'country' => 'BR'
-            ],
-            'packages' => $dados['pacotes'],
-            'service_type' => 'express_international',
-            'customs_value' => $dados['valor_aduaneiro']
-        ];
-
-        $response = $this->makeRequest('POST', $endpoint, $payload);
-        return $response;
+    public function getServiceCode(): string {
+        return $this->serviceCode;
     }
 
-    public function rastrearEnvio($trackingCode) {
-        $endpoint = $this->baseUrl . '/tracking/' . $trackingCode;
-        $response = $this->makeRequest('GET', $endpoint);
-        return $response;
+    public function getSender(): ?array {
+        return $this->sender;
     }
 
-    public function calcularFrete($dados) {
-        $endpoint = $this->baseUrl . '/rates';
-        
-        $payload = [
-            'origin' => [
-                'zip' => $dados['cep_origem'],
-                'country' => 'US'
-            ],
-            'destination' => [
-                'zip' => $dados['cep_destino'],
-                'country' => 'BR'
-            ],
-            'weight' => $dados['peso'],
-            'dimensions' => [
-                'length' => $dados['comprimento'],
-                'width' => $dados['largura'],
-                'height' => $dados['altura']
-            ]
-        ];
-
-        $response = $this->makeRequest('POST', $endpoint, $payload);
-        return $response;
+    public function getLastHttpCode(): int {
+        return $this->lastHttpCode;
     }
 
-    private function makeRequest($method, $url, $data = null) {
-        $ch = curl_init();
-        
+    public function createShipping(array $payload): array {
+        return $this->request('POST', '/shipping', $payload);
+    }
+
+    public function getShipping(string $wexpressId): array {
+        $wexpressId = trim($wexpressId);
+        if ($wexpressId === '') {
+            throw new \Exception('WExpressID inválido');
+        }
+        return $this->request('GET', '/shipping/' . rawurlencode($wexpressId));
+    }
+
+    private function getBaseUrl(): string {
+        $amb = strtolower(trim($this->ambiente));
+        // Swagger expõe sandbox.wexpress.me
+        if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
+            return 'https://wexpress.me';
+        }
+        return 'https://sandbox.wexpress.me';
+    }
+
+    private function request(string $method, string $path, ?array $body = null): array {
+        if (empty($this->apiKey)) {
+            throw new \Exception('W-Express não configurado (API Key ausente)');
+        }
+
+        $url = rtrim($this->getBaseUrl(), '/') . '/' . ltrim($path, '/');
+
         $headers = [
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->apiKey
+            'Accept: application/json',
+            'x-api-key: ' . $this->apiKey,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
 
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_TIMEOUT => 30
-        ]);
-
-        if ($data && in_array($method, ['POST', 'PUT'])) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body);
         }
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
+        if (!function_exists('curl_init')) {
+            throw new \Exception('cURL não disponível no servidor');
+        }
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+        if ($payload !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        }
+        $respBody = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
         curl_close($ch);
 
-        if ($error) {
-            throw new \Exception('Erro na requisição: ' . $error);
+        $this->lastHttpCode = $httpCode;
+
+        if ($err) {
+            throw new \Exception('Erro ao chamar W-Express: ' . $err);
         }
 
-        $responseData = json_decode($response, true);
+        $decoded = $respBody !== false ? json_decode((string) $respBody, true) : null;
+        if (!is_array($decoded)) {
+            $decoded = ['raw' => $respBody];
+        }
 
         if ($httpCode >= 400) {
-            throw new \Exception('API Error: ' . ($responseData['message'] ?? 'Unknown error'));
+            $msg = $decoded['message'] ?? ($decoded['raw'] ?? 'Erro desconhecido');
+            throw new \Exception('W-Express HTTP ' . $httpCode . ': ' . $msg);
         }
 
-        return $responseData;
+        return $decoded;
     }
 
-    public function simularCriacaoEnvio($dados) {
-        return [
-            'success' => true,
-            'tracking_code' => 'WE' . strtoupper(uniqid()),
-            'estimated_delivery' => date('Y-m-d', strtotime('+7 days')),
-            'cost' => 85.50,
-            'status' => 'created'
-        ];
-    }
+    private function getConfig(string $categoria, string $chave, $default = null) {
+        $db = \Config\Database::getConnection();
 
-    public function simularRastreamento($trackingCode) {
-        return [
-            'success' => true,
-            'tracking_code' => $trackingCode,
-            'status' => 'in_transit',
-            'events' => [
-                [
-                    'date' => '2024-01-20 10:30:00',
-                    'location' => 'Miami, FL',
-                    'description' => 'Pacote coletado',
-                    'status' => 'picked_up'
-                ],
-                [
-                    'date' => '2024-01-20 14:15:00',
-                    'location' => 'Miami International Airport',
-                    'description' => 'Pacote em trânsito',
-                    'status' => 'in_transit'
-                ]
-            ]
-        ];
+        // single-row (colunas diretas)
+        try {
+            $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            if (is_array($cols) && !empty($cols)) {
+                $colName = null;
+                if ($categoria === 'entrega') {
+                    $direct = [
+                        'wexpress_api_key',
+                        'wexpress_ambiente',
+                        'wexpress_enabled',
+                        'wexpress_service_code',
+                        'wexpress_sender_json',
+                    ];
+                    if (in_array($chave, $direct, true) && in_array($chave, $cols, true)) {
+                        $colName = $chave;
+                    }
+                }
+
+                if (!empty($colName)) {
+                    $stmt = $db->query('SELECT ' . $colName . ' AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        // categoria+chave
+        try {
+            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
+            $stmt->execute([$categoria, $chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        // chave/valor configuracoes_sistema sem categoria
+        try {
+            $key = $categoria . '_' . $chave;
+            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        // chave/valor configuracoes
+        try {
+            $key = $categoria . '_' . $chave;
+            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1");
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
     }
 }

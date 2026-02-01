@@ -1,12 +1,14 @@
 <?php
 namespace App\Controllers;
 
+use Config\Database;
+use App\Services\WExpressService;
+
 class AdminRemessaInternacionalController extends Controller {
     private $connection;
 
     public function __construct() {
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-        $this->connection->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $this->connection = Database::getConnection();
     }
 
     private function requireAdmin(): void {
@@ -32,30 +34,7 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function ensureTables(): void {
-        $this->connection->exec("CREATE TABLE IF NOT EXISTS remessa_janelas (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            data_inicio DATETIME NOT NULL,
-            data_fim DATETIME NOT NULL,
-            status VARCHAR(20) NOT NULL DEFAULT 'aberta',
-            closed_at DATETIME NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL,
-            INDEX idx_remessa_janelas_periodo (data_inicio, data_fim),
-            INDEX idx_remessa_janelas_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-        $this->connection->exec("CREATE TABLE IF NOT EXISTS remessa_janela_pedidos (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            janela_id INT NOT NULL,
-            pedido_id INT NOT NULL,
-            etiqueta_gerada TINYINT(1) NOT NULL DEFAULT 0,
-            etiqueta_gerada_em DATETIME NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_janela_pedido (janela_id, pedido_id),
-            INDEX idx_rjp_janela (janela_id),
-            INDEX idx_rjp_pedido (pedido_id),
-            CONSTRAINT fk_rjp_janela FOREIGN KEY (janela_id) REFERENCES remessa_janelas(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        return;
     }
 
     private function now(): \DateTime {
@@ -63,8 +42,6 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function ensureJanelaAtual(): array {
-        $this->ensureTables();
-
         $now = $this->now();
 
         // Atualizar janelas antigas (aberta -> finalizada) e marcar atraso quando aplicável
@@ -287,9 +264,6 @@ class AdminRemessaInternacionalController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-globe-americas me-2"></i>Remessa Internacional</h1>
                     <div>
-                        <button type="button" class="btn btn-success me-2" onclick="criarNovaJanela()">
-                            <i class="fas fa-plus me-1"></i>Nova Janela
-                        </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
@@ -732,10 +706,6 @@ class AdminRemessaInternacionalController extends Controller {
             }
         }
 
-        function criarNovaJanela() {
-            alert("Funcionalidade em desenvolvimento");
-        }
-
         function verJanela(janelaId) {
             window.location.href = "/admin/remessa-internacional/janela/" + janelaId;
         }
@@ -750,8 +720,6 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function getJanelasByStatus(array $statuses): array {
-        $this->ensureTables();
-
         $statuses = array_values(array_filter(array_map('strval', $statuses)));
         if (!$statuses) {
             return [];
@@ -773,7 +741,6 @@ class AdminRemessaInternacionalController extends Controller {
             exit;
         }
 
-        $this->ensureTables();
         $this->syncPedidosParaJanela($janelaId);
 
         $stJ = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE id = ? LIMIT 1');
@@ -790,6 +757,10 @@ class AdminRemessaInternacionalController extends Controller {
                 rjp.pedido_id,
                 rjp.etiqueta_gerada,
                 rjp.etiqueta_gerada_em,
+                rjp.wexpress_shipping_id,
+                rjp.wexpress_tracking_number,
+                rjp.courier_tracking_number,
+                rjp.wexpress_status,
                 p.created_at,
                 p.total,
                 p.status,
@@ -901,6 +872,9 @@ class AdminRemessaInternacionalController extends Controller {
                 $et = (int) ($p['etiqueta_gerada'] ?? 0);
                 $etBadge = $et === 1 ? 'success' : 'warning';
                 $etLabel = $et === 1 ? 'Gerada' : 'Pendente';
+                $wxStatus = (string) ($p['wexpress_status'] ?? '');
+                $wxShipId = (string) ($p['wexpress_shipping_id'] ?? '');
+                $wxCourier = (string) ($p['courier_tracking_number'] ?? '');
                 $dt = !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-';
                 $totalV = is_numeric($p['total'] ?? null) ? number_format((float) $p['total'], 2, ',', '.') : '-';
 
@@ -909,7 +883,20 @@ class AdminRemessaInternacionalController extends Controller {
                     <td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? 'N/A')) . '<br><small class="text-muted">' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</small></td>
                     <td>' . $dt . '</td>
                     <td>R$ ' . $totalV . '</td>
-                    <td><span class="badge bg-' . $etBadge . '">' . $etLabel . '</span></td>
+                    <td>
+                        <span class="badge bg-' . $etBadge . '">' . $etLabel . '</span>';
+
+                if ($wxStatus !== '') {
+                    echo '<br><small class="text-muted">W-Express: ' . htmlspecialchars($wxStatus) . '</small>';
+                }
+                if ($wxShipId !== '') {
+                    echo '<br><small class="text-muted">ShipID: ' . htmlspecialchars($wxShipId) . '</small>';
+                }
+                if ($wxCourier !== '') {
+                    echo '<br><small class="text-muted">Tracking: ' . htmlspecialchars($wxCourier) . '</small>';
+                }
+
+                echo '    </td>
                     <td>
                         <a class="btn btn-sm btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $janelaId . '/pedido/' . (int) $pid . '"><i class="fas fa-eye"></i> Detalhes</a>
                         <button class="btn btn-sm btn-outline-success ms-1" type="button" onclick="marcarEtiquetaGerada(' . (int) $pid . ')" ' . ($et === 1 ? 'disabled' : '') . '><i class="fas fa-tag"></i> Marcar etiqueta</button>
@@ -926,8 +913,9 @@ class AdminRemessaInternacionalController extends Controller {
         </main>
     </div>
 </div>
+';
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const janelaId = ' . (int) $janelaId . ';
 
@@ -966,7 +954,6 @@ function fecharJanela() {
 
     public function detalhesPedidoJanela($request, $janelaId, $pedidoId) {
         $this->requireAdmin();
-        $this->ensureTables();
 
         $jid = (int) $janelaId;
         $pid = (int) $pedidoId;
@@ -1085,15 +1072,15 @@ function fecharJanela() {
         </main>
     </div>
 </div>
+';
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const janelaId = ' . (int) $jid . ';
 const pedidoId = ' . (int) $pid . ';
 
 function gerarEtiqueta() {
-    // Integração futura: por enquanto marca como gerada
-    if (!confirm("Gerar etiqueta agora? (Por enquanto isso só marca como gerada)")) return;
+    if (!confirm("Gerar etiqueta agora?")) return;
     fetch("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId + "/etiqueta-gerada", { method: "POST" })
         .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
         .then(({ok, data}) => {
@@ -1113,7 +1100,6 @@ function gerarEtiqueta() {
 
     public function marcarEtiquetaGerada($request, $janelaId, $pedidoId) {
         $this->requireAdmin();
-        $this->ensureTables();
 
         $jid = (int) $janelaId;
         $pid = (int) $pedidoId;
@@ -1124,21 +1110,177 @@ function gerarEtiqueta() {
 
         try {
             $this->syncPedidosParaJanela($jid);
-            $st = $this->connection->prepare('UPDATE remessa_janela_pedidos SET etiqueta_gerada = 1, etiqueta_gerada_em = COALESCE(etiqueta_gerada_em, NOW()) WHERE janela_id = ? AND pedido_id = ?');
-            $st->execute([$jid, $pid]);
+
+            $pedido = $this->getPedidoCompleto($pid);
+            if (!$pedido) {
+                echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                exit;
+            }
+
+            $svc = new WExpressService();
+            $payload = $this->buildWExpressShippingPayload($svc, $pedido, $jid);
+
+            $resp = null;
+            $httpCode = null;
+            $errorMsg = null;
+            try {
+                $resp = $svc->createShipping($payload);
+                $httpCode = $svc->getLastHttpCode();
+            } catch (\Exception $e) {
+                $httpCode = $svc->getLastHttpCode();
+                $errorMsg = $e->getMessage();
+            }
+
+            $wxStatus = is_array($resp) ? (string) ($resp['shipping_status'] ?? '') : '';
+            $wxShipId = is_array($resp) ? (string) ($resp['shipping_id'] ?? '') : '';
+            $wxTrack = is_array($resp) ? (string) ($resp['wexpress_tracking_number'] ?? '') : '';
+            $wxCourier = is_array($resp) ? (string) ($resp['courier_tracking_number'] ?? '') : '';
+
+            $etiquetaGerada = ($wxStatus === 'LABEL_CREATED');
+
+            $stUp = $this->connection->prepare(
+                'UPDATE remessa_janela_pedidos
+                 SET
+                    etiqueta_gerada = ?,
+                    etiqueta_gerada_em = IF(?, COALESCE(etiqueta_gerada_em, NOW()), etiqueta_gerada_em),
+                    wexpress_shipping_id = ?,
+                    wexpress_tracking_number = ?,
+                    courier_tracking_number = ?,
+                    wexpress_status = ?,
+                    wexpress_last_request_json = ?,
+                    wexpress_last_response_json = ?,
+                    wexpress_last_http_code = ?,
+                    wexpress_updated_at = NOW()
+                 WHERE janela_id = ? AND pedido_id = ?'
+            );
+
+            $stUp->execute([
+                $etiquetaGerada ? 1 : 0,
+                $etiquetaGerada ? 1 : 0,
+                $wxShipId !== '' ? $wxShipId : null,
+                $wxTrack !== '' ? $wxTrack : null,
+                $wxCourier !== '' ? $wxCourier : null,
+                $wxStatus !== '' ? $wxStatus : ($errorMsg !== null ? 'ERROR' : null),
+                json_encode($payload),
+                json_encode($resp !== null ? $resp : ['error' => $errorMsg]),
+                $httpCode,
+                $jid,
+                $pid,
+            ]);
 
             $this->tryAutoCloseJanela($jid);
 
-            echo json_encode(['success' => true]);
+            if ($errorMsg !== null) {
+                echo json_encode(['success' => false, 'error' => $errorMsg]);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'wexpress_status' => $wxStatus, 'shipping_id' => $wxShipId]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
     }
 
+    private function buildWExpressShippingPayload(WExpressService $svc, array $pedido, int $janelaId): array {
+        $sender = $svc->getSender();
+        if (!is_array($sender) || empty($sender)) {
+            throw new \Exception('W-Express: configure o Sender (JSON) em /admin/configuracoes > Entrega');
+        }
+
+        $nome = trim((string) ($pedido['cliente_nome'] ?? ''));
+        $partes = preg_split('/\s+/', $nome) ?: [];
+        $firstName = $partes[0] ?? $nome;
+        $lastName = count($partes) > 1 ? implode(' ', array_slice($partes, 1)) : '';
+
+        $doc = (string) ($pedido['documento'] ?? ($pedido['cliente_documento'] ?? ''));
+        $docDigits = preg_replace('/\D+/', '', $doc);
+        $taxType = strlen((string) $docDigits) > 11 ? 'CNPJ' : 'CPF';
+        $taxId = (string) $docDigits;
+
+        $end = $pedido['endereco'] ?? [];
+        $cep = preg_replace('/\D+/', '', (string) ($end['cep'] ?? ''));
+        $addr1 = trim((string) ($end['endereco'] ?? ($end['logradouro'] ?? '')));
+        $addr2Parts = [];
+        $compl = trim((string) ($end['complemento'] ?? ''));
+        $bairro = trim((string) ($end['bairro'] ?? ''));
+        if ($compl !== '') $addr2Parts[] = $compl;
+        if ($bairro !== '') $addr2Parts[] = $bairro;
+        $addr2 = trim(implode(', ', $addr2Parts));
+        $numero = trim((string) ($end['numero'] ?? ''));
+        $cidade = (string) ($end['cidade'] ?? '');
+        $estado = (string) ($end['estado'] ?? '');
+
+        $itens = $pedido['itens'] ?? [];
+        $items = [];
+        if (is_array($itens)) {
+            foreach ($itens as $it) {
+                $qtd = (int) ($it['quantidade'] ?? 1);
+                if ($qtd <= 0) $qtd = 1;
+                $items[] = [
+                    'description' => (string) ($it['produto_nome'] ?? ($it['nome_produto'] ?? 'item')),
+                    'quantity' => $qtd,
+                    'unit_value' => is_numeric($it['preco'] ?? null) ? (float) $it['preco'] : 1,
+                ];
+            }
+        }
+
+        $pesoTotal = 1.0;
+        if (is_numeric($pedido['peso_total'] ?? null)) {
+            $pesoTotal = max(0.001, (float) $pedido['peso_total']);
+        }
+
+        $packages = [[
+            'weight' => round($pesoTotal * 1000, 2),
+            'width' => 10,
+            'length' => 10,
+            'height' => 10,
+        ]];
+
+        $declared = 0.0;
+        if (is_numeric($pedido['total'] ?? null)) {
+            $declared = (float) $pedido['total'];
+        }
+
+        $externalShippingId = (string) (($pedido['codigo_pedido'] ?? '') !== '' ? $pedido['codigo_pedido'] : ('PEDIDO-' . (int) ($pedido['id'] ?? 0)));
+        $externalRef = 'janela-' . (int) $janelaId;
+
+        return [
+            'external_shipping_id' => $externalShippingId,
+            'external_shipping_reference' => $externalRef,
+            'service_code' => $svc->getServiceCode(),
+            'incoterms' => 'DDU',
+            'dimensions_unit' => 'cm',
+            'weight_unit' => 'g',
+            'currency' => 'USD',
+            'declared_value' => $declared,
+            'freight_value' => 0,
+            'insurance_value' => 0,
+            'packages' => $packages,
+            'sender' => $sender,
+            'recipient' => [
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'tax_id_type' => $taxType,
+                'tax_id' => $taxId,
+                'email' => (string) ($pedido['cliente_email'] ?? ''),
+                'phone' => (string) ($pedido['cliente_telefone'] ?? ''),
+                'address' => [
+                    'address_number' => $numero,
+                    'address_line_1' => $addr1,
+                    'address_line_2' => $addr2,
+                    'postal_code' => $cep,
+                    'city' => $cidade,
+                    'state' => $estado,
+                    'country' => 'BR',
+                ],
+            ],
+            'items' => $items,
+        ];
+    }
+
     public function fecharJanela($request, $id) {
         $this->requireAdmin();
-        $this->ensureTables();
 
         $janelaId = (int) $id;
         if ($janelaId <= 0) {
@@ -1315,7 +1457,16 @@ function gerarEtiqueta() {
         ");
         $stmt->execute([$pedido['usuario_id']]);
         $pedido['endereco'] = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
+
+        // Documento do usuário
+        try {
+            $stDoc = $this->connection->prepare('SELECT documento FROM usuarios WHERE id = ? LIMIT 1');
+            $stDoc->execute([$pedido['usuario_id']]);
+            $pedido['documento'] = (string) ($stDoc->fetchColumn() ?: '');
+        } catch (\Exception $e) {
+            $pedido['documento'] = '';
+        }
+
         return $pedido;
     }
 

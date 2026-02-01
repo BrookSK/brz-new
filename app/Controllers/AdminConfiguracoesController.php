@@ -525,6 +525,59 @@ class AdminConfiguracoesController extends Controller {
                                                 <input class="form-check-input" type="checkbox" name="entrega_calcular_automatico" value="1" ' . ($this->getConfigValue($config, 'entrega', 'calcular_automatico', '1') === '1' ? 'checked' : '') . '>
                                                 <label class="form-check-label">Calcular frete automaticamente</label>
                                             </div>
+
+                                            <hr>
+
+                                            <h6 class="mb-3">W-Express (Etiquetas)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ativo</label>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="wexpress_enabled" name="entrega_wexpress_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="wexpress_enabled">Habilitar W-Express</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente</label>
+                                                        <select class="form-select" name="entrega_wexpress_ambiente">
+                                                            <option value="sandbox" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_ambiente', 'sandbox') === 'sandbox' ? 'selected' : '') . '>Sandbox</option>
+                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                        <small class="text-muted">A API do Swagger usa sandbox.wexpress.me</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">API Key</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" name="entrega_wexpress_api_key" value="' . $this->getConfigValue($config, 'entrega', 'wexpress_api_key', '') . '" placeholder="Cole a API Key da W-Express">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Solicite a chave por e-mail conforme a documentação da W-Express</small>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Service Code</label>
+                                                <select class="form-select" name="entrega_wexpress_service_code">
+                                                    <option value="wexpress_correios_std" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_service_code', 'wexpress_correios_std') === 'wexpress_correios_std' ? 'selected' : '') . '>wexpress_correios_std</option>
+                                                    <option value="wexpress_correios_exp" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_service_code', '') === 'wexpress_correios_exp' ? 'selected' : '') . '>wexpress_correios_exp</option>
+                                                    <option value="wexpress_correios_prime_express" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_service_code', '') === 'wexpress_correios_prime_express' ? 'selected' : '') . '>wexpress_correios_prime_express</option>
+                                                    <option value="wexpress_premium" ' . ($this->getConfigValue($config, 'entrega', 'wexpress_service_code', '') === 'wexpress_premium' ? 'selected' : '') . '>wexpress_premium</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Sender (JSON)</label>
+                                                <textarea class="form-control" name="entrega_wexpress_sender_json" rows="6" placeholder="{\n  \"first_name\": \"Tim\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'wexpress_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Dados do remetente (EUA). Pode colar o objeto sender do exemplo oficial da W-Express.</small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -864,7 +917,7 @@ class AdminConfiguracoesController extends Controller {
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
@@ -872,7 +925,7 @@ class AdminConfiguracoesController extends Controller {
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
