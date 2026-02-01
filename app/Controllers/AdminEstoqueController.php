@@ -1222,9 +1222,10 @@ class AdminEstoqueController extends Controller {
                 echo '<tr>'
                     . '<td>'
                     . '<input type="hidden" name="estoque_id[]" value="' . $eid . '">'
-                    . '<input type="hidden" name="galpao[]" value="' . htmlspecialchars($loc) . '">'
-                    . '<input type="hidden" name="prateleira[]" value="' . htmlspecialchars($pr) . '">'
-                    . '<span class="fw-semibold">' . htmlspecialchars($locFull !== '' ? $locFull : '-') . '</span>'
+                    . '<div class="row g-2">'
+                    . '<div class="col-6"><input type="text" class="form-control" name="galpao[]" value="' . htmlspecialchars($loc) . '" placeholder="Galpão"></div>'
+                    . '<div class="col-6"><input type="text" class="form-control" name="prateleira[]" value="' . htmlspecialchars($pr) . '" placeholder="Prateleira"></div>'
+                    . '</div>'
                     . '</td>'
                     . '<td style="max-width:140px;"><input type="number" class="form-control" name="quantidade[]" min="0" step="1" value="' . $qtd . '" required></td>'
                     . '<td style="max-width:170px;"><input type="date" class="form-control" name="data_compra[]" value="' . htmlspecialchars($dc) . '"></td>'
@@ -1233,20 +1234,37 @@ class AdminEstoqueController extends Controller {
                     . '<input type="date" class="form-control" name="data_validade[]" value="' . htmlspecialchars($dv) . '"></td>'
                     . '<td><input type="text" class="form-control" name="observacao[]" value="' . htmlspecialchars($obs) . '"></td>'
                     . '<td>'
-                    . '<button type="submit" class="btn btn-sm btn-outline-danger" form="form_del_' . $eid . '" onclick="return confirm(\'Excluir esta localização do estoque? Esta ação será registrada no log.\');"><i class="fas fa-trash"></i></button>'
+                    . '<button type="button" class="btn btn-sm btn-outline-danger" onclick="return excluirEntradaEstoque(' . (int) $produtoId . ', ' . $eid . ');"><i class="fas fa-trash"></i></button>'
                     . '</td>'
                     . '</tr>';
-
-                // Formulário separado para exclusão (evita <form> dentro de <form>)
-                echo '<form id="form_del_' . $eid . '" method="POST" action="/admin/estoque/editar/excluir" style="display:none;">'
-                    . '<input type="hidden" name="produto_id" value="' . (int) $produtoId . '">'
-                    . '<input type="hidden" name="estoque_id" value="' . $eid . '">'
-                    . '</form>';
             }
 
             echo '</tbody></table></div>'
+                . '<div class="d-flex gap-2">'
                 . '<button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar alterações</button>'
+                . '</div>'
                 . '</form>';
+
+            echo '<form id="form_del_global" method="POST" action="/admin/estoque/editar/excluir" style="display:none;">'
+                . '<input type="hidden" name="produto_id" id="del_produto_id" value="' . (int) $produtoId . '">'
+                . '<input type="hidden" name="estoque_id" id="del_estoque_id" value="">'
+                . '</form>';
+
+            echo '<script>
+                function excluirEntradaEstoque(produtoId, estoqueId) {
+                    if (!confirm("Excluir esta localização do estoque? Esta ação será registrada no log.")) {
+                        return false;
+                    }
+                    var f = document.getElementById("form_del_global");
+                    var p = document.getElementById("del_produto_id");
+                    var e = document.getElementById("del_estoque_id");
+                    if (!f || !p || !e) return false;
+                    p.value = String(produtoId);
+                    e.value = String(estoqueId);
+                    f.submit();
+                    return false;
+                }
+            </script>';
         }
 
         echo '        </div>
@@ -1332,7 +1350,9 @@ class AdminEstoqueController extends Controller {
                     quantidade = :quantidade,
                     data_compra = :data_compra,
                     data_validade = :data_validade,
-                    observacao = :observacao
+                    observacao = :observacao,
+                    galpao = :galpao,
+                    prateleira = :prateleira
                 WHERE id = :id AND produto_id = :produto_id
                 LIMIT 1
             ');
@@ -1382,6 +1402,20 @@ class AdminEstoqueController extends Controller {
                 $pra = trim((string) ($prats[$i] ?? ''));
                 $isAli = (int) ($isAliArr[$i] ?? 0);
 
+                // Normalizar prateleira (mesma regra do salvar entrada)
+                if ($gal !== '') {
+                    $gal = preg_replace('/\s+/', ' ', $gal);
+                    $gal = trim($gal);
+                }
+                if ($pra !== '') {
+                    $pra = preg_replace('/^\s*prateleira\s+/i', '', $pra);
+                    $pra = preg_replace('/\s+/', ' ', $pra);
+                    $pra = trim($pra);
+                    if ($pra !== '' && stripos($pra, 'prateleira') !== 0) {
+                        $pra = 'Prateleira ' . $pra;
+                    }
+                }
+
                 if ($isAli === 0) {
                     $newDv = '';
                 }
@@ -1389,6 +1423,31 @@ class AdminEstoqueController extends Controller {
                 $oldDc = (string) ($old['data_compra'] ?? '');
                 $oldDv = (string) ($old['data_validade'] ?? '');
                 $oldObs = (string) ($old['observacao'] ?? '');
+                $oldGal = trim((string) ($old['galpao'] ?? ''));
+                $oldPra = trim((string) ($old['prateleira'] ?? ''));
+
+                // Impedir conflito: não permitir renomear para localização já existente no mesmo produto
+                $stmtDup = $this->connection->prepare('
+                    SELECT id
+                    FROM estoque_interno
+                    WHERE produto_id = :produto_id
+                      AND COALESCE(galpao, \'\') = :galpao
+                      AND COALESCE(prateleira, \'\') = :prateleira
+                      AND id <> :id
+                    LIMIT 1
+                ');
+                $stmtDup->execute([
+                    ':produto_id' => $produtoId,
+                    ':galpao' => $gal,
+                    ':prateleira' => $pra,
+                    ':id' => $estoqueId,
+                ]);
+                if ($stmtDup->fetchColumn()) {
+                    $this->connection->rollBack();
+                    $this->setFlash('Já existe uma entrada deste produto para esta localização. Ajuste a quantidade no registro existente.', 'danger');
+                    header('Location: /admin/estoque/editar/' . (int) $produtoId);
+                    exit;
+                }
 
                 $locFull = $gal;
                 if ($gal !== '' && $pra !== '') {
@@ -1400,6 +1459,11 @@ class AdminEstoqueController extends Controller {
                 $diffs = [];
                 if ($newQtd !== $oldQtd) {
                     $diffs[] = 'Quantidade: ' . $oldQtd . ' -> ' . $newQtd;
+                }
+                if ($gal !== $oldGal || $pra !== $oldPra) {
+                    $from = trim($oldGal . ($oldGal !== '' && $oldPra !== '' ? ' - ' : '') . $oldPra);
+                    $to = trim($gal . ($gal !== '' && $pra !== '' ? ' - ' : '') . $pra);
+                    $diffs[] = 'Localização: ' . ($from !== '' ? $from : '-') . ' -> ' . ($to !== '' ? $to : '-');
                 }
                 if ($newDc !== $oldDc) {
                     $diffs[] = 'Data compra: ' . ($oldDc !== '' ? $oldDc : '-') . ' -> ' . ($newDc !== '' ? $newDc : '-');
@@ -1420,6 +1484,8 @@ class AdminEstoqueController extends Controller {
                     ':data_compra' => ($newDc !== '' ? $newDc : null),
                     ':data_validade' => ($newDv !== '' ? $newDv : null),
                     ':observacao' => ($newObs !== '' ? $newObs : null),
+                    ':galpao' => ($gal !== '' ? $gal : null),
+                    ':prateleira' => ($pra !== '' ? $pra : null),
                     ':id' => $estoqueId,
                     ':produto_id' => $produtoId,
                 ]);
