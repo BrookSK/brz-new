@@ -58,10 +58,31 @@ class AdminRemessaInternacionalController extends Controller {
         }
 
         // Garantir que existe uma janela que contém o dia atual
-        $st = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE data_inicio <= ? AND data_fim >= ? ORDER BY data_inicio DESC LIMIT 1');
+        $st = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE data_inicio <= ? AND data_fim >= ? ORDER BY id ASC');
         $nowStr = $now->format('Y-m-d H:i:s');
         $st->execute([$nowStr, $nowStr]);
-        $current = $st->fetch(\PDO::FETCH_ASSOC);
+        $currents = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $current = $currents[0] ?? null;
+
+        // Se existirem janelas duplicadas cobrindo o mesmo período, consolidar automaticamente
+        if ($current && count($currents) > 1) {
+            $primaryId = (int) ($current['id'] ?? 0);
+            foreach ($currents as $idx => $dup) {
+                if ($idx === 0) continue;
+                $dupId = (int) ($dup['id'] ?? 0);
+                if ($dupId <= 0 || $primaryId <= 0) continue;
+
+                // mover pedidos para a janela principal
+                $stMove = $this->connection->prepare('INSERT IGNORE INTO remessa_janela_pedidos (janela_id, pedido_id, etiqueta_gerada, etiqueta_gerada_em, created_at) SELECT ?, pedido_id, etiqueta_gerada, etiqueta_gerada_em, created_at FROM remessa_janela_pedidos WHERE janela_id = ?');
+                $stMove->execute([$primaryId, $dupId]);
+
+                $stDelLinks = $this->connection->prepare('DELETE FROM remessa_janela_pedidos WHERE janela_id = ?');
+                $stDelLinks->execute([$dupId]);
+
+                $stDelJanela = $this->connection->prepare('DELETE FROM remessa_janelas WHERE id = ?');
+                $stDelJanela->execute([$dupId]);
+            }
+        }
 
         if (!$current) {
             // Se não existir janela cobrindo hoje, criar sequencial a partir da última janela
@@ -82,12 +103,22 @@ class AdminRemessaInternacionalController extends Controller {
 
                 $status = ($end < $now) ? 'finalizada' : 'aberta';
 
-                $stIns = $this->connection->prepare('INSERT INTO remessa_janelas (data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
-                $stIns->execute([
+                // Evitar criar janelas duplicadas para o mesmo período
+                $stExists = $this->connection->prepare('SELECT * FROM remessa_janelas WHERE data_inicio = ? AND data_fim = ? ORDER BY id ASC LIMIT 1');
+                $stExists->execute([
                     $start->format('Y-m-d H:i:s'),
                     $end->format('Y-m-d H:i:s'),
-                    $status,
                 ]);
+                $existing = $stExists->fetch(\PDO::FETCH_ASSOC);
+
+                if (!$existing) {
+                    $stIns = $this->connection->prepare('INSERT INTO remessa_janelas (data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())');
+                    $stIns->execute([
+                        $start->format('Y-m-d H:i:s'),
+                        $end->format('Y-m-d H:i:s'),
+                        $status,
+                    ]);
+                }
 
                 if ($start <= $now && $end >= $now) {
                     break;
