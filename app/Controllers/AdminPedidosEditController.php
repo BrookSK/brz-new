@@ -461,6 +461,174 @@ class AdminPedidosEditController {
             </div>
         </main>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            const pedidoId = ' . (int) $id . ';
+            const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
+            const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
+
+            window.calcularTotal = function(){
+                let subtotal = 0;
+                document.querySelectorAll(".item-row").forEach(function(row){
+                    const qtdEl = row.querySelector(".quantidade");
+                    const precoEl = row.querySelector(".preco_unitario");
+                    const qtd = parseFloat(qtdEl ? qtdEl.value : 0) || 0;
+                    const preco = parseFloat(precoEl ? precoEl.value : 0) || 0;
+                    subtotal += qtd * preco;
+                });
+
+                const frete = parseFloat(document.getElementById("valor_frete")?.value || 0) || 0;
+                const desconto = parseFloat(document.getElementById("percentual_desconto")?.value || 0) || 0;
+                const valorDesconto = subtotal * (desconto / 100);
+                const total = subtotal + frete - valorDesconto;
+
+                const setVal = function(id, v){
+                    const el = document.getElementById(id);
+                    if (el) el.value = v;
+                };
+
+                setVal("subtotal_produtos", "R$ " + subtotal.toFixed(2).replace(".", ","));
+                setVal("valor_desconto", "R$ " + valorDesconto.toFixed(2).replace(".", ","));
+                setVal("valor_total", "R$ " + total.toFixed(2).replace(".", ","));
+            };
+
+            window.atualizarSubtotal = function(input){
+                const row = input.closest(".item-row");
+                if (!row) return;
+                const qtd = parseFloat(row.querySelector(".quantidade")?.value || 0) || 0;
+                const preco = parseFloat(row.querySelector(".preco_unitario")?.value || 0) || 0;
+                const subtotal = qtd * preco;
+                const cell = row.querySelector(".subtotal");
+                if (cell) cell.textContent = "R$ " + subtotal.toFixed(2).replace(".", ",");
+                window.calcularTotal();
+            };
+
+            window.removerItem = function(btn){
+                if (!canEditItens) return;
+                if (confirm("Tem certeza que deseja remover este item?")) {
+                    const row = btn.closest(".item-row");
+                    if (row) row.remove();
+                    window.calcularTotal();
+                }
+            };
+
+            window.buscarProdutos = function(){
+                const termo = (document.getElementById("busca_produto")?.value || "").toLowerCase();
+                document.querySelectorAll("#lista_produtos .col-md-6").forEach(function(card){
+                    const texto = (card.textContent || "").toLowerCase();
+                    card.style.display = texto.includes(termo) ? "block" : "none";
+                });
+            };
+
+            window.selecionarProduto = function(id, nome, preco, sku, loja){
+                if (!canEditItens) return;
+                const tbody = document.getElementById("itens_pedido");
+                if (!tbody) return;
+                const newRow = tbody.insertRow();
+                newRow.className = "item-row";
+                newRow.setAttribute("data-produto-id", id);
+                newRow.setAttribute("data-nome-produto", nome);
+                newRow.setAttribute("data-nome-produto-sku", sku);
+                newRow.setAttribute("data-loja", loja || "outro");
+
+                newRow.innerHTML =
+                    "<td><strong>" + nome + "</strong><br><small class=\"text-muted\">SKU: " + sku + "</small></td>" +
+                    "<td><span class=\"badge bg-secondary\">" + (loja || "outro") + "</span></td>" +
+                    "<td><input type=\"number\" class=\"form-control form-control-sm quantidade\" value=\"1\" min=\"1\" onchange=\"atualizarSubtotal(this)\"></td>" +
+                    "<td><input type=\"number\" class=\"form-control form-control-sm preco_unitario\" value=\"" + Number(preco) + "\" min=\"0\" step=\"0.01\" onchange=\"atualizarSubtotal(this)\"></td>" +
+                    "<td class=\"subtotal\">R$ " + Number(preco).toFixed(2).replace(".", ",") + "</td>" +
+                    "<td><button type=\"button\" class=\"btn btn-sm btn-danger\" onclick=\"removerItem(this)\"><i class=\"fas fa-trash\"></i></button></td>";
+
+                try {
+                    const modalEl = document.getElementById("modalAdicionarProduto");
+                    const inst = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+                    if (inst) inst.hide();
+                } catch (e) {}
+                window.calcularTotal();
+            };
+
+            window.salvarPedido = function(){
+                if (!canEditItens) return;
+                const itens = [];
+                document.querySelectorAll(".item-row").forEach(function(row){
+                    const item = {
+                        quantidade: row.querySelector(".quantidade")?.value,
+                        preco_unitario: row.querySelector(".preco_unitario")?.value,
+                        produto_id: row.dataset.produtoId || "",
+                        nome_produto: row.dataset.nomeProduto || "",
+                        nome_produto_sku: row.dataset.nomeProdutoSku || "",
+                        loja: row.dataset.loja || "outro"
+                    };
+                    if (row.dataset.itemId) item.id = row.dataset.itemId;
+                    itens.push(item);
+                });
+
+                const dados = {
+                    pedido_id: pedidoId,
+                    status: document.getElementById("pedido_status")?.value,
+                    frete: document.getElementById("valor_frete")?.value,
+                    desconto: document.getElementById("percentual_desconto")?.value,
+                    itens: itens
+                };
+
+                fetch("/admin/pedidos/salvar", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(dados)
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (data.success) {
+                        alert("Pedido salvo com sucesso!");
+                        window.location.href = "/admin/pedidos/detalhes/" + pedidoId;
+                        return;
+                    }
+                    alert("Erro: " + (data.message || "Falha ao salvar"));
+                })
+                .catch(function(){
+                    alert("Erro ao salvar pedido");
+                });
+            };
+
+            window.atualizarSomenteStatus = function(){
+                const st = document.getElementById("pedido_status")?.value;
+                if (!st) return;
+                window.location.href = "/admin/pedidos/atualizar-status/" + pedidoId + "/" + st;
+            };
+
+            window.gerarCobrancaDiferenca = function(){
+                if (!temPagamentoAsaas) return;
+                const box = document.getElementById("box_link_diferenca");
+                if (!box) return;
+                box.style.display = "block";
+                box.className = "alert alert-info";
+                box.textContent = "Gerando link...";
+
+                fetch("/admin/estoque/compras/gerar-link-diferenca?pedido_id=" + pedidoId)
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        if (!data.success) {
+                            box.className = "alert alert-warning";
+                            box.textContent = data.message || "Não foi possível gerar a cobrança.";
+                            return;
+                        }
+                        const link = data.bankSlipUrl || data.invoiceUrl || "";
+                        box.className = "alert alert-success";
+                        box.innerHTML = "<div class=\"fw-bold\">Cobrança gerada</div>" +
+                            (data.diferenca ? ("<div class=\"small\">Diferença: <strong>R$ " + Number(data.diferenca).toFixed(2).replace(".", ",") + "</strong></div>") : "") +
+                            (link ? ("<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-dark\" href=\"" + link + "\" target=\"_blank\" rel=\"noopener\">Abrir link</a></div>") : "");
+                    })
+                    .catch(function(){
+                        box.className = "alert alert-danger";
+                        box.textContent = "Erro ao gerar a cobrança.";
+                    });
+            };
+
+            window.calcularTotal();
+        })();
+    </script>
 </body>
 </html>';
 

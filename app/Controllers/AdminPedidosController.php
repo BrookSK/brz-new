@@ -891,6 +891,12 @@ class AdminPedidosController extends Controller {
             $params[] = $id;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
+
+            if ($stmt->rowCount() <= 0) {
+                echo '<div class="alert alert-warning">Nenhuma linha foi atualizada. Verifique se o pedido existe e se a coluna de status está correta (coluna usada: <strong>' . htmlspecialchars($statusCol) . '</strong>).</div>';
+                echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
             
             header('Location: /admin/pedidos/detalhes/' . $id . '?success=1');
             exit;
