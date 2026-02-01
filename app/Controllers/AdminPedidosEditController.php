@@ -660,6 +660,34 @@ class AdminPedidosEditController {
                 $oldStatus = '';
             }
 
+            $statusOldNorm = strtolower(trim((string) $oldStatus));
+            $cicloFechadoOld = in_array($statusOldNorm, [
+                'produto_consolidado',
+                'em_transporte',
+                'aguardando_liberacao_aduaneira',
+                'enviado_ao_destinatario',
+                'enviado',
+                'entregue',
+            ], true);
+
+            $oldQtyByProduto = [];
+            if ($cicloFechadoOld) {
+                $tOld = $this->getItensTableForPedido($pedidoId);
+                try {
+                    $stmtOldItens = $this->connection->prepare('SELECT produto_id, quantidade FROM ' . $tOld . ' WHERE pedido_id = :id');
+                    $stmtOldItens->execute([':id' => $pedidoId]);
+                    $rows = $stmtOldItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rows as $r) {
+                        $pid = (int) ($r['produto_id'] ?? 0);
+                        $q = (int) ($r['quantidade'] ?? 0);
+                        if ($pid <= 0 || $q <= 0) continue;
+                        $oldQtyByProduto[$pid] = ($oldQtyByProduto[$pid] ?? 0) + $q;
+                    }
+                } catch (\Exception $e) {
+                    $oldQtyByProduto = [];
+                }
+            }
+
             // Se estiver pago, não permite editar itens aqui (apenas via rota atualizar-status).
             if (strtolower(trim($oldStatus)) === 'pago') {
                 echo json_encode([
@@ -681,6 +709,55 @@ class AdminPedidosEditController {
             $statusReserva = $cicloFechado ? 'finalizada' : 'ativa';
 
             $this->connection->beginTransaction();
+
+            if ($cicloFechadoOld && !empty($oldQtyByProduto) && $this->tableExists('estoque_interno')) {
+                $newQtyByProduto = [];
+                foreach (($dados['itens'] ?? []) as $it) {
+                    $pid = (int) ($it['produto_id'] ?? 0);
+                    $q = (int) ($it['quantidade'] ?? 0);
+                    if ($pid <= 0 || $q <= 0) continue;
+                    $newQtyByProduto[$pid] = ($newQtyByProduto[$pid] ?? 0) + $q;
+                }
+
+                $colsEstoque = $this->getColsFromTable('estoque_interno');
+                $hasProdutoId = in_array('produto_id', $colsEstoque, true);
+                $hasQuantidade = in_array('quantidade', $colsEstoque, true);
+                if ($hasProdutoId && $hasQuantidade) {
+                    foreach ($oldQtyByProduto as $produtoId => $qOld) {
+                        $qNew = (int) ($newQtyByProduto[$produtoId] ?? 0);
+                        $delta = (int) $qOld - (int) $qNew;
+                        if ($delta <= 0) {
+                            continue;
+                        }
+
+                        try {
+                            $stmtPick = $this->connection->prepare('SELECT id, quantidade FROM estoque_interno WHERE produto_id = :produto_id ORDER BY id ASC LIMIT 1');
+                            $stmtPick->execute([':produto_id' => (int) $produtoId]);
+                            $loc = $stmtPick->fetch(\PDO::FETCH_ASSOC);
+                            if (is_array($loc) && (int) ($loc['id'] ?? 0) > 0) {
+                                $locId = (int) $loc['id'];
+                                $qAtual = (int) ($loc['quantidade'] ?? 0);
+                                $stmtUp = $this->connection->prepare('UPDATE estoque_interno SET quantidade = :q WHERE id = :id LIMIT 1');
+                                $stmtUp->execute([':q' => ($qAtual + $delta), ':id' => $locId]);
+                            } else {
+                                $insertCols = ['produto_id', 'quantidade'];
+                                $insertVals = [':produto_id', ':quantidade'];
+                                $params = [':produto_id' => (int) $produtoId, ':quantidade' => (int) $delta];
+
+                                if (in_array('created_at', $colsEstoque, true)) {
+                                    $insertCols[] = 'created_at';
+                                    $insertVals[] = 'NOW()';
+                                }
+
+                                $sqlIns = 'INSERT INTO estoque_interno (' . implode(',', $insertCols) . ') VALUES (' . implode(',', $insertVals) . ')';
+                                $stmtIns = $this->connection->prepare($sqlIns);
+                                $stmtIns->execute($params);
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            }
 
             // Recalcular reservas/pendências baseado no novo estado do pedido
             $this->limparReservasEPendenciasDoPedido($pedidoId);
