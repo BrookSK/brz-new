@@ -882,6 +882,39 @@ class AdminPedidosController extends Controller {
                 }
             }
 
+            // Se a coluna de status for ENUM, validar se o valor existe; caso contr2rio o MySQL pode gravar '' (string vazia)
+            $enumAllowed = null;
+            try {
+                $stmtType = $pdo->prepare("SELECT DATA_TYPE, COLUMN_TYPE FROM information_schema.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'pedidos' AND column_name = ? LIMIT 1");
+                $stmtType->execute([$statusCol]);
+                $colInfo = $stmtType->fetch(\PDO::FETCH_ASSOC);
+                if (is_array($colInfo) && isset($colInfo['DATA_TYPE']) && strtolower((string) $colInfo['DATA_TYPE']) === 'enum') {
+                    $colType = (string) ($colInfo['COLUMN_TYPE'] ?? '');
+                    // COLUMN_TYPE vem como enum('a','b',...)
+                    if (preg_match("/^enum\((.*)\)$/i", $colType, $m)) {
+                        $raw = $m[1];
+                        preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $raw, $mm);
+                        $vals = [];
+                        if (!empty($mm[1])) {
+                            foreach ($mm[1] as $v) {
+                                $vals[] = stripcslashes($v);
+                            }
+                        }
+                        $enumAllowed = $vals;
+                    }
+                }
+            } catch (\Exception $e) {
+                $enumAllowed = null;
+            }
+
+            if (is_array($enumAllowed) && !empty($enumAllowed) && !in_array((string) $novoStatus, $enumAllowed, true)) {
+                echo '<div class="alert alert-danger">Status inv1ido para a coluna <strong>' . htmlspecialchars($statusCol) . '</strong>: <strong>' . htmlspecialchars((string) $novoStatus) . '</strong>. Esta coluna 1 ENUM e o MySQL pode converter valores inv1idos para <strong>string vazia</strong>, parecendo que "processou" mas n2o persiste.</div>';
+                echo '<div class="alert alert-secondary"><strong>Valores permitidos</strong><br>' . htmlspecialchars(implode(', ', $enumAllowed)) . '</div>';
+                echo '<div class="alert alert-warning">Para permitir novos status (ex: produto_consolidado), crie uma migration SQL para atualizar o ENUM (ou trocar para VARCHAR) no banco.</div>';
+                echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+
             $set = [$statusCol . ' = ?'];
             $params = [$novoStatus];
             if (is_array($cols) && in_array('updated_at', $cols, true)) {
