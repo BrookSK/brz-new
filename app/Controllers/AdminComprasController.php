@@ -72,18 +72,40 @@ class AdminComprasController extends Controller {
         return 'BRL';
     }
 
-    private function getPedidoTotalAtual(int $pedidoId): float {
+    private function getPedidoTotalAtual($pedidoOrId): float {
         $total = 0.0;
-        if ($pedidoId <= 0) return $total;
+        $pedidoId = 0;
+        if (is_array($pedidoOrId)) {
+            if (!empty($pedidoOrId['valor_total'])) {
+                return (float) $pedidoOrId['valor_total'];
+            }
+            if (!empty($pedidoOrId['total'])) {
+                return (float) $pedidoOrId['total'];
+            }
+            $pedidoId = (int) ($pedidoOrId['id'] ?? 0);
+        } else {
+            $pedidoId = (int) $pedidoOrId;
+        }
+
+        if ($pedidoId <= 0) {
+            return $total;
+        }
+
         try {
-            $stmt = $this->connection->prepare('SELECT total FROM pedidos WHERE id = :id LIMIT 1');
+            $stmt = $this->connection->prepare('SELECT total, valor_total FROM pedidos WHERE id = :id LIMIT 1');
             $stmt->execute([':id' => $pedidoId]);
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && isset($row['total'])) {
-                $total = (float) $row['total'];
+            if ($row) {
+                if (isset($row['valor_total']) && $row['valor_total'] !== null) {
+                    return (float) $row['valor_total'];
+                }
+                if (isset($row['total']) && $row['total'] !== null) {
+                    return (float) $row['total'];
+                }
             }
         } catch (\Exception $e) {
         }
+
         return $total;
     }
 
@@ -183,7 +205,7 @@ class AdminComprasController extends Controller {
         $stmt->execute($vals);
     }
 
-    private function recalcularTotaisPedido(int $pedidoId): array {
+    private function recalcularTotaisPedido(int $pedidoId, string $moeda = 'BRL'): array {
         $itensTable = $this->findPedidoItensTable();
         if (!$itensTable || $pedidoId <= 0) {
             return ['subtotal' => 0.0, 'frete' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'total' => 0.0];
@@ -224,7 +246,7 @@ class AdminComprasController extends Controller {
         }
 
         $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-        $frete = $this->calcularFrete($subtotal, $pesoTotal, $this->getPedidoMoeda(['moeda' => 'BRL']));
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, $moeda);
         $impostos = $subtotal * 0.80;
         $total = $subtotal + $taxaServico + $impostos + $frete;
 
@@ -1879,8 +1901,8 @@ class AdminComprasController extends Controller {
             }
 
             $moedaPedido = $this->getPedidoMoeda($pedido);
-            $oldTotal = $this->getPedidoTotalAtual($pedido, $colsPedidos);
-            $novos = $this->recalcularTotaisPedido($pedidoId, $moedaPedido, $colsPedidos);
+            $oldTotal = $this->getPedidoTotalAtual($pedido);
+            $novos = $this->recalcularTotaisPedido($pedidoId, $moedaPedido);
             $newTotal = (float) ($novos['total'] ?? 0);
             $valorPendente = $newTotal - $oldTotal;
             if ($valorPendente < 0) {
