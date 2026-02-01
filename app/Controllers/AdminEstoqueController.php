@@ -1912,7 +1912,7 @@ class AdminEstoqueController extends Controller {
 
                     form.addEventListener("submit", function(ev){
                         if (reservadoTotal <= 0) return;
-                        var inputs = form.querySelectorAll("input[name='quantidade[]']");
+                        var inputs = form.querySelectorAll("input[name=\"quantidade[]\"]");
                         var total = 0;
                         for (var i = 0; i < inputs.length; i++) {
                             var n = parseInt(inputs[i].value || "0", 10);

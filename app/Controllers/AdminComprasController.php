@@ -72,17 +72,19 @@ class AdminComprasController extends Controller {
         return 'BRL';
     }
 
-    private function getPedidoTotalAtual(array $pedidoRow, array $colsPedidos): float {
-        $candidates = ['valor_total', 'total'];
-        foreach ($candidates as $c) {
-            if (in_array($c, $colsPedidos, true) && isset($pedidoRow[$c])) {
-                return (float) $pedidoRow[$c];
+    private function getPedidoTotalAtual(int $pedidoId): float {
+        $total = 0.0;
+        if ($pedidoId <= 0) return $total;
+        try {
+            $stmt = $this->connection->prepare('SELECT total FROM pedidos WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $pedidoId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && isset($row['total'])) {
+                $total = (float) $row['total'];
             }
+        } catch (\Exception $e) {
         }
-        // fallback
-        if (isset($pedidoRow['valor_total'])) return (float) $pedidoRow['valor_total'];
-        if (isset($pedidoRow['total'])) return (float) $pedidoRow['total'];
-        return 0.0;
+        return $total;
     }
 
     private function getProdutoInfo(int $produtoId): ?array {
@@ -181,24 +183,30 @@ class AdminComprasController extends Controller {
         $stmt->execute($vals);
     }
 
-    private function recalcularTotaisPedido(int $pedidoId, string $moeda, array $colsPedidos): array {
+    private function recalcularTotaisPedido(int $pedidoId): array {
         $itensTable = $this->findPedidoItensTable();
-        if (!$itensTable) {
-            return ['subtotal' => 0.0, 'peso' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'frete' => 0.0, 'total' => 0.0];
+        if (!$itensTable || $pedidoId <= 0) {
+            return ['subtotal' => 0.0, 'frete' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'total' => 0.0];
         }
 
         // subtotal
         $subtotal = 0.0;
         try {
+            $unitExpr = '0';
+            if ($this->columnExists($itensTable, 'preco_unitario')) {
+                $unitExpr = 'i.preco_unitario';
+            } elseif ($this->columnExists($itensTable, 'valor_unitario')) {
+                $unitExpr = 'i.valor_unitario';
+            }
+
             $stmt = $this->connection->prepare(
-                "SELECT COALESCE(SUM(COALESCE(i.subtotal, (COALESCE(i.preco_unitario, i.valor_unitario, 0) * COALESCE(i.quantidade,0)))),0) as subtotal
+                "SELECT COALESCE(SUM(COALESCE(i.subtotal, (({$unitExpr}) * COALESCE(i.quantidade,0)))),0) as subtotal
                  FROM {$itensTable} i
                  WHERE i.pedido_id = :pedido_id"
             );
             $stmt->execute([':pedido_id' => $pedidoId]);
-            $subtotal = (float) ($stmt->fetch(\PDO::FETCH_ASSOC)['subtotal'] ?? 0);
+            $subtotal = (float) ($stmt->fetchColumn() ?: 0.0);
         } catch (\Exception $e) {
-            $subtotal = 0.0;
         }
 
         // peso total
@@ -211,13 +219,12 @@ class AdminComprasController extends Controller {
                  WHERE i.pedido_id = :pedido_id"
             );
             $stmt->execute([':pedido_id' => $pedidoId]);
-            $pesoTotal = (float) ($stmt->fetch(\PDO::FETCH_ASSOC)['peso'] ?? 0);
+            $pesoTotal = (float) ($stmt->fetchColumn() ?: 0.0);
         } catch (\Exception $e) {
-            $pesoTotal = 0.0;
         }
 
         $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-        $frete = $this->calcularFrete($subtotal, $pesoTotal, $moeda);
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, $this->getPedidoMoeda(['moeda' => 'BRL']));
         $impostos = $subtotal * 0.80;
         $total = $subtotal + $taxaServico + $impostos + $frete;
 
@@ -1026,8 +1033,15 @@ class AdminComprasController extends Controller {
                             $pedidoPago[(int) $pr['id']] = $this->pedidoEstaPago($pr);
                         }
 
+                        $unitExpr = '0';
+                        if ($this->columnExists($itensTable, 'preco_unitario')) {
+                            $unitExpr = 'i.preco_unitario';
+                        } elseif ($this->columnExists($itensTable, 'valor_unitario')) {
+                            $unitExpr = 'i.valor_unitario';
+                        }
+
                         $stmtItens = $this->connection->prepare(
-                            "SELECT i.pedido_id, i.produto_id, COALESCE(i.subtotal, (COALESCE(i.preco_unitario, i.valor_unitario, 0) * COALESCE(i.quantidade,0))) as subtotal
+                            "SELECT i.pedido_id, i.produto_id, COALESCE(i.subtotal, (({$unitExpr}) * COALESCE(i.quantidade,0))) as subtotal
                              FROM {$itensTable} i
                              WHERE i.pedido_id IN ($inPedidos) AND i.produto_id IN ($inProdutos)"
                         );
