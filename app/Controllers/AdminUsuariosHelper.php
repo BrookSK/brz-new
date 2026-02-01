@@ -161,6 +161,7 @@ class AdminUsuariosHelper {
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'switch', $dados['switch'] ?? null);
 
             if (in_array('ativo', $colunas)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
@@ -178,6 +179,14 @@ class AdminUsuariosHelper {
             $stmt->execute($params);
             
             $usuarioId = $this->pdo->lastInsertId();
+
+            if (in_array('switch', $colunas, true) && empty($dados['switch'])) {
+                try {
+                    $stmtSw = $this->pdo->prepare('UPDATE usuarios SET `switch` = ? WHERE id = ? AND (`switch` IS NULL OR `switch` = 0)');
+                    $stmtSw->execute([(int) $usuarioId, (int) $usuarioId]);
+                } catch (\Exception $e) {
+                }
+            }
             
             // Criar carteira para o usuário
             $this->garantirCarteiraUsuario($usuarioId);

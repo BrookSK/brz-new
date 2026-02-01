@@ -13,6 +13,7 @@ class AdminUsuariosViews {
                             <div>
                                 <h6 class="card-title mb-1">' . htmlspecialchars($usuario['nome']) . '</h6>
                                 <p class="text-muted small mb-0">' . htmlspecialchars($usuario['email']) . '</p>
+                                ' . (!empty($usuario['switch']) ? '<p class="text-muted small mb-0">Switch: <strong>' . (int) $usuario['switch'] . '</strong></p>' : '') . '
                             </div>
                         </div>
                         <div class="row text-center mb-3">
