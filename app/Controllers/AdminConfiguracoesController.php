@@ -681,19 +681,7 @@ class AdminConfiguracoesController extends Controller {
                                                         <small class="text-muted">Ative apenas quando tiver o token/API key e o endpoint.</small>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Header do Token</label>
-                                                        <input type="text" class="form-control" name="entrega_correios_tracking_header" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_header', 'Authorization') . '" placeholder="Authorization">
-                                                        <small class="text-muted">Ex.: Authorization (Bearer), x-api-key, etc.</small>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label class="form-label">Base URL do Rastreamento</label>
-                                                <input type="text" class="form-control" name="entrega_correios_tracking_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_tracking_base_url', '') . '" placeholder="Ex.: https://api.correios.com.br/srorastro/v1/objetos/{codigo}">
-                                                <small class="text-muted">Você pode usar {codigo} para interpolar o código de rastreio.</small>
+                                                <div class="col-md-6"></div>
                                             </div>
 
                                             <div class="mb-3">
@@ -704,6 +692,7 @@ class AdminConfiguracoesController extends Controller {
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
+                                                <small class="text-muted">O sistema usa automaticamente o endpoint do Packet Service conforme o ambiente selecionado em SIGEP (Homologação/Produção).</small>
                                             </div>
                                         </div>
                                     </div>

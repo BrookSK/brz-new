@@ -60,6 +60,26 @@ class CorreiosTrackingService {
             return str_replace('{codigo}', rawurlencode($codigo), $baseUrl);
         }
 
+        // Suporte ao endpoint do Packet Service (query string)
+        // Ex.: https://api.correios.com.br/packet/v1/packages?trackingNumber=
+        if (stripos($baseUrl, 'trackingNumber=') !== false) {
+            // Se já terminar com trackingNumber= (ou trackingNumber=%s), apenas concatenar o código
+            if (preg_match('/trackingNumber=\s*$/i', $baseUrl)) {
+                return $baseUrl . rawurlencode($codigo);
+            }
+
+            // Se a URL já tiver o parâmetro preenchido, substitui o valor
+            $parts = explode('trackingNumber=', $baseUrl, 2);
+            if (count($parts) === 2) {
+                $prefix = $parts[0] . 'trackingNumber=';
+                // remove valor antigo até & (se houver)
+                $suffix = $parts[1];
+                $suffix = preg_replace('/^[^&]*/', '', $suffix);
+                return $prefix . rawurlencode($codigo) . $suffix;
+            }
+        }
+
+        // Fallback: tratar como endpoint baseado em path
         $u = rtrim($baseUrl, '/');
         return $u . '/' . rawurlencode($codigo);
     }
