@@ -863,9 +863,24 @@ class AdminPedidosController extends Controller {
         
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            
-            $stmt = $pdo->prepare("UPDATE pedidos SET status = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$novoStatus, $id]);
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $set = ['status = ?'];
+            $params = [$novoStatus];
+            if (is_array($cols) && in_array('updated_at', $cols, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            $params[] = $id;
+            $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
+            $stmt->execute($params);
             
             header('Location: /admin/pedidos/detalhes/' . $id . '?success=1');
             exit;

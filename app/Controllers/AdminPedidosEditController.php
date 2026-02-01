@@ -24,6 +24,48 @@ class AdminPedidosEditController {
         return 'pedido_itens';
     }
 
+    private function getItensTableForPedido(int $pedidoId): string {
+        $prefer = 'pedido_itens';
+        $t1 = $this->tableExists('pedido_itens') ? 'pedido_itens' : null;
+        $t2 = $this->tableExists('pedido_items') ? 'pedido_items' : null;
+
+        if (!$t1 && !$t2) {
+            return $prefer;
+        }
+        if ($t1 && !$t2) return $t1;
+        if ($t2 && !$t1) return $t2;
+
+        $c1 = 0;
+        $c2 = 0;
+        try {
+            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = :id');
+            $stmt->execute([':id' => $pedidoId]);
+            $c1 = (int) ($stmt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            $c1 = 0;
+        }
+        try {
+            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = :id');
+            $stmt->execute([':id' => $pedidoId]);
+            $c2 = (int) ($stmt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            $c2 = 0;
+        }
+
+        if ($c2 > $c1) return 'pedido_items';
+        return 'pedido_itens';
+    }
+
+    private function getColsFromTable(string $table): array {
+        try {
+            $stmt = $this->connection->query('DESCRIBE ' . $table);
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
     private function columnExists(string $table, string $column): bool {
         try {
             $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
@@ -222,7 +264,7 @@ class AdminPedidosEditController {
             $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
             $bloquearEdicao = ($statusAtual === 'pago');
 
-            $itensTable = $this->getItensTable();
+            $itensTable = $this->getItensTableForPedido((int) $id);
             
             // Buscar itens do pedido
             $stmt = $this->connection->prepare("
@@ -722,37 +764,67 @@ class AdminPedidosEditController {
             // Recalcular reservas/pendências baseado no novo estado do pedido
             $this->limparReservasEPendenciasDoPedido($pedidoId);
             
-            // Primeiro, remover todos os itens existentes do pedido
-            $itensTable = $this->getItensTable();
-            $stmt = $this->connection->prepare("DELETE FROM {$itensTable} WHERE pedido_id = :pedido_id");
-            $stmt->bindParam(':pedido_id', $dados['pedido_id']);
-            $stmt->execute();
+            // Primeiro, remover todos os itens existentes do pedido (sincronizar tabelas quando ambas existirem)
+            $itensTables = [];
+            if ($this->tableExists('pedido_itens')) $itensTables[] = 'pedido_itens';
+            if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
+            if (empty($itensTables)) $itensTables[] = $this->getItensTable();
+
+            foreach ($itensTables as $t) {
+                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
+                $stmt->execute([':pedido_id' => $pedidoId]);
+            }
             
             // Calcular subtotal e inserir novos itens
             $subtotal = 0;
             foreach ($dados['itens'] as $item) {
                 $subtotalItem = $item['quantidade'] * $item['preco_unitario'];
                 $subtotal += $subtotalItem;
-                
-                // Inserir novo item
-                $stmt = $this->connection->prepare("
-                    INSERT INTO {$itensTable} (
-                        pedido_id, produto_id, quantidade, preco_unitario, subtotal,
-                        nome_produto, nome_produto_sku, loja, created_at
-                    ) VALUES (
-                        :pedido_id, :produto_id, :quantidade, :preco_unitario, :subtotal,
-                        :nome_produto, :nome_produto_sku, :loja, NOW()
-                    )
-                ");
-                $stmt->bindParam(':pedido_id', $dados['pedido_id']);
-                $stmt->bindParam(':produto_id', $item['produto_id']);
-                $stmt->bindParam(':quantidade', $item['quantidade']);
-                $stmt->bindParam(':preco_unitario', $item['preco_unitario']);
-                $stmt->bindParam(':subtotal', $subtotalItem);
-                $stmt->bindParam(':nome_produto', $item['nome_produto']);
-                $stmt->bindParam(':nome_produto_sku', $item['nome_produto_sku']);
-                $stmt->bindParam(':loja', $item['loja']);
-                $stmt->execute();
+
+                // Inserir novo item em todas as tabelas existentes (com colunas dinâmicas)
+                foreach ($itensTables as $t) {
+                    $cols = $this->getColsFromTable($t);
+                    if (empty($cols)) {
+                        continue;
+                    }
+
+                    $insertCols = [];
+                    $insertVals = [];
+                    $params = [];
+
+                    $map = [
+                        'pedido_id' => $pedidoId,
+                        'produto_id' => (int) ($item['produto_id'] ?? 0),
+                        'quantidade' => (int) ($item['quantidade'] ?? 0),
+                        'preco_unitario' => (float) ($item['preco_unitario'] ?? 0),
+                        'subtotal' => (float) $subtotalItem,
+                        'nome_produto' => (string) ($item['nome_produto'] ?? ''),
+                        'nome_produto_sku' => (string) ($item['nome_produto_sku'] ?? ''),
+                        'loja' => (string) ($item['loja'] ?? ''),
+                    ];
+
+                    foreach ($map as $c => $v) {
+                        if (in_array($c, $cols, true)) {
+                            $insertCols[] = $c;
+                            $ph = ':' . $c;
+                            $insertVals[] = $ph;
+                            $params[$ph] = $v;
+                        }
+                    }
+
+                    if (in_array('created_at', $cols, true)) {
+                        $insertCols[] = 'created_at';
+                        $insertVals[] = 'NOW()';
+                    }
+
+                    if (empty($insertCols)) {
+                        continue;
+                    }
+
+                    $sql = 'INSERT INTO ' . $t . ' (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
+                    $stmt = $this->connection->prepare($sql);
+                    $stmt->execute($params);
+                }
 
                 // Estoque: reservar o que houver disponível e gerar pendência só para o que faltar
                 $produtoId = (int) ($item['produto_id'] ?? 0);
