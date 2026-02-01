@@ -8,13 +8,40 @@ class AdminComprasController extends Controller {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
-    private function tableExists(string $table): bool {
+    public function reabrirCompras($request) {
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        $lojaId = (int) $request->getParam('loja_id', 0);
+        $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
+        $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
         try {
-            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
-            $stmt->execute([$table]);
-            return (bool) $stmt->fetchColumn();
+            $sql = "UPDATE lista_compras lc SET lc.status = 'pendente' WHERE lc.status IN ('comprado','cancelado')";
+            $params = [];
+            if ($produtoId > 0) {
+                $sql .= ' AND lc.produto_id = :produto_id';
+                $params[':produto_id'] = $produtoId;
+            }
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $sql .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $sql .= ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                }
+            }
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
+
+            $_SESSION['message'] = 'Itens reabertos.';
+            $_SESSION['message_type'] = 'success';
+            header('Location: /admin/estoque/compras?status=pendente' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
+            exit;
         } catch (\Exception $e) {
-            return false;
+            $_SESSION['message'] = 'Erro ao reabrir itens.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/estoque/compras?status=concluidas');
+            exit;
         }
     }
 
@@ -55,6 +82,16 @@ class AdminComprasController extends Controller {
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/estoque/compras');
             exit;
+        }
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
         }
     }
 
@@ -118,6 +155,8 @@ class AdminComprasController extends Controller {
             $lojas = $this->fetchLojas();
             $lojaIdFilter = (int) $request->getParam('loja_id', 0);
             $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
+            $statusView = (string) $request->getParam('status', 'pendente');
+            $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
@@ -152,17 +191,19 @@ class AdminComprasController extends Controller {
                 . ', agg.prioridade as prioridade'
                 . ', agg.data_solicitacao as data_solicitacao'
                 . ', agg.loja_id as loja_id'
-                . ", 'pendente' as status"
+                . ', agg.status as status'
                 . ' FROM ('
                 . '   SELECT produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+                . '     , status as status'
                 . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
                 . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
-                . "   FROM lista_compras lc WHERE lc.status = 'pendente'"
+                . '   FROM lista_compras lc WHERE '
+                . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
                 . '   GROUP BY produto_id, '
-                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0)' : '0')
+                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0), status' : '0, status')
                 . ' ) agg'
                 . ' JOIN produtos p ON agg.produto_id = p.id';
 
@@ -202,6 +243,7 @@ class AdminComprasController extends Controller {
             $lojas = [];
             $lojaIdFilter = 0;
             $semLoja = false;
+            $statusView = 'pendente';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
         }
@@ -239,36 +281,55 @@ class AdminComprasController extends Controller {
                         <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
                             <i class="fas fa-file-pdf me-1"></i>Gerar PDF
                         </button>
-                        <form method="POST" action="/admin/estoque/compras/concluir" class="d-inline">
+                        ';
+
+        if ($statusView === 'pendente') {
+            echo '<form method="POST" action="/admin/estoque/compras/concluir" class="d-inline">
                             <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                             <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                             <button type="button" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#modalConcluirCompras">
                                 <i class="fas fa-check-double me-1"></i>Concluir compras
                             </button>
-                        </form>
+                        </form>';
+        } else {
+            echo '<form method="POST" action="/admin/estoque/compras/reabrir" class="d-inline">
+                            <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
+                            <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
+                            <button type="button" class="btn btn-secondary me-2" data-bs-toggle="modal" data-bs-target="#modalReabrirCompras">
+                                <i class="fas fa-rotate-left me-1"></i>Reabrir itens
+                            </button>
+                        </form>';
+        }
+
+        echo '
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
                 </div>';
 
+                echo '<div class="d-flex flex-wrap gap-2 mb-2">'
+                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente">Pendentes</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas">Concluídas</a>'
+                    . '</div>';
+
                 echo '<div class="card mb-4">
                     <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras">Todas</a>';
+                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '">Todas</a>';
 
                 foreach ($lojas as $l) {
                     $lid = (int) ($l['id'] ?? 0);
                     $lname = (string) ($l['nome'] ?? '');
                     $active = (!$semLoja && $lojaIdFilter === $lid);
-                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?loja_id=' . $lid . '">' . htmlspecialchars($lname) . '</a>';
+                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '&loja_id=' . $lid . '">' . htmlspecialchars($lname) . '</a>';
                 }
 
-                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?sem_loja=1">Sem loja</a>'
+                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
                     . '</div>'
                     . '<div class="text-end">'
-                    . '<div><strong>Total pendente (itens):</strong> ' . number_format($totalItensPendentes) . '</div>'
-                    . '<div><strong>Valor total pendente:</strong> $ ' . number_format($valorTotalPendente, 2, '.', ',') . '</div>'
+                    . '<div><strong>Total ' . ($statusView === 'pendente' ? 'pendente' : 'concluído') . ' (itens):</strong> ' . number_format($totalItensPendentes) . '</div>'
+                    . '<div><strong>Valor total ' . ($statusView === 'pendente' ? 'pendente' : 'concluído') . ':</strong> $ ' . number_format($valorTotalPendente, 2, '.', ',') . '</div>'
                     . '</div>'
                     . '</div>'
                     . '</div>';
@@ -391,6 +452,12 @@ class AdminComprasController extends Controller {
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
                                         . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
                                         . '><i class="fas fa-trash"></i></button>';
+                                    $btnReabrirItem = '<button type="button" class="btn btn-outline-secondary"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalReabrirItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . '><i class="fas fa-rotate-left"></i></button>';
                                     $btnLoja = $missingLoja
                                         ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"><i class="fas fa-store"></i></button>'
                                         : '';
@@ -412,15 +479,17 @@ class AdminComprasController extends Controller {
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
-                                        . $btnEditItem
-                                        . $btnLoja
-                                        . '<button type="button" class="btn btn-outline-success"'
-                                        . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
-                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
-                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
-                                        . '><i class="fas fa-check"></i></button>'
-                                        . $btnRemoverItem
+                                        . ($statusView === 'pendente' ? $btnEditItem : '')
+                                        . ($statusView === 'pendente' ? $btnLoja : '')
+                                        . ($statusView === 'pendente'
+                                            ? ('<button type="button" class="btn btn-outline-success"'
+                                                . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
+                                                . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                                . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                                . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                                . '><i class="fas fa-check"></i></button>')
+                                            : $btnReabrirItem)
+                                        . ($statusView === 'pendente' ? $btnRemoverItem : '')
                                         . '</div>'
                                         . '</td>'
                                         . '</tr>';
@@ -455,6 +524,31 @@ class AdminComprasController extends Controller {
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                                         <button type="submit" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                // Modal: Reabrir compras (tudo do filtro)
+                echo '<div class="modal fade" id="modalReabrirCompras" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/reabrir">
+                                    <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
+                                    <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Reabrir itens</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-secondary mb-0">
+                                            Deseja voltar para <strong>pendente</strong> todos os itens concluídos deste filtro?
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Reabrir</button>
                                     </div>
                                 </form>
                             </div>
@@ -555,6 +649,43 @@ class AdminComprasController extends Controller {
                             document.getElementById("remover_produto_id").value = button.getAttribute("data-produto-id") || "";
                             document.getElementById("remover_loja_id").value = button.getAttribute("data-loja-id") || "0";
                             document.getElementById("remover_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                        });
+                    }
+                </script>';
+
+                // Modal: Reabrir item
+                echo '<div class="modal fade" id="modalReabrirItem" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="/admin/estoque/compras/reabrir">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Reabrir item</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" name="produto_id" id="reabrir_produto_id" value="">
+                                        <input type="hidden" name="loja_id" id="reabrir_loja_id" value="0">
+                                        <div class="alert alert-secondary mb-0">
+                                            Voltar para <strong>pendente</strong>: <strong id="reabrir_produto_nome"></strong>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Reabrir</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>';
+
+                echo '<script>
+                    var modalReabrirItem = document.getElementById("modalReabrirItem");
+                    if (modalReabrirItem) {
+                        modalReabrirItem.addEventListener("show.bs.modal", function (event) {
+                            var button = event.relatedTarget;
+                            document.getElementById("reabrir_produto_id").value = button.getAttribute("data-produto-id") || "";
+                            document.getElementById("reabrir_loja_id").value = button.getAttribute("data-loja-id") || "0";
+                            document.getElementById("reabrir_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
                         });
                     }
                 </script>';
