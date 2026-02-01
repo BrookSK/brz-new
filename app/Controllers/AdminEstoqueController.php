@@ -16,6 +16,32 @@ class AdminEstoqueController extends Controller {
         $_SESSION['message_type'] = $type;
     }
 
+    private function renderFlashIfAny(): void {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (!isset($_SESSION['message'])) {
+            return;
+        }
+        $type = (string) ($_SESSION['message_type'] ?? 'info');
+        $msg = (string) $_SESSION['message'];
+        unset($_SESSION['message'], $_SESSION['message_type']);
+        echo '<div class="alert alert-' . htmlspecialchars($type) . ' alert-dismissible fade show mt-3" role="alert">'
+            . htmlspecialchars($msg)
+            . '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>'
+            . '</div>';
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     private function getProdutosSchema(): array {
         $cols = [];
         try {
@@ -272,8 +298,11 @@ class AdminEstoqueController extends Controller {
                             <i class="fas fa-arrow-left me-1"></i>Voltar
                         </a>
                     </div>
-                </div>
+                </div>';
 
+        $this->renderFlashIfAny();
+
+        echo '
                 <div class="row g-4">
                     <div class="col-lg-5">
                         <div class="card">
@@ -579,6 +608,8 @@ class AdminEstoqueController extends Controller {
                     </div>
                 </div>';
 
+        $this->renderFlashIfAny();
+
                 // Cards de Estatísticas
                 echo '<div class="row mb-4">
                     <div class="col-md-3">
@@ -744,6 +775,12 @@ class AdminEstoqueController extends Controller {
                 $dataValidade = '';
             }
 
+            if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_movimentacao')) {
+                $this->setFlash('Tabelas de estoque não encontradas no banco. Rode a migration 020_create_estoque_profissional_fix.sql no banco do servidor.', 'danger');
+                header('Location: /admin/estoque/entrada');
+                exit;
+            }
+
             // Validar produto existente
             $stmtProduto = $this->connection->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
             $stmtProduto->execute([':id' => $produtoId]);
@@ -848,8 +885,9 @@ class AdminEstoqueController extends Controller {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
-            $this->setFlash('Erro ao registrar entrada de estoque.', 'danger');
-            header('Location: /admin/estoque');
+            error_log('Erro ao registrar entrada de estoque: ' . $e->getMessage());
+            $this->setFlash('Erro ao registrar entrada de estoque: ' . $e->getMessage(), 'danger');
+            header('Location: /admin/estoque/entrada');
             exit;
         }
     }
