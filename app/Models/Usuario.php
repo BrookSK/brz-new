@@ -16,7 +16,21 @@ class Usuario extends Model {
     }
     
     public function getAll() {
-        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} ORDER BY nome ASC");
+        $orderCol = 'id';
+        try {
+            $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($cols)) {
+                if (in_array('nome', $cols, true)) {
+                    $orderCol = 'nome';
+                } elseif (in_array('name', $cols, true)) {
+                    $orderCol = 'name';
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        $stmt = $this->getConnection()->prepare("SELECT * FROM {$this->table} ORDER BY {$orderCol} ASC");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

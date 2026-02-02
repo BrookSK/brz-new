@@ -8,6 +8,15 @@ class PedidoManualService {
         $this->db = $db ?? \Config\Database::getConnection();
     }
 
+    private function pickFirstExistingColumn(array $cols, array $candidates): string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return '';
+    }
+
     private function tableExists(string $table): bool {
         try {
             $stmt = $this->db->prepare('SHOW TABLES LIKE ?');
@@ -200,7 +209,17 @@ class PedidoManualService {
             throw new \Exception('Tabela de itens do pedido não encontrada');
         }
 
-        $produtoStmt = $this->db->prepare('SELECT id, name, nome, sku, price, valor, currency, moeda FROM produtos WHERE id = ? LIMIT 1');
+        $colsProdutos = $this->getCols('produtos');
+        $prodNameCol = $this->pickFirstExistingColumn($colsProdutos, ['name', 'nome', 'titulo', 'descricao']);
+        $prodSkuCol = $this->pickFirstExistingColumn($colsProdutos, ['sku', 'codigo', 'codigo_sku']);
+        $prodPriceCol = $this->pickFirstExistingColumn($colsProdutos, ['price', 'valor', 'preco']);
+
+        $select = ['id'];
+        if ($prodNameCol !== '') $select[] = $prodNameCol . ' AS name';
+        if ($prodSkuCol !== '') $select[] = $prodSkuCol . ' AS sku';
+        if ($prodPriceCol !== '') $select[] = $prodPriceCol . ' AS price';
+
+        $produtoStmt = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = ? LIMIT 1');
 
         foreach ($itens as $it) {
             $produtoId = (int) ($it['produto_id'] ?? 0);
@@ -215,7 +234,7 @@ class PedidoManualService {
                 throw new \Exception('Produto não encontrado: ' . $produtoId);
             }
 
-            $nome = (string) ($prod['name'] ?? ($prod['nome'] ?? ''));
+            $nome = (string) ($prod['name'] ?? '');
             $sku = (string) ($prod['sku'] ?? '');
 
             $valorUnit = 0.0;
@@ -223,8 +242,6 @@ class PedidoManualService {
                 $valorUnit = (float) $it['valor_unitario'];
             } elseif (isset($prod['price'])) {
                 $valorUnit = (float) $prod['price'];
-            } elseif (isset($prod['valor'])) {
-                $valorUnit = (float) $prod['valor'];
             }
 
             $subtotal = round($valorUnit * $qtd, 2);
@@ -318,14 +335,26 @@ class PedidoManualService {
             throw new \Exception('Pedido sem cliente vinculado');
         }
 
-        $stU = $this->db->prepare('SELECT id, nome, name, email, telefone, documento FROM usuarios WHERE id = ? LIMIT 1');
+        $colsUsuarios = $this->getCols('usuarios');
+        $uNomeCol = $this->pickFirstExistingColumn($colsUsuarios, ['nome', 'name']);
+        $uEmailCol = $this->pickFirstExistingColumn($colsUsuarios, ['email']);
+        $uTelefoneCol = $this->pickFirstExistingColumn($colsUsuarios, ['telefone', 'phone', 'celular']);
+        $uDocumentoCol = $this->pickFirstExistingColumn($colsUsuarios, ['documento', 'cpf', 'cnpj']);
+
+        $uSelect = ['id'];
+        if ($uNomeCol !== '') $uSelect[] = $uNomeCol . ' AS nome';
+        if ($uEmailCol !== '') $uSelect[] = $uEmailCol . ' AS email';
+        if ($uTelefoneCol !== '') $uSelect[] = $uTelefoneCol . ' AS telefone';
+        if ($uDocumentoCol !== '') $uSelect[] = $uDocumentoCol . ' AS documento';
+
+        $stU = $this->db->prepare('SELECT ' . implode(', ', $uSelect) . ' FROM usuarios WHERE id = ? LIMIT 1');
         $stU->execute([$clienteId]);
         $user = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
         if (empty($user)) {
             throw new \Exception('Cliente não encontrado');
         }
 
-        $nome = (string) ($user['nome'] ?? ($user['name'] ?? ''));
+        $nome = (string) ($user['nome'] ?? '');
         $email = (string) ($user['email'] ?? '');
         $telefone = (string) ($user['telefone'] ?? '');
         $documento = (string) ($user['documento'] ?? '');
