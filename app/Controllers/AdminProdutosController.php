@@ -705,6 +705,8 @@ HTML;
                 }
             }
 
+            unset($produto);
+
             $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (name LIKE :busca OR sku LIKE :busca)" : ""));
             if (!empty($busca)) {
                 $stmtTotal->bindValue(':busca', "%{$busca}%");

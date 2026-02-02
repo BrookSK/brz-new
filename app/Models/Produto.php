@@ -116,14 +116,16 @@ class Produto extends Model {
 
         $where = [];
         if (in_array('status', $cols, true)) {
-            $where[] = "p.status = 'published'";
+            // Compatibilidade: alguns bancos usam 'published' e outros usam 'ativo'
+            $where[] = "LOWER(COALESCE(p.status,'')) IN ('published','ativo','active')";
         }
         if (in_array('active', $cols, true)) {
             $where[] = 'p.active = 1';
         } elseif (in_array('ativo', $cols, true)) {
             $where[] = 'p.ativo = 1';
         }
-        if (in_array('featured', $cols, true)) {
+        $hasFeatured = in_array('featured', $cols, true);
+        if ($hasFeatured) {
             $where[] = 'p.featured = 1';
         }
 
@@ -132,7 +134,9 @@ class Produto extends Model {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
 
-        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.created_at DESC\n                LIMIT :limit";
+        $orderBy = $hasFeatured ? 'ORDER BY p.featured DESC, p.created_at DESC' : 'ORDER BY p.created_at DESC';
+
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                {$orderBy}\n                LIMIT :limit";
 
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);

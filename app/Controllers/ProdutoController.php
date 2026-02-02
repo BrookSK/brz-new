@@ -44,6 +44,8 @@ class ProdutoController extends Controller {
                 $produto['foto_principal'] = null;
             }
         }
+
+        unset($produto);
         
         $categorias = $this->produtoModel->getCategorias();
         
