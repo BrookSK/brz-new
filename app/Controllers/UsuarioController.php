@@ -293,6 +293,26 @@ class UsuarioController extends Controller {
                     
                     // Preparar dados para atualização (apenas campos que existem)
                     $dadosAtualizacao = $this->prepararDadosAtualizacao($dados);
+
+                    // Registrar aceite de termos quando solicitado
+                    if (!empty($dados['aceitar_termos'])) {
+                        try {
+                            $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                            if (is_array($cols)) {
+                                if (in_array('termos_aceitos_em', $cols, true)) {
+                                    $dadosAtualizacao['termos_aceitos_em'] = date('Y-m-d H:i:s');
+                                }
+                                if (in_array('termos_aceitos_ip', $cols, true)) {
+                                    $dadosAtualizacao['termos_aceitos_ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+                                }
+                                if (in_array('termos_versao', $cols, true)) {
+                                    $dadosAtualizacao['termos_versao'] = '1.0';
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
                     
                     // Atualizar senha se fornecida
                     if (!empty($dados['senha_atual']) && !empty($dados['senha_nova'])) {
@@ -642,6 +662,8 @@ class UsuarioController extends Controller {
             'bairro' => 'bairro',
             'cidade' => 'cidade',
             'estado' => 'estado',
+            'data_nascimento' => 'data_nascimento',
+            'pais_residencia' => 'pais_residencia',
             'notificacoes_email' => 'notificacoes_email',
             'notificacoes_sms' => 'notificacoes_sms',
             'idioma' => 'idioma'
@@ -818,6 +840,33 @@ class UsuarioController extends Controller {
         if (empty($dados['telefone'])) {
             $erros[] = 'Telefone é obrigatório';
         }
+
+        if (empty($dados['documento'])) {
+            $erros[] = 'Documento é obrigatório';
+        }
+
+        if (empty($dados['data_nascimento'])) {
+            $erros[] = 'Data de nascimento é obrigatória';
+        }
+
+        if (empty($dados['pais_residencia'])) {
+            $erros[] = 'País de residência é obrigatório';
+        }
+
+        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($pais === 'BR') {
+            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+            if ($doc === '' || strlen($doc) < 11) {
+                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            }
+        }
+
+        if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
+        if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
+        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if (empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
+        if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
         
         if (!filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
             $erros[] = 'E-mail inválido';

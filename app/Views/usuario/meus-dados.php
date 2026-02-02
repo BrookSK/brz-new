@@ -150,17 +150,48 @@
                                 <label for="telefone" class="form-label">Telefone</label>
                                 <input type="tel" class="form-control" id="telefone" name="telefone" 
                                        value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
-                                       placeholder="(00) 00000-0000">
+                                       placeholder="(00) 00000-0000" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="documento" class="form-label">CPF/CNPJ</label>
                                 <input type="text" class="form-control" id="documento" name="documento" 
                                        value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>" 
-                                       placeholder="000.000.000-00">
+                                       placeholder="000.000.000-00" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
+                                       value="<?= htmlspecialchars($usuario['data_nascimento'] ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <select class="form-select" id="pais_residencia" name="pais_residencia" required>
+                                    <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
+                                    <option value="BR" <?= $pr === 'BR' ? 'selected' : '' ?>>Brasil</option>
+                                    <option value="US" <?= $pr === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
+                                </select>
                             </div>
                         </div>
                 </div>
             </div>
+
+            <?php if (empty($usuario['termos_aceitos_em'])): ?>
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-signature me-2"></i> Termos e Condições</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">Você precisa aceitar os termos para continuar comprando.</div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="aceitar_termos" id="aceitar_termos" required>
+                        <label class="form-check-label" for="aceitar_termos">
+                            Li e aceito os <a href="/termos-uso" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/politica-privacidade" target="_blank" rel="noopener">Política de Privacidade</a>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <!-- Address Form -->
             <div class="card border-0 shadow-sm mt-4">
@@ -175,19 +206,19 @@
                                 <label for="cep" class="form-label">CEP</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars($usuario['cep'] ?? '') ?>" 
-                                       placeholder="00000-000">
+                                       placeholder="00000-000" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="endereco" class="form-label">Endereço</label>
                                 <input type="text" class="form-control" id="endereco" name="endereco" 
                                        value="<?= htmlspecialchars($usuario['endereco'] ?? '') ?>" 
-                                       placeholder="Rua, Avenida, etc.">
+                                       placeholder="Rua, Avenida, etc." required>
                             </div>
                             <div class="col-md-3">
                                 <label for="numero" class="form-label">Número</label>
                                 <input type="text" class="form-control" id="numero" name="numero" 
                                        value="<?= htmlspecialchars($usuario['numero'] ?? '') ?>" 
-                                       placeholder="123">
+                                       placeholder="123" required>
                             </div>
                             <div class="col-md-3">
                                 <label for="complemento" class="form-label">Complemento</label>
@@ -199,17 +230,17 @@
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
                                        value="<?= htmlspecialchars($usuario['bairro'] ?? '') ?>" 
-                                       placeholder="Centro">
+                                       placeholder="Centro" required>
                             </div>
                             <div class="col-md-4">
                                 <label for="cidade" class="form-label">Cidade</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
                                        value="<?= htmlspecialchars($usuario['cidade'] ?? '') ?>" 
-                                       placeholder="São Paulo">
+                                       placeholder="São Paulo" required>
                             </div>
                             <div class="col-md-4">
                                 <label for="estado" class="form-label">Estado</label>
-                                <select class="form-select" id="estado" name="estado">
+                                <select class="form-select" id="estado" name="estado" required>
                                     <option value="">Selecione...</option>
                                     <option value="AC" <?= ($usuario['estado'] ?? '') === 'AC' ? 'selected' : '' ?>>Acre</option>
                                     <option value="AL" <?= ($usuario['estado'] ?? '') === 'AL' ? 'selected' : '' ?>>Alagoas</option>
@@ -272,41 +303,6 @@
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
                             Deixe os campos de senha em branco caso não queira alterá-los.
-                        </div>
-                </div>
-            </div>
-            
-            <!-- Preferences Form -->
-            <div class="card border-0 shadow-sm mt-4">
-                <div class="card-header bg-white border-0 pt-4 pb-3">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-cog me-2"></i> Preferências
-                    </h5>
-                </div>
-                <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="notificacoes_email" class="form-label">
-                                    <input type="checkbox" class="form-check-input me-2" id="notificacoes_email" name="notificacoes_email" 
-                                           <?= ($usuario['notificacoes_email'] ?? 1) ? 'checked' : '' ?>>
-                                    Receber notificações por e-mail
-                                </label>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="notificacoes_sms" class="form-label">
-                                    <input type="checkbox" class="form-check-input me-2" id="notificacoes_sms" name="notificacoes_sms" 
-                                           <?= ($usuario['notificacoes_sms'] ?? 0) ? 'checked' : '' ?>>
-                                    Receber notificações por SMS
-                                </label>
-                            </div>
-                            <div class="col-md-12">
-                                <label for="idioma" class="form-label">Idioma</label>
-                                <select class="form-select" id="idioma" name="idioma">
-                                    <option value="pt-BR" <?= ($usuario['idioma'] ?? 'pt-BR') === 'pt-BR' ? 'selected' : '' ?>>Português (Brasil)</option>
-                                    <option value="en-US" <?= ($usuario['idioma'] ?? 'pt-BR') === 'en-US' ? 'selected' : '' ?>>English (US)</option>
-                                    <option value="es-ES" <?= ($usuario['idioma'] ?? 'pt-BR') === 'es-ES' ? 'selected' : '' ?>>Español</option>
-                                </select>
-                            </div>
                         </div>
                 </div>
             </div>

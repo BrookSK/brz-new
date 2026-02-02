@@ -503,6 +503,35 @@ class CheckoutController extends Controller {
         
         // Obter usuário logado
         $usuario = $this->authService->getUsuarioLogado();
+        $usuarioCompletoDb = null;
+        if (!empty($usuario) && !empty($usuario['id'])) {
+            try {
+                $usuarioCompletoDb = $this->usuarioModel->find((int) $usuario['id']);
+            } catch (\Exception $e) {
+                $usuarioCompletoDb = null;
+            }
+        }
+
+        if (is_array($usuarioCompletoDb) && !empty($usuarioCompletoDb)) {
+            $usuario = array_merge($usuarioCompletoDb, is_array($usuario) ? $usuario : []);
+        }
+
+        $usuarioCompleto = null;
+        $perfilOk = true;
+        $termosOk = true;
+        $faltando = [];
+        if (!empty($usuario) && !empty($usuario['id'])) {
+            try {
+                $usuarioCompleto = $this->usuarioModel->find((int) $usuario['id']);
+            } catch (\Exception $e) {
+                $usuarioCompleto = null;
+            }
+            if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
+                $termosOk = $this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+                $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
+                $perfilOk = empty($faltando);
+            }
+        }
         
         // Obter detalhes dos produtos no carrinho
         $items = [];
@@ -542,13 +571,42 @@ class CheckoutController extends Controller {
         $impostos = $subtotal * 0.80;
         $total = $subtotal + $frete + $taxaServico + $impostos;
         
+        $enderecos = $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [];
+        $enderecoPrincipal = null;
+        if (is_array($enderecos) && !empty($enderecos)) {
+            foreach ($enderecos as $e) {
+                if (!empty($e['principal'])) {
+                    $enderecoPrincipal = $e;
+                    break;
+                }
+            }
+            if (!$enderecoPrincipal) {
+                $enderecoPrincipal = $enderecos[0] ?? null;
+            }
+        }
+
+        $enderecoPrefill = [
+            'pais' => (string) ($enderecoPrincipal['pais'] ?? ($usuario['pais_residencia'] ?? 'BR')),
+            'cep' => (string) ($enderecoPrincipal['cep'] ?? ($usuario['cep'] ?? '')),
+            'endereco' => (string) ($enderecoPrincipal['endereco'] ?? ($usuario['endereco'] ?? '')),
+            'numero' => (string) ($enderecoPrincipal['numero'] ?? ($usuario['numero'] ?? '')),
+            'complemento' => (string) ($enderecoPrincipal['complemento'] ?? ($usuario['complemento'] ?? '')),
+            'bairro' => (string) ($enderecoPrincipal['bairro'] ?? ($usuario['bairro'] ?? '')),
+            'cidade' => (string) ($enderecoPrincipal['cidade'] ?? ($usuario['cidade'] ?? '')),
+            'estado' => (string) ($enderecoPrincipal['estado'] ?? ($usuario['estado'] ?? '')),
+        ];
+
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
             'items' => $items,
             'subtotal' => $subtotal,
             'peso_total' => $pesoTotal,
             'usuario' => $usuario,
-            'enderecos' => $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [],
+            'perfil_ok' => $perfilOk,
+            'termos_ok' => $termosOk,
+            'campos_faltando' => $faltando,
+            'enderecos' => $enderecos,
+            'endereco_prefill' => $enderecoPrefill,
             'moeda' => $_GET['moeda'] ?? 'BRL', // Obter moeda da URL ou padrão BRL
             'frete' => $frete,
             'taxa_servico' => $taxaServico,
@@ -639,6 +697,31 @@ class CheckoutController extends Controller {
         
         // Obter usuário logado
         $usuario = $this->authService->getUsuarioLogado();
+
+        // Se está logado, exigir perfil completo + termos aceitos previamente
+        if (!empty($usuario) && !empty($usuario['id'])) {
+            try {
+                $usuarioCompleto = $this->usuarioModel->find((int) $usuario['id']);
+                if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
+                    $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
+                    $termosOk = $this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+                    if (!$termosOk || !empty($faltando)) {
+                        $parts = [];
+                        if (!$termosOk) {
+                            $parts[] = 'aceitar os termos';
+                        }
+                        if (!empty($faltando)) {
+                            $parts[] = 'completar seus dados: ' . implode(', ', $faltando);
+                        }
+                        $this->json([
+                            'error' => 'Para finalizar, você precisa ' . implode(' e ', $parts) . '. Atualize em /meus-dados'
+                        ], 400);
+                        return;
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
         
         // Obter dados do formulário
         $dados = $request->getParams();
@@ -678,6 +761,28 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT] Consentimento legal nao aceito');
             $this->json(['error' => 'É necessário aceitar os termos para continuar'], 400);
             return;
+        }
+
+        if (!empty($usuario) && !empty($usuario['id'])) {
+            try {
+                $colsU = [];
+                $stmtColsU = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                $colsU = $stmtColsU ? $stmtColsU->fetchAll(\PDO::FETCH_COLUMN) : [];
+                $upd = [];
+                if (is_array($colsU) && in_array('termos_aceitos_em', $colsU, true)) {
+                    $upd['termos_aceitos_em'] = date('Y-m-d H:i:s');
+                }
+                if (is_array($colsU) && in_array('termos_aceitos_ip', $colsU, true)) {
+                    $upd['termos_aceitos_ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+                }
+                if (is_array($colsU) && in_array('termos_versao', $colsU, true)) {
+                    $upd['termos_versao'] = '1.0';
+                }
+                if (!empty($upd)) {
+                    $this->usuarioModel->update((int) $usuario['id'], $upd);
+                }
+            } catch (\Exception $e) {
+            }
         }
         
         // Validar dados obrigatórios

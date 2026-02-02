@@ -37,6 +37,7 @@ class AuthController extends Controller {
             $email = $request->getParam('email');
             $senha = $request->getParam('senha');
             $isAdmin = $request->getParam('admin_login') === '1';
+            $aceiteTermos = (string) ($request->getParam('consentimento_legal', '') ?? '');
             if ($redirectTo === '') {
                 $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
             }
@@ -65,9 +66,64 @@ class AuthController extends Controller {
                         }
                         $this->redirect('/admin/dashboard');
                     } else {
+                        $usuarioCompleto = null;
+                        try {
+                            $usuarioCompleto = $this->usuarioModel->find((int) ($usuario['id'] ?? 0));
+                        } catch (\Exception $e) {
+                            $usuarioCompleto = null;
+                        }
+
+                        if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
+                            $precisaSalvarTermos = !$this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+                            if ($precisaSalvarTermos) {
+                                if ($aceiteTermos === '' || $aceiteTermos === '0') {
+                                    $_SESSION['message'] = 'É necessário aceitar os termos e condições para entrar.';
+                                    $_SESSION['message_type'] = 'warning';
+                                    if ($isAjax) {
+                                        header('Content-Type: application/json; charset=utf-8');
+                                        echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                                        return;
+                                    }
+                                    $this->redirect('/login');
+                                    return;
+                                }
+
+                                $colsU = [];
+                                try {
+                                    $stmtColsU = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                                    $colsU = $stmtColsU ? $stmtColsU->fetchAll(\PDO::FETCH_COLUMN) : [];
+                                } catch (\Exception $e) {
+                                    $colsU = [];
+                                }
+                                $upd = [];
+                                if (is_array($colsU) && in_array('termos_aceitos_em', $colsU, true)) {
+                                    $upd['termos_aceitos_em'] = date('Y-m-d H:i:s');
+                                }
+                                if (is_array($colsU) && in_array('termos_aceitos_ip', $colsU, true)) {
+                                    $upd['termos_aceitos_ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+                                }
+                                if (is_array($colsU) && in_array('termos_versao', $colsU, true)) {
+                                    $upd['termos_versao'] = '1.0';
+                                }
+                                if (!empty($upd)) {
+                                    $this->usuarioModel->update((int) $usuarioCompleto['id'], $upd);
+                                }
+                            }
+
+                            $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
+                            if (!empty($faltando)) {
+                                $_SESSION['message'] = 'Complete seus dados obrigatórios para continuar: ' . implode(', ', $faltando);
+                                $_SESSION['message_type'] = 'warning';
+                                $target = '/meus-dados';
+                            } else {
+                                $target = $redirectTo !== '' ? $redirectTo : '/minha-conta';
+                            }
+                        } else {
+                            $target = $redirectTo !== '' ? $redirectTo : '/minha-conta';
+                        }
+
                         $_SESSION['message'] = 'Bem-vendo de volta, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
-                        $target = $redirectTo !== '' ? $redirectTo : '/minha-conta';
                         if ($isAjax) {
                             header('Content-Type: application/json; charset=utf-8');
                             echo json_encode(['success' => true, 'redirect' => $target]);
@@ -253,16 +309,58 @@ class AuthController extends Controller {
                             'documento' => $dados['documento'],
                             'perfil' => 'cliente'
                         ]);
+
+                        if ($usuarioId) {
+                            $colsU = [];
+                            try {
+                                $stmtColsU = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                                $colsU = $stmtColsU ? $stmtColsU->fetchAll(\PDO::FETCH_COLUMN) : [];
+                            } catch (\Exception $e) {
+                                $colsU = [];
+                            }
+
+                            $upd = [];
+                            $map = [
+                                'cep' => 'cep',
+                                'endereco' => 'endereco',
+                                'numero' => 'numero',
+                                'complemento' => 'complemento',
+                                'bairro' => 'bairro',
+                                'cidade' => 'cidade',
+                                'estado' => 'estado',
+                                'data_nascimento' => 'data_nascimento',
+                                'pais_residencia' => 'pais_residencia',
+                            ];
+                            foreach ($map as $k => $col) {
+                                if (is_array($colsU) && in_array($col, $colsU, true) && isset($dados[$k])) {
+                                    $upd[$col] = $dados[$k];
+                                }
+                            }
+
+                            if (is_array($colsU) && in_array('termos_aceitos_em', $colsU, true)) {
+                                $upd['termos_aceitos_em'] = date('Y-m-d H:i:s');
+                            }
+                            if (is_array($colsU) && in_array('termos_aceitos_ip', $colsU, true)) {
+                                $upd['termos_aceitos_ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+                            }
+                            if (is_array($colsU) && in_array('termos_versao', $colsU, true)) {
+                                $upd['termos_versao'] = '1.0';
+                            }
+
+                            if (!empty($upd)) {
+                                $this->usuarioModel->update((int) $usuarioId, $upd);
+                            }
+                        }
                         
                         if ($usuarioId) {
                             // Fazer login automático
                             $usuario = $this->authService->login($dados['email'], $dados['senha']);
                             if ($isAjax) {
                                 header('Content-Type: application/json; charset=utf-8');
-                                echo json_encode(['success' => true, 'redirect' => '/minha-conta']);
+                                echo json_encode(['success' => true, 'redirect' => '/meus-dados']);
                                 return;
                             }
-                            $this->redirect('/minha-conta');
+                            $this->redirect('/meus-dados');
                             return;
                         } else {
                             $erros[] = 'Erro ao criar conta';
@@ -322,6 +420,36 @@ class AuthController extends Controller {
         
         if (empty($dados['telefone'])) {
             $erros[] = 'Telefone é obrigatório';
+        }
+
+        if (empty($dados['data_nascimento'])) {
+            $erros[] = 'Data de nascimento é obrigatória';
+        }
+
+        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        if (empty($dados['pais_residencia'])) {
+            $erros[] = 'País de residência é obrigatório';
+        }
+
+        if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
+        if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
+        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if (empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
+        if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+
+        if ($pais === 'BR') {
+            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+            if ($doc === '' || strlen($doc) < 11) {
+                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            }
+        }
+
+        if (empty($dados['termos'])) {
+            $erros[] = 'Você precisa aceitar os termos';
         }
         
         return $erros;

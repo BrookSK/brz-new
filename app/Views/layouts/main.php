@@ -1085,8 +1085,26 @@
                 // Atualizar valores do carrinho
                 const cartValues = document.querySelectorAll('.cart-currency');
                 cartValues.forEach(element => {
-                    const originalValue = parseFloat(element.getAttribute('data-original-value'));
+                    const rawAttr = element.getAttribute('data-original-value');
+                    const isFrete = (element.classList.contains('frete-value') || element.id === 'frete');
+
+                    // Se já está grátis, não sobrescreve.
+                    const currentText = String(element.textContent || '').trim().toLowerCase();
+                    if (isFrete && (currentText === 'frete grátis' || currentText === 'frete gratis')) {
+                        element.textContent = 'Frete grátis';
+                        return;
+                    }
+
+                    const originalValue = parseFloat(rawAttr);
+                    if (isFrete && (rawAttr === null || rawAttr === '' || isNaN(originalValue))) {
+                        return;
+                    }
+
                     if (!isNaN(originalValue)) {
+                        if (isFrete && originalValue <= 0) {
+                            element.textContent = 'Frete grátis';
+                            return;
+                        }
                         const convertedValue = originalValue * rate;
                         element.textContent = `${symbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
                     }
