@@ -86,7 +86,7 @@
                     </h2>
                     <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            Aceitamos cartão de crédito, débito, PIX e boleto. Para compras em USD, processamos via Stripe. Para compras em BRL, usamos Asaas. Todas as transações são 100% seguras com criptografia SSL.
+                            Aceitamos cartão de crédito, débito, PIX e boleto. Para compras em USD, processamos via Stripe. Para compras em BRL, usamos AppMax. Todas as transações são 100% seguras com criptografia SSL.
                         </div>
                     </div>
                 </div>

@@ -12,10 +12,280 @@ class PaymentService {
     private $stripeWebhookSecret;
     private $pedidoModel;
     private $asaasAmbiente;
+    private $appmaxEnabled;
+    private $appmaxClientId;
+    private $appmaxClientSecret;
+    private $appmaxAppId;
+    private $appmaxAccessToken;
+    private $appmaxAccessTokenExpiresAt;
     
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
         $this->loadConfigurations();
+    }
+
+    private function isAppmaxEnabled(): bool {
+        $v = strtolower(trim((string) $this->appmaxEnabled));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function appmaxRequest(string $method, string $path, ?array $body = null): array {
+        if (!$this->isAppmaxEnabled()) {
+            throw new \Exception('AppMax está desativado');
+        }
+
+        $token = $this->getAppmaxAccessToken();
+        $url = 'https://api.appmax.com.br' . '/' . ltrim($path, '/');
+
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $token,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body);
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com AppMax: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload ?? '',
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function appmaxCreateCustomer(array $dados, array $products = []): int {
+        $nome = trim((string) ($dados['customer_name'] ?? ''));
+        $email = trim((string) ($dados['customer_email'] ?? ''));
+        $phone = preg_replace('/\D+/', '', (string) ($dados['customer_phone'] ?? ''));
+        $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
+
+        $firstName = $nome;
+        $lastName = '';
+        if (strpos($nome, ' ') !== false) {
+            $parts = preg_split('/\s+/', $nome);
+            $firstName = (string) array_shift($parts);
+            $lastName = trim(implode(' ', $parts));
+        }
+        if ($lastName === '') {
+            $lastName = $firstName;
+        }
+
+        $ip = (string) ($dados['customer_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
+
+        $address = [
+            'postcode' => preg_replace('/\D+/', '', (string) ($dados['customer_zipcode'] ?? '')),
+            'street' => (string) ($dados['customer_address'] ?? ''),
+            'number' => (string) ($dados['customer_address_number'] ?? ''),
+            'complement' => (string) ($dados['customer_address_complement'] ?? ''),
+            'district' => (string) ($dados['customer_province'] ?? ''),
+            'city' => (string) ($dados['customer_city'] ?? ''),
+            'state' => (string) ($dados['customer_state'] ?? ''),
+        ];
+
+        $payload = [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'phone' => $phone,
+            'document_number' => $doc,
+            'address' => $address,
+            'ip' => $ip,
+        ];
+
+        if (!empty($products)) {
+            $payload['products'] = $products;
+        }
+
+        $created = $this->appmaxRequest('POST', '/v1/customers', $payload);
+        $customerId = (int) ($created['data']['customer']['id'] ?? 0);
+        if ($customerId <= 0) {
+            throw new \Exception('AppMax: customer_id não retornado');
+        }
+        return $customerId;
+    }
+
+    private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
+        $payload = [
+            'customer_id' => $customerId,
+            'products_value' => $productsValueCents,
+            'discount_value' => $discountValueCents,
+            'shipping_value' => $shippingValueCents,
+            'products' => $products,
+        ];
+        $created = $this->appmaxRequest('POST', '/v1/orders', $payload);
+        $orderId = (int) ($created['data']['order']['id'] ?? 0);
+        if ($orderId <= 0) {
+            throw new \Exception('AppMax: order_id não retornado');
+        }
+        return $orderId;
+    }
+
+    private function processarPagamentoAppmax($dados, $valor, $descricao) {
+        if (!$this->isAppmaxEnabled()) {
+            throw new \Exception('AppMax está desativado');
+        }
+
+        $forma = strtoupper(trim((string) ($dados['billingType'] ?? '')));
+        if ($forma === '') {
+            $forma = strtoupper(trim((string) ($dados['forma_pagamento'] ?? '')));
+        }
+
+        // Normalizar formas do checkout
+        if ($forma === 'PIX' || $forma === 'PXD') {
+            $forma = 'PIX';
+        } elseif ($forma === 'BOLETO') {
+            $forma = 'BOLETO';
+        } elseif ($forma === 'CARTAO_CREDITO' || $forma === 'CARTAO' || $forma === 'CREDIT_CARD') {
+            $forma = 'CREDIT_CARD';
+        }
+
+        $products = (array) ($dados['products'] ?? []);
+        $productsValueCents = (int) ($dados['products_value_cents'] ?? 0);
+        if ($productsValueCents <= 0) {
+            $productsValueCents = (int) round(((float) $valor) * 100);
+        }
+
+        $shippingValueCents = (int) ($dados['shipping_value_cents'] ?? 0);
+        $discountValueCents = (int) ($dados['discount_value_cents'] ?? 0);
+
+        $customerId = $this->appmaxCreateCustomer($dados, $products);
+        $orderId = $this->appmaxCreateOrder($customerId, $productsValueCents, $discountValueCents, $shippingValueCents, $products);
+
+        $result = [
+            'success' => true,
+            // usamos order_id como payment_id para vínculo simples no banco (webhooks geralmente referenciam order)
+            'payment_id' => (string) $orderId,
+            'status' => 'pending',
+            'billingType' => $forma,
+            'appmax' => [
+                'customer_id' => $customerId,
+                'order_id' => $orderId,
+            ],
+        ];
+
+        $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
+
+        if ($forma === 'PIX') {
+            $pixResp = $this->appmaxRequest('POST', '/v1/payments/pix', [
+                'order_id' => $orderId,
+                'payment_data' => [
+                    'pix' => [
+                        'document_number' => $doc,
+                    ],
+                ],
+            ]);
+            $result['appmax']['pix_response'] = $pixResp;
+
+            // Normalização para as views (padrão legado Asaas)
+            $pixData = $pixResp['data'] ?? $pixResp;
+            if (is_array($pixData)) {
+                $encodedImage = (string) ($pixData['encodedImage'] ?? ($pixData['qr_code_base64'] ?? ($pixData['qrCodeBase64'] ?? '')));
+                $payload = (string) ($pixData['payload'] ?? ($pixData['emv'] ?? ($pixData['copy_paste'] ?? '')));
+                $expirationDate = (string) ($pixData['expirationDate'] ?? ($pixData['expires_at'] ?? ''));
+                $result['pix'] = [
+                    'encodedImage' => $encodedImage !== '' ? $encodedImage : null,
+                    'payload' => $payload !== '' ? $payload : null,
+                    'expirationDate' => $expirationDate !== '' ? $expirationDate : null,
+                ];
+            }
+            return $result;
+        }
+
+        if ($forma === 'BOLETO') {
+            $bolResp = $this->appmaxRequest('POST', '/v1/payments/boleto', [
+                'order_id' => $orderId,
+                'payment_data' => [
+                    'boleto' => [
+                        'document_number' => $doc,
+                    ],
+                ],
+            ]);
+            $result['appmax']['boleto_response'] = $bolResp;
+
+            // Normalização para as views (padrão legado Asaas)
+            $bolData = $bolResp['data'] ?? $bolResp;
+            if (is_array($bolData)) {
+                $bankSlipUrl = (string) ($bolData['bankSlipUrl'] ?? ($bolData['pdf'] ?? ($bolData['url'] ?? '')));
+                $invoiceUrl = (string) ($bolData['invoiceUrl'] ?? '');
+                $digitableLine = (string) ($bolData['digitableLine'] ?? ($bolData['linha_digitavel'] ?? ($bolData['line'] ?? '')));
+                if ($invoiceUrl !== '') {
+                    $result['invoiceUrl'] = $invoiceUrl;
+                }
+                if ($bankSlipUrl !== '') {
+                    $result['bankSlipUrl'] = $bankSlipUrl;
+                }
+                if ($digitableLine !== '') {
+                    $result['digitableLine'] = $digitableLine;
+                }
+            }
+            return $result;
+        }
+
+        if ($forma === 'CREDIT_CARD') {
+            $cc = [
+                'number' => preg_replace('/\D+/', '', (string) ($dados['card_number'] ?? '')),
+                'cvv' => (string) ($dados['card_cvv'] ?? ''),
+                'expiration_month' => (string) ($dados['card_expiry_month'] ?? ''),
+                'expiration_year' => (string) ($dados['card_expiry_year'] ?? ''),
+                'holder_document_number' => $doc,
+                'holder_name' => (string) ($dados['card_holder_name'] ?? ($dados['customer_name'] ?? '')),
+                'installments' => (int) ($dados['installments'] ?? 1),
+                'soft_descriptor' => (string) ($dados['soft_descriptor'] ?? ($this->appmaxAppId !== '' ? $this->appmaxAppId : 'BRZ')),
+            ];
+            if (!empty($dados['token'])) {
+                $cc['token'] = (string) $dados['token'];
+            }
+            if (!empty($dados['upsell_hash'])) {
+                $cc['upsell_hash'] = (string) $dados['upsell_hash'];
+            }
+
+            $ccResp = $this->appmaxRequest('POST', '/v1/payments/credit-card', [
+                'order_id' => $orderId,
+                'customer_id' => $customerId,
+                'payment_data' => [
+                    'credit_card' => $cc,
+                ],
+            ]);
+            $result['appmax']['credit_card_response'] = $ccResp;
+            return $result;
+        }
+
+        throw new \Exception('AppMax: forma de pagamento inválida');
     }
     
     private function loadConfigurations() {
@@ -26,6 +296,13 @@ class PaymentService {
         $this->stripeAmbiente = (string) $this->getConfig('pagamentos', 'stripe_ambiente', 'test');
         $this->stripeEnabled = (string) $this->getConfig('pagamentos', 'stripe_enabled', '0');
         $this->stripeWebhookSecret = (string) $this->getConfig('pagamentos', 'stripe_webhook_secret', (string) $this->getConfig('pagamentos', 'stripe_webhook_signing_secret', ''));
+
+        $this->appmaxEnabled = (string) $this->getConfig('pagamentos', 'appmax_enabled', '0');
+        $this->appmaxClientId = (string) $this->getConfig('pagamentos', 'appmax_client_id', '');
+        $this->appmaxClientSecret = (string) $this->getConfig('pagamentos', 'appmax_client_secret', '');
+        $this->appmaxAppId = (string) $this->getConfig('pagamentos', 'appmax_app_id', '');
+        $this->appmaxAccessToken = null;
+        $this->appmaxAccessTokenExpiresAt = null;
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {
@@ -42,6 +319,10 @@ class PaymentService {
                         'asaas_api_key',
                         'asaas_ambiente',
                         'asaas_enabled',
+                        'appmax_enabled',
+                        'appmax_client_id',
+                        'appmax_client_secret',
+                        'appmax_app_id',
                         'stripe_secret_key',
                         'stripe_publishable_key',
                         'stripe_ambiente',
@@ -175,7 +456,7 @@ class PaymentService {
     
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
         if ($moeda === 'BRL') {
-            return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
+            return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
         }
 
         // Stripe via Elements: o pagamento é confirmado no frontend.
@@ -347,6 +628,218 @@ class PaymentService {
         }
 
         return ['status' => 'ignored'];
+    }
+
+    public function processarWebhookAppmax($payload) {
+        $event = '';
+        foreach (['event', 'evento', 'type', 'nome', 'name'] as $k) {
+            if (!empty($payload[$k]) && is_string($payload[$k])) {
+                $event = (string) $payload[$k];
+                break;
+            }
+        }
+        $eventNorm = strtoupper(trim($event));
+
+        $data = $payload['data'] ?? $payload['payload'] ?? $payload;
+        if (!is_array($data)) {
+            $data = $payload;
+        }
+
+        $externalReference = '';
+        foreach (['external_reference', 'externalReference', 'external_key', 'externalKey', 'reference', 'pedido_id', 'order_id', 'orderId'] as $k) {
+            if (isset($data[$k]) && (is_string($data[$k]) || is_numeric($data[$k]))) {
+                $externalReference = (string) $data[$k];
+                break;
+            }
+        }
+
+        $paymentId = '';
+        foreach (['payment_id', 'paymentId', 'transaction_id', 'transactionId', 'id'] as $k) {
+            if (isset($data[$k]) && (is_string($data[$k]) || is_numeric($data[$k]))) {
+                $paymentId = (string) $data[$k];
+                break;
+            }
+        }
+
+        $internal = 'pending';
+        if (str_contains($eventNorm, 'PAGO') || str_contains($eventNorm, 'APROVADO') || str_contains($eventNorm, 'APPROVED') || str_contains($eventNorm, 'PAID')) {
+            $internal = 'approved';
+        } elseif (str_contains($eventNorm, 'ESTORN') || str_contains($eventNorm, 'REFUND')) {
+            $internal = 'refunded';
+        } elseif (str_contains($eventNorm, 'NAO AUTORIZ') || str_contains($eventNorm, 'NÃO AUTORIZ') || str_contains($eventNorm, 'NOTAUTHORIZED') || str_contains($eventNorm, 'NOT_AUTHORIZED')) {
+            $internal = 'rejected';
+        } elseif (str_contains($eventNorm, 'EXPIR')) {
+            $internal = 'rejected';
+        }
+
+        if ($paymentId !== '') {
+            $this->atualizarPagamentoPedidoPorGateway($paymentId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
+            return ['status' => 'processed', 'match' => 'payment_id'];
+        }
+
+        if ($externalReference !== '' && ctype_digit($externalReference)) {
+            $pid = (int) $externalReference;
+            if ($pid > 0) {
+                $this->atualizarPagamentoPedidoPorPedidoId($pid, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
+                return ['status' => 'processed', 'match' => 'pedido_id'];
+            }
+        }
+
+        return ['status' => 'ignored'];
+    }
+
+    private function atualizarPagamentoPedidoPorPedidoId(int $pedidoId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
+        try {
+            $db = \Config\Database::getConnection();
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+            }
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $set = [];
+            $params = ['id' => $pedidoId];
+
+            if (in_array('payment_gateway', $colsP, true)) {
+                $set[] = 'payment_gateway = :payment_gateway';
+                $params['payment_gateway'] = $gateway;
+            }
+
+            if (in_array('payment_status', $colsP, true)) {
+                $set[] = 'payment_status = :payment_status';
+                $params['payment_status'] = $paymentStatusInterno;
+            }
+
+            $aprovado = ($paymentStatusInterno === 'approved');
+            if ($aprovado && in_array('pago_em', $colsP, true)) {
+                $set[] = 'pago_em = :pago_em';
+                $params['pago_em'] = date('Y-m-d H:i:s');
+            }
+
+            if ($aprovado && in_array('status', $colsP, true)) {
+                $set[] = 'status = :status';
+                $params['status'] = 'pago';
+            }
+
+            if (!empty($set)) {
+                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $stmtUp = $db->prepare($sql);
+                $stmtUp->execute($params);
+            }
+
+            try {
+                $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
+                if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                    $updates = [];
+                    $paramsPg = ['pedido_id' => $pedidoId];
+                    foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                        if (in_array($c, $colsPg, true)) {
+                            $updates[] = "$c = :pg_status";
+                            $paramsPg['pg_status'] = $gatewayStatus !== '' ? $gatewayStatus : $paymentStatusInterno;
+                            break;
+                        }
+                    }
+                    foreach (['gateway', 'provedor', 'provider'] as $c) {
+                        if (in_array($c, $colsPg, true)) {
+                            $updates[] = "$c = :pg_gateway";
+                            $paramsPg['pg_gateway'] = $gateway;
+                            break;
+                        }
+                    }
+                    if (!empty($updates)) {
+                        $sqlPg = 'UPDATE pagamentos SET ' . implode(', ', $updates) . ' WHERE pedido_id = :pedido_id';
+                        $stmtUpPg = $db->prepare($sqlPg);
+                        $stmtUpPg->execute($paramsPg);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    private function appmaxRequestToken(): array {
+        if (empty($this->appmaxClientId) || empty($this->appmaxClientSecret)) {
+            throw new \Exception('AppMax não configurado (client_id/client_secret ausentes)');
+        }
+
+        $url = 'https://auth.appmax.com.br/oauth2/token';
+        $body = http_build_query([
+            'grant_type' => 'client_credentials',
+            'client_id' => $this->appmaxClientId,
+            'client_secret' => $this->appmaxClientSecret,
+        ]);
+
+        $headers = [
+            'Content-Type: application/x-www-form-urlencoded',
+            'Accept: application/json',
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com AppMax Auth: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro AppMax Auth HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headers),
+                'content' => $body,
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function getAppmaxAccessToken(): string {
+        $enabled = ($this->appmaxEnabled === '1' || strtolower((string) $this->appmaxEnabled) === 'true');
+        if (!$enabled) {
+            throw new \Exception('AppMax desativado');
+        }
+
+        $now = time();
+        if (!empty($this->appmaxAccessToken) && !empty($this->appmaxAccessTokenExpiresAt) && $now < ((int) $this->appmaxAccessTokenExpiresAt - 30)) {
+            return (string) $this->appmaxAccessToken;
+        }
+
+        $tok = $this->appmaxRequestToken();
+        $accessToken = (string) ($tok['access_token'] ?? '');
+        $expiresIn = (int) ($tok['expires_in'] ?? 0);
+        if ($accessToken === '') {
+            throw new \Exception('AppMax: access_token não retornado');
+        }
+
+        $this->appmaxAccessToken = $accessToken;
+        $this->appmaxAccessTokenExpiresAt = $expiresIn > 0 ? ($now + $expiresIn) : ($now + 3600);
+        return $accessToken;
     }
 
     private function mapearStatusAsaasParaInterno(string $status, string $evento = ''): string {

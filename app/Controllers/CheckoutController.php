@@ -151,6 +151,58 @@ class CheckoutController extends Controller {
                 $params['pago_em'] = $paymentResult['paid_at'];
             }
 
+            // Persistir detalhes auxiliares (quando existirem colunas no schema)
+            if (!empty($paymentResult['invoiceUrl'])) {
+                foreach (['payment_invoice_url', 'invoice_url', 'invoiceUrl'] as $c) {
+                    if (in_array($c, $colsP, true)) {
+                        $set[] = $c . ' = :invoice_url';
+                        $params['invoice_url'] = (string) $paymentResult['invoiceUrl'];
+                        break;
+                    }
+                }
+            }
+            if (!empty($paymentResult['bankSlipUrl'])) {
+                foreach (['payment_bank_slip_url', 'bank_slip_url', 'bankSlipUrl', 'boleto_url'] as $c) {
+                    if (in_array($c, $colsP, true)) {
+                        $set[] = $c . ' = :boleto_url';
+                        $params['boleto_url'] = (string) $paymentResult['bankSlipUrl'];
+                        break;
+                    }
+                }
+            }
+            if (!empty($paymentResult['digitableLine'])) {
+                foreach (['payment_digitable_line', 'digitable_line', 'digitableLine', 'linha_digitavel'] as $c) {
+                    if (in_array($c, $colsP, true)) {
+                        $set[] = $c . ' = :digitable_line';
+                        $params['digitable_line'] = (string) $paymentResult['digitableLine'];
+                        break;
+                    }
+                }
+            }
+
+            if (!empty($paymentResult['pix']) && is_array($paymentResult['pix'])) {
+                $pixImg = (string) ($paymentResult['pix']['encodedImage'] ?? '');
+                $pixPayload = (string) ($paymentResult['pix']['payload'] ?? '');
+                if ($pixImg !== '') {
+                    foreach (['payment_pix_encoded_image', 'pix_encoded_image', 'pix_qr_base64', 'pix_qr'] as $c) {
+                        if (in_array($c, $colsP, true)) {
+                            $set[] = $c . ' = :pix_encoded_image';
+                            $params['pix_encoded_image'] = $pixImg;
+                            break;
+                        }
+                    }
+                }
+                if ($pixPayload !== '') {
+                    foreach (['payment_pix_payload', 'pix_payload', 'pix_emv', 'pix_copy_paste'] as $c) {
+                        if (in_array($c, $colsP, true)) {
+                            $set[] = $c . ' = :pix_payload';
+                            $params['pix_payload'] = $pixPayload;
+                            break;
+                        }
+                    }
+                }
+            }
+
             // Se o pagamento já veio confirmado/aprovado, atualizar o status do pedido
             $statusPago = false;
             $st = strtoupper((string) ($paymentResult['status'] ?? ''));
@@ -205,7 +257,108 @@ class CheckoutController extends Controller {
             'customer_address_number' => (string) ($dados['numero'] ?? ''),
             'customer_address_complement' => (string) ($dados['complemento'] ?? ''),
             'customer_province' => (string) ($dados['bairro'] ?? ''),
+            'customer_city' => (string) ($dados['cidade'] ?? ''),
+            'customer_state' => (string) ($dados['estado'] ?? ''),
         ];
+
+        // AppMax exige o order_id/customer_id, mas aqui criamos os dois com base em:
+        // - products (itens) em centavos
+        // - products_value/shipping_value/discount_value em centavos
+        if (strtoupper(trim((string) $moeda)) === 'BRL') {
+            try {
+                $db = \Config\Database::getConnection();
+
+                $products = [];
+                $productsValueCents = 0;
+                $shippingValueCents = 0;
+                $discountValueCents = 0;
+
+                // Frete do pedido (se existir coluna)
+                try {
+                    $stmtColsP = $db->query('DESCRIBE pedidos');
+                    $colsP = $stmtColsP->fetchAll(\PDO::FETCH_COLUMN);
+                    $freteCol = null;
+                    foreach (['frete', 'valor_frete', 'shipping'] as $c) {
+                        if (is_array($colsP) && in_array($c, $colsP, true)) {
+                            $freteCol = $c;
+                            break;
+                        }
+                    }
+                    if ($freteCol) {
+                        $stmtF = $db->prepare('SELECT ' . $freteCol . ' AS frete FROM pedidos WHERE id = ? LIMIT 1');
+                        $stmtF->execute([$pedidoId]);
+                        $rowF = $stmtF->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $shippingValueCents = (int) round(((float) ($rowF['frete'] ?? 0)) * 100);
+                    }
+                } catch (\Exception $e) {
+                }
+
+                // Itens do pedido: tentar ler do pedido_itens
+                try {
+                    $stmtColsI = $db->query('DESCRIBE pedido_itens');
+                    $colsI = $stmtColsI->fetchAll(\PDO::FETCH_COLUMN);
+
+                    $colPedidoId = in_array('pedido_id', $colsI, true) ? 'pedido_id' : '';
+                    if ($colPedidoId !== '') {
+                        $colQtd = in_array('quantidade', $colsI, true) ? 'quantidade' : (in_array('qty', $colsI, true) ? 'qty' : '');
+                        $colPreco = in_array('preco_unitario', $colsI, true) ? 'preco_unitario' : (in_array('valor_unitario', $colsI, true) ? 'valor_unitario' : (in_array('price', $colsI, true) ? 'price' : ''));
+                        $colNome = in_array('nome_produto', $colsI, true) ? 'nome_produto' : (in_array('produto_nome', $colsI, true) ? 'produto_nome' : (in_array('nome', $colsI, true) ? 'nome' : ''));
+                        $colSku = in_array('nome_produto_sku', $colsI, true) ? 'nome_produto_sku' : (in_array('sku', $colsI, true) ? 'sku' : '');
+                        $colProdutoId = in_array('produto_id', $colsI, true) ? 'produto_id' : '';
+
+                        $select = ['id'];
+                        if ($colProdutoId !== '') $select[] = $colProdutoId . ' AS produto_id';
+                        if ($colQtd !== '') $select[] = $colQtd . ' AS quantidade';
+                        if ($colPreco !== '') $select[] = $colPreco . ' AS preco_unitario';
+                        if ($colNome !== '') $select[] = $colNome . ' AS nome_produto';
+                        if ($colSku !== '') $select[] = $colSku . ' AS sku';
+
+                        $stmtItens = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM pedido_itens WHERE ' . $colPedidoId . ' = ?');
+                        $stmtItens->execute([$pedidoId]);
+                        $rowsItens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        foreach ($rowsItens as $it) {
+                            $qtd = (int) ($it['quantidade'] ?? 1);
+                            if ($qtd <= 0) $qtd = 1;
+                            $preco = (float) ($it['preco_unitario'] ?? 0);
+                            $unitValueCents = (int) round($preco * 100);
+                            if ($unitValueCents <= 0) {
+                                continue;
+                            }
+                            $productsValueCents += ($unitValueCents * $qtd);
+
+                            $sku = (string) ($it['sku'] ?? '');
+                            if ($sku === '') {
+                                $pid = (int) ($it['produto_id'] ?? 0);
+                                $sku = $pid > 0 ? ('PROD_' . $pid) : ('ITEM_' . (int) ($it['id'] ?? 0));
+                            }
+
+                            $name = (string) ($it['nome_produto'] ?? '');
+                            if ($name === '') {
+                                $name = 'Item do Pedido';
+                            }
+
+                            $products[] = [
+                                'sku' => $sku,
+                                'name' => $name,
+                                'quantity' => $qtd,
+                                'unit_value' => $unitValueCents,
+                                'type' => 'physical',
+                            ];
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+
+                if (!empty($products)) {
+                    $payload['products'] = $products;
+                    $payload['products_value_cents'] = $productsValueCents;
+                    $payload['shipping_value_cents'] = $shippingValueCents;
+                    $payload['discount_value_cents'] = $discountValueCents;
+                }
+            } catch (\Exception $e) {
+            }
+        }
 
         if ($billingType === 'CREDIT_CARD') {
             $payload['card_holder_name'] = (string) ($dados['card_holder_name'] ?? '');
@@ -272,7 +425,7 @@ class CheckoutController extends Controller {
 
             foreach (['gateway', 'provedor', 'provider'] as $c) {
                 if (in_array($c, $cols, true)) {
-                    $insert[$c] = ($pedidoRow['moeda'] ?? null) === 'BRL' ? 'asaas' : 'stripe';
+                    $insert[$c] = ($pedidoRow['moeda'] ?? null) === 'BRL' ? 'appmax' : 'stripe';
                     break;
                 }
             }
@@ -626,7 +779,7 @@ class CheckoutController extends Controller {
                 }
 
                 // Processar pagamento
-                // BRL: Asaas no backend
+                // BRL: AppMax no backend
                 // USD: Stripe Elements no frontend (não coletar dados de cartão aqui)
                 $pedidoRowPay = [];
                 try {
@@ -642,7 +795,7 @@ class CheckoutController extends Controller {
                 if (strtoupper(trim($moedaPedido)) === 'BRL') {
                     try {
                         $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
-                        $gateway = 'asaas';
+                        $gateway = 'appmax';
                         $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                         $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
                     } catch (\Exception $e) {
@@ -807,17 +960,50 @@ class CheckoutController extends Controller {
 
         $paymentDetails = null;
         $pixQrCode = null;
-        try {
-            if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
-                $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
-                if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
-                    try {
-                        $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
-                    } catch (\Exception $e) {
-                    }
+
+        // AppMax: não depende de consulta externa aqui; usar dados persistidos no pedido (quando disponíveis)
+        if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'appmax') {
+            $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
+            if ($billingType === 'CARTAO_CREDITO') {
+                $billingType = 'CREDIT_CARD';
+            }
+
+            $invoiceUrl = (string) ($pedido['payment_invoice_url'] ?? ($pedido['invoice_url'] ?? ($pedido['invoiceUrl'] ?? '')));
+            $bankSlipUrl = (string) ($pedido['payment_bank_slip_url'] ?? ($pedido['bank_slip_url'] ?? ($pedido['bankSlipUrl'] ?? '')));
+            $digitableLine = (string) ($pedido['payment_digitable_line'] ?? ($pedido['digitable_line'] ?? ($pedido['digitableLine'] ?? ($pedido['linha_digitavel'] ?? ''))));
+
+            $paymentDetails = [
+                'billingType' => $billingType,
+                'invoiceUrl' => $invoiceUrl !== '' ? $invoiceUrl : null,
+                'bankSlipUrl' => $bankSlipUrl !== '' ? $bankSlipUrl : null,
+                'digitableLine' => $digitableLine !== '' ? $digitableLine : null,
+                'status' => (string) ($pedido['payment_status'] ?? ''),
+            ];
+
+            if ($billingType === 'PIX') {
+                $pixImg = (string) ($pedido['payment_pix_encoded_image'] ?? ($pedido['pix_encoded_image'] ?? ($pedido['pix_qr_base64'] ?? ($pedido['pix_qr'] ?? ''))));
+                $pixPayload = (string) ($pedido['payment_pix_payload'] ?? ($pedido['pix_payload'] ?? ($pedido['pix_emv'] ?? ($pedido['pix_copy_paste'] ?? ''))));
+                if ($pixImg !== '' || $pixPayload !== '') {
+                    $pixQrCode = [
+                        'encodedImage' => $pixImg !== '' ? $pixImg : null,
+                        'payload' => $pixPayload !== '' ? $pixPayload : null,
+                    ];
                 }
             }
-        } catch (\Exception $e) {
+        } else {
+            // Legado Asaas
+            try {
+                if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                    if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                        try {
+                            $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
         }
         
         $this->view('checkout/conclusao', [

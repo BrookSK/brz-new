@@ -26,6 +26,21 @@ class WebhookController extends Controller {
         }
     }
 
+    public function appmax(Request $request) {
+        $raw = file_get_contents('php://input');
+        $payload = json_decode((string) $raw, true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        try {
+            $result = $this->paymentService->processarWebhookAppmax($payload);
+            $this->json(['success' => true, 'result' => $result]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function stripe(Request $request) {
         $raw = file_get_contents('php://input');
         $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';

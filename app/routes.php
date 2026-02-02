@@ -288,6 +288,7 @@ $router->post('/admin/testar-email-template', 'AdminNotificacoesController', 'te
 // Webhooks
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
 $router->post('/webhook/stripe', 'WebhookController', 'stripe');
+$router->post('/webhook/appmax', 'WebhookController', 'appmax');
 
 // API
 $router->get('/api/produtos/buscar', 'ApiController', 'buscarProdutos');

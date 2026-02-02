@@ -1053,6 +1053,21 @@ class AdminPedidosController extends Controller {
 
         try {
             $paymentService = new PaymentService();
+
+            $pedido = null;
+            try {
+                $pedidoModel = new PedidoEcommerce();
+                $pedido = $pedidoModel->getComDetalhes($id);
+            } catch (\Exception $e) {
+                $pedido = null;
+            }
+
+            $gateway = is_array($pedido) ? (string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? '')) : '';
+            if ($gateway !== 'asaas') {
+                header('Location: /admin/pedidos/detalhes/' . $id . '?reemitido=0');
+                exit;
+            }
+
             $paymentService->reemitirCobrancaAsaasPorPedido($id);
             header('Location: /admin/pedidos/detalhes/' . $id . '?reemitido=1');
             exit;

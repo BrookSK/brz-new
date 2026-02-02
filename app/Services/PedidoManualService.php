@@ -739,7 +739,7 @@ class PedidoManualService {
         }
 
         if ($moeda !== 'BRL') {
-            throw new \Exception('Pedido manual para Asaas deve estar em BRL');
+            throw new \Exception('Pedido manual para AppMax deve estar em BRL');
         }
 
         $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedidoId);
@@ -764,10 +764,10 @@ class PedidoManualService {
         $statusGateway = (string) ($result['status'] ?? '');
 
         if ($paymentId === '') {
-            throw new \Exception('Asaas: payment_id não retornado');
+            throw new \Exception('AppMax: payment_id não retornado');
         }
 
-        $this->persistirPagamentoNoPedido($pedidoId, $result);
+        $this->persistirPagamentoNoPedido($pedidoId, $result, 'appmax');
 
         $itens = $this->obterItensPedidoManualParaWebhook($pedidoId, $moeda);
 
@@ -789,7 +789,7 @@ class PedidoManualService {
             ],
             'itens' => $itens,
             'pagamento' => [
-                'gateway' => 'asaas',
+                'gateway' => 'appmax',
                 'payment_id' => $paymentId,
                 'invoice_url' => $invoiceUrl,
                 'billing_type' => $billingType,
