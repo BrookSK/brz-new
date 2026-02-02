@@ -108,7 +108,13 @@ class AdminPedidosManualController extends Controller {
 
         renderAdminSidebarStyles();
 
-        echo '</head>
+        echo '<style>
+            #itensTable .prodResults { max-height: 420px !important; }
+            #itensTable .prodResults .list-group-item { white-space: normal; }
+            #itensTable td { overflow: visible; }
+            #itensTable { overflow: visible; }
+            .table-responsive { overflow: visible !important; }
+        </style></head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -364,7 +370,7 @@ function addItemRow(){
                 <div class="flex-grow-1">
                     <input type="hidden" class="produtoIdInp" name="produto_id[]" value="" required>
                     <input type="text" class="form-control form-control-sm produtoSearch" placeholder="Buscar produto..." autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
-                    <div class="list-group position-absolute w-100 prodResults" style="z-index: 1050; display:none; max-height: 280px; overflow:auto;"></div>
+                    <div class="list-group position-absolute w-100 prodResults" style="z-index: 1050; display:none; max-height: 420px; overflow:auto;"></div>
                 </div>
             </div>
         </td>

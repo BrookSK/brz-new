@@ -49,6 +49,9 @@
                         <a class="nav-link active mb-2" href="/meus-pedidos">
                             <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
                         </a>
+                        <a class="nav-link mb-2" href="/meus-pedidos?tab=comissoes">
+                            <i class="fas fa-percentage me-2"></i> Comissões
+                        </a>
                         <a class="nav-link mb-2" href="/carrinho">
                             <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
                             <?php if (!empty($_SESSION['carrinho'])): ?>
@@ -626,6 +629,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    }
+
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const tab = (params.get('tab') || '').toLowerCase();
+        if (tab === 'comissoes') {
+            const tabBtn = document.getElementById('tab-comissoes');
+            if (tabBtn) {
+                tabBtn.click();
+            }
+        }
+    } catch (e) {
     }
 });
 
