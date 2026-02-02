@@ -416,6 +416,18 @@ class PedidoManualService {
             $moeda = 'BRL';
         }
 
+        if ($formaPagamento !== null) {
+            $fpNorm = trim((string) $formaPagamento);
+            if ($fpNorm === 'pagdev') {
+                // ok para testes em qualquer moeda
+            } elseif ($fpNorm === 'nomad_transferencia' && $moeda !== 'USD') {
+                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
+            }
+            if ($fpNorm === 'appmax_pix' && $moeda !== 'BRL') {
+                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
+            }
+        }
+
         $colsPedidos = $this->getCols('pedidos');
         if (empty($colsPedidos)) {
             throw new \Exception('Tabela pedidos não encontrada');

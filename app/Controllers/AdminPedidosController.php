@@ -1141,6 +1141,19 @@ class AdminPedidosController extends Controller {
             ];
         }
 
+        foreach (['USD', 'BRL'] as $mBase) {
+            if (!isset($porMoeda[$mBase]) || !is_array($porMoeda[$mBase])) {
+                $porMoeda[$mBase] = [
+                    'total_faturado' => 0.0,
+                    'total_custo_produtos' => 0.0,
+                    'total_liquido' => 0.0,
+                    'percentual_comissao' => 0.0,
+                    'valor_comissao' => 0.0,
+                    'pedidos' => [],
+                ];
+            }
+        }
+
         $formatMoney = function (float $v, string $moeda): string {
             $moeda = strtoupper(trim($moeda));
             if ($moeda === 'USD') {

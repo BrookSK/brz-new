@@ -251,6 +251,7 @@ class AdminPedidosManualController extends Controller {
                                     <option value="" selected>Online (link de pagamento)</option>
                                     <option value="nomad_transferencia">Nomad (transferência USD)</option>
                                     <option value="appmax_pix">AppMax - Pix (BRL)</option>
+                                    <option value="pagdev">PagDev (teste)</option>
                                 </select>
                                 <div class="form-text">Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
                             </div>
@@ -908,16 +909,39 @@ function gerarLinkPagamento(){
 
 document.addEventListener('DOMContentLoaded', function(){
     const moedaSel = document.getElementById('moeda');
+    const fpSel = document.getElementById('forma_pagamento');
+
+    function updateManualPaymentMethodsForCurrency(){
+        if (!fpSel) return;
+        const moeda = getSelectedMoeda();
+        const prev = String(fpSel.value || '');
+
+        fpSel.innerHTML = '';
+        if (moeda === 'BRL') {
+            fpSel.appendChild(new Option('Online (link de pagamento - Asaas)', ''));
+            fpSel.appendChild(new Option('AppMax - Pix (BRL)', 'appmax_pix'));
+            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
+        } else {
+            fpSel.appendChild(new Option('Online (link de pagamento - Stripe)', ''));
+            fpSel.appendChild(new Option('Nomad (transferência USD)', 'nomad_transferencia'));
+            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
+        }
+
+        const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
+        fpSel.value = stillValid ? prev : 'pagdev';
+    }
+
     if (moedaSel) {
         moedaSel.value = (EXISTING_PEDIDO && String(EXISTING_PEDIDO.moeda || '').toUpperCase() === 'BRL') ? 'BRL' : 'USD';
         moedaSel.addEventListener('change', function(){
             const g = document.getElementById('gatewayLabel');
             if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Asaas' : 'Stripe';
+            updateManualPaymentMethodsForCurrency();
+            try { refreshOffline(); } catch (e) {}
             calcTotal();
         });
     }
 
-    const fpSel = document.getElementById('forma_pagamento');
     const offlineWrap = document.getElementById('offlineInfoWrap');
     const offlineBox = document.getElementById('offlineInfoBox');
     const refreshOffline = function(){
@@ -946,6 +970,7 @@ document.addEventListener('DOMContentLoaded', function(){
     };
     if (fpSel) {
         fpSel.addEventListener('change', refreshOffline);
+        updateManualPaymentMethodsForCurrency();
         refreshOffline();
     }
 
