@@ -337,7 +337,8 @@ class AdminProdutosNovoController extends Controller {
                 </div>
               </form>';
 
-        echo '      </div>
+        echo <<<'HTML'
+      </div>
             </div>
             </main>
         </div>
@@ -453,7 +454,8 @@ class AdminProdutosNovoController extends Controller {
 })();
 </script>
 </body>
-</html>';
+</html>
+HTML;
 
         exit;
     }
