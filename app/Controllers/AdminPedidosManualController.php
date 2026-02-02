@@ -1040,12 +1040,14 @@ document.addEventListener('DOMContentLoaded', function(){
                         throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
                     }
 
-                    PEDIDO_ID = Number(resp.pedidoId || resp.id || 0);
+                    PEDIDO_ID = Number(resp.pedidoId || resp.pedido_id || resp.id || 0);
 
                     const fp = fpSel ? String(fpSel.value || '') : '';
                     if (fp === 'nomad_transferencia' || fp === 'appmax_pix') {
-                        window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
-                        return;
+                        if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
+                            window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
+                            return;
+                        }
                     }
                     if (!PEDIDO_ID) {
                         throw new Error('Pedido inválido');

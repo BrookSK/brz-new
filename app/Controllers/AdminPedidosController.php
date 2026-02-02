@@ -756,7 +756,20 @@ class AdminPedidosController extends Controller {
                                             $hasDocs = false;
                                         }
 
-                                        if ($hasDocs) {
+                                        // Pagamentos offline exigem comprovante; bloquear status por padrão.
+                                        $statusBloqueadoPorComprovante = true;
+
+                                        echo '<hr>';
+                                        echo '<div class="mb-3" id="comprovante">'
+                                            . '<h6 class="mb-2">Comprovante de Pagamento</h6>';
+
+                                        if (!$hasDocs) {
+                                            echo '<div class="alert alert-warning">'
+                                                . '<div><strong>Aguardando comprovante.</strong> Para anexar, é necessário criar a tabela <code>pedidos_pagamento_documentos</code>.</div>'
+                                                . '<div class="small mt-2">Rode as migrations: <strong>055_create_pedidos_pagamento_documentos.sql</strong> e <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong>.</div>'
+                                                . '</div>';
+                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>Anexar comprovante</button>';
+                                        } else {
                                             $doc = null;
                                             try {
                                                 $st = $pdo->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
@@ -767,15 +780,12 @@ class AdminPedidosController extends Controller {
                                                 $doc = null;
                                             }
 
-                                            $docStatus = strtolower((string) (($doc['status'] ?? '') ?: 'pendente_upload'));
-                                            $docPath = (string) ($doc['arquivo_path'] ?? '');
-                                            $docUploadedAt = (string) ($doc['uploaded_at'] ?? '');
+                                            $docArr = is_array($doc) ? $doc : [];
+                                            $docStatus = strtolower((string) (($docArr['status'] ?? '') ?: 'pendente_upload'));
+                                            $docPath = (string) ($docArr['arquivo_path'] ?? '');
+                                            $docUploadedAt = (string) ($docArr['uploaded_at'] ?? '');
 
                                             $statusBloqueadoPorComprovante = !($docStatus === 'ok' && $docPath !== '');
-
-                                            echo '<hr>';
-                                            echo '<div class="mb-3" id="comprovante">'
-                                                . '<h6 class="mb-2">Comprovante de Pagamento</h6>';
 
                                             if ($docStatus === 'ok' && $docPath !== '') {
                                                 echo '<div class="alert alert-success">'
@@ -785,18 +795,18 @@ class AdminPedidosController extends Controller {
                                                     . '</div>';
                                             } else {
                                                 echo '<div class="alert alert-warning">'
-                                                    . '<div><strong>Pendente de comprovante.</strong> Faça o upload para que possamos alterar o status para pago.</div>'
+                                                    . '<div><strong>Aguardando comprovante.</strong> Anexe o arquivo para liberar a edição do status.</div>'
                                                     . '</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<div class="mb-2">'
                                                     . '<input class="form-control" type="file" name="comprovante" required>'
                                                     . '</div>'
-                                                    . '<button type="submit" class="btn btn-sm btn-primary">Enviar comprovante</button>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar comprovante</button>'
                                                     . '</form>';
                                             }
-
-                                            echo '</div>';
                                         }
+
+                                        echo '</div>';
                                     }
 
                                 echo '</div>
