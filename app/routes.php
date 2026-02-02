@@ -236,6 +236,7 @@ $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/comissoes', 'AdminPedidosController', 'comissoes');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
+$router->post('/admin/pedidos/upload-comprovante/{id}', 'AdminPedidosController', 'uploadComprovante');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
 $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
@@ -255,6 +256,13 @@ $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController'
 // Pagamentos
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');
 $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', 'confirmarPagamento');
+
+// Comissões gerais
+$router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
+$router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');
+$router->post('/admin/pagamentos/comissoes-gerais/pagamento', 'AdminPagamentosController', 'criarPagamentoComissaoGeral');
+$router->post('/admin/pagamentos/comissoes-gerais/aprovar/{id}', 'AdminPagamentosController', 'aprovarPagamentoComissaoGeral');
+$router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamentosController', 'deletarPagamentoComissaoGeral');
 
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');

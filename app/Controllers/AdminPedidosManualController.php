@@ -232,7 +232,32 @@ class AdminPedidosManualController extends Controller {
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Moeda</label>
-                                <input type="text" class="form-control" name="moeda" value="BRL" readonly>
+                                <select class="form-select" name="moeda" id="moeda">
+                                    <option value="USD" selected>Dólar (USD)</option>
+                                    <option value="BRL">Real (BRL)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header"><strong>Pagamento</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Método de Pagamento</label>
+                                <select class="form-select" name="forma_pagamento" id="forma_pagamento">
+                                    <option value="" selected>Online (link de pagamento)</option>
+                                    <option value="nomad_transferencia">Nomad (transferência USD)</option>
+                                    <option value="appmax_pix">AppMax - Pix (BRL)</option>
+                                    <option value="pagdev">PagDev (teste)</option>
+                                </select>
+                                <div class="form-text">Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
+                            </div>
+                            <div class="col-md-6" id="offlineInfoWrap" style="display:none;">
+                                <label class="form-label">Instruções</label>
+                                <div class="alert alert-warning mb-0" id="offlineInfoBox"></div>
                             </div>
                         </div>
                     </div>
@@ -281,13 +306,13 @@ class AdminPedidosManualController extends Controller {
                             <div class="col-md-3">
                                 <div class="border rounded p-3 h-100">
                                     <div class="text-muted small">Subtotal</div>
-                                    <div class="fs-5 fw-bold">R$ <span id="resumoSubtotal">0.00</span></div>
+                                    <div class="fs-5 fw-bold"><span id="resumoMoedaSymbol">$</span> <span id="resumoSubtotal">0.00</span></div>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="border rounded p-3 h-100">
                                     <div class="text-muted small">Total</div>
-                                    <div class="fs-5 fw-bold">R$ <span id="resumoTotal">0.00</span></div>
+                                    <div class="fs-5 fw-bold"><span id="resumoMoedaSymbol2">$</span> <span id="resumoTotal">0.00</span></div>
                                 </div>
                             </div>
                         </div>
@@ -298,20 +323,20 @@ class AdminPedidosManualController extends Controller {
                             <div class="col-md-6 offset-md-6">
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Taxa de Serviço</span>
-                                    <span>R$ <span id="resumoTaxaServico">0.00</span></span>
+                                    <span><span id="resumoMoedaSymbol3">$</span> <span id="resumoTaxaServico">0.00</span></span>
                                 </div>
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Impostos</span>
-                                    <span>R$ <span id="resumoImpostos">0.00</span></span>
+                                    <span><span id="resumoMoedaSymbol4">$</span> <span id="resumoImpostos">0.00</span></span>
                                 </div>
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Frete</span>
-                                    <span>R$ <span id="resumoFrete">0.00</span></span>
+                                    <span id="resumoFreteWrap"><span id="resumoMoedaSymbol5">$</span> <span id="resumoFrete">0.00</span></span>
                                 </div>
                                 <hr>
                                 <div class="d-flex justify-content-between">
                                     <strong>Total</strong>
-                                    <strong>R$ <span id="resumoTotal2">0.00</span></strong>
+                                    <strong><span id="resumoMoedaSymbol6">$</span> <span id="resumoTotal2">0.00</span></strong>
                                 </div>
                             </div>
                         </div>
@@ -337,10 +362,10 @@ class AdminPedidosManualController extends Controller {
                 <div id="orcamentoResult" style="display:none;"></div>
             </form>
 
-            <div class="card mb-4">
-                <div class="card-header"><strong>Pagamento (Asaas)</strong></div>
+            <div class="card mb-4" id="linkPagamentoCard">
+                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Stripe</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4">
                             <label class="form-label">Billing Type</label>
@@ -368,7 +393,9 @@ class AdminPedidosManualController extends Controller {
         echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
         echo 'const EXISTING_PEDIDO = ' . json_encode($existingPedido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
-        echo 'const TAXA_SERVICO_POR_KG = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const TAXA_SERVICO_POR_KG_BRL = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const TAXA_SERVICO_POR_KG_USD = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgUSD(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const USD_BRL_RATE = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaConversaoUSDBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
 
@@ -396,12 +423,33 @@ function buildProdutoOptions(){
     return html;
 }
 
+function getSelectedMoeda(){
+    const sel = document.getElementById('moeda');
+    const m = sel ? String(sel.value || '').toUpperCase() : 'USD';
+    return m === 'BRL' ? 'BRL' : 'USD';
+}
+
+function getSymbol(m){
+    return m === 'BRL' ? 'R$' : '$';
+}
+
+function formatForDisplay(value, moeda){
+    const n = Number(value || 0);
+    if (moeda === 'BRL') {
+        return n.toFixed(2).replace('.', ',');
+    }
+    return n.toFixed(2);
+}
+
 function produtoLabel(p){
     const name = (p && p.name) ? String(p.name) : '';
     const sku = (p && p.sku) ? String(p.sku) : '';
     const price = (p && p.price) ? Number(p.price) : 0;
     const partSku = sku ? ` (${sku})` : '';
-    return `${name}${partSku} - R$ ${formatMoney(price)}`;
+    const moeda = getSelectedMoeda();
+    const sym = getSymbol(moeda);
+    const shown = moeda === 'BRL' ? (price * Number(USD_BRL_RATE || 1)) : price;
+    return `${name}${partSku} - ${sym} ${formatForDisplay(shown, moeda)}`;
 }
 
 function produtoImagem(p){
@@ -564,13 +612,16 @@ function selectProdutoFromSearch(btn, produtoId){
 }
 
 function calcTotal(){
+    const moeda = getSelectedMoeda();
+    const sym = getSymbol(moeda);
     let subtotal = 0;
     let pesoTotal = 0;
     let qtdItens = 0;
     const rows = document.querySelectorAll('#itensTable tbody tr');
     rows.forEach(r => {
         const qtd = Number(r.querySelector('.qtdInp')?.value || 0);
-        const val = Number(String(r.querySelector('.valorInp')?.value || '0').replace(',', '.'));
+        const raw = String(r.querySelector('.valorInp')?.value || '0');
+        const val = Number(moeda === 'BRL' ? raw.replace('.', '').replace(',', '.') : raw.replace(',', '.'));
         const pid = Number(r.querySelector('.produtoIdInp')?.value || 0);
         const prod = PRODUTOS.find(p => Number(p.id) === pid);
         const peso = prod ? Number(prod.peso || 0) : 0;
@@ -584,7 +635,8 @@ function calcTotal(){
     const frete = 0;
     // Cobrança padrão: taxa de serviço usa peso arredondado para cima
     const pesoParaTaxa = Math.ceil(pesoTotal);
-    const taxaServico = (Number(TAXA_SERVICO_POR_KG || 0) > 0) ? (pesoParaTaxa * Number(TAXA_SERVICO_POR_KG)) : 0;
+    const taxaKg = moeda === 'BRL' ? Number(TAXA_SERVICO_POR_KG_BRL || 0) : Number(TAXA_SERVICO_POR_KG_USD || 0);
+    const taxaServico = (taxaKg > 0) ? (pesoParaTaxa * taxaKg) : 0;
     const baseImpostos = subtotal + frete;
     const icms = (Number(ALIQUOTA_ICMS || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_ICMS) / 100)) : 0;
     const ipi = (Number(ALIQUOTA_IPI || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_IPI) / 100)) : 0;
@@ -593,12 +645,22 @@ function calcTotal(){
 
     document.getElementById('resumoQtdItens').textContent = String(qtdItens);
     document.getElementById('resumoPeso').textContent = formatPeso(pesoTotal);
-    document.getElementById('resumoSubtotal').textContent = formatMoney(subtotal);
-    document.getElementById('resumoTaxaServico').textContent = formatMoney(taxaServico);
-    document.getElementById('resumoImpostos').textContent = formatMoney(impostos);
-    document.getElementById('resumoFrete').textContent = formatMoney(frete);
-    document.getElementById('resumoTotal').textContent = formatMoney(total);
-    document.getElementById('resumoTotal2').textContent = formatMoney(total);
+    const setSym = (id) => { const el = document.getElementById(id); if (el) el.textContent = sym; };
+    ['resumoMoedaSymbol','resumoMoedaSymbol2','resumoMoedaSymbol3','resumoMoedaSymbol4','resumoMoedaSymbol5','resumoMoedaSymbol6'].forEach(setSym);
+
+    document.getElementById('resumoSubtotal').textContent = formatForDisplay(subtotal, moeda);
+    document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
+    document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
+    const freteWrap = document.getElementById('resumoFreteWrap');
+    if (Number(frete) <= 0) {
+        if (freteWrap) freteWrap.textContent = 'Frete grátis';
+    } else {
+        if (freteWrap) freteWrap.innerHTML = `<span id="resumoMoedaSymbol5">${escapeHtml(sym)}</span> <span id="resumoFrete">${escapeHtml(formatForDisplay(frete, moeda))}</span>`;
+        const rf = document.getElementById('resumoFrete');
+        if (rf) rf.textContent = formatForDisplay(frete, moeda);
+    }
+    document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
+    document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
 
     const setVal = (id, v) => {
         const el = document.getElementById(id);
@@ -674,7 +736,7 @@ function gerarMensagemOrcamento(){
     msg += `- Peso total: ${Number(pesoTotal || 0).toFixed(3)} kg\n`;
     msg += `- Taxa de serviço: ${formatBRL(taxaServico)}\n`;
     msg += `- Impostos: ${formatBRL(impostos)}\n`;
-    msg += `- Frete: ${formatBRL(frete)}\n`;
+    msg += `- Frete: ${Number(frete || 0) <= 0 ? 'Frete grátis' : formatBRL(frete)}\n`;
     msg += `- Total: ${formatBRL(total)}\n\n`;
     msg += `Se desejar, posso gerar o link de pagamento e te enviar aqui.\n`;
 
@@ -846,6 +908,90 @@ function gerarLinkPagamento(){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
+    const moedaSel = document.getElementById('moeda');
+    const fpSel = document.getElementById('forma_pagamento');
+    const linkCard = document.getElementById('linkPagamentoCard');
+    const linkInfo = document.getElementById('linkPagamentoInfo');
+    const linkResult = document.getElementById('linkResult');
+
+    function updateManualPaymentMethodsForCurrency(){
+        if (!fpSel) return;
+        const moeda = getSelectedMoeda();
+        const prev = String(fpSel.value || '');
+
+        fpSel.innerHTML = '';
+        if (moeda === 'BRL') {
+            fpSel.appendChild(new Option('Online (link de pagamento - Asaas)', ''));
+            fpSel.appendChild(new Option('AppMax - Pix (BRL)', 'appmax_pix'));
+            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
+        } else {
+            fpSel.appendChild(new Option('Online (link de pagamento - Stripe)', ''));
+            fpSel.appendChild(new Option('Nomad (transferência USD)', 'nomad_transferencia'));
+            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
+        }
+
+        const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
+        fpSel.value = stillValid ? prev : 'pagdev';
+    }
+
+    if (moedaSel) {
+        moedaSel.value = (EXISTING_PEDIDO && String(EXISTING_PEDIDO.moeda || '').toUpperCase() === 'BRL') ? 'BRL' : 'USD';
+        moedaSel.addEventListener('change', function(){
+            const g = document.getElementById('gatewayLabel');
+            if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Asaas' : 'Stripe';
+            updateManualPaymentMethodsForCurrency();
+            try { refreshOffline(); } catch (e) {}
+            calcTotal();
+        });
+    }
+
+    const offlineWrap = document.getElementById('offlineInfoWrap');
+    const offlineBox = document.getElementById('offlineInfoBox');
+    const refreshOffline = function(){
+        const v = fpSel ? String(fpSel.value || '') : '';
+        const moeda = getSelectedMoeda();
+        if (!offlineWrap || !offlineBox) return;
+        if (v === 'nomad_transferencia') {
+            offlineWrap.style.display = 'block';
+            offlineBox.textContent = 'Pagamento via transferência (USD) - Nomad. Após o depósito, anexe o comprovante no pedido para que possamos alterar o status para pago.';
+        } else if (v === 'appmax_pix') {
+            offlineWrap.style.display = 'block';
+            offlineBox.textContent = 'Pagamento via Pix (BRL) - AppMax. Após o pagamento, anexe o comprovante no pedido para que possamos alterar o status para pago.';
+        } else {
+            offlineWrap.style.display = 'none';
+            offlineBox.textContent = '';
+        }
+
+        // Pagamentos offline não devem gerar link
+        const isOffline = (v === 'nomad_transferencia' || v === 'appmax_pix');
+        if (linkCard) {
+            linkCard.style.display = isOffline ? 'none' : '';
+        }
+        if (linkInfo) {
+            linkInfo.style.display = isOffline ? 'none' : '';
+        }
+        if (linkResult && isOffline) {
+            linkResult.style.display = 'none';
+            linkResult.innerHTML = '';
+        }
+
+        // Ajuste simples: se método exige moeda, mantém compatibilidade de seleção
+        if (v === 'nomad_transferencia' && moeda !== 'USD') {
+            if (moedaSel) moedaSel.value = 'USD';
+        }
+        if (v === 'appmax_pix' && moeda !== 'BRL') {
+            if (moedaSel) moedaSel.value = 'BRL';
+        }
+        try { calcTotal(); } catch (e) {}
+    };
+    if (fpSel) {
+        fpSel.addEventListener('change', refreshOffline);
+        updateManualPaymentMethodsForCurrency();
+        refreshOffline();
+    }
+
+    const g = document.getElementById('gatewayLabel');
+    if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Asaas' : 'Stripe';
     if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
         const sel = document.getElementById('cliente_id');
         if (sel) {
@@ -893,7 +1039,16 @@ document.addEventListener('DOMContentLoaded', function(){
                     if (!resp || !resp.success) {
                         throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
                     }
-                    PEDIDO_ID = Number(resp.pedido_id || resp.pedidoId || 0);
+
+                    PEDIDO_ID = Number(resp.pedidoId || resp.pedido_id || resp.id || 0);
+
+                    const fp = String(fd.get('forma_pagamento') || (fpSel ? String(fpSel.value || '') : ''));
+                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix') {
+                        if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
+                            window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
+                            return;
+                        }
+                    }
                     if (!PEDIDO_ID) {
                         throw new Error('Pedido inválido');
                     }
@@ -934,7 +1089,8 @@ JS;
     public function salvar(Request $request) {
         try {
             $clienteId = (int) $request->getParam('cliente_id');
-            $moeda = (string) $request->getParam('moeda', 'BRL');
+            $moeda = (string) $request->getParam('moeda', 'USD');
+            $formaPagamento = (string) $request->getParam('forma_pagamento', '');
 
             $resumo = [
                 'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
@@ -980,7 +1136,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
@@ -993,7 +1149,8 @@ JS;
     public function criar(Request $request) {
         try {
             $clienteId = (int) $request->getParam('cliente_id');
-            $moeda = (string) $request->getParam('moeda', 'BRL');
+            $moeda = (string) $request->getParam('moeda', 'USD');
+            $formaPagamento = (string) $request->getParam('forma_pagamento', '');
 
             $resumo = [
                 'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
@@ -1039,7 +1196,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
@@ -1052,7 +1209,7 @@ JS;
             $billingType = (string) $request->getParam('billingType', 'BOLETO');
 
             $svc = new PedidoManualService();
-            $result = $svc->gerarLinkPagamentoAsaasPedidoManual($pedidoId, $billingType);
+            $result = $svc->gerarLinkPagamentoPedidoManual($pedidoId, $billingType);
             $this->json($result);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);

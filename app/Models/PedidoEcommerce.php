@@ -480,6 +480,14 @@ class PedidoEcommerce extends Model {
             }
         }
 
+        $moedaCol = null;
+        foreach (['moeda', 'currency', 'moeda_original'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $moedaCol = $c;
+                break;
+            }
+        }
+
         $statusCol = null;
         foreach (['status', 'payment_status', 'status_pagamento', 'pagamento_status'] as $c) {
             if (in_array($c, $colsP, true)) {
@@ -511,6 +519,9 @@ class PedidoEcommerce extends Model {
             $select[] = 'created_at';
         }
         $select[] = $totalCol . ' AS total_valor';
+        if ($moedaCol) {
+            $select[] = $moedaCol . ' AS moeda';
+        }
 
         $stmt = $this->connection->prepare('SELECT ' . implode(', ', $select) . " FROM pedidos WHERE {$where} ORDER BY " . (in_array('created_at', $colsP, true) ? 'created_at' : 'id') . ' DESC');
         $stmt->execute([':uid' => $usuarioId, ':origem' => 'manual']);
@@ -577,9 +588,24 @@ class PedidoEcommerce extends Model {
             }
         }
 
-        $totalFaturado = 0.0;
+        $totaisPorMoeda = [];
         foreach ($pedidos as $p) {
-            $totalFaturado += (float) ($p['total_valor'] ?? 0);
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            if (!isset($totaisPorMoeda[$m])) {
+                $totaisPorMoeda[$m] = [
+                    'total_faturado' => 0.0,
+                    'total_custo_produtos' => 0.0,
+                    'total_liquido' => 0.0,
+                    'percentual_comissao' => 0.0,
+                    'valor_comissao' => 0.0,
+                    'pedidos' => [],
+                ];
+            }
+            $totaisPorMoeda[$m]['total_faturado'] += (float) ($p['total_valor'] ?? 0);
         }
 
         $totalCusto = 0.0;
@@ -607,33 +633,64 @@ class PedidoEcommerce extends Model {
             }
         }
 
-        $totalLiquido = $totalFaturado - $totalCusto;
+        foreach ($pedidos as $p) {
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            $pid = (int) ($p['id'] ?? 0);
+            $totaisPorMoeda[$m]['total_custo_produtos'] += (float) ($custoPorPedido[$pid] ?? 0);
+        }
+
         $faixas = $this->getFaixasComissaoManual();
-        $percent = $this->calcularPercentualComissaoManual($totalFaturado, $faixas);
-        $valorComissao = $totalLiquido * ($percent / 100.0);
+        foreach ($totaisPorMoeda as $m => &$t) {
+            $t['total_liquido'] = (float) $t['total_faturado'] - (float) $t['total_custo_produtos'];
+            $percent = $this->calcularPercentualComissaoManual((float) $t['total_faturado'], $faixas);
+            $t['percentual_comissao'] = (float) $percent;
+            $t['valor_comissao'] = (float) $t['total_liquido'] * ($percent / 100.0);
+        }
+        unset($t);
 
         $pedidosOut = [];
         foreach ($pedidos as $p) {
             $pid = (int) ($p['id'] ?? 0);
             $fat = (float) ($p['total_valor'] ?? 0);
             $custo = (float) ($custoPorPedido[$pid] ?? 0);
-            $pedidosOut[] = [
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            $row = [
                 'id' => $pid,
                 'codigo' => (string) ($p['codigo_ref'] ?? $pid),
                 'created_at' => (string) ($p['created_at'] ?? ''),
                 'faturado' => $fat,
                 'custo' => $custo,
                 'liquido' => $fat - $custo,
+                'moeda' => $m,
             ];
+            $pedidosOut[] = $row;
+            if (!isset($totaisPorMoeda[$m]['pedidos']) || !is_array($totaisPorMoeda[$m]['pedidos'])) {
+                $totaisPorMoeda[$m]['pedidos'] = [];
+            }
+            $totaisPorMoeda[$m]['pedidos'][] = $row;
         }
+
+        $moedas = array_keys($totaisPorMoeda);
+        $principal = $moedas[0] ?? 'BRL';
+        $pTot = $totaisPorMoeda[$principal] ?? ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0];
 
         return [
             'pedidos' => $pedidosOut,
-            'total_faturado' => (float) $totalFaturado,
-            'total_custo_produtos' => (float) $totalCusto,
-            'total_liquido' => (float) $totalLiquido,
-            'percentual_comissao' => (float) $percent,
-            'valor_comissao' => (float) $valorComissao,
+            'por_moeda' => $totaisPorMoeda,
+            'moeda_principal' => $principal,
+            'total_faturado' => (float) ($pTot['total_faturado'] ?? 0),
+            'total_custo_produtos' => (float) ($pTot['total_custo_produtos'] ?? 0),
+            'total_liquido' => (float) ($pTot['total_liquido'] ?? 0),
+            'percentual_comissao' => (float) ($pTot['percentual_comissao'] ?? 0),
+            'valor_comissao' => (float) ($pTot['valor_comissao'] ?? 0),
             'faixas' => $faixas,
         ];
     }
@@ -676,6 +733,14 @@ class PedidoEcommerce extends Model {
         foreach (['valor_total', 'total', 'amount', 'valor'] as $c) {
             if (in_array($c, $colsP, true)) {
                 $totalCol = $c;
+                break;
+            }
+        }
+
+        $moedaCol = null;
+        foreach (['moeda', 'currency', 'moeda_original'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $moedaCol = $c;
                 break;
             }
         }
@@ -722,6 +787,9 @@ class PedidoEcommerce extends Model {
             $select[] = 'created_at';
         }
         $select[] = $totalCol . ' AS total_valor';
+        if ($moedaCol) {
+            $select[] = $moedaCol . ' AS moeda';
+        }
 
         $stmt = $this->connection->prepare('SELECT ' . implode(', ', $select) . " FROM pedidos WHERE {$where} ORDER BY " . (in_array('created_at', $colsP, true) ? 'created_at' : 'id') . ' DESC');
         $stmt->execute([':aid' => $adminId, ':origem' => 'manual']);
@@ -789,9 +857,25 @@ class PedidoEcommerce extends Model {
             }
         }
 
-        $totalFaturado = 0.0;
+        $totaisPorMoeda = [];
         foreach ($pedidos as $p) {
-            $totalFaturado += (float) ($p['total_valor'] ?? 0);
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            if (!isset($totaisPorMoeda[$m])) {
+                $totaisPorMoeda[$m] = [
+                    'total_faturado' => 0.0,
+                    'total_custo_produtos' => 0.0,
+                    'total_liquido' => 0.0,
+                    'percentual_comissao' => 0.0,
+                    'valor_comissao' => 0.0,
+                    'faixas' => $this->getFaixasComissaoManual(),
+                    'pedidos' => [],
+                ];
+            }
+            $totaisPorMoeda[$m]['total_faturado'] += (float) ($p['total_valor'] ?? 0);
         }
 
         $totalCusto = 0.0;
@@ -819,33 +903,65 @@ class PedidoEcommerce extends Model {
             }
         }
 
-        $totalLiquido = $totalFaturado - $totalCusto;
+        foreach ($pedidos as $p) {
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            $pid = (int) ($p['id'] ?? 0);
+            $totaisPorMoeda[$m]['total_custo_produtos'] += (float) ($custoPorPedido[$pid] ?? 0);
+        }
+
         $faixas = $this->getFaixasComissaoManual();
-        $percent = $this->calcularPercentualComissaoManual($totalFaturado, $faixas);
-        $valorComissao = $totalLiquido * ($percent / 100.0);
+        foreach ($totaisPorMoeda as $m => &$t) {
+            $t['faixas'] = $faixas;
+            $t['total_liquido'] = (float) $t['total_faturado'] - (float) $t['total_custo_produtos'];
+            $percent = $this->calcularPercentualComissaoManual((float) $t['total_faturado'], $faixas);
+            $t['percentual_comissao'] = (float) $percent;
+            $t['valor_comissao'] = (float) $t['total_liquido'] * ($percent / 100.0);
+        }
+        unset($t);
 
         $pedidosOut = [];
         foreach ($pedidos as $p) {
             $pid = (int) ($p['id'] ?? 0);
             $fat = (float) ($p['total_valor'] ?? 0);
             $custo = (float) ($custoPorPedido[$pid] ?? 0);
-            $pedidosOut[] = [
+            $m = (string) ($p['moeda'] ?? '');
+            $m = strtoupper(trim($m));
+            if ($m === '') {
+                $m = 'BRL';
+            }
+            $row = [
                 'id' => $pid,
                 'codigo' => (string) ($p['codigo_ref'] ?? $pid),
                 'created_at' => (string) ($p['created_at'] ?? ''),
                 'faturado' => $fat,
                 'custo' => $custo,
                 'liquido' => $fat - $custo,
+                'moeda' => $m,
             ];
+            $pedidosOut[] = $row;
+            if (!isset($totaisPorMoeda[$m]['pedidos']) || !is_array($totaisPorMoeda[$m]['pedidos'])) {
+                $totaisPorMoeda[$m]['pedidos'] = [];
+            }
+            $totaisPorMoeda[$m]['pedidos'][] = $row;
         }
+
+        $moedas = array_keys($totaisPorMoeda);
+        $principal = $moedas[0] ?? 'BRL';
+        $pTot = $totaisPorMoeda[$principal] ?? ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0];
 
         return [
             'pedidos' => $pedidosOut,
-            'total_faturado' => (float) $totalFaturado,
-            'total_custo_produtos' => (float) $totalCusto,
-            'total_liquido' => (float) $totalLiquido,
-            'percentual_comissao' => (float) $percent,
-            'valor_comissao' => (float) $valorComissao,
+            'por_moeda' => $totaisPorMoeda,
+            'moeda_principal' => $principal,
+            'total_faturado' => (float) ($pTot['total_faturado'] ?? 0),
+            'total_custo_produtos' => (float) ($pTot['total_custo_produtos'] ?? 0),
+            'total_liquido' => (float) ($pTot['total_liquido'] ?? 0),
+            'percentual_comissao' => (float) ($pTot['percentual_comissao'] ?? 0),
+            'valor_comissao' => (float) ($pTot['valor_comissao'] ?? 0),
             'faixas' => $faixas,
         ];
     }

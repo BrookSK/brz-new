@@ -283,7 +283,7 @@
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
                                     <span id="frete" class="cart-currency" data-original-value="<?= $frete ?? 0 ?>">
-                                        <?= (($frete ?? 0) == 0) ? 'GRÁTIS' : '$' . number_format(($frete ?? 0), 2, '.', ',') ?>
+                                        <?= (((float) ($frete ?? 0)) <= 0) ? 'Frete grátis' : '$' . number_format(($frete ?? 0), 2, '.', ',') ?>
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between">
@@ -1087,7 +1087,7 @@ function updatePrices(currency) {
     for (const [key, element] of Object.entries(elements)) {
         if (element) {
             if (key === 'frete' && originalValues.frete === 0) {
-                element.textContent = 'GRÁTIS';
+                element.textContent = 'Frete grátis';
             } else {
                 const value = convertedValues[key];
                 const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
@@ -1126,6 +1126,10 @@ function updatePrices(currency) {
     cartCurrencyElements.forEach(element => {
         const originalValue = parseFloat(element.getAttribute('data-original-value'));
         if (!isNaN(originalValue)) {
+            if (element.id === 'frete' && originalValues.frete === 0) {
+                element.textContent = 'Frete grátis';
+                return;
+            }
             const convertedValue = originalValue * rate;
             element.textContent = `${currencySymbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
             console.log(`🔍 [MOEDA] ${element.id}: ${originalValue} → ${convertedValue.toFixed(2)}`);

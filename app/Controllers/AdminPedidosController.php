@@ -744,11 +744,93 @@ class AdminPedidosController extends Controller {
                                             . '</form>';
                                     }
 
+                                    $pdoLocal = null;
+                                    try {
+                                        if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
+                                            $pdoLocal = $pdoCols;
+                                        } else {
+                                            $pdoLocal = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                                        }
+                                    } catch (\Exception $e) {
+                                        $pdoLocal = null;
+                                    }
+
+                                    $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+                                    $statusBloqueadoPorComprovante = false;
+                                    if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+                                        $hasDocs = false;
+                                        if ($pdoLocal instanceof \PDO) {
+                                            try {
+                                                $st = $pdoLocal->prepare('SHOW TABLES LIKE ?');
+                                                $st->execute(['pedidos_pagamento_documentos']);
+                                                $hasDocs = (bool) $st->fetchColumn();
+                                            } catch (\Exception $e) {
+                                                $hasDocs = false;
+                                            }
+                                        }
+
+                                        // Pagamentos offline exigem comprovante; bloquear status por padrão.
+                                        $statusBloqueadoPorComprovante = true;
+
+                                        echo '<hr>';
+                                        echo '<div class="mb-3" id="comprovante">'
+                                            . '<h6 class="mb-2">Comprovante de Pagamento</h6>';
+
+                                        if (!$hasDocs) {
+                                            echo '<div class="alert alert-warning">'
+                                                . '<div><strong>Aguardando comprovante.</strong> Para anexar, é necessário criar a tabela <code>pedidos_pagamento_documentos</code>.</div>'
+                                                . '<div class="small mt-2">Rode as migrations: <strong>055_create_pedidos_pagamento_documentos.sql</strong> e <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong>.</div>'
+                                                . '</div>';
+                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>Anexar comprovante</button>';
+                                        } else {
+                                            $doc = null;
+                                            try {
+                                                if ($pdoLocal instanceof \PDO) {
+                                                    $st = $pdoLocal->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
+                                                    $st->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp]);
+                                                    $row = $st->fetch(\PDO::FETCH_ASSOC);
+                                                    $doc = is_array($row) ? $row : null;
+                                                } else {
+                                                    $doc = null;
+                                                }
+                                            } catch (\Exception $e) {
+                                                $doc = null;
+                                            }
+
+                                            $docArr = is_array($doc) ? $doc : [];
+                                            $docStatus = strtolower((string) (($docArr['status'] ?? '') ?: 'pendente_upload'));
+                                            $docPath = (string) ($docArr['arquivo_path'] ?? '');
+                                            $docUploadedAt = (string) ($docArr['uploaded_at'] ?? '');
+
+                                            $statusBloqueadoPorComprovante = !($docStatus === 'ok' && $docPath !== '');
+
+                                            if ($docStatus === 'ok' && $docPath !== '') {
+                                                echo '<div class="alert alert-success">'
+                                                    . '<div><strong>Comprovante recebido.</strong></div>'
+                                                    . (!empty($docUploadedAt) ? ('<div class="small">Enviado em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($docUploadedAt))) . '</strong></div>') : '')
+                                                    . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($docPath) . '" target="_blank" rel="noopener">Abrir comprovante</a></div>'
+                                                    . '</div>';
+                                            } else {
+                                                echo '<div class="alert alert-warning">'
+                                                    . '<div><strong>Aguardando comprovante.</strong> Anexe o arquivo para liberar a edição do status.</div>'
+                                                    . '</div>';
+                                                echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
+                                                    . '<div class="mb-2">'
+                                                    . '<input class="form-control" type="file" name="comprovante" required>'
+                                                    . '</div>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar comprovante</button>'
+                                                    . '</form>';
+                                            }
+                                        }
+
+                                        echo '</div>';
+                                    }
+
                                 echo '</div>
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>
-                                    <select class="form-select" id="novo_status">
+                                    <select class="form-select" id="novo_status" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>
                                         <option value="">Selecione...</option>
                                         <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
@@ -762,7 +844,8 @@ class AdminPedidosController extends Controller {
                                         <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>
                                 </div>
-                                <button onclick="atualizarStatus()" class="btn btn-primary w-100">Atualizar Status</button>
+                                ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">Envie o comprovante para liberar a edição do status.</div>' : '') . '
+                                <button onclick="atualizarStatus()" class="btn btn-primary w-100" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>Atualizar Status</button>
                             </div>
                         </div>
                         
@@ -813,6 +896,152 @@ class AdminPedidosController extends Controller {
 </html>';
     exit;
 
+    }
+
+    public function uploadComprovante(Request $request) {
+        $pedidoId = (int) $request->getParam('id');
+        if ($pedidoId <= 0) {
+            $this->redirect('/admin/pedidos?erro=' . urlencode('Pedido inválido'));
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $formaPagamento = '';
+            if (is_array($colsPedidos) && in_array('forma_pagamento', $colsPedidos, true)) {
+                $stmt = $pdo->prepare('SELECT forma_pagamento FROM pedidos WHERE id = :id LIMIT 1');
+                $stmt->execute([':id' => $pedidoId]);
+                $formaPagamento = (string) ($stmt->fetchColumn() ?: '');
+            }
+
+            $fp = strtolower(trim($formaPagamento));
+            if (!in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            $hasDocs = false;
+            try {
+                $st = $pdo->prepare('SHOW TABLES LIKE ?');
+                $st->execute(['pedidos_pagamento_documentos']);
+                $hasDocs = (bool) $st->fetchColumn();
+            } catch (\Exception $e) {
+                $hasDocs = false;
+            }
+
+            if (!$hasDocs) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            if (!isset($_FILES['comprovante']) || !is_array($_FILES['comprovante'])) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            $f = $_FILES['comprovante'];
+            $err = (int) ($f['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($err !== UPLOAD_ERR_OK) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            $tmp = (string) ($f['tmp_name'] ?? '');
+            $origName = (string) ($f['name'] ?? '');
+            $mime = (string) ($f['type'] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            $ext = '';
+            if (strpos($origName, '.') !== false) {
+                $parts = explode('.', $origName);
+                $ext = strtolower(trim((string) end($parts)));
+                if ($ext !== '') {
+                    $ext = '.' . preg_replace('/[^a-z0-9]/', '', $ext);
+                }
+            }
+            if ($ext === '') {
+                $ext = '.bin';
+            }
+
+            $baseDir = realpath(__DIR__ . '/../../public');
+            if (!$baseDir) {
+                $baseDir = __DIR__ . '/../../public';
+            }
+            $targetDir = rtrim($baseDir, '/\\') . '/uploads/comprovantes';
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0775, true);
+            }
+
+            $fname = 'pedido_' . (int) $pedidoId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . $ext;
+            $absPath = rtrim($targetDir, '/\\') . '/' . $fname;
+            $relPath = '/uploads/comprovantes/' . $fname;
+
+            if (!move_uploaded_file($tmp, $absPath)) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+            }
+
+            $colsDocs = [];
+            try {
+                $stmtColsD = $pdo->query('DESCRIBE pedidos_pagamento_documentos');
+                $colsDocs = $stmtColsD ? $stmtColsD->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsDocs = [];
+            }
+
+            $docId = 0;
+            try {
+                $st = $pdo->prepare('SELECT id FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo LIMIT 1');
+                $st->execute([':pid' => $pedidoId, ':metodo' => $fp]);
+                $docId = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+                $docId = 0;
+            }
+
+            $adminId = null;
+            try {
+                $auth = new AuthService();
+                $u = $auth->getUsuarioLogado();
+                if (is_array($u) && (($u['perfil'] ?? '') === 'admin')) {
+                    $adminId = (int) ($u['id'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $adminId = null;
+            }
+
+            if ($docId > 0) {
+                $set = ['status = :status', 'arquivo_path = :path', 'mime = :mime', 'uploaded_at = NOW()'];
+                $params = [':id' => $docId, ':status' => 'ok', ':path' => $relPath, ':mime' => $mime];
+                if ($adminId !== null && $adminId > 0 && in_array('usuario_id', $colsDocs, true)) {
+                    $set[] = 'usuario_id = :usuario_id';
+                    $params[':usuario_id'] = (int) $adminId;
+                }
+                $sql = 'UPDATE pedidos_pagamento_documentos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+            } else {
+                $insertCols = ['pedido_id', 'metodo', 'status', 'arquivo_path', 'mime', 'uploaded_at'];
+                $insertVals = [':pedido_id', ':metodo', ':status', ':path', ':mime', 'NOW()'];
+                $params = [':pedido_id' => $pedidoId, ':metodo' => $fp, ':status' => 'ok', ':path' => $relPath, ':mime' => $mime];
+                if ($adminId !== null && $adminId > 0 && in_array('usuario_id', $colsDocs, true)) {
+                    $insertCols[] = 'usuario_id';
+                    $insertVals[] = ':usuario_id';
+                    $params[':usuario_id'] = (int) $adminId;
+                }
+                $sql = 'INSERT INTO pedidos_pagamento_documentos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
+                $st = $pdo->prepare($sql);
+                $st->execute($params);
+            }
+
+            $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+        } catch (\Exception $e) {
+            $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+        }
     }
 
     public function reemitirPagamento(Request $request) {
@@ -929,11 +1158,40 @@ class AdminPedidosController extends Controller {
         }
 
         $cPedidos = is_array($resumo) && isset($resumo['pedidos']) && is_array($resumo['pedidos']) ? $resumo['pedidos'] : [];
-        $totalFaturado = (float) ($resumo['total_faturado'] ?? 0);
-        $totalCusto = (float) ($resumo['total_custo_produtos'] ?? 0);
-        $totalLiquido = (float) ($resumo['total_liquido'] ?? 0);
-        $percent = (float) ($resumo['percentual_comissao'] ?? 0);
-        $valorComissao = (float) ($resumo['valor_comissao'] ?? 0);
+        $porMoeda = (is_array($resumo) && isset($resumo['por_moeda']) && is_array($resumo['por_moeda'])) ? $resumo['por_moeda'] : [];
+        if (empty($porMoeda)) {
+            $porMoeda = [
+                'BRL' => [
+                    'total_faturado' => (float) ($resumo['total_faturado'] ?? 0),
+                    'total_custo_produtos' => (float) ($resumo['total_custo_produtos'] ?? 0),
+                    'total_liquido' => (float) ($resumo['total_liquido'] ?? 0),
+                    'percentual_comissao' => (float) ($resumo['percentual_comissao'] ?? 0),
+                    'valor_comissao' => (float) ($resumo['valor_comissao'] ?? 0),
+                    'pedidos' => $cPedidos,
+                ],
+            ];
+        }
+
+        foreach (['USD', 'BRL'] as $mBase) {
+            if (!isset($porMoeda[$mBase]) || !is_array($porMoeda[$mBase])) {
+                $porMoeda[$mBase] = [
+                    'total_faturado' => 0.0,
+                    'total_custo_produtos' => 0.0,
+                    'total_liquido' => 0.0,
+                    'percentual_comissao' => 0.0,
+                    'valor_comissao' => 0.0,
+                    'pedidos' => [],
+                ];
+            }
+        }
+
+        $formatMoney = function (float $v, string $moeda): string {
+            $moeda = strtoupper(trim($moeda));
+            if ($moeda === 'USD') {
+                return '$ ' . number_format($v, 2, '.', ',');
+            }
+            return 'R$ ' . number_format($v, 2, ',', '.');
+        };
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
@@ -948,7 +1206,10 @@ class AdminPedidosController extends Controller {
 
         renderAdminSidebarStyles();
 
-        echo '</head>
+        echo '<style>
+        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:2px}
+        .comm-card{flex:0 0 220px}
+        </style></head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -964,46 +1225,67 @@ class AdminPedidosController extends Controller {
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                <div class="row g-3 mb-4">';
+
+        foreach ($porMoeda as $moeda => $t) {
+            $moeda = strtoupper(trim((string) $moeda));
+            if ($moeda === '') $moeda = 'BRL';
+            $totalFaturado = (float) ($t['total_faturado'] ?? 0);
+            $totalCusto = (float) ($t['total_custo_produtos'] ?? 0);
+            $totalLiquido = (float) ($t['total_liquido'] ?? 0);
+            $percent = (float) ($t['percentual_comissao'] ?? 0);
+            $valorComissao = (float) ($t['valor_comissao'] ?? 0);
+
+            echo '<div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
+                    </div>
+                    <div class="comm-cards">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Total Faturado (Manuais)</div>
-                            <div class="fs-5 fw-bold">R$ ' . number_format($totalFaturado, 2, ',', '.') . '</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($totalFaturado, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Custo dos Produtos</div>
-                            <div class="fs-5 fw-bold">R$ ' . number_format($totalCusto, 2, ',', '.') . '</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($totalCusto, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Total Líquido</div>
-                            <div class="fs-5 fw-bold">R$ ' . number_format($totalLiquido, 2, ',', '.') . '</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($totalLiquido, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Comissão</div>
-                            <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (R$ ' . number_format($valorComissao, 2, ',', '.') . ')</div>
+                            <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (' . $formatMoney($valorComissao, $moeda) . ')</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Comissão total</div>
-                            <div class="fs-5 fw-bold">R$ ' . number_format($valorComissao, 2, ',', '.') . '</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
                     </div>
-                </div>
+                </div>';
+        }
+
+        $pedidosUsd = [];
+        $pedidosBrl = [];
+        foreach ($cPedidos as $p) {
+            $m = strtoupper(trim((string) ($p['moeda'] ?? '')));
+            if ($m === '') $m = 'BRL';
+            if ($m === 'USD') $pedidosUsd[] = $p;
+            else $pedidosBrl[] = $p;
+        }
+
+        echo '</div>
 
                 <div class="card">
                     <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
                     <div class="card-body">';
 
-        if (empty($cPedidos)) {
-            echo '<div class="text-muted">Sem pedidos manuais pagos para este admin.</div>';
-        } else {
+        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel) use ($formatMoney) {
+            if (empty($pedidos)) {
+                echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                return;
+            }
+
             echo '<div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
@@ -1018,21 +1300,23 @@ class AdminPedidosController extends Controller {
                         </thead>
                         <tbody>';
 
-            foreach ($cPedidos as $p) {
+            foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
                 $codigo = (string) ($p['codigo'] ?? $pid);
                 $fat = (float) ($p['faturado'] ?? 0);
                 $cus = (float) ($p['custo'] ?? 0);
                 $liq = (float) ($p['liquido'] ?? ($fat - $cus));
+                $moeda = strtoupper(trim((string) ($p['moeda'] ?? '')));
+                if ($moeda === '') $moeda = 'BRL';
                 $dt = (string) ($p['created_at'] ?? '');
                 $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
 
                 echo '<tr>
                         <td><strong>' . htmlspecialchars($codigo) . '</strong><div class="text-muted small">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</div></td>
                         <td>' . htmlspecialchars($dtFmt) . '</td>
-                        <td class="text-end fw-semibold">R$ ' . number_format($fat, 2, ',', '.') . '</td>
-                        <td class="text-end">R$ ' . number_format($cus, 2, ',', '.') . '</td>
-                        <td class="text-end">R$ ' . number_format($liq, 2, ',', '.') . '</td>
+                        <td class="text-end fw-semibold">' . $formatMoney($fat, $moeda) . '</td>
+                        <td class="text-end">' . $formatMoney($cus, $moeda) . '</td>
+                        <td class="text-end">' . $formatMoney($liq, $moeda) . '</td>
                         <td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>
                       </tr>';
             }
@@ -1040,7 +1324,21 @@ class AdminPedidosController extends Controller {
             echo '        </tbody>
                     </table>
                 </div>';
-        }
+        };
+
+        echo '<div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>USD</strong>
+                </div>';
+        $renderTabelaPedidos($pedidosUsd, 'USD');
+        echo '</div>';
+
+        echo '<div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>BRL</strong>
+                </div>';
+        $renderTabelaPedidos($pedidosBrl, 'BRL');
+        echo '</div>';
 
         echo '        </div>
                 </div>

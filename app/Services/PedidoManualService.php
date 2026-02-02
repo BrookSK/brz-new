@@ -8,6 +8,91 @@ class PedidoManualService {
         $this->db = $db ?? \Config\Database::getConnection();
     }
 
+    private function criarPendenciaComprovantePedido(int $pedidoId, string $metodo, ?int $usuarioId = null): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+        $metodo = trim((string) $metodo);
+        if ($metodo === '') {
+            return;
+        }
+        if (!$this->tableExists('pedidos_pagamento_documentos')) {
+            return;
+        }
+
+        try {
+            $stmt = $this->db->prepare('SELECT id FROM pedidos_pagamento_documentos WHERE pedido_id = :pedido_id AND metodo = :metodo LIMIT 1');
+            $stmt->execute([':pedido_id' => $pedidoId, ':metodo' => $metodo]);
+            $exists = (int) ($stmt->fetchColumn() ?: 0);
+            if ($exists > 0) {
+                return;
+            }
+        } catch (
+            \Exception $e
+        ) {
+            // ignore
+        }
+
+        $cols = ['pedido_id', 'metodo', 'status'];
+        $vals = [':pedido_id', ':metodo', ':status'];
+        $params = [':pedido_id' => $pedidoId, ':metodo' => $metodo, ':status' => 'pendente_upload'];
+
+        try {
+            $colsT = $this->getCols('pedidos_pagamento_documentos');
+            if (!empty($colsT) && $usuarioId !== null && $usuarioId > 0 && in_array('usuario_id', $colsT, true)) {
+                $cols[] = 'usuario_id';
+                $vals[] = ':usuario_id';
+                $params[':usuario_id'] = (int) $usuarioId;
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $sql = 'INSERT INTO pedidos_pagamento_documentos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $stmtIns = $this->db->prepare($sql);
+            $stmtIns->execute($params);
+        } catch (\Exception $e) {
+            // ignore
+        }
+    }
+
+    public function gerarLinkPagamentoPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido');
+        }
+
+        $colsPedidos = $this->getCols('pedidos');
+        if (empty($colsPedidos)) {
+            throw new \Exception('Tabela pedidos não encontrada');
+        }
+
+        $colMoeda = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
+        $stmt = $this->db->prepare('SELECT id' . ($colMoeda !== '' ? (', ' . $colMoeda . ' AS moeda') : '') . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stmt->execute([$pedidoId]);
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($pedido)) {
+            throw new \Exception('Pedido não encontrado');
+        }
+
+        $moeda = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+        if ($moeda === '') {
+            $moeda = 'BRL';
+        }
+
+        if ($moeda === 'BRL') {
+            return $this->gerarLinkPagamentoAsaasPedidoManual($pedidoId, $billingType);
+        }
+
+        return $this->gerarLinkPagamentoStripePedidoManual($pedidoId);
+    }
+
+    private function gerarLinkPagamentoStripePedidoManual(int $pedidoId): array {
+        return [
+            'success' => false,
+            'error' => 'Geração de link de pagamento em USD (Stripe) ainda está em desenvolvimento.',
+        ];
+    }
+
     private function pickFirstExistingColumn(array $cols, array $candidates): string {
         foreach ($candidates as $c) {
             if (in_array($c, $cols, true)) {
@@ -27,6 +112,25 @@ class PedidoManualService {
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($row && array_key_exists('valor', $row)) {
                 return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Formato categoria/chave/valor: se a chave vier no formato categoria_chave,
+        // tenta buscar em (categoria, chave) quando a chave completa não existir.
+        try {
+            if (strpos($key, '_') !== false) {
+                [$categoria, $chave] = explode('_', $key, 2);
+                $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($cols) && in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                    $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stmt->execute([(string) $categoria, (string) $chave]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                }
             }
         } catch (\Exception $e) {
         }
@@ -87,17 +191,18 @@ class PedidoManualService {
         }
         $usd = ($vUSD !== null && $vUSD !== '') ? (float) str_replace(',', '.', (string) $vUSD) : 39.0;
 
-        $taxa = 5.5;
-        try {
-            $stmt = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-            $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
-            if (is_array($row) && isset($row['taxa_conversao'])) {
-                $taxa = (float) $row['taxa_conversao'];
-            }
-        } catch (\Exception $e) {
-        }
+        $taxa = $this->getTaxaConversaoUSDBRL();
 
         return $usd * $taxa;
+    }
+
+    public function getTaxaServicoPorKgUSD(): float {
+        $vUSD = $this->getConfigKeyValue('entrega_taxa_servico_usd_por_kg', null);
+        if ($vUSD === null || $vUSD === '') {
+            $vUSD = $this->getConfigKeyValue('taxa_servico_usd_por_kg', null);
+        }
+        $usd = ($vUSD !== null && $vUSD !== '') ? (float) str_replace(',', '.', (string) $vUSD) : 39.0;
+        return $usd;
     }
 
     private function calcularImpostosPadrao(float $valorProdutos, float $valorFrete): float {
@@ -111,16 +216,29 @@ class PedidoManualService {
         return $valorICMS + $valorIPI;
     }
 
-    private function obterTaxaConversaoUSDBRL(): float {
+    public function getTaxaConversaoUSDBRL(): float {
         $taxa = 5.5;
+
+        $cfg = $this->getConfigKeyValue('sistema_usd_brl_rate', null);
+        if ($cfg !== null && $cfg !== '') {
+            $v = (float) str_replace(',', '.', (string) $cfg);
+            if ($v > 0) {
+                return $v;
+            }
+        }
+
         try {
             $stmt = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
             $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
             if (is_array($row) && isset($row['taxa_conversao'])) {
-                $taxa = (float) $row['taxa_conversao'];
+                $v = (float) $row['taxa_conversao'];
+                if ($v > 0) {
+                    $taxa = $v;
+                }
             }
         } catch (\Exception $e) {
         }
+
         return $taxa;
     }
 
@@ -285,7 +403,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -296,6 +414,18 @@ class PedidoManualService {
         $moeda = strtoupper(trim($moeda));
         if (!in_array($moeda, ['BRL', 'USD', 'EUR'], true)) {
             $moeda = 'BRL';
+        }
+
+        if ($formaPagamento !== null) {
+            $fpNorm = trim((string) $formaPagamento);
+            if ($fpNorm === 'pagdev') {
+                // ok para testes em qualquer moeda
+            } elseif ($fpNorm === 'nomad_transferencia' && $moeda !== 'USD') {
+                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
+            }
+            if ($fpNorm === 'appmax_pix' && $moeda !== 'BRL') {
+                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
+            }
         }
 
         $colsPedidos = $this->getCols('pedidos');
@@ -348,6 +478,15 @@ class PedidoManualService {
             $cols[] = $colMoeda;
             $vals[] = ':moeda';
             $params[':moeda'] = $moeda;
+        }
+
+        if ($formaPagamento !== null) {
+            $fp = trim((string) $formaPagamento);
+            if ($fp !== '' && in_array('forma_pagamento', $colsPedidos, true)) {
+                $cols[] = 'forma_pagamento';
+                $vals[] = ':forma_pagamento';
+                $params[':forma_pagamento'] = $fp;
+            }
         }
 
         // Persistir resumo quando colunas existirem
@@ -419,6 +558,14 @@ class PedidoManualService {
             }
 
             $this->salvarItensPedido($pedidoId, $itens, $moeda);
+
+            // Se for pagamento offline (nomad/appmax_pix), cria pendência de comprovante quando a tabela existir
+            if ($formaPagamento !== null) {
+                $fp = strtolower(trim((string) $formaPagamento));
+                if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+                    $this->criarPendenciaComprovantePedido($pedidoId, $fp, $adminCriadorId);
+                }
+            }
 
             $this->db->commit();
             return $pedidoId;
@@ -660,7 +807,7 @@ class PedidoManualService {
         ];
     }
 
-    private function persistirPagamentoNoPedido(int $pedidoId, array $payResult): void {
+    private function persistirPagamentoNoPedido(int $pedidoId, array $payResult, string $gateway = 'asaas'): void {
         $colsPedidos = $this->getCols('pedidos');
         if (empty($colsPedidos)) {
             return;
@@ -671,7 +818,7 @@ class PedidoManualService {
 
         if (in_array('payment_gateway', $colsPedidos, true)) {
             $set[] = 'payment_gateway = :pg';
-            $params[':pg'] = 'asaas';
+            $params[':pg'] = $gateway;
         }
         if (in_array('payment_id', $colsPedidos, true)) {
             $set[] = 'payment_id = :pid';

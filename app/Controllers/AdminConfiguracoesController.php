@@ -1048,10 +1048,16 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Moeda Padrão</label>
                                                 <select class="form-select" name="moeda">
-                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'sistema', 'moeda', 'BRL') === 'BRL' ? 'selected' : '') . '>Real (BRL)</option>
-                                                    <option value="USD" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'USD' ? 'selected' : '') . '>Dólar (USD)</option>
+                                                    <option value="USD" ' . ($this->getConfigValue($config, 'sistema', 'moeda', 'USD') === 'USD' ? 'selected' : '') . '>Dólar (USD)</option>
+                                                    <option value="BRL" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'BRL' ? 'selected' : '') . '>Real (BRL)</option>
                                                     <option value="EUR" ' . ($this->getConfigValue($config, 'sistema', 'moeda', '') === 'EUR' ? 'selected' : '') . '>Euro (EUR)</option>
                                                 </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Taxa de conversão USD → BRL</label>
+                                                <input type="number" step="0.0001" min="0" class="form-control" name="sistema_usd_brl_rate" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'usd_brl_rate', '5.5'), ENT_QUOTES, 'UTF-8') . '">
+                                                <small class="text-muted">Taxa usada no conversor global e para cálculos auxiliares em BRL quando necessário.</small>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="manutencao" ' . ($this->getConfigValue($config, 'sistema', 'manutencao', '0') === '1' ? 'checked' : '') . '>
@@ -1194,7 +1200,7 @@ JS;
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
-                'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
+                'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']

@@ -960,12 +960,21 @@
     <script>
         // Incluir o código diretamente para evitar problemas de caminho
         console.log('Carregando sistema de conversão inline...');
+
+        const __USD_BRL_RATE__ = <?php
+        try {
+            $svc = new \App\Services\PedidoManualService();
+            echo json_encode((float) $svc->getTaxaConversaoUSDBRL());
+        } catch (\Exception $e) {
+            echo '5.5';
+        }
+        ?>;
         
         // Variáveis globais
         window.CurrencyConverter = {
-            currentCurrency: 'BRL',
+            currentCurrency: 'USD',
             exchangeRates: {
-                BRL: 5.50,
+                BRL: __USD_BRL_RATE__ || 5.50,
                 USD: 1.00
             },
             
@@ -973,7 +982,7 @@
                 console.log('=== INICIANDO SISTEMA DE CONVERSÃO INLINE ===');
                 
                 // Recuperar moeda salva
-                this.currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+                this.currentCurrency = localStorage.getItem('selected_currency') || 'USD';
                 console.log('Moeda inicial:', this.currentCurrency);
                 
                 // Inicializar seletor
