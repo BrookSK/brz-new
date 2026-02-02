@@ -263,7 +263,6 @@ class PedidoEcommerce extends Model {
     }
 
     public function getPedidos($usuarioId = null, $limite = 10, $offset = 0) {
-        $sql = "SELECT p.* FROM {$this->table} p";
         $where = [];
         $params = [];
 
@@ -272,23 +271,80 @@ class PedidoEcommerce extends Model {
             $params[':usuario_id'] = (int) $usuarioId;
         }
 
+        $itensTable = null;
+        $itensCols = [];
+        $colPedidoId = null;
+        $colQtd = null;
+        try {
+            $st = $this->connection->query("SHOW TABLES LIKE 'pedido_itens'");
+            if ($st && $st->fetchColumn()) {
+                $itensTable = 'pedido_itens';
+            } else {
+                $st = $this->connection->query("SHOW TABLES LIKE 'pedido_items'");
+                if ($st && $st->fetchColumn()) {
+                    $itensTable = 'pedido_items';
+                }
+            }
+            if ($itensTable) {
+                $stCols = $this->connection->query('DESCRIBE ' . $itensTable);
+                $itensCols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($itensCols)) {
+                    if (in_array('pedido_id', $itensCols, true)) {
+                        $colPedidoId = 'pedido_id';
+                    }
+                    if (in_array('quantidade', $itensCols, true)) {
+                        $colQtd = 'quantidade';
+                    } elseif (in_array('qty', $itensCols, true)) {
+                        $colQtd = 'qty';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $itensTable = null;
+        }
+
+        $select = 'p.*';
+        $join = '';
+        $group = '';
+        if ($itensTable && $colPedidoId) {
+            if ($colQtd) {
+                $select .= ', COALESCE(SUM(pi.' . $colQtd . '), 0) AS total_itens';
+            } else {
+                $select .= ', COALESCE(COUNT(pi.id), 0) AS total_itens';
+            }
+            $join = ' LEFT JOIN ' . $itensTable . ' pi ON pi.' . $colPedidoId . ' = p.id';
+            $group = ' GROUP BY p.id';
+        }
+
+        $sql = "SELECT {$select} FROM {$this->table} p{$join}";
         if (!empty($where)) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-
+        $sql .= $group;
         $sql .= ' ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset';
 
         $stmt = $this->connection->prepare($sql);
-
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, \PDO::PARAM_INT);
         }
-
         $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
         $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
         $stmt->execute();
 
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getTotalPedidosUsuario(int $usuarioId): int {
+        if ($usuarioId <= 0) {
+            return 0;
+        }
+        try {
+            $stmt = $this->connection->prepare("SELECT COUNT(*) FROM {$this->table} p WHERE p.usuario_id = :usuario_id");
+            $stmt->execute([':usuario_id' => $usuarioId]);
+            return (int) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return 0;
+        }
     }
 
     private function getConfigKeyValue(string $key, $default = null) {

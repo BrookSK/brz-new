@@ -651,7 +651,10 @@ class UsuarioController extends Controller {
         $this->authService->requerAutenticacao();
         
         $usuario = $this->authService->getUsuarioLogado();
-        $pagina = $request->getParam('pagina', 1);
+        $pagina = (int) $request->getParam('pagina', 1);
+        if ($pagina < 1) {
+            $pagina = 1;
+        }
         $limite = 10;
         $offset = ($pagina - 1) * $limite;
         
@@ -663,13 +666,24 @@ class UsuarioController extends Controller {
             error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
+
+        $total = 0;
+        try {
+            $total = $this->pedidoModel->getTotalPedidosUsuario((int) $usuario['id']);
+        } catch (\Exception $e) {
+            $total = is_array($pedidos) ? count($pedidos) : 0;
+        }
+        $totalPaginas = (int) ceil(((int) $total) / $limite);
+        if ($totalPaginas < 1) {
+            $totalPaginas = 1;
+        }
         
         $this->view('usuario/meus-pedidos', [
             'usuario' => $usuario,
             'pedidos' => $pedidos,
             'pagina' => $pagina,
-            'total' => count($pedidos),
-            'total_paginas' => ceil(count($pedidos) / $limite)
+            'total' => (int) $total,
+            'total_paginas' => $totalPaginas
         ]);
     }
 
