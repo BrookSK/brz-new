@@ -278,6 +278,15 @@
 
 <script>
 $(document).ready(function() {
+    function formatMoney(value) {
+        const num = Number(value || 0);
+        try {
+            return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+        } catch (e) {
+            return num.toFixed(2);
+        }
+    }
+
     // Carregar produtos em destaque via AJAX
     $.ajax({
         url: '/api/produtos/destaque',
@@ -299,7 +308,7 @@ $(document).ready(function() {
                                     <h6 class="card-title">${produto.nome}</h6>
                                     <p class="text-muted small">${produto.categoria}</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="h5 mb-0 text-primary">${produto.moeda} ${number_format(produto.valor, 2, ',', '.')}</span>
+                                        <span class="h5 mb-0 text-primary">${produto.moeda} ${formatMoney(produto.valor)}</span>
                                         <small class="text-muted">${produto.estoque} unid.</small>
                                     </div>
                                     <a href="/produto/detalhes/${produto.id}" class="btn btn-outline-primary btn-sm w-100">
@@ -311,10 +320,12 @@ $(document).ready(function() {
                     `;
                 });
                 $('#produtos-destaque').html(html);
+            } else {
+                $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">Nenhum produto em destaque no momento.</p></div>');
             }
         },
         error: function() {
-            $('#produtos-destaque').html('<div class="col-12 text-center"><p>Carregando produtos...</p></div>');
+            $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">Não foi possível carregar produtos em destaque.</p></div>');
         }
     });
 });
