@@ -281,18 +281,18 @@
                                     <span id="subtotal" class="cart-currency" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
-                                    <span>Frete:</span>
-                                    <span id="frete" class="cart-currency" data-original-value="<?= $frete ?? 0 ?>">
-                                        <?= (((float) ($frete ?? 0)) <= 0) ? 'Frete grátis' : '$' . number_format(($frete ?? 0), 2, '.', ',') ?>
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between">
                                     <span>Taxa de Serviço:</span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <span>Impostos:</span>
                                     <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Frete:</span>
+                                    <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
+                                        <?= (((float) ($frete ?? 0)) <= 0) ? 'Frete grátis' : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                    </span>
                                 </div>
                             </div>
 
