@@ -745,6 +745,53 @@ class AdminComprasController extends Controller {
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
 
         try {
+            // Registrar quais itens vão ser reabertos para exibir apenas eles após o redirect
+            $whereLoja = '';
+            $selParams = [];
+            if ($produtoId > 0) {
+                $selParams[':produto_id'] = $produtoId;
+            }
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $whereLoja .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $whereLoja .= ' AND lc.loja_id = :loja_id';
+                    $selParams[':loja_id'] = $lojaId;
+                }
+            }
+
+            $selSql = "SELECT DISTINCT lc.produto_id";
+            if ($temLojaIdEmLista) {
+                $selSql .= ", COALESCE(lc.loja_id,0) as loja_id";
+            } else {
+                $selSql .= ", 0 as loja_id";
+            }
+            $selSql .= " FROM lista_compras lc WHERE lc.status IN ('comprado','cancelado')";
+            if ($produtoId > 0) {
+                $selSql .= ' AND lc.produto_id = :produto_id';
+            }
+            $selSql .= $whereLoja;
+
+            $stmtSel = $this->connection->prepare($selSql);
+            $stmtSel->execute($selParams);
+            $reabertosRows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['compras_reabertas'] = [
+                'ts' => time(),
+                'produto_id' => $produtoId,
+                'loja_id' => $lojaId,
+                'sem_loja' => $semLoja ? 1 : 0,
+                'items' => array_values(array_map(function ($r) {
+                    return [
+                        'produto_id' => (int) ($r['produto_id'] ?? 0),
+                        'loja_id' => (int) ($r['loja_id'] ?? 0),
+                    ];
+                }, $reabertosRows)),
+            ];
+
             $sql = "UPDATE lista_compras lc SET lc.status = 'pendente' WHERE lc.status IN ('comprado','cancelado')";
             $params = [];
             if ($produtoId > 0) {
@@ -765,7 +812,7 @@ class AdminComprasController extends Controller {
 
             $_SESSION['message'] = 'Itens reabertos.';
             $_SESSION['message_type'] = 'success';
-            header('Location: /admin/estoque/compras?status=pendente' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
+            header('Location: /admin/estoque/compras?status=pendente&somente_reabertos=1' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
             exit;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao reabrir itens.';
@@ -891,6 +938,12 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
+            $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
+            $reabertos = null;
+            if ($somenteReabertos && isset($_SESSION['compras_reabertas']) && is_array($_SESSION['compras_reabertas'])) {
+                $reabertos = $_SESSION['compras_reabertas'];
+            }
+
             $produtosSelect = $this->fetchProdutosSelect();
             $pedidosSelect = $this->fetchPedidosSelect();
 
@@ -938,6 +991,18 @@ class AdminComprasController extends Controller {
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
                 . '   FROM lista_compras lc WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
+                . ($reabertos && !empty($reabertos['items'])
+                    ? ($temLojaIdEmLista
+                        ? (' AND (' . implode(' OR ', array_values(array_filter(array_map(function ($x) {
+                            $pid = (int) ($x['produto_id'] ?? 0);
+                            $lid = (int) ($x['loja_id'] ?? 0);
+                            if ($pid <= 0) return '';
+                            return '(lc.produto_id = ' . $pid . ' AND COALESCE(lc.loja_id,0) = ' . $lid . ')';
+                        }, (array) $reabertos['items'])))) . ')')
+                        : (' AND lc.produto_id IN (' . implode(',', array_values(array_unique(array_map(function ($x) {
+                            return (int) ($x['produto_id'] ?? 0);
+                        }, (array) $reabertos['items'])))) . ')'))
+                    : '')
                 . '   GROUP BY produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(loja_id,0), status' : '0, status')
                 . ' ) agg'
@@ -957,6 +1022,11 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
             $compras = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Limpar filtro após exibir (para não "grudar" na sessão)
+            if ($reabertos !== null) {
+                unset($_SESSION['compras_reabertas']);
+            }
 
             // Estatísticas: itens/valor pendente
             $totalItensPendentes = 0;
