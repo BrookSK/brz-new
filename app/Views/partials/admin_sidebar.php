@@ -4,6 +4,7 @@ function renderAdminSidebar($activePage = '') {
     $menuItems = [
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard'],
         'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos'],
+        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => 'Variações', 'url' => '/admin/variacoes'],
         'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas'],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias'],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos'],

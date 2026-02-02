@@ -234,6 +234,13 @@ $router->get('/admin/categorias/editar/{id}', 'AdminCategoriasController', 'edit
 $router->post('/admin/categorias/salvar', 'AdminCategoriasController', 'salvar');
 $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'excluir');
 
+// Variações (tipos/opções)
+$router->get('/admin/variacoes', 'AdminVariacoesController', 'index');
+$router->post('/admin/variacoes/tipos/salvar', 'AdminVariacoesController', 'salvarTipo');
+$router->post('/admin/variacoes/tipos/inativar/{id}', 'AdminVariacoesController', 'inativarTipo');
+$router->post('/admin/variacoes/opcoes/salvar', 'AdminVariacoesController', 'salvarOpcao');
+$router->post('/admin/variacoes/opcoes/inativar/{id}', 'AdminVariacoesController', 'inativarOpcao');
+
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/comissoes', 'AdminPedidosController', 'comissoes');
