@@ -666,6 +666,7 @@ class AdminComprasController extends Controller {
                 "SELECT DISTINCT lc.pedido_id
                  FROM lista_compras lc
                  WHERE lc.produto_id = :produto_id
+                   AND lc.status = 'pendente'
                    AND lc.pedido_id IS NOT NULL
                    AND lc.pedido_id <> 0" . $whereLoja .
                 " ORDER BY lc.pedido_id DESC"
@@ -744,6 +745,53 @@ class AdminComprasController extends Controller {
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
 
         try {
+            // Registrar quais itens vão ser reabertos para exibir apenas eles após o redirect
+            $whereLoja = '';
+            $selParams = [];
+            if ($produtoId > 0) {
+                $selParams[':produto_id'] = $produtoId;
+            }
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $whereLoja .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $whereLoja .= ' AND lc.loja_id = :loja_id';
+                    $selParams[':loja_id'] = $lojaId;
+                }
+            }
+
+            $selSql = "SELECT DISTINCT lc.produto_id";
+            if ($temLojaIdEmLista) {
+                $selSql .= ", COALESCE(lc.loja_id,0) as loja_id";
+            } else {
+                $selSql .= ", 0 as loja_id";
+            }
+            $selSql .= " FROM lista_compras lc WHERE lc.status IN ('comprado','cancelado')";
+            if ($produtoId > 0) {
+                $selSql .= ' AND lc.produto_id = :produto_id';
+            }
+            $selSql .= $whereLoja;
+
+            $stmtSel = $this->connection->prepare($selSql);
+            $stmtSel->execute($selParams);
+            $reabertosRows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['compras_reabertas'] = [
+                'ts' => time(),
+                'produto_id' => $produtoId,
+                'loja_id' => $lojaId,
+                'sem_loja' => $semLoja ? 1 : 0,
+                'items' => array_values(array_map(function ($r) {
+                    return [
+                        'produto_id' => (int) ($r['produto_id'] ?? 0),
+                        'loja_id' => (int) ($r['loja_id'] ?? 0),
+                    ];
+                }, $reabertosRows)),
+            ];
+
             $sql = "UPDATE lista_compras lc SET lc.status = 'pendente' WHERE lc.status IN ('comprado','cancelado')";
             $params = [];
             if ($produtoId > 0) {
@@ -764,7 +812,7 @@ class AdminComprasController extends Controller {
 
             $_SESSION['message'] = 'Itens reabertos.';
             $_SESSION['message_type'] = 'success';
-            header('Location: /admin/estoque/compras?status=pendente' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
+            header('Location: /admin/estoque/compras?status=pendente&somente_reabertos=1' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
             exit;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao reabrir itens.';
@@ -890,6 +938,12 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
+            $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
+            $reabertos = null;
+            if ($somenteReabertos && isset($_SESSION['compras_reabertas']) && is_array($_SESSION['compras_reabertas'])) {
+                $reabertos = $_SESSION['compras_reabertas'];
+            }
+
             $produtosSelect = $this->fetchProdutosSelect();
             $pedidosSelect = $this->fetchPedidosSelect();
 
@@ -937,6 +991,18 @@ class AdminComprasController extends Controller {
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
                 . '   FROM lista_compras lc WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
+                . ($reabertos && !empty($reabertos['items'])
+                    ? ($temLojaIdEmLista
+                        ? (' AND (' . implode(' OR ', array_values(array_filter(array_map(function ($x) {
+                            $pid = (int) ($x['produto_id'] ?? 0);
+                            $lid = (int) ($x['loja_id'] ?? 0);
+                            if ($pid <= 0) return '';
+                            return '(lc.produto_id = ' . $pid . ' AND COALESCE(lc.loja_id,0) = ' . $lid . ')';
+                        }, (array) $reabertos['items'])))) . ')')
+                        : (' AND lc.produto_id IN (' . implode(',', array_values(array_unique(array_map(function ($x) {
+                            return (int) ($x['produto_id'] ?? 0);
+                        }, (array) $reabertos['items'])))) . ')'))
+                    : '')
                 . '   GROUP BY produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(loja_id,0), status' : '0, status')
                 . ' ) agg'
@@ -956,6 +1022,11 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
             $compras = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Limpar filtro após exibir (para não "grudar" na sessão)
+            if ($reabertos !== null) {
+                unset($_SESSION['compras_reabertas']);
+            }
 
             // Estatísticas: itens/valor pendente
             $totalItensPendentes = 0;
@@ -1256,14 +1327,6 @@ class AdminComprasController extends Controller {
 
                                     $missingLoja = ($lojaIdRow <= 0);
                                      
-                                    $btnEditItem = '<button type="button" class="btn btn-outline-primary"'
-                                        . ' data-bs-toggle="modal" data-bs-target="#modalEditarItem"'
-                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
-                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
-                                        . ' data-quantidade="' . (int) $qf . '"'
-                                        . ' data-prioridade="' . htmlspecialchars((string) ($item['prioridade'] ?? 'media')) . '"'
-                                        . '><i class="fas fa-pen"></i></button>';
                                     $btnRemoverItem = '<button type="button" class="btn btn-outline-danger"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalRemoverItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
@@ -1305,7 +1368,6 @@ class AdminComprasController extends Controller {
                                         . '<td>'
                                         . '<div class="btn-group btn-group-sm">'
                                         . $btnVerPedidos
-                                        . ($statusView === 'pendente' ? $btnEditItem : '')
                                         . ($statusView === 'pendente' ? $btnLoja : '')
                                         . ($statusView === 'pendente'
                                             ? ('<button type="button" class="btn btn-outline-success"'
@@ -1584,53 +1646,7 @@ class AdminComprasController extends Controller {
                     }
                 </script>';
 
-                // Modal: Editar item
-                echo '<div class="modal fade" id="modalEditarItem" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="/admin/estoque/compras/editar-item">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Editar item da lista</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <input type="hidden" name="produto_id" id="edit_produto_id" value="">
-                                        <input type="hidden" name="loja_id" id="edit_loja_id" value="0">
-                                        <div class="mb-2 text-muted" id="edit_produto_nome"></div>
-                                        <label class="form-label">Quantidade *</label>
-                                        <input type="number" class="form-control" name="quantidade" id="edit_quantidade" min="0" required>
-                                        <label class="form-label mt-3">Prioridade *</label>
-                                        <select class="form-select" name="prioridade" id="edit_prioridade" required>
-                                            <option value="baixa">Baixa</option>
-                                            <option value="media">Média</option>
-                                            <option value="alta">Alta</option>
-                                            <option value="urgente">Urgente</option>
-                                        </select>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Salvar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>';
-
-                echo '<script>
-                    var modalEditarItem = document.getElementById("modalEditarItem");
-                    if (modalEditarItem) {
-                        modalEditarItem.addEventListener("show.bs.modal", function (event) {
-                            var button = event.relatedTarget;
-                            document.getElementById("edit_produto_id").value = button.getAttribute("data-produto-id") || "";
-                            document.getElementById("edit_loja_id").value = button.getAttribute("data-loja-id") || "0";
-                            document.getElementById("edit_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
-                            document.getElementById("edit_quantidade").value = button.getAttribute("data-quantidade") || "0";
-                            document.getElementById("edit_prioridade").value = button.getAttribute("data-prioridade") || "media";
-                        });
-                    }
-                </script>';
-
-                // Modal: Remover item (cancelar pendência na lista)
+                // Modal: Remover item
                 echo '<div class="modal fade" id="modalRemoverItem" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog">
                             <div class="modal-content">
@@ -1717,12 +1733,18 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="produto_id" id="concluir_produto_id" value="">
                                         <input type="hidden" name="loja_id" id="concluir_loja_id" value="0">
                                         <div class="alert alert-success mb-0">
-                                            Marcar como comprado: <strong id="concluir_produto_nome"></strong>
+                                            Concluir compra de: <strong id="concluir_produto_nome"></strong>
+                                        </div>
+                                        <div class="mt-3">
+                                            <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
+                                            <input type="number" class="form-control" name="quantidade_comprada" id="concluir_quantidade_comprada" min="0" value="0">
+                                            <div class="form-text">Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Concluir</button>
+                                        <button type="submit" class="btn btn-success" name="modo" value="total">Confirmar compra total</button>
+                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">Confirmar parcial</button>
                                     </div>
                                 </form>
                             </div>
@@ -1753,13 +1775,19 @@ class AdminComprasController extends Controller {
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="alert alert-success mb-0">
-                                            Deseja marcar como <strong>comprado</strong> todos os itens pendentes deste filtro?
+                                        <div class="alert alert-success">
+                                            Você pode concluir <strong>total</strong> ou <strong>parcial</strong> os itens pendentes deste filtro.
+                                        </div>
+                                        <div>
+                                            <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
+                                            <input type="number" class="form-control" name="quantidade_comprada" min="0" value="0">
+                                            <div class="form-text">Em compra parcial, o restante continuará pendente.</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success">Concluir</button>
+                                        <button type="submit" class="btn btn-success" name="modo" value="total">Confirmar compra total</button>
+                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">Confirmar parcial</button>
                                     </div>
                                 </form>
                             </div>
@@ -2064,8 +2092,73 @@ class AdminComprasController extends Controller {
         $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
 
+        $modo = (string) $request->getParam('modo', 'total');
+        $modo = in_array($modo, ['total', 'parcial'], true) ? $modo : 'total';
+        $quantidadeComprada = (int) $request->getParam('quantidade_comprada', 0);
+        if ($quantidadeComprada < 0) $quantidadeComprada = 0;
+
         try {
-            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado' WHERE lc.status = 'pendente'";
+            // Parcial só faz sentido para concluir UM produto (senão não tem como distribuir quantidade)
+            if ($modo === 'parcial' && $produtoId > 0) {
+                if ($quantidadeComprada <= 0) {
+                    $_SESSION['message'] = 'Informe a quantidade comprada para concluir parcialmente.';
+                    $_SESSION['message_type'] = 'warning';
+                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    exit;
+                }
+
+                $whereLoja = '';
+                $params = [':produto_id' => $produtoId];
+                if ($temLojaIdEmLista) {
+                    if ($semLoja) {
+                        $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                    } elseif ($lojaId > 0) {
+                        $whereLoja = ' AND lc.loja_id = :loja_id';
+                        $params[':loja_id'] = $lojaId;
+                    }
+                }
+
+                // Aplicar compra parcial consumindo quantidades das pendências mais antigas
+                $stmtSel = $this->connection->prepare(
+                    "SELECT id, quantidade_faltante, quantidade_necessaria
+                     FROM lista_compras lc
+                     WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja .
+                    " ORDER BY lc.id ASC"
+                );
+                $stmtSel->execute($params);
+                $rows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $restante = $quantidadeComprada;
+                foreach ($rows as $r) {
+                    if ($restante <= 0) break;
+                    $id = (int) ($r['id'] ?? 0);
+                    if ($id <= 0) continue;
+
+                    $qf = (int) ($r['quantidade_faltante'] ?? 0);
+                    $qn = (int) ($r['quantidade_necessaria'] ?? 0);
+                    $need = $qf > 0 ? $qf : $qn;
+                    if ($need <= 0) continue;
+
+                    if ($restante >= $need) {
+                        $stmtUp = $this->connection->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE id = :id");
+                        $stmtUp->execute([':id' => $id]);
+                        $restante -= $need;
+                    } else {
+                        $novoFaltante = $need - $restante;
+                        $stmtUp = $this->connection->prepare("UPDATE lista_compras SET status = 'pendente', quantidade_faltante = :qf WHERE id = :id");
+                        $stmtUp->execute([':id' => $id, ':qf' => $novoFaltante]);
+                        $restante = 0;
+                    }
+                }
+
+                $_SESSION['message'] = 'Compra parcial registrada. O restante continua pendente.';
+                $_SESSION['message_type'] = 'success';
+                header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                exit;
+            }
+
+            // Total (comportamento padrão): marcar como comprado
+            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
             $params = [];
             if ($produtoId > 0) {
                 $sql .= ' AND lc.produto_id = :produto_id';

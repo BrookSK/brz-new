@@ -1099,7 +1099,7 @@ class AdminPedidosController extends Controller {
             }
 
             if (is_array($enumAllowed) && !empty($enumAllowed) && !in_array((string) $novoStatus, $enumAllowed, true)) {
-                echo '<div class="alert alert-danger">Status inv1ido para a coluna <strong>' . htmlspecialchars($statusCol) . '</strong>: <strong>' . htmlspecialchars((string) $novoStatus) . '</strong>. Esta coluna 1 ENUM e o MySQL pode converter valores inv1idos para <strong>string vazia</strong>, parecendo que "processou" mas n2o persiste.</div>';
+                echo '<div class="alert alert-danger">Status inválido para a coluna <strong>' . htmlspecialchars($statusCol) . '</strong>: <strong>' . htmlspecialchars((string) $novoStatus) . '</strong>. Esta coluna é ENUM e o MySQL pode converter valores inválidos para <strong>string vazia</strong>, parecendo que "processou" mas não persiste.</div>';
                 echo '<div class="alert alert-secondary"><strong>Valores permitidos</strong><br>' . htmlspecialchars(implode(', ', $enumAllowed)) . '</div>';
                 echo '<div class="alert alert-warning">Para permitir novos status (ex: produto_consolidado), crie uma migration SQL para atualizar o ENUM (ou trocar para VARCHAR) no banco.</div>';
                 echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
@@ -1108,6 +1108,34 @@ class AdminPedidosController extends Controller {
 
             $set = [$statusCol . ' = ?'];
             $params = [$novoStatus];
+
+            // Se marcou como pago/aprovado, manter colunas relacionadas consistentes.
+            // Isso impacta diretamente a tela de comissões (que pode filtrar por payment_status).
+            $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
+            $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
+            if ($isPaid && is_array($cols)) {
+                // 1) pago_em
+                if (in_array('pago_em', $cols, true)) {
+                    $set[] = 'pago_em = COALESCE(pago_em, NOW())';
+                }
+
+                // 2) payment_status / status_pagamento
+                if (in_array('payment_status', $cols, true) && $statusCol !== 'payment_status') {
+                    $set[] = 'payment_status = ?';
+                    $params[] = 'approved';
+                }
+                if (in_array('status_pagamento', $cols, true) && $statusCol !== 'status_pagamento') {
+                    $set[] = 'status_pagamento = ?';
+                    $params[] = 'aprovado';
+                }
+
+                // 3) status (caso a coluna atualizada tenha sido payment_status/status_pagamento)
+                if (in_array('status', $cols, true) && $statusCol !== 'status') {
+                    $set[] = 'status = ?';
+                    $params[] = 'pago';
+                }
+            }
+
             if (is_array($cols) && in_array('updated_at', $cols, true)) {
                 $set[] = 'updated_at = NOW()';
             }
