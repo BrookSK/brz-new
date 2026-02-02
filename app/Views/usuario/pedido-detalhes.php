@@ -115,6 +115,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                 
                 <!-- Main Content -->
         <div class="col-lg-9">
+            <div class="d-flex flex-column gap-4">
                     <!-- Status Timeline -->
                     <div class="card border-0 shadow-sm">
                         <div class="card-header">
@@ -325,6 +326,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                         </div>
                     </div>
                     <?php endif; ?>
+
+            </div>
             
             <!-- Action Buttons -->
             <div class="d-flex gap-2 flex-wrap mt-4">
@@ -385,6 +388,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
 .product-item {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
     padding: 1rem;
     border-bottom: 1px solid rgba(148, 163, 184, 0.22);
 }
@@ -398,7 +403,11 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
     height: 60px;
     object-fit: cover;
     border-radius: 12px;
-    margin-right: 1rem;
+    margin-right: 0;
+}
+
+.product-info {
+    min-width: 0;
 }
 
 .quantity-badge {
