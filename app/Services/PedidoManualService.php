@@ -70,13 +70,21 @@ class PedidoManualService {
     }
 
     public function getTaxaServicoPorKgBRL(): float {
-        // Preferência: chave taxa_servico_usd_por_kg * taxa de conversão, ou taxa_servico_kg diretamente
+        // Preferência: chaves de entrega (Checkout) e depois chaves genéricas
+        $vBRL = $this->getConfigKeyValue('entrega_taxa_servico_kg', null);
+        if ($vBRL !== null && $vBRL !== '') {
+            return (float) str_replace(',', '.', (string) $vBRL);
+        }
+
         $vBRL = $this->getConfigKeyValue('taxa_servico_kg', null);
         if ($vBRL !== null && $vBRL !== '') {
             return (float) str_replace(',', '.', (string) $vBRL);
         }
 
-        $vUSD = $this->getConfigKeyValue('taxa_servico_usd_por_kg', null);
+        $vUSD = $this->getConfigKeyValue('entrega_taxa_servico_usd_por_kg', null);
+        if ($vUSD === null || $vUSD === '') {
+            $vUSD = $this->getConfigKeyValue('taxa_servico_usd_por_kg', null);
+        }
         $usd = ($vUSD !== null && $vUSD !== '') ? (float) str_replace(',', '.', (string) $vUSD) : 39.0;
 
         $taxa = 5.5;
@@ -90,6 +98,99 @@ class PedidoManualService {
         }
 
         return $usd * $taxa;
+    }
+
+    private function calcularImpostosPadrao(float $valorProdutos, float $valorFrete): float {
+        $icms = $this->getAliquota('icms_aliquota');
+        $ipi = $this->getAliquota('ipi_aliquota');
+
+        $base = $valorProdutos + $valorFrete;
+        $valorICMS = ($icms > 0) ? ($base * ($icms / 100)) : 0.0;
+        $valorIPI = ($ipi > 0) ? ($base * ($ipi / 100)) : 0.0;
+
+        return $valorICMS + $valorIPI;
+    }
+
+    private function obterTaxaConversaoUSDBRL(): float {
+        $taxa = 5.5;
+        try {
+            $stmt = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+            $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
+            if (is_array($row) && isset($row['taxa_conversao'])) {
+                $taxa = (float) $row['taxa_conversao'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $taxa;
+    }
+
+    private function calcularResumoPadrao(string $moeda, array $itens, float $valorFrete = 0.0): array {
+        $moeda = strtoupper(trim($moeda));
+        if ($moeda === '') {
+            $moeda = 'BRL';
+        }
+
+        $subtotal = 0.0;
+        $pesoTotal = 0.0;
+
+        $colsProdutos = $this->getCols('produtos');
+        $prodPesoCol = $this->pickFirstExistingColumn($colsProdutos, ['peso', 'weight']);
+        $prodPriceCol = $this->pickFirstExistingColumn($colsProdutos, ['price', 'valor', 'preco']);
+
+        $select = ['id'];
+        if ($prodPesoCol !== '') $select[] = $prodPesoCol . ' AS peso';
+        if ($prodPriceCol !== '') $select[] = $prodPriceCol . ' AS price';
+        $stmtProd = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = ? LIMIT 1');
+
+        foreach ($itens as $it) {
+            $produtoId = (int) ($it['produto_id'] ?? 0);
+            $qtd = (int) ($it['quantidade'] ?? 0);
+            if ($produtoId <= 0 || $qtd <= 0) continue;
+
+            $valorUnit = isset($it['valor_unitario']) ? (float) $it['valor_unitario'] : 0.0;
+            $peso = 0.0;
+
+            try {
+                $stmtProd->execute([$produtoId]);
+                $p = $stmtProd->fetch(\PDO::FETCH_ASSOC) ?: [];
+                if ($valorUnit <= 0 && isset($p['price'])) {
+                    $valorUnit = (float) $p['price'];
+                }
+                if (isset($p['peso'])) {
+                    $peso = (float) $p['peso'];
+                }
+            } catch (\Exception $e) {
+            }
+
+            $subtotal += ($valorUnit * $qtd);
+            $pesoTotal += ($peso * $qtd);
+        }
+
+        $pesoParaTaxa = ceil($pesoTotal);
+        $taxaServico = 0.0;
+        if ($moeda === 'BRL') {
+            $taxaServico = $pesoParaTaxa * $this->getTaxaServicoPorKgBRL();
+        } else {
+            // Para moedas diferentes, usa taxa USD e não converte (mantém compatibilidade)
+            $vUSD = $this->getConfigKeyValue('entrega_taxa_servico_usd_por_kg', null);
+            if ($vUSD === null || $vUSD === '') {
+                $vUSD = $this->getConfigKeyValue('taxa_servico_usd_por_kg', null);
+            }
+            $usd = ($vUSD !== null && $vUSD !== '') ? (float) str_replace(',', '.', (string) $vUSD) : 39.0;
+            $taxaServico = $pesoParaTaxa * $usd;
+        }
+
+        $impostos = $this->calcularImpostosPadrao($subtotal, $valorFrete);
+        $total = $subtotal + $valorFrete + $taxaServico + $impostos;
+
+        return [
+            'subtotal_produtos' => round($subtotal, 2),
+            'peso_total' => round($pesoTotal, 3),
+            'taxa_servico' => round($taxaServico, 2),
+            'valor_impostos' => round($impostos, 2),
+            'valor_frete' => round($valorFrete, 2),
+            'valor_total' => round($total, 2),
+        ];
     }
 
     private function tableExists(string $table): bool {
@@ -184,7 +285,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = []): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -217,22 +318,27 @@ class PedidoManualService {
         $statusCol = in_array('status', $colsPedidos, true) ? 'status' : '';
         $obsCol = in_array('observacoes', $colsPedidos, true) ? 'observacoes' : (in_array('observacao', $colsPedidos, true) ? 'observacao' : '');
 
-        $total = 0.0;
+        // Se resumo não veio do front (ou veio zerado), recalcular com a cobrança padrão do sistema
+        $resumoTotal = isset($resumo['valor_total']) ? (float) $resumo['valor_total'] : 0.0;
+        if ($resumoTotal <= 0) {
+            $valorFrete = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
+            $resumo = $this->calcularResumoPadrao($moeda, $itens, $valorFrete);
+        }
+
+        $subtotalItens = 0.0;
         foreach ($itens as $it) {
             $q = (int) ($it['quantidade'] ?? 0);
             $vu = (float) ($it['valor_unitario'] ?? 0);
             if ($q <= 0 || $vu < 0) {
                 throw new \Exception('Item inválido');
             }
-            $total += ($q * $vu);
+            $subtotalItens += ($q * $vu);
         }
-        $total = round($total, 2);
+        $subtotalItens = round($subtotalItens, 2);
 
-        // Se o front enviou um total calculado (com taxas), usar quando for maior ou igual ao subtotal
+        // Se veio total calculado (com taxas), usar. Senão, usar subtotal como base.
         $valorTotalCalc = isset($resumo['valor_total']) ? (float) $resumo['valor_total'] : 0.0;
-        if ($valorTotalCalc > 0 && $valorTotalCalc >= $total) {
-            $total = round($valorTotalCalc, 2);
-        }
+        $total = ($valorTotalCalc > 0) ? round($valorTotalCalc, 2) : $subtotalItens;
 
         $cols = [$usuarioCol, $colTotal];
         $vals = [':usuario_id', ':total'];
@@ -287,6 +393,18 @@ class PedidoManualService {
             $cols[] = $codigoCol;
             $vals[] = ':codigo';
             $params[':codigo'] = 'MAN-' . date('Ymd-His');
+        }
+
+        // Origem do pedido / admin criador (quando colunas existirem)
+        if (in_array('origem_pedido', $colsPedidos, true)) {
+            $cols[] = 'origem_pedido';
+            $vals[] = ':origem_pedido';
+            $params[':origem_pedido'] = 'manual';
+        }
+        if ($adminCriadorId !== null && $adminCriadorId > 0 && in_array('admin_criador_id', $colsPedidos, true)) {
+            $cols[] = 'admin_criador_id';
+            $vals[] = ':admin_criador_id';
+            $params[':admin_criador_id'] = (int) $adminCriadorId;
         }
 
         $this->db->beginTransaction();

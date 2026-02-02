@@ -48,6 +48,7 @@ $router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
 $router->post('/meus-dados/avatar/remover', 'UsuarioController', 'avatarRemover');
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
 $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
+$router->get('/pedido/detalhes/{id}/pdf', 'UsuarioController', 'pedidoPdf');
 $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirPagamento');
 
 // Checkout
@@ -231,9 +232,11 @@ $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'ex
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
+$router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
 $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
+$router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');

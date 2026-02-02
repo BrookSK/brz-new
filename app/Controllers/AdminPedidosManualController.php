@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Models\Usuario;
 use App\Services\PedidoManualService;
+use App\Services\AuthService;
 
 class AdminPedidosManualController extends Controller {
     public function novo(Request $request) {
@@ -37,6 +38,17 @@ class AdminPedidosManualController extends Controller {
             if (in_array('sku', $cols, true)) $select[] = 'sku';
             if ($pesoCol !== '') $select[] = $pesoCol . ' AS peso';
 
+            $fotoCol = '';
+            foreach (['foto_principal', 'capa', 'imagem', 'image'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $fotoCol = $c;
+                    break;
+                }
+            }
+            if ($fotoCol !== '') {
+                $select[] = $fotoCol . ' AS foto_principal';
+            }
+
             $where = '';
             if ($activeCol !== '') {
                 $where = ' WHERE ' . $activeCol . ' = 1 ';
@@ -48,6 +60,34 @@ class AdminPedidosManualController extends Controller {
             $stmt = $pdo->prepare($sql);
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Enriquecer com imagem (primeiro tenta foto_principal; depois primeira foto de produto_fotos)
+            foreach ($produtos as &$p) {
+                $img = (string) ($p['foto_principal'] ?? '');
+                if ($img === '') {
+                    try {
+                        $stmtFoto = $pdo->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = :produto_id ORDER BY principal DESC, ordem ASC, id ASC LIMIT 1');
+                        $stmtFoto->bindValue(':produto_id', (int) ($p['id'] ?? 0), \PDO::PARAM_INT);
+                        $stmtFoto->execute();
+                        $foto = $stmtFoto->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $img = (string) ($foto['nome_arquivo'] ?? '');
+                    } catch (\Exception $e) {
+                        $img = '';
+                    }
+                }
+
+                $img = trim($img);
+                if ($img !== '' && !preg_match('#^https?://#i', $img)) {
+                    if ($img[0] !== '/') {
+                        $img = '/' . $img;
+                    }
+                    if (strpos($img, '/uploads/') !== 0) {
+                        $img = '/uploads/produtos/' . ltrim($img, '/');
+                    }
+                }
+
+                $p['imagem'] = $img;
+            }
         } catch (\Exception $e) {
             $produtos = [];
         }
@@ -218,7 +258,7 @@ class AdminPedidosManualController extends Controller {
             <div class="card mb-4">
                 <div class="card-header"><strong>Pagamento (Asaas)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3">Primeiro crie o pedido manual. Depois gere o link de pagamento.</div>
+                    <div class="alert alert-info mb-3">Clique em <strong>Gerar Link de Pagamento</strong>. O sistema irá criar o pedido manual automaticamente se necessário e então gerar o link.</div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4">
                             <label class="form-label">Billing Type</label>
@@ -228,7 +268,7 @@ class AdminPedidosManualController extends Controller {
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <button type="button" class="btn btn-primary" onclick="gerarLinkPagamento()" ' . ($pedidoId > 0 ? '' : 'disabled') . '>
+                            <button type="button" class="btn btn-primary" onclick="gerarLinkPagamento()">
                                 <i class="fas fa-link"></i> Gerar Link de Pagamento
                             </button>
                         </div>
@@ -243,7 +283,7 @@ class AdminPedidosManualController extends Controller {
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
         echo "<script>\n";
         echo 'const PRODUTOS = ' . json_encode($produtos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
-        echo 'const PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
+        echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
@@ -272,6 +312,44 @@ function buildProdutoOptions(){
     return html;
 }
 
+function produtoLabel(p){
+    const name = (p && p.name) ? String(p.name) : '';
+    const sku = (p && p.sku) ? String(p.sku) : '';
+    const price = (p && p.price) ? Number(p.price) : 0;
+    const partSku = sku ? ` (${sku})` : '';
+    return `${name}${partSku} - R$ ${formatMoney(price)}`;
+}
+
+function produtoImagem(p){
+    const img = (p && p.imagem) ? String(p.imagem) : '';
+    if (!img) return '/uploads/produtos/placeholder.jpg';
+    return img;
+}
+
+function findProdutos(term){
+    const t = String(term || '').trim().toLowerCase();
+    if (!t) return [];
+    const max = 12;
+    const res = [];
+    for (const p of PRODUTOS) {
+        const name = String(p.name || '').toLowerCase();
+        const sku = String(p.sku || '').toLowerCase();
+        const id = String(p.id || '');
+        if (name.includes(t) || sku.includes(t) || id === t) {
+            res.push(p);
+            if (res.length >= max) break;
+        }
+    }
+    return res;
+}
+
+function closeAllProductResults(){
+    document.querySelectorAll('.prodResults').forEach(el => {
+        el.style.display = 'none';
+        el.innerHTML = '';
+    });
+}
+
 function escapeHtml(str){
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
@@ -281,9 +359,14 @@ function addItemRow(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td>
-            <select class="form-select form-select-sm produtoSel" name="produto_id[]" onchange="onProdutoChange(this)" required>
-                ${buildProdutoOptions()}
-            </select>
+            <div class="d-flex align-items-center gap-2 position-relative">
+                <img src="/uploads/produtos/placeholder.jpg" class="rounded border" style="width:34px;height:34px;object-fit:cover" alt="">
+                <div class="flex-grow-1">
+                    <input type="hidden" class="produtoIdInp" name="produto_id[]" value="" required>
+                    <input type="text" class="form-control form-control-sm produtoSearch" placeholder="Buscar produto..." autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
+                    <div class="list-group position-absolute w-100 prodResults" style="z-index: 1050; display:none; max-height: 280px; overflow:auto;"></div>
+                </div>
+            </div>
         </td>
         <td>
             <input type="number" class="form-control form-control-sm qtdInp" name="quantidade[]" min="1" value="1" onchange="calcTotal()" required>
@@ -307,13 +390,59 @@ function removeRow(btn){
     calcTotal();
 }
 
-function onProdutoChange(sel){
-    const opt = sel.options[sel.selectedIndex];
-    const price = opt ? opt.getAttribute('data-price') : '0';
-    const tr = sel.closest('tr');
+function onProdutoSearchInput(inp){
+    const tr = inp.closest('tr');
     if (!tr) return;
+    const resultsEl = tr.querySelector('.prodResults');
+    if (!resultsEl) return;
+
+    const term = inp.value;
+    const items = findProdutos(term);
+    if (!term || items.length === 0) {
+        resultsEl.style.display = 'none';
+        resultsEl.innerHTML = '';
+        return;
+    }
+
+    resultsEl.innerHTML = items.map(p => {
+        const img = produtoImagem(p);
+        const label = produtoLabel(p);
+        const pid = Number(p.id || 0);
+        return `
+            <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2" onclick="selectProdutoFromSearch(this, ${pid})">
+                <img src="${escapeHtml(img)}" class="rounded border" style="width:40px;height:40px;object-fit:cover" alt="">
+                <div class="text-start">
+                    <div class="fw-semibold">${escapeHtml(String(p.name || ''))}</div>
+                    <div class="small text-muted">R$ ${formatMoney(p.price || 0)}</div>
+                </div>
+            </button>
+        `;
+    }).join('');
+
+    resultsEl.style.display = 'block';
+}
+
+function selectProdutoFromSearch(btn, produtoId){
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const prod = PRODUTOS.find(p => Number(p.id) === Number(produtoId));
+    if (!prod) return;
+
+    const hidden = tr.querySelector('.produtoIdInp');
+    const search = tr.querySelector('.produtoSearch');
+    const imgEl = tr.querySelector('img');
     const valor = tr.querySelector('.valorInp');
-    if (valor) valor.value = formatMoney(price);
+    if (hidden) hidden.value = String(prod.id);
+    if (search) search.value = produtoLabel(prod);
+    if (imgEl) imgEl.src = produtoImagem(prod);
+    if (valor) valor.value = formatMoney(prod.price || 0);
+
+    const resultsEl = tr.querySelector('.prodResults');
+    if (resultsEl) {
+        resultsEl.style.display = 'none';
+        resultsEl.innerHTML = '';
+    }
+
     calcTotal();
 }
 
@@ -325,8 +454,7 @@ function calcTotal(){
     rows.forEach(r => {
         const qtd = Number(r.querySelector('.qtdInp')?.value || 0);
         const val = Number(String(r.querySelector('.valorInp')?.value || '0').replace(',', '.'));
-        const sel = r.querySelector('.produtoSel');
-        const pid = sel ? Number(sel.value || 0) : 0;
+        const pid = Number(r.querySelector('.produtoIdInp')?.value || 0);
         const prod = PRODUTOS.find(p => Number(p.id) === pid);
         const peso = prod ? Number(prod.peso || 0) : 0;
         if (qtd > 0 && val >= 0) {
@@ -337,7 +465,9 @@ function calcTotal(){
     });
 
     const frete = 0;
-    const taxaServico = (Number(TAXA_SERVICO_POR_KG || 0) > 0) ? (pesoTotal * Number(TAXA_SERVICO_POR_KG)) : 0;
+    // Cobrança padrão: taxa de serviço usa peso arredondado para cima
+    const pesoParaTaxa = Math.ceil(pesoTotal);
+    const taxaServico = (Number(TAXA_SERVICO_POR_KG || 0) > 0) ? (pesoParaTaxa * Number(TAXA_SERVICO_POR_KG)) : 0;
     const baseImpostos = subtotal + frete;
     const icms = (Number(ALIQUOTA_ICMS || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_ICMS) / 100)) : 0;
     const ipi = (Number(ALIQUOTA_IPI || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_IPI) / 100)) : 0;
@@ -366,18 +496,44 @@ function calcTotal(){
 }
 
 function gerarLinkPagamento(){
-    if (!PEDIDO_ID) return;
     const bt = document.getElementById('billingType').value;
 
-    const fd = new FormData();
-    fd.append('pedido_id', String(PEDIDO_ID));
-    fd.append('billingType', bt);
+    // Garantir que os hidden inputs estejam atualizados
+    try { calcTotal(); } catch (e) {}
 
-    fetch('/admin/pedidos/novo-manual/gerar-link', { method: 'POST', body: fd })
-        .then(r => r.json())
+    const el = document.getElementById('linkResult');
+    el.style.display = 'block';
+    el.innerHTML = `<div class="alert alert-info">Processando...</div>`;
+
+    const criarSeNecessario = () => {
+        if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
+            return Promise.resolve({ success: true, pedido_id: Number(PEDIDO_ID) });
+        }
+
+        // Criar pedido via AJAX usando os dados do formulário
+        const form = document.getElementById('formPedidoManual');
+        const fd = new FormData(form);
+        return fetch('/admin/pedidos/novo-manual/criar', { method: 'POST', body: fd })
+            .then(r => r.json());
+    };
+
+    criarSeNecessario()
+        .then(resp => {
+            if (!resp || !resp.success) {
+                throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
+            }
+            PEDIDO_ID = Number(resp.pedido_id || resp.pedidoId || 0);
+            if (!PEDIDO_ID) {
+                throw new Error('Pedido inválido');
+            }
+
+            const fd = new FormData();
+            fd.append('pedido_id', String(PEDIDO_ID));
+            fd.append('billingType', bt);
+            return fetch('/admin/pedidos/novo-manual/gerar-link', { method: 'POST', body: fd })
+                .then(r => r.json());
+        })
         .then(data => {
-            const el = document.getElementById('linkResult');
-            el.style.display = 'block';
             if (data && data.success) {
                 const url = data.invoiceUrl || '';
                 el.innerHTML = `<div class="alert alert-success">Link gerado: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>`;
@@ -386,14 +542,18 @@ function gerarLinkPagamento(){
             }
         })
         .catch(err => {
-            const el = document.getElementById('linkResult');
-            el.style.display = 'block';
             el.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
         });
 }
 
 document.addEventListener('DOMContentLoaded', function(){
     addItemRow();
+
+    document.addEventListener('click', function(e){
+        if (!(e.target && (e.target.closest('.produtoSearch') || e.target.closest('.prodResults')))) {
+            closeAllProductResults();
+        }
+    });
 });
 
 JS;
@@ -443,14 +603,81 @@ JS;
                 }
             }
 
+            $adminId = null;
+            try {
+                $auth = new AuthService();
+                $u = $auth->getUsuarioLogado();
+                if (is_array($u) && (($u['perfil'] ?? '') === 'admin')) {
+                    $adminId = (int) ($u['id'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $adminId = null;
+            }
+
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
         } catch (\Exception $e) {
             header('Location: /admin/pedidos/novo-manual?erro=' . urlencode($e->getMessage()));
             exit;
+        }
+    }
+
+    public function criar(Request $request) {
+        try {
+            $clienteId = (int) $request->getParam('cliente_id');
+            $moeda = (string) $request->getParam('moeda', 'BRL');
+
+            $resumo = [
+                'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
+                'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
+                'taxa_servico' => (float) str_replace(',', '.', (string) $request->getParam('taxa_servico', '0')),
+                'valor_impostos' => (float) str_replace(',', '.', (string) $request->getParam('valor_impostos', '0')),
+                'valor_frete' => (float) str_replace(',', '.', (string) $request->getParam('valor_frete', '0')),
+                'valor_total' => (float) str_replace(',', '.', (string) $request->getParam('valor_total', '0')),
+            ];
+
+            $produtoIds = $request->getParam('produto_id', []);
+            $qtds = $request->getParam('quantidade', []);
+            $vals = $request->getParam('valor_unitario', []);
+
+            if (!is_array($produtoIds)) $produtoIds = [];
+            if (!is_array($qtds)) $qtds = [];
+            if (!is_array($vals)) $vals = [];
+
+            $itens = [];
+            $count = max(count($produtoIds), count($qtds), count($vals));
+            for ($i = 0; $i < $count; $i++) {
+                $pid = (int) ($produtoIds[$i] ?? 0);
+                $q = (int) ($qtds[$i] ?? 0);
+                $v = (float) (is_string(($vals[$i] ?? '')) ? str_replace(',', '.', (string) ($vals[$i] ?? '0')) : ($vals[$i] ?? 0));
+                if ($pid > 0 && $q > 0) {
+                    $itens[] = [
+                        'produto_id' => $pid,
+                        'quantidade' => $q,
+                        'valor_unitario' => $v,
+                    ];
+                }
+            }
+
+            $adminId = null;
+            try {
+                $auth = new AuthService();
+                $u = $auth->getUsuarioLogado();
+                if (is_array($u) && (($u['perfil'] ?? '') === 'admin')) {
+                    $adminId = (int) ($u['id'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $adminId = null;
+            }
+
+            $svc = new PedidoManualService();
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId);
+            $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
 

@@ -1508,6 +1508,23 @@ class CheckoutController extends Controller {
             $pedidoId = $db->lastInsertId();
             $this->debugLog('[CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
 
+            // Origem do pedido (orgânico/checkout) quando a coluna existir
+            try {
+                $colsPed = [];
+                try {
+                    $stmtColsPed = $db->query('DESCRIBE pedidos');
+                    $colsPed = $stmtColsPed ? $stmtColsPed->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsPed = [];
+                }
+
+                if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
+                    $stmtOrigem = $db->prepare('UPDATE pedidos SET origem_pedido = ? WHERE id = ?');
+                    $stmtOrigem->execute(['organico', $pedidoId]);
+                }
+            } catch (\Exception $e) {
+            }
+
             // Criar endereço(s) e vincular ao pedido
             try {
                 $enderecoModelApp = new \App\Models\Endereco();

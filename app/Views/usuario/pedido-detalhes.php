@@ -44,8 +44,20 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                 <h1 class="h4 mb-0">Pedido #<?= htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['id']) ?></h1>
             </div>
             <div class="text-muted small">Data: <?= !empty($pedido['created_at']) ? date('d/m/Y \à\s H:i', strtotime($pedido['created_at'])) : '-' ?></div>
+            <?php if (!empty($pedido['origem_pedido'])): ?>
+                <div class="text-muted small">
+                    Origem: <strong><?= htmlspecialchars((string) $pedido['origem_pedido']) ?></strong>
+                    <?php if (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email'])): ?>
+                        <span class="ms-1">(Admin: <?= htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) ?><?= !empty($pedido['admin_criador_email']) ? ' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;' : '' ?>)</span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
-        <div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="/pedido/detalhes/<?= (int) ($pedido['id'] ?? 0) ?>/pdf" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener">
+                <i class="fas fa-file-pdf"></i>
+                Exportar PDF
+            </a>
             <span class="badge" style="background: <?= $badgePedido['bg'] ?>; border: 1px solid <?= $badgePedido['border'] ?>; color: <?= $badgePedido['color'] ?>;">
                 <?= getStatusText($pedido['status'] ?? '') ?>
             </span>
@@ -210,7 +222,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                     </div>
                                     <div class="price-row">
                                         <span>Frete:</span>
-                                        <span>R$ <?= number_format($pedido['valor_frete'] ?? 0, 2, ',', '.') ?></span>
+                                        <?php $freteVal = (float) ($pedido['valor_frete'] ?? 0); ?>
+                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ('R$ ' . number_format($freteVal, 2, ',', '.'))) ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Taxa de Serviço:</span>

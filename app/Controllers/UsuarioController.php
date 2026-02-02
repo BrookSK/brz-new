@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\PdfPedidoService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
 use App\Models\Carrinho;
@@ -532,6 +533,40 @@ class UsuarioController extends Controller {
         }
     }
 
+    public function pedidoPdf(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $pedidoId = $request->getParam('id');
+        $usuario = $this->authService->getUsuarioLogado();
+
+        try {
+            $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+            if (!$pedido || $pedido['usuario_id'] != $usuario['id']) {
+                $this->view('errors/404');
+                return;
+            }
+
+            $itens = $pedido['items'] ?? [];
+
+            $paymentDetails = null;
+            try {
+                if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
+                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
+                } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                }
+            } catch (\Exception $e) {
+                $paymentDetails = null;
+            }
+
+            $svc = new PdfPedidoService();
+            $html = $svc->renderPedidoHtml($pedido, is_array($itens) ? $itens : [], is_array($paymentDetails) ? $paymentDetails : null);
+            $svc->outputPdfOrHtml($html, 'pedido_' . (string) ($pedido['codigo_pedido'] ?? $pedido['id'] ?? $pedidoId));
+        } catch (\Exception $e) {
+            echo 'Erro ao gerar PDF: ' . $e->getMessage();
+        }
+    }
+
     public function reemitirPagamento(Request $request) {
         $this->authService->requerAutenticacao();
 
@@ -628,10 +663,26 @@ class UsuarioController extends Controller {
             error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
+
+        $comissoes = [
+            'pedidos' => [],
+            'total_faturado' => 0.0,
+            'total_custo_produtos' => 0.0,
+            'total_liquido' => 0.0,
+            'percentual_comissao' => 0.0,
+            'valor_comissao' => 0.0,
+            'faixas' => [],
+        ];
+        try {
+            $comissoes = $this->pedidoModel->getResumoComissoesPedidosManuais((int) $usuario['id']);
+        } catch (\Exception $e) {
+            $comissoes = $comissoes;
+        }
         
         $this->view('usuario/meus-pedidos', [
             'usuario' => $usuario,
             'pedidos' => $pedidos,
+            'comissoes' => $comissoes,
             'pagina' => $pagina,
             'total' => count($pedidos),
             'total_paginas' => ceil(count($pedidos) / $limite)

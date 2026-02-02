@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Models\PedidoEcommerce;
+use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
 
 class AdminPedidosController extends Controller {
@@ -394,6 +395,38 @@ class AdminPedidosController extends Controller {
 </html>';
         exit;
     }
+
+    public function pdf(Request $request) {
+        $id = $request->getParam('id');
+        try {
+            $pedidoModel = new PedidoEcommerce();
+            $pedido = $pedidoModel->getComDetalhes($id);
+            if (!$pedido) {
+                echo 'Pedido não encontrado';
+                return;
+            }
+
+            $itens = $pedido['items'] ?? [];
+
+            $paymentDetails = null;
+            try {
+                $paymentService = new PaymentService();
+                $paymentId = (string) ($pedido['pagamento_transacao'] ?? ($pedido['payment_id'] ?? ''));
+                $gateway = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ''));
+                if ($paymentId !== '' && strtolower($gateway) === 'asaas') {
+                    $paymentDetails = $paymentService->obterPagamentoAsaas($paymentId);
+                }
+            } catch (\Exception $e) {
+                $paymentDetails = null;
+            }
+
+            $svc = new PdfPedidoService();
+            $html = $svc->renderPedidoHtml($pedido, is_array($itens) ? $itens : [], is_array($paymentDetails) ? $paymentDetails : null);
+            $svc->outputPdfOrHtml($html, 'pedido_' . (string) ($pedido['codigo_pedido'] ?? $pedido['id'] ?? $id));
+        } catch (\Exception $e) {
+            echo 'Erro ao gerar PDF: ' . $e->getMessage();
+        }
+    }
     
     public function detalhes(Request $request) {
         $id = $request->getParam('id');
@@ -464,6 +497,9 @@ class AdminPedidosController extends Controller {
                 <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
                 <div>
+                    <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
+                        <i class="fas fa-file-pdf me-1"></i>Exportar PDF
+                    </a>
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
                         <i class="fas fa-edit me-1"></i>Editar Pedido
                     </a>
@@ -645,11 +681,12 @@ class AdminPedidosController extends Controller {
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
                                             <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
                                             <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
+                                            ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>
                                             <tr><td><strong>Subtotal</strong></td><td>R$ ' . number_format($pedido['subtotal'], 2, ',', '.') . '</td></tr>
                                             <tr><td><strong>Serviços</strong></td><td>R$ ' . number_format($pedido['servicos'], 2, ',', '.') . '</td></tr>
                                             <tr><td><strong>Impostos</strong></td><td>R$ ' . number_format($pedido['impostos'], 2, ',', '.') . '</td></tr>
-                                            <tr><td><strong>Frete</strong></td><td>R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</td></tr>
+                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</td></tr>
                                             <tr><td><strong>Desconto</strong></td><td>R$ ' . number_format($pedido['desconto'], 2, ',', '.') . '</td></tr>
                                             <tr><td><strong>Total</strong></td><td><strong>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</strong></td></tr>
                                             <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars($pedido['moeda']) . '</td></tr>
@@ -673,7 +710,7 @@ class AdminPedidosController extends Controller {
                                 <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                <p><strong>Frete:</strong> R$ ' . number_format($pedido['frete'], 2, ',', '.') . '</p>
+                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</p>
                                 <hr>
                                 <div class="mb-3">
                                     <h6 class="mb-2">Pagamento</h6>

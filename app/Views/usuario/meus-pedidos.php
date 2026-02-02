@@ -198,184 +198,289 @@
                 </div>
             </div>
             
-            <!-- Orders Table -->
+            <!-- Tabs: Pedidos / Comissões -->
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 pt-4 pb-3">
-                    <h5 class="mb-0 fw-bold">Lista de Pedidos</h5>
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-pedidos" data-bs-toggle="tab" data-bs-target="#pane-pedidos" type="button" role="tab" aria-controls="pane-pedidos" aria-selected="true">Pedidos</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-comissoes" data-bs-toggle="tab" data-bs-target="#pane-comissoes" type="button" role="tab" aria-controls="pane-comissoes" aria-selected="false">Comissões</button>
+                        </li>
+                    </ul>
                 </div>
                 <div class="card-body">
-                    <?php if (empty($pedidos)): ?>
-                        <div class="text-center py-5">
-                            <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
-                                <i class="fas fa-shopping-bag text-muted fs-2"></i>
-                            </div>
-                            <h5 class="mb-2">Nenhum pedido encontrado</h5>
-                            <p class="text-muted mb-4">Você ainda não fez nenhuma compra.</p>
-                            <a href="/produtos" class="btn btn-primary">
-                                <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
-                            </a>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="tabelaPedidos">
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Data</th>
-                                        <th>Status</th>
-                                        <th>Valor</th>
-                                        <th>Itens</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($pedidos as $pedido): ?>
-                                    <?php
-                                        $codigoPedido = (string) (
-                                            $pedido['codigo_pedido'] ??
-                                            $pedido['numero_pedido'] ??
-                                            $pedido['codigo'] ??
-                                            ('#' . (string) ($pedido['id'] ?? ''))
-                                        );
-                                        $statusPedido = (string) ($pedido['status'] ?? '');
-                                        if ($statusPedido === '') {
-                                            $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
-                                        }
-                                        $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
-                                        $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
-                                    ?>
-                                    <tr data-status="<?= htmlspecialchars($statusPedido) ?>">
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
-                                                    <i class="fas fa-receipt text-primary fs-6"></i>
-                                                </div>
-                                                <div>
-                                                    <strong><?= htmlspecialchars($codigoPedido) ?></strong>
-                                                    <div class="text-muted small">#<?= str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div>
-                                                <div class="small fw-semibold"><?= date('d/m/Y', strtotime($pedido['created_at'])) ?></div>
-                                                <div class="text-muted small"><?= date('H:i', strtotime($pedido['created_at'])) ?></div>
-                                            </div>
-                                        </td>
-                                        <td>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="pane-pedidos" role="tabpanel" aria-labelledby="tab-pedidos">
+                            <?php if (empty($pedidos)): ?>
+                                <div class="text-center py-5">
+                                    <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
+                                        <i class="fas fa-shopping-bag text-muted fs-2"></i>
+                                    </div>
+                                    <h5 class="mb-2">Nenhum pedido encontrado</h5>
+                                    <p class="text-muted mb-4">Você ainda não fez nenhuma compra.</p>
+                                    <a href="/produtos" class="btn btn-primary">
+                                        <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="tabelaPedidos">
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Data</th>
+                                                <th>Status</th>
+                                                <th>Valor</th>
+                                                <th>Itens</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($pedidos as $pedido): ?>
                                             <?php
-                                            $statusColors = [
-                                                'pendente' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
-                                                'processando' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'enviado' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'entregue' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
-                                                'cancelado' => ['bg' => 'rgba(239, 68, 68, 0.10)', 'border' => 'rgba(239, 68, 68, 0.18)', 'color' => 'rgba(185, 28, 28, 1)'],
-                                                'pago' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
-                                                'paid' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
-                                                'aprovado' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
-                                                'approved' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
-                                                'selecao' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
-                                                'cobranca' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
-                                                'despacho' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'aduana' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'entrega' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
-                                            ];
-                                            $statusLabels = [
-                                                'pendente' => 'Pendente',
-                                                'processando' => 'Processando',
-                                                'enviado' => 'Enviado',
-                                                'entregue' => 'Entregue',
-                                                'cancelado' => 'Cancelado',
-                                                'pago' => 'Pago',
-                                                'paid' => 'Pago',
-                                                'aprovado' => 'Pago',
-                                                'approved' => 'Pago',
-                                                'selecao' => 'Seleção',
-                                                'cobranca' => 'Cobrança',
-                                                'despacho' => 'Despacho',
-                                                'transito' => 'Trânsito',
-                                                'aduana' => 'Aduana',
-                                                'entrega' => 'Entrega',
-                                                'concluido' => 'Concluído'
-                                            ];
-                                            $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
-                                            $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
+                                                $codigoPedido = (string) (
+                                                    $pedido['codigo_pedido'] ??
+                                                    $pedido['numero_pedido'] ??
+                                                    $pedido['codigo'] ??
+                                                    ('#' . (string) ($pedido['id'] ?? ''))
+                                                );
+                                                $statusPedido = (string) ($pedido['status'] ?? '');
+                                                if ($statusPedido === '') {
+                                                    $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
+                                                }
+                                                $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
+                                                $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
                                             ?>
-                                            <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
-                                                <?= $label ?>
-                                            </span>
-                                        </td>
-                                        <td class="fw-semibold">
-                                            <?php if ($moeda === 'USD'): ?>
-                                                US$ <?= number_format($totalPedido, 2, ',', '.') ?>
-                                            <?php else: ?>
-                                                R$ <?= number_format($totalPedido, 2, ',', '.') ?>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-box text-muted me-2"></i>
-                                                <span class="small"><?= $pedido['total_itens'] ?? 0 ?> itens</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
-                                                   class="btn btn-sm btn-outline-primary"
-                                                   title="Ver Detalhes">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <button class="btn btn-sm btn-outline-success" 
-                                                        onclick="rastrearPedido('<?= $pedido['codigo_pedido'] ?>')"
-                                                        title="Rastrear">
-                                                    <i class="fas fa-search-location"></i>
-                                                </button>
-                                                <?php if ($pedido['status'] === 'entregue'): ?>
-                                                <button class="btn btn-sm btn-outline-info" 
-                                                        onclick="recomprarPedido(<?= $pedido['id'] ?>)"
-                                                        title="Comprar Novamente">
-                                                    <i class="fas fa-redo"></i>
-                                                </button>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                                            <tr data-status="<?= htmlspecialchars($statusPedido) ?>">
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
+                                                            <i class="fas fa-receipt text-primary fs-6"></i>
+                                                        </div>
+                                                        <div>
+                                                            <strong><?= htmlspecialchars($codigoPedido) ?></strong>
+                                                            <div class="text-muted small">#<?= str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <div class="small fw-semibold"><?= date('d/m/Y', strtotime($pedido['created_at'])) ?></div>
+                                                        <div class="text-muted small"><?= date('H:i', strtotime($pedido['created_at'])) ?></div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <?php
+                                                    $statusColors = [
+                                                        'pendente' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                        'processando' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'enviado' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'entregue' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'cancelado' => ['bg' => 'rgba(239, 68, 68, 0.10)', 'border' => 'rgba(239, 68, 68, 0.18)', 'color' => 'rgba(185, 28, 28, 1)'],
+                                                        'pago' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'paid' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'aprovado' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'approved' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'selecao' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
+                                                        'cobranca' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                        'despacho' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'aduana' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'entrega' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
+                                                    ];
+                                                    $statusLabels = [
+                                                        'pendente' => 'Pendente',
+                                                        'processando' => 'Processando',
+                                                        'enviado' => 'Enviado',
+                                                        'entregue' => 'Entregue',
+                                                        'cancelado' => 'Cancelado',
+                                                        'pago' => 'Pago',
+                                                        'paid' => 'Pago',
+                                                        'aprovado' => 'Pago',
+                                                        'approved' => 'Pago',
+                                                        'selecao' => 'Seleção',
+                                                        'cobranca' => 'Cobrança',
+                                                        'despacho' => 'Despacho',
+                                                        'transito' => 'Trânsito',
+                                                        'aduana' => 'Aduana',
+                                                        'entrega' => 'Entrega',
+                                                        'concluido' => 'Concluído'
+                                                    ];
+                                                    $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
+                                                    $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
+                                                    ?>
+                                                    <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
+                                                        <?= $label ?>
+                                                    </span>
+                                                </td>
+                                                <td class="fw-semibold">
+                                                    <?php if ($moeda === 'USD'): ?>
+                                                        US$ <?= number_format($totalPedido, 2, ',', '.') ?>
+                                                    <?php else: ?>
+                                                        R$ <?= number_format($totalPedido, 2, ',', '.') ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-box text-muted me-2"></i>
+                                                        <span class="small"><?= $pedido['total_itens'] ?? 0 ?> itens</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group">
+                                                        <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
+                                                           class="btn btn-sm btn-outline-primary"
+                                                           title="Ver Detalhes">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        <button class="btn btn-sm btn-outline-success" 
+                                                                onclick="rastrearPedido('<?= $pedido['codigo_pedido'] ?>')"
+                                                                title="Rastrear">
+                                                            <i class="fas fa-search-location"></i>
+                                                        </button>
+                                                        <?php if ($pedido['status'] === 'entregue'): ?>
+                                                        <button class="btn btn-sm btn-outline-info" 
+                                                                onclick="recomprarPedido(<?= $pedido['id'] ?>)"
+                                                                title="Comprar Novamente">
+                                                            <i class="fas fa-redo"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination -->
+                                <?php if ($total_paginas > 1): ?>
+                                <nav aria-label="Navegação de páginas" class="mt-4">
+                                    <ul class="pagination justify-content-center">
+                                        <?php if ($pagina > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina - 1 ?>">
+                                                <i class="fas fa-chevron-left"></i>
+                                            </a>
+                                        </li>
+                                        <?php endif; ?>
+                                        
+                                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                                        <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $i ?>"><?= $i ?></a>
+                                        </li>
+                                        <?php endfor; ?>
+                                        
+                                        <?php if ($pagina < $total_paginas): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina + 1 ?>">
+                                                <i class="fas fa-chevron-right"></i>
+                                            </a>
+                                        </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </nav>
+                                <?php endif; ?>
+                            <?php endif; ?>
                         </div>
-                        
-                        <!-- Pagination -->
-                        <?php if ($total_paginas > 1): ?>
-                        <nav aria-label="Navegação de páginas" class="mt-4">
-                            <ul class="pagination justify-content-center">
-                                <?php if ($pagina > 1): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina - 1 ?>">
-                                        <i class="fas fa-chevron-left"></i>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                                
-                                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                                <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                    <a class="page-link" href="/meus-pedidos?pagina=<?= $i ?>"><?= $i ?></a>
-                                </li>
-                                <?php endfor; ?>
-                                
-                                <?php if ($pagina < $total_paginas): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina + 1 ?>">
-                                        <i class="fas fa-chevron-right"></i>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
-                        <?php endif; ?>
-                    <?php endif; ?>
+
+                        <div class="tab-pane fade" id="pane-comissoes" role="tabpanel" aria-labelledby="tab-comissoes">
+                            <?php
+                                $comissoes = $comissoes ?? [];
+                                $cPedidos = is_array($comissoes) && isset($comissoes['pedidos']) && is_array($comissoes['pedidos']) ? $comissoes['pedidos'] : [];
+                                $totalFaturado = (float) ($comissoes['total_faturado'] ?? 0);
+                                $totalCusto = (float) ($comissoes['total_custo_produtos'] ?? 0);
+                                $totalLiquido = (float) ($comissoes['total_liquido'] ?? 0);
+                                $percent = (float) ($comissoes['percentual_comissao'] ?? 0);
+                                $valorComissao = (float) ($comissoes['valor_comissao'] ?? 0);
+                            ?>
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Total Faturado (Manuais)</div>
+                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalFaturado, 2, ',', '.') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Custo dos Produtos</div>
+                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalCusto, 2, ',', '.') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Total Líquido</div>
+                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalLiquido, 2, ',', '.') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Comissão</div>
+                                        <div class="fs-5 fw-bold"><?= number_format($percent, 2, ',', '.') ?>% (R$ <?= number_format($valorComissao, 2, ',', '.') ?>)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if (empty($cPedidos)): ?>
+                                <div class="text-center py-4">
+                                    <div class="bg-light rounded-circle p-3 d-inline-block mb-2">
+                                        <i class="fas fa-percentage text-muted fs-4"></i>
+                                    </div>
+                                    <h6 class="mb-1">Sem pedidos manuais pagos</h6>
+                                    <div class="text-muted small">A comissão é calculada somente sobre pedidos manuais com pagamento confirmado.</div>
+                                </div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Pedido</th>
+                                                <th>Data</th>
+                                                <th class="text-end">Faturado</th>
+                                                <th class="text-end">Custo</th>
+                                                <th class="text-end">Líquido</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($cPedidos as $p): ?>
+                                                <?php
+                                                    $pid = (int) ($p['id'] ?? 0);
+                                                    $codigo = (string) ($p['codigo'] ?? $pid);
+                                                    $fat = (float) ($p['faturado'] ?? 0);
+                                                    $cus = (float) ($p['custo'] ?? 0);
+                                                    $liq = (float) ($p['liquido'] ?? ($fat - $cus));
+                                                    $dt = (string) ($p['created_at'] ?? '');
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <a href="/pedido/detalhes/<?= $pid ?>" class="text-decoration-none">
+                                                            <strong><?= htmlspecialchars($codigo) ?></strong>
+                                                        </a>
+                                                        <div class="text-muted small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></div>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($dt !== ''): ?>
+                                                            <div class="small fw-semibold"><?= date('d/m/Y', strtotime($dt)) ?></div>
+                                                            <div class="text-muted small"><?= date('H:i', strtotime($dt)) ?></div>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end fw-semibold">R$ <?= number_format($fat, 2, ',', '.') ?></td>
+                                                    <td class="text-end">R$ <?= number_format($cus, 2, ',', '.') ?></td>
+                                                    <td class="text-end">R$ <?= number_format($liq, 2, ',', '.') ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

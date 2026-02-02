@@ -101,7 +101,8 @@
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Frete:</span>
-                        <span><?= $pedido['moeda'] ?> <?= number_format($pedido['frete'], 2, ',', '.') ?></span>
+                        <?php $freteVal = (float) ($pedido['frete'] ?? 0); ?>
+                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($pedido['moeda'] . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço:</span>

@@ -147,6 +147,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-assessoria-tab" data-bs-toggle="pill" data-bs-target="#v-pills-assessoria" type="button">
                                 <i class="fas fa-robot"></i> Assessoria / IA
                             </button>
+                            <button class="nav-link" id="v-pills-comissoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-comissoes" type="button">
+                                <i class="fas fa-percentage"></i> Comissões
+                            </button>
                             <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
                                 <i class="fas fa-cogs"></i> Sistema
                             </button>
@@ -960,6 +963,21 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="tab-pane fade" id="v-pills-comissoes" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurações de Comissões</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Faixas de comissão (Pedidos Manuais) - JSON</label>
+                                                <textarea class="form-control" name="comissao_manual_faixas" rows="8" placeholder='[{"min":0,"max":999999999,"percent":0}]'>'. htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]')) . '</textarea>
+                                                <small class="text-muted">Formato: lista de objetos com <code>min</code>, <code>max</code> e <code>percent</code>. O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <!-- Configurações do Sistema -->
                                 <div class="tab-pane fade" id="v-pills-sistema" role="tabpanel">
@@ -1046,6 +1064,7 @@ class AdminConfiguracoesController extends Controller {
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'webhook_link_pagamento_pedido_manual_url'],
+                'comissao' => ['manual_faixas'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],
@@ -1086,6 +1105,15 @@ class AdminConfiguracoesController extends Controller {
                         }
                         if ($chave === 'prazo_padrao') {
                             $valor = is_numeric($valor) ? intval($valor) : 30;
+                        }
+
+                        if ($categoria === 'comissao' && $chave === 'manual_faixas') {
+                            $decoded = json_decode((string) $valor, true);
+                            if ($decoded === null || !is_array($decoded)) {
+                                $valor = '[{"min":0,"max":999999999,"percent":0}]';
+                            } else {
+                                $valor = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+                            }
                         }
                         
                         // Atualizar ou inserir configuração
@@ -2065,7 +2093,7 @@ class AdminConfiguracoesController extends Controller {
 
             if ($temAlguma) {
                 $updatedAtCol = '';
-                foreach (['updated_at', 'data_atualizacao', 'updated'] as $c) {
+                foreach ($updatedCandidates as $c) {
                     if (in_array($c, $cols, true)) {
                         $updatedAtCol = $c;
                         break;
@@ -2081,20 +2109,28 @@ class AdminConfiguracoesController extends Controller {
                         'stripe_ambiente' => 'stripe_ambiente',
                         'stripe_publishable_key' => 'stripe_publishable_key',
                         'stripe_secret_key' => 'stripe_secret_key',
-                        'webhook_link_pagamento_pedido_manual_url' => 'webhook_link_pagamento_pedido_manual_url',
                     ],
                 ];
 
-                // Mapear colunas de e-mail (SMTP) se existirem no schema single_row
+                if (in_array('webhook_link_pagamento_pedido_manual_url', $cols, true)) {
+                    $columnMap['pagamentos']['webhook_link_pagamento_pedido_manual_url'] = 'webhook_link_pagamento_pedido_manual_url';
+                }
+
+                if (in_array('comissao_manual_faixas', $cols, true)) {
+                    $columnMap['comissao'] = [
+                        'manual_faixas' => 'comissao_manual_faixas',
+                    ];
+                }
+
                 $emailMapCandidates = [
                     'driver' => ['email_driver'],
                     'host' => ['email_host', 'smtp_host'],
                     'port' => ['email_port', 'smtp_port'],
-                    'username' => ['email_username', 'smtp_usuario', 'smtp_user', 'smtp_username'],
-                    'password' => ['email_password', 'smtp_senha', 'smtp_pass', 'smtp_password'],
-                    'encryption' => ['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption'],
-                    'from' => ['email_from', 'email_remetente', 'smtp_from'],
-                    'from_name' => ['email_from_name', 'email_nome_remetente', 'smtp_from_name'],
+                    'username' => ['email_username', 'smtp_usuario', 'smtp_user'],
+                    'password' => ['email_password', 'smtp_senha', 'smtp_pass'],
+                    'encryption' => ['email_encryption', 'smtp_criptografia'],
+                    'from' => ['email_from', 'email_remetente'],
+                    'from_name' => ['email_from_name', 'nome_remetente'],
                     'test_to' => ['email_test_to', 'email_teste_para'],
                 ];
 
