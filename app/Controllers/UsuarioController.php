@@ -663,26 +663,10 @@ class UsuarioController extends Controller {
             error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
             $pedidos = [];
         }
-
-        $comissoes = [
-            'pedidos' => [],
-            'total_faturado' => 0.0,
-            'total_custo_produtos' => 0.0,
-            'total_liquido' => 0.0,
-            'percentual_comissao' => 0.0,
-            'valor_comissao' => 0.0,
-            'faixas' => [],
-        ];
-        try {
-            $comissoes = $this->pedidoModel->getResumoComissoesPedidosManuais((int) $usuario['id']);
-        } catch (\Exception $e) {
-            $comissoes = $comissoes;
-        }
         
         $this->view('usuario/meus-pedidos', [
             'usuario' => $usuario,
             'pedidos' => $pedidos,
-            'comissoes' => $comissoes,
             'pagina' => $pagina,
             'total' => count($pedidos),
             'total_paginas' => ceil(count($pedidos) / $limite)

@@ -565,6 +565,201 @@ class PedidoEcommerce extends Model {
         ];
     }
 
+    public function getResumoComissoesPedidosManuaisPorAdminCriador(int $adminId): array {
+        $adminId = (int) $adminId;
+        if ($adminId <= 0) {
+            return [
+                'pedidos' => [],
+                'total_faturado' => 0.0,
+                'total_custo_produtos' => 0.0,
+                'total_liquido' => 0.0,
+                'percentual_comissao' => 0.0,
+                'valor_comissao' => 0.0,
+                'faixas' => $this->getFaixasComissaoManual(),
+            ];
+        }
+
+        $colsP = [];
+        try {
+            $stmtCols = $this->connection->query('DESCRIBE pedidos');
+            $colsP = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $colsP = [];
+        }
+
+        if (!is_array($colsP) || !in_array('origem_pedido', $colsP, true) || !in_array('admin_criador_id', $colsP, true)) {
+            return [
+                'pedidos' => [],
+                'total_faturado' => 0.0,
+                'total_custo_produtos' => 0.0,
+                'total_liquido' => 0.0,
+                'percentual_comissao' => 0.0,
+                'valor_comissao' => 0.0,
+                'faixas' => $this->getFaixasComissaoManual(),
+            ];
+        }
+
+        $totalCol = null;
+        foreach (['valor_total', 'total', 'amount', 'valor'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $totalCol = $c;
+                break;
+            }
+        }
+        if (!$totalCol) {
+            return [
+                'pedidos' => [],
+                'total_faturado' => 0.0,
+                'total_custo_produtos' => 0.0,
+                'total_liquido' => 0.0,
+                'percentual_comissao' => 0.0,
+                'valor_comissao' => 0.0,
+                'faixas' => $this->getFaixasComissaoManual(),
+            ];
+        }
+
+        $statusCol = null;
+        foreach (['status_pagamento', 'payment_status', 'status'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $statusCol = $c;
+                break;
+            }
+        }
+
+        $statusPaid = ['pago','paid','approved','aprovado','concluido','concluído'];
+
+        $where = 'admin_criador_id = :aid AND origem_pedido = :origem';
+        if (!empty($statusCol)) {
+            $where .= " AND LOWER(COALESCE({$statusCol}, '')) IN ('" . implode("','", $statusPaid) . "')";
+        }
+
+        $stmt = $this->connection->prepare("SELECT id, codigo_pedido, numero_pedido, created_at, {$totalCol} AS total_valor FROM pedidos WHERE {$where} ORDER BY created_at DESC");
+        $stmt->execute([':aid' => $adminId, ':origem' => 'manual']);
+        $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        if (empty($pedidos)) {
+            $faixas = $this->getFaixasComissaoManual();
+            return [
+                'pedidos' => [],
+                'total_faturado' => 0.0,
+                'total_custo_produtos' => 0.0,
+                'total_liquido' => 0.0,
+                'percentual_comissao' => 0.0,
+                'valor_comissao' => 0.0,
+                'faixas' => $faixas,
+            ];
+        }
+
+        // Reaproveita a mesma lógica de custo por pedido
+        $itensTable = null;
+        try {
+            $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmtT->execute(['pedido_itens']);
+            $hasItens = ((int) $stmtT->fetchColumn() > 0);
+            $stmtT->execute(['pedido_items']);
+            $hasItems = ((int) $stmtT->fetchColumn() > 0);
+            if ($hasItens && !$hasItems) $itensTable = 'pedido_itens';
+            elseif ($hasItems && !$hasItens) $itensTable = 'pedido_items';
+            else $itensTable = 'pedido_itens';
+        } catch (\Exception $e) {
+            $itensTable = 'pedido_itens';
+        }
+
+        $colsItens = [];
+        try {
+            $stmtColsI = $this->connection->query('DESCRIBE ' . $itensTable);
+            $colsItens = $stmtColsI ? $stmtColsI->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $colsItens = [];
+        }
+
+        $qtdCol = null;
+        foreach (['quantidade', 'qty', 'qtd'] as $c) {
+            if (is_array($colsItens) && in_array($c, $colsItens, true)) {
+                $qtdCol = $c;
+                break;
+            }
+        }
+        $produtoIdCol = (is_array($colsItens) && in_array('produto_id', $colsItens, true)) ? 'produto_id' : null;
+        $pedidoIdCol = (is_array($colsItens) && in_array('pedido_id', $colsItens, true)) ? 'pedido_id' : null;
+
+        $colsProdutos = [];
+        try {
+            $stmtColsPr = $this->connection->query('DESCRIBE produtos');
+            $colsProdutos = $stmtColsPr ? $stmtColsPr->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $colsProdutos = [];
+        }
+
+        $custoCol = null;
+        foreach (['custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
+            if (is_array($colsProdutos) && in_array($c, $colsProdutos, true)) {
+                $custoCol = $c;
+                break;
+            }
+        }
+
+        $totalFaturado = 0.0;
+        foreach ($pedidos as $p) {
+            $totalFaturado += (float) ($p['total_valor'] ?? 0);
+        }
+
+        $totalCusto = 0.0;
+        $pedidoIds = array_map(fn($p) => (int) ($p['id'] ?? 0), $pedidos);
+        $pedidoIds = array_values(array_filter($pedidoIds, fn($v) => $v > 0));
+
+        $custoPorPedido = [];
+        if (!empty($pedidoIds) && $pedidoIdCol && $produtoIdCol && $qtdCol && $custoCol) {
+            $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+            $sqlItens = "SELECT i.{$pedidoIdCol} AS pedido_id, i.{$qtdCol} AS qtd, pr.{$custoCol} AS custo_unit FROM {$itensTable} i INNER JOIN produtos pr ON pr.id = i.{$produtoIdCol} WHERE i.{$pedidoIdCol} IN ({$in})";
+            try {
+                $stmtItens = $this->connection->prepare($sqlItens);
+                $stmtItens->execute($pedidoIds);
+                $rows = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    $q = (float) ($r['qtd'] ?? 0);
+                    $cu = (float) ($r['custo_unit'] ?? 0);
+                    $custo = $q * $cu;
+                    if (!isset($custoPorPedido[$pid])) $custoPorPedido[$pid] = 0.0;
+                    $custoPorPedido[$pid] += $custo;
+                    $totalCusto += $custo;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $totalLiquido = $totalFaturado - $totalCusto;
+        $faixas = $this->getFaixasComissaoManual();
+        $percent = $this->calcularPercentualComissaoManual($totalFaturado, $faixas);
+        $valorComissao = $totalLiquido * ($percent / 100.0);
+
+        $pedidosOut = [];
+        foreach ($pedidos as $p) {
+            $pid = (int) ($p['id'] ?? 0);
+            $fat = (float) ($p['total_valor'] ?? 0);
+            $custo = (float) ($custoPorPedido[$pid] ?? 0);
+            $pedidosOut[] = [
+                'id' => $pid,
+                'codigo' => (string) ($p['codigo_pedido'] ?? ($p['numero_pedido'] ?? $pid)),
+                'created_at' => (string) ($p['created_at'] ?? ''),
+                'faturado' => $fat,
+                'custo' => $custo,
+                'liquido' => $fat - $custo,
+            ];
+        }
+
+        return [
+            'pedidos' => $pedidosOut,
+            'total_faturado' => (float) $totalFaturado,
+            'total_custo_produtos' => (float) $totalCusto,
+            'total_liquido' => (float) $totalLiquido,
+            'percentual_comissao' => (float) $percent,
+            'valor_comissao' => (float) $valorComissao,
+            'faixas' => $faixas,
+        ];
+    }
+
     public function criarPedidoAPartirDoCarrinho($carrinhoId, $usuarioId, $enderecoEntregaId, $enderecoCobrancaId, $dadosPagamento) {
         $this->connection->beginTransaction();
         

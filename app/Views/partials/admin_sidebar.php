@@ -7,6 +7,7 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas'],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias'],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos'],
+        'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes'],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque'],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras'],
         'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios'],

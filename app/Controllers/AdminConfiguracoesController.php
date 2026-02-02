@@ -972,7 +972,7 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Faixas de comissão (Pedidos Manuais) - JSON</label>
-                                                <textarea class="form-control" name="comissao_manual_faixas" rows="8" placeholder='[{"min":0,"max":999999999,"percent":0}]'>'. htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]')) . '</textarea>
+                                                <textarea class="form-control" name="comissao_manual_faixas" rows="8" placeholder="[{&quot;min&quot;:0,&quot;max&quot;:999999999,&quot;percent&quot;:0}]">' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]')) . '</textarea>
                                                 <small class="text-muted">Formato: lista de objetos com <code>min</code>, <code>max</code> e <code>percent</code>. O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
                                             </div>
                                         </div>

@@ -49,9 +49,6 @@
                         <a class="nav-link active mb-2" href="/meus-pedidos">
                             <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
                         </a>
-                        <a class="nav-link mb-2" href="/meus-pedidos?tab=comissoes">
-                            <i class="fas fa-percentage me-2"></i> Comissões
-                        </a>
                         <a class="nav-link mb-2" href="/carrinho">
                             <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
                             <?php if (!empty($_SESSION['carrinho'])): ?>
@@ -201,21 +198,9 @@
                 </div>
             </div>
             
-            <!-- Tabs: Pedidos / Comissões -->
+            <!-- Pedidos -->
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 pt-4 pb-0">
-                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="tab-pedidos" data-bs-toggle="tab" data-bs-target="#pane-pedidos" type="button" role="tab" aria-controls="pane-pedidos" aria-selected="true">Pedidos</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-comissoes" data-bs-toggle="tab" data-bs-target="#pane-comissoes" type="button" role="tab" aria-controls="pane-comissoes" aria-selected="false">Comissões</button>
-                        </li>
-                    </ul>
-                </div>
                 <div class="card-body">
-                    <div class="tab-content">
-                        <div class="tab-pane fade show active" id="pane-pedidos" role="tabpanel" aria-labelledby="tab-pedidos">
                             <?php if (empty($pedidos)): ?>
                                 <div class="text-center py-5">
                                     <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
@@ -387,103 +372,6 @@
                                     </ul>
                                 </nav>
                                 <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="tab-pane fade" id="pane-comissoes" role="tabpanel" aria-labelledby="tab-comissoes">
-                            <?php
-                                $comissoes = $comissoes ?? [];
-                                $cPedidos = is_array($comissoes) && isset($comissoes['pedidos']) && is_array($comissoes['pedidos']) ? $comissoes['pedidos'] : [];
-                                $totalFaturado = (float) ($comissoes['total_faturado'] ?? 0);
-                                $totalCusto = (float) ($comissoes['total_custo_produtos'] ?? 0);
-                                $totalLiquido = (float) ($comissoes['total_liquido'] ?? 0);
-                                $percent = (float) ($comissoes['percentual_comissao'] ?? 0);
-                                $valorComissao = (float) ($comissoes['valor_comissao'] ?? 0);
-                            ?>
-
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Total Faturado (Manuais)</div>
-                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalFaturado, 2, ',', '.') ?></div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Custo dos Produtos</div>
-                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalCusto, 2, ',', '.') ?></div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Total Líquido</div>
-                                        <div class="fs-5 fw-bold">R$ <?= number_format($totalLiquido, 2, ',', '.') ?></div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="text-muted small">Comissão</div>
-                                        <div class="fs-5 fw-bold"><?= number_format($percent, 2, ',', '.') ?>% (R$ <?= number_format($valorComissao, 2, ',', '.') ?>)</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <?php if (empty($cPedidos)): ?>
-                                <div class="text-center py-4">
-                                    <div class="bg-light rounded-circle p-3 d-inline-block mb-2">
-                                        <i class="fas fa-percentage text-muted fs-4"></i>
-                                    </div>
-                                    <h6 class="mb-1">Sem pedidos manuais pagos</h6>
-                                    <div class="text-muted small">A comissão é calculada somente sobre pedidos manuais com pagamento confirmado.</div>
-                                </div>
-                            <?php else: ?>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Pedido</th>
-                                                <th>Data</th>
-                                                <th class="text-end">Faturado</th>
-                                                <th class="text-end">Custo</th>
-                                                <th class="text-end">Líquido</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($cPedidos as $p): ?>
-                                                <?php
-                                                    $pid = (int) ($p['id'] ?? 0);
-                                                    $codigo = (string) ($p['codigo'] ?? $pid);
-                                                    $fat = (float) ($p['faturado'] ?? 0);
-                                                    $cus = (float) ($p['custo'] ?? 0);
-                                                    $liq = (float) ($p['liquido'] ?? ($fat - $cus));
-                                                    $dt = (string) ($p['created_at'] ?? '');
-                                                ?>
-                                                <tr>
-                                                    <td>
-                                                        <a href="/pedido/detalhes/<?= $pid ?>" class="text-decoration-none">
-                                                            <strong><?= htmlspecialchars($codigo) ?></strong>
-                                                        </a>
-                                                        <div class="text-muted small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></div>
-                                                    </td>
-                                                    <td>
-                                                        <?php if ($dt !== ''): ?>
-                                                            <div class="small fw-semibold"><?= date('d/m/Y', strtotime($dt)) ?></div>
-                                                            <div class="text-muted small"><?= date('H:i', strtotime($dt)) ?></div>
-                                                        <?php else: ?>
-                                                            <span class="text-muted">-</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="text-end fw-semibold">R$ <?= number_format($fat, 2, ',', '.') ?></td>
-                                                    <td class="text-end">R$ <?= number_format($cus, 2, ',', '.') ?></td>
-                                                    <td class="text-end">R$ <?= number_format($liq, 2, ',', '.') ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

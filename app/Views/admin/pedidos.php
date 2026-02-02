@@ -13,6 +13,9 @@
             <a href="/admin/pedidos/novo-manual" class="btn btn-primary ms-2">
                 <i class="fas fa-plus me-2"></i>Novo Pedido Manual
             </a>
+            <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-percentage me-2"></i>Minhas Comissões
+            </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCriarPedido">
                 <i class="fas fa-plus me-2"></i>Novo Pedido
             </button>

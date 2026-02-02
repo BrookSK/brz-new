@@ -5,6 +5,7 @@ use App\Core\Request;
 use App\Models\PedidoEcommerce;
 use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
+use App\Services\AuthService;
 
 class AdminPedidosController extends Controller {
     
@@ -100,6 +101,9 @@ class AdminPedidosController extends Controller {
                     <div>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary me-2">
                             <i class="fas fa-plus me-1"></i>Novo Pedido Manual
+                        </a>
+                        <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
@@ -895,6 +899,147 @@ class AdminPedidosController extends Controller {
             $colors['separacao'] = 'primary';
         }
         return $colors[$status] ?? 'secondary';
+    }
+
+    public function comissoes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+        $admin = $auth->getUsuarioLogado();
+
+        $pedidoModel = new PedidoEcommerce();
+        $resumo = [
+            'pedidos' => [],
+            'total_faturado' => 0.0,
+            'total_custo_produtos' => 0.0,
+            'total_liquido' => 0.0,
+            'percentual_comissao' => 0.0,
+            'valor_comissao' => 0.0,
+            'faixas' => [],
+        ];
+        try {
+            $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador((int) ($admin['id'] ?? 0));
+        } catch (\Exception $e) {
+            $resumo = $resumo;
+        }
+
+        $cPedidos = is_array($resumo) && isset($resumo['pedidos']) && is_array($resumo['pedidos']) ? $resumo['pedidos'] : [];
+        $totalFaturado = (float) ($resumo['total_faturado'] ?? 0);
+        $totalCusto = (float) ($resumo['total_custo_produtos'] ?? 0);
+        $totalLiquido = (float) ($resumo['total_liquido'] ?? 0);
+        $percent = (float) ($resumo['percentual_comissao'] ?? 0);
+        $valorComissao = (float) ($resumo['valor_comissao'] ?? 0);
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Comissões - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('pedidos-comissoes');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Minhas Comissões</h1>
+                    <div>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Total Faturado (Manuais)</div>
+                            <div class="fs-5 fw-bold">R$ ' . number_format($totalFaturado, 2, ',', '.') . '</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Custo dos Produtos</div>
+                            <div class="fs-5 fw-bold">R$ ' . number_format($totalCusto, 2, ',', '.') . '</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Total Líquido</div>
+                            <div class="fs-5 fw-bold">R$ ' . number_format($totalLiquido, 2, ',', '.') . '</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Comissão</div>
+                            <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (R$ ' . number_format($valorComissao, 2, ',', '.') . ')</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
+                    <div class="card-body">';
+
+        if (empty($cPedidos)) {
+            echo '<div class="text-muted">Sem pedidos manuais pagos para este admin.</div>';
+        } else {
+            echo '<div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Pedido</th>
+                                <th>Data</th>
+                                <th class="text-end">Faturado</th>
+                                <th class="text-end">Custo</th>
+                                <th class="text-end">Líquido</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>';
+
+            foreach ($cPedidos as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $codigo = (string) ($p['codigo'] ?? $pid);
+                $fat = (float) ($p['faturado'] ?? 0);
+                $cus = (float) ($p['custo'] ?? 0);
+                $liq = (float) ($p['liquido'] ?? ($fat - $cus));
+                $dt = (string) ($p['created_at'] ?? '');
+                $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+
+                echo '<tr>
+                        <td><strong>' . htmlspecialchars($codigo) . '</strong><div class="text-muted small">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</div></td>
+                        <td>' . htmlspecialchars($dtFmt) . '</td>
+                        <td class="text-end fw-semibold">R$ ' . number_format($fat, 2, ',', '.') . '</td>
+                        <td class="text-end">R$ ' . number_format($cus, 2, ',', '.') . '</td>
+                        <td class="text-end">R$ ' . number_format($liq, 2, ',', '.') . '</td>
+                        <td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>
+                      </tr>';
+            }
+
+            echo '        </tbody>
+                    </table>
+                </div>';
+        }
+
+        echo '        </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
     }
     
     public function atualizarStatus(Request $request) {

@@ -231,6 +231,7 @@ $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'ex
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
+$router->get('/admin/pedidos/comissoes', 'AdminPedidosController', 'comissoes');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
