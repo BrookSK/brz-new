@@ -401,7 +401,9 @@ class CheckoutController extends Controller {
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
-            'frete_gratis' => ($frete == 0)
+            'frete_gratis' => ($frete == 0),
+            'stripe_publishable_key' => $this->paymentService->getStripePublishableKey(),
+            'stripe_enabled' => $this->paymentService->isStripeEnabled(),
         ]);
     }
 
@@ -623,20 +625,29 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
 
-                // Processar pagamento (Asaas/Stripe) e persistir referência no pedido
+                // Processar pagamento
+                // BRL: Asaas no backend
+                // USD: Stripe Elements no frontend (não coletar dados de cartão aqui)
+                $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
                     $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
-
-                    $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
-                    $gateway = (($pedidoRowPay['moeda'] ?? 'BRL') === 'BRL') ? 'asaas' : 'stripe';
-                    $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
-                    $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
                 } catch (\Exception $e) {
-                    // Se pagamento falhar, manter pedido como aguardando pagamento e retornar erro amigável
-                    throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
+                    $pedidoRowPay = [];
+                }
+
+                $moedaPedido = (string) ($pedidoRowPay['moeda'] ?? 'BRL');
+                if (strtoupper(trim($moedaPedido)) === 'BRL') {
+                    try {
+                        $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
+                        $gateway = 'asaas';
+                        $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                        $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                    } catch (\Exception $e) {
+                        throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
+                    }
                 }
 
                 // Se veio da Assessoria, vincular orçamento ao pedido (pago)
@@ -658,15 +669,19 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
                 
-                // Limpar carrinho
-                unset($_SESSION['carrinho']);
-                $this->debugLog('[CHECKOUT] Carrinho limpo');
+                // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
+                // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
+                if (strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                    unset($_SESSION['carrinho']);
+                    $this->debugLog('[CHECKOUT] Carrinho limpo');
+                }
                 
                 $response = [
                     'success' => true,
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
-                    'redirect' => '/checkout/conclusao/' . $pedidoId
+                    'redirect' => '/checkout/conclusao/' . $pedidoId,
+                    'stripe_required' => (strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
                 ];
                 
                 $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
@@ -683,6 +698,95 @@ class CheckoutController extends Controller {
         }
         
         $this->debugLog('[CHECKOUT] processar() - FIM');
+    }
+
+    public function stripePaymentIntent(Request $request) {
+        $pedidoId = (int) ($request->getParam('pedido_id') ?? 0);
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT id, total, moeda, numero_pedido, payment_gateway, payment_id FROM pedidos WHERE id = ? LIMIT 1');
+            $stmt->execute([$pedidoId]);
+            $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($pedido)) {
+                $this->json(['success' => false, 'error' => 'Pedido não encontrado'], 404);
+                return;
+            }
+
+            $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
+            if ($moeda === 'BRL') {
+                $this->json(['success' => false, 'error' => 'Este pedido não é USD/Stripe'], 400);
+                return;
+            }
+
+            $valor = (float) ($pedido['total'] ?? 0);
+            $descricao = 'Pedido #' . (string) ($pedido['numero_pedido'] ?? $pedidoId);
+            $customer = [
+                'email' => (string) ($request->getParam('email') ?? ''),
+            ];
+
+            $pi = $this->paymentService->createStripePaymentIntent($pedidoId, $valor, $descricao, $customer);
+            if (empty($pi['success'])) {
+                $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao criar PaymentIntent')], 500);
+                return;
+            }
+
+            $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
+            if ($paymentIntentId !== '') {
+                $this->atualizarPagamentoNoPedido($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
+                $this->atualizarPagamentoNaTabelaPagamentos($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
+            }
+
+            $this->json([
+                'success' => true,
+                'pedido_id' => $pedidoId,
+                'payment_intent_id' => $paymentIntentId,
+                'client_secret' => (string) ($pi['client_secret'] ?? ''),
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function stripeFinalizar(Request $request) {
+        $pedidoId = (int) ($request->getParam('pedido_id') ?? 0);
+        $paymentIntentId = trim((string) ($request->getParam('payment_intent_id') ?? ''));
+        if ($pedidoId <= 0 || $paymentIntentId === '') {
+            $this->json(['success' => false, 'error' => 'Parâmetros inválidos'], 400);
+            return;
+        }
+
+        try {
+            $pi = $this->paymentService->retrieveStripePaymentIntent($paymentIntentId);
+            $status = strtoupper((string) ($pi['status'] ?? ''));
+
+            $internalStatus = 'pending';
+            if ($status === 'SUCCEEDED') {
+                $internalStatus = 'SUCCEEDED';
+            } elseif (in_array($status, ['CANCELED', 'CANCELLED', 'REQUIRES_PAYMENT_METHOD'], true)) {
+                $internalStatus = 'FAILED';
+            }
+
+            $this->atualizarPagamentoNoPedido($pedidoId, ['payment_id' => $paymentIntentId, 'status' => $internalStatus, 'paid_at' => ($status === 'SUCCEEDED' ? date('Y-m-d H:i:s') : null)], 'stripe');
+            $this->atualizarPagamentoNaTabelaPagamentos($pedidoId, ['payment_id' => $paymentIntentId, 'status' => $internalStatus, 'paid_at' => ($status === 'SUCCEEDED' ? date('Y-m-d H:i:s') : null)], 'stripe');
+
+            if ($status === 'SUCCEEDED') {
+                unset($_SESSION['carrinho']);
+            }
+
+            $this->json([
+                'success' => ($status === 'SUCCEEDED'),
+                'pedido_id' => $pedidoId,
+                'payment_intent_id' => $paymentIntentId,
+                'status' => $status,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
     }
     
     public function conclusao(Request $request) {

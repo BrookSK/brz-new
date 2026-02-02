@@ -890,6 +890,16 @@ class AdminConfiguracoesController extends Controller {
                                                                 </div>
                                                                 <small class="text-muted">Chave secreta (sk_test_... ou sk_live_...)</small>
                                                             </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Webhook Signing Secret</label>
+                                                                <div class="input-group">
+                                                                    <input type="password" class="form-control" name="pagamentos_stripe_webhook_secret" value="' . $this->getConfigValue($config, 'pagamentos', 'stripe_webhook_secret', '') . '" placeholder="whsec_...">
+                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <small class="text-muted">Signing secret do endpoint de webhook (whsec_...). Necessário para validar o Stripe-Signature.</small>
+                                                            </div>
                                                             <div class="d-flex gap-2">
                                                                 <button type="button" class="btn btn-outline-primary" onclick="testarStripeAPI()">
                                                                     <i class="fas fa-plug"></i> Testar Conexão
@@ -1180,7 +1190,7 @@ JS;
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'webhook_link_pagamento_pedido_manual_url'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],

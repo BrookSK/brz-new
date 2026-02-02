@@ -6,6 +6,10 @@ use App\Models\PedidoEcommerce;
 class PaymentService {
     private $asaasApiKey;
     private $stripeApiKey;
+    private $stripePublishableKey;
+    private $stripeEnabled;
+    private $stripeAmbiente;
+    private $stripeWebhookSecret;
     private $pedidoModel;
     private $asaasAmbiente;
     
@@ -18,6 +22,10 @@ class PaymentService {
         $this->asaasApiKey = (string) $this->getConfig('pagamentos', 'asaas_api_key', '');
         $this->asaasAmbiente = (string) $this->getConfig('pagamentos', 'asaas_ambiente', 'sandbox');
         $this->stripeApiKey = (string) $this->getConfig('pagamentos', 'stripe_secret_key', (string) $this->getConfig('pagamentos', 'stripe_api_key', ''));
+        $this->stripePublishableKey = (string) $this->getConfig('pagamentos', 'stripe_publishable_key', (string) $this->getConfig('pagamentos', 'stripe_public_key', ''));
+        $this->stripeAmbiente = (string) $this->getConfig('pagamentos', 'stripe_ambiente', 'test');
+        $this->stripeEnabled = (string) $this->getConfig('pagamentos', 'stripe_enabled', '0');
+        $this->stripeWebhookSecret = (string) $this->getConfig('pagamentos', 'stripe_webhook_secret', (string) $this->getConfig('pagamentos', 'stripe_webhook_signing_secret', ''));
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {
@@ -170,6 +178,8 @@ class PaymentService {
             return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
         }
 
+        // Stripe via Elements: o pagamento é confirmado no frontend.
+        // Aqui mantemos compatibilidade com fluxos antigos, mas para USD o recomendado é usar createPaymentIntent().
         return $this->processarPagamentoStripe($dadosPagamento, $valor, $descricao);
     }
     
@@ -313,17 +323,30 @@ class PaymentService {
     }
     
     public function processarWebhookStripe($payload) {
-        // Validar webhook do Stripe
-        $eventType = $payload['type'] ?? '';
-        
-        if ($eventType === 'payment_intent.succeeded') {
-            $paymentId = $payload['data']['object']['id'] ?? '';
-            if (!empty($paymentId)) {
-                $this->atualizarPagamentoPedidoPorGateway((string) $paymentId, 'stripe', 'approved', 'SUCCEEDED');
-            }
+        $eventType = (string) ($payload['type'] ?? '');
+        $obj = $payload['data']['object'] ?? null;
+        if (!is_array($obj)) {
+            return ['status' => 'ignored'];
         }
-        
-        return ['status' => 'processed'];
+
+        $paymentId = (string) ($obj['id'] ?? '');
+        if ($paymentId === '') {
+            return ['status' => 'ignored'];
+        }
+
+        $gatewayStatus = strtoupper((string) ($obj['status'] ?? ''));
+
+        if ($eventType === 'payment_intent.succeeded') {
+            $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'approved', $gatewayStatus !== '' ? $gatewayStatus : 'SUCCEEDED');
+            return ['status' => 'processed'];
+        }
+
+        if ($eventType === 'payment_intent.payment_failed' || $eventType === 'payment_intent.canceled') {
+            $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'rejected', $gatewayStatus !== '' ? $gatewayStatus : 'FAILED');
+            return ['status' => 'processed'];
+        }
+
+        return ['status' => 'ignored'];
     }
 
     private function mapearStatusAsaasParaInterno(string $status, string $evento = ''): string {
@@ -792,6 +815,129 @@ class PaymentService {
             ]
         ];
     }
+
+    public function getStripePublishableKey(): string {
+        return $this->stripePublishableKey;
+    }
+
+    public function getStripeWebhookSecret(): string {
+        return $this->stripeWebhookSecret;
+    }
+
+    public function isStripeEnabled(): bool {
+        $v = strtolower(trim((string) $this->stripeEnabled));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    public function createStripePaymentIntent(int $pedidoId, float $valorUsd, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round($valorUsd * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para cobrança.'];
+        }
+
+        $metadata = [
+            'pedido_id' => (string) $pedidoId,
+        ];
+
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'usd',
+            'description' => $descricao,
+            'metadata[pedido_id]' => (string) $pedidoId,
+            'automatic_payment_methods[enabled]' => 'true',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '' || $clientSecret === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar PaymentIntent.'];
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function retrieveStripePaymentIntent(string $paymentIntentId): array {
+        if (empty($this->stripeApiKey)) {
+            throw new \Exception('Stripe não configurado (Secret Key ausente).');
+        }
+        return $this->stripeRequest('GET', '/v1/payment_intents/' . rawurlencode($paymentIntentId), null);
+    }
+
+    private function stripeRequest(string $method, string $path, ?array $body): array {
+        $url = 'https://api.stripe.com' . $path;
+        $headers = [
+            'Authorization: Bearer ' . $this->stripeApiKey,
+            'Accept: application/json',
+            'Content-Type: application/x-www-form-urlencoded',
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        $payload = '';
+        if ($body !== null) {
+            $payload = http_build_query($body);
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if (strtoupper($method) !== 'GET' && $payload !== '') {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com Stripe: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro Stripe HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => (strtoupper($method) !== 'GET') ? $payload : '',
+                'ignore_errors' => true,
+            ]
+        ]);
+
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
     
     public function validarDadosPagamento($dados) {
         $erros = [];
@@ -816,7 +962,8 @@ class PaymentService {
         }
         
         // Validações de cartão (se aplicável)
-        if (isset($dados['billingType']) && $dados['billingType'] === 'CREDIT_CARD') {
+        // Para Stripe Elements, NÃO validamos nem recebemos dados de cartão no backend.
+        if (isset($dados['billingType']) && $dados['billingType'] === 'CREDIT_CARD' && !isset($dados['stripe_elements'])) {
             if (empty($dados['card_holder_name'])) {
                 $erros[] = 'Nome no cartão é obrigatório';
             }

@@ -215,26 +215,33 @@
                                             </script>
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
-                                            <label class="form-label">Nome no Cartão</label>
-                                            <input type="text" name="card_holder_name" class="form-control" placeholder="Nome como está no cartão" required>
-                                            <div class="row g-2 mt-2">
-                                                <div class="col-6">
-                                                    <label class="form-label">Número do Cartão</label>
-                                                    <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number" inputmode="numeric" required>
-                                                </div>
-                                                <div class="col-3">
-                                                    <label class="form-label">Validade</label>
-                                                    <input type="text" name="card_expiry_month" class="form-control" placeholder="MM" maxlength="2" autocomplete="cc-exp-month" inputmode="numeric" required>
-                                                </div>
-                                                <div class="col-3">
-                                                    <label class="form-label">&nbsp;</label>
-                                                    <input type="text" name="card_expiry_year" class="form-control" placeholder="AAAA" maxlength="4" autocomplete="cc-exp-year" inputmode="numeric" required>
-                                                </div>
+                                            <div id="campos-cartao-stripe" style="display:none;">
+                                                <label class="form-label">Cartão (Stripe)</label>
+                                                <div id="stripe-card-element" class="form-control" style="padding: 12px; background: #fff;"></div>
+                                                <div id="stripe-card-errors" class="text-danger small mt-2" style="display:none;"></div>
                                             </div>
-                                            <div class="row g-2 mt-2">
-                                                <div class="col-6">
-                                                    <label class="form-label">CVV</label>
-                                                    <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" autocomplete="cc-csc" inputmode="numeric" required>
+                                            <div id="campos-cartao-manual">
+                                                <label class="form-label">Nome no Cartão</label>
+                                                <input type="text" name="card_holder_name" class="form-control" placeholder="Nome como está no cartão" required>
+                                                <div class="row g-2 mt-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Número do Cartão</label>
+                                                        <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number" inputmode="numeric" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label">Validade</label>
+                                                        <input type="text" name="card_expiry_month" class="form-control" placeholder="MM" maxlength="2" autocomplete="cc-exp-month" inputmode="numeric" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label">&nbsp;</label>
+                                                        <input type="text" name="card_expiry_year" class="form-control" placeholder="AAAA" maxlength="4" autocomplete="cc-exp-year" inputmode="numeric" required>
+                                                    </div>
+                                                </div>
+                                                <div class="row g-2 mt-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label">CVV</label>
+                                                        <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" autocomplete="cc-csc" inputmode="numeric" required>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -344,8 +351,102 @@
     </div>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
+
 <script>
 console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
+
+let stripeClient = null;
+let stripeElements = null;
+let stripeCard = null;
+
+function ensureStripeInit() {
+    const publishableKey = <?php echo json_encode((string) ($stripe_publishable_key ?? '')); ?>;
+    const stripeEnabled = <?php echo json_encode((bool) ($stripe_enabled ?? false)); ?>;
+
+    if (!stripeEnabled || !publishableKey) {
+        return false;
+    }
+    if (typeof Stripe !== 'function') {
+        return false;
+    }
+
+    if (!stripeClient) {
+        stripeClient = Stripe(publishableKey);
+        stripeElements = stripeClient.elements();
+        stripeCard = stripeElements.create('card');
+        stripeCard.mount('#stripe-card-element');
+        stripeCard.on('change', function(event) {
+            const errEl = document.getElementById('stripe-card-errors');
+            if (!errEl) return;
+            if (event.error) {
+                errEl.style.display = 'block';
+                errEl.textContent = event.error.message;
+            } else {
+                errEl.style.display = 'none';
+                errEl.textContent = '';
+            }
+        });
+    }
+    return true;
+}
+
+function iniciarPagamentoStripeElements(pedidoId, email) {
+    if (!ensureStripeInit()) {
+        hideCheckoutLoading();
+        alert('Stripe não configurado. Verifique as configurações de pagamento.');
+        return;
+    }
+
+    fetch('/checkout/stripe/payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ pedido_id: String(pedidoId), email: String(email || '') }).toString()
+    })
+    .then(r => r.json())
+    .then(async (piResp) => {
+        if (!piResp.success || !piResp.client_secret) {
+            throw new Error(piResp.error || 'Falha ao iniciar pagamento Stripe');
+        }
+
+        const result = await stripeClient.confirmCardPayment(piResp.client_secret, {
+            payment_method: { card: stripeCard }
+        });
+
+        if (result.error) {
+            throw new Error(result.error.message || 'Pagamento não autorizado');
+        }
+
+        const paymentIntent = result.paymentIntent;
+        const paymentIntentId = paymentIntent && paymentIntent.id ? paymentIntent.id : (piResp.payment_intent_id || '');
+        if (!paymentIntentId) {
+            throw new Error('PaymentIntent inválido');
+        }
+
+        return fetch('/checkout/stripe/finalizar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ pedido_id: String(pedidoId), payment_intent_id: String(paymentIntentId) }).toString()
+        });
+    })
+    .then(r => r.json())
+    .then((finalResp) => {
+        if (!finalResp.success) {
+            throw new Error(finalResp.error || 'Pagamento não confirmado');
+        }
+        const destino = '/checkout/conclusao/' + pedidoId;
+        window.location.href = destino;
+    })
+    .catch((e) => {
+        console.error(e);
+        hideCheckoutLoading();
+        alert('Erro no pagamento: ' + (e && e.message ? e.message : e));
+        const botao = document.getElementById('btn-finalizar');
+        if (botao) {
+            botao.disabled = false;
+        }
+    });
+}
 
 function atualizarEnderecoPorPais() {
     const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
@@ -490,6 +591,9 @@ function processarPedidoDireto() {
     formData.append('consentimento_legal', checkbox.checked ? 'on' : '');
     console.log(`🔍 [DIRETO] consentimento_legal: ${checkbox.checked ? 'on' : ''} (garantido)`);
     
+    const moedaHidden = document.getElementById('moeda_hidden');
+    const currentCurrency = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+
     // Garantir que a forma de pagamento seja adicionada
     const formaPagamentoSelect = document.getElementById('forma_pagamento');
     if (formaPagamentoSelect) {
@@ -497,8 +601,8 @@ function processarPedidoDireto() {
         formData.append('forma_pagamento', formaPagamento);
         console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
 
-        // Garantir coleta explícita dos campos do cartão quando selecionado
-        if (formaPagamento === 'cartao_credito') {
+        // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL/Asaas)
+        if (formaPagamento === 'cartao_credito' && currentCurrency === 'BRL') {
             const camposCartao = document.getElementById('campos-cartao');
             const nomeCartao = camposCartao ? camposCartao.querySelector('input[name="card_holder_name"]') : null;
             const numeroCartao = camposCartao ? camposCartao.querySelector('input[name="card_number"]') : null;
@@ -543,7 +647,7 @@ function processarPedidoDireto() {
     botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
     showCheckoutLoading();
     
-    // Enviar requisição AJAX
+    // Enviar requisição AJAX (criar pedido)
     fetch('/checkout/processar', {
         method: 'POST',
         body: formData
@@ -558,12 +662,19 @@ function processarPedidoDireto() {
         if (data.success) {
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
 
-            // Manter overlay até redirecionar para página de conclusão
-            const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);
-            console.log('🔍 [DIRETO] Redirecionando para:', destino);
-            setTimeout(function() {
-                window.location.href = destino;
-            }, 300);
+            const isStripeUsd = (currentCurrency !== 'BRL') && (data.stripe_required === true);
+            if (!isStripeUsd) {
+                // Manter overlay até redirecionar para página de conclusão
+                const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);
+                console.log('🔍 [DIRETO] Redirecionando para:', destino);
+                setTimeout(function() {
+                    window.location.href = destino;
+                }, 300);
+                return;
+            }
+
+            // Stripe Elements (USD)
+            iniciarPagamentoStripeElements(data.pedido_id, formData.get('email') || '');
         } else {
             console.error('❌ [DIRETO] Erro ao processar pedido:', data.error);
             alert('Erro: ' + data.error);
@@ -748,17 +859,32 @@ function atualizarFormaPagamento() {
             if (camposCartao) {
                 camposCartao.style.display = 'block';
                 console.log('🔍 [PAGAMENTO] Campos de cartão exibidos');
-                
-                // Garantir que os campos obrigatórios estejam visíveis
-                const nomeCartao = camposCartao.querySelector('input[name="card_holder_name"]');
-                const numeroCartao = camposCartao.querySelector('input[name="card_number"]');
-                const cvvCartao = camposCartao.querySelector('input[name="card_cvv"]');
-                
-                if (nomeCartao) nomeCartao.required = true;
-                if (numeroCartao) numeroCartao.required = true;
-                if (cvvCartao) cvvCartao.required = true;
-                
-                console.log('🔍 [PAGAMENTO] Campos obrigatórios do cartão marcados');
+
+                const moedaHidden = document.getElementById('moeda_hidden');
+                const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+                const stripeMode = (cur !== 'BRL');
+
+                const blocoStripe = document.getElementById('campos-cartao-stripe');
+                const blocoManual = document.getElementById('campos-cartao-manual');
+
+                if (stripeMode) {
+                    if (blocoStripe) blocoStripe.style.display = 'block';
+                    if (blocoManual) blocoManual.style.display = 'none';
+                    // Remover required dos inputs manuais
+                    const inputsManual = blocoManual ? blocoManual.querySelectorAll('input') : [];
+                    inputsManual.forEach(i => { i.required = false; });
+                    ensureStripeInit();
+                } else {
+                    if (blocoStripe) blocoStripe.style.display = 'none';
+                    if (blocoManual) blocoManual.style.display = 'block';
+                    // Garantir required para BRL
+                    const nomeCartao = blocoManual ? blocoManual.querySelector('input[name="card_holder_name"]') : null;
+                    const numeroCartao = blocoManual ? blocoManual.querySelector('input[name="card_number"]') : null;
+                    const cvvCartao = blocoManual ? blocoManual.querySelector('input[name="card_cvv"]') : null;
+                    if (nomeCartao) nomeCartao.required = true;
+                    if (numeroCartao) numeroCartao.required = true;
+                    if (cvvCartao) cvvCartao.required = true;
+                }
             } else {
                 console.error('❌ [ERRO] Elemento campos-cartao não encontrado');
             }
