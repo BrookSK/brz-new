@@ -1297,12 +1297,52 @@ class PedidoEcommerce extends Model {
                 $stmtItens->execute();
                 $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+                // Buscar NCM dos produtos em lote (se existir coluna ncm na tabela produtos)
+                $produtoNcmMap = [];
+                try {
+                    $produtoCols = [];
+                    try {
+                        $stmtProdCols = $this->connection->query('DESCRIBE produtos');
+                        $produtoCols = $stmtProdCols ? $stmtProdCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    } catch (\Exception $e) {
+                        $produtoCols = [];
+                    }
+
+                    $temNcm = is_array($produtoCols) && in_array('ncm', $produtoCols, true);
+                    if ($temNcm && !empty($itens)) {
+                        $produtoIds = [];
+                        foreach ($itens as $it) {
+                            $pid = (int) ($it['produto_id'] ?? 0);
+                            if ($pid > 0) {
+                                $produtoIds[$pid] = true;
+                            }
+                        }
+
+                        $produtoIds = array_keys($produtoIds);
+                        if (!empty($produtoIds)) {
+                            $placeholders = implode(',', array_fill(0, count($produtoIds), '?'));
+                            $stmtNcm = $this->connection->prepare('SELECT id, ncm FROM produtos WHERE id IN (' . $placeholders . ')');
+                            $stmtNcm->execute($produtoIds);
+                            $rowsNcm = $stmtNcm->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($rowsNcm as $r) {
+                                $rid = (int) ($r['id'] ?? 0);
+                                if ($rid > 0) {
+                                    $produtoNcmMap[$rid] = (string) ($r['ncm'] ?? '');
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $produtoNcmMap = [];
+                }
+
                 foreach ($itens as &$item) {
                     $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                     $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
                     $item['descricao_produto'] = $item['descricao_produto'] ?? '';
+                    $pid = (int) ($item['produto_id'] ?? 0);
+                    $item['ncm'] = $produtoNcmMap[$pid] ?? ($item['ncm'] ?? '');
                     if (empty($item['nome_produto'])) {
-                        $pid = (int) ($item['produto_id'] ?? 0);
                         $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
                     }
                     $q = (int) ($item['quantidade'] ?? 0);

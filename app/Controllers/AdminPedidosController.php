@@ -578,6 +578,7 @@ class AdminPedidosController extends Controller {
                                                 <th>Imagem</th>
                                                 <th>Produto</th>
                                                 <th>ID Produto</th>
+                                                <th>NCM</th>
                                                 <th>Referência</th>
                                                 <th>Quantidade</th>
                                                 <th>Preço Unitário</th>
@@ -588,7 +589,7 @@ class AdminPedidosController extends Controller {
                                         <tbody>';
                                         
                                         if (empty($itens)) {
-                                            echo '<tr><td colspan="8" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
+                                            echo '<tr><td colspan="9" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
                                         }
                                         
                                         foreach ($itens as $item) {
@@ -653,6 +654,7 @@ class AdminPedidosController extends Controller {
                                             echo '</td>
                                                 <td>' . $nomeHtml . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
+                                                <td>' . htmlspecialchars((string) ($item['ncm'] ?? '')) . '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
