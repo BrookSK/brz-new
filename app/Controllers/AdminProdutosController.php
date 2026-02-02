@@ -849,6 +849,10 @@ HTML;
                     <h1 class="h2">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
+
+                <div class="alert alert-info">
+                    Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.
+                </div>
                 
                 <form method="POST" action="/admin/produtos/salvar" enctype="multipart/form-data">
                     <div class="row">
@@ -1255,6 +1259,18 @@ HTML;
 
             $lojas = $this->fetchLojasSafe();
             $ncmOptions = $this->getNcmOptions();
+
+            $variacoesSchemaOk = $this->tableExists($pdo, 'variacao_tipos')
+                && $this->tableExists($pdo, 'variacao_opcoes')
+                && $this->tableExists($pdo, 'produto_atributos')
+                && $this->tableExists($pdo, 'produto_variacoes')
+                && $this->tableExists($pdo, 'produto_variacao_itens');
+
+            $variacaoTipos = $variacoesSchemaOk ? $this->getVariacaoTipos($pdo) : [];
+            $variacaoOpcoesPorTipo = $variacoesSchemaOk ? $this->getVariacaoOpcoesPorTipo($pdo) : [];
+            $produtoTipoIds = $variacoesSchemaOk ? $this->getProdutoAtributos($pdo, (int) $id) : [];
+            $produtoOpcoesPorTipo = $variacoesSchemaOk ? $this->getProdutoOpcoesUsadasPorTipo($pdo, (int) $id) : [];
+            $produtoVariacoes = $variacoesSchemaOk ? $this->getProdutoVariacoesComDescricao($pdo, (int) $id) : [];
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
@@ -1450,6 +1466,125 @@ HTML;
                                             <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/galeria/ordem/' . (int) $id . '" formmethod="POST" formnovalidate>Salvar ordem</button>
                                         </div>
                                     </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Variações</label>';
+
+        if (empty($variacoesSchemaOk)) {
+            echo '<div class="alert alert-warning mb-0">Para habilitar variações, rode a migration <strong>061_create_produto_variacoes_schema.sql</strong> no banco.</div>';
+        } else {
+            echo '<div class="alert alert-info">Use atributos e opções para gerar variações simples ou compostas. Você pode gerar todas, apagar e também criar variações individuais.</div>';
+
+            echo '<div class="card mb-3">
+                    <div class="card-body">
+                        <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/atributos">
+                            <div class="row g-2">';
+
+            foreach ($variacaoTipos as $t) {
+                $tid = (int) ($t['id'] ?? 0);
+                $tnome = (string) ($t['nome'] ?? '');
+                $checked = in_array($tid, $produtoTipoIds, true) ? 'checked' : '';
+
+                echo '<div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipo_ids[]" value="' . $tid . '" id="tipo_' . $tid . '" ' . $checked . '>
+                            <label class="form-check-label" for="tipo_' . $tid . '">' . htmlspecialchars($tnome, ENT_QUOTES, 'UTF-8') . '</label>
+                        </div>
+                      </div>';
+
+                $opcoes = $variacaoOpcoesPorTipo[$tid] ?? [];
+                if (!empty($opcoes)) {
+                    echo '<div class="col-12 ms-4">
+                            <div class="row g-2">';
+                    foreach ($opcoes as $o) {
+                        $oid = (int) ($o['id'] ?? 0);
+                        $ovalor = (string) ($o['valor'] ?? '');
+                        $oChecked = (!empty($produtoOpcoesPorTipo[$tid]) && in_array($oid, $produtoOpcoesPorTipo[$tid], true)) ? 'checked' : '';
+                        echo '<div class="col-6 col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="opcoes[' . $tid . '][]" value="' . $oid . '" id="opt_' . $tid . '_' . $oid . '" ' . $oChecked . '>
+                                    <label class="form-check-label" for="opt_' . $tid . '_' . $oid . '">' . htmlspecialchars($ovalor, ENT_QUOTES, 'UTF-8') . '</label>
+                                </div>
+                              </div>';
+                    }
+                    echo '      </div>
+                          </div>';
+                }
+            }
+
+            echo '          <div class="col-12">
+                                <button type="submit" class="btn btn-outline-primary w-100">Salvar atributos/opções</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>';
+
+            echo '<div class="d-flex flex-wrap gap-2 mb-3">
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Gerar variações com base nas opções selecionadas?\')">
+                        <input type="hidden" name="replace" value="0">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-cogs"></i> Gerar todas</button>
+                    </form>
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')">
+                        <input type="hidden" name="replace" value="1">
+                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-redo"></i> Apagar e gerar</button>
+                    </form>
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/apagar" onsubmit="return confirm(\'Apagar todas as variações deste produto?\')">
+                        <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Apagar todas</button>
+                    </form>
+                  </div>';
+
+            echo '<div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <strong>Variações cadastradas</strong>
+                        <form class="d-flex gap-2" method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/criar">
+                            <input type="number" name="stock" class="form-control form-control-sm" style="width:120px" placeholder="Estoque" value="0" min="0">
+                            <input type="text" name="price_override" class="form-control form-control-sm" style="width:160px" placeholder="Preço variação">
+                            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-plus"></i> Criar individual</button>
+                        </form>
+                    </div>
+                    <div class="card-body">';
+
+            if (empty($produtoVariacoes)) {
+                echo '<div class="text-muted">Nenhuma variação criada ainda.</div>';
+            } else {
+                echo '<div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Variação</th>
+                                    <th>Preço</th>
+                                    <th>Estoque</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>';
+                foreach ($produtoVariacoes as $v) {
+                    $vId = (int) ($v['id'] ?? 0);
+                    $desc = (string) ($v['descricao'] ?? '');
+                    $priceOv = $v['price_override'] ?? null;
+                    $stockV = (int) ($v['stock'] ?? 0);
+                    $ativoV = (int) ($v['ativo'] ?? 0);
+                    echo '<tr>
+                            <td>
+                                <div class="fw-semibold">#' . $vId . '</div>
+                                <div class="text-muted small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</div>
+                            </td>
+                            <td>' . htmlspecialchars(($priceOv === null || $priceOv === '' ? '-' : (string) $priceOv), ENT_QUOTES, 'UTF-8') . '</td>
+                            <td>' . $stockV . '</td>
+                            <td>' . ($ativoV ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') . '</td>
+                          </tr>';
+                }
+                echo '      </tbody>
+                        </table>
+                    </div>';
+            }
+
+            echo '      </div>
+                </div>';
+        }
+
+        echo '                        </div>
                                 </div>
                             </div>
                         </div>
@@ -1792,6 +1927,385 @@ HTMLSCRIPT;
             if (isset($pdo)) $pdo->rollBack();
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
+        }
+    }
+
+    public function salvarAtributosVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        if ($produtoId <= 0) {
+            header('Location: /admin/produtos');
+            exit;
+        }
+
+        $tipoIds = $request->getParam('tipo_ids', []);
+        if (!is_array($tipoIds)) $tipoIds = [];
+        $tipoIds = array_values(array_unique(array_map('intval', $tipoIds)));
+
+        $opcoes = $request->getParam('opcoes', []);
+        if (!is_array($opcoes)) $opcoes = [];
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_atributos')) {
+                $_SESSION['message'] = 'Tabelas de variações não encontradas. Rode a migration 061.';
+                $_SESSION['message_type'] = 'warning';
+                header('Location: /admin/produtos/editar/' . $produtoId);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            $stmtDel = $pdo->prepare('DELETE FROM produto_atributos WHERE produto_id = :pid');
+            $stmtDel->execute([':pid' => $produtoId]);
+
+            if (!empty($tipoIds)) {
+                $stmtIns = $pdo->prepare('INSERT INTO produto_atributos (produto_id, tipo_id, created_at, updated_at) VALUES (:pid, :tid, NOW(), NOW())');
+                foreach ($tipoIds as $tid) {
+                    if ($tid <= 0) continue;
+                    $stmtIns->execute([':pid' => $produtoId, ':tid' => $tid]);
+                }
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Atributos/Opções salvos.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao salvar atributos.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function apagarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $stmtVarIds = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid');
+            $stmtVarIds->execute([':pid' => $produtoId]);
+            $ids = array_map('intval', $stmtVarIds->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+            if (!empty($ids)) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
+                    $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+                if ($this->tableExists($pdo, 'produto_variacao_itens')) {
+                    $pdo->prepare('DELETE FROM produto_variacao_itens WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+            }
+
+            $stmtDel = $pdo->prepare('DELETE FROM produto_variacoes WHERE produto_id = :pid');
+            $stmtDel->execute([':pid' => $produtoId]);
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações removidas.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao apagar variações.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function gerarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        $replace = (int) $request->getParam('replace', 0) === 1;
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes') || !$this->tableExists($pdo, 'produto_variacao_itens')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $opcoesPorTipo = $this->getProdutoOpcoesUsadasPorTipo($pdo, $produtoId);
+            $tipoIds = array_keys($opcoesPorTipo);
+
+            $tiposValidos = [];
+            foreach ($tipoIds as $tid) {
+                $list = array_values(array_unique(array_map('intval', $opcoesPorTipo[$tid] ?? [])));
+                if (!empty($list)) {
+                    $tiposValidos[(int) $tid] = $list;
+                }
+            }
+
+            if (empty($tiposValidos)) {
+                $_SESSION['message'] = 'Selecione opções nos atributos antes de gerar variações.';
+                $_SESSION['message_type'] = 'warning';
+                header('Location: /admin/produtos/editar/' . $produtoId);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            if ($replace) {
+                $stmtVarIds = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid');
+                $stmtVarIds->execute([':pid' => $produtoId]);
+                $ids = array_map('intval', $stmtVarIds->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+                if (!empty($ids)) {
+                    $in = implode(',', array_fill(0, count($ids), '?'));
+                    if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
+                        $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                    }
+                    $pdo->prepare('DELETE FROM produto_variacao_itens WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+                $pdo->prepare('DELETE FROM produto_variacoes WHERE produto_id = :pid')->execute([':pid' => $produtoId]);
+            }
+
+            $existingSignatures = $this->getProdutoVariacoesSignatures($pdo, $produtoId);
+
+            $combinacoes = [[]];
+            foreach ($tiposValidos as $tid => $opcoesIds) {
+                $new = [];
+                foreach ($combinacoes as $c) {
+                    foreach ($opcoesIds as $oid) {
+                        $tmp = $c;
+                        $tmp[(int) $tid] = (int) $oid;
+                        $new[] = $tmp;
+                    }
+                }
+                $combinacoes = $new;
+            }
+
+            $stmtInsVar = $pdo->prepare('INSERT INTO produto_variacoes (produto_id, sku, price_override, stock, ativo, created_at, updated_at) VALUES (:pid, NULL, NULL, :stock, 1, NOW(), NOW())');
+            $stmtInsItem = $pdo->prepare('INSERT INTO produto_variacao_itens (produto_variacao_id, tipo_id, opcao_id, created_at, updated_at) VALUES (:pvi, :tid, :oid, NOW(), NOW())');
+
+            $created = 0;
+            foreach ($combinacoes as $comb) {
+                ksort($comb);
+                $parts = [];
+                foreach ($comb as $tid => $oid) {
+                    $parts[] = $tid . ':' . $oid;
+                }
+                $sig = implode('|', $parts);
+                if (isset($existingSignatures[$sig])) {
+                    continue;
+                }
+
+                $stmtInsVar->execute([':pid' => $produtoId, ':stock' => 0]);
+                $varId = (int) $pdo->lastInsertId();
+                foreach ($comb as $tid => $oid) {
+                    $stmtInsItem->execute([':pvi' => $varId, ':tid' => (int) $tid, ':oid' => (int) $oid]);
+                }
+                $created++;
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações geradas: ' . (int) $created;
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao gerar variações.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function criarVariacaoIndividual(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $stock = (int) $request->getParam('stock', 0);
+            $priceOverrideRaw = trim((string) $request->getParam('price_override', ''));
+            $priceOverride = $priceOverrideRaw !== '' ? $this->parseMoneyToDb($priceOverrideRaw) : null;
+
+            $stmt = $pdo->prepare('INSERT INTO produto_variacoes (produto_id, sku, price_override, stock, ativo, created_at, updated_at) VALUES (:pid, NULL, :po, :st, 1, NOW(), NOW())');
+            $stmt->bindValue(':pid', $produtoId, \PDO::PARAM_INT);
+            if ($priceOverride === null || $priceOverride === '') {
+                $stmt->bindValue(':po', null, \PDO::PARAM_NULL);
+            } else {
+                $stmt->bindValue(':po', $priceOverride);
+            }
+            $stmt->bindValue(':st', $stock, \PDO::PARAM_INT);
+            $stmt->execute();
+
+            $_SESSION['message'] = 'Variação criada.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao criar variação.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    private function tableExists(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getVariacaoTipos(\PDO $pdo): array {
+        try {
+            $stmt = $pdo->query('SELECT * FROM variacao_tipos WHERE ativo = 1 ORDER BY nome ASC');
+            return $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getVariacaoOpcoesPorTipo(\PDO $pdo): array {
+        $map = [];
+        try {
+            $stmt = $pdo->query('SELECT * FROM variacao_opcoes WHERE ativo = 1 ORDER BY tipo_id ASC, ordem ASC, valor ASC');
+            $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            foreach ($rows as $r) {
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                if ($tid <= 0) continue;
+                if (!isset($map[$tid])) $map[$tid] = [];
+                $map[$tid][] = $r;
+            }
+        } catch (\Exception $e) {
+            $map = [];
+        }
+        return $map;
+    }
+
+    private function getProdutoAtributos(\PDO $pdo, int $produtoId): array {
+        try {
+            $stmt = $pdo->prepare('SELECT tipo_id FROM produto_atributos WHERE produto_id = :pid');
+            $stmt->execute([':pid' => $produtoId]);
+            $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            return array_values(array_unique(array_map('intval', $ids)));
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getProdutoOpcoesUsadasPorTipo(\PDO $pdo, int $produtoId): array {
+        $map = [];
+        try {
+            $stmt = $pdo->prepare('
+                SELECT pvi.tipo_id, pvi.opcao_id
+                FROM produto_variacao_itens pvi
+                INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id
+                WHERE pv.produto_id = :pid
+            ');
+            $stmt->execute([':pid' => $produtoId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $r) {
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                $oid = (int) ($r['opcao_id'] ?? 0);
+                if ($tid <= 0 || $oid <= 0) continue;
+                if (!isset($map[$tid])) $map[$tid] = [];
+                $map[$tid][$oid] = true;
+            }
+            foreach ($map as $tid => $set) {
+                $map[$tid] = array_map('intval', array_keys($set));
+            }
+        } catch (\Exception $e) {
+            $map = [];
+        }
+        return $map;
+    }
+
+    private function getProdutoVariacoesSignatures(\PDO $pdo, int $produtoId): array {
+        $sigs = [];
+        try {
+            $stmt = $pdo->prepare('
+                SELECT pv.id AS variacao_id, pvi.tipo_id, pvi.opcao_id
+                FROM produto_variacoes pv
+                LEFT JOIN produto_variacao_itens pvi ON pvi.produto_variacao_id = pv.id
+                WHERE pv.produto_id = :pid
+                ORDER BY pv.id ASC
+            ');
+            $stmt->execute([':pid' => $produtoId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $tmp = [];
+            foreach ($rows as $r) {
+                $vid = (int) ($r['variacao_id'] ?? 0);
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                $oid = (int) ($r['opcao_id'] ?? 0);
+                if ($vid <= 0) continue;
+                if (!isset($tmp[$vid])) $tmp[$vid] = [];
+                if ($tid > 0 && $oid > 0) {
+                    $tmp[$vid][$tid] = $oid;
+                }
+            }
+            foreach ($tmp as $vid => $comb) {
+                ksort($comb);
+                $parts = [];
+                foreach ($comb as $tid => $oid) {
+                    $parts[] = $tid . ':' . $oid;
+                }
+                $sig = implode('|', $parts);
+                if ($sig !== '') {
+                    $sigs[$sig] = true;
+                }
+            }
+        } catch (\Exception $e) {
+            $sigs = [];
+        }
+        return $sigs;
+    }
+
+    private function getProdutoVariacoesComDescricao(\PDO $pdo, int $produtoId): array {
+        try {
+            $stmt = $pdo->prepare('SELECT * FROM produto_variacoes WHERE produto_id = :pid ORDER BY id ASC');
+            $stmt->execute([':pid' => $produtoId]);
+            $vars = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($vars)) return [];
+
+            $ids = array_map(fn($v) => (int) ($v['id'] ?? 0), $vars);
+            $ids = array_values(array_filter($ids, fn($v) => $v > 0));
+            if (empty($ids)) return $vars;
+
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $sql = '
+                SELECT pvi.produto_variacao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
+                FROM produto_variacao_itens pvi
+                INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
+                INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
+                WHERE pvi.produto_variacao_id IN (' . $in . ')
+                ORDER BY pvi.produto_variacao_id ASC, vt.nome ASC, vo.valor ASC
+            ';
+            $st = $pdo->prepare($sql);
+            $st->execute($ids);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $map = [];
+            foreach ($rows as $r) {
+                $vid = (int) ($r['produto_variacao_id'] ?? 0);
+                $tn = (string) ($r['tipo_nome'] ?? '');
+                $ov = (string) ($r['opcao_valor'] ?? '');
+                if ($vid <= 0) continue;
+                if (!isset($map[$vid])) $map[$vid] = [];
+                $map[$vid][] = $tn . '=' . $ov;
+            }
+
+            foreach ($vars as &$v) {
+                $vid = (int) ($v['id'] ?? 0);
+                $desc = '';
+                if ($vid > 0 && !empty($map[$vid])) {
+                    $desc = implode(' / ', $map[$vid]);
+                }
+                $v['descricao'] = $desc;
+            }
+            unset($v);
+
+            return $vars;
+        } catch (\Exception $e) {
+            return [];
         }
     }
 

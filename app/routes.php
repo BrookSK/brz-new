@@ -206,13 +206,19 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
-$router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
+$router->get('/admin/produtos/novo', 'AdminProdutosNovoController', 'index');
+$router->get('/admin/produtos/novo-simples', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
+$router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
+$router->post('/admin/produtos/{id}/variacoes/atributos', 'AdminProdutosController', 'salvarAtributosVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/gerar', 'AdminProdutosController', 'gerarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/apagar', 'AdminProdutosController', 'apagarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/criar', 'AdminProdutosController', 'criarVariacaoIndividual');
 $router->post('/admin/produtos/upload-capa/{id}', 'AdminProdutosController', 'uploadCapa');
 $router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 'uploadGaleria');
 $router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'removerCapa');
