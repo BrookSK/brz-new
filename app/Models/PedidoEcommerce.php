@@ -495,7 +495,24 @@ class PedidoEcommerce extends Model {
             $where .= " AND LOWER(COALESCE({$statusCol}, '')) IN ('" . implode("','", $statusPaid) . "')";
         }
 
-        $stmt = $this->connection->prepare("SELECT id, codigo_pedido, numero_pedido, created_at, {$totalCol} AS total_valor FROM pedidos WHERE {$where} ORDER BY created_at DESC");
+        $codigoCol = null;
+        foreach (['codigo_pedido', 'numero_pedido'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $codigoCol = $c;
+                break;
+            }
+        }
+
+        $select = ['id'];
+        if ($codigoCol) {
+            $select[] = $codigoCol . ' AS codigo_ref';
+        }
+        if (in_array('created_at', $colsP, true)) {
+            $select[] = 'created_at';
+        }
+        $select[] = $totalCol . ' AS total_valor';
+
+        $stmt = $this->connection->prepare('SELECT ' . implode(', ', $select) . " FROM pedidos WHERE {$where} ORDER BY " . (in_array('created_at', $colsP, true) ? 'created_at' : 'id') . ' DESC');
         $stmt->execute([':uid' => $usuarioId, ':origem' => 'manual']);
         $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -602,7 +619,7 @@ class PedidoEcommerce extends Model {
             $custo = (float) ($custoPorPedido[$pid] ?? 0);
             $pedidosOut[] = [
                 'id' => $pid,
-                'codigo' => (string) ($p['codigo_pedido'] ?? ($p['numero_pedido'] ?? $pid)),
+                'codigo' => (string) ($p['codigo_ref'] ?? $pid),
                 'created_at' => (string) ($p['created_at'] ?? ''),
                 'faturado' => $fat,
                 'custo' => $custo,
@@ -689,7 +706,24 @@ class PedidoEcommerce extends Model {
             $where .= " AND LOWER(COALESCE({$statusCol}, '')) IN ('" . implode("','", $statusPaid) . "')";
         }
 
-        $stmt = $this->connection->prepare("SELECT id, codigo_pedido, numero_pedido, created_at, {$totalCol} AS total_valor FROM pedidos WHERE {$where} ORDER BY created_at DESC");
+        $codigoCol = null;
+        foreach (['codigo_pedido', 'numero_pedido'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $codigoCol = $c;
+                break;
+            }
+        }
+
+        $select = ['id'];
+        if ($codigoCol) {
+            $select[] = $codigoCol . ' AS codigo_ref';
+        }
+        if (in_array('created_at', $colsP, true)) {
+            $select[] = 'created_at';
+        }
+        $select[] = $totalCol . ' AS total_valor';
+
+        $stmt = $this->connection->prepare('SELECT ' . implode(', ', $select) . " FROM pedidos WHERE {$where} ORDER BY " . (in_array('created_at', $colsP, true) ? 'created_at' : 'id') . ' DESC');
         $stmt->execute([':aid' => $adminId, ':origem' => 'manual']);
         $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -797,7 +831,7 @@ class PedidoEcommerce extends Model {
             $custo = (float) ($custoPorPedido[$pid] ?? 0);
             $pedidosOut[] = [
                 'id' => $pid,
-                'codigo' => (string) ($p['codigo_pedido'] ?? ($p['numero_pedido'] ?? $pid)),
+                'codigo' => (string) ($p['codigo_ref'] ?? $pid),
                 'created_at' => (string) ($p['created_at'] ?? ''),
                 'faturado' => $fat,
                 'custo' => $custo,
