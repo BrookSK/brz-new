@@ -938,20 +938,37 @@ class AdminPedidosEditController {
             $total = $subtotal + $frete - $valorDesconto;
 
             // Atualizar pedido
-            $stmt = $this->connection->prepare("
-                UPDATE pedidos SET 
-                    status = :status,
-                    frete = :frete,
-                    subtotal = :subtotal,
-                    total = :total
-                WHERE id = :pedido_id
-            ");
-            $stmt->bindParam(':status', $newStatus);
-            $stmt->bindParam(':frete', $frete);
-            $stmt->bindParam(':subtotal', $subtotal);
-            $stmt->bindParam(':total', $total);
-            $stmt->bindParam(':pedido_id', $pedidoId);
-            $stmt->execute();
+            $colsPedidos = $this->getColsFromTable('pedidos');
+            $setParts = [];
+            $paramsUpd = [':pedido_id' => $pedidoId];
+
+            $setParts[] = 'status = :status';
+            $paramsUpd[':status'] = $newStatus;
+
+            $setParts[] = 'frete = :frete';
+            $paramsUpd[':frete'] = $frete;
+
+            $setParts[] = 'subtotal = :subtotal';
+            $paramsUpd[':subtotal'] = $subtotal;
+
+            $setParts[] = 'total = :total';
+            $paramsUpd[':total'] = $total;
+
+            // Se marcar como pago/aprovado, manter payment_status/pago_em consistentes (impacta comissões)
+            $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
+            $isPaid = in_array(strtolower(trim((string) $newStatus)), $paidValues, true);
+            if ($isPaid && is_array($colsPedidos)) {
+                if (in_array('payment_status', $colsPedidos, true)) {
+                    $setParts[] = 'payment_status = :payment_status';
+                    $paramsUpd[':payment_status'] = 'approved';
+                }
+                if (in_array('pago_em', $colsPedidos, true)) {
+                    $setParts[] = 'pago_em = COALESCE(pago_em, NOW())';
+                }
+            }
+
+            $stmt = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $setParts) . ' WHERE id = :pedido_id');
+            $stmt->execute($paramsUpd);
 
             if ($cicloFechado) {
                 $this->finalizarCicloPedido($pedidoId);

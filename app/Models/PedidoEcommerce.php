@@ -553,7 +553,7 @@ class PedidoEcommerce extends Model {
         }
 
         $custoCol = null;
-        foreach (['custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
+        foreach (['cost_price', 'custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
             if (is_array($colsProdutos) && in_array($c, $colsProdutos, true)) {
                 $custoCol = $c;
                 break;
@@ -748,7 +748,7 @@ class PedidoEcommerce extends Model {
         }
 
         $custoCol = null;
-        foreach (['custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
+        foreach (['cost_price', 'custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
             if (is_array($colsProdutos) && in_array($c, $colsProdutos, true)) {
                 $custoCol = $c;
                 break;
