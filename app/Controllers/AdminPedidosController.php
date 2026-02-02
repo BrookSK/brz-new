@@ -504,6 +504,10 @@ class AdminPedidosController extends Controller {
                 <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
                 <div>
+                    ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
+                        ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary me-2">'
+                            . '<i class="fas fa-pen-to-square me-1"></i>Editar Pedido Manual</a>')
+                        : '') . '
                     <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>

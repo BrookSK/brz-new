@@ -95,6 +95,77 @@ class AdminPedidosManualController extends Controller {
         $pedidoId = (int) $request->getParam('pedido_id', 0);
         $erro = (string) $request->getParam('erro', '');
 
+        $existingPedido = null;
+        $existingItens = [];
+        if ($pedidoId > 0) {
+            try {
+                $colsPedidos = [];
+                try {
+                    $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                    $colsPedidos = $stmtColsP ? $stmtColsP->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsPedidos = [];
+                }
+
+                $usuarioCol = in_array('usuario_id', $colsPedidos, true) ? 'usuario_id' : (in_array('user_id', $colsPedidos, true) ? 'user_id' : '');
+                $origemCol = in_array('origem_pedido', $colsPedidos, true) ? 'origem_pedido' : '';
+                $codigoCol = in_array('codigo_pedido', $colsPedidos, true) ? 'codigo_pedido' : (in_array('numero_pedido', $colsPedidos, true) ? 'numero_pedido' : '');
+
+                $sel = ['id'];
+                if ($usuarioCol !== '') $sel[] = $usuarioCol . ' AS cliente_id';
+                if ($origemCol !== '') $sel[] = $origemCol . ' AS origem_pedido';
+                if ($codigoCol !== '') $sel[] = $codigoCol . ' AS codigo_pedido';
+
+                $stmtP = $pdo->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = :id LIMIT 1');
+                $stmtP->bindValue(':id', (int) $pedidoId, \PDO::PARAM_INT);
+                $stmtP->execute();
+                $existingPedido = $stmtP->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+                $itensTable = '';
+                try {
+                    $st = $pdo->prepare('SHOW TABLES LIKE ?');
+                    $st->execute(['pedido_itens']);
+                    if ($st->fetchColumn()) $itensTable = 'pedido_itens';
+                } catch (\Exception $e) {
+                    $itensTable = '';
+                }
+                if ($itensTable === '') {
+                    try {
+                        $st = $pdo->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['pedido_items']);
+                        if ($st->fetchColumn()) $itensTable = 'pedido_items';
+                    } catch (\Exception $e) {
+                        $itensTable = '';
+                    }
+                }
+
+                if ($itensTable !== '') {
+                    $colsItens = [];
+                    try {
+                        $stmtColsI = $pdo->query('DESCRIBE ' . $itensTable);
+                        $colsItens = $stmtColsI ? $stmtColsI->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    } catch (\Exception $e) {
+                        $colsItens = [];
+                    }
+
+                    $colPedido = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : '';
+                    $colProduto = in_array('produto_id', $colsItens, true) ? 'produto_id' : '';
+                    $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
+                    $colVal = in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : ''));
+
+                    if ($colPedido !== '' && $colProduto !== '' && $colQtd !== '' && $colVal !== '') {
+                        $stmtI = $pdo->prepare('SELECT id, ' . $colProduto . ' AS produto_id, ' . $colQtd . ' AS quantidade, ' . $colVal . ' AS valor_unitario FROM ' . $itensTable . ' WHERE ' . $colPedido . ' = :pid ORDER BY id ASC');
+                        $stmtI->bindValue(':pid', (int) $pedidoId, \PDO::PARAM_INT);
+                        $stmtI->execute();
+                        $existingItens = $stmtI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    }
+                }
+            } catch (\Exception $e) {
+                $existingPedido = null;
+                $existingItens = [];
+            }
+        }
+
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
@@ -295,6 +366,8 @@ class AdminPedidosManualController extends Controller {
         echo "<script>\n";
         echo 'const PRODUTOS = ' . json_encode($produtos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
+        echo 'const EXISTING_PEDIDO = ' . json_encode($existingPedido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
@@ -393,6 +466,39 @@ function addItemRow(){
     `;
     tbody.appendChild(tr);
     calcTotal();
+}
+
+function prefillRowFromExisting(tr, item){
+    if (!tr || !item) return;
+    const pid = Number(item.produto_id || 0);
+    const qtd = Number(item.quantidade || 0);
+    const unit = Number(item.valor_unitario || 0);
+
+    const prod = PRODUTOS.find(p => Number(p.id) === pid);
+
+    const hidden = tr.querySelector('.produtoIdInp');
+    const search = tr.querySelector('.produtoSearch');
+    const imgEl = tr.querySelector('img');
+    const valor = tr.querySelector('.valorInp');
+    const qtdEl = tr.querySelector('.qtdInp');
+
+    if (hidden) hidden.value = pid ? String(pid) : '';
+    if (search) {
+        if (prod) {
+            search.value = produtoLabel(prod);
+        } else {
+            search.value = pid ? ('Produto #' + String(pid)) : '';
+        }
+    }
+    if (imgEl && prod) imgEl.src = produtoImagem(prod);
+    if (valor) valor.value = formatMoney(unit);
+    if (qtdEl) qtdEl.value = String(qtd > 0 ? qtd : 1);
+
+    const resultsEl = tr.querySelector('.prodResults');
+    if (resultsEl) {
+        resultsEl.style.display = 'none';
+        resultsEl.innerHTML = '';
+    }
 }
 
 function removeRow(btn){
@@ -639,6 +745,62 @@ function copiarTextoOrcamento(){
     }
 }
 
+function copiarLinkPagamento(){
+    const url = String(window.__PAGAMENTO_LINK__ || '').trim();
+    if (!url) return;
+
+    const ok = () => {
+        const out = document.getElementById('linkResult');
+        if (out) {
+            out.querySelector('.alert')?.classList.remove('alert-info');
+            out.querySelector('.alert')?.classList.remove('alert-success');
+            out.querySelector('.alert')?.classList.add('alert-success');
+            const d = out.querySelector('.alert > div');
+            if (d) d.innerHTML = '<strong>Copiado!</strong> Link de pagamento copiado para a área de transferência.';
+        }
+    };
+    const fail = () => {
+        const ta = document.getElementById('linkPagamentoTexto');
+        if (ta) {
+            ta.focus();
+            ta.select();
+        }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(ok).catch(() => {
+            try {
+                const ta = document.getElementById('linkPagamentoTexto');
+                if (ta) {
+                    ta.focus();
+                    ta.select();
+                    document.execCommand('copy');
+                    ok();
+                } else {
+                    fail();
+                }
+            } catch (e) {
+                fail();
+            }
+        });
+        return;
+    }
+
+    try {
+        const ta = document.getElementById('linkPagamentoTexto');
+        if (ta) {
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            ok();
+        } else {
+            fail();
+        }
+    } catch (e) {
+        fail();
+    }
+}
+
 function gerarLinkPagamento(){
     const bt = document.getElementById('billingType').value;
 
@@ -662,7 +824,18 @@ function gerarLinkPagamento(){
         .then(data => {
             if (data && data.success) {
                 const url = data.invoiceUrl || '';
-                el.innerHTML = `<div class="alert alert-success">Link gerado: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>`;
+                window.__PAGAMENTO_LINK__ = url;
+                el.innerHTML = `<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <strong>Link gerado.</strong> Agora é só copiar e enviar para o cliente.
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>
+                        <button type="button" class="btn btn-sm btn-dark" onclick="copiarLinkPagamento()"><i class="fas fa-copy"></i> Copiar</button>
+                    </div>
+                </div>
+                <textarea class="form-control" id="linkPagamentoTexto" rows="2" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(url)}</textarea>
+                <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar outro link.</div>`;
             } else {
                 el.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml((data && data.error) ? data.error : 'Falha ao gerar link')}</div>`;
             }
@@ -673,7 +846,25 @@ function gerarLinkPagamento(){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
-    addItemRow();
+    if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
+        const sel = document.getElementById('cliente_id');
+        if (sel) {
+            sel.value = String(EXISTING_PEDIDO.cliente_id);
+        }
+    }
+
+    const tbody = document.querySelector('#itensTable tbody');
+    if (tbody && Array.isArray(EXISTING_ITENS) && EXISTING_ITENS.length > 0) {
+        tbody.innerHTML = '';
+        EXISTING_ITENS.forEach(it => {
+            addItemRow();
+            const last = tbody.querySelector('tr:last-child');
+            prefillRowFromExisting(last, it);
+        });
+        calcTotal();
+    } else {
+        addItemRow();
+    }
 
     const btnLink = document.getElementById('btnGerarLinkPagamento');
     if (btnLink) {
