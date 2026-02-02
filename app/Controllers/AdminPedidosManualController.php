@@ -362,10 +362,10 @@ class AdminPedidosManualController extends Controller {
                 <div id="orcamentoResult" style="display:none;"></div>
             </form>
 
-            <div class="card mb-4">
+            <div class="card mb-4" id="linkPagamentoCard">
                 <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Stripe</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4">
                             <label class="form-label">Billing Type</label>
@@ -910,6 +910,9 @@ function gerarLinkPagamento(){
 document.addEventListener('DOMContentLoaded', function(){
     const moedaSel = document.getElementById('moeda');
     const fpSel = document.getElementById('forma_pagamento');
+    const linkCard = document.getElementById('linkPagamentoCard');
+    const linkInfo = document.getElementById('linkPagamentoInfo');
+    const linkResult = document.getElementById('linkResult');
 
     function updateManualPaymentMethodsForCurrency(){
         if (!fpSel) return;
@@ -957,6 +960,19 @@ document.addEventListener('DOMContentLoaded', function(){
         } else {
             offlineWrap.style.display = 'none';
             offlineBox.textContent = '';
+        }
+
+        // Pagamentos offline não devem gerar link
+        const isOffline = (v === 'nomad_transferencia' || v === 'appmax_pix');
+        if (linkCard) {
+            linkCard.style.display = isOffline ? 'none' : '';
+        }
+        if (linkInfo) {
+            linkInfo.style.display = isOffline ? 'none' : '';
+        }
+        if (linkResult && isOffline) {
+            linkResult.style.display = 'none';
+            linkResult.innerHTML = '';
         }
 
         // Ajuste simples: se método exige moeda, mantém compatibilidade de seleção
@@ -1023,7 +1039,14 @@ document.addEventListener('DOMContentLoaded', function(){
                     if (!resp || !resp.success) {
                         throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
                     }
-                    PEDIDO_ID = Number(resp.pedido_id || resp.pedidoId || 0);
+
+                    PEDIDO_ID = Number(resp.pedidoId || resp.id || 0);
+
+                    const fp = fpSel ? String(fpSel.value || '') : '';
+                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix') {
+                        window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
+                        return;
+                    }
                     if (!PEDIDO_ID) {
                         throw new Error('Pedido inválido');
                     }

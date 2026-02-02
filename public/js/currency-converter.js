@@ -126,6 +126,10 @@ window.CurrencyConverter = {
         cartValues.forEach(element => {
             const originalValue = parseFloat(element.getAttribute('data-original-value'));
             if (!isNaN(originalValue)) {
+                if ((element.classList.contains('frete-value') || element.id === 'frete') && originalValue === 0) {
+                    element.textContent = 'Frete grátis';
+                    return;
+                }
                 const convertedValue = originalValue * rate;
                 element.textContent = `${symbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
             }

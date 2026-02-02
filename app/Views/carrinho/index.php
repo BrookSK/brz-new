@@ -170,7 +170,7 @@
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Frete (0 kg)</span>
-                            <span class="cart-currency frete-value" data-original-value="0">0,00</span>
+                            <span class="cart-currency frete-value" data-original-value="0">Frete grátis</span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
@@ -229,7 +229,7 @@
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Frete (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= number_format($frete, 2, ',', '.') ?></span>
+                        <span class="cart-currency frete-value" data-original-value="<?= $frete ?>"><?= (((float) $frete) <= 0 ? 'Frete grátis' : number_format($frete, 2, ',', '.')) ?></span>
                     </div>
                     
                     <hr>

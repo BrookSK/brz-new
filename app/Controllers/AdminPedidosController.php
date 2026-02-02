@@ -745,6 +745,7 @@ class AdminPedidosController extends Controller {
                                     }
 
                                     $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+                                    $statusBloqueadoPorComprovante = false;
                                     if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
                                         $hasDocs = false;
                                         try {
@@ -770,8 +771,10 @@ class AdminPedidosController extends Controller {
                                             $docPath = (string) ($doc['arquivo_path'] ?? '');
                                             $docUploadedAt = (string) ($doc['uploaded_at'] ?? '');
 
+                                            $statusBloqueadoPorComprovante = !($docStatus === 'ok' && $docPath !== '');
+
                                             echo '<hr>';
-                                            echo '<div class="mb-3">'
+                                            echo '<div class="mb-3" id="comprovante">'
                                                 . '<h6 class="mb-2">Comprovante de Pagamento</h6>';
 
                                             if ($docStatus === 'ok' && $docPath !== '') {
@@ -800,7 +803,7 @@ class AdminPedidosController extends Controller {
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>
-                                    <select class="form-select" id="novo_status">
+                                    <select class="form-select" id="novo_status" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>
                                         <option value="">Selecione...</option>
                                         <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
@@ -814,7 +817,8 @@ class AdminPedidosController extends Controller {
                                         <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>
                                 </div>
-                                <button onclick="atualizarStatus()" class="btn btn-primary w-100">Atualizar Status</button>
+                                ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">Envie o comprovante para liberar a edição do status.</div>' : '') . '
+                                <button onclick="atualizarStatus()" class="btn btn-primary w-100" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>Atualizar Status</button>
                             </div>
                         </div>
                         
@@ -1175,7 +1179,10 @@ class AdminPedidosController extends Controller {
 
         renderAdminSidebarStyles();
 
-        echo '</head>
+        echo '<style>
+        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:2px}
+        .comm-card{flex:0 0 220px}
+        </style></head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -1202,37 +1209,42 @@ class AdminPedidosController extends Controller {
             $percent = (float) ($t['percentual_comissao'] ?? 0);
             $valorComissao = (float) ($t['valor_comissao'] ?? 0);
 
-            echo '<div class="col-12"><div class="d-flex justify-content-between align-items-center"><h5 class="mb-2">Moeda: ' . htmlspecialchars($moeda) . '</h5></div></div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+            echo '<div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
+                    </div>
+                    <div class="comm-cards">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Total Faturado (Manuais)</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalFaturado, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Custo dos Produtos</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalCusto, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Total Líquido</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($totalLiquido, $moeda) . '</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Comissão</div>
                             <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (' . $formatMoney($valorComissao, $moeda) . ')</div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-3 h-100">
+                        <div class="border rounded p-3 comm-card">
                             <div class="text-muted small">Comissão total</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
-                    </div>';
+                    </div>
+                </div>';
+        }
+
+        $pedidosUsd = [];
+        $pedidosBrl = [];
+        foreach ($cPedidos as $p) {
+            $m = strtoupper(trim((string) ($p['moeda'] ?? '')));
+            if ($m === '') $m = 'BRL';
+            if ($m === 'USD') $pedidosUsd[] = $p;
+            else $pedidosBrl[] = $p;
         }
 
         echo '</div>
@@ -1241,15 +1253,17 @@ class AdminPedidosController extends Controller {
                     <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
                     <div class="card-body">';
 
-        if (empty($cPedidos)) {
-            echo '<div class="text-muted">Sem pedidos manuais pagos para este admin.</div>';
-        } else {
+        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel) use ($formatMoney) {
+            if (empty($pedidos)) {
+                echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                return;
+            }
+
             echo '<div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>Pedido</th>
-                                <th>Moeda</th>
                                 <th>Data</th>
                                 <th class="text-end">Faturado</th>
                                 <th class="text-end">Custo</th>
@@ -1259,7 +1273,7 @@ class AdminPedidosController extends Controller {
                         </thead>
                         <tbody>';
 
-            foreach ($cPedidos as $p) {
+            foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
                 $codigo = (string) ($p['codigo'] ?? $pid);
                 $fat = (float) ($p['faturado'] ?? 0);
@@ -1272,7 +1286,6 @@ class AdminPedidosController extends Controller {
 
                 echo '<tr>
                         <td><strong>' . htmlspecialchars($codigo) . '</strong><div class="text-muted small">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</div></td>
-                        <td>' . htmlspecialchars($moeda) . '</td>
                         <td>' . htmlspecialchars($dtFmt) . '</td>
                         <td class="text-end fw-semibold">' . $formatMoney($fat, $moeda) . '</td>
                         <td class="text-end">' . $formatMoney($cus, $moeda) . '</td>
@@ -1284,7 +1297,21 @@ class AdminPedidosController extends Controller {
             echo '        </tbody>
                     </table>
                 </div>';
-        }
+        };
+
+        echo '<div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>USD</strong>
+                </div>';
+        $renderTabelaPedidos($pedidosUsd, 'USD');
+        echo '</div>';
+
+        echo '<div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>BRL</strong>
+                </div>';
+        $renderTabelaPedidos($pedidosBrl, 'BRL');
+        echo '</div>';
 
         echo '        </div>
                 </div>
