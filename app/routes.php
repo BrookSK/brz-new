@@ -272,6 +272,10 @@ $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
 
+// Mapa de calor (segmentação)
+$router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
+$router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
+
 // Notificações (Webhooks / Email teste)
 $router->post('/admin/salvar-notificacao', 'AdminNotificacoesController', 'salvarNotificacao');
 $router->get('/admin/notificacao', 'AdminNotificacoesController', 'obterNotificacao');
