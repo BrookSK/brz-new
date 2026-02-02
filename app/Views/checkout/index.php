@@ -610,7 +610,7 @@ function processarPedidoDireto() {
         formData.append('forma_pagamento', formaPagamento);
         console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
 
-        // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL/Asaas)
+        // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL/AppMax)
         if (formaPagamento === 'cartao_credito' && currentCurrency === 'BRL') {
             const camposCartao = document.getElementById('campos-cartao');
             const nomeCartao = camposCartao ? camposCartao.querySelector('input[name="card_holder_name"]') : null;
@@ -1188,7 +1188,7 @@ function updatePrices(currency) {
         console.log('🔍 [MOEDA] Campo oculto de moeda atualizado para:', currency);
     }
 
-    // Atualizar opções de forma de pagamento conforme moeda (BRL=Asaas, USD=Stripe)
+    // Atualizar opções de forma de pagamento conforme moeda (BRL=AppMax, USD=Stripe)
     updatePaymentMethodsForCurrency(currency);
     
     // Atualizar símbolo da moeda no header se existir

@@ -313,7 +313,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
 
                             <?php
                             $statusInterno = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ''));
-                            $podeReemitir = in_array(strtoupper($statusInterno), ['PENDING', 'PENDENTE', 'OVERDUE'], true);
+                            $gatewayPedido = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ''));
+                            $podeReemitir = ($gatewayPedido === 'asaas') && in_array(strtoupper($statusInterno), ['PENDING', 'PENDENTE', 'OVERDUE'], true);
                             ?>
 
                             <?php if ($podeReemitir && in_array($billingType, ['PIX', 'BOLETO'], true) && !empty($pedido['id'])): ?>

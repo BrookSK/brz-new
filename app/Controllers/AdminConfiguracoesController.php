@@ -447,7 +447,8 @@ class AdminConfiguracoesController extends Controller {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
+                                            <hr>
                                             <!-- Pré-visualização -->
                                             <div class="row mt-4" id="preview_section" style="display: none;">
                                                 <div class="col-12">
@@ -917,6 +918,61 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="mb-0">🇧🇷 AppMax</h6>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="appmax_enabled" name="pagamentos_appmax_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <label class="form-check-label" for="appmax_enabled">Ativo</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Client ID</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_appmax_client_id" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_client_id', '') . '" placeholder="CLIENT_ID">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Client Secret</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_appmax_client_secret" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_client_secret', '') . '" placeholder="CLIENT_SECRET">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">App ID</label>
+                                                                        <input type="text" class="form-control" name="pagamentos_appmax_app_id" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_app_id', '') . '" placeholder="APP_ID">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Webhook URL</label>
+                                                                        <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/appmax', ENT_QUOTES, 'UTF-8') . '" readonly>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-12">
                                                     <h6 class="mb-3">Webhook - Pedido Manual</h6>
                                                     <div class="mb-3">
                                                         <label class="form-label">Webhook - Link de Pagamento do Pedido Manual (URL)</label>
@@ -1196,7 +1252,7 @@ JS;
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'webhook_link_pagamento_pedido_manual_url'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
@@ -1206,7 +1262,7 @@ JS;
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {

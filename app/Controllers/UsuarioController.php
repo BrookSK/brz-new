@@ -569,14 +569,33 @@ class UsuarioController extends Controller {
             $itens = $pedido['items'] ?? [];
 
             $paymentDetails = null;
-            try {
-                if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
-                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
-                } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
-                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+            if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'appmax') {
+                $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
+                if ($billingType === 'CARTAO_CREDITO') {
+                    $billingType = 'CREDIT_CARD';
                 }
-            } catch (\Exception $e) {
-                $paymentDetails = null;
+
+                $invoiceUrl = (string) ($pedido['payment_invoice_url'] ?? ($pedido['invoice_url'] ?? ($pedido['invoiceUrl'] ?? '')));
+                $bankSlipUrl = (string) ($pedido['payment_bank_slip_url'] ?? ($pedido['bank_slip_url'] ?? ($pedido['bankSlipUrl'] ?? '')));
+                $digitableLine = (string) ($pedido['payment_digitable_line'] ?? ($pedido['digitable_line'] ?? ($pedido['digitableLine'] ?? ($pedido['linha_digitavel'] ?? ''))));
+
+                $paymentDetails = [
+                    'billingType' => $billingType,
+                    'invoiceUrl' => $invoiceUrl !== '' ? $invoiceUrl : null,
+                    'bankSlipUrl' => $bankSlipUrl !== '' ? $bankSlipUrl : null,
+                    'digitableLine' => $digitableLine !== '' ? $digitableLine : null,
+                    'status' => (string) ($pedido['payment_status'] ?? ''),
+                ];
+            } else {
+                try {
+                    if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
+                        $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
+                    } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                        $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                    }
+                } catch (\Exception $e) {
+                    $paymentDetails = null;
+                }
             }
 
             $svc = new PdfPedidoService();
@@ -602,6 +621,12 @@ class UsuarioController extends Controller {
             $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
             if (!$pedido || (int) ($pedido['usuario_id'] ?? 0) !== (int) ($usuario['id'] ?? 0)) {
                 $this->redirect('/meus-pedidos');
+                return;
+            }
+
+            $gateway = (string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''));
+            if ($gateway !== 'asaas') {
+                $this->redirect('/pedido/detalhes/' . $pedidoId . '?reemitido=0');
                 return;
             }
 
@@ -738,25 +763,56 @@ class UsuarioController extends Controller {
 
             $paymentDetails = null;
             $pixQrCode = null;
-            try {
-                if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
-                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
-                    if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
-                        try {
-                            $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['pagamento_transacao']);
-                        } catch (\Exception $e) {
-                        }
-                    }
-                } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
-                    $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
-                    if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
-                        try {
-                            $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
-                        } catch (\Exception $e) {
-                        }
+
+            if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'appmax') {
+                $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
+                if ($billingType === 'CARTAO_CREDITO') {
+                    $billingType = 'CREDIT_CARD';
+                }
+
+                $invoiceUrl = (string) ($pedido['payment_invoice_url'] ?? ($pedido['invoice_url'] ?? ($pedido['invoiceUrl'] ?? '')));
+                $bankSlipUrl = (string) ($pedido['payment_bank_slip_url'] ?? ($pedido['bank_slip_url'] ?? ($pedido['bankSlipUrl'] ?? '')));
+                $digitableLine = (string) ($pedido['payment_digitable_line'] ?? ($pedido['digitable_line'] ?? ($pedido['digitableLine'] ?? ($pedido['linha_digitavel'] ?? ''))));
+
+                $paymentDetails = [
+                    'billingType' => $billingType,
+                    'invoiceUrl' => $invoiceUrl !== '' ? $invoiceUrl : null,
+                    'bankSlipUrl' => $bankSlipUrl !== '' ? $bankSlipUrl : null,
+                    'digitableLine' => $digitableLine !== '' ? $digitableLine : null,
+                    'status' => (string) ($pedido['payment_status'] ?? ''),
+                ];
+
+                if ($billingType === 'PIX') {
+                    $pixImg = (string) ($pedido['payment_pix_encoded_image'] ?? ($pedido['pix_encoded_image'] ?? ($pedido['pix_qr_base64'] ?? ($pedido['pix_qr'] ?? ''))));
+                    $pixPayload = (string) ($pedido['payment_pix_payload'] ?? ($pedido['pix_payload'] ?? ($pedido['pix_emv'] ?? ($pedido['pix_copy_paste'] ?? ''))));
+                    if ($pixImg !== '' || $pixPayload !== '') {
+                        $pixQrCode = [
+                            'encodedImage' => $pixImg !== '' ? $pixImg : null,
+                            'payload' => $pixPayload !== '' ? $pixPayload : null,
+                        ];
                     }
                 }
-            } catch (\Exception $e) {
+            } else {
+                try {
+                    if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {
+                        $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['pagamento_transacao']);
+                        if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                            try {
+                                $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['pagamento_transacao']);
+                            } catch (\Exception $e) {
+                            }
+                        }
+                    } elseif (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'asaas' && !empty($pedido['payment_id'])) {
+                        $paymentDetails = $this->paymentService->obterPagamentoAsaas((string) $pedido['payment_id']);
+                        if (strtoupper((string) ($paymentDetails['billingType'] ?? '')) === 'PIX') {
+                            try {
+                                $pixQrCode = $this->paymentService->obterPixQrCodeAsaas((string) $pedido['payment_id']);
+                            } catch (\Exception $e) {
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
             }
             
             $this->view('usuario/pedido-detalhes', [
