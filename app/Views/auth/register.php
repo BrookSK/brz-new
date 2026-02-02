@@ -49,6 +49,84 @@
                                        placeholder="000.000.000-00" required>
                             </div>
                         </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-cake-candles"></i></span>
+                                    <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-flag"></i></span>
+                                    <select class="form-select" id="pais_residencia" name="pais_residencia" required>
+                                        <option value="BR" selected>Brasil</option>
+                                        <option value="US">Estados Unidos</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="cep" class="form-label">CEP</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-location-dot"></i></span>
+                                    <input type="text" class="form-control" id="cep" name="cep" placeholder="00000-000" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="endereco" class="form-label">Endereço</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-map"></i></span>
+                                    <input type="text" class="form-control" id="endereco" name="endereco" placeholder="Rua, Avenida, etc." required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="numero" class="form-label">Número</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
+                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123" required>
+                                </div>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label for="complemento" class="form-label">Complemento</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-building"></i></span>
+                                    <input type="text" class="form-control" id="complemento" name="complemento" placeholder="Apto, Casa, etc.">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="bairro" class="form-label">Bairro</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
+                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="cidade" class="form-label">Cidade</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-city"></i></span>
+                                    <input type="text" class="form-control" id="cidade" name="cidade" placeholder="São Paulo" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="estado" class="form-label">Estado</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-map-pin"></i></span>
+                                    <input type="text" class="form-control" id="estado" name="estado" placeholder="SP" required>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">

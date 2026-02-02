@@ -6,6 +6,16 @@
         <div class="col-lg-8 mb-4 mb-lg-0">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
+                        <?php if (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))): ?>
+                            <div class="alert alert-warning">
+                                <div><strong>Atenção:</strong> você precisa completar seus dados e aceitar os termos para finalizar a compra.</div>
+                                <?php if (!empty($campos_faltando) && is_array($campos_faltando)): ?>
+                                    <div class="small mt-1">Campos pendentes: <strong><?= htmlspecialchars(implode(', ', $campos_faltando)) ?></strong></div>
+                                <?php endif; ?>
+                                <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados">Completar cadastro</a></div>
+                            </div>
+                        <?php endif; ?>
+
                         <!-- Campo oculto para moeda -->
                         <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
                         
@@ -319,7 +329,7 @@
                             </div>
 
                             <!-- Botão Finalizar -->
-                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" 
+                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
                                     onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
                                 <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
                             </button>

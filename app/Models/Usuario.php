@@ -4,6 +4,8 @@ namespace App\Models;
 class Usuario extends Model {
     protected $table = 'usuarios';
 
+    private static ?array $cachedUserColumns = null;
+
     public function __construct() {
         parent::__construct();
     }
@@ -362,5 +364,96 @@ class Usuario extends Model {
         $stmt->bindParam(':offset', $offset, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    private function getUserColumns(): array {
+        if (self::$cachedUserColumns !== null) {
+            return self::$cachedUserColumns;
+        }
+
+        try {
+            $stmt = $this->getConnection()->query('DESCRIBE usuarios');
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            self::$cachedUserColumns = is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            self::$cachedUserColumns = [];
+        }
+
+        return self::$cachedUserColumns;
+    }
+
+    public function getMissingRequiredFields(array $usuario): array {
+        $cols = $this->getUserColumns();
+
+        $required = [
+            'nome' => ['nome', 'name'],
+            'email' => ['email'],
+            'telefone' => ['telefone', 'phone'],
+            'documento' => ['documento', 'cpf_cnpj', 'cpf'],
+            'cep' => ['cep', 'zip_code'],
+            'endereco' => ['endereco', 'address'],
+            'numero' => ['numero', 'number'],
+            'bairro' => ['bairro', 'neighborhood'],
+            'cidade' => ['cidade', 'city'],
+            'estado' => ['estado', 'state'],
+            'data_nascimento' => ['data_nascimento', 'birth_date'],
+            'pais_residencia' => ['pais_residencia'],
+        ];
+
+        $missing = [];
+        foreach ($required as $label => $candidates) {
+            $col = null;
+            foreach ($candidates as $c) {
+                if (in_array($c, $cols, true)) {
+                    $col = $c;
+                    break;
+                }
+            }
+            if ($col === null) {
+                continue;
+            }
+
+            $val = $usuario[$col] ?? '';
+            if (is_string($val)) {
+                $val = trim($val);
+            }
+            if ($val === '' || $val === null) {
+                $missing[] = $label;
+            }
+        }
+
+        $pais = '';
+        if (in_array('pais_residencia', $cols, true)) {
+            $pais = strtoupper(trim((string) ($usuario['pais_residencia'] ?? '')));
+        }
+        if ($pais === 'BR' || $pais === '') {
+            $doc = '';
+            foreach (['documento', 'cpf_cnpj', 'cpf'] as $c) {
+                if (in_array($c, $cols, true) && !empty($usuario[$c])) {
+                    $doc = preg_replace('/\D+/', '', (string) $usuario[$c]);
+                    break;
+                }
+            }
+            if ($doc === '' || strlen($doc) < 11) {
+                if (!in_array('documento', $missing, true)) {
+                    $missing[] = 'documento';
+                }
+            }
+        }
+
+        return $missing;
+    }
+
+    public function hasAcceptedTerms(array $usuario): bool {
+        $cols = $this->getUserColumns();
+        if (!in_array('termos_aceitos_em', $cols, true)) {
+            return false;
+        }
+        $v = (string) ($usuario['termos_aceitos_em'] ?? '');
+        return trim($v) !== '';
+    }
+
+    public function isProfileComplete(array $usuario): bool {
+        return empty($this->getMissingRequiredFields($usuario));
     }
 }
