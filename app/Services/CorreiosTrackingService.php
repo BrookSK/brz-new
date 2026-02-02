@@ -164,9 +164,21 @@ class CorreiosTrackingService {
 
     private function extractErrorMessage(array $json): string {
         $cands = [];
-        foreach (['message', 'mensagem', 'msg', 'error', 'erro', 'detail', 'details', 'title'] as $k) {
+        foreach (['message', 'mensagem', 'msg', 'msgs', 'error', 'erro', 'detail', 'details', 'title'] as $k) {
             if (isset($json[$k]) && is_string($json[$k]) && trim($json[$k]) !== '') {
                 $cands[] = trim($json[$k]);
+            }
+        }
+
+        if (isset($json['msgs']) && is_array($json['msgs'])) {
+            $parts = [];
+            foreach ($json['msgs'] as $m) {
+                if (is_string($m) && trim($m) !== '') {
+                    $parts[] = trim($m);
+                }
+            }
+            if (!empty($parts)) {
+                $cands[] = implode(' | ', $parts);
             }
         }
 
