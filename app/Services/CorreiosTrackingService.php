@@ -41,6 +41,16 @@ class CorreiosTrackingService {
                 return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw];
             }
 
+            if (is_int($httpCode) && $httpCode >= 400) {
+                $msg = $this->extractErrorMessage($json);
+                return [
+                    'success' => false,
+                    'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar rastreamento.'),
+                    'http_code' => $httpCode,
+                    'raw' => $json,
+                ];
+            }
+
             $eventos = $this->extractEventos($json);
 
             return [
@@ -102,6 +112,10 @@ class CorreiosTrackingService {
             $candidates = $json['eventos'];
         } elseif (isset($json['objetos'][0]['eventos']) && is_array($json['objetos'][0]['eventos'])) {
             $candidates = $json['objetos'][0]['eventos'];
+        } elseif (isset($json['packages'][0]['events']) && is_array($json['packages'][0]['events'])) {
+            $candidates = $json['packages'][0]['events'];
+        } elseif (isset($json['package']['events']) && is_array($json['package']['events'])) {
+            $candidates = $json['package']['events'];
         } elseif (isset($json[0]) && is_array($json[0])) {
             $candidates = $json;
         }
@@ -110,12 +124,16 @@ class CorreiosTrackingService {
         foreach ($candidates as $ev) {
             if (!is_array($ev)) continue;
 
-            $etapa = (string) ($ev['status'] ?? ($ev['descricao'] ?? ($ev['evento'] ?? '')));
-            $descricao = (string) ($ev['descricao'] ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? $etapa)));
+            $etapa = (string) ($ev['status'] ?? ($ev['descricao'] ?? ($ev['evento'] ?? ($ev['eventType'] ?? ($ev['eventDescription'] ?? '')))));
+            $descricao = (string) ($ev['descricao'] ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? ($ev['eventDescription'] ?? $etapa))));
 
             $local = '';
             if (isset($ev['unidade']['nome'])) {
                 $local = (string) $ev['unidade']['nome'];
+            } elseif (isset($ev['eventLocation'])) {
+                $local = (string) $ev['eventLocation'];
+            } elseif (isset($ev['location'])) {
+                $local = (string) $ev['location'];
             } elseif (isset($ev['local'])) {
                 $local = (string) $ev['local'];
             }
@@ -123,6 +141,10 @@ class CorreiosTrackingService {
             $dataHora = '';
             if (!empty($ev['dataHora'])) {
                 $dataHora = (string) $ev['dataHora'];
+            } elseif (!empty($ev['eventDate']) && !empty($ev['eventTime'])) {
+                $dataHora = (string) ($ev['eventDate'] . ' ' . $ev['eventTime']);
+            } elseif (!empty($ev['eventDateTime'])) {
+                $dataHora = (string) $ev['eventDateTime'];
             } elseif (!empty($ev['data']) && !empty($ev['hora'])) {
                 $dataHora = (string) ($ev['data'] . ' ' . $ev['hora']);
             } elseif (!empty($ev['data_hora'])) {
@@ -138,5 +160,47 @@ class CorreiosTrackingService {
         }
 
         return $out;
+    }
+
+    private function extractErrorMessage(array $json): string {
+        $cands = [];
+        foreach (['message', 'mensagem', 'msg', 'msgs', 'error', 'erro', 'detail', 'details', 'title'] as $k) {
+            if (isset($json[$k]) && is_string($json[$k]) && trim($json[$k]) !== '') {
+                $cands[] = trim($json[$k]);
+            }
+        }
+
+        if (isset($json['msgs']) && is_array($json['msgs'])) {
+            $parts = [];
+            foreach ($json['msgs'] as $m) {
+                if (is_string($m) && trim($m) !== '') {
+                    $parts[] = trim($m);
+                }
+            }
+            if (!empty($parts)) {
+                $cands[] = implode(' | ', $parts);
+            }
+        }
+
+        if (isset($json['errors']) && is_array($json['errors'])) {
+            $parts = [];
+            foreach ($json['errors'] as $e) {
+                if (is_string($e) && trim($e) !== '') {
+                    $parts[] = trim($e);
+                } elseif (is_array($e)) {
+                    foreach (['message', 'mensagem', 'detail', 'error'] as $k) {
+                        if (isset($e[$k]) && is_string($e[$k]) && trim($e[$k]) !== '') {
+                            $parts[] = trim($e[$k]);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!empty($parts)) {
+                $cands[] = implode(' | ', $parts);
+            }
+        }
+
+        return $cands[0] ?? '';
     }
 }
