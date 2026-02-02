@@ -630,13 +630,15 @@ class PedidoEcommerce extends Model {
         $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($pedido) {
-            // Obter itens do pedido com dados do produto
+            $pedido['items'] = [];
+            $pedido['historico'] = [];
+
+            // Obter itens do pedido (tolerante a schemas)
             try {
-                // Detectar tabela de itens (pedido_itens vs pedido_items)
                 $itensTable = 'pedido_itens';
-                $colsItens = [];
                 $temPedidoItens = false;
                 $temPedidoItems = false;
+
                 try {
                     $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
                     $stmtT->execute(['pedido_itens']);
@@ -676,7 +678,7 @@ class PedidoEcommerce extends Model {
                     $itensTable = 'pedido_itens';
                 }
 
-                // Descobrir colunas disponíveis na tabela escolhida para evitar SQL quebrar
+                $colsItens = [];
                 try {
                     $stmtCols = $this->connection->query('DESCRIBE ' . $itensTable);
                     $colsItens = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
@@ -684,97 +686,92 @@ class PedidoEcommerce extends Model {
                     $colsItens = [];
                 }
 
-                $selectExtrasItens = '';
-                foreach (['url_original', 'variacao_id', 'variacao_label', 'variacao_atributos'] as $c) {
-                    if (is_array($colsItens) && in_array($c, $colsItens, true)) {
-                        $selectExtrasItens .= ', pi.' . $c;
-                    }
-                }
-
-                // Buscar itens diretamente com as colunas que criamos
-                $stmt = $this->connection->prepare("
-                    SELECT 
-                        pi.id,
-                        pi.pedido_id,
-                        pi.produto_id,
-                        pi.quantidade,
-                        pi.preco_unitario,
-                        pi.subtotal,
-                        pi.nome_produto,
-                        pi.nome_produto_sku,
-                        pi.produto_preco,
-                        pi.produto_ncm,
-                        pi.produto_peso,
-                        pi.produto_dimensoes,
-                        pi.produto_tipo,
-                        pi.produto_status,
-                        pi.created_at,
-                        (SELECT pf.nome_arquivo 
-                         FROM produto_fotos pf 
-                         WHERE pf.produto_id = pi.produto_id 
-                         ORDER BY pf.principal DESC, pf.ordem ASC 
-                         LIMIT 1) as imagem_principal
-                    FROM {$itensTable} pi 
-                    WHERE pi.pedido_id = :id 
-                    ORDER BY pi.id
-                ");
-                // Injetar colunas extras de forma segura
-                if ($selectExtrasItens !== '') {
-                    $sql = $stmt->queryString;
-                    $sql = str_replace('pi.created_at,', 'pi.created_at' . $selectExtrasItens . ',', $sql);
-                    $stmt = $this->connection->prepare($sql);
-                }
-                $stmt->bindParam(':id', $pedidoId);
-                $stmt->execute();
-                $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                
-                // Garantir que os itens tenham todos os campos necessários
-                foreach ($itens as &$item) {
-                    $item['referencia'] = $item['referencia'] ?? $item['nome_produto_sku'] ?? '';
-                    $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
-                    $item['descricao_produto'] = $item['descricao_produto'] ?? '';
-
-                    if (isset($item['variacao_atributos']) && is_string($item['variacao_atributos']) && $item['variacao_atributos'] !== '') {
-                        $decoded = json_decode($item['variacao_atributos'], true);
-                        if (json_last_error() === JSON_ERROR_NONE) {
-                            $item['variacao_atributos'] = $decoded;
+                $pick = function(array $cands) use ($colsItens) {
+                    foreach ($cands as $c) {
+                        if (is_array($colsItens) && in_array($c, $colsItens, true)) {
+                            return $c;
                         }
                     }
-                    
-                    // Se não tiver nome_produto, usar fallback
-                    if (empty($item['nome_produto'])) {
-                        $item['nome_produto'] = 'Produto #' . $item['produto_id'];
-                    }
-                    
-                    $item['subtotal'] = ($item['preco_unitario'] ?? 0) * ($item['quantidade'] ?? 0);
+                    return null;
+                };
+
+                $colPedidoId = $pick(['pedido_id']);
+                $colProdutoId = $pick(['produto_id']);
+                $colQtd = $pick(['quantidade', 'qty']);
+                $colPrecoUnit = $pick(['preco_unitario', 'valor_unitario', 'price', 'preco']);
+                $colSubtotal = $pick(['subtotal']);
+                $colNomeProduto = $pick(['nome_produto', 'produto_nome', 'nome']);
+                $colSku = $pick(['nome_produto_sku', 'sku']);
+
+                if (!$colPedidoId) {
+                    throw new \Exception('Tabela de itens sem pedido_id');
                 }
-                
+
+                $selectParts = [];
+                if ($pick(['id']) !== null) $selectParts[] = 'pi.id';
+                if ($colProdutoId) $selectParts[] = 'pi.' . $colProdutoId . ' AS produto_id';
+                if ($colQtd) $selectParts[] = 'pi.' . $colQtd . ' AS quantidade';
+                if ($colPrecoUnit) $selectParts[] = 'pi.' . $colPrecoUnit . ' AS preco_unitario';
+                if ($colSubtotal) $selectParts[] = 'pi.' . $colSubtotal . ' AS subtotal';
+                if ($colNomeProduto) $selectParts[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
+                if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
+                if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
+                $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
+
+                $sqlItens = 'SELECT ' . implode(", ", $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
+                $stmtItens = $this->connection->prepare($sqlItens);
+                $stmtItens->bindParam(':id', $pedidoId);
+                $stmtItens->execute();
+                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                foreach ($itens as &$item) {
+                    $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
+                    $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+                    $item['descricao_produto'] = $item['descricao_produto'] ?? '';
+                    if (empty($item['nome_produto'])) {
+                        $pid = (int) ($item['produto_id'] ?? 0);
+                        $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
+                    }
+                    $q = (int) ($item['quantidade'] ?? 0);
+                    $pu = (float) ($item['preco_unitario'] ?? 0);
+                    if (!isset($item['subtotal']) || $item['subtotal'] === null) {
+                        $item['subtotal'] = $pu * $q;
+                    }
+                }
+
                 $pedido['items'] = $itens;
-                
             } catch (\Exception $e) {
                 $pedido['items'] = [];
             }
-            
-            // Obter histórico de status
+
+            // Obter histórico de status (tolerante a nome/name)
             try {
-                $stmt = $this->connection->prepare("
-                    SELECT psh.*, u.nome as usuario_alterou 
+                $userNomeCol = 'nome';
+                try {
+                    $stmtUserCols = $this->connection->query('DESCRIBE usuarios');
+                    $userCols = $stmtUserCols ? $stmtUserCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    if (is_array($userCols) && !in_array('nome', $userCols, true) && in_array('name', $userCols, true)) {
+                        $userNomeCol = 'name';
+                    }
+                } catch (\Exception $e) {
+                }
+
+                $stmtHist = $this->connection->prepare("\
+                    SELECT psh.*, u.{$userNomeCol} as usuario_alterou 
                     FROM pedido_status_history psh 
                     LEFT JOIN usuarios u ON psh.usuario_id = u.id 
                     WHERE psh.pedido_id = :id 
                     ORDER BY psh.created_at DESC
                 ");
-                $stmt->bindParam(':id', $pedidoId);
-                $stmt->execute();
-                $pedido['historico'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                
-                // Garantir que o histórico tenha todos os campos
+                $stmtHist->bindParam(':id', $pedidoId);
+                $stmtHist->execute();
+                $pedido['historico'] = $stmtHist->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
                 foreach ($pedido['historico'] as &$item) {
                     $item['novo_status'] = $item['status_novo'] ?? 'Status atualizado';
                     $item['observacao'] = $item['observacoes'] ?? 'Sem observação';
                     $item['usuario_alterou'] = $item['usuario_alterou'] ?? 'Sistema';
                 }
-                
             } catch (\Exception $e) {
                 $pedido['historico'] = [];
             }
@@ -830,9 +827,19 @@ class PedidoEcommerce extends Model {
 
     public function getRastreamento($pedidoId) {
         try {
+            $userNomeCol = 'nome';
+            try {
+                $stmtUserCols = $this->connection->query('DESCRIBE usuarios');
+                $userCols = $stmtUserCols ? $stmtUserCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($userCols) && !in_array('nome', $userCols, true) && in_array('name', $userCols, true)) {
+                    $userNomeCol = 'name';
+                }
+            } catch (\Exception $e) {
+            }
+
             // Adaptar query para a estrutura correta da tabela pedido_status_historico
             $stmt = $this->connection->prepare("
-                SELECT psh.*, u.nome as usuario_alterou 
+                SELECT psh.*, u.{$userNomeCol} as usuario_alterou 
                 FROM pedido_status_history psh 
                 LEFT JOIN usuarios u ON psh.usuario_id = u.id 
                 WHERE psh.pedido_id = :id 

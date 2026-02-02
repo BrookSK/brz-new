@@ -17,6 +17,81 @@ class PedidoManualService {
         return '';
     }
 
+    private function getConfigKeyValue(string $key, $default = null) {
+        $db = $this->db;
+
+        // Formato categoria/chave/valor ou chave/valor
+        try {
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Formato single row (coluna direta)
+        try {
+            $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($cols) && in_array($key, $cols, true)) {
+                $stmt = $db->query('SELECT ' . $key . ' AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($row && array_key_exists('valor', $row)) {
+                    return $row['valor'];
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Fallback em tabela configuracoes (chave/valor)
+        try {
+            $stmt = $db->prepare('SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1');
+            $stmt->execute([$key]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
+    }
+
+    public function getAliquota(string $key): float {
+        $key = trim($key);
+        if ($key === '') return 0.0;
+        $v = $this->getConfigKeyValue($key, null);
+        if ($v === null) {
+            return 0.0;
+        }
+        return (float) str_replace(',', '.', (string) $v);
+    }
+
+    public function getTaxaServicoPorKgBRL(): float {
+        // Preferência: chave taxa_servico_usd_por_kg * taxa de conversão, ou taxa_servico_kg diretamente
+        $vBRL = $this->getConfigKeyValue('taxa_servico_kg', null);
+        if ($vBRL !== null && $vBRL !== '') {
+            return (float) str_replace(',', '.', (string) $vBRL);
+        }
+
+        $vUSD = $this->getConfigKeyValue('taxa_servico_usd_por_kg', null);
+        $usd = ($vUSD !== null && $vUSD !== '') ? (float) str_replace(',', '.', (string) $vUSD) : 39.0;
+
+        $taxa = 5.5;
+        try {
+            $stmt = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+            $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
+            if (is_array($row) && isset($row['taxa_conversao'])) {
+                $taxa = (float) $row['taxa_conversao'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $usd * $taxa;
+    }
+
     private function tableExists(string $table): bool {
         try {
             $stmt = $this->db->prepare('SHOW TABLES LIKE ?');
@@ -109,7 +184,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = []): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -153,6 +228,12 @@ class PedidoManualService {
         }
         $total = round($total, 2);
 
+        // Se o front enviou um total calculado (com taxas), usar quando for maior ou igual ao subtotal
+        $valorTotalCalc = isset($resumo['valor_total']) ? (float) $resumo['valor_total'] : 0.0;
+        if ($valorTotalCalc > 0 && $valorTotalCalc >= $total) {
+            $total = round($valorTotalCalc, 2);
+        }
+
         $cols = [$usuarioCol, $colTotal];
         $vals = [':usuario_id', ':total'];
         $params = [':usuario_id' => $clienteId, ':total' => $total];
@@ -161,6 +242,33 @@ class PedidoManualService {
             $cols[] = $colMoeda;
             $vals[] = ':moeda';
             $params[':moeda'] = $moeda;
+        }
+
+        // Persistir resumo quando colunas existirem
+        $mapResumo = [
+            'subtotal_produtos' => ['subtotal_produtos', 'subtotal'],
+            'peso_total' => ['peso_total'],
+            'taxa_servico' => ['taxa_servico', 'servicos'],
+            'valor_impostos' => ['valor_impostos', 'impostos'],
+            'valor_frete' => ['valor_frete', 'frete'],
+            'valor_total' => ['valor_total', 'total'],
+        ];
+        foreach ($mapResumo as $k => $cands) {
+            if (!array_key_exists($k, $resumo)) {
+                continue;
+            }
+            $col = '';
+            foreach ($cands as $c) {
+                if (in_array($c, $colsPedidos, true)) {
+                    $col = $c;
+                    break;
+                }
+            }
+            if ($col !== '') {
+                $cols[] = $col;
+                $vals[] = ':' . $k;
+                $params[':' . $k] = (float) $resumo[$k];
+            }
         }
 
         if ($statusCol !== '') {
