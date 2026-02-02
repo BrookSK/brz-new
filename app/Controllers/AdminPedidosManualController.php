@@ -18,7 +18,32 @@ class AdminPedidosManualController extends Controller {
         $pdo = \Config\Database::getConnection();
         $produtos = [];
         try {
-            $stmt = $pdo->prepare("SELECT id, name, price, sku FROM produtos WHERE active = 1 ORDER BY name ASC");
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $nameCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : '');
+            $priceCol = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : '');
+            $activeCol = in_array('active', $cols, true) ? 'active' : (in_array('ativo', $cols, true) ? 'ativo' : '');
+
+            $select = ['id'];
+            if ($nameCol !== '') $select[] = $nameCol . ' AS name';
+            if ($priceCol !== '') $select[] = $priceCol . ' AS price';
+            if (in_array('sku', $cols, true)) $select[] = 'sku';
+
+            $where = '';
+            if ($activeCol !== '') {
+                $where = ' WHERE ' . $activeCol . ' = 1 ';
+            }
+
+            $orderBy = ($nameCol !== '') ? ' ORDER BY ' . $nameCol . ' ASC' : ' ORDER BY id DESC';
+
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM produtos' . $where . $orderBy;
+            $stmt = $pdo->prepare($sql);
             $stmt->execute();
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
@@ -26,6 +51,7 @@ class AdminPedidosManualController extends Controller {
         }
 
         $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $erro = (string) $request->getParam('erro', '');
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
@@ -56,6 +82,10 @@ class AdminPedidosManualController extends Controller {
                         </a>
                     </div>
                 </div>';
+
+        if ($erro !== '') {
+            echo '<div class="alert alert-danger">' . htmlspecialchars($erro, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
 
         if ($pedidoId > 0) {
             echo '<div class="alert alert-success">Pedido manual criado com sucesso: <strong>#' . (int) $pedidoId . '</strong></div>';
