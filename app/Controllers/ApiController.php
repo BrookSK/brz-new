@@ -48,13 +48,18 @@ class ApiController extends Controller {
         
         // Adicionar fotos aos produtos
         foreach ($produtos as &$produto) {
-            $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
-            $produto['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
-            
-            // Adicionar categoria
-            if ($produto['categoria_id']) {
-                $categoria = $this->produtoModel->getCategoria($produto['categoria_id']);
-                $produto['categoria'] = $categoria ? $categoria['nome'] : 'Não categorizado';
+            if (empty($produto['foto_principal'])) {
+                $fotoPrincipal = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
+                $produto['foto_principal'] = $fotoPrincipal ? $fotoPrincipal['nome_arquivo'] : null;
+            }
+
+            if (empty($produto['categoria'])) {
+                if (!empty($produto['categoria_id'])) {
+                    $categoria = $this->produtoModel->getCategoria($produto['categoria_id']);
+                    $produto['categoria'] = $categoria ? ($categoria['nome'] ?? ($categoria['name'] ?? 'Não categorizado')) : 'Não categorizado';
+                } else {
+                    $produto['categoria'] = 'Não categorizado';
+                }
             }
         }
         

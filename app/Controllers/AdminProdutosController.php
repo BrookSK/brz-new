@@ -244,6 +244,107 @@ class AdminProdutosController extends Controller {
         ];
     }
 
+    public function cadastroRapido(Request $request) {
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro Rápido - Produtos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-3" style="max-width: 520px;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <h1 class="h5 mb-0">Cadastro rápido</h1>
+            <span style="width: 40px;"></span>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Foto do produto</label>
+                        <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
+                        <div id="capaPreview" class="mt-3"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Nome *</label>
+                        <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Valor (USD) *</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">$</span>
+                                <input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Peso (kg) *</label>
+                            <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1">
+                        <label class="form-check-label" for="featuredSwitch">Destaque (aparece na Home)</label>
+                    </div>
+
+                    <input type="hidden" name="status" value="published">
+                    <input type="hidden" name="active" value="1">
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-bolt me-2"></i>Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var capaInput = document.getElementById('capaInput');
+        if (capaInput) {
+            capaInput.addEventListener('change', function(e) {
+                const preview = document.getElementById('capaPreview');
+                if (!preview) return;
+                preview.innerHTML = '';
+
+                const file = (e.target.files || [])[0];
+                if (file && file.type && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        const img = document.createElement('img');
+                        img.src = ev.target.result;
+                        img.className = 'img-fluid rounded';
+                        img.style.width = '100%';
+                        img.style.maxHeight = '220px';
+                        img.style.objectFit = 'cover';
+                        preview.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    </script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function cadastroRapidoSalvar(Request $request) {
+        // Reaproveitar a mesma lógica de salvar produto do formulário completo
+        return $this->salvar($request);
+    }
+
     public function index(Request $request) {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -350,7 +451,10 @@ class AdminProdutosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Produtos (' . $total . ')</h1>
-                    <a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
+                    <div class="d-flex gap-2">
+                        <a href="/admin/produtos/cadastro-rapido" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>
+                        <a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
+                    </div>
                 </div>';
 
         echo '<form method="GET" class="row g-3 mb-4">

@@ -96,7 +96,7 @@ class Produto extends Model {
             WHERE p.active = 1 
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
             AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY p.name ASC
+            ORDER BY p.featured DESC, p.name ASC
         ");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -107,7 +107,7 @@ class Produto extends Model {
             SELECT p.*, c.name as categoria 
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE p.status = 'published' AND p.active = 1 
+            WHERE p.status = 'published' AND p.active = 1 AND p.featured = 1
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
             AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY p.created_at DESC 
@@ -136,7 +136,7 @@ class Produto extends Model {
             AND p.status = 'published' AND p.active = 1
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
             AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY p.name ASC 
+            ORDER BY p.featured DESC, p.name ASC 
             LIMIT :limit
         ");
         $term = "%{$term}%";
@@ -153,7 +153,7 @@ class Produto extends Model {
             WHERE category_id = :category_id 
             AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
             AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY name ASC
+            ORDER BY featured DESC, name ASC
         ");
         $stmt->bindParam(':category_id', $categoriaId);
         $stmt->execute();
