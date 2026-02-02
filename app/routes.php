@@ -54,6 +54,8 @@ $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirP
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
 $router->post('/checkout/processar', 'CheckoutController', 'processar');
+$router->post('/checkout/stripe/payment-intent', 'CheckoutController', 'stripePaymentIntent');
+$router->post('/checkout/stripe/finalizar', 'CheckoutController', 'stripeFinalizar');
 $router->get('/checkout/conclusao/{id}', 'CheckoutController', 'conclusao');
 $router->post('/checkout/calcular', 'CheckoutController', 'calcular');
 
