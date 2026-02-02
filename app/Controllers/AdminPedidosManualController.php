@@ -258,8 +258,12 @@ class AdminPedidosManualController extends Controller {
                     <button type="submit" class="btn btn-success" id="btnCriarPedidoManual">
                         <i class="fas fa-save"></i> Criar Pedido Manual
                     </button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnGerarMensagemOrcamento" onclick="gerarMensagemOrcamento()">
+                        <i class="fas fa-comment-dots"></i> Gerar mensagem de orçamento
+                    </button>
                 </div>
                 <div id="createResult" style="display:none;"></div>
+                <div id="orcamentoResult" style="display:none;"></div>
             </form>
 
             <div class="card mb-4">
@@ -500,6 +504,139 @@ function calcTotal(){
     setVal('valor_impostos', impostos.toFixed(2));
     setVal('valor_frete', frete.toFixed(2));
     setVal('valor_total', total.toFixed(2));
+}
+
+function getSelectedClienteLabel(){
+    const sel = document.getElementById('cliente_id');
+    if (!sel) return '';
+    const opt = sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+    if (!opt) return '';
+    return String(opt.text || '').trim();
+}
+
+function formatBRL(v){
+    const n = Number(v || 0);
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function gerarMensagemOrcamento(){
+    try { calcTotal(); } catch (e) {}
+
+    const cliente = getSelectedClienteLabel();
+    const nomeCliente = cliente ? cliente.split('(')[0].trim() : 'Cliente';
+
+    const itens = [];
+    document.querySelectorAll('#itensTable tbody tr').forEach(r => {
+        const qtd = Number(r.querySelector('.qtdInp')?.value || 0);
+        const val = Number(String(r.querySelector('.valorInp')?.value || '0').replace(',', '.'));
+        const pid = Number(r.querySelector('.produtoIdInp')?.value || 0);
+        if (!pid || qtd <= 0) return;
+        const prod = PRODUTOS.find(p => Number(p.id) === pid);
+        const nome = prod ? String(prod.name || '') : ('Produto #' + String(pid));
+        const sku = prod ? String(prod.sku || '') : '';
+        const subtotal = qtd * val;
+        itens.push({ nome, sku, qtd, val, subtotal });
+    });
+
+    const subtotal = Number(document.getElementById('subtotal_produtos')?.value || 0);
+    const pesoTotal = Number(document.getElementById('peso_total')?.value || 0);
+    const taxaServico = Number(document.getElementById('taxa_servico')?.value || 0);
+    const impostos = Number(document.getElementById('valor_impostos')?.value || 0);
+    const frete = Number(document.getElementById('valor_frete')?.value || 0);
+    const total = Number(document.getElementById('valor_total')?.value || 0);
+
+    const now = new Date();
+    const dt = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    let msg = '';
+    msg += `Olá, ${nomeCliente}!\n\n`;
+    msg += `Segue o orçamento solicitado (${dt}):\n\n`;
+    msg += `Itens:\n`;
+
+    if (itens.length === 0) {
+        msg += `- (nenhum item selecionado)\n`;
+    } else {
+        itens.forEach((it, idx) => {
+            const skuTxt = it.sku ? ` | SKU: ${it.sku}` : '';
+            msg += `${idx + 1}) ${it.nome}${skuTxt}\n`;
+            msg += `   Qtd: ${it.qtd} | Unitário: ${formatBRL(it.val)} | Subtotal: ${formatBRL(it.subtotal)}\n`;
+        });
+    }
+
+    msg += `\nResumo:\n`;
+    msg += `- Subtotal dos produtos: ${formatBRL(subtotal)}\n`;
+    msg += `- Peso total: ${Number(pesoTotal || 0).toFixed(3)} kg\n`;
+    msg += `- Taxa de serviço: ${formatBRL(taxaServico)}\n`;
+    msg += `- Impostos: ${formatBRL(impostos)}\n`;
+    msg += `- Frete: ${formatBRL(frete)}\n`;
+    msg += `- Total: ${formatBRL(total)}\n\n`;
+    msg += `Se desejar, posso gerar o link de pagamento e te enviar aqui.\n`;
+
+    const out = document.getElementById('orcamentoResult');
+    if (out) {
+        out.style.display = 'block';
+        out.innerHTML = `<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div><strong>Mensagem de orçamento gerada.</strong> Clique para copiar.</div>
+            <button type="button" class="btn btn-sm btn-dark" onclick="copiarTextoOrcamento()"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+        <textarea class="form-control" id="orcamentoTexto" rows="10" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">${escapeHtml(msg)}</textarea>`;
+    }
+    window.__ORCAMENTO_MSG__ = msg;
+}
+
+function copiarTextoOrcamento(){
+    const msg = String(window.__ORCAMENTO_MSG__ || '');
+    if (!msg) return;
+
+    const ok = () => {
+        const out = document.getElementById('orcamentoResult');
+        if (out) {
+            out.querySelector('.alert')?.classList.remove('alert-info');
+            out.querySelector('.alert')?.classList.add('alert-success');
+            const d = out.querySelector('.alert > div');
+            if (d) d.innerHTML = '<strong>Copiado!</strong> A mensagem foi enviada para a área de transferência.';
+        }
+    };
+    const fail = () => {
+        const ta = document.getElementById('orcamentoTexto');
+        if (ta) {
+            ta.focus();
+            ta.select();
+        }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(ok).catch(() => {
+            try {
+                const ta = document.getElementById('orcamentoTexto');
+                if (ta) {
+                    ta.focus();
+                    ta.select();
+                    document.execCommand('copy');
+                    ok();
+                } else {
+                    fail();
+                }
+            } catch (e) {
+                fail();
+            }
+        });
+        return;
+    }
+
+    try {
+        const ta = document.getElementById('orcamentoTexto');
+        if (ta) {
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            ok();
+        } else {
+            fail();
+        }
+    } catch (e) {
+        fail();
+    }
 }
 
 function gerarLinkPagamento(){

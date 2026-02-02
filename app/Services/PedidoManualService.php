@@ -622,17 +622,32 @@ class PedidoManualService {
 
         $this->persistirPagamentoNoPedido($pedidoId, $result);
 
+        $itens = $this->obterItensPedidoManualParaWebhook($pedidoId, $moeda);
+
         $this->enviarWebhookLinkPagamentoPedidoManual([
-            'pedido_id' => (string) $pedidoId,
-            'codigo_pedido' => $codigoPedido,
-            'cliente_id' => (string) $clienteId,
-            'cliente_nome' => $nome,
-            'total' => (string) $total,
-            'moeda' => $moeda,
-            'payment_id' => $paymentId,
-            'invoiceUrl' => $invoiceUrl,
-            'billingType' => $billingType,
-            'status' => $statusGateway,
+            'evento' => 'pedido_manual_link_pagamento_gerado',
+            'timestamp' => date('c'),
+            'pedido' => [
+                'id' => (int) $pedidoId,
+                'codigo' => $codigoPedido,
+                'moeda' => $moeda,
+                'total' => (float) $total,
+            ],
+            'cliente' => [
+                'id' => (int) $clienteId,
+                'nome' => $nome,
+                'email' => $email,
+                'telefone' => $telefone,
+                'documento' => $documento,
+            ],
+            'itens' => $itens,
+            'pagamento' => [
+                'gateway' => 'asaas',
+                'payment_id' => $paymentId,
+                'invoice_url' => $invoiceUrl,
+                'billing_type' => $billingType,
+                'status' => $statusGateway,
+            ],
         ]);
 
         return [
@@ -727,5 +742,87 @@ class PedidoManualService {
         if ($resp === false) {
             error_log('[WEBHOOK][PEDIDO_MANUAL] Falha ao enviar');
         }
+    }
+
+    private function obterItensPedidoManualParaWebhook(int $pedidoId, string $moeda): array {
+        $table = $this->getItensTable();
+        $colsItens = $this->getCols($table);
+        if (empty($colsItens)) {
+            return [];
+        }
+
+        $colPedido = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : '';
+        if ($colPedido === '') {
+            return [];
+        }
+
+        $colProduto = in_array('produto_id', $colsItens, true) ? 'produto_id' : '';
+        $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
+        $colUnit = in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : ''));
+        $colSub = in_array('subtotal', $colsItens, true) ? 'subtotal' : '';
+        $colNomeItem = in_array('nome_produto', $colsItens, true) ? 'nome_produto' : (in_array('produto_nome', $colsItens, true) ? 'produto_nome' : (in_array('nome', $colsItens, true) ? 'nome' : ''));
+        $colSkuItem = in_array('sku', $colsItens, true) ? 'sku' : '';
+
+        $select = [];
+        if ($colProduto !== '') $select[] = $colProduto . ' AS produto_id';
+        if ($colQtd !== '') $select[] = $colQtd . ' AS quantidade';
+        if ($colUnit !== '') $select[] = $colUnit . ' AS valor_unitario';
+        if ($colSub !== '') $select[] = $colSub . ' AS subtotal';
+        if ($colNomeItem !== '') $select[] = $colNomeItem . ' AS nome';
+        if ($colSkuItem !== '') $select[] = $colSkuItem . ' AS sku';
+        if (empty($select)) {
+            $select[] = 'id';
+        }
+
+        $stmt = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $table . ' WHERE ' . $colPedido . ' = ? ORDER BY id ASC');
+        $stmt->execute([$pedidoId]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Enriquecer com dados do produto se faltar nome/sku
+        $colsProdutos = $this->getCols('produtos');
+        $pNomeCol = $this->pickFirstExistingColumn($colsProdutos, ['name', 'nome', 'titulo', 'descricao']);
+        $pSkuCol = $this->pickFirstExistingColumn($colsProdutos, ['sku', 'codigo', 'codigo_sku']);
+
+        $prodStmt = null;
+        if (!empty($colsProdutos) && ($pNomeCol !== '' || $pSkuCol !== '')) {
+            $pSel = ['id'];
+            if ($pNomeCol !== '') $pSel[] = $pNomeCol . ' AS nome';
+            if ($pSkuCol !== '') $pSel[] = $pSkuCol . ' AS sku';
+            $prodStmt = $this->db->prepare('SELECT ' . implode(', ', $pSel) . ' FROM produtos WHERE id = ? LIMIT 1');
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $pid = (int) ($r['produto_id'] ?? 0);
+            $nome = (string) ($r['nome'] ?? '');
+            $sku = (string) ($r['sku'] ?? '');
+
+            if ($prodStmt && $pid > 0 && ($nome === '' || $sku === '')) {
+                try {
+                    $prodStmt->execute([$pid]);
+                    $p = $prodStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    if ($nome === '' && isset($p['nome'])) $nome = (string) $p['nome'];
+                    if ($sku === '' && isset($p['sku'])) $sku = (string) $p['sku'];
+                } catch (\Exception $e) {
+                    // ignore
+                }
+            }
+
+            $qtd = (int) ($r['quantidade'] ?? 0);
+            $unit = (float) ($r['valor_unitario'] ?? 0);
+            $sub = isset($r['subtotal']) ? (float) $r['subtotal'] : (float) ($qtd * $unit);
+
+            $out[] = [
+                'produto_id' => $pid,
+                'nome' => $nome,
+                'sku' => $sku,
+                'quantidade' => $qtd,
+                'valor_unitario' => $unit,
+                'subtotal' => $sub,
+                'moeda' => $moeda,
+            ];
+        }
+
+        return $out;
     }
 }
