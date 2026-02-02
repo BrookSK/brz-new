@@ -325,7 +325,7 @@
                                                             <i class="fas fa-eye"></i>
                                                         </a>
                                                         <button class="btn btn-sm btn-outline-success" 
-                                                                onclick="rastrearPedido('<?= $pedido['codigo_pedido'] ?>')"
+                                                                onclick="rastrearPedido('<?= htmlspecialchars((string)($pedido['codigo_pedido'] ?? $pedido['codigo'] ?? $pedido['codigo_rastreamento'] ?? $pedido['rastreamento'] ?? $pedido['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')"
                                                                 title="Rastrear">
                                                             <i class="fas fa-search-location"></i>
                                                         </button>

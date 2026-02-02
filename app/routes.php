@@ -206,12 +206,19 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
-$router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
+$router->get('/admin/produtos/novo', 'AdminProdutosNovoController', 'index');
+$router->get('/admin/produtos/novo-simples', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
+$router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
+$router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
+$router->post('/admin/produtos/{id}/variacoes/atributos', 'AdminProdutosController', 'salvarAtributosVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/gerar', 'AdminProdutosController', 'gerarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/apagar', 'AdminProdutosController', 'apagarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/criar', 'AdminProdutosController', 'criarVariacaoIndividual');
 $router->post('/admin/produtos/upload-capa/{id}', 'AdminProdutosController', 'uploadCapa');
 $router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 'uploadGaleria');
 $router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'removerCapa');
@@ -232,6 +239,13 @@ $router->get('/admin/categorias/novo', 'AdminCategoriasController', 'novo');
 $router->get('/admin/categorias/editar/{id}', 'AdminCategoriasController', 'editar');
 $router->post('/admin/categorias/salvar', 'AdminCategoriasController', 'salvar');
 $router->post('/admin/categorias/excluir/{id}', 'AdminCategoriasController', 'excluir');
+
+// Variações (tipos/opções)
+$router->get('/admin/variacoes', 'AdminVariacoesController', 'index');
+$router->post('/admin/variacoes/tipos/salvar', 'AdminVariacoesController', 'salvarTipo');
+$router->post('/admin/variacoes/tipos/inativar/{id}', 'AdminVariacoesController', 'inativarTipo');
+$router->post('/admin/variacoes/opcoes/salvar', 'AdminVariacoesController', 'salvarOpcao');
+$router->post('/admin/variacoes/opcoes/inativar/{id}', 'AdminVariacoesController', 'inativarOpcao');
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
@@ -270,6 +284,10 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
+
+// Mapa de calor (segmentação)
+$router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
+$router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
 
 // Notificações (Webhooks / Email teste)
 $router->post('/admin/salvar-notificacao', 'AdminNotificacoesController', 'salvarNotificacao');

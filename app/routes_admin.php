@@ -8,6 +8,7 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
 $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
+$router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
@@ -48,6 +49,10 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
+
+// Mapa de calor (segmentação)
+$router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
+$router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
 
 // Página principal do admin
 $router->get('/admin', function() {

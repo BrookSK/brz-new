@@ -245,6 +245,262 @@ class AdminProdutosController extends Controller {
     }
 
     public function cadastroRapido(Request $request) {
+        if (!$this->ensureCadastroRapidoAccess($request)) {
+            return;
+        }
+        $this->renderCadastroRapido(null, null);
+    }
+
+    public function cadastroRapidoSalvar(Request $request) {
+        if (!$this->ensureCadastroRapidoAccess($request)) {
+            return;
+        }
+        try {
+            $created = $this->salvarCadastroRapido($request);
+            $this->renderCadastroRapido($created, null);
+        } catch (\Exception $e) {
+            $this->renderCadastroRapido(null, $e->getMessage());
+        }
+    }
+
+    private function ensureCadastroRapidoAccess(Request $request): bool {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        if (!empty($_SESSION['cadastro_rapido_autorizado'])) {
+            return true;
+        }
+
+        $senha = (string) ($request->getParam('senha', '') ?? '');
+        if ($request->getMethod() === 'POST' && $senha !== '') {
+            if (hash_equals('sonhodafabi', $senha)) {
+                $_SESSION['cadastro_rapido_autorizado'] = true;
+                return true;
+            }
+            $this->renderCadastroRapidoSenha('Senha inválida');
+            return false;
+        }
+
+        $this->renderCadastroRapidoSenha(null);
+        return false;
+    }
+
+    private function renderCadastroRapidoSenha(?string $error): void {
+        $errorHtml = '';
+        if (!empty($error)) {
+            $errorHtml = '<div class="alert alert-danger" style="border-radius:14px;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+
+        echo <<<'HTML'
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso - Cadastro Rápido</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b1f3a;
+            --bg: #f6f8fb;
+            --radius: 18px;
+            --shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+        }
+        body { background: var(--bg); }
+        .topbar {
+            background: radial-gradient(1200px 260px at 50% -60%, rgba(11,31,58,0.18), rgba(11,31,58,0)) ,
+                        linear-gradient(180deg, rgba(11,31,58,0.06), rgba(11,31,58,0));
+            padding: 16px 0 10px;
+        }
+        .page-title { color: var(--primary); font-weight: 800; letter-spacing: -0.02em; }
+        .subtle { color: rgba(15, 23, 42, 0.62); }
+        .glass {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(148,163,184,0.24);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .form-control, .btn { border-radius: 14px; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-primary { border-color: rgba(11,31,58,0.35); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="container" style="max-width: 560px;">
+            <div class="d-flex align-items-center justify-content-between">
+                <a href="/" class="btn btn-outline-secondary btn-sm" style="border-radius: 999px;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="text-center">
+                    <div class="page-title">Acesso ao cadastro rápido</div>
+                    <div class="small subtle">Digite a senha para continuar</div>
+                </div>
+                <span style="width: 40px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container pb-4" style="max-width: 560px;">
+HTML;
+
+        echo $errorHtml;
+
+        echo <<<'HTML'
+        <div class="glass p-3 p-sm-4">
+            <form method="POST" action="/admin/produtos/cadastro-rapido">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Senha</label>
+                    <input type="password" class="form-control form-control-lg" name="senha" required autocomplete="current-password" placeholder="Digite a senha">
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-lock-open me-2"></i>Entrar
+                    </button>
+                </div>
+
+                <div class="small subtle mt-3">Após validar, você poderá acessar e salvar produtos sem login (neste navegador).</div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
+
+        exit;
+    }
+
+    private function salvarCadastroRapido(Request $request): array {
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo->beginTransaction();
+
+        $cols = $this->getTableColumns($pdo, 'produtos');
+
+        $name = (string) $request->getParam('name');
+        $price = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('price'));
+        $weight = str_replace([','], ['.'], (string) $request->getParam('weight'));
+        $stock = (int) $request->getParam('stock', 999);
+        $featured = $request->getParam('featured') ? 1 : 0;
+
+        if (trim($name) === '') {
+            throw new \Exception('Nome é obrigatório');
+        }
+
+        $data = [];
+        if (in_array('name', $cols, true)) {
+            $data['name'] = $name;
+        } elseif (in_array('nome', $cols, true)) {
+            $data['nome'] = $name;
+        }
+
+        if (in_array('price', $cols, true)) $data['price'] = $price;
+        if (in_array('valor', $cols, true) && !isset($data['price'])) $data['valor'] = $price;
+
+        if (in_array('weight', $cols, true)) $data['weight'] = $weight;
+        if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
+
+        if (in_array('stock', $cols, true)) $data['stock'] = $stock;
+        if (in_array('estoque', $cols, true) && !isset($data['stock'])) $data['estoque'] = $stock;
+
+        if (in_array('status', $cols, true)) $data['status'] = 'published';
+        if (in_array('active', $cols, true)) $data['active'] = 1;
+        if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
+        if (in_array('featured', $cols, true)) $data['featured'] = $featured;
+
+        if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
+        if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
+
+        $columnsSql = implode(', ', array_keys($data));
+        $placeholders = ':' . implode(', :', array_keys($data));
+        $stmt = $pdo->prepare("INSERT INTO produtos ({$columnsSql}) VALUES ({$placeholders})");
+        foreach ($data as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->execute();
+
+        $produtoId = (int) $pdo->lastInsertId();
+        $fotoWebPath = '';
+
+        if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $uploadDir = $this->getProdutoUploadsDir();
+            $webDir = '/uploads/produtos/';
+            $this->ensureDir($uploadDir);
+
+            $orig = (string) $_FILES['capa']['name'];
+            $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $orig);
+            $fileName = time() . '_' . $fileName;
+            $filePath = $uploadDir . $fileName;
+            $fotoWebPath = $webDir . $fileName;
+
+            if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                if (in_array('foto_principal', $cols, true)) {
+                    $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                    $stmtCover->execute([$fotoWebPath, $produtoId]);
+                }
+            }
+        }
+
+        $pdo->commit();
+
+        return [
+            'id' => $produtoId,
+            'name' => $name,
+            'price' => $price,
+            'weight' => $weight,
+            'stock' => $stock,
+            'featured' => $featured,
+            'foto_principal' => $fotoWebPath,
+        ];
+    }
+
+    private function renderCadastroRapido(?array $created, ?string $error): void {
+        $successHtml = '';
+        if (!empty($error)) {
+            $successHtml = '<div class="alert alert-danger" style="border-radius:14px;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+        } elseif (is_array($created) && !empty($created['id'])) {
+            $id = (int) $created['id'];
+            $nome = htmlspecialchars((string) ($created['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $foto = (string) ($created['foto_principal'] ?? '');
+            $valor = htmlspecialchars((string) ($created['price'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $peso = htmlspecialchars((string) ($created['weight'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $estoque = htmlspecialchars((string) ($created['stock'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $destaque = !empty($created['featured']) ? 'Sim' : 'Não';
+            if ($foto === '') {
+                $foto = '/uploads/produtos/placeholder.jpg';
+            }
+            $fotoEsc = htmlspecialchars($foto, ENT_QUOTES, 'UTF-8');
+            $link = '/produto/detalhes/' . $id;
+            $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+            $successHtml = '<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius: 14px;">'
+                . '<i class="fas fa-check-circle mt-1"></i>'
+                . '<div><div class="fw-bold">Produto salvo com sucesso.</div><div class="small">Se estiver como destaque, ele deve aparecer na Home.</div></div>'
+                . '</div>'
+                . '<div class="card border-0 shadow-sm mb-3" style="border-radius: 18px; overflow: hidden;">'
+                . '<div class="row g-0">'
+                . '<div class="col-4" style="min-height: 92px;"><img src="' . $fotoEsc . '" alt="' . $nome . '" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>'
+                . '<div class="col-8"><div class="card-body py-3">'
+                . '<div class="fw-bold" style="line-height:1.2">' . $nome . '</div>'
+                . '<div class="small text-muted">Link do produto</div>'
+                . '<div class="small" style="word-break: break-all;"><a href="' . $linkEsc . '" target="_blank">' . $linkEsc . '</a></div>'
+                . '<div class="small text-muted mt-2">Detalhes</div>'
+                . '<div class="small">Valor (USD): <span class="fw-semibold">$ ' . $valor . '</span></div>'
+                . '<div class="small">Peso (kg): <span class="fw-semibold">' . $peso . '</span></div>'
+                . '<div class="small">Estoque: <span class="fw-semibold">' . $estoque . '</span></div>'
+                . '<div class="small">Destaque: <span class="fw-semibold">' . htmlspecialchars($destaque, ENT_QUOTES, 'UTF-8') . '</span></div>'
+                . '<div class="d-grid gap-2 mt-2">'
+                . '<a class="btn btn-outline-primary" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-2"></i>Abrir produto</a>'
+                . '<a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-2"></i>Novo envio</a>'
+                . '</div>'
+                . '</div></div>'
+                . '</div>'
+                . '</div>';
+        }
+
         echo <<<'HTML'
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -254,60 +510,101 @@ class AdminProdutosController extends Controller {
     <title>Cadastro Rápido - Produtos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b1f3a;
+            --bg: #f6f8fb;
+            --radius: 18px;
+            --shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+        }
+        body { background: var(--bg); }
+        .topbar {
+            background: radial-gradient(1200px 260px at 50% -60%, rgba(11,31,58,0.18), rgba(11,31,58,0)) ,
+                        linear-gradient(180deg, rgba(11,31,58,0.06), rgba(11,31,58,0));
+            padding: 16px 0 10px;
+        }
+        .page-title { color: var(--primary); font-weight: 800; letter-spacing: -0.02em; }
+        .subtle { color: rgba(15, 23, 42, 0.62); }
+        .glass {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(148,163,184,0.24);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .form-control, .input-group-text, .btn { border-radius: 14px; }
+        .input-group .input-group-text { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        .input-group .form-control { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-primary { border-color: rgba(11,31,58,0.35); color: var(--primary); }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container py-3" style="max-width: 520px;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i>
-            </a>
-            <h1 class="h5 mb-0">Cadastro rápido</h1>
-            <span style="width: 40px;"></span>
-        </div>
-
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label class="form-label">Foto do produto</label>
-                        <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
-                        <div id="capaPreview" class="mt-3"></div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Nome *</label>
-                        <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label">Valor (USD) *</label>
-                            <div class="input-group input-group-lg">
-                                <span class="input-group-text">$</span>
-                                <input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Peso (kg) *</label>
-                            <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mt-3">
-                        <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1">
-                        <label class="form-check-label" for="featuredSwitch">Destaque (aparece na Home)</label>
-                    </div>
-
-                    <input type="hidden" name="status" value="published">
-                    <input type="hidden" name="active" value="1">
-
-                    <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-bolt me-2"></i>Salvar
-                        </button>
-                    </div>
-                </form>
+<body>
+    <div class="topbar">
+        <div class="container" style="max-width: 560px;">
+            <div class="d-flex align-items-center justify-content-between">
+                <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm" style="border-radius: 999px;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="text-center">
+                    <div class="page-title">Cadastro rápido</div>
+                    <div class="small subtle">Mobile-first, envio rápido para Home</div>
+                </div>
+                <span style="width: 40px;"></span>
             </div>
+        </div>
+    </div>
+
+    <div class="container pb-4" style="max-width: 560px;">
+HTML;
+
+        echo $successHtml;
+
+        echo <<<'HTML'
+        <div class="glass p-3 p-sm-4">
+            <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
+                    <div id="capaPreview" class="mt-3"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome</label>
+                    <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">$</span>
+                            <input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label fw-semibold">Estoque</label>
+                    <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0" step="1">
+                    <div class="small subtle mt-1">Pré-preenchido com 999 para garantir disponibilidade.</div>
+                </div>
+
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-bolt me-2"></i>Salvar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -325,10 +622,11 @@ class AdminProdutosController extends Controller {
                     reader.onload = function(ev) {
                         const img = document.createElement('img');
                         img.src = ev.target.result;
-                        img.className = 'img-fluid rounded';
                         img.style.width = '100%';
-                        img.style.maxHeight = '220px';
+                        img.style.maxHeight = '240px';
                         img.style.objectFit = 'cover';
+                        img.style.borderRadius = '16px';
+                        img.style.boxShadow = '0 14px 36px rgba(15, 23, 42, 0.14)';
                         preview.appendChild(img);
                     };
                     reader.readAsDataURL(file);
@@ -339,12 +637,8 @@ class AdminProdutosController extends Controller {
 </body>
 </html>
 HTML;
-        exit;
-    }
 
-    public function cadastroRapidoSalvar(Request $request) {
-        // Reaproveitar a mesma lógica de salvar produto do formulário completo
-        return $this->salvar($request);
+        exit;
     }
 
     public function index(Request $request) {
@@ -410,6 +704,8 @@ HTML;
                     }
                 }
             }
+
+            unset($produto);
 
             $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (name LIKE :busca OR sku LIKE :busca)" : ""));
             if (!empty($busca)) {
@@ -552,6 +848,10 @@ HTML;
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                </div>
+
+                <div class="alert alert-info">
+                    Para cadastrar variações (cor/tamanho etc.), primeiro salve o produto. Depois entre em <strong>Editar</strong> e use a seção <strong>Variações</strong>.
                 </div>
                 
                 <form method="POST" action="/admin/produtos/salvar" enctype="multipart/form-data">
@@ -959,6 +1259,18 @@ HTML;
 
             $lojas = $this->fetchLojasSafe();
             $ncmOptions = $this->getNcmOptions();
+
+            $variacoesSchemaOk = $this->tableExists($pdo, 'variacao_tipos')
+                && $this->tableExists($pdo, 'variacao_opcoes')
+                && $this->tableExists($pdo, 'produto_atributos')
+                && $this->tableExists($pdo, 'produto_variacoes')
+                && $this->tableExists($pdo, 'produto_variacao_itens');
+
+            $variacaoTipos = $variacoesSchemaOk ? $this->getVariacaoTipos($pdo) : [];
+            $variacaoOpcoesPorTipo = $variacoesSchemaOk ? $this->getVariacaoOpcoesPorTipo($pdo) : [];
+            $produtoTipoIds = $variacoesSchemaOk ? $this->getProdutoAtributos($pdo, (int) $id) : [];
+            $produtoOpcoesPorTipo = $variacoesSchemaOk ? $this->getProdutoOpcoesUsadasPorTipo($pdo, (int) $id) : [];
+            $produtoVariacoes = $variacoesSchemaOk ? $this->getProdutoVariacoesComDescricao($pdo, (int) $id) : [];
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
@@ -1154,6 +1466,125 @@ HTML;
                                             <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/galeria/ordem/' . (int) $id . '" formmethod="POST" formnovalidate>Salvar ordem</button>
                                         </div>
                                     </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Variações</label>';
+
+        if (empty($variacoesSchemaOk)) {
+            echo '<div class="alert alert-warning mb-0">Para habilitar variações, rode a migration <strong>061_create_produto_variacoes_schema.sql</strong> no banco.</div>';
+        } else {
+            echo '<div class="alert alert-info">Use atributos e opções para gerar variações simples ou compostas. Você pode gerar todas, apagar e também criar variações individuais.</div>';
+
+            echo '<div class="card mb-3">
+                    <div class="card-body">
+                        <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/atributos">
+                            <div class="row g-2">';
+
+            foreach ($variacaoTipos as $t) {
+                $tid = (int) ($t['id'] ?? 0);
+                $tnome = (string) ($t['nome'] ?? '');
+                $checked = in_array($tid, $produtoTipoIds, true) ? 'checked' : '';
+
+                echo '<div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipo_ids[]" value="' . $tid . '" id="tipo_' . $tid . '" ' . $checked . '>
+                            <label class="form-check-label" for="tipo_' . $tid . '">' . htmlspecialchars($tnome, ENT_QUOTES, 'UTF-8') . '</label>
+                        </div>
+                      </div>';
+
+                $opcoes = $variacaoOpcoesPorTipo[$tid] ?? [];
+                if (!empty($opcoes)) {
+                    echo '<div class="col-12 ms-4">
+                            <div class="row g-2">';
+                    foreach ($opcoes as $o) {
+                        $oid = (int) ($o['id'] ?? 0);
+                        $ovalor = (string) ($o['valor'] ?? '');
+                        $oChecked = (!empty($produtoOpcoesPorTipo[$tid]) && in_array($oid, $produtoOpcoesPorTipo[$tid], true)) ? 'checked' : '';
+                        echo '<div class="col-6 col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="opcoes[' . $tid . '][]" value="' . $oid . '" id="opt_' . $tid . '_' . $oid . '" ' . $oChecked . '>
+                                    <label class="form-check-label" for="opt_' . $tid . '_' . $oid . '">' . htmlspecialchars($ovalor, ENT_QUOTES, 'UTF-8') . '</label>
+                                </div>
+                              </div>';
+                    }
+                    echo '      </div>
+                          </div>';
+                }
+            }
+
+            echo '          <div class="col-12">
+                                <button type="submit" class="btn btn-outline-primary w-100">Salvar atributos/opções</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>';
+
+            echo '<div class="d-flex flex-wrap gap-2 mb-3">
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Gerar variações com base nas opções selecionadas?\')">
+                        <input type="hidden" name="replace" value="0">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-cogs"></i> Gerar todas</button>
+                    </form>
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')">
+                        <input type="hidden" name="replace" value="1">
+                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-redo"></i> Apagar e gerar</button>
+                    </form>
+                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/apagar" onsubmit="return confirm(\'Apagar todas as variações deste produto?\')">
+                        <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Apagar todas</button>
+                    </form>
+                  </div>';
+
+            echo '<div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <strong>Variações cadastradas</strong>
+                        <form class="d-flex gap-2" method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/criar">
+                            <input type="number" name="stock" class="form-control form-control-sm" style="width:120px" placeholder="Estoque" value="0" min="0">
+                            <input type="text" name="price_override" class="form-control form-control-sm" style="width:160px" placeholder="Preço variação">
+                            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-plus"></i> Criar individual</button>
+                        </form>
+                    </div>
+                    <div class="card-body">';
+
+            if (empty($produtoVariacoes)) {
+                echo '<div class="text-muted">Nenhuma variação criada ainda.</div>';
+            } else {
+                echo '<div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Variação</th>
+                                    <th>Preço</th>
+                                    <th>Estoque</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>';
+                foreach ($produtoVariacoes as $v) {
+                    $vId = (int) ($v['id'] ?? 0);
+                    $desc = (string) ($v['descricao'] ?? '');
+                    $priceOv = $v['price_override'] ?? null;
+                    $stockV = (int) ($v['stock'] ?? 0);
+                    $ativoV = (int) ($v['ativo'] ?? 0);
+                    echo '<tr>
+                            <td>
+                                <div class="fw-semibold">#' . $vId . '</div>
+                                <div class="text-muted small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</div>
+                            </td>
+                            <td>' . htmlspecialchars(($priceOv === null || $priceOv === '' ? '-' : (string) $priceOv), ENT_QUOTES, 'UTF-8') . '</td>
+                            <td>' . $stockV . '</td>
+                            <td>' . ($ativoV ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') . '</td>
+                          </tr>';
+                }
+                echo '      </tbody>
+                        </table>
+                    </div>';
+            }
+
+            echo '      </div>
+                </div>';
+        }
+
+        echo '                        </div>
                                 </div>
                             </div>
                         </div>
@@ -1496,6 +1927,385 @@ HTMLSCRIPT;
             if (isset($pdo)) $pdo->rollBack();
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
+        }
+    }
+
+    public function salvarAtributosVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        if ($produtoId <= 0) {
+            header('Location: /admin/produtos');
+            exit;
+        }
+
+        $tipoIds = $request->getParam('tipo_ids', []);
+        if (!is_array($tipoIds)) $tipoIds = [];
+        $tipoIds = array_values(array_unique(array_map('intval', $tipoIds)));
+
+        $opcoes = $request->getParam('opcoes', []);
+        if (!is_array($opcoes)) $opcoes = [];
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_atributos')) {
+                $_SESSION['message'] = 'Tabelas de variações não encontradas. Rode a migration 061.';
+                $_SESSION['message_type'] = 'warning';
+                header('Location: /admin/produtos/editar/' . $produtoId);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            $stmtDel = $pdo->prepare('DELETE FROM produto_atributos WHERE produto_id = :pid');
+            $stmtDel->execute([':pid' => $produtoId]);
+
+            if (!empty($tipoIds)) {
+                $stmtIns = $pdo->prepare('INSERT INTO produto_atributos (produto_id, tipo_id, created_at, updated_at) VALUES (:pid, :tid, NOW(), NOW())');
+                foreach ($tipoIds as $tid) {
+                    if ($tid <= 0) continue;
+                    $stmtIns->execute([':pid' => $produtoId, ':tid' => $tid]);
+                }
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Atributos/Opções salvos.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao salvar atributos.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function apagarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $stmtVarIds = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid');
+            $stmtVarIds->execute([':pid' => $produtoId]);
+            $ids = array_map('intval', $stmtVarIds->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+            if (!empty($ids)) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
+                    $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+                if ($this->tableExists($pdo, 'produto_variacao_itens')) {
+                    $pdo->prepare('DELETE FROM produto_variacao_itens WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+            }
+
+            $stmtDel = $pdo->prepare('DELETE FROM produto_variacoes WHERE produto_id = :pid');
+            $stmtDel->execute([':pid' => $produtoId]);
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações removidas.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao apagar variações.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function gerarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        $replace = (int) $request->getParam('replace', 0) === 1;
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes') || !$this->tableExists($pdo, 'produto_variacao_itens')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $opcoesPorTipo = $this->getProdutoOpcoesUsadasPorTipo($pdo, $produtoId);
+            $tipoIds = array_keys($opcoesPorTipo);
+
+            $tiposValidos = [];
+            foreach ($tipoIds as $tid) {
+                $list = array_values(array_unique(array_map('intval', $opcoesPorTipo[$tid] ?? [])));
+                if (!empty($list)) {
+                    $tiposValidos[(int) $tid] = $list;
+                }
+            }
+
+            if (empty($tiposValidos)) {
+                $_SESSION['message'] = 'Selecione opções nos atributos antes de gerar variações.';
+                $_SESSION['message_type'] = 'warning';
+                header('Location: /admin/produtos/editar/' . $produtoId);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            if ($replace) {
+                $stmtVarIds = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid');
+                $stmtVarIds->execute([':pid' => $produtoId]);
+                $ids = array_map('intval', $stmtVarIds->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+                if (!empty($ids)) {
+                    $in = implode(',', array_fill(0, count($ids), '?'));
+                    if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
+                        $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                    }
+                    $pdo->prepare('DELETE FROM produto_variacao_itens WHERE produto_variacao_id IN (' . $in . ')')->execute($ids);
+                }
+                $pdo->prepare('DELETE FROM produto_variacoes WHERE produto_id = :pid')->execute([':pid' => $produtoId]);
+            }
+
+            $existingSignatures = $this->getProdutoVariacoesSignatures($pdo, $produtoId);
+
+            $combinacoes = [[]];
+            foreach ($tiposValidos as $tid => $opcoesIds) {
+                $new = [];
+                foreach ($combinacoes as $c) {
+                    foreach ($opcoesIds as $oid) {
+                        $tmp = $c;
+                        $tmp[(int) $tid] = (int) $oid;
+                        $new[] = $tmp;
+                    }
+                }
+                $combinacoes = $new;
+            }
+
+            $stmtInsVar = $pdo->prepare('INSERT INTO produto_variacoes (produto_id, sku, price_override, stock, ativo, created_at, updated_at) VALUES (:pid, NULL, NULL, :stock, 1, NOW(), NOW())');
+            $stmtInsItem = $pdo->prepare('INSERT INTO produto_variacao_itens (produto_variacao_id, tipo_id, opcao_id, created_at, updated_at) VALUES (:pvi, :tid, :oid, NOW(), NOW())');
+
+            $created = 0;
+            foreach ($combinacoes as $comb) {
+                ksort($comb);
+                $parts = [];
+                foreach ($comb as $tid => $oid) {
+                    $parts[] = $tid . ':' . $oid;
+                }
+                $sig = implode('|', $parts);
+                if (isset($existingSignatures[$sig])) {
+                    continue;
+                }
+
+                $stmtInsVar->execute([':pid' => $produtoId, ':stock' => 0]);
+                $varId = (int) $pdo->lastInsertId();
+                foreach ($comb as $tid => $oid) {
+                    $stmtInsItem->execute([':pvi' => $varId, ':tid' => (int) $tid, ':oid' => (int) $oid]);
+                }
+                $created++;
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações geradas: ' . (int) $created;
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao gerar variações.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function criarVariacaoIndividual(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $stock = (int) $request->getParam('stock', 0);
+            $priceOverrideRaw = trim((string) $request->getParam('price_override', ''));
+            $priceOverride = $priceOverrideRaw !== '' ? $this->parseMoneyToDb($priceOverrideRaw) : null;
+
+            $stmt = $pdo->prepare('INSERT INTO produto_variacoes (produto_id, sku, price_override, stock, ativo, created_at, updated_at) VALUES (:pid, NULL, :po, :st, 1, NOW(), NOW())');
+            $stmt->bindValue(':pid', $produtoId, \PDO::PARAM_INT);
+            if ($priceOverride === null || $priceOverride === '') {
+                $stmt->bindValue(':po', null, \PDO::PARAM_NULL);
+            } else {
+                $stmt->bindValue(':po', $priceOverride);
+            }
+            $stmt->bindValue(':st', $stock, \PDO::PARAM_INT);
+            $stmt->execute();
+
+            $_SESSION['message'] = 'Variação criada.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao criar variação.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    private function tableExists(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getVariacaoTipos(\PDO $pdo): array {
+        try {
+            $stmt = $pdo->query('SELECT * FROM variacao_tipos WHERE ativo = 1 ORDER BY nome ASC');
+            return $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getVariacaoOpcoesPorTipo(\PDO $pdo): array {
+        $map = [];
+        try {
+            $stmt = $pdo->query('SELECT * FROM variacao_opcoes WHERE ativo = 1 ORDER BY tipo_id ASC, ordem ASC, valor ASC');
+            $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            foreach ($rows as $r) {
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                if ($tid <= 0) continue;
+                if (!isset($map[$tid])) $map[$tid] = [];
+                $map[$tid][] = $r;
+            }
+        } catch (\Exception $e) {
+            $map = [];
+        }
+        return $map;
+    }
+
+    private function getProdutoAtributos(\PDO $pdo, int $produtoId): array {
+        try {
+            $stmt = $pdo->prepare('SELECT tipo_id FROM produto_atributos WHERE produto_id = :pid');
+            $stmt->execute([':pid' => $produtoId]);
+            $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            return array_values(array_unique(array_map('intval', $ids)));
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getProdutoOpcoesUsadasPorTipo(\PDO $pdo, int $produtoId): array {
+        $map = [];
+        try {
+            $stmt = $pdo->prepare('
+                SELECT pvi.tipo_id, pvi.opcao_id
+                FROM produto_variacao_itens pvi
+                INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id
+                WHERE pv.produto_id = :pid
+            ');
+            $stmt->execute([':pid' => $produtoId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $r) {
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                $oid = (int) ($r['opcao_id'] ?? 0);
+                if ($tid <= 0 || $oid <= 0) continue;
+                if (!isset($map[$tid])) $map[$tid] = [];
+                $map[$tid][$oid] = true;
+            }
+            foreach ($map as $tid => $set) {
+                $map[$tid] = array_map('intval', array_keys($set));
+            }
+        } catch (\Exception $e) {
+            $map = [];
+        }
+        return $map;
+    }
+
+    private function getProdutoVariacoesSignatures(\PDO $pdo, int $produtoId): array {
+        $sigs = [];
+        try {
+            $stmt = $pdo->prepare('
+                SELECT pv.id AS variacao_id, pvi.tipo_id, pvi.opcao_id
+                FROM produto_variacoes pv
+                LEFT JOIN produto_variacao_itens pvi ON pvi.produto_variacao_id = pv.id
+                WHERE pv.produto_id = :pid
+                ORDER BY pv.id ASC
+            ');
+            $stmt->execute([':pid' => $produtoId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $tmp = [];
+            foreach ($rows as $r) {
+                $vid = (int) ($r['variacao_id'] ?? 0);
+                $tid = (int) ($r['tipo_id'] ?? 0);
+                $oid = (int) ($r['opcao_id'] ?? 0);
+                if ($vid <= 0) continue;
+                if (!isset($tmp[$vid])) $tmp[$vid] = [];
+                if ($tid > 0 && $oid > 0) {
+                    $tmp[$vid][$tid] = $oid;
+                }
+            }
+            foreach ($tmp as $vid => $comb) {
+                ksort($comb);
+                $parts = [];
+                foreach ($comb as $tid => $oid) {
+                    $parts[] = $tid . ':' . $oid;
+                }
+                $sig = implode('|', $parts);
+                if ($sig !== '') {
+                    $sigs[$sig] = true;
+                }
+            }
+        } catch (\Exception $e) {
+            $sigs = [];
+        }
+        return $sigs;
+    }
+
+    private function getProdutoVariacoesComDescricao(\PDO $pdo, int $produtoId): array {
+        try {
+            $stmt = $pdo->prepare('SELECT * FROM produto_variacoes WHERE produto_id = :pid ORDER BY id ASC');
+            $stmt->execute([':pid' => $produtoId]);
+            $vars = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($vars)) return [];
+
+            $ids = array_map(fn($v) => (int) ($v['id'] ?? 0), $vars);
+            $ids = array_values(array_filter($ids, fn($v) => $v > 0));
+            if (empty($ids)) return $vars;
+
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $sql = '
+                SELECT pvi.produto_variacao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
+                FROM produto_variacao_itens pvi
+                INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
+                INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
+                WHERE pvi.produto_variacao_id IN (' . $in . ')
+                ORDER BY pvi.produto_variacao_id ASC, vt.nome ASC, vo.valor ASC
+            ';
+            $st = $pdo->prepare($sql);
+            $st->execute($ids);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $map = [];
+            foreach ($rows as $r) {
+                $vid = (int) ($r['produto_variacao_id'] ?? 0);
+                $tn = (string) ($r['tipo_nome'] ?? '');
+                $ov = (string) ($r['opcao_valor'] ?? '');
+                if ($vid <= 0) continue;
+                if (!isset($map[$vid])) $map[$vid] = [];
+                $map[$vid][] = $tn . '=' . $ov;
+            }
+
+            foreach ($vars as &$v) {
+                $vid = (int) ($v['id'] ?? 0);
+                $desc = '';
+                if ($vid > 0 && !empty($map[$vid])) {
+                    $desc = implode(' / ', $map[$vid]);
+                }
+                $v['descricao'] = $desc;
+            }
+            unset($v);
+
+            return $vars;
+        } catch (\Exception $e) {
+            return [];
         }
     }
 
