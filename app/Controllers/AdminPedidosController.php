@@ -744,16 +744,29 @@ class AdminPedidosController extends Controller {
                                             . '</form>';
                                     }
 
+                                    $pdoLocal = null;
+                                    try {
+                                        if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
+                                            $pdoLocal = $pdoCols;
+                                        } else {
+                                            $pdoLocal = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                                        }
+                                    } catch (\Exception $e) {
+                                        $pdoLocal = null;
+                                    }
+
                                     $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
                                     $statusBloqueadoPorComprovante = false;
                                     if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
                                         $hasDocs = false;
-                                        try {
-                                            $st = $pdo->prepare('SHOW TABLES LIKE ?');
-                                            $st->execute(['pedidos_pagamento_documentos']);
-                                            $hasDocs = (bool) $st->fetchColumn();
-                                        } catch (\Exception $e) {
-                                            $hasDocs = false;
+                                        if ($pdoLocal instanceof \PDO) {
+                                            try {
+                                                $st = $pdoLocal->prepare('SHOW TABLES LIKE ?');
+                                                $st->execute(['pedidos_pagamento_documentos']);
+                                                $hasDocs = (bool) $st->fetchColumn();
+                                            } catch (\Exception $e) {
+                                                $hasDocs = false;
+                                            }
                                         }
 
                                         // Pagamentos offline exigem comprovante; bloquear status por padrão.
@@ -772,10 +785,14 @@ class AdminPedidosController extends Controller {
                                         } else {
                                             $doc = null;
                                             try {
-                                                $st = $pdo->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
-                                                $st->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp]);
-                                                $row = $st->fetch(\PDO::FETCH_ASSOC);
-                                                $doc = is_array($row) ? $row : null;
+                                                if ($pdoLocal instanceof \PDO) {
+                                                    $st = $pdoLocal->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
+                                                    $st->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp]);
+                                                    $row = $st->fetch(\PDO::FETCH_ASSOC);
+                                                    $doc = is_array($row) ? $row : null;
+                                                } else {
+                                                    $doc = null;
+                                                }
                                             } catch (\Exception $e) {
                                                 $doc = null;
                                             }

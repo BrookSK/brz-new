@@ -124,9 +124,24 @@ window.CurrencyConverter = {
         // Atualizar valores do carrinho
         const cartValues = document.querySelectorAll('.cart-currency');
         cartValues.forEach(element => {
-            const originalValue = parseFloat(element.getAttribute('data-original-value'));
+            const rawAttr = element.getAttribute('data-original-value');
+            const isFrete = (element.classList.contains('frete-value') || element.id === 'frete');
+
+            // Se o texto já está como grátis, não sobrescreve.
+            const currentText = String(element.textContent || '').trim().toLowerCase();
+            if (isFrete && (currentText === 'frete grátis' || currentText === 'frete gratis')) {
+                element.textContent = 'Frete grátis';
+                return;
+            }
+
+            const originalValue = parseFloat(rawAttr);
+            if (isFrete && (rawAttr === null || rawAttr === '' || isNaN(originalValue))) {
+                // Falta atributo numérico: mantém grátis se aplicável.
+                return;
+            }
+
             if (!isNaN(originalValue)) {
-                if ((element.classList.contains('frete-value') || element.id === 'frete') && originalValue === 0) {
+                if (isFrete && originalValue <= 0) {
                     element.textContent = 'Frete grátis';
                     return;
                 }
