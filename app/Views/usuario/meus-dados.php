@@ -307,41 +307,6 @@
                 </div>
             </div>
             
-            <!-- Preferences Form -->
-            <div class="card border-0 shadow-sm mt-4">
-                <div class="card-header bg-white border-0 pt-4 pb-3">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-cog me-2"></i> Preferências
-                    </h5>
-                </div>
-                <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="notificacoes_email" class="form-label">
-                                    <input type="checkbox" class="form-check-input me-2" id="notificacoes_email" name="notificacoes_email" 
-                                           <?= ($usuario['notificacoes_email'] ?? 1) ? 'checked' : '' ?>>
-                                    Receber notificações por e-mail
-                                </label>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="notificacoes_sms" class="form-label">
-                                    <input type="checkbox" class="form-check-input me-2" id="notificacoes_sms" name="notificacoes_sms" 
-                                           <?= ($usuario['notificacoes_sms'] ?? 0) ? 'checked' : '' ?>>
-                                    Receber notificações por SMS
-                                </label>
-                            </div>
-                            <div class="col-md-12">
-                                <label for="idioma" class="form-label">Idioma</label>
-                                <select class="form-select" id="idioma" name="idioma">
-                                    <option value="pt-BR" <?= ($usuario['idioma'] ?? 'pt-BR') === 'pt-BR' ? 'selected' : '' ?>>Português (Brasil)</option>
-                                    <option value="en-US" <?= ($usuario['idioma'] ?? 'pt-BR') === 'en-US' ? 'selected' : '' ?>>English (US)</option>
-                                    <option value="es-ES" <?= ($usuario['idioma'] ?? 'pt-BR') === 'es-ES' ? 'selected' : '' ?>>Español</option>
-                                </select>
-                            </div>
-                        </div>
-                </div>
-            </div>
-            
             <!-- Action Buttons -->
             <div class="row g-3 mt-4">
                 <div class="col-12">

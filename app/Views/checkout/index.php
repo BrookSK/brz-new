@@ -58,6 +58,7 @@
                                         <option value="">Novo endereço...</option>
                                         <?php foreach ($enderecos as $endereco): ?>
                                             <option value="<?= $endereco['id'] ?>" 
+                                                    data-pais="<?= htmlspecialchars((string) ($endereco['pais'] ?? 'BR')) ?>"
                                                     data-cep="<?= htmlspecialchars($endereco['cep']) ?>"
                                                     data-endereco="<?= htmlspecialchars($endereco['endereco']) ?>"
                                                     data-numero="<?= htmlspecialchars($endereco['numero']) ?>"
@@ -86,8 +87,9 @@
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">País / Country *</label>
                                         <select class="form-select" name="pais" id="pais" required>
-                                            <option value="BR" selected>Brasil</option>
-                                            <option value="US">Estados Unidos</option>
+                                            <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
+                                            <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
+                                            <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
                                             <option value="DE">Alemanha</option>
                                             <option value="AU">Austrália</option>
                                         </select>
@@ -96,45 +98,42 @@
                                         <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
                                         <input type="text" class="form-control" name="cep" required 
                                                id="cep" maxlength="12"
-                                               value="<?= htmlspecialchars($enderecos[0]['cep'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['cep'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-9 mb-3">
                                         <label class="form-label">Rua / Street *</label>
                                         <input type="text" class="form-control" name="endereco" required id="endereco"
-                                               value="<?= htmlspecialchars($enderecos[0]['endereco'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['endereco'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Número / Number *</label>
                                         <input type="text" class="form-control" name="numero" required
-                                               value="<?= htmlspecialchars($enderecos[0]['numero'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['numero'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Complemento / Complement</label>
                                         <input type="text" class="form-control" name="complemento"
-                                               value="<?= htmlspecialchars($enderecos[0]['complemento'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['complemento'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Bairro / District *</label>
                                         <input type="text" class="form-control" name="bairro" required id="bairro"
-                                               value="<?= htmlspecialchars($enderecos[0]['bairro'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['bairro'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Cidade / City *</label>
                                         <input type="text" class="form-control" name="cidade" required id="cidade"
-                                               value="<?= htmlspecialchars($enderecos[0]['cidade'] ?? '') ?>">
+                                               value="<?= htmlspecialchars((string) ($endereco_prefill['cidade'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label" id="label-estado">Estado / State *</label>
                                         <select class="form-select" name="estado" required id="estado">
                                             <option value="">Selecione...</option>
+                                            <?php $ufSel = (string) ($endereco_prefill['estado'] ?? ''); ?>
                                             <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
-                                                <option value="<?= $uf ?>" 
-                                                        <?= ($enderecos[0]['estado'] ?? '') === $uf ? 'selected' : '' ?>>
-                                                    <?= $uf ?>
-                                                </option>
+                                                <option value="<?= $uf ?>" <?= $ufSel === $uf ? 'selected' : '' ?>><?= $uf ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <input type="text" class="form-control" name="estado_text" id="estado_text" style="display:none;" placeholder="State / Province">
                                     </div>
                                 </div>
                             </div>
@@ -1412,6 +1411,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mostrar formulário para novo endereço
                 enderecoForm.style.display = 'block';
                 // Limpar campos do formulário
+                if (document.getElementById('pais')) document.getElementById('pais').value = 'BR';
                 document.getElementById('cep').value = '';
                 document.getElementById('endereco').value = '';
                 document.querySelector('input[name="numero"]').value = '';
@@ -1419,9 +1419,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('bairro').value = '';
                 document.getElementById('cidade').value = '';
                 document.getElementById('estado').value = '';
+                try { atualizarEnderecoPorPais(); } catch (e) {}
             } else {
                 // Preencher formulário com endereço selecionado
                 enderecoForm.style.display = 'block';
+                if (document.getElementById('pais')) {
+                    document.getElementById('pais').value = selectedOption.dataset.pais || 'BR';
+                }
                 document.getElementById('cep').value = selectedOption.dataset.cep || '';
                 document.getElementById('endereco').value = selectedOption.dataset.endereco || '';
                 document.querySelector('input[name="numero"]').value = selectedOption.dataset.numero || '';
@@ -1429,6 +1433,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('bairro').value = selectedOption.dataset.bairro || '';
                 document.getElementById('cidade').value = selectedOption.dataset.cidade || '';
                 document.getElementById('estado').value = selectedOption.dataset.estado || '';
+                try { atualizarEnderecoPorPais(); } catch (e) {}
             }
         });
     }
@@ -1438,6 +1443,7 @@ document.addEventListener('DOMContentLoaded', function() {
             enderecoSelect.value = '';
             enderecoForm.style.display = 'block';
             // Limpar campos
+            if (document.getElementById('pais')) document.getElementById('pais').value = 'BR';
             document.getElementById('cep').value = '';
             document.getElementById('endereco').value = '';
             document.querySelector('input[name="numero"]').value = '';
@@ -1445,6 +1451,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('bairro').value = '';
             document.getElementById('cidade').value = '';
             document.getElementById('estado').value = '';
+            try { atualizarEnderecoPorPais(); } catch (e) {}
         });
     }
 });
