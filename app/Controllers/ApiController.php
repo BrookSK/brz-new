@@ -61,7 +61,23 @@ class ApiController extends Controller {
                     $produto['categoria'] = 'Não categorizado';
                 }
             }
+
+            // Padronizar chaves para o frontend (Home/index.php)
+            if (!isset($produto['nome'])) {
+                $produto['nome'] = $produto['name'] ?? ($produto['nome'] ?? '');
+            }
+            if (!isset($produto['valor'])) {
+                $produto['valor'] = $produto['price'] ?? ($produto['valor'] ?? 0);
+            }
+            if (!isset($produto['estoque'])) {
+                $produto['estoque'] = $produto['stock'] ?? ($produto['estoque'] ?? 0);
+            }
+            if (!isset($produto['moeda'])) {
+                $produto['moeda'] = $produto['currency'] ?? ($produto['moeda'] ?? 'USD');
+            }
         }
+
+        unset($produto);
         
         $this->json([
             'success' => true,

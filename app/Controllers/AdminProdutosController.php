@@ -245,6 +245,262 @@ class AdminProdutosController extends Controller {
     }
 
     public function cadastroRapido(Request $request) {
+        if (!$this->ensureCadastroRapidoAccess($request)) {
+            return;
+        }
+        $this->renderCadastroRapido(null, null);
+    }
+
+    public function cadastroRapidoSalvar(Request $request) {
+        if (!$this->ensureCadastroRapidoAccess($request)) {
+            return;
+        }
+        try {
+            $created = $this->salvarCadastroRapido($request);
+            $this->renderCadastroRapido($created, null);
+        } catch (\Exception $e) {
+            $this->renderCadastroRapido(null, $e->getMessage());
+        }
+    }
+
+    private function ensureCadastroRapidoAccess(Request $request): bool {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        if (!empty($_SESSION['cadastro_rapido_autorizado'])) {
+            return true;
+        }
+
+        $senha = (string) ($request->getParam('senha', '') ?? '');
+        if ($request->getMethod() === 'POST' && $senha !== '') {
+            if (hash_equals('sonhodafabi', $senha)) {
+                $_SESSION['cadastro_rapido_autorizado'] = true;
+                return true;
+            }
+            $this->renderCadastroRapidoSenha('Senha inválida');
+            return false;
+        }
+
+        $this->renderCadastroRapidoSenha(null);
+        return false;
+    }
+
+    private function renderCadastroRapidoSenha(?string $error): void {
+        $errorHtml = '';
+        if (!empty($error)) {
+            $errorHtml = '<div class="alert alert-danger" style="border-radius:14px;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+
+        echo <<<'HTML'
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso - Cadastro Rápido</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b1f3a;
+            --bg: #f6f8fb;
+            --radius: 18px;
+            --shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+        }
+        body { background: var(--bg); }
+        .topbar {
+            background: radial-gradient(1200px 260px at 50% -60%, rgba(11,31,58,0.18), rgba(11,31,58,0)) ,
+                        linear-gradient(180deg, rgba(11,31,58,0.06), rgba(11,31,58,0));
+            padding: 16px 0 10px;
+        }
+        .page-title { color: var(--primary); font-weight: 800; letter-spacing: -0.02em; }
+        .subtle { color: rgba(15, 23, 42, 0.62); }
+        .glass {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(148,163,184,0.24);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .form-control, .btn { border-radius: 14px; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-primary { border-color: rgba(11,31,58,0.35); color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="container" style="max-width: 560px;">
+            <div class="d-flex align-items-center justify-content-between">
+                <a href="/" class="btn btn-outline-secondary btn-sm" style="border-radius: 999px;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="text-center">
+                    <div class="page-title">Acesso ao cadastro rápido</div>
+                    <div class="small subtle">Digite a senha para continuar</div>
+                </div>
+                <span style="width: 40px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container pb-4" style="max-width: 560px;">
+HTML;
+
+        echo $errorHtml;
+
+        echo <<<'HTML'
+        <div class="glass p-3 p-sm-4">
+            <form method="POST" action="/admin/produtos/cadastro-rapido">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Senha</label>
+                    <input type="password" class="form-control form-control-lg" name="senha" required autocomplete="current-password" placeholder="Digite a senha">
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-lock-open me-2"></i>Entrar
+                    </button>
+                </div>
+
+                <div class="small subtle mt-3">Após validar, você poderá acessar e salvar produtos sem login (neste navegador).</div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
+
+        exit;
+    }
+
+    private function salvarCadastroRapido(Request $request): array {
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo->beginTransaction();
+
+        $cols = $this->getTableColumns($pdo, 'produtos');
+
+        $name = (string) $request->getParam('name');
+        $price = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('price'));
+        $weight = str_replace([','], ['.'], (string) $request->getParam('weight'));
+        $stock = (int) $request->getParam('stock', 999);
+        $featured = $request->getParam('featured') ? 1 : 0;
+
+        if (trim($name) === '') {
+            throw new \Exception('Nome é obrigatório');
+        }
+
+        $data = [];
+        if (in_array('name', $cols, true)) {
+            $data['name'] = $name;
+        } elseif (in_array('nome', $cols, true)) {
+            $data['nome'] = $name;
+        }
+
+        if (in_array('price', $cols, true)) $data['price'] = $price;
+        if (in_array('valor', $cols, true) && !isset($data['price'])) $data['valor'] = $price;
+
+        if (in_array('weight', $cols, true)) $data['weight'] = $weight;
+        if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
+
+        if (in_array('stock', $cols, true)) $data['stock'] = $stock;
+        if (in_array('estoque', $cols, true) && !isset($data['stock'])) $data['estoque'] = $stock;
+
+        if (in_array('status', $cols, true)) $data['status'] = 'published';
+        if (in_array('active', $cols, true)) $data['active'] = 1;
+        if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
+        if (in_array('featured', $cols, true)) $data['featured'] = $featured;
+
+        if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
+        if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
+
+        $columnsSql = implode(', ', array_keys($data));
+        $placeholders = ':' . implode(', :', array_keys($data));
+        $stmt = $pdo->prepare("INSERT INTO produtos ({$columnsSql}) VALUES ({$placeholders})");
+        foreach ($data as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->execute();
+
+        $produtoId = (int) $pdo->lastInsertId();
+        $fotoWebPath = '';
+
+        if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $uploadDir = $this->getProdutoUploadsDir();
+            $webDir = '/uploads/produtos/';
+            $this->ensureDir($uploadDir);
+
+            $orig = (string) $_FILES['capa']['name'];
+            $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $orig);
+            $fileName = time() . '_' . $fileName;
+            $filePath = $uploadDir . $fileName;
+            $fotoWebPath = $webDir . $fileName;
+
+            if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                if (in_array('foto_principal', $cols, true)) {
+                    $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                    $stmtCover->execute([$fotoWebPath, $produtoId]);
+                }
+            }
+        }
+
+        $pdo->commit();
+
+        return [
+            'id' => $produtoId,
+            'name' => $name,
+            'price' => $price,
+            'weight' => $weight,
+            'stock' => $stock,
+            'featured' => $featured,
+            'foto_principal' => $fotoWebPath,
+        ];
+    }
+
+    private function renderCadastroRapido(?array $created, ?string $error): void {
+        $successHtml = '';
+        if (!empty($error)) {
+            $successHtml = '<div class="alert alert-danger" style="border-radius:14px;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+        } elseif (is_array($created) && !empty($created['id'])) {
+            $id = (int) $created['id'];
+            $nome = htmlspecialchars((string) ($created['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $foto = (string) ($created['foto_principal'] ?? '');
+            $valor = htmlspecialchars((string) ($created['price'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $peso = htmlspecialchars((string) ($created['weight'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $estoque = htmlspecialchars((string) ($created['stock'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $destaque = !empty($created['featured']) ? 'Sim' : 'Não';
+            if ($foto === '') {
+                $foto = '/uploads/produtos/placeholder.jpg';
+            }
+            $fotoEsc = htmlspecialchars($foto, ENT_QUOTES, 'UTF-8');
+            $link = '/produto/detalhes/' . $id;
+            $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+            $successHtml = '<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius: 14px;">'
+                . '<i class="fas fa-check-circle mt-1"></i>'
+                . '<div><div class="fw-bold">Produto salvo com sucesso.</div><div class="small">Se estiver como destaque, ele deve aparecer na Home.</div></div>'
+                . '</div>'
+                . '<div class="card border-0 shadow-sm mb-3" style="border-radius: 18px; overflow: hidden;">'
+                . '<div class="row g-0">'
+                . '<div class="col-4" style="min-height: 92px;"><img src="' . $fotoEsc . '" alt="' . $nome . '" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>'
+                . '<div class="col-8"><div class="card-body py-3">'
+                . '<div class="fw-bold" style="line-height:1.2">' . $nome . '</div>'
+                . '<div class="small text-muted">Link do produto</div>'
+                . '<div class="small" style="word-break: break-all;"><a href="' . $linkEsc . '" target="_blank">' . $linkEsc . '</a></div>'
+                . '<div class="small text-muted mt-2">Detalhes</div>'
+                . '<div class="small">Valor (USD): <span class="fw-semibold">$ ' . $valor . '</span></div>'
+                . '<div class="small">Peso (kg): <span class="fw-semibold">' . $peso . '</span></div>'
+                . '<div class="small">Estoque: <span class="fw-semibold">' . $estoque . '</span></div>'
+                . '<div class="small">Destaque: <span class="fw-semibold">' . htmlspecialchars($destaque, ENT_QUOTES, 'UTF-8') . '</span></div>'
+                . '<div class="d-grid gap-2 mt-2">'
+                . '<a class="btn btn-outline-primary" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-2"></i>Abrir produto</a>'
+                . '<a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-2"></i>Novo envio</a>'
+                . '</div>'
+                . '</div></div>'
+                . '</div>'
+                . '</div>';
+        }
+
         echo <<<'HTML'
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -254,60 +510,101 @@ class AdminProdutosController extends Controller {
     <title>Cadastro Rápido - Produtos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0b1f3a;
+            --bg: #f6f8fb;
+            --radius: 18px;
+            --shadow: 0 12px 34px rgba(15, 23, 42, 0.10);
+        }
+        body { background: var(--bg); }
+        .topbar {
+            background: radial-gradient(1200px 260px at 50% -60%, rgba(11,31,58,0.18), rgba(11,31,58,0)) ,
+                        linear-gradient(180deg, rgba(11,31,58,0.06), rgba(11,31,58,0));
+            padding: 16px 0 10px;
+        }
+        .page-title { color: var(--primary); font-weight: 800; letter-spacing: -0.02em; }
+        .subtle { color: rgba(15, 23, 42, 0.62); }
+        .glass {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(148,163,184,0.24);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .form-control, .input-group-text, .btn { border-radius: 14px; }
+        .input-group .input-group-text { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        .input-group .form-control { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-primary { border-color: rgba(11,31,58,0.35); color: var(--primary); }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container py-3" style="max-width: 520px;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i>
-            </a>
-            <h1 class="h5 mb-0">Cadastro rápido</h1>
-            <span style="width: 40px;"></span>
-        </div>
-
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label class="form-label">Foto do produto</label>
-                        <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
-                        <div id="capaPreview" class="mt-3"></div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Nome *</label>
-                        <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label">Valor (USD) *</label>
-                            <div class="input-group input-group-lg">
-                                <span class="input-group-text">$</span>
-                                <input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Peso (kg) *</label>
-                            <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mt-3">
-                        <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1">
-                        <label class="form-check-label" for="featuredSwitch">Destaque (aparece na Home)</label>
-                    </div>
-
-                    <input type="hidden" name="status" value="published">
-                    <input type="hidden" name="active" value="1">
-
-                    <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-bolt me-2"></i>Salvar
-                        </button>
-                    </div>
-                </form>
+<body>
+    <div class="topbar">
+        <div class="container" style="max-width: 560px;">
+            <div class="d-flex align-items-center justify-content-between">
+                <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm" style="border-radius: 999px;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="text-center">
+                    <div class="page-title">Cadastro rápido</div>
+                    <div class="small subtle">Mobile-first, envio rápido para Home</div>
+                </div>
+                <span style="width: 40px;"></span>
             </div>
+        </div>
+    </div>
+
+    <div class="container pb-4" style="max-width: 560px;">
+HTML;
+
+        echo $successHtml;
+
+        echo <<<'HTML'
+        <div class="glass p-3 p-sm-4">
+            <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
+                    <div id="capaPreview" class="mt-3"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome</label>
+                    <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">$</span>
+                            <input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label fw-semibold">Estoque</label>
+                    <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0" step="1">
+                    <div class="small subtle mt-1">Pré-preenchido com 999 para garantir disponibilidade.</div>
+                </div>
+
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-bolt me-2"></i>Salvar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -325,10 +622,11 @@ class AdminProdutosController extends Controller {
                     reader.onload = function(ev) {
                         const img = document.createElement('img');
                         img.src = ev.target.result;
-                        img.className = 'img-fluid rounded';
                         img.style.width = '100%';
-                        img.style.maxHeight = '220px';
+                        img.style.maxHeight = '240px';
                         img.style.objectFit = 'cover';
+                        img.style.borderRadius = '16px';
+                        img.style.boxShadow = '0 14px 36px rgba(15, 23, 42, 0.14)';
                         preview.appendChild(img);
                     };
                     reader.readAsDataURL(file);
@@ -339,12 +637,8 @@ class AdminProdutosController extends Controller {
 </body>
 </html>
 HTML;
-        exit;
-    }
 
-    public function cadastroRapidoSalvar(Request $request) {
-        // Reaproveitar a mesma lógica de salvar produto do formulário completo
-        return $this->salvar($request);
+        exit;
     }
 
     public function index(Request $request) {

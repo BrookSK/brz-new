@@ -49,6 +49,10 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// Mapa de calor (segmentação)
+$router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
+$router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
+
 // Página principal do admin
 $router->get('/admin', function() {
     header('Location: /admin/dashboard');

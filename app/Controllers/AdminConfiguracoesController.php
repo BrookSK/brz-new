@@ -83,6 +83,20 @@ class AdminConfiguracoesController extends Controller {
         } catch (\Exception $e) {
             $config = [];
         }
+
+        $mapaCalor = [];
+        try {
+            $mapaCalor = $this->getMapaCalorData($pdo ?? null);
+        } catch (\Exception $e) {
+            $mapaCalor = [];
+        }
+
+        $mapaCalorTabHtml = '';
+        try {
+            $mapaCalorTabHtml = $this->renderMapaCalorTabHtml($mapaCalor);
+        } catch (\Exception $e) {
+            $mapaCalorTabHtml = $this->renderMapaCalorTabHtml([]);
+        }
         
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -149,6 +163,9 @@ class AdminConfiguracoesController extends Controller {
                             </button>
                             <button class="nav-link" id="v-pills-comissoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-comissoes" type="button">
                                 <i class="fas fa-percentage"></i> Comissões
+                            </button>
+                            <button class="nav-link" id="v-pills-mapa-calor-tab" data-bs-toggle="pill" data-bs-target="#v-pills-mapa-calor" type="button">
+                                <i class="fas fa-chart-area"></i> Mapa de calor
                             </button>
                             <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
                                 <i class="fas fa-cogs"></i> Sistema
@@ -1077,6 +1094,8 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
+
+                                ' . $mapaCalorTabHtml . '
                                 
                                 <!-- Configurações do Sistema -->
                                 <div class="tab-pane fade" id="v-pills-sistema" role="tabpanel">
@@ -1236,6 +1255,803 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 JS;
+    }
+
+    private function tableExists(\PDO $pdo, string $table): bool {
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmt->execute([$table]);
+            return ((int) $stmt->fetchColumn() > 0);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getColumns(\PDO $pdo, string $table): array {
+        try {
+            $stmt = $pdo->query('DESCRIBE ' . $table);
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $cols, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    private function detectItensTable(\PDO $pdo): ?string {
+        foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+            if ($this->tableExists($pdo, $t)) {
+                return $t;
+            }
+        }
+        return null;
+    }
+
+    private function normalizePaidWhere(?string $pedidoStatusCol): string {
+        if (!$pedidoStatusCol) {
+            return '';
+        }
+        $paid = [
+            'pago','paid','approved','confirmed','received','succeeded','success','enviado','entregue'
+        ];
+        return " WHERE LOWER(COALESCE(ped.{$pedidoStatusCol}, '')) IN ('" . implode("','", $paid) . "')";
+    }
+
+    private function getMapaCalorData($pdo): array {
+        if (!$pdo instanceof \PDO) {
+            return [];
+        }
+
+        $out = [
+            'sexo' => [],
+            'faixa_etaria_consumo' => [],
+            'regioes_estado' => [],
+            'regioes_pais' => [],
+            'mais_vendidos_produtos' => [],
+            'mais_vendidos_categorias' => [],
+            'mais_vendidos_tipos' => [],
+        ];
+
+        // Usuários
+        if ($this->tableExists($pdo, 'usuarios')) {
+            $uCols = $this->getColumns($pdo, 'usuarios');
+            $sexoCol = $this->pickColumn($uCols, ['sexo', 'genero', 'gender']);
+            if ($sexoCol) {
+                try {
+                    $stmt = $pdo->query("SELECT LOWER(TRIM(COALESCE({$sexoCol}, '')) ) AS sexo, COUNT(*) AS total FROM usuarios GROUP BY LOWER(TRIM(COALESCE({$sexoCol}, '')) ) ORDER BY total DESC");
+                    $out['sexo'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                } catch (\Exception $e) {
+                    $out['sexo'] = [];
+                }
+            }
+
+            $estadoCol = $this->pickColumn($uCols, ['estado', 'uf', 'state']);
+            if ($estadoCol) {
+                try {
+                    $stmt = $pdo->query("SELECT UPPER(TRIM(COALESCE({$estadoCol}, ''))) AS estado, COUNT(*) AS total FROM usuarios GROUP BY UPPER(TRIM(COALESCE({$estadoCol}, ''))) ORDER BY total DESC");
+                    $out['regioes_estado'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                } catch (\Exception $e) {
+                    $out['regioes_estado'] = [];
+                }
+            }
+
+            $paisCol = $this->pickColumn($uCols, ['pais_residencia', 'pais', 'country']);
+            if ($paisCol) {
+                try {
+                    $stmt = $pdo->query("SELECT UPPER(TRIM(COALESCE({$paisCol}, ''))) AS pais, COUNT(*) AS total FROM usuarios GROUP BY UPPER(TRIM(COALESCE({$paisCol}, ''))) ORDER BY total DESC");
+                    $out['regioes_pais'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                } catch (\Exception $e) {
+                    $out['regioes_pais'] = [];
+                }
+            }
+        }
+
+        // Consumo por faixa etária
+        if ($this->tableExists($pdo, 'usuarios') && $this->tableExists($pdo, 'pedidos')) {
+            $uCols = $this->getColumns($pdo, 'usuarios');
+            $pCols = $this->getColumns($pdo, 'pedidos');
+
+            $dataNascCol = $this->pickColumn($uCols, ['data_nascimento', 'nascimento', 'birthdate', 'dob']);
+            $usuarioIdCol = $this->pickColumn($pCols, ['usuario_id', 'user_id']);
+            $totalCol = $this->pickColumn($pCols, ['valor_total', 'total', 'amount', 'valor']);
+            $statusCol = $this->pickColumn($pCols, ['status', 'payment_status', 'status_pagamento', 'pagamento_status']);
+
+            if ($dataNascCol && $usuarioIdCol && $totalCol) {
+                $wherePaid = '';
+                if ($statusCol) {
+                    $paid = [
+                        'pago','paid','approved','confirmed','received','succeeded','success','enviado','entregue'
+                    ];
+                    $wherePaid = " AND LOWER(COALESCE(p.{$statusCol}, '')) IN ('" . implode("','", $paid) . "')";
+                }
+
+                $idadeExpr = "TIMESTAMPDIFF(YEAR, u.{$dataNascCol}, CURDATE())";
+                $faixaExpr = "CASE\n"
+                    . " WHEN {$idadeExpr} < 18 THEN '0-17'\n"
+                    . " WHEN {$idadeExpr} BETWEEN 18 AND 24 THEN '18-24'\n"
+                    . " WHEN {$idadeExpr} BETWEEN 25 AND 34 THEN '25-34'\n"
+                    . " WHEN {$idadeExpr} BETWEEN 35 AND 44 THEN '35-44'\n"
+                    . " WHEN {$idadeExpr} BETWEEN 45 AND 54 THEN '45-54'\n"
+                    . " WHEN {$idadeExpr} BETWEEN 55 AND 64 THEN '55-64'\n"
+                    . " ELSE '65+'\n END";
+
+                try {
+                    $sql = "SELECT {$faixaExpr} AS faixa, SUM(COALESCE(p.{$totalCol},0)) AS total_gasto, COUNT(*) AS pedidos\n"
+                        . "FROM pedidos p\n"
+                        . "INNER JOIN usuarios u ON u.id = p.{$usuarioIdCol}\n"
+                        . "WHERE u.{$dataNascCol} IS NOT NULL {$wherePaid}\n"
+                        . "GROUP BY faixa\n"
+                        . "ORDER BY total_gasto DESC";
+                    $stmt = $pdo->query($sql);
+                    $out['faixa_etaria_consumo'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                } catch (\Exception $e) {
+                    $out['faixa_etaria_consumo'] = [];
+                }
+            }
+        }
+
+        // Mais vendidos (produtos / categorias / tipos)
+        $itensTable = null;
+        foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+            if ($this->tableExists($pdo, $t)) {
+                $itensTable = $t;
+                break;
+            }
+        }
+        if ($itensTable && $this->tableExists($pdo, 'produtos') && $this->tableExists($pdo, 'pedidos')) {
+            $iCols = $this->getColumns($pdo, $itensTable);
+            $pCols = $this->getColumns($pdo, 'pedidos');
+            $prCols = $this->getColumns($pdo, 'produtos');
+
+            $colPedidoId = $this->pickColumn($iCols, ['pedido_id']);
+            $colProdutoId = $this->pickColumn($iCols, ['produto_id', 'product_id']);
+            $colQtd = $this->pickColumn($iCols, ['quantidade', 'qty', 'qtd']);
+            $pedidoStatusCol = $this->pickColumn($pCols, ['status', 'payment_status', 'status_pagamento', 'pagamento_status']);
+
+            $wherePaid = '';
+            if ($pedidoStatusCol) {
+                $paid = [
+                    'pago','paid','approved','confirmed','received','succeeded','success','enviado','entregue'
+                ];
+                $wherePaid = " WHERE LOWER(COALESCE(ped.{$pedidoStatusCol}, '')) IN ('" . implode("','", $paid) . "')";
+            }
+
+            if ($colPedidoId && $colProdutoId) {
+                $qtdExpr = $colQtd ? "SUM(COALESCE(i.{$colQtd},0))" : 'COUNT(*)';
+                $nomeProdutoCol = $this->pickColumn($prCols, ['name', 'nome']);
+                $tipoCol = $this->pickColumn($prCols, ['type', 'tipo']);
+
+                // Produtos mais vendidos
+                if ($nomeProdutoCol) {
+                    try {
+                        $sql = "SELECT pr.id, pr.{$nomeProdutoCol} AS produto, {$qtdExpr} AS quantidade\n"
+                            . "FROM {$itensTable} i\n"
+                            . "INNER JOIN pedidos ped ON ped.id = i.{$colPedidoId}\n"
+                            . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                            . $wherePaid . "\n"
+                            . "GROUP BY pr.id, pr.{$nomeProdutoCol}\n"
+                            . "ORDER BY quantidade DESC\n"
+                            . "LIMIT 15";
+                        $stmt = $pdo->query($sql);
+                        $out['mais_vendidos_produtos'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $out['mais_vendidos_produtos'] = [];
+                    }
+                }
+
+                // Categorias mais vendidas
+                if ($this->tableExists($pdo, 'categorias') && in_array('category_id', $prCols, true)) {
+                    $cCols = $this->getColumns($pdo, 'categorias');
+                    $catNomeCol = $this->pickColumn($cCols, ['name', 'nome']);
+                    if ($catNomeCol) {
+                        try {
+                            $sql = "SELECT c.{$catNomeCol} AS categoria, {$qtdExpr} AS quantidade\n"
+                                . "FROM {$itensTable} i\n"
+                                . "INNER JOIN pedidos ped ON ped.id = i.{$colPedidoId}\n"
+                                . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                                . "LEFT JOIN categorias c ON c.id = pr.category_id\n"
+                                . $wherePaid . "\n"
+                                . "GROUP BY c.{$catNomeCol}\n"
+                                . "ORDER BY quantidade DESC\n"
+                                . "LIMIT 15";
+                            $stmt = $pdo->query($sql);
+                            $out['mais_vendidos_categorias'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $out['mais_vendidos_categorias'] = [];
+                        }
+                    }
+                }
+
+                // Tipos mais vendidos
+                if ($tipoCol) {
+                    try {
+                        $sql = "SELECT COALESCE(NULLIF(TRIM(pr.{$tipoCol}),''), 'sem_tipo') AS tipo, {$qtdExpr} AS quantidade\n"
+                            . "FROM {$itensTable} i\n"
+                            . "INNER JOIN pedidos ped ON ped.id = i.{$colPedidoId}\n"
+                            . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                            . $wherePaid . "\n"
+                            . "GROUP BY tipo\n"
+                            . "ORDER BY quantidade DESC\n"
+                            . "LIMIT 15";
+                        $stmt = $pdo->query($sql);
+                        $out['mais_vendidos_tipos'] = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $out['mais_vendidos_tipos'] = [];
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    private function renderMapaCalorTabHtml(array $data): string {
+        $sexo = $data['sexo'] ?? [];
+        $faixa = $data['faixa_etaria_consumo'] ?? [];
+        $estados = $data['regioes_estado'] ?? [];
+        $paises = $data['regioes_pais'] ?? [];
+        $produtos = $data['mais_vendidos_produtos'] ?? [];
+        $categorias = $data['mais_vendidos_categorias'] ?? [];
+        $tipos = $data['mais_vendidos_tipos'] ?? [];
+
+        $renderRows = function($rows, $cols) {
+            if (!is_array($rows) || empty($rows)) {
+                return '<tr><td colspan="' . count($cols) . '" class="text-center text-muted">Sem dados</td></tr>';
+            }
+            $html = '';
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $html .= '<tr>';
+                foreach ($cols as $c) {
+                    $v = $r[$c] ?? '';
+                    $html .= '<td>' . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            return $html;
+        };
+
+        $sexRows = $renderRows($sexo, ['sexo', 'total']);
+        $faixaRows = $renderRows($faixa, ['faixa', 'total_gasto', 'pedidos']);
+        $estadoRows = $renderRows($estados, ['estado', 'total']);
+        $paisRows = $renderRows($paises, ['pais', 'total']);
+        $prodRows = $renderRows($produtos, ['id', 'produto', 'quantidade']);
+        $catRows = $renderRows($categorias, ['categoria', 'quantidade']);
+        $tipoRows = $renderRows($tipos, ['tipo', 'quantidade']);
+
+        $cardsCategorias = '';
+        if (is_array($categorias) && !empty($categorias)) {
+            foreach ($categorias as $c) {
+                if (!is_array($c)) continue;
+                $nome = (string) ($c['categoria'] ?? '');
+                if (trim($nome) === '') continue;
+                $qtd = (string) ($c['quantidade'] ?? '0');
+                $cardsCategorias .= '<div class="col-6 col-lg-4">'
+                    . '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="categoria" data-val="' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<div class="card-body">'
+                    . '<div class="small text-muted">Categoria</div>'
+                    . '<div class="fw-bold">' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '</div>'
+                    . '<div class="small">Vendidos: <span class="fw-semibold">' . htmlspecialchars($qtd, ENT_QUOTES, 'UTF-8') . '</span></div>'
+                    . '</div></a></div>';
+            }
+        }
+        if ($cardsCategorias === '') {
+            $cardsCategorias = '<div class="col-12"><div class="text-muted">Sem dados de categorias para segmentar.</div></div>';
+        }
+
+        $cardsLojas = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
+        // Lojas serão carregadas via AJAX (quando existir tabela lojas ou colunas loja/loja_id)
+        $cardsLojas = '<div class="col-12" id="mapaCalorLojasWrap"><div class="text-muted">Carregando lojas...</div></div>';
+
+        return '
+            <div class="tab-pane fade" id="v-pills-mapa-calor" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Mapa de calor</h5>
+                        <span class="badge bg-secondary">Beta</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info" style="border-radius: 12px;">
+                            Clique em uma categoria ou loja para ver os clientes que mais consumiram e exportar e-mails para campanhas.
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header"><strong>Segmentação por categoria</strong></div>
+                                    <div class="card-body">
+                                        <div class="row g-2">' . $cardsCategorias . '</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header"><strong>Segmentação por loja</strong></div>
+                                    <div class="card-body">
+                                        <div class="row g-2" id="mapaCalorLojasGrid">' . $cardsLojas . '</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-4" id="mapaCalorSegmentoCard" style="display:none;">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong id="mapaCalorSegmentoTitulo">Clientes do segmento</strong>
+                                    <div class="small text-muted" id="mapaCalorSegmentoSub"></div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a class="btn btn-sm btn-outline-primary" id="mapaCalorExportBtn" href="#" target="_blank">
+                                        <i class="fas fa-file-csv me-1"></i>Exportar e-mails (CSV)
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Cliente</th>
+                                                <th>E-mail</th>
+                                                <th>Pedidos</th>
+                                                <th>Total gasto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="mapaCalorClientesBody">
+                                            <tr><td colspan="4" class="text-center text-muted">Selecione um segmento acima.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Usuários por sexo</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>Sexo</th><th>Total</th></tr></thead>
+                                                <tbody>' . $sexRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Faixa etária com maior consumo</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>Faixa</th><th>Total gasto</th><th>Pedidos</th></tr></thead>
+                                                <tbody>' . $faixaRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Regiões de cadastro (Estados)</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+                                                <tbody>' . $estadoRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Regiões de cadastro (Países)</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>País</th><th>Total</th></tr></thead>
+                                                <tbody>' . $paisRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header"><strong>Produtos mais vendidos</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>ID</th><th>Produto</th><th>Quantidade</th></tr></thead>
+                                                <tbody>' . $prodRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Categorias mais vendidas</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>Categoria</th><th>Quantidade</th></tr></thead>
+                                                <tbody>' . $catRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-header"><strong>Tipos de produtos mais vendidos</strong></div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead><tr><th>Tipo</th><th>Quantidade</th></tr></thead>
+                                                <tbody>' . $tipoRows . '</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <script>
+                            (function(){
+                                function qs(sel){ return document.querySelector(sel); }
+                                function esc(s){
+                                    return String(s ?? '')
+                                        .replace(/&/g,'&amp;')
+                                        .replace(/</g,'&lt;')
+                                        .replace(/>/g,'&gt;')
+                                        .replace(/"/g,'&quot;')
+                                        .replace(/'/g,'&#039;');
+                                }
+
+                                async function loadClientes(seg, val){
+                                    const card = qs('#mapaCalorSegmentoCard');
+                                    const body = qs('#mapaCalorClientesBody');
+                                    const title = qs('#mapaCalorSegmentoTitulo');
+                                    const sub = qs('#mapaCalorSegmentoSub');
+                                    const exportBtn = qs('#mapaCalorExportBtn');
+                                    if (!card || !body || !title || !sub || !exportBtn) return;
+
+                                    card.style.display = 'block';
+                                    title.textContent = 'Clientes do segmento';
+                                    sub.textContent = seg + ': ' + val;
+                                    exportBtn.href = '/admin/configuracoes/mapa-calor/export-emails?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val);
+
+                                    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>';
+
+                                    try {
+                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val));
+                                        const json = await resp.json();
+                                        const rows = (json && json.clientes) ? json.clientes : [];
+                                        if (!rows.length) {
+                                            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>';
+                                            return;
+                                        }
+                                        let html = '';
+                                        rows.forEach(r => {
+                                            html += '<tr>'
+                                                + '<td>' + esc(r.nome || '') + '</td>'
+                                                + '<td>' + esc(r.email || '') + '</td>'
+                                                + '<td>' + esc(r.pedidos || 0) + '</td>'
+                                                + '<td>' + esc(r.total_gasto || 0) + '</td>'
+                                                + '</tr>';
+                                        });
+                                        body.innerHTML = html;
+                                    } catch (e) {
+                                        body.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar</td></tr>';
+                                    }
+                                }
+
+                                function bindCards(){
+                                    document.querySelectorAll('.mapa-calor-card').forEach(el => {
+                                        el.addEventListener('click', function(ev){
+                                            ev.preventDefault();
+                                            const seg = this.getAttribute('data-seg') || '';
+                                            const val = this.getAttribute('data-val') || '';
+                                            if (!seg || !val) return;
+                                            loadClientes(seg, val);
+                                        });
+                                    });
+                                }
+
+                                async function loadLojas(){
+                                    const grid = qs('#mapaCalorLojasGrid');
+                                    if (!grid) return;
+                                    try {
+                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=lojas');
+                                        const json = await resp.json();
+                                        const lojas = (json && json.lojas) ? json.lojas : [];
+                                        if (!lojas.length) {
+                                            grid.innerHTML = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
+                                            bindCards();
+                                            return;
+                                        }
+                                        let html = '';
+                                        lojas.forEach(l => {
+                                            html += '<div class="col-6 col-lg-4">'
+                                                + '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="loja" data-val="' + esc(l.label || '') + '">'
+                                                + '<div class="card-body">'
+                                                + '<div class="small text-muted">Loja</div>'
+                                                + '<div class="fw-bold">' + esc(l.label || '') + '</div>'
+                                                + '<div class="small">Vendidos: <span class="fw-semibold">' + esc(l.quantidade || 0) + '</span></div>'
+                                                + '</div></a></div>';
+                                        });
+                                        grid.innerHTML = html;
+                                        bindCards();
+                                    } catch (e) {
+                                        grid.innerHTML = '<div class="col-12"><div class="text-danger">Erro ao carregar lojas</div></div>';
+                                    }
+                                }
+
+                                bindCards();
+                                loadLojas();
+                            })();
+                        </script>
+                    </div>
+                </div>
+            </div>
+        ';
+    }
+
+    public function mapaCalorClientes(Request $request) {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $pdo = Database::getConnection();
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Sem conexão com banco']);
+            return;
+        }
+
+        $seg = (string) ($request->getParam('seg', '') ?? '');
+        $val = (string) ($request->getParam('val', '') ?? '');
+        $seg = trim($seg);
+        $val = trim($val);
+
+        // Endpoint auxiliar: retornar lista de lojas para cards
+        if ($seg === 'lojas') {
+            $lojas = $this->getLojasSegmentos($pdo);
+            echo json_encode(['success' => true, 'lojas' => $lojas]);
+            return;
+        }
+
+        if ($seg === '' || $val === '') {
+            echo json_encode(['success' => true, 'clientes' => []]);
+            return;
+        }
+
+        $clientes = $this->getClientesTopPorSegmento($pdo, $seg, $val, 100);
+        echo json_encode(['success' => true, 'clientes' => $clientes]);
+    }
+
+    public function mapaCalorExportEmails(Request $request) {
+        try {
+            $pdo = Database::getConnection();
+        } catch (\Exception $e) {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Sem conexão com banco';
+            return;
+        }
+
+        $seg = (string) ($request->getParam('seg', '') ?? '');
+        $val = (string) ($request->getParam('val', '') ?? '');
+        $seg = trim($seg);
+        $val = trim($val);
+
+        if ($seg === '' || $val === '') {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Parâmetros inválidos';
+            return;
+        }
+
+        $clientes = $this->getClientesTopPorSegmento($pdo, $seg, $val, 1000);
+        $emails = [];
+        foreach ($clientes as $c) {
+            if (!is_array($c)) continue;
+            $em = trim((string) ($c['email'] ?? ''));
+            if ($em === '') continue;
+            $emails[$em] = true;
+        }
+        $emails = array_keys($emails);
+
+        $fileName = 'emails_' . preg_replace('/[^a-z0-9\-_]+/i', '_', $seg) . '_' . preg_replace('/[^a-z0-9\-_]+/i', '_', $val) . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['email']);
+        foreach ($emails as $em) {
+            fputcsv($out, [$em]);
+        }
+        fclose($out);
+    }
+
+    private function getLojasSegmentos(\PDO $pdo): array {
+        $itensTable = $this->detectItensTable($pdo);
+        if (!$itensTable || !$this->tableExists($pdo, 'produtos') || !$this->tableExists($pdo, 'pedidos')) {
+            return [];
+        }
+        $iCols = $this->getColumns($pdo, $itensTable);
+        $pCols = $this->getColumns($pdo, 'pedidos');
+        $prCols = $this->getColumns($pdo, 'produtos');
+
+        $colPedidoId = $this->pickColumn($iCols, ['pedido_id']);
+        $colProdutoId = $this->pickColumn($iCols, ['produto_id', 'product_id']);
+        $colQtd = $this->pickColumn($iCols, ['quantidade', 'qty', 'qtd']);
+        if (!$colPedidoId || !$colProdutoId) {
+            return [];
+        }
+
+        $pedidoStatusCol = $this->pickColumn($pCols, ['status', 'payment_status', 'status_pagamento', 'pagamento_status']);
+        $wherePaid = $this->normalizePaidWhere($pedidoStatusCol);
+        $qtdExpr = $colQtd ? "SUM(COALESCE(i.{$colQtd},0))" : 'COUNT(*)';
+
+        $lojaIdCol = $this->pickColumn($prCols, ['loja_id']);
+        $lojaSlugCol = $this->pickColumn($prCols, ['loja', 'store', 'seller']);
+
+        // Preferir tabela lojas quando existir
+        if ($lojaIdCol && $this->tableExists($pdo, 'lojas')) {
+            try {
+                $sql = "SELECT COALESCE(l.nome, CONCAT('Loja #', pr.{$lojaIdCol})) AS label, {$qtdExpr} AS quantidade\n"
+                    . "FROM {$itensTable} i\n"
+                    . "INNER JOIN pedidos ped ON ped.id = i.{$colPedidoId}\n"
+                    . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                    . "LEFT JOIN lojas l ON l.id = pr.{$lojaIdCol}\n"
+                    . $wherePaid . "\n"
+                    . "GROUP BY label\n"
+                    . "ORDER BY quantidade DESC\n"
+                    . "LIMIT 15";
+                $stmt = $pdo->query($sql);
+                $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                return $rows;
+            } catch (\Exception $e) {
+                return [];
+            }
+        }
+
+        if ($lojaSlugCol) {
+            try {
+                $sql = "SELECT COALESCE(NULLIF(TRIM(pr.{$lojaSlugCol}),''), 'sem_loja') AS label, {$qtdExpr} AS quantidade\n"
+                    . "FROM {$itensTable} i\n"
+                    . "INNER JOIN pedidos ped ON ped.id = i.{$colPedidoId}\n"
+                    . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                    . $wherePaid . "\n"
+                    . "GROUP BY label\n"
+                    . "ORDER BY quantidade DESC\n"
+                    . "LIMIT 15";
+                $stmt = $pdo->query($sql);
+                $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                return $rows;
+            } catch (\Exception $e) {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    private function getClientesTopPorSegmento(\PDO $pdo, string $seg, string $val, int $limit): array {
+        $limit = max(1, min(2000, (int) $limit));
+
+        $itensTable = $this->detectItensTable($pdo);
+        if (!$itensTable || !$this->tableExists($pdo, 'produtos') || !$this->tableExists($pdo, 'pedidos')) {
+            return [];
+        }
+
+        $uTable = $this->tableExists($pdo, 'usuarios') ? 'usuarios' : null;
+        if ($uTable === null) {
+            return [];
+        }
+
+        $iCols = $this->getColumns($pdo, $itensTable);
+        $pCols = $this->getColumns($pdo, 'pedidos');
+        $prCols = $this->getColumns($pdo, 'produtos');
+        $uCols = $this->getColumns($pdo, 'usuarios');
+
+        $colPedidoId = $this->pickColumn($iCols, ['pedido_id']);
+        $colProdutoId = $this->pickColumn($iCols, ['produto_id', 'product_id']);
+        $colQtd = $this->pickColumn($iCols, ['quantidade', 'qty', 'qtd']);
+        $usuarioIdCol = $this->pickColumn($pCols, ['usuario_id', 'user_id']);
+        $totalCol = $this->pickColumn($pCols, ['valor_total', 'total', 'amount', 'valor']);
+        $pedidoStatusCol = $this->pickColumn($pCols, ['status', 'payment_status', 'status_pagamento', 'pagamento_status']);
+
+        if (!$colPedidoId || !$colProdutoId || !$usuarioIdCol || !$totalCol) {
+            return [];
+        }
+
+        $nomeUserCol = $this->pickColumn($uCols, ['nome', 'name']);
+        if (!$nomeUserCol) {
+            $nomeUserCol = 'id';
+        }
+        $emailCol = $this->pickColumn($uCols, ['email']);
+        if (!$emailCol) {
+            return [];
+        }
+
+        $wherePaid = $this->normalizePaidWhere($pedidoStatusCol);
+        $qtdExpr = $colQtd ? "SUM(COALESCE(i.{$colQtd},0))" : 'COUNT(*)';
+
+        $joinSeg = '';
+        $whereSeg = '';
+        $params = [];
+
+        if ($seg === 'categoria') {
+            if (!in_array('category_id', $prCols, true) || !$this->tableExists($pdo, 'categorias')) {
+                return [];
+            }
+            $cCols = $this->getColumns($pdo, 'categorias');
+            $catNomeCol = $this->pickColumn($cCols, ['name', 'nome']);
+            if (!$catNomeCol) {
+                return [];
+            }
+            $joinSeg = 'LEFT JOIN categorias c ON c.id = pr.category_id';
+            $whereSeg = ' AND c.' . $catNomeCol . ' = :seg_val';
+            $params[':seg_val'] = $val;
+        } elseif ($seg === 'loja') {
+            $lojaIdCol = $this->pickColumn($prCols, ['loja_id']);
+            $lojaSlugCol = $this->pickColumn($prCols, ['loja', 'store', 'seller']);
+
+            if ($lojaIdCol && $this->tableExists($pdo, 'lojas')) {
+                $joinSeg = 'LEFT JOIN lojas l ON l.id = pr.' . $lojaIdCol;
+                $whereSeg = ' AND COALESCE(l.nome, CONCAT(\'Loja #\', pr.' . $lojaIdCol . ')) = :seg_val';
+                $params[':seg_val'] = $val;
+            } elseif ($lojaSlugCol) {
+                $whereSeg = ' AND COALESCE(NULLIF(TRIM(pr.' . $lojaSlugCol . '),\'\'), \'sem_loja\') = :seg_val';
+                $params[':seg_val'] = $val;
+            } else {
+                return [];
+            }
+        } else {
+            return [];
+        }
+
+        // Para ranking por segmento, o total_gasto será soma do total do pedido
+        try {
+            $sql = "SELECT\n"
+                . "  COALESCE(u.{$nomeUserCol}, CONCAT('Cliente #', u.id)) AS nome,\n"
+                . "  u.{$emailCol} AS email,\n"
+                . "  COUNT(DISTINCT ped.id) AS pedidos,\n"
+                . "  SUM(COALESCE(ped.{$totalCol},0)) AS total_gasto\n"
+                . "FROM pedidos ped\n"
+                . "INNER JOIN {$itensTable} i ON i.{$colPedidoId} = ped.id\n"
+                . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
+                . "INNER JOIN usuarios u ON u.id = ped.{$usuarioIdCol}\n"
+                . ($joinSeg ? ($joinSeg . "\n") : '')
+                . $wherePaid
+                . " AND u.{$emailCol} IS NOT NULL AND u.{$emailCol} <> ''"
+                . $whereSeg
+                . "\nGROUP BY nome, email\n"
+                . "ORDER BY total_gasto DESC\n"
+                . "LIMIT {$limit}";
+
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            return $rows;
+        } catch (\Exception $e) {
+            return [];
+        }
     }
     
     public function salvar(Request $request) {

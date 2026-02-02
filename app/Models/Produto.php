@@ -103,17 +103,39 @@ class Produto extends Model {
     }
     
     public function getDestaque($limit = 8) {
-        $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria 
-            FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE p.status = 'published' AND p.active = 1 AND p.featured = 1
-            AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
-            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY p.created_at DESC 
-            LIMIT :limit
-        ");
-        $stmt->bindParam(':limit', $limit, \PDO::PARAM_INT);
+        $pdo = $this->getConnection();
+        $limit = (int) $limit;
+
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $where = [];
+        if (in_array('status', $cols, true)) {
+            $where[] = "p.status = 'published'";
+        }
+        if (in_array('active', $cols, true)) {
+            $where[] = 'p.active = 1';
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = 'p.ativo = 1';
+        }
+        if (in_array('featured', $cols, true)) {
+            $where[] = 'p.featured = 1';
+        }
+
+        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.created_at DESC\n                LIMIT :limit";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
