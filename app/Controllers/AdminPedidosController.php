@@ -98,6 +98,9 @@ class AdminPedidosController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Pedidos (' . $total . ')</h1>
                     <div>
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary me-2">
+                            <i class="fas fa-plus me-1"></i>Novo Pedido Manual
+                        </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
                         </button>

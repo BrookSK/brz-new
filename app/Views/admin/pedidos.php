@@ -10,6 +10,9 @@
             <a href="/admin" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Voltar
             </a>
+            <a href="/admin/pedidos/novo-manual" class="btn btn-primary ms-2">
+                <i class="fas fa-plus me-2"></i>Novo Pedido Manual
+            </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCriarPedido">
                 <i class="fas fa-plus me-2"></i>Novo Pedido
             </button>

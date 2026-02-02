@@ -494,7 +494,7 @@
     height: 80px;
 }
 
-.nav-link {
+.card-body nav.nav.flex-column .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -505,13 +505,13 @@
     align-items: center;
 }
 
-.nav-link:hover {
+.card-body nav.nav.flex-column .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
     transform: none;
 }
 
-.nav-link.active {
+.card-body nav.nav.flex-column .nav-link.active {
     background: rgba(11, 31, 58, 0.08);
     border: 1px solid rgba(11, 31, 58, 0.14);
     color: rgba(11, 31, 58, 1) !important;
