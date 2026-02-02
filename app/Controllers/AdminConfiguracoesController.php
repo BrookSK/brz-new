@@ -971,9 +971,25 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                         <div class="card-body">
                                             <div class="mb-3">
-                                                <label class="form-label">Faixas de comissão (Pedidos Manuais) - JSON</label>
-                                                <textarea class="form-control" name="comissao_manual_faixas" rows="8" placeholder="[{&quot;min&quot;:0,&quot;max&quot;:999999999,&quot;percent&quot;:0}]">' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]')) . '</textarea>
-                                                <small class="text-muted">Formato: lista de objetos com <code>min</code>, <code>max</code> e <code>percent</code>. O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
+                                                <label class="form-label">Faixas de comissão (Pedidos Manuais)</label>
+                                                <input type="hidden" name="comissao_manual_faixas" id="comissao_manual_faixas" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]'), ENT_QUOTES, 'UTF-8') . '">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-bordered align-middle" id="comissaoManualFaixasTable">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style="width: 30%">Mínimo (R$)</th>
+                                                                <th style="width: 30%">Máximo (R$)</th>
+                                                                <th style="width: 25%">Comissão (%)</th>
+                                                                <th style="width: 15%">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="comissaoManualFaixasBody"></tbody>
+                                                    </table>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddComissaoFaixa">
+                                                    <i class="fas fa-plus"></i> Adicionar faixa
+                                                </button>
+                                                <small class="text-muted d-block mt-2">O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
                                             </div>
                                         </div>
                                     </div>
@@ -1043,10 +1059,94 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . '
 </body>
 </html>';
         exit;
+    }
+
+    private function getComissoesJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const hidden = document.getElementById('comissao_manual_faixas');
+    const body = document.getElementById('comissaoManualFaixasBody');
+    const btnAdd = document.getElementById('btnAddComissaoFaixa');
+    if (!hidden || !body || !btnAdd) return;
+
+    const normalizeNumber = (v) => {
+        if (v === null || v === undefined) return 0;
+        const s = String(v).replace(',', '.').trim();
+        const n = Number(s);
+        return isNaN(n) ? 0 : n;
+    };
+
+    const parseJson = () => {
+        try {
+            const raw = String(hidden.value || '').trim();
+            if (!raw) return [];
+            const arr = JSON.parse(raw);
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const serialize = () => {
+        const rows = [];
+        body.querySelectorAll('tr').forEach(tr => {
+            const min = normalizeNumber(tr.querySelector('.cm-min')?.value);
+            const max = normalizeNumber(tr.querySelector('.cm-max')?.value);
+            const percent = normalizeNumber(tr.querySelector('.cm-percent')?.value);
+            rows.push({ min, max, percent });
+        });
+        hidden.value = JSON.stringify(rows);
+    };
+
+    const addRow = (min, max, percent) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm cm-min" value="${String(min ?? 0)}"></td>
+            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm cm-max" value="${String(max ?? 0)}"></td>
+            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm cm-percent" value="${String(percent ?? 0)}"></td>
+            <td>
+                <button type="button" class="btn btn-outline-danger btn-sm cm-del"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        body.appendChild(tr);
+
+        tr.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('input', serialize);
+            inp.addEventListener('change', serialize);
+        });
+        tr.querySelector('.cm-del')?.addEventListener('click', function(){
+            tr.remove();
+            serialize();
+        });
+    };
+
+    const initial = parseJson();
+    if (initial.length === 0) {
+        addRow(0, 999999999, 0);
+    } else {
+        initial.forEach(it => addRow(it.min ?? 0, it.max ?? 0, it.percent ?? 0));
+    }
+    serialize();
+
+    btnAdd.addEventListener('click', function(){
+        addRow(0, 0, 0);
+        serialize();
+    });
+
+    const form = hidden.closest('form');
+    if (form) {
+        form.addEventListener('submit', function(){
+            serialize();
+        });
+    }
+});
+</script>
+JS;
     }
     
     public function salvar(Request $request) {

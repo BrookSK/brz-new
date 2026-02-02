@@ -255,16 +255,17 @@ class AdminPedidosManualController extends Controller {
                 </div>
 
                 <div class="d-flex gap-2 mb-4">
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-success" id="btnCriarPedidoManual">
                         <i class="fas fa-save"></i> Criar Pedido Manual
                     </button>
                 </div>
+                <div id="createResult" style="display:none;"></div>
             </form>
 
             <div class="card mb-4">
                 <div class="card-header"><strong>Pagamento (Asaas)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3">Clique em <strong>Gerar Link de Pagamento</strong>. O sistema irá criar o pedido manual automaticamente se necessário e então gerar o link.</div>
+                    <div class="alert alert-info mb-3">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4">
                             <label class="form-label">Billing Type</label>
@@ -274,7 +275,7 @@ class AdminPedidosManualController extends Controller {
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <button type="button" class="btn btn-primary" onclick="gerarLinkPagamento()">
+                            <button type="button" class="btn btn-primary" id="btnGerarLinkPagamento" onclick="gerarLinkPagamento()" disabled>
                                 <i class="fas fa-link"></i> Gerar Link de Pagamento
                             </button>
                         </div>
@@ -511,34 +512,16 @@ function gerarLinkPagamento(){
     el.style.display = 'block';
     el.innerHTML = `<div class="alert alert-info">Processando...</div>`;
 
-    const criarSeNecessario = () => {
-        if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
-            return Promise.resolve({ success: true, pedido_id: Number(PEDIDO_ID) });
-        }
+    if (!PEDIDO_ID || Number(PEDIDO_ID) <= 0) {
+        el.innerHTML = `<div class="alert alert-warning">Crie o pedido manual antes de gerar o link de pagamento.</div>`;
+        return;
+    }
 
-        // Criar pedido via AJAX usando os dados do formulário
-        const form = document.getElementById('formPedidoManual');
-        const fd = new FormData(form);
-        return fetch('/admin/pedidos/novo-manual/criar', { method: 'POST', body: fd })
-            .then(r => r.json());
-    };
-
-    criarSeNecessario()
-        .then(resp => {
-            if (!resp || !resp.success) {
-                throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
-            }
-            PEDIDO_ID = Number(resp.pedido_id || resp.pedidoId || 0);
-            if (!PEDIDO_ID) {
-                throw new Error('Pedido inválido');
-            }
-
-            const fd = new FormData();
-            fd.append('pedido_id', String(PEDIDO_ID));
-            fd.append('billingType', bt);
-            return fetch('/admin/pedidos/novo-manual/gerar-link', { method: 'POST', body: fd })
-                .then(r => r.json());
-        })
+    const fd = new FormData();
+    fd.append('pedido_id', String(PEDIDO_ID));
+    fd.append('billingType', bt);
+    fetch('/admin/pedidos/novo-manual/gerar-link', { method: 'POST', body: fd })
+        .then(r => r.json())
         .then(data => {
             if (data && data.success) {
                 const url = data.invoiceUrl || '';
@@ -554,6 +537,54 @@ function gerarLinkPagamento(){
 
 document.addEventListener('DOMContentLoaded', function(){
     addItemRow();
+
+    const btnLink = document.getElementById('btnGerarLinkPagamento');
+    if (btnLink) {
+        btnLink.disabled = !(PEDIDO_ID && Number(PEDIDO_ID) > 0);
+    }
+
+    const form = document.getElementById('formPedidoManual');
+    const createBox = document.getElementById('createResult');
+    if (form) {
+        form.addEventListener('submit', function(e){
+            e.preventDefault();
+            try { calcTotal(); } catch (err) {}
+
+            const btn = document.getElementById('btnCriarPedidoManual');
+            if (btn) btn.disabled = true;
+
+            if (createBox) {
+                createBox.style.display = 'block';
+                createBox.innerHTML = `<div class="alert alert-info">Criando pedido...</div>`;
+            }
+
+            const fd = new FormData(form);
+            fetch('/admin/pedidos/novo-manual/criar', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(resp => {
+                    if (!resp || !resp.success) {
+                        throw new Error((resp && resp.error) ? resp.error : 'Falha ao criar pedido');
+                    }
+                    PEDIDO_ID = Number(resp.pedido_id || resp.pedidoId || 0);
+                    if (!PEDIDO_ID) {
+                        throw new Error('Pedido inválido');
+                    }
+
+                    if (createBox) {
+                        createBox.innerHTML = `<div class="alert alert-success">Pedido manual criado com sucesso: <strong>#${PEDIDO_ID}</strong></div>`;
+                    }
+                    if (btnLink) btnLink.disabled = false;
+                })
+                .catch(err => {
+                    if (createBox) {
+                        createBox.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
+                    }
+                })
+                .finally(() => {
+                    if (btn) btn.disabled = false;
+                });
+        });
+    }
 
     document.addEventListener('click', function(e){
         if (!(e.target && (e.target.closest('.produtoSearch') || e.target.closest('.prodResults')))) {
