@@ -370,7 +370,7 @@ class PedidoManualService {
                     break;
                 }
             }
-            if ($col !== '') {
+            if ($col !== '' && !in_array($col, $cols, true)) {
                 $cols[] = $col;
                 $vals[] = ':' . $k;
                 $params[':' . $k] = (float) $resumo[$k];
