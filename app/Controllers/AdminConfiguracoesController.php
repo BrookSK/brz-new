@@ -1551,6 +1551,104 @@ JS;
         // Lojas serão carregadas via AJAX (quando existir tabela lojas ou colunas loja/loja_id)
         $cardsLojas = '<div class="col-12" id="mapaCalorLojasWrap"><div class="text-muted">Carregando lojas...</div></div>';
 
+        $mapaCalorScript = <<<'HTML'
+                        <script>
+                            (function(){
+                                function qs(sel){ return document.querySelector(sel); }
+                                function esc(s){
+                                    return String(s ?? '')
+                                        .replace(/&/g,'&amp;')
+                                        .replace(/</g,'&lt;')
+                                        .replace(/>/g,'&gt;')
+                                        .replace(/"/g,'&quot;')
+                                        .replace(/'/g,'&#039;');
+                                }
+
+                                async function loadClientes(seg, val){
+                                    const card = qs('#mapaCalorSegmentoCard');
+                                    const body = qs('#mapaCalorClientesBody');
+                                    const title = qs('#mapaCalorSegmentoTitulo');
+                                    const sub = qs('#mapaCalorSegmentoSub');
+                                    const exportBtn = qs('#mapaCalorExportBtn');
+                                    if (!card || !body || !title || !sub || !exportBtn) return;
+
+                                    card.style.display = 'block';
+                                    title.textContent = 'Clientes do segmento';
+                                    sub.textContent = seg + ': ' + val;
+                                    exportBtn.href = '/admin/configuracoes/mapa-calor/export-emails?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val);
+
+                                    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>';
+
+                                    try {
+                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val));
+                                        const json = await resp.json();
+                                        const rows = (json && json.clientes) ? json.clientes : [];
+                                        if (!rows.length) {
+                                            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>';
+                                            return;
+                                        }
+                                        let html = '';
+                                        rows.forEach(r => {
+                                            html += '<tr>'
+                                                + '<td>' + esc(r.nome || '') + '</td>'
+                                                + '<td>' + esc(r.email || '') + '</td>'
+                                                + '<td>' + esc(r.pedidos || 0) + '</td>'
+                                                + '<td>' + esc(r.total_gasto || 0) + '</td>'
+                                                + '</tr>';
+                                        });
+                                        body.innerHTML = html;
+                                    } catch (e) {
+                                        body.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar</td></tr>';
+                                    }
+                                }
+
+                                function bindCards(){
+                                    document.querySelectorAll('.mapa-calor-card').forEach(el => {
+                                        el.addEventListener('click', function(ev){
+                                            ev.preventDefault();
+                                            const seg = this.getAttribute('data-seg') || '';
+                                            const val = this.getAttribute('data-val') || '';
+                                            if (!seg || !val) return;
+                                            loadClientes(seg, val);
+                                        });
+                                    });
+                                }
+
+                                async function loadLojas(){
+                                    const grid = qs('#mapaCalorLojasGrid');
+                                    if (!grid) return;
+                                    try {
+                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=lojas');
+                                        const json = await resp.json();
+                                        const lojas = (json && json.lojas) ? json.lojas : [];
+                                        if (!lojas.length) {
+                                            grid.innerHTML = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
+                                            bindCards();
+                                            return;
+                                        }
+                                        let html = '';
+                                        lojas.forEach(l => {
+                                            html += '<div class="col-6 col-lg-4">'
+                                                + '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="loja" data-val="' + esc(l.label || '') + '">'
+                                                + '<div class="card-body">'
+                                                + '<div class="small text-muted">Loja</div>'
+                                                + '<div class="fw-bold">' + esc(l.label || '') + '</div>'
+                                                + '<div class="small">Vendidos: <span class="fw-semibold">' + esc(l.quantidade || 0) + '</span></div>'
+                                                + '</div></a></div>';
+                                        });
+                                        grid.innerHTML = html;
+                                        bindCards();
+                                    } catch (e) {
+                                        grid.innerHTML = '<div class="col-12"><div class="text-danger">Erro ao carregar lojas</div></div>';
+                                    }
+                                }
+
+                                bindCards();
+                                loadLojas();
+                            })();
+                        </script>
+HTML;
+
         return '
             <div class="tab-pane fade" id="v-pills-mapa-calor" role="tabpanel">
                 <div class="card">
@@ -1710,101 +1808,7 @@ JS;
                             </div>
                         </div>
 
-                        <script>
-                            (function(){
-                                function qs(sel){ return document.querySelector(sel); }
-                                function esc(s){
-                                    return String(s ?? '')
-                                        .replace(/&/g,'&amp;')
-                                        .replace(/</g,'&lt;')
-                                        .replace(/>/g,'&gt;')
-                                        .replace(/"/g,'&quot;')
-                                        .replace(/'/g,'&#039;');
-                                }
-
-                                async function loadClientes(seg, val){
-                                    const card = qs('#mapaCalorSegmentoCard');
-                                    const body = qs('#mapaCalorClientesBody');
-                                    const title = qs('#mapaCalorSegmentoTitulo');
-                                    const sub = qs('#mapaCalorSegmentoSub');
-                                    const exportBtn = qs('#mapaCalorExportBtn');
-                                    if (!card || !body || !title || !sub || !exportBtn) return;
-
-                                    card.style.display = 'block';
-                                    title.textContent = 'Clientes do segmento';
-                                    sub.textContent = seg + ': ' + val;
-                                    exportBtn.href = '/admin/configuracoes/mapa-calor/export-emails?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val);
-
-                                    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>';
-
-                                    try {
-                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=' + encodeURIComponent(seg) + '&val=' + encodeURIComponent(val));
-                                        const json = await resp.json();
-                                        const rows = (json && json.clientes) ? json.clientes : [];
-                                        if (!rows.length) {
-                                            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>';
-                                            return;
-                                        }
-                                        let html = '';
-                                        rows.forEach(r => {
-                                            html += '<tr>'
-                                                + '<td>' + esc(r.nome || '') + '</td>'
-                                                + '<td>' + esc(r.email || '') + '</td>'
-                                                + '<td>' + esc(r.pedidos || 0) + '</td>'
-                                                + '<td>' + esc(r.total_gasto || 0) + '</td>'
-                                                + '</tr>';
-                                        });
-                                        body.innerHTML = html;
-                                    } catch (e) {
-                                        body.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar</td></tr>';
-                                    }
-                                }
-
-                                function bindCards(){
-                                    document.querySelectorAll('.mapa-calor-card').forEach(el => {
-                                        el.addEventListener('click', function(ev){
-                                            ev.preventDefault();
-                                            const seg = this.getAttribute('data-seg') || '';
-                                            const val = this.getAttribute('data-val') || '';
-                                            if (!seg || !val) return;
-                                            loadClientes(seg, val);
-                                        });
-                                    });
-                                }
-
-                                async function loadLojas(){
-                                    const grid = qs('#mapaCalorLojasGrid');
-                                    if (!grid) return;
-                                    try {
-                                        const resp = await fetch('/admin/configuracoes/mapa-calor/clientes?seg=lojas');
-                                        const json = await resp.json();
-                                        const lojas = (json && json.lojas) ? json.lojas : [];
-                                        if (!lojas.length) {
-                                            grid.innerHTML = '<div class="col-12"><div class="text-muted">Sem dados de lojas para segmentar.</div></div>';
-                                            bindCards();
-                                            return;
-                                        }
-                                        let html = '';
-                                        lojas.forEach(l => {
-                                            html += '<div class="col-6 col-lg-4">'
-                                                + '<a href="#" class="card h-100 text-decoration-none mapa-calor-card" data-seg="loja" data-val="' + esc(l.label || '') + '">'
-                                                + '<div class="card-body">'
-                                                + '<div class="small text-muted">Loja</div>'
-                                                + '<div class="fw-bold">' + esc(l.label || '') + '</div>'
-                                                + '<div class="small">Vendidos: <span class="fw-semibold">' + esc(l.quantidade || 0) + '</span></div>'
-                                                + '</div></a></div>';
-                                        });
-                                        grid.innerHTML = html;
-                                        bindCards();
-                                    } catch (e) {
-                                        grid.innerHTML = '<div class="col-12"><div class="text-danger">Erro ao carregar lojas</div></div>';
-                                    }
-                                }
-
-                                bindCards();
-                                loadLojas();
-                            })();
-                        </script>
+                        ' . $mapaCalorScript . '
                     </div>
                 </div>
             </div>
