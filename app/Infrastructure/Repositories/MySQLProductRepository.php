@@ -223,16 +223,6 @@ class MySQLProductRepository implements ProductRepositoryInterface {
         
         $products = [];
         while ($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $products[] = $this->hydrate($data);
-        }
-        return $products;
-    }
-
-    public function findRelated(int $productId, int $limit = 5): array {
-        $product = $this->findById($productId);
-        if (!$product) return [];
-        
-        $stmt = $this->connection->prepare("SELECT * FROM produtos WHERE id != ? AND active = 1 AND status = ? AND (category_id = ? OR type = ?) ORDER BY RAND() LIMIT ?");
         $stmt->execute([$productId, ProductStatus::PUBLISHED, $product->getCategoryId(), $product->getType(), $limit]);
         
         $products = [];
@@ -243,7 +233,7 @@ class MySQLProductRepository implements ProductRepositoryInterface {
     }
 
     public function findBestSellers(int $limit = 10, int $offset = 0): array {
-        $stmt = $this->connection->prepare("SELECT p.*, SUM(ip.quantidade) as total FROM produtos p LEFT JOIN itens_pedido ip ON p.id = ip.produto_id LEFT JOIN pedidos ped ON ip.pedido_id = ped.id WHERE p.active = 1 AND p.status = ? AND ped.status IN ('pago', 'enviado', 'entregue') AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY p.id HAVING total > 0 ORDER BY total DESC LIMIT ? OFFSET ?");
+        $stmt = $this->connection->prepare("SELECT p.*, SUM(ip.quantidade) as total_vendido FROM produtos p LEFT JOIN itens_pedido ip ON p.id = ip.produto_id LEFT JOIN pedidos ped ON ip.pedido_id = ped.id WHERE p.active = 1 AND p.status = ? AND ped.status IN ('pago', 'enviado', 'entregue') AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY p.id HAVING total_vendido > 0 ORDER BY total_vendido DESC LIMIT ? OFFSET ?");
         $stmt->execute([ProductStatus::PUBLISHED, $limit, $offset]);
         
         $products = [];
