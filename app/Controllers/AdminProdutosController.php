@@ -245,7 +245,8 @@ class AdminProdutosController extends Controller {
     }
 
     public function cadastroRapido(Request $request) {
-        echo '<!DOCTYPE html>
+        echo <<<'HTML'
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -336,7 +337,8 @@ class AdminProdutosController extends Controller {
         }
     </script>
 </body>
-</html>';
+</html>
+HTML;
         exit;
     }
 
