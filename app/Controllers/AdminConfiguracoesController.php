@@ -970,6 +970,23 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">Configurações de Comissões</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="row g-3 mb-4">
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Início da 1ª janela</label>
+                                                    <input type="date" class="form-control" name="comissao_janela_primeiro_inicio" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_primeiro_inicio', ''), ENT_QUOTES, 'UTF-8') . '">
+                                                    <small class="text-muted">Defina a data de início da primeira janela global.</small>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Fim da 1ª janela</label>
+                                                    <input type="date" class="form-control" name="comissao_janela_primeiro_fim" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_primeiro_fim', ''), ENT_QUOTES, 'UTF-8') . '">
+                                                    <small class="text-muted">Defina a data de término da primeira janela global.</small>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Duração das janelas (dias)</label>
+                                                    <input type="number" min="1" step="1" class="form-control" name="comissao_janela_duracao_dias" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'janela_duracao_dias', '14'), ENT_QUOTES, 'UTF-8') . '">
+                                                    <small class="text-muted">Após a 1ª janela, as próximas são calculadas automaticamente.</small>
+                                                </div>
+                                            </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Faixas de comissão (Pedidos Manuais)</label>
                                                 <input type="hidden" name="comissao_manual_faixas" id="comissao_manual_faixas" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]'), ENT_QUOTES, 'UTF-8') . '">
@@ -1164,7 +1181,7 @@ JS;
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'webhook_link_pagamento_pedido_manual_url'],
-                'comissao' => ['manual_faixas'],
+                'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'manutencao', 'debug', 'cache_ativado'],

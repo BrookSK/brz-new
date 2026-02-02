@@ -987,6 +987,12 @@ class AdminPedidosController extends Controller {
                             <div class="fs-5 fw-bold">' . number_format($percent, 2, ',', '.') . '% (R$ ' . number_format($valorComissao, 2, ',', '.') . ')</div>
                         </div>
                     </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Comissão total</div>
+                            <div class="fs-5 fw-bold">R$ ' . number_format($valorComissao, 2, ',', '.') . '</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card">

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminPagamentosController extends Controller {
     
@@ -125,6 +126,9 @@ class AdminPagamentosController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
                     <div>
+                        <a href="/admin/pagamentos/comissoes-gerais" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-percentage me-1"></i>Comissões gerais
+                        </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar Relatório
                         </button>
@@ -521,6 +525,1051 @@ class AdminPagamentosController extends Controller {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>';
+        exit;
+    }
+
+    private function getAdminUserId(): int {
+        try {
+            $auth = new AuthService();
+            $u = $auth->getUsuarioLogado();
+            if (is_array($u) && !empty($u['id'])) {
+                return (int) $u['id'];
+            }
+        } catch (\Exception $e) {
+        }
+        return 0;
+    }
+
+    private function getConfigComissao(string $chave, $default = '') {
+        $db = \Config\Database::getConnection();
+
+        try {
+            $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($cols) && !empty($cols)) {
+                $direct = [
+                    'comissao_janela_primeiro_inicio',
+                    'comissao_janela_primeiro_fim',
+                    'comissao_janela_duracao_dias',
+                ];
+                $colName = null;
+                $directKey = 'comissao_' . $chave;
+                if (in_array($directKey, $direct, true) && in_array($directKey, $cols, true)) {
+                    $colName = $directKey;
+                }
+                if (!empty($colName)) {
+                    $stmt = $db->query('SELECT ' . $colName . ' AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+            $stmt->execute(['comissao', $chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute(['comissao_' . $chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
+    }
+
+    private function parseDate(string $value): ?\DateTime {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        try {
+            return new \DateTime($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function getWindowsForUi(): array {
+        $inicioCfg = (string) $this->getConfigComissao('janela_primeiro_inicio', '');
+        $fimCfg = (string) $this->getConfigComissao('janela_primeiro_fim', '');
+        $durCfg = (int) $this->getConfigComissao('janela_duracao_dias', '14');
+        if ($durCfg <= 0) {
+            $durCfg = 14;
+        }
+
+        $inicio = $this->parseDate($inicioCfg);
+        $fim = $this->parseDate($fimCfg);
+
+        $windows = [];
+        if ($inicio && $fim && $fim >= $inicio) {
+            $windows[] = ['inicio' => $inicio, 'fim' => $fim];
+
+            $cursor = clone $fim;
+            $cursor->modify('+1 day');
+            for ($i = 0; $i < 12; $i++) {
+                $wInicio = clone $cursor;
+                $wFim = clone $cursor;
+                $wFim->modify('+' . ($durCfg - 1) . ' day');
+                $windows[] = ['inicio' => $wInicio, 'fim' => $wFim];
+                $cursor = clone $wFim;
+                $cursor->modify('+1 day');
+            }
+        }
+
+        if (empty($windows)) {
+            $wFim = new \DateTime('today');
+            $wFim->setTime(23, 59, 59);
+            $wInicio = new \DateTime('today');
+            $wInicio->modify('-13 day');
+            $wInicio->setTime(0, 0, 0);
+            $windows[] = ['inicio' => $wInicio, 'fim' => $wFim];
+        }
+
+        usort($windows, function ($a, $b) {
+            return $b['inicio'] <=> $a['inicio'];
+        });
+
+        $windows = array_slice($windows, 0, 12);
+        return $windows;
+    }
+
+    private function loadPedidoColumns(\PDO $db): array {
+        try {
+            $stmt = $db->query('DESCRIBE pedidos');
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function loadTableColumns(\PDO $db, string $table): array {
+        try {
+            $stmt = $db->query('DESCRIBE ' . $table);
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function detectPedidoItensTable(\PDO $db): string {
+        try {
+            $st = $db->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['pedido_itens']);
+            if ($st->fetchColumn()) {
+                return 'pedido_itens';
+            }
+        } catch (\Exception $e) {
+        }
+        try {
+            $st = $db->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['pedido_items']);
+            if ($st->fetchColumn()) {
+                return 'pedido_items';
+            }
+        } catch (\Exception $e) {
+        }
+        return 'pedido_itens';
+    }
+
+    private function buildPaidAtExpression(array $colsPedidos, array $colsPagamentos, bool $temPagamentosJoin): string {
+        if (in_array('pago_em', $colsPedidos, true)) {
+            return 'p.pago_em';
+        }
+        if ($temPagamentosJoin) {
+            foreach (['data_pagamento', 'paid_at', 'data_confirmacao', 'updated_at', 'created_at'] as $c) {
+                if (in_array($c, $colsPagamentos, true)) {
+                    return 'pg.' . $c;
+                }
+            }
+        }
+        if (in_array('updated_at', $colsPedidos, true)) {
+            return 'p.updated_at';
+        }
+        if (in_array('created_at', $colsPedidos, true)) {
+            return 'p.created_at';
+        }
+        return 'p.id';
+    }
+
+    private function buildPaidStatusWhere(array $colsPedidos, array $colsPagamentos, bool $temPagamentosJoin): array {
+        $paid = ['pago', 'paid', 'approved', 'aprovado', 'concluido', 'concluído'];
+
+        $statusColPedido = null;
+        foreach (['payment_status', 'status_pagamento', 'status'] as $c) {
+            if (in_array($c, $colsPedidos, true)) {
+                $statusColPedido = 'p.' . $c;
+                break;
+            }
+        }
+
+        $statusColPg = null;
+        if ($temPagamentosJoin) {
+            foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                if (in_array($c, $colsPagamentos, true)) {
+                    $statusColPg = 'pg.' . $c;
+                    break;
+                }
+            }
+        }
+
+        $whereParts = [];
+        if (!empty($statusColPedido)) {
+            $whereParts[] = "LOWER(COALESCE({$statusColPedido}, '')) IN ('" . implode("','", $paid) . "')";
+        }
+        if (!empty($statusColPg)) {
+            $whereParts[] = "LOWER(COALESCE({$statusColPg}, '')) IN ('" . implode("','", $paid) . "')";
+        }
+
+        if (empty($whereParts)) {
+            return ['sql' => '1=1', 'usesPaidAt' => false];
+        }
+
+        return ['sql' => '(' . implode(' OR ', $whereParts) . ')', 'usesPaidAt' => true];
+    }
+
+    private function getPedidosComissaoForWindowAndVendedor(\PDO $db, int $vendedorId, \DateTime $inicio, \DateTime $fim): array {
+        $vendedorId = (int) $vendedorId;
+        if ($vendedorId <= 0) {
+            return [];
+        }
+
+        $colsPedidos = $this->loadPedidoColumns($db);
+        if (empty($colsPedidos) || !in_array('origem_pedido', $colsPedidos, true) || !in_array('admin_criador_id', $colsPedidos, true)) {
+            return [];
+        }
+
+        $totalCol = null;
+        foreach (['valor_total', 'total', 'amount', 'valor'] as $c) {
+            if (in_array($c, $colsPedidos, true)) {
+                $totalCol = $c;
+                break;
+            }
+        }
+        if (!$totalCol) {
+            return [];
+        }
+
+        $temPagamentosJoin = false;
+        $colsPagamentos = [];
+        try {
+            $colsPagamentos = $this->loadTableColumns($db, 'pagamentos');
+            if (!empty($colsPagamentos) && in_array('pedido_id', $colsPagamentos, true)) {
+                $temPagamentosJoin = true;
+            }
+        } catch (\Exception $e) {
+            $temPagamentosJoin = false;
+        }
+
+        $paidAtExpr = $this->buildPaidAtExpression($colsPedidos, $colsPagamentos, $temPagamentosJoin);
+        $statusWhere = $this->buildPaidStatusWhere($colsPedidos, $colsPagamentos, $temPagamentosJoin);
+        $joinPagamentos = $temPagamentosJoin ? 'LEFT JOIN pagamentos pg ON pg.pedido_id = p.id' : '';
+
+        $itensTable = $this->detectPedidoItensTable($db);
+        $colsItens = $this->loadTableColumns($db, $itensTable);
+        $qtdCol = null;
+        foreach (['quantidade', 'qty', 'qtd'] as $c) {
+            if (in_array($c, $colsItens, true)) {
+                $qtdCol = $c;
+                break;
+            }
+        }
+        $produtoIdCol = in_array('produto_id', $colsItens, true) ? 'produto_id' : null;
+        $pedidoIdCol = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : null;
+        if (!$pedidoIdCol || !$produtoIdCol || !$qtdCol) {
+            return [];
+        }
+
+        $colsProdutos = $this->loadTableColumns($db, 'produtos');
+        $custoCol = null;
+        foreach (['cost_price', 'custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
+            if (in_array($c, $colsProdutos, true)) {
+                $custoCol = $c;
+                break;
+            }
+        }
+        if (!$custoCol) {
+            return [];
+        }
+
+        $sqlPedidos = "SELECT p.id AS pedido_id, p.{$totalCol} AS faturado, {$paidAtExpr} AS pago_em FROM pedidos p {$joinPagamentos} WHERE p.origem_pedido = 'manual' AND p.admin_criador_id = :vid AND {$statusWhere['sql']} AND {$paidAtExpr} BETWEEN :inicio AND :fim ORDER BY {$paidAtExpr} ASC";
+        $stmtP = $db->prepare($sqlPedidos);
+        $stmtP->execute([
+            ':vid' => $vendedorId,
+            ':inicio' => $inicio->format('Y-m-d H:i:s'),
+            ':fim' => $fim->format('Y-m-d H:i:s'),
+        ]);
+        $pedidos = $stmtP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($pedidos)) {
+            return [];
+        }
+
+        $pedidoIds = array_values(array_filter(array_map(fn($p) => (int) ($p['pedido_id'] ?? 0), $pedidos), fn($v) => $v > 0));
+        if (empty($pedidoIds)) {
+            return [];
+        }
+
+        $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+        $sqlCusto = "SELECT i.{$pedidoIdCol} AS pedido_id, SUM(i.{$qtdCol} * COALESCE(pr.{$custoCol},0)) AS custo_total FROM {$itensTable} i INNER JOIN produtos pr ON pr.id = i.{$produtoIdCol} WHERE i.{$pedidoIdCol} IN ({$in}) GROUP BY i.{$pedidoIdCol}";
+        $stmtC = $db->prepare($sqlCusto);
+        $stmtC->execute($pedidoIds);
+        $rowsC = $stmtC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $custoPorPedido = [];
+        foreach ($rowsC as $r) {
+            $pid = (int) ($r['pedido_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $custoPorPedido[$pid] = (float) ($r['custo_total'] ?? 0);
+        }
+
+        $totalFaturado = 0.0;
+        foreach ($pedidos as $p) {
+            $totalFaturado += (float) ($p['faturado'] ?? 0);
+        }
+
+        $pedidoModel = null;
+        $faixas = [];
+        $percent = 0.0;
+        try {
+            $pedidoModel = new \App\Models\PedidoEcommerce();
+            $faixas = $pedidoModel->getFaixasComissaoManual();
+            $percent = (float) $pedidoModel->calcularPercentualComissaoManual($totalFaturado, $faixas);
+        } catch (\Exception $e) {
+            $pedidoModel = null;
+            $faixas = [];
+            $percent = 0.0;
+        }
+
+        $out = [];
+        foreach ($pedidos as $p) {
+            $pid = (int) ($p['pedido_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $fat = (float) ($p['faturado'] ?? 0);
+            $custo = (float) ($custoPorPedido[$pid] ?? 0);
+            $liq = $fat - $custo;
+            $com = $liq * ($percent / 100.0);
+            if ($com < 0) $com = 0.0;
+            $out[] = [
+                'pedido_id' => $pid,
+                'faturado' => $fat,
+                'custo' => $custo,
+                'liquido' => $liq,
+                'comissao_usd' => $com,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function getCommissionKpisForWindow(\PDO $db, \DateTime $inicio, \DateTime $fim): array {
+        $colsPedidos = $this->loadPedidoColumns($db);
+        if (empty($colsPedidos) || !in_array('origem_pedido', $colsPedidos, true) || !in_array('admin_criador_id', $colsPedidos, true)) {
+            return [];
+        }
+
+        $totalCol = null;
+        foreach (['valor_total', 'total', 'amount', 'valor'] as $c) {
+            if (in_array($c, $colsPedidos, true)) {
+                $totalCol = $c;
+                break;
+            }
+        }
+        if (!$totalCol) {
+            return [];
+        }
+
+        $temPagamentosJoin = false;
+        $colsPagamentos = [];
+        try {
+            $colsPagamentos = $this->loadTableColumns($db, 'pagamentos');
+            if (!empty($colsPagamentos) && in_array('pedido_id', $colsPagamentos, true)) {
+                $temPagamentosJoin = true;
+            }
+        } catch (\Exception $e) {
+            $temPagamentosJoin = false;
+        }
+
+        $paidAtExpr = $this->buildPaidAtExpression($colsPedidos, $colsPagamentos, $temPagamentosJoin);
+        $statusWhere = $this->buildPaidStatusWhere($colsPedidos, $colsPagamentos, $temPagamentosJoin);
+
+        $joinPagamentos = $temPagamentosJoin ? 'LEFT JOIN pagamentos pg ON pg.pedido_id = p.id' : '';
+
+        $sqlBase = "FROM pedidos p {$joinPagamentos} WHERE p.origem_pedido = 'manual' AND p.admin_criador_id IS NOT NULL AND {$statusWhere['sql']} AND {$paidAtExpr} BETWEEN :inicio AND :fim";
+
+        $sqlAgg = "SELECT p.admin_criador_id AS vendedor_id, COUNT(*) AS pedidos_qtd, SUM(p.{$totalCol}) AS faturado_total, AVG(p.{$totalCol}) AS ticket_medio {$sqlBase} GROUP BY p.admin_criador_id";
+
+        $stmt = $db->prepare($sqlAgg);
+        $stmt->execute([
+            ':inicio' => $inicio->format('Y-m-d H:i:s'),
+            ':fim' => $fim->format('Y-m-d H:i:s'),
+        ]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $vendedorIds = array_values(array_filter(array_map(fn($r) => (int) ($r['vendedor_id'] ?? 0), $rows), fn($v) => $v > 0));
+        if (empty($vendedorIds)) {
+            return [];
+        }
+
+        $in = implode(',', array_fill(0, count($vendedorIds), '?'));
+        $mapVendedor = [];
+        try {
+            $stU = $db->prepare("SELECT id, COALESCE(nome, name) AS nome, email FROM usuarios WHERE id IN ({$in})");
+            $stU->execute($vendedorIds);
+            $us = $stU->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($us as $u) {
+                $mapVendedor[(int) $u['id']] = $u;
+            }
+        } catch (\Exception $e) {
+            $mapVendedor = [];
+        }
+
+        $itensTable = $this->detectPedidoItensTable($db);
+        $colsItens = $this->loadTableColumns($db, $itensTable);
+        $qtdCol = null;
+        foreach (['quantidade', 'qty', 'qtd'] as $c) {
+            if (in_array($c, $colsItens, true)) {
+                $qtdCol = $c;
+                break;
+            }
+        }
+        $produtoIdCol = in_array('produto_id', $colsItens, true) ? 'produto_id' : null;
+        $pedidoIdCol = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : null;
+
+        $colsProdutos = $this->loadTableColumns($db, 'produtos');
+        $pesoCol = null;
+        foreach (['peso', 'weight'] as $c) {
+            if (in_array($c, $colsProdutos, true)) {
+                $pesoCol = $c;
+                break;
+            }
+        }
+        $custoCol = null;
+        foreach (['cost_price', 'custo', 'preco_custo', 'cost', 'valor_custo'] as $c) {
+            if (in_array($c, $colsProdutos, true)) {
+                $custoCol = $c;
+                break;
+            }
+        }
+        $nomeProdCol = null;
+        foreach (['nome', 'name'] as $c) {
+            if (in_array($c, $colsProdutos, true)) {
+                $nomeProdCol = $c;
+                break;
+            }
+        }
+
+        $kgPorVendedor = [];
+        $topProdutoPorVendedor = [];
+        $custoPorVendedor = [];
+
+        if ($pedidoIdCol && $produtoIdCol && $qtdCol && ($pesoCol || $custoCol || $nomeProdCol)) {
+            $sqlItensAgg = "SELECT p.admin_criador_id AS vendedor_id, i.{$produtoIdCol} AS produto_id, SUM(i.{$qtdCol}) AS qtd_sum";
+            if ($pesoCol) {
+                $sqlItensAgg .= ", SUM(i.{$qtdCol} * COALESCE(pr.{$pesoCol},0)) AS kg_sum";
+            }
+            if ($custoCol) {
+                $sqlItensAgg .= ", SUM(i.{$qtdCol} * COALESCE(pr.{$custoCol},0)) AS custo_sum";
+            }
+            if ($nomeProdCol) {
+                $sqlItensAgg .= ", MAX(pr.{$nomeProdCol}) AS produto_nome";
+            }
+            $sqlItensAgg .= " {$sqlBase} AND i.{$pedidoIdCol} = p.id INNER JOIN {$itensTable} i ON i.{$pedidoIdCol} = p.id INNER JOIN produtos pr ON pr.id = i.{$produtoIdCol} GROUP BY p.admin_criador_id, i.{$produtoIdCol}";
+
+            try {
+                $stItens = $db->prepare($sqlItensAgg);
+                $stItens->execute([
+                    ':inicio' => $inicio->format('Y-m-d H:i:s'),
+                    ':fim' => $fim->format('Y-m-d H:i:s'),
+                ]);
+                $itRows = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($itRows as $ir) {
+                    $vid = (int) ($ir['vendedor_id'] ?? 0);
+                    if ($vid <= 0) {
+                        continue;
+                    }
+                    if ($pesoCol) {
+                        $kgPorVendedor[$vid] = ($kgPorVendedor[$vid] ?? 0.0) + (float) ($ir['kg_sum'] ?? 0);
+                    }
+                    if ($custoCol) {
+                        $custoPorVendedor[$vid] = ($custoPorVendedor[$vid] ?? 0.0) + (float) ($ir['custo_sum'] ?? 0);
+                    }
+                    $qsum = (float) ($ir['qtd_sum'] ?? 0);
+                    $cur = $topProdutoPorVendedor[$vid] ?? null;
+                    if (!$cur || $qsum > (float) ($cur['qtd_sum'] ?? 0)) {
+                        $topProdutoPorVendedor[$vid] = [
+                            'produto_id' => (int) ($ir['produto_id'] ?? 0),
+                            'produto_nome' => (string) ($ir['produto_nome'] ?? ''),
+                            'qtd_sum' => $qsum,
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                $kgPorVendedor = [];
+                $topProdutoPorVendedor = [];
+                $custoPorVendedor = [];
+            }
+        }
+
+        $faixas = [];
+        $pedidoModel = null;
+        try {
+            $pedidoModel = new \App\Models\PedidoEcommerce();
+            $faixas = $pedidoModel->getFaixasComissaoManual();
+        } catch (\Exception $e) {
+            $pedidoModel = null;
+            $faixas = [];
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $vid = (int) ($r['vendedor_id'] ?? 0);
+            if ($vid <= 0) {
+                continue;
+            }
+            $faturado = (float) ($r['faturado_total'] ?? 0);
+            $custo = (float) ($custoPorVendedor[$vid] ?? 0);
+            $liquido = $faturado - $custo;
+            $percent = 0.0;
+            if ($pedidoModel) {
+                try {
+                    $percent = (float) $pedidoModel->calcularPercentualComissaoManual($faturado, $faixas);
+                } catch (\Exception $e) {
+                    $percent = 0.0;
+                }
+            }
+            $comissao = $liquido * ($percent / 100.0);
+
+            $out[$vid] = [
+                'vendedor_id' => $vid,
+                'vendedor_nome' => (string) (($mapVendedor[$vid]['nome'] ?? '') ?: ('#' . $vid)),
+                'pedidos_qtd' => (int) ($r['pedidos_qtd'] ?? 0),
+                'ticket_medio' => (float) ($r['ticket_medio'] ?? 0),
+                'faturado_total' => $faturado,
+                'custo_total' => $custo,
+                'liquido_total' => $liquido,
+                'percentual' => $percent,
+                'comissao_usd' => $comissao,
+                'kg_total' => (float) ($kgPorVendedor[$vid] ?? 0),
+                'top_produto_nome' => (string) (($topProdutoPorVendedor[$vid]['produto_nome'] ?? '') ?: ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    public function comissoesGerais(Request $request) {
+        $db = \Config\Database::getConnection();
+        $windows = $this->getWindowsForUi();
+
+        $janelaParam = (string) $request->getParam('janela', '');
+        $selected = $windows[0] ?? null;
+        foreach ($windows as $w) {
+            $key = $w['inicio']->format('Y-m-d') . '|' . $w['fim']->format('Y-m-d');
+            if ($janelaParam !== '' && $janelaParam === $key) {
+                $selected = $w;
+                break;
+            }
+        }
+        if (!$selected) {
+            $wFim = new \DateTime('today');
+            $wFim->setTime(23, 59, 59);
+            $wInicio = new \DateTime('today');
+            $wInicio->modify('-13 day');
+            $wInicio->setTime(0, 0, 0);
+            $selected = ['inicio' => $wInicio, 'fim' => $wFim];
+        }
+
+        $inicio = clone $selected['inicio'];
+        $inicio->setTime(0, 0, 0);
+        $fim = clone $selected['fim'];
+        $fim->setTime(23, 59, 59);
+
+        $kpis = [];
+        try {
+            $kpis = $this->getCommissionKpisForWindow($db, $inicio, $fim);
+        } catch (\Exception $e) {
+            $kpis = [];
+        }
+
+        $vendedorIds = array_keys($kpis);
+        $ajustesPorVendedor = [];
+        $pagosPorVendedor = [];
+        $pagamentosPorVendedor = [];
+
+        $janelaId = 0;
+        try {
+            $stJ = $db->prepare('SELECT id FROM comissao_janelas WHERE data_inicio = :di AND data_fim = :df LIMIT 1');
+            $stJ->execute([':di' => $inicio->format('Y-m-d H:i:s'), ':df' => $fim->format('Y-m-d H:i:s')]);
+            $janelaId = (int) ($stJ->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            $janelaId = 0;
+        }
+
+        if ($janelaId <= 0) {
+            try {
+                $stIns = $db->prepare('INSERT INTO comissao_janelas (data_inicio, data_fim, status, created_at) VALUES (:di, :df, :st, NOW())');
+                $stIns->execute([':di' => $inicio->format('Y-m-d H:i:s'), ':df' => $fim->format('Y-m-d H:i:s'), ':st' => 'aberta']);
+                $janelaId = (int) $db->lastInsertId();
+            } catch (\Exception $e) {
+                $janelaId = 0;
+            }
+        }
+
+        if ($janelaId > 0 && !empty($vendedorIds)) {
+            $in = implode(',', array_fill(0, count($vendedorIds), '?'));
+            try {
+                $stA = $db->prepare("SELECT vendedor_id, tipo, SUM(valor_usd) AS total FROM comissao_ajustes WHERE janela_id = ? AND vendedor_id IN ({$in}) GROUP BY vendedor_id, tipo");
+                $stA->execute(array_merge([$janelaId], $vendedorIds));
+                $ars = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($ars as $a) {
+                    $vid = (int) ($a['vendedor_id'] ?? 0);
+                    $tipo = (string) ($a['tipo'] ?? '');
+                    $val = (float) ($a['total'] ?? 0);
+                    if ($vid <= 0) continue;
+                    if (!isset($ajustesPorVendedor[$vid])) $ajustesPorVendedor[$vid] = 0.0;
+                    if (strtolower($tipo) === 'debito') {
+                        $ajustesPorVendedor[$vid] -= $val;
+                    } else {
+                        $ajustesPorVendedor[$vid] += $val;
+                    }
+                }
+            } catch (\Exception $e) {
+                $ajustesPorVendedor = [];
+            }
+
+            try {
+                $stP = $db->prepare("SELECT vendedor_id, SUM(valor_pago_usd) AS total_pago FROM comissao_pagamentos WHERE janela_id = ? AND deleted_at IS NULL AND status IN ('pendente','aprovado') AND vendedor_id IN ({$in}) GROUP BY vendedor_id");
+                $stP->execute(array_merge([$janelaId], $vendedorIds));
+                $prs = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($prs as $p) {
+                    $vid = (int) ($p['vendedor_id'] ?? 0);
+                    if ($vid <= 0) continue;
+                    $pagosPorVendedor[$vid] = (float) ($p['total_pago'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $pagosPorVendedor = [];
+            }
+
+            try {
+                $stPH = $db->prepare("SELECT * FROM comissao_pagamentos WHERE janela_id = ? AND deleted_at IS NULL AND vendedor_id IN ({$in}) ORDER BY id DESC");
+                $stPH->execute(array_merge([$janelaId], $vendedorIds));
+                $ph = $stPH->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($ph as $p) {
+                    $vid = (int) ($p['vendedor_id'] ?? 0);
+                    if ($vid <= 0) continue;
+                    if (!isset($pagamentosPorVendedor[$vid])) $pagamentosPorVendedor[$vid] = [];
+                    $pagamentosPorVendedor[$vid][] = $p;
+                }
+            } catch (\Exception $e) {
+                $pagamentosPorVendedor = [];
+            }
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comissões gerais - Braziliana Shop Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('pagamentos');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div>
+                    <h1 class="h2 mb-0">Comissões gerais</h1>
+                    <div class="text-muted small">Janela por data de pagamento</div>
+                </div>
+                <div>
+                    <a class="btn btn-secondary" href="/admin/pagamentos"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+                </div>
+            </div>';
+
+        echo '<form method="GET" class="row g-3 align-items-end mb-4">
+            <div class="col-md-6">
+                <label class="form-label">Janela</label>
+                <select class="form-select" name="janela">';
+
+        foreach ($windows as $w) {
+            $key = $w['inicio']->format('Y-m-d') . '|' . $w['fim']->format('Y-m-d');
+            $label = $w['inicio']->format('d/m/Y') . ' - ' . $w['fim']->format('d/m/Y');
+            $sel = ($selected && $key === ($selected['inicio']->format('Y-m-d') . '|' . $selected['fim']->format('Y-m-d'))) ? 'selected' : '';
+            echo '<option value="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" ' . $sel . '>' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+
+        echo '</select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-filter me-1"></i>Aplicar</button>
+            </div>
+        </form>';
+
+        if (empty($kpis)) {
+            echo '<div class="alert alert-warning">Nenhum dado encontrado para esta janela.</div>';
+        } else {
+            echo '<div class="table-responsive">
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th>Vendedor</th>
+                            <th>Pedidos</th>
+                            <th>Ticket médio</th>
+                            <th>Top produto</th>
+                            <th>Total kg</th>
+                            <th>Comissão (USD)</th>
+                            <th>Ajustes (USD)</th>
+                            <th>Total (USD)</th>
+                            <th>Pago (USD)</th>
+                            <th>Saldo (USD)</th>
+                            <th style="width: 280px">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+
+            foreach ($kpis as $vid => $r) {
+                $aj = (float) ($ajustesPorVendedor[$vid] ?? 0);
+                $calc = (float) ($r['comissao_usd'] ?? 0);
+                $total = $calc + $aj;
+                $pago = (float) ($pagosPorVendedor[$vid] ?? 0);
+                $saldo = $total - $pago;
+
+                echo '<tr>
+                    <td><strong>' . htmlspecialchars((string) ($r['vendedor_nome'] ?? ('#' . $vid)), ENT_QUOTES, 'UTF-8') . '</strong><div class="text-muted small">#' . (int) $vid . '</div></td>
+                    <td>' . (int) ($r['pedidos_qtd'] ?? 0) . '</td>
+                    <td>$ ' . number_format((float) ($r['ticket_medio'] ?? 0), 2, '.', ',') . '</td>
+                    <td>' . htmlspecialchars((string) ($r['top_produto_nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>
+                    <td>' . number_format((float) ($r['kg_total'] ?? 0), 2, '.', ',') . '</td>
+                    <td><strong>$ ' . number_format($calc, 2, '.', ',') . '</strong></td>
+                    <td>$ ' . number_format($aj, 2, '.', ',') . '</td>
+                    <td><strong>$ ' . number_format($total, 2, '.', ',') . '</strong></td>
+                    <td>$ ' . number_format($pago, 2, '.', ',') . '</td>
+                    <td><strong>$ ' . number_format($saldo, 2, '.', ',') . '</strong></td>
+                    <td>
+                        <form method="POST" action="/admin/pagamentos/comissoes-gerais/ajuste" class="d-flex flex-wrap gap-2 mb-2">
+                            <input type="hidden" name="janela_id" value="' . (int) $janelaId . '">
+                            <input type="hidden" name="vendedor_id" value="' . (int) $vid . '">
+                            <select class="form-select form-select-sm" name="tipo" style="width: 110px">
+                                <option value="credito">Crédito</option>
+                                <option value="debito">Débito</option>
+                            </select>
+                            <input class="form-control form-control-sm" name="valor_usd" placeholder="Valor USD" style="width: 110px">
+                            <input class="form-control form-control-sm" name="motivo" placeholder="Motivo" style="width: 160px">
+                            <button class="btn btn-sm btn-outline-primary" type="submit">Ajustar</button>
+                        </form>
+
+                        <form method="POST" action="/admin/pagamentos/comissoes-gerais/pagamento" class="d-flex flex-wrap gap-2">
+                            <input type="hidden" name="janela_id" value="' . (int) $janelaId . '">
+                            <input type="hidden" name="vendedor_id" value="' . (int) $vid . '">
+                            <input class="form-control form-control-sm" name="valor_pago_usd" placeholder="Pagar USD" style="width: 110px">
+                            <input class="form-control form-control-sm" name="metodo" placeholder="Método" style="width: 110px">
+                            <button class="btn btn-sm btn-success" type="submit">Registrar</button>
+                        </form>
+                    </td>
+                </tr>';
+
+                $hist = $pagamentosPorVendedor[$vid] ?? [];
+                if (!empty($hist)) {
+                    echo '<tr class="table-light"><td colspan="11">';
+                    foreach ($hist as $p) {
+                        $pid = (int) ($p['id'] ?? 0);
+                        $st = (string) ($p['status'] ?? '');
+                        $valPago = (float) ($p['valor_pago_usd'] ?? 0);
+                        echo '<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                            <div>
+                                <strong>Pagamento #' . $pid . '</strong>
+                                <span class="badge bg-' . ($st === 'aprovado' ? 'success' : ($st === 'cancelado' ? 'secondary' : 'warning')) . ' ms-2">' . htmlspecialchars($st, ENT_QUOTES, 'UTF-8') . '</span>
+                                <div class="text-muted small">$ ' . number_format($valPago, 2, '.', ',') . ' | ' . htmlspecialchars((string) ($p['metodo'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <form method="POST" action="/admin/pagamentos/comissoes-gerais/aprovar/' . $pid . '">
+                                    <button class="btn btn-sm btn-outline-success" type="submit">Aprovar</button>
+                                </form>
+                                <form method="POST" action="/admin/pagamentos/comissoes-gerais/deletar/' . $pid . '">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Deletar</button>
+                                </form>
+                            </div>
+                        </div>';
+                    }
+                    echo '</td></tr>';
+                }
+            }
+
+            echo '</tbody></table></div>';
+        }
+
+        echo '</main>
+        </div>
+    </div>';
+
+        renderAdminScripts();
+
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function criarAjusteComissaoGeral(Request $request) {
+        $db = \Config\Database::getConnection();
+        $janelaId = (int) $request->getParam('janela_id', 0);
+        $vendedorId = (int) $request->getParam('vendedor_id', 0);
+        $tipo = strtolower(trim((string) $request->getParam('tipo', 'credito')));
+        $valorUsd = (float) $request->getParam('valor_usd', 0);
+        $motivo = (string) $request->getParam('motivo', '');
+
+        if ($janelaId <= 0 || $vendedorId <= 0 || $valorUsd <= 0) {
+            header('Location: /admin/pagamentos/comissoes-gerais');
+            exit;
+        }
+
+        if ($tipo !== 'debito') {
+            $tipo = 'credito';
+        }
+
+        try {
+            $stmt = $db->prepare('INSERT INTO comissao_ajustes (janela_id, vendedor_id, tipo, valor_usd, motivo, criado_por, created_at) VALUES (:j, :v, :t, :val, :m, :cp, NOW())');
+            $stmt->execute([
+                ':j' => $janelaId,
+                ':v' => $vendedorId,
+                ':t' => $tipo,
+                ':val' => $valorUsd,
+                ':m' => $motivo,
+                ':cp' => $this->getAdminUserId() ?: null,
+            ]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/pagamentos/comissoes-gerais');
+        exit;
+    }
+
+    public function criarPagamentoComissaoGeral(Request $request) {
+        $db = \Config\Database::getConnection();
+        $janelaId = (int) $request->getParam('janela_id', 0);
+        $vendedorId = (int) $request->getParam('vendedor_id', 0);
+        $valorPago = (float) $request->getParam('valor_pago_usd', 0);
+        $metodo = (string) $request->getParam('metodo', '');
+
+        if ($janelaId <= 0 || $vendedorId <= 0 || $valorPago <= 0) {
+            header('Location: /admin/pagamentos/comissoes-gerais');
+            exit;
+        }
+
+        $janela = null;
+        try {
+            $st = $db->prepare('SELECT * FROM comissao_janelas WHERE id = :id LIMIT 1');
+            $st->execute([':id' => $janelaId]);
+            $janela = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $janela = null;
+        }
+
+        $valorCalculado = 0.0;
+        $valorAjustes = 0.0;
+        $valorJaPago = 0.0;
+        $saldoDisponivel = 0.0;
+
+        if ($janela) {
+            try {
+                $inicio = new \DateTime((string) ($janela['data_inicio'] ?? ''));
+                $fim = new \DateTime((string) ($janela['data_fim'] ?? ''));
+                $inicio->setTime(0, 0, 0);
+                $fim->setTime(23, 59, 59);
+                $kpis = $this->getCommissionKpisForWindow($db, $inicio, $fim);
+                if (isset($kpis[$vendedorId])) {
+                    $valorCalculado = (float) ($kpis[$vendedorId]['comissao_usd'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                $valorCalculado = 0.0;
+            }
+
+            try {
+                $stA = $db->prepare('SELECT tipo, SUM(valor_usd) AS total FROM comissao_ajustes WHERE janela_id = :j AND vendedor_id = :v GROUP BY tipo');
+                $stA->execute([':j' => $janelaId, ':v' => $vendedorId]);
+                $ars = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($ars as $a) {
+                    $t = strtolower((string) ($a['tipo'] ?? ''));
+                    $val = (float) ($a['total'] ?? 0);
+                    if ($t === 'debito') {
+                        $valorAjustes -= $val;
+                    } else {
+                        $valorAjustes += $val;
+                    }
+                }
+            } catch (\Exception $e) {
+                $valorAjustes = 0.0;
+            }
+
+            try {
+                $stP = $db->prepare("SELECT COALESCE(SUM(valor_pago_usd),0) AS total_pago FROM comissao_pagamentos WHERE janela_id = :j AND vendedor_id = :v AND deleted_at IS NULL AND status IN ('pendente','aprovado')");
+                $stP->execute([':j' => $janelaId, ':v' => $vendedorId]);
+                $valorJaPago = (float) ($stP->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+                $valorJaPago = 0.0;
+            }
+        }
+
+        $valorTotal = $valorCalculado + $valorAjustes;
+
+        $saldoDisponivel = $valorTotal - $valorJaPago;
+        if ($saldoDisponivel < 0) {
+            $saldoDisponivel = 0.0;
+        }
+
+        if ($valorPago > $saldoDisponivel) {
+            $valorPago = $saldoDisponivel;
+        }
+
+        if ($valorPago <= 0) {
+            header('Location: /admin/pagamentos/comissoes-gerais');
+            exit;
+        }
+
+        try {
+            $db->beginTransaction();
+
+            $stmt = $db->prepare('INSERT INTO comissao_pagamentos (janela_id, vendedor_id, valor_calculado_usd, valor_ajustes_usd, valor_total_usd, valor_pago_usd, metodo, status, created_at) VALUES (:j, :v, :vc, :va, :vt, :vp, :m, :st, NOW())');
+            $stmt->execute([
+                ':j' => $janelaId,
+                ':v' => $vendedorId,
+                ':vc' => $valorCalculado,
+                ':va' => $valorAjustes,
+                ':vt' => $valorTotal,
+                ':vp' => $valorPago,
+                ':m' => $metodo,
+                ':st' => 'pendente',
+            ]);
+
+            $pagamentoId = (int) $db->lastInsertId();
+
+            if ($pagamentoId > 0 && $janela) {
+                $inicio = new \DateTime((string) ($janela['data_inicio'] ?? ''));
+                $fim = new \DateTime((string) ($janela['data_fim'] ?? ''));
+                $inicio->setTime(0, 0, 0);
+                $fim->setTime(23, 59, 59);
+
+                $pedidosCom = $this->getPedidosComissaoForWindowAndVendedor($db, $vendedorId, $inicio, $fim);
+
+                $pedidoIds = array_values(array_filter(array_map(fn($p) => (int) ($p['pedido_id'] ?? 0), $pedidosCom), fn($v) => $v > 0));
+                $jaPagoPorPedido = [];
+                if (!empty($pedidoIds)) {
+                    $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                    $sqlJa = "SELECT cpp.pedido_id, COALESCE(SUM(cpp.valor_comissao_usd),0) AS total_pago\n                            FROM comissao_pagamento_pedidos cpp\n                            INNER JOIN comissao_pagamentos cp ON cp.id = cpp.pagamento_id\n                            WHERE cp.janela_id = ? AND cp.vendedor_id = ? AND cp.deleted_at IS NULL AND cp.status IN ('pendente','aprovado') AND cpp.pedido_id IN ({$in})\n                            GROUP BY cpp.pedido_id";
+                    $stJa = $db->prepare($sqlJa);
+                    $stJa->execute(array_merge([$janelaId, $vendedorId], $pedidoIds));
+                    $rowsJa = $stJa->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsJa as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        $jaPagoPorPedido[$pid] = (float) ($r['total_pago'] ?? 0);
+                    }
+                }
+
+                $restante = $valorPago;
+                foreach ($pedidosCom as $p) {
+                    if ($restante <= 0) {
+                        break;
+                    }
+                    $pid = (int) ($p['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $comissaoPedido = (float) ($p['comissao_usd'] ?? 0);
+                    if ($comissaoPedido <= 0) continue;
+
+                    $ja = (float) ($jaPagoPorPedido[$pid] ?? 0);
+                    $disponivelPedido = $comissaoPedido - $ja;
+                    if ($disponivelPedido <= 0) {
+                        continue;
+                    }
+
+                    $alocar = ($restante < $disponivelPedido) ? $restante : $disponivelPedido;
+                    if ($alocar <= 0) continue;
+
+                    $stIns = $db->prepare('INSERT INTO comissao_pagamento_pedidos (pagamento_id, pedido_id, valor_comissao_usd, created_at) VALUES (:pg, :pid, :val, NOW())');
+                    $stIns->execute([':pg' => $pagamentoId, ':pid' => $pid, ':val' => $alocar]);
+                    $restante -= $alocar;
+                }
+            }
+
+            $db->commit();
+        } catch (\Exception $e) {
+            try {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+        }
+
+        header('Location: /admin/pagamentos/comissoes-gerais');
+        exit;
+    }
+
+    public function aprovarPagamentoComissaoGeral(Request $request) {
+        $db = \Config\Database::getConnection();
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) {
+            header('Location: /admin/pagamentos/comissoes-gerais');
+            exit;
+        }
+
+        try {
+            $stmt = $db->prepare("UPDATE comissao_pagamentos SET status = 'aprovado', aprovado_por = :ap, aprovado_em = NOW() WHERE id = :id AND deleted_at IS NULL");
+            $stmt->execute([
+                ':ap' => $this->getAdminUserId() ?: null,
+                ':id' => $id,
+            ]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/pagamentos/comissoes-gerais');
+        exit;
+    }
+
+    public function deletarPagamentoComissaoGeral(Request $request) {
+        $db = \Config\Database::getConnection();
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) {
+            header('Location: /admin/pagamentos/comissoes-gerais');
+            exit;
+        }
+
+        try {
+            $stmt = $db->prepare("UPDATE comissao_pagamentos SET status = 'cancelado', deleted_at = NOW() WHERE id = :id AND deleted_at IS NULL");
+            $stmt->execute([':id' => $id]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/pagamentos/comissoes-gerais');
         exit;
     }
 }
