@@ -299,6 +299,14 @@ class AdminRelatoriosController extends Controller {
             'lucro_brl' => 0.0,
         ];
 
+        $qtdPedidos = 0;
+        $qtdPedidosUsd = 0;
+        $qtdPedidosBrl = 0;
+        $totalOrigUsd = 0.0;
+        $totalOrigBrl = 0.0;
+        $impostosOrigUsd = 0.0;
+        $impostosOrigBrl = 0.0;
+
         foreach ($rows as $p) {
             $pedidoId = (int) ($p['id'] ?? 0);
             if ($pedidoId <= 0) continue;
@@ -310,6 +318,17 @@ class AdminRelatoriosController extends Controller {
 
             $totalOrig = (float) ($colTotal ? ($p[$colTotal] ?? 0) : 0);
             $impostosOrig = (float) ($colImpostos ? ($p[$colImpostos] ?? 0) : 0);
+
+            $qtdPedidos++;
+            if ($m === 'USD') {
+                $qtdPedidosUsd++;
+                $totalOrigUsd += $totalOrig;
+                $impostosOrigUsd += $impostosOrig;
+            } else {
+                $qtdPedidosBrl++;
+                $totalOrigBrl += $totalOrig;
+                $impostosOrigBrl += $impostosOrig;
+            }
 
             $totalUsd = ($m === 'USD') ? $totalOrig : ($totalOrig / $taxa);
             $impostosUsd = ($m === 'USD') ? $impostosOrig : ($impostosOrig / $taxa);
@@ -413,23 +432,47 @@ class AdminRelatoriosController extends Controller {
             . '</div></div>';
 
         echo '<div class="row g-3 mb-3">'
+            . '<div class="col-md-3"><div class="card"><div class="card-body">'
+            . '<div class="text-muted small">Quantidade de vendas</div>'
+            . '<div class="h4 mb-0">' . number_format($qtdPedidos) . '</div>'
+            . '<div class="small text-muted">USD: ' . number_format($qtdPedidosUsd) . ' | BRL: ' . number_format($qtdPedidosBrl) . '</div>'
+            . '</div></div></div>'
+
+            . '<div class="col-md-3"><div class="card"><div class="card-body">'
+            . '<div class="text-muted small">Total arrecadado (origem)</div>'
+            . '<div class="h6 mb-0">US$ ' . number_format($totalOrigUsd, 2, '.', ',') . '</div>'
+            . '<div class="h6 mb-0">R$ ' . number_format($totalOrigBrl, 2, ',', '.') . '</div>'
+            . '</div></div></div>'
+
+            . '<div class="col-md-3"><div class="card"><div class="card-body">'
+            . '<div class="text-muted small">Impostos arrecadados (origem)</div>'
+            . '<div class="h6 mb-0">US$ ' . number_format($impostosOrigUsd, 2, '.', ',') . '</div>'
+            . '<div class="h6 mb-0">R$ ' . number_format($impostosOrigBrl, 2, ',', '.') . '</div>'
+            . '</div></div></div>'
+
+            . '<div class="col-md-3"><div class="card"><div class="card-body">'
+            . '<div class="text-muted small">Lucro (consolidado)</div>'
+            . '<div class="h6 mb-0">US$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</div>'
+            . '<div class="h6 mb-0">R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</div>'
+            . '</div></div></div>'
+            . '</div>';
+
+        echo '<div class="row g-3 mb-3">'
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
-            . '<div class="fw-bold mb-2">Totais (USD)</div>'
+            . '<div class="fw-bold mb-2">Consolidado (USD)</div>'
             . '<div>Total arrecadado: <strong>$ ' . number_format($totais['total_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Impostos (pass-through): <strong>$ ' . number_format($totais['impostos_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Custo envio fixo: <strong>$ ' . number_format($totais['envio_fixo_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Custo produtos: <strong>$ ' . number_format($totais['custo_produtos_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Comissão: <strong>$ ' . number_format($totais['comissao_usd'], 2, '.', ',') . '</strong></div>'
-            . '<div class="mt-2">Lucro: <strong>$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</strong></div>'
             . '</div></div></div>'
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
-            . '<div class="fw-bold mb-2">Totais (BRL)</div>'
+            . '<div class="fw-bold mb-2">Consolidado (BRL)</div>'
             . '<div>Total arrecadado: <strong>R$ ' . number_format($totais['total_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Impostos (pass-through): <strong>R$ ' . number_format($totais['impostos_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Custo envio fixo: <strong>R$ ' . number_format($totais['envio_fixo_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Custo produtos: <strong>R$ ' . number_format($totais['custo_produtos_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Comissão: <strong>R$ ' . number_format($totais['comissao_brl'], 2, ',', '.') . '</strong></div>'
-            . '<div class="mt-2">Lucro: <strong>R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</strong></div>'
             . '</div></div></div>'
             . '</div>';
 
@@ -804,6 +847,9 @@ class AdminRelatoriosController extends Controller {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2"><i class="fas fa-file-pdf me-2"></i>Relatórios e Análises</h1>
                     <div>
+                        <a class="btn btn-primary me-2" href="/admin/estoque/relatorios/financeiro">
+                            <i class="fas fa-chart-line me-1"></i>Financeiro (Completo)
+                        </a>
                         <button type="button" class="btn btn-danger me-2" onclick="gerarPDFCompleto()">
                             <i class="fas fa-file-pdf me-1"></i>Relatório Completo
                         </button>
