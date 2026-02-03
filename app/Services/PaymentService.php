@@ -27,6 +27,31 @@ class PaymentService {
         $this->loadConfigurations();
     }
 
+    private function isDebugEnabled(): bool {
+        $v = '';
+        if (isset($_ENV['APP_DEBUG'])) {
+            $v = (string) $_ENV['APP_DEBUG'];
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $v = (string) $_SERVER['APP_DEBUG'];
+        }
+        $v = strtolower(trim($v));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function appmaxLog(string $tag, $data): void {
+        if (!$this->isDebugEnabled()) {
+            return;
+        }
+        try {
+            $msg = is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE);
+            if (is_string($msg) && strlen($msg) > 4000) {
+                $msg = substr($msg, 0, 4000) . '...';
+            }
+            error_log('[APPMAX]' . $tag . ' ' . (string) $msg);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function isAppmaxEnabled(): bool {
         $v = strtolower(trim((string) $this->appmaxEnabled));
         return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
@@ -65,6 +90,12 @@ class PaymentService {
         if (!array_key_exists('access-token', $payloadArr)) {
             $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
+
+        $logBody = $payloadArr;
+        if (is_array($logBody) && array_key_exists('access-token', $logBody)) {
+            $logBody['access-token'] = '***';
+        }
+        $this->appmaxLog('[' . strtoupper($method) . ' ' . $path . '][REQ]', $logBody);
         $payload = json_encode($payloadArr);
 
         if (function_exists('curl_init')) {
@@ -85,6 +116,7 @@ class PaymentService {
             }
 
             $decoded = json_decode((string) $respBody, true);
+            $this->appmaxLog('[' . strtoupper($method) . ' ' . $path . '][RESP][' . $httpCode . ']', $decoded);
             if ($httpCode < 200 || $httpCode >= 300) {
                 $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
                 throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
@@ -103,6 +135,7 @@ class PaymentService {
         ]);
         $respBody = @file_get_contents($url, false, $context);
         $decoded = json_decode((string) $respBody, true);
+        $this->appmaxLog('[' . strtoupper($method) . ' ' . $path . '][RESP]', $decoded);
         return is_array($decoded) ? $decoded : [];
     }
 

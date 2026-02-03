@@ -403,38 +403,72 @@ class CheckoutController extends Controller {
             $taxaConversao = 1.0;
         }
 
-        // Recarregar pedido completo (quando possível) para ter base consistente de total/frete/serviços/impostos
-        $pedidoFull = [];
-        try {
-            $dbP = \Config\Database::getConnection();
-            $stCols = $dbP->query('DESCRIBE pedidos');
-            $colsPed = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
-            if (is_array($colsPed) && !empty($colsPed)) {
-                $select = ['id'];
-                foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'frete', 'valor_frete', 'desconto', 'total', 'valor_total', 'taxa_conversao', 'moeda', 'currency'] as $c) {
-                    if (in_array($c, $colsPed, true)) {
-                        $select[] = $c;
+        // Para BRL, preferir valores normalizados (já em BRL) vindos do model (evita cobrar USD quando moeda=BRL)
+        $pedidoNorm = [];
+        $usingNorm = false;
+        if (strtoupper(trim((string) $moeda)) === 'BRL') {
+            try {
+                $pedidoNorm = $this->pedidoModel->getComDetalhes((int) $pedidoId);
+                if (is_array($pedidoNorm) && !empty($pedidoNorm)) {
+                    if (strtoupper(trim((string) ($pedidoNorm['moeda'] ?? 'BRL'))) === 'BRL') {
+                        $vNorm = (float) ($pedidoNorm['total'] ?? 0);
+                        if ($vNorm > 0) {
+                            $valor = $vNorm;
+                            $usingNorm = true;
+                        }
+                        $txNorm = (float) ($pedidoNorm['taxa_conversao'] ?? 0);
+                        if ($txNorm > 1.01) {
+                            $taxaConversao = $txNorm;
+                        }
                     }
                 }
-                $stP = $dbP->prepare('SELECT ' . implode(', ', array_unique($select)) . ' FROM pedidos WHERE id = ? LIMIT 1');
-                $stP->execute([$pedidoId]);
-                $pedidoFull = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $pedidoNorm = [];
+                $usingNorm = false;
             }
-        } catch (\Exception $e) {
-            $pedidoFull = [];
         }
 
-        // Preferir moeda do pedido completo se existir
-        if (!empty($pedidoFull)) {
-            $moeda = (string) ($pedidoFull['moeda'] ?? ($pedidoFull['currency'] ?? $moeda));
-            if (isset($pedidoFull['taxa_conversao']) && (float) $pedidoFull['taxa_conversao'] > 0) {
-                $taxaConversao = (float) $pedidoFull['taxa_conversao'];
+        // Se já temos valores normalizados, não usar heurísticas nem recarregar colunas do pedido
+        $pedidoFull = [];
+        if (!$usingNorm) {
+            // Recarregar pedido completo (quando possível) para ter base consistente de total/frete/serviços/impostos
+            try {
+                $dbP = \Config\Database::getConnection();
+                $stCols = $dbP->query('DESCRIBE pedidos');
+                $colsPed = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (is_array($colsPed) && !empty($colsPed)) {
+                    $select = ['id'];
+                    foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'frete', 'valor_frete', 'desconto', 'total', 'valor_total', 'taxa_conversao', 'moeda', 'currency'] as $c) {
+                        if (in_array($c, $colsPed, true)) {
+                            $select[] = $c;
+                        }
+                    }
+                    $stP = $dbP->prepare('SELECT ' . implode(', ', array_unique($select)) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                    $stP->execute([$pedidoId]);
+                    $pedidoFull = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+                }
+            } catch (\Exception $e) {
+                $pedidoFull = [];
+            }
+
+            // Preferir moeda do pedido completo se existir
+            if (!empty($pedidoFull)) {
+                $moeda = (string) ($pedidoFull['moeda'] ?? ($pedidoFull['currency'] ?? $moeda));
+                if (isset($pedidoFull['taxa_conversao']) && (float) $pedidoFull['taxa_conversao'] > 0) {
+                    $taxaConversao = (float) $pedidoFull['taxa_conversao'];
+                }
             }
         }
 
         // Se o pedido está como BRL mas o total parece estar em USD, converter antes de cobrar
         $deveConverterParaBRL = false;
+        if ($usingNorm) {
+            $deveConverterParaBRL = false;
+        }
         if (strtoupper(trim((string) $moeda)) === 'BRL') {
+            if ($usingNorm) {
+                // já normalizado em BRL via model
+            } else {
             if ($taxaConversao <= 1.01) {
                 try {
                     $dbTx = \Config\Database::getConnection();
@@ -463,6 +497,17 @@ class CheckoutController extends Controller {
                 }
             }
 
+            // Se os valores do pedido no banco estão em USD mas a moeda é BRL, converter com taxa_conversao
+            if ($taxaConversao > 1.01) {
+                if ($sumCols !== null && $sumCols > 0 && $sumCols <= 2000) {
+                    $sumCols = $sumCols * $taxaConversao;
+                    $deveConverterParaBRL = true;
+                }
+                if ($valor > 0 && $valor <= 2000) {
+                    $deveConverterParaBRL = true;
+                }
+            }
+
             // Se a soma já está em BRL (ex: 754.65) ela deve ser o valor da cobrança
             if ($sumCols !== null && $sumCols > 0) {
                 // Se o total salvo é muito menor (ex: 129), usar a soma
@@ -477,6 +522,7 @@ class CheckoutController extends Controller {
                 if ($sumCols === null) {
                     $deveConverterParaBRL = true;
                 }
+            }
             }
         }
 
@@ -513,6 +559,38 @@ class CheckoutController extends Controller {
                 $shippingValueCents = 0;
                 $discountValueCents = 0;
 
+                // Preferir itens/frete normalizados do PedidoEcommerce (já em BRL)
+                if (is_array($pedidoNorm) && !empty($pedidoNorm)) {
+                    $freteNorm = (float) ($pedidoNorm['frete'] ?? 0);
+                    $shippingValueCents = (int) round($freteNorm * 100);
+
+                    $itemsNorm = (array) ($pedidoNorm['items'] ?? []);
+                    foreach ($itemsNorm as $it) {
+                        if (!is_array($it)) continue;
+                        $qtd = (int) ($it['quantidade'] ?? 1);
+                        if ($qtd <= 0) $qtd = 1;
+
+                        $preco = (float) ($it['preco_unitario'] ?? 0);
+                        $unitValueCents = (int) round($preco * 100);
+                        if ($unitValueCents <= 0) continue;
+                        $productsValueCents += ($unitValueCents * $qtd);
+
+                        $sku = (string) ($it['sku'] ?? ($it['nome_produto_sku'] ?? ($it['referencia'] ?? '')));
+                        if ($sku === '') {
+                            $pid = (int) ($it['produto_id'] ?? 0);
+                            $sku = $pid > 0 ? ('PROD_' . $pid) : ('ITEM_' . uniqid());
+                        }
+                        $name = (string) ($it['nome'] ?? ($it['nome_produto'] ?? 'Item do Pedido'));
+                        $products[] = [
+                            'sku' => $sku,
+                            'name' => $name,
+                            'quantity' => $qtd,
+                            'unit_value' => $unitValueCents,
+                            'type' => 'physical',
+                        ];
+                    }
+                }
+
                 // Frete do pedido (se existir coluna)
                 try {
                     $stmtColsP = $db->query('DESCRIBE pedidos');
@@ -532,13 +610,19 @@ class CheckoutController extends Controller {
                         if ($deveConverterParaBRL) {
                             $freteValor = $freteValor * $taxaConversao;
                         }
-                        $shippingValueCents = (int) round($freteValor * 100);
+                        if ($shippingValueCents <= 0) {
+                            $shippingValueCents = (int) round($freteValor * 100);
+                        }
                     }
                 } catch (\Exception $e) {
                 }
 
                 // Itens do pedido (tolerante a schema)
                 try {
+                    if (!empty($products)) {
+                        // já carregado via PedidoEcommerce
+                        throw new \Exception('skip');
+                    }
                     $itensTable = $this->pickPedidoItensTable($db, $pedidoId);
                     $stmtColsI = $db->query('DESCRIBE ' . $itensTable);
                     $colsI = $stmtColsI->fetchAll(\PDO::FETCH_COLUMN);
