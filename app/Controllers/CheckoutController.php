@@ -2442,21 +2442,18 @@ class CheckoutController extends Controller {
             $taxaConversao = 1.0;
             if ($moedaSelecionada === 'BRL') {
                 try {
-                    $stTx = $db->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                    $stTx->execute();
-                    $rowTx = $stTx->fetch(\PDO::FETCH_ASSOC);
-                    $tx = (float) ($rowTx['taxa_conversao'] ?? 0);
-                    if ($tx > 1.01) {
-                        $taxaConversao = $tx;
+                    $r = (float) $this->carrinhoModel->getTaxaConversao('BRL');
+                    if ($r > 1.01) {
+                        $taxaConversao = $r;
                     }
                 } catch (\Exception $e) {
                 }
             }
 
-            // Calcular em USD
-            $taxaServicoUsd = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-            $impostosUsd = $subtotal * 0.80;
+            // Calcular em USD (mesma regra do carrinho/checkout)
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+            $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+            $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {

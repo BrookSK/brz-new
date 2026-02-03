@@ -648,13 +648,8 @@ class PedidoEcommerce {
                 }
             }
 
-            // Se não há coluna BRL, decidir conversão por heurística
-            if ($moeda === 'BRL' && $taxaConversao > 1.01 && !$deveConverterUSDParaBRL) {
-                // Heurística: totals "baixos" + taxa>1 normalmente indicam USD salvo com moeda BRL
-                if ($valorTotal > 0 && $valorTotal <= 2000 && $subtotalProdutos <= 2000) {
-                    $deveConverterUSDParaBRL = true;
-                }
-            }
+            // Não aplicar heurística de conversão automática.
+            // A conversão USD->BRL só deve ocorrer quando houver indicação explícita (ex.: moeda_original=USD).
 
             if ($moeda === 'BRL' && $taxaConversao > 1.01) {
                 // Preferência: valores explicitamente em BRL quando existirem
