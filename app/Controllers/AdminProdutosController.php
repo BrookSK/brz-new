@@ -384,6 +384,15 @@ HTML;
                 throw new \Exception('Tabela produto_variacao_fotos não encontrada');
             }
 
+            $hasLegenda = false;
+            try {
+                $stCol = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_fotos' AND column_name = 'legenda'");
+                $stCol->execute();
+                $hasLegenda = ((int) $stCol->fetchColumn()) > 0;
+            } catch (\Throwable $e) {
+                $hasLegenda = false;
+            }
+
             $inserted = [];
             if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
                 $uploadDir = $this->getProdutoUploadsDir();
@@ -413,8 +422,13 @@ HTML;
                         continue;
                     }
 
-                    $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem) VALUES (?, ?, ?, ?, ?)');
-                    $stmt->execute([$varId, $webPath, $name, null, $ordBase + (int) $key]);
+                    if ($hasLegenda) {
+                        $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem) VALUES (?, ?, ?, ?, ?)');
+                        $stmt->execute([$varId, $webPath, $name, null, $ordBase + (int) $key]);
+                    } else {
+                        $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, ordem) VALUES (?, ?, ?, ?)');
+                        $stmt->execute([$varId, $webPath, $name, $ordBase + (int) $key]);
+                    }
                     $insertId = (int) $pdo->lastInsertId();
                     $inserted[] = ['id' => $insertId, 'url' => Url::absolute($webPath)];
                 }
