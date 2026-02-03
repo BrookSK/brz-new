@@ -223,9 +223,34 @@ class PaymentService {
         ];
 
         $created = $this->appmaxRequest('POST', 'order', $payload);
-        $orderId = (int) ($created['data']['order_id'] ?? ($created['order_id'] ?? 0));
+        $orderId = 0;
+        if (isset($created['data']['order_id'])) {
+            $orderId = (int) $created['data']['order_id'];
+        } elseif (isset($created['order_id'])) {
+            $orderId = (int) $created['order_id'];
+        } elseif (isset($created['data']['id'])) {
+            $orderId = (int) $created['data']['id'];
+        } elseif (isset($created['data']['order']['id'])) {
+            $orderId = (int) $created['data']['order']['id'];
+        }
         if ($orderId <= 0) {
-            throw new \Exception('AppMax: order_id não retornado');
+            $msg = '';
+            foreach (['message', 'mensagem', 'error', 'erro'] as $k) {
+                if (!empty($created[$k]) && is_string($created[$k])) {
+                    $msg = $created[$k];
+                    break;
+                }
+            }
+            if ($msg === '' && !empty($created['data']['message']) && is_string($created['data']['message'])) {
+                $msg = (string) $created['data']['message'];
+            }
+            $details = '';
+            try {
+                $details = json_encode($created, JSON_UNESCAPED_UNICODE);
+            } catch (\Exception $e) {
+                $details = '';
+            }
+            throw new \Exception('AppMax: order_id não retornado' . ($msg !== '' ? (' - ' . $msg) : '') . ($details !== '' ? (' | response=' . $details) : ''));
         }
         return $orderId;
     }
