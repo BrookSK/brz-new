@@ -117,7 +117,7 @@ class PaymentService {
         $nome = trim((string) ($dados['customer_name'] ?? ''));
         $email = trim((string) ($dados['customer_email'] ?? ''));
         $phone = preg_replace('/\D+/', '', (string) ($dados['customer_phone'] ?? ''));
-        $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
+        // Documento não é obrigatório para criar/atualizar o cliente (lead)
 
         $firstName = $nome;
         $lastName = '';
@@ -307,8 +307,20 @@ class PaymentService {
         ];
 
         $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
+        if ($doc === '' && isset($dados['documento'])) {
+            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        }
+        if ($doc === '' && isset($dados['document_number'])) {
+            $doc = preg_replace('/\D+/', '', (string) ($dados['document_number'] ?? ''));
+        }
+
+        if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) {
+            throw new \Exception('AppMax: documento (CPF/CNPJ) inválido para pagamento');
+        }
 
         if ($forma === 'PIX') {
+            // A doc permite expiration_date; alguns ambientes retornam erro genérico quando não informado.
+            $exp = date('Y-m-d H:i:s', time() + (60 * 60 * 24));
             $pixResp = $this->appmaxRequest('POST', 'payment/pix', [
                 'cart' => [
                     'order_id' => $orderId,
@@ -319,6 +331,7 @@ class PaymentService {
                 'payment' => [
                     'pix' => [
                         'document_number' => $doc,
+                        'expiration_date' => $exp,
                     ],
                 ],
             ]);
