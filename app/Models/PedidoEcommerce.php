@@ -1038,6 +1038,22 @@ class PedidoEcommerce extends Model {
             // Criar itens do pedido
             $pedidoItens = [];
             foreach ($items as $item) {
+                $produtoVariacaoId = null;
+                if (isset($item['produto_variacao_id']) && $item['produto_variacao_id'] !== '' && $item['produto_variacao_id'] !== null) {
+                    $pv = (int) $item['produto_variacao_id'];
+                    if ($pv > 0) {
+                        $produtoVariacaoId = $pv;
+                    }
+                }
+
+                $colsItens = [];
+                try {
+                    $stmtCols = $this->connection->query('DESCRIBE pedido_items');
+                    $colsItens = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsItens = [];
+                }
+
                 $itemData = [
                     'pedido_id' => $pedidoId,
                     'produto_id' => $item['produto_id'],
@@ -1045,10 +1061,17 @@ class PedidoEcommerce extends Model {
                     'preco_unitario' => $item['preco'],
                     'subtotal' => $item['preco'] * $item['quantidade']
                 ];
-                $this->connection->prepare("
-                    INSERT INTO pedido_items (pedido_id, produto_id, quantidade, preco_unitario, subtotal)
-                    VALUES (:pedido_id, :produto_id, :quantidade, :preco_unitario, :subtotal)
-                ")->execute($itemData);
+
+                $insertCols = ['pedido_id', 'produto_id', 'quantidade', 'preco_unitario', 'subtotal'];
+                $insertVals = [':pedido_id', ':produto_id', ':quantidade', ':preco_unitario', ':subtotal'];
+                if (!empty($colsItens) && in_array('produto_variacao_id', $colsItens, true)) {
+                    $insertCols[] = 'produto_variacao_id';
+                    $insertVals[] = ':produto_variacao_id';
+                    $itemData['produto_variacao_id'] = $produtoVariacaoId;
+                }
+
+                $sqlItem = 'INSERT INTO pedido_items (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
+                $this->connection->prepare($sqlItem)->execute($itemData);
 
                 $pedidoItens[] = [
                     'produto_id' => (int) $item['produto_id'],
@@ -1056,8 +1079,16 @@ class PedidoEcommerce extends Model {
                 ];
                 
                 // Atualizar estoque
-                $produtoModel = new Produto();
-                $produtoModel->updateEstoque($item['produto_id'], $item['quantidade']);
+                if ($produtoVariacaoId !== null) {
+                    try {
+                        $stmtStock = $this->connection->prepare('UPDATE produto_variacoes SET stock = stock - :q WHERE id = :id AND stock >= :q');
+                        $stmtStock->execute([':q' => (int) $item['quantidade'], ':id' => (int) $produtoVariacaoId]);
+                    } catch (\Exception $e) {
+                    }
+                } else {
+                    $produtoModel = new Produto();
+                    $produtoModel->updateEstoque($item['produto_id'], $item['quantidade']);
+                }
             }
             
             // Adicionar histórico de status

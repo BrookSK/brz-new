@@ -9,6 +9,29 @@ class AdminProdutosNovoController extends Controller {
         return new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
+    private function ensureDir(string $dir): void {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+    }
+
+    private function getProdutoUploadsDir(): string {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $candidates = [
+            $docRoot . '/public/uploads/produtos/',
+            $docRoot . '/uploads/produtos/',
+            __DIR__ . '/../../public/uploads/produtos/',
+        ];
+
+        foreach ($candidates as $c) {
+            if (is_string($c) && $c !== '' && (is_dir($c) || @mkdir($c, 0777, true))) {
+                return rtrim($c, '/\\') . DIRECTORY_SEPARATOR;
+            }
+        }
+
+        return rtrim((string) $candidates[0], '/\\') . DIRECTORY_SEPARATOR;
+    }
+
     private function tableExists(\PDO $pdo, string $table): bool {
         try {
             $st = $pdo->prepare('SHOW TABLES LIKE ?');
@@ -190,6 +213,11 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
+                                    <label class="form-label">NCM</label>
+                                    <input type="text" class="form-control" name="ncm" placeholder="Pesquisar NCM...">
+                                </div>
+
+                                <div class="mb-3">
                                     <label class="form-label">Loja</label>
                                     <select class="form-select" name="loja">
                                         <option value="">Selecione...</option>';
@@ -288,6 +316,7 @@ class AdminProdutosNovoController extends Controller {
                                 <th>Variação</th>
                                 <th style="width:180px">Preço (override)</th>
                                 <th style="width:140px">Estoque</th>
+                                <th style="width:260px">Fotos da variação</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -314,9 +343,35 @@ class AdminProdutosNovoController extends Controller {
                                 </div>
 
                                 <div class="mb-3">
+                                    <label class="form-label">Preço de custo (USD)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" class="form-control" name="cost_price" value="0">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Preço promocional (USD)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" class="form-control" name="sale_price" value="0">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
                                     <label class="form-label">Estoque base</label>
                                     <input type="number" class="form-control" name="stock" value="0" min="0">
                                     <small class="text-muted">Quando o produto tiver variações, o estoque real passa a ser o da variação.</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Estoque mínimo</label>
+                                    <input type="number" class="form-control" name="min_stock" value="0" min="0">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Peso (kg)</label>
+                                    <input type="text" class="form-control" name="weight" value="0">
                                 </div>
 
                                 <div class="mb-3">
@@ -455,6 +510,7 @@ class AdminProdutosNovoController extends Controller {
                 <td><div class="fw-semibold">${desc || ('Variação #' + (idx+1))}</div></td>
                 <td><input type="text" class="form-control form-control-sm" data-idx="${idx}" data-field="price_override" placeholder="ex: 99.90"></td>
                 <td><input type="number" class="form-control form-control-sm" data-idx="${idx}" data-field="stock" value="0" min="0"></td>
+                <td><input type="file" class="form-control form-control-sm" name="variacao_fotos[${idx}][]" multiple accept="image/*"></td>
             `;
             tableBody.appendChild(tr);
         });
@@ -538,11 +594,24 @@ HTML;
             $pdo->beginTransaction();
 
             $price = $this->parseMoneyToDb($request->getParam('price'));
+            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
+            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
             $stock = (int) $request->getParam('stock', 0);
+            $minStock = (int) $request->getParam('min_stock', 0);
+            $weight = $this->parseMoneyToDb($request->getParam('weight'));
 
             $data = [];
             if (in_array('name', $cols, true)) $data['name'] = $name;
             if (in_array('sku', $cols, true)) $data['sku'] = trim((string) $request->getParam('sku', ''));
+            $lojaParam = $request->getParam('loja');
+            $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
+            if (in_array('loja_id', $cols, true) && $lojaId > 0) {
+                $data['loja_id'] = $lojaId;
+            }
+            if (in_array('loja', $cols, true)) {
+                $data['loja'] = $lojaParam;
+            }
+            if (in_array('ncm', $cols, true)) $data['ncm'] = (string) $request->getParam('ncm', '');
             if (in_array('description', $cols, true)) $data['description'] = (string) $request->getParam('description', '');
             if (in_array('short_description', $cols, true)) $data['short_description'] = (string) $request->getParam('short_description', '');
 
@@ -550,7 +619,11 @@ HTML;
             if (in_array('category_id', $cols, true)) $data['category_id'] = ($cat !== '' ? $cat : null);
 
             if (in_array('price', $cols, true)) $data['price'] = $price;
+            if (in_array('cost_price', $cols, true) && $costPrice !== '') $data['cost_price'] = $costPrice;
+            if (in_array('sale_price', $cols, true) && $salePrice !== '') $data['sale_price'] = $salePrice;
             if (in_array('stock', $cols, true)) $data['stock'] = $stock;
+            if (in_array('min_stock', $cols, true)) $data['min_stock'] = $minStock;
+            if (in_array('weight', $cols, true)) $data['weight'] = $weight;
             if (in_array('status', $cols, true)) $data['status'] = (string) $request->getParam('status', 'published');
             if (in_array('active', $cols, true)) $data['active'] = (int) $request->getParam('active', 1);
             if (in_array('featured', $cols, true)) $data['featured'] = (int) $request->getParam('featured', 0);
@@ -567,7 +640,53 @@ HTML;
 
             $produtoId = (int) $pdo->lastInsertId();
 
-            // Salvar atributos selecionados (derivado das opções marcadas)
+            if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                $nameFile = $_FILES['capa']['name'];
+                $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $nameFile);
+                $fileName = time() . '_' . $fileName;
+                $filePath = $uploadDir . $fileName;
+                $webPath = $webDir . $fileName;
+
+                if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                    if (in_array('foto_principal', $cols, true)) {
+                        $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                        $stmtCover->execute([$webPath, $produtoId]);
+                    }
+                }
+            }
+
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                foreach ($_FILES['imagens']['name'] as $key => $nameUp) {
+                    if (($_FILES['imagens']['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                        continue;
+                    }
+                    $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $nameUp);
+                    $fileName = time() . '_' . $fileName;
+
+                    $filePath = $uploadDir . $fileName;
+                    $webPath = $webDir . $fileName;
+
+                    if (move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
+                        $stFoto = $pdo->prepare('INSERT INTO produto_fotos (produto_id, nome_arquivo, arquivo_original, principal, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                        $stFoto->execute([
+                            $produtoId,
+                            $webPath,
+                            $nameUp,
+                            0,
+                            (int) $key,
+                        ]);
+                    }
+                }
+            }
+
             $opcoes = $request->getParam('opcoes', []);
             if (!is_array($opcoes)) $opcoes = [];
 
@@ -586,7 +705,6 @@ HTML;
                 }
             }
 
-            // Criar variações a partir do variacoes_json
             $variacoesJson = (string) $request->getParam('variacoes_json', '');
             $variacoes = [];
             if ($variacoesJson !== '') {
@@ -598,7 +716,12 @@ HTML;
                 $stmtInsVar = $pdo->prepare('INSERT INTO produto_variacoes (produto_id, sku, price_override, stock, ativo, created_at, updated_at) VALUES (:pid, NULL, :po, :st, 1, NOW(), NOW())');
                 $stmtInsItem = $pdo->prepare('INSERT INTO produto_variacao_itens (produto_variacao_id, tipo_id, opcao_id, created_at, updated_at) VALUES (:pvi, :tid, :oid, NOW(), NOW())');
 
-                foreach ($variacoes as $v) {
+                $stmtInsVarFoto = null;
+                if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
+                    $stmtInsVarFoto = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                }
+
+                foreach ($variacoes as $idx => $v) {
                     $st = (int) ($v['stock'] ?? 0);
                     $poRaw = trim((string) ($v['price_override'] ?? ''));
                     $po = ($poRaw !== '') ? $this->parseMoneyToDb($poRaw) : null;
@@ -621,6 +744,31 @@ HTML;
                             $oid = (int) ($it['opcao_id'] ?? 0);
                             if ($tid <= 0 || $oid <= 0) continue;
                             $stmtInsItem->execute([':pvi' => $varId, ':tid' => $tid, ':oid' => $oid]);
+                        }
+                    }
+
+                    if ($stmtInsVarFoto && isset($_FILES['variacao_fotos']) && isset($_FILES['variacao_fotos']['name'][$idx])) {
+                        $names = $_FILES['variacao_fotos']['name'][$idx] ?? [];
+                        $tmps = $_FILES['variacao_fotos']['tmp_name'][$idx] ?? [];
+                        $errs = $_FILES['variacao_fotos']['error'][$idx] ?? [];
+
+                        if (is_array($names)) {
+                            $uploadDir = $this->getProdutoUploadsDir();
+                            $webDir = '/uploads/produtos/';
+                            $this->ensureDir($uploadDir);
+
+                            $ord = 0;
+                            foreach ($names as $k => $nm) {
+                                if (($errs[$k] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                                $clean = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $nm);
+                                $fileName = time() . '_' . $varId . '_' . $clean;
+                                $filePath = $uploadDir . $fileName;
+                                $webPath = $webDir . $fileName;
+                                if (move_uploaded_file($tmps[$k] ?? '', $filePath)) {
+                                    $stmtInsVarFoto->execute([$varId, $webPath, $nm, null, $ord]);
+                                    $ord++;
+                                }
+                            }
                         }
                     }
                 }

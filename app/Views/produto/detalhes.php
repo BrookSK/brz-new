@@ -177,11 +177,11 @@
                                 <td><strong>Estoque:</strong></td>
                                 <td>
                                     <?php if ($produto['estoque'] > 0): ?>
-                                        <span class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                        <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
                                             <?= $produto['estoque'] ?> unidades
                                         </span>
                                     <?php else: ?>
-                                        <span class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                        <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
                                             Fora de estoque
                                         </span>
                                     <?php endif; ?>
@@ -191,10 +191,34 @@
                     </div>
                 </div>
 
+                <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
+                <?php if (!empty($variacoesUi['enabled'])): ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="mb-3">Variações</h5>
+                            <div class="row g-3" id="variacoes-selectors">
+                                <?php foreach (($variacoesUi['atributos'] ?? []) as $attr): ?>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fw-semibold"><?= htmlspecialchars((string) ($attr['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></label>
+                                        <select class="form-select variacao-select" data-tipo-id="<?= (int) ($attr['tipo_id'] ?? 0) ?>">
+                                            <option value="">Selecione...</option>
+                                            <?php foreach (($attr['opcoes'] ?? []) as $op): ?>
+                                                <option value="<?= (int) ($op['opcao_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($op['valor'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="mt-3 small text-muted" id="variacao-status"></div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Adicionar ao Carrinho -->
                 <div class="add-to-cart-section">
                     <form id="add-to-cart-form" class="row g-3">
                         <input type="hidden" name="id" value="<?= $produto['id'] ?>">
+                        <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
                         
                         <div class="col-12">
                             <label for="quantity" class="form-label">Quantidade:</label>
@@ -207,7 +231,7 @@
                         </div>
                         
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary btn-lg w-100" 
+                            <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" 
                                     <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
                                 <?php if ($produto['estoque'] > 0): ?>
                                     <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
@@ -409,6 +433,162 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function inicializarDetalhesProduto() {
     console.log('Inicializando detalhes do produto...');
+
+    const variacoesUi = <?= json_encode($variacoesUi ?? ['enabled' => false]) ?>;
+    const fotosProdutoBase = <?= json_encode(array_values(array_map(function($f) {
+        return [
+            'url' => ($f['url_completa'] ?? (isset($f['nome_arquivo']) ? Url::absolute((string) $f['nome_arquivo']) : null)),
+            'legenda' => ($f['legenda'] ?? null),
+        ];
+    }, $fotos ?? []))) ?>;
+
+    const currencyLabel = <?= json_encode($currencyLabel ?? '') ?>;
+    const basePrice = Number($('.amount').data('original-price') || 0);
+
+    function renderGallery(photos) {
+        const safe = Array.isArray(photos) ? photos.filter(p => p && p.url) : [];
+        if (safe.length === 0) return;
+
+        const mainUrl = safe[0].url;
+        const mainLink = $('#main-image').parent('a');
+        $('#main-image').attr('src', mainUrl + '?v=' + Date.now());
+        if (mainLink && mainLink.length) {
+            mainLink.attr('href', mainUrl);
+        }
+
+        const thumbsContainer = $('.product-gallery .row.g-2');
+        if (!thumbsContainer || thumbsContainer.length === 0) return;
+        thumbsContainer.empty();
+        safe.forEach((p, index) => {
+            const col = $('<div class="col-3"></div>');
+            const img = $('<img />');
+            img.attr('src', p.url + '?v=' + Date.now());
+            img.attr('alt', p.legenda || ('Miniatura ' + (index + 1)));
+            img.addClass('img-thumbnail thumbnail-image cursor-pointer');
+            img.attr('style', 'height: 80px; width: 100%; object-fit: cover; cursor: pointer;');
+            img.attr('data-main-image', p.url);
+            col.append(img);
+            thumbsContainer.append(col);
+        });
+
+        // Rebind do clique nas miniaturas
+        $('.thumbnail-image').off('click').on('click', function() {
+            const newImageSrc = $(this).data('main-image');
+            $('#main-image').attr('src', newImageSrc + '?v=' + Date.now());
+            $('#main-image').parent('a').attr('href', newImageSrc);
+            $('.thumbnail-image').removeClass('border-primary');
+            $(this).addClass('border-primary');
+        });
+
+        $('.thumbnail-image').first().addClass('border-primary');
+    }
+
+    function setStockUi(stock) {
+        const s = Number(stock || 0);
+        const badge = $('#stock-badge');
+        const btn = $('#btn-add-to-cart');
+        const qty = $('#quantity');
+        if (!badge.length || !btn.length || !qty.length) return;
+
+        if (s > 0) {
+            badge.text(s + ' unidades');
+            badge.attr('style', 'background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);');
+            btn.prop('disabled', false);
+        } else {
+            badge.text('Fora de estoque');
+            badge.attr('style', 'background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);');
+            btn.prop('disabled', true);
+        }
+        qty.attr('max', String(Math.max(1, s)));
+        const current = Number(qty.val() || 1);
+        if (s > 0 && current > s) qty.val(String(s));
+        if (s <= 0) qty.val('1');
+    }
+
+    function setPriceUi(price) {
+        const p = Number(price || 0);
+        const amount = $('.amount');
+        if (!amount.length) return;
+        const formatted = p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        amount.text(formatted);
+        $('.currency').text(currencyLabel);
+    }
+
+    function findMatchingVariation(selectionMap) {
+        if (!variacoesUi || !variacoesUi.enabled) return null;
+        const vars = variacoesUi.variacoes || [];
+        for (let i = 0; i < vars.length; i++) {
+            const v = vars[i];
+            const map = v.map || {};
+            let ok = true;
+            for (const k in selectionMap) {
+                if (!Object.prototype.hasOwnProperty.call(selectionMap, k)) continue;
+                if (String(map[k] || '') !== String(selectionMap[k] || '')) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) return v;
+        }
+        return null;
+    }
+
+    function readSelection() {
+        const sel = {};
+        $('.variacao-select').each(function() {
+            const tipoId = $(this).data('tipo-id');
+            const v = $(this).val();
+            if (v && tipoId) sel[String(tipoId)] = String(v);
+        });
+        return sel;
+    }
+
+    function allSelected() {
+        let ok = true;
+        $('.variacao-select').each(function() {
+            if (!$(this).val()) ok = false;
+        });
+        return ok;
+    }
+
+    function onVariationChange() {
+        if (!variacoesUi || !variacoesUi.enabled) return;
+        const selection = readSelection();
+        const status = $('#variacao-status');
+        const hidden = $('#produto_variacao_id');
+
+        if (!allSelected()) {
+            hidden.val('');
+            status.text('Selecione as opções para ver disponibilidade.');
+            setPriceUi(basePrice);
+            setStockUi(<?= (int) ($produto['estoque'] ?? 0) ?>);
+            renderGallery(fotosProdutoBase);
+            return;
+        }
+
+        const v = findMatchingVariation(selection);
+        if (!v) {
+            hidden.val('');
+            status.text('Combinação indisponível.');
+            setStockUi(0);
+            return;
+        }
+
+        hidden.val(String(v.id));
+        status.text(v.descricao || 'Variação selecionada');
+
+        const price = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
+        setPriceUi(price);
+        setStockUi(v.stock);
+
+        const fotosMap = variacoesUi.fotos_por_variacao || {};
+        const fotosVar = fotosMap[String(v.id)] || fotosMap[v.id] || [];
+        if (Array.isArray(fotosVar) && fotosVar.length > 0) {
+            renderGallery(fotosVar.map(x => ({ url: x.url_completa || x.url, legenda: x.legenda || null })));
+        } else {
+            renderGallery(fotosProdutoBase);
+        }
+    }
     
     // Verificar se SweetAlert está disponível
     if (typeof Swal === 'undefined') {
@@ -477,6 +657,18 @@ function inicializarDetalhesProduto() {
     // Adicionar ao carrinho
     $('#add-to-cart-form').on('submit', function(e) {
         e.preventDefault();
+
+        if (variacoesUi && variacoesUi.enabled) {
+            const pv = $('#produto_variacao_id').val();
+            if (!pv) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', title: 'Selecione a variação', text: 'Escolha as opções do produto antes de adicionar ao carrinho.' });
+                } else {
+                    alert('Selecione a variação antes de adicionar ao carrinho.');
+                }
+                return;
+            }
+        }
         
         console.log('Formulário submetido');
         
@@ -557,6 +749,12 @@ function inicializarDetalhesProduto() {
         } else {
             badge.hide();
         }
+    }
+    
+    if (variacoesUi && variacoesUi.enabled) {
+        $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
+        // Inicial
+        $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
     }
 }
 </script>
