@@ -200,8 +200,23 @@ class Carrinho extends Model {
     }
 
     public function getItems($carrinhoId) {
+        $pesoCol = 'peso';
+        try {
+            $stCols = $this->connection->query('DESCRIBE produtos');
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (is_array($cols) && !empty($cols)) {
+                if (!in_array('peso', $cols, true) && in_array('weight', $cols, true)) {
+                    $pesoCol = 'weight';
+                } elseif (!in_array('peso', $cols, true) && in_array('product_weight', $cols, true)) {
+                    $pesoCol = 'product_weight';
+                }
+            }
+        } catch (\Exception $e) {
+            $pesoCol = 'peso';
+        }
+
         $stmt = $this->connection->prepare("
-            SELECT ci.*, p.nome, p.sku, p.descricao, p.peso, p.moeda as moeda_produto
+            SELECT ci.*, p.nome, p.sku, p.descricao, p." . $pesoCol . " AS peso, p.moeda as moeda_produto
             FROM carrinho_items ci 
             JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id
