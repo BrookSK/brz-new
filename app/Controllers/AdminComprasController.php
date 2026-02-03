@@ -1370,11 +1370,6 @@ class AdminComprasController extends Controller {
 
                 echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
                     . '</div>'
-                    . '<div class="text-end">'
-                    . '<div><strong>Total ' . ($statusView === 'pendente' ? 'pendente' : 'concluído') . ' (itens):</strong> ' . number_format($totalItensPendentes) . '</div>'
-                    . '<div><strong>Custo total:</strong> $ ' . number_format($valorTotalPendente, 2, '.', ',') . '</div>'
-                    . '<div><strong>Total efetivamente pago (itens):</strong> $ ' . number_format($valorTotalPago, 2, '.', ',') . '</div>'
-                    . '</div>'
                     . '</div>'
                     . '</div>';
 
@@ -1440,11 +1435,8 @@ class AdminComprasController extends Controller {
                                 <thead>
                                     <tr>
                                         <th>Produto</th>
-                                        <th>SKU</th>
                                         <th>Loja</th>
                                         <th>Quantidade</th>
-                                        <th>Custo</th>
-                                        <th>Total</th>
                                         <th>Status</th>
                                         <th>Prioridade</th>
                                         <th>Data Solicitação</th>
@@ -1460,8 +1452,6 @@ class AdminComprasController extends Controller {
                                                        ($item['prioridade'] == 'alta' ? 'warning' : 'info');
 
                                     $qf = (int) ($item['quantidade_faltante'] ?? $item['quantidade_necessaria'] ?? 0);
-                                    $cost = isset($item['cost_price']) ? (float) $item['cost_price'] : 0.0;
-                                    $rowTotal = $qf * $cost;
 
                                     $imgUrl = $this->resolveProdutoImagem($item);
                                     $imgTag = $imgUrl
@@ -1512,11 +1502,8 @@ class AdminComprasController extends Controller {
                                         . '<br><small class="text-muted">ID: ' . (int) $item['produto_id'] . '</small>'
                                         . '</div></div>'
                                         . '</td>'
-                                        . '<td>' . htmlspecialchars((string) ($item['sku'] ?? '')) . '</td>'
                                         . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">Sem loja</span>') . '</td>'
                                         . '<td><span class="badge bg-primary">' . $qf . '</span></td>'
-                                        . '<td>$ ' . number_format($cost, 2, '.', ',') . '</td>'
-                                        . '<td>$ ' . number_format($rowTotal, 2, '.', ',') . '</td>'
                                         . '<td><span class="badge bg-' . $status_class . '">' . ucfirst((string) $item['status']) . '</span></td>'
                                         . '<td><span class="badge bg-' . $prioridade_class . '">' . ucfirst((string) $item['prioridade']) . '</span></td>'
                                         . '<td>' . (!empty($item['data_solicitacao']) ? date('d/m/Y', strtotime((string) $item['data_solicitacao'])) : '-') . '</td>'
@@ -2438,35 +2425,25 @@ class AdminComprasController extends Controller {
             . '<div class="meta">Gerado em: ' . date('d/m/Y H:i') . '</div>';
 
         echo '<table><thead><tr>'
-            . '<th style="width:34px;">OK</th>'
+            . '<th style="width:40px;">Ok</th>'
             . '<th style="width:60px;">Foto</th>'
             . '<th>Produto</th>'
-            . '<th style="width:80px;">SKU</th>'
             . '<th style="width:70px;">Qtd</th>'
-            . '<th style="width:80px;">Custo</th>'
-            . '<th style="width:90px;">Total</th>'
             . '</tr></thead><tbody>';
 
         foreach ($rows as $r) {
             $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
-            $cost = isset($r['cost_price']) ? (float) $r['cost_price'] : 0.0;
-            $rowTotal = $qf * $cost;
             $img = $this->resolveProdutoImagem($r);
             $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
             echo '<tr>'
                 . '<td style="text-align:center;"><span class="check"></span></td>'
                 . '<td style="text-align:center;">' . $imgTag . '</td>'
                 . '<td><strong>' . htmlspecialchars((string) ($r['produto_nome'] ?? '')) . '</strong></td>'
-                . '<td>' . htmlspecialchars((string) ($r['sku'] ?? '')) . '</td>'
                 . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
-                . '<td>$ ' . number_format($cost, 2, '.', ',') . '</td>'
-                . '<td>$ ' . number_format($rowTotal, 2, '.', ',') . '</td>'
                 . '</tr>';
         }
 
         echo '</tbody></table>';
-        echo '<div class="totais"><strong>Total de itens:</strong> ' . number_format($totalItens) . '<br>'
-            . '<strong>Valor total pendente:</strong> $ ' . number_format($totalValor, 2, '.', ',') . '</div>';
 
         echo '<div class="no-print" style="margin-top:14px;">
                 <button onclick="window.print()">Imprimir / Salvar como PDF</button>
