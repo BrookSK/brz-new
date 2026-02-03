@@ -403,6 +403,35 @@ class CheckoutController extends Controller {
             $taxaConversao = 1.0;
         }
 
+        // Recarregar pedido completo (quando possível) para ter base consistente de total/frete/serviços/impostos
+        $pedidoFull = [];
+        try {
+            $dbP = \Config\Database::getConnection();
+            $stCols = $dbP->query('DESCRIBE pedidos');
+            $colsPed = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($colsPed) && !empty($colsPed)) {
+                $select = ['id'];
+                foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'frete', 'valor_frete', 'desconto', 'total', 'valor_total', 'taxa_conversao', 'moeda', 'currency'] as $c) {
+                    if (in_array($c, $colsPed, true)) {
+                        $select[] = $c;
+                    }
+                }
+                $stP = $dbP->prepare('SELECT ' . implode(', ', array_unique($select)) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                $stP->execute([$pedidoId]);
+                $pedidoFull = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $pedidoFull = [];
+        }
+
+        // Preferir moeda do pedido completo se existir
+        if (!empty($pedidoFull)) {
+            $moeda = (string) ($pedidoFull['moeda'] ?? ($pedidoFull['currency'] ?? $moeda));
+            if (isset($pedidoFull['taxa_conversao']) && (float) $pedidoFull['taxa_conversao'] > 0) {
+                $taxaConversao = (float) $pedidoFull['taxa_conversao'];
+            }
+        }
+
         // Se o pedido está como BRL mas o total parece estar em USD, converter antes de cobrar
         $deveConverterParaBRL = false;
         if (strtoupper(trim((string) $moeda)) === 'BRL') {
@@ -420,9 +449,34 @@ class CheckoutController extends Controller {
                 }
             }
 
+            // Fonte canônica: soma das colunas (quando existirem)
+            $sumCols = null;
+            if (!empty($pedidoFull)) {
+                $sub = (float) ($pedidoFull['subtotal'] ?? ($pedidoFull['subtotal_produtos'] ?? 0));
+                $svc = (float) ($pedidoFull['servicos'] ?? ($pedidoFull['taxa_servico'] ?? 0));
+                $imp = (float) ($pedidoFull['impostos'] ?? ($pedidoFull['valor_impostos'] ?? 0));
+                $fre = (float) ($pedidoFull['frete'] ?? ($pedidoFull['valor_frete'] ?? 0));
+                $des = (float) ($pedidoFull['desconto'] ?? 0);
+                $sumCols = ($sub + $svc + $imp + $fre - $des);
+                if ($sumCols <= 0) {
+                    $sumCols = null;
+                }
+            }
+
+            // Se a soma já está em BRL (ex: 754.65) ela deve ser o valor da cobrança
+            if ($sumCols !== null && $sumCols > 0) {
+                // Se o total salvo é muito menor (ex: 129), usar a soma
+                if ($valor <= 0 || $sumCols > ($valor * 1.2)) {
+                    $valor = $sumCols;
+                }
+            }
+
             // heurística: total "baixo" com taxa>1 normalmente significa que total está em USD
             if ($taxaConversao > 1.01 && $valor > 0 && $valor <= 2000) {
-                $deveConverterParaBRL = true;
+                // Se já ajustamos para a soma, não converter novamente.
+                if ($sumCols === null) {
+                    $deveConverterParaBRL = true;
+                }
             }
         }
 
@@ -483,9 +537,10 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
 
-                // Itens do pedido: tentar ler do pedido_itens
+                // Itens do pedido (tolerante a schema)
                 try {
-                    $stmtColsI = $db->query('DESCRIBE pedido_itens');
+                    $itensTable = $this->pickPedidoItensTable($db, $pedidoId);
+                    $stmtColsI = $db->query('DESCRIBE ' . $itensTable);
                     $colsI = $stmtColsI->fetchAll(\PDO::FETCH_COLUMN);
 
                     $colPedidoId = in_array('pedido_id', $colsI, true) ? 'pedido_id' : '';
@@ -503,7 +558,7 @@ class CheckoutController extends Controller {
                         if ($colNome !== '') $select[] = $colNome . ' AS nome_produto';
                         if ($colSku !== '') $select[] = $colSku . ' AS sku';
 
-                        $stmtItens = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM pedido_itens WHERE ' . $colPedidoId . ' = ?');
+                        $stmtItens = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
                         $stmtItens->execute([$pedidoId]);
                         $rowsItens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
