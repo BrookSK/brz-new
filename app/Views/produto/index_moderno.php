@@ -152,7 +152,7 @@
 }
 
 .product-image-frame {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 1 / 1;
 }
 
 .product-card-modern:hover {

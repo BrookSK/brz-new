@@ -54,11 +54,11 @@
                                  src="<?= $fotoAbsUrl ?>?v=<?= time() ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
-                                 style="cursor: pointer;"
+                                 style="object-fit: cover; cursor: pointer;"
                                  title="Clique para ver imagem em tamanho real">
                         </a>
                     <?php else: ?>
-                        <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 400px;">
+                        <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
                             <i class="fas fa-image text-muted fa-3x"></i>
                         </div>
                     <?php endif; ?>
@@ -347,12 +347,24 @@
     position: relative;
     overflow: hidden;
     border-radius: 8px;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    min-height: 320px;
+    max-height: 560px;
+}
+
+.main-image-container > a {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .main-product-image {
     width: 100%;
-    height: auto;
+    height: 100%;
     cursor: zoom-in;
+    object-fit: cover;
+    display: block;
 }
 
 .thumbnail-image {
