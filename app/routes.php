@@ -219,6 +219,7 @@ $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atua
 $router->post('/admin/produtos/{id}/variacoes/atributos', 'AdminProdutosController', 'salvarAtributosVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/gerar', 'AdminProdutosController', 'gerarVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/apagar', 'AdminProdutosController', 'apagarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/salvar', 'AdminProdutosController', 'salvarVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/criar', 'AdminProdutosController', 'criarVariacaoIndividual');
 $router->post('/admin/produtos/upload-capa/{id}', 'AdminProdutosController', 'uploadCapa');
 $router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 'uploadGaleria');

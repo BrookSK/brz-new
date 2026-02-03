@@ -1690,9 +1690,9 @@ HTML;
                             <thead>
                                 <tr>
                                     <th>Variação</th>
-                                    <th>Preço</th>
-                                    <th>Estoque</th>
-                                    <th>Status</th>
+                                    <th style="width:180px">Preço (override)</th>
+                                    <th style="width:140px">Estoque</th>
+                                    <th style="width:140px">Ativa</th>
                                 </tr>
                             </thead>
                             <tbody>';
@@ -1702,19 +1702,24 @@ HTML;
                     $priceOv = $v['price_override'] ?? null;
                     $stockV = (int) ($v['stock'] ?? 0);
                     $ativoV = (int) ($v['ativo'] ?? 0);
+                    $priceUi = ($priceOv === null || $priceOv === '') ? '' : (string) $priceOv;
                     echo '<tr>
                             <td>
                                 <div class="fw-semibold">#' . $vId . '</div>
                                 <div class="text-muted small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</div>
                             </td>
-                            <td>' . htmlspecialchars(($priceOv === null || $priceOv === '' ? '-' : (string) $priceOv), ENT_QUOTES, 'UTF-8') . '</td>
-                            <td>' . $stockV . '</td>
-                            <td>' . ($ativoV ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') . '</td>
+                            <td><input type="text" class="form-control form-control-sm" name="variacao_price_override[' . $vId . ']" value="' . htmlspecialchars($priceUi, ENT_QUOTES, 'UTF-8') . '" placeholder="Ex: 19,90"></td>
+                            <td><input type="number" class="form-control form-control-sm" name="variacao_stock[' . $vId . ']" value="' . (int) $stockV . '" min="0"></td>
+                            <td class="text-center"><input type="hidden" name="variacao_ativo[' . $vId . ']" value="0"><input type="checkbox" class="form-check-input" name="variacao_ativo[' . $vId . ']" value="1" ' . ($ativoV ? 'checked' : '') . '></td>
                           </tr>';
                 }
                 echo '      </tbody>
                         </table>
                     </div>';
+
+                echo '<div class="d-flex justify-content-end mt-2">
+                        <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/' . (int) $id . '/variacoes/salvar" formmethod="POST" formnovalidate><i class="fas fa-save"></i> Salvar variações</button>
+                      </div>';
             }
 
             echo '      </div>
@@ -2231,6 +2236,80 @@ HTMLSCRIPT;
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
             $_SESSION['message'] = 'Erro ao salvar atributos.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function salvarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        if ($produtoId <= 0) {
+            header('Location: /admin/produtos');
+            exit;
+        }
+
+        $stocks = $request->getParam('variacao_stock', []);
+        if (!is_array($stocks)) $stocks = [];
+
+        $prices = $request->getParam('variacao_price_override', []);
+        if (!is_array($prices)) $prices = [];
+
+        $ativos = $request->getParam('variacao_ativo', []);
+        if (!is_array($ativos)) $ativos = [];
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare('UPDATE produto_variacoes SET stock = :st, price_override = :po, ativo = :at, updated_at = NOW() WHERE id = :vid AND produto_id = :pid');
+
+            $varIds = [];
+            foreach ($stocks as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+            foreach ($prices as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+            foreach ($ativos as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+
+            foreach (array_keys($varIds) as $vid) {
+                $stock = (int) ($stocks[$vid] ?? 0);
+                $poRaw = trim((string) ($prices[$vid] ?? ''));
+                $po = ($poRaw !== '') ? $this->parseMoneyToDb($poRaw) : null;
+
+                $ativo = 0;
+                if (array_key_exists($vid, $ativos)) {
+                    $ativo = ((string) $ativos[$vid] === '1' || (int) $ativos[$vid] === 1) ? 1 : 0;
+                }
+
+                $stmt->bindValue(':st', $stock, \PDO::PARAM_INT);
+                if ($po === null) {
+                    $stmt->bindValue(':po', null, \PDO::PARAM_NULL);
+                } else {
+                    $stmt->bindValue(':po', $po);
+                }
+                $stmt->bindValue(':at', $ativo, \PDO::PARAM_INT);
+                $stmt->bindValue(':vid', $vid, \PDO::PARAM_INT);
+                $stmt->bindValue(':pid', $produtoId, \PDO::PARAM_INT);
+                $stmt->execute();
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações atualizadas.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao atualizar variações.';
             $_SESSION['message_type'] = 'danger';
         }
 
