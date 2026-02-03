@@ -113,6 +113,201 @@ class AdminRelatoriosController extends Controller {
         return null;
     }
 
+    public function auditoriaLogs(Request $request) {
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
+        $dataInicio = (string) $request->getParam('data_inicio', '');
+        $dataFim = (string) $request->getParam('data_fim', '');
+        $q = trim((string) $request->getParam('q', ''));
+
+        $page = (int) $request->getParam('page', 1);
+        if ($page < 1) $page = 1;
+        $perPage = 50;
+        $offset = ($page - 1) * $perPage;
+
+        $hasLogs = false;
+        try {
+            $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['auditoria_logs']);
+            $hasLogs = (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            $hasLogs = false;
+        }
+
+        $usuarios = [];
+        try {
+            $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['usuarios']);
+            if ($st->fetchColumn()) {
+                $stU = $this->connection->query('SELECT id, COALESCE(nome, name, email) AS nome, email FROM usuarios ORDER BY id DESC LIMIT 500');
+                $usuarios = $stU ? ($stU->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Exception $e) {
+            $usuarios = [];
+        }
+
+        $rows = [];
+        $totalRows = 0;
+        if ($hasLogs) {
+            $where = [];
+            $params = [];
+            if ($usuarioId > 0) {
+                $where[] = 'l.usuario_id = :uid';
+                $params[':uid'] = $usuarioId;
+            }
+            if ($dataInicio !== '') {
+                $where[] = 'DATE(l.created_at) >= :di';
+                $params[':di'] = $dataInicio;
+            }
+            if ($dataFim !== '') {
+                $where[] = 'DATE(l.created_at) <= :df';
+                $params[':df'] = $dataFim;
+            }
+            if ($q !== '') {
+                $where[] = '(l.acao LIKE :q OR l.tabela LIKE :q OR l.valores_novos LIKE :q OR l.valores_antigos LIKE :q)';
+                $params[':q'] = '%' . $q . '%';
+            }
+
+            $joinUser = '';
+            $selectUser = '';
+            try {
+                $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+                $st->execute(['usuarios']);
+                if ($st->fetchColumn()) {
+                    $joinUser = ' LEFT JOIN usuarios u ON u.id = l.usuario_id ';
+                    $selectUser = ', u.email AS usuario_email, COALESCE(u.nome, u.name, u.email) AS usuario_nome';
+                }
+            } catch (\Exception $e) {
+            }
+
+            $baseSql = 'FROM auditoria_logs l' . $joinUser . (!empty($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
+
+            try {
+                $stCount = $this->connection->prepare('SELECT COUNT(*) ' . $baseSql);
+                $stCount->execute($params);
+                $totalRows = (int) ($stCount->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+                $totalRows = 0;
+            }
+
+            try {
+                $sql = 'SELECT l.*' . $selectUser . ' ' . $baseSql . ' ORDER BY l.id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+                $stList = $this->connection->prepare($sql);
+                $stList->execute($params);
+                $rows = $stList->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $rows = [];
+            }
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditoria de Ações - Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head><body><div class="container-fluid"><div class="row">';
+        renderAdminSidebar('relatorios');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
+            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
+            . '<h1 class="h2"><i class="fas fa-user-shield me-2"></i>Auditoria / Logs de Uso</h1>'
+            . '</div>';
+
+        if (!$hasLogs) {
+            echo '<div class="alert alert-warning">A tabela <strong>auditoria_logs</strong> não existe no banco. Rode a migration <code>068_create_auditoria_logs.sql</code>.</div>';
+        }
+
+        echo '<div class="card mb-3"><div class="card-body">'
+            . '<form method="GET" class="row g-2 align-items-end">'
+            . '<div class="col-md-3"><label class="form-label">Usuário</label><select class="form-select" name="usuario_id">'
+            . '<option value="0">Todos</option>';
+        foreach ($usuarios as $u) {
+            $uid = (int) ($u['id'] ?? 0);
+            $label = trim((string) (($u['nome'] ?? '') . ' ' . ($u['email'] ?? '')));
+            if ($label === '') $label = 'Usuário #' . $uid;
+            echo '<option value="' . $uid . '" ' . ($usuarioId === $uid ? 'selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+        }
+        echo '</select></div>'
+            . '<div class="col-md-2"><label class="form-label">De</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">Até</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
+            . '<div class="col-md-4"><label class="form-label">Buscar</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="ação, rota, tabela..."></div>'
+            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>'
+            . '</form>'
+            . '</div></div>';
+
+        $totalPages = $perPage > 0 ? (int) ceil($totalRows / $perPage) : 1;
+        if ($totalPages < 1) $totalPages = 1;
+
+        echo '<div class="d-flex justify-content-between align-items-center mb-2">'
+            . '<div class="text-muted small">Total: <strong>' . number_format($totalRows) . '</strong> registros</div>'
+            . '<div class="text-muted small">Página <strong>' . $page . '</strong> de <strong>' . $totalPages . '</strong></div>'
+            . '</div>';
+
+        echo '<div class="card"><div class="card-body">'
+            . '<div class="table-responsive">'
+            . '<table class="table table-sm table-hover">'
+            . '<thead><tr>'
+            . '<th>Data</th><th>Usuário</th><th>Ação</th><th>IP</th><th>Detalhes</th>'
+            . '</tr></thead><tbody>';
+
+        if (empty($rows)) {
+            echo '<tr><td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+        } else {
+            foreach ($rows as $r) {
+                $dt = !empty($r['created_at']) ? date('d/m/Y H:i:s', strtotime((string) $r['created_at'])) : '-';
+                $uName = (string) ($r['usuario_nome'] ?? '');
+                $uEmail = (string) ($r['usuario_email'] ?? '');
+                $uLabel = trim($uName !== '' ? ($uName . ($uEmail !== '' ? (' (' . $uEmail . ')') : '')) : ($uEmail !== '' ? $uEmail : ''));
+                if ($uLabel === '') {
+                    $uLabel = 'Usuário #' . (int) ($r['usuario_id'] ?? 0);
+                }
+
+                $acao = (string) ($r['acao'] ?? '');
+                $ip = (string) ($r['ip'] ?? '');
+                $payload = (string) ($r['valores_novos'] ?? '');
+                $short = $payload;
+                if (strlen($short) > 240) {
+                    $short = substr($short, 0, 240) . '...';
+                }
+
+                $detailId = 'log_' . (int) ($r['id'] ?? 0);
+                echo '<tr>'
+                    . '<td>' . htmlspecialchars($dt) . '</td>'
+                    . '<td>' . htmlspecialchars($uLabel) . '</td>'
+                    . '<td><code>' . htmlspecialchars($acao) . '</code></td>'
+                    . '<td>' . htmlspecialchars($ip) . '</td>'
+                    . '<td>'
+                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">Ver</button>'
+                    . '<div class="collapse mt-2" id="' . $detailId . '">'
+                    . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($payload) . '</pre>'
+                    . '</div>'
+                    . '</td>'
+                    . '</tr>';
+            }
+        }
+
+        echo '</tbody></table></div></div></div>';
+
+        // paginação
+        $qs = $_GET;
+        echo '<nav class="mt-3"><ul class="pagination pagination-sm">';
+        $prev = max(1, $page - 1);
+        $next = min($totalPages, $page + 1);
+        $qs['page'] = $prev;
+        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Anterior</a></li>';
+        $qs['page'] = $next;
+        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Próxima</a></li>';
+        echo '</ul></nav>';
+
+        echo '</main></div></div>'
+            . '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>'
+            . '</body></html>';
+        exit;
+    }
+
     public function financeiro(Request $request) {
         // filtros
         $dataInicioCriacao = (string) $request->getParam('data_inicio_criacao', '');
@@ -859,9 +1054,9 @@ class AdminRelatoriosController extends Controller {
                         <button type="button" class="btn btn-info me-2" onclick="gerarPDFCompras()">
                             <i class="fas fa-shopping-basket me-1"></i>Compras
                         </button>
-                        <button type="button" class="btn btn-success" onclick="gerarPDFMovimentacao()">
+                        <a class="btn btn-success" href="/admin/estoque/relatorios/movimentacao">
                             <i class="fas fa-exchange-alt me-1"></i>Movimentação
-                        </button>
+                        </a>
                     </div>
                 </div>';
 
