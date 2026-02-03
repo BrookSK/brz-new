@@ -190,7 +190,11 @@
                         <?php if (!empty($pixPayload)): ?>
                             <div class="mb-2">
                                 <strong>Copia e cola:</strong>
-                                <input type="text" class="form-control" value="<?= htmlspecialchars($pixPayload) ?>" readonly onclick="this.select();" />
+                                <div class="input-group">
+                                    <input id="pix-payload" type="text" class="form-control" value="<?= htmlspecialchars($pixPayload) ?>" readonly onclick="this.select();" />
+                                    <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('pix-payload','pix-copied', this)">Copiar</button>
+                                </div>
+                                <div id="pix-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>
                             </div>
                         <?php endif; ?>
                     <?php elseif ($billingType === 'BOLETO'): ?>
@@ -296,6 +300,40 @@
     border-radius: 10px 10px 0 0 !important;
 }
 </style>
+
+<script>
+function copiarPixPayload(inputId, msgId, btn) {
+    const el = document.getElementById(inputId);
+    const msg = document.getElementById(msgId);
+    if (!el) return;
+    const txt = el.value || el.textContent || "";
+    if (!txt) return;
+    const old = btn ? btn.innerText : "";
+
+    const ok = () => {
+        if (msg) {
+            msg.style.display = "block";
+            setTimeout(() => { msg.style.display = "none"; }, 1800);
+        }
+        if (btn) {
+            btn.innerText = "Copiado";
+            setTimeout(() => { btn.innerText = old || "Copiar"; }, 1800);
+        }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(ok).catch(() => {
+            el.focus();
+            el.select();
+            try { document.execCommand("copy"); ok(); } catch (e) {}
+        });
+        return;
+    }
+    el.focus();
+    el.select();
+    try { document.execCommand("copy"); ok(); } catch (e) {}
+}
+</script>
 
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
