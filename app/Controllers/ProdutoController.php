@@ -165,13 +165,55 @@ class ProdutoController extends Controller {
 
     public function variacoes(Request $request) {
         $produtoId = (int) $request->getParam('id');
+        $debug = (string) $request->getParam('debug', '');
         if ($produtoId <= 0) {
             $this->json(['enabled' => false, 'atributos' => [], 'variacoes' => [], 'fotos_por_variacao' => []], 400);
         }
 
         try {
             $pdo = $this->getDirectPdo();
-            $data = $this->buildVariacoesUiData($pdo, $produtoId);
+            $err = null;
+            try {
+                $data = $this->buildVariacoesUiData($pdo, $produtoId);
+            } catch (\Throwable $e) {
+                $data = ['enabled' => false, 'atributos' => [], 'variacoes' => [], 'fotos_por_variacao' => []];
+                $err = $e->getMessage();
+            }
+
+            if ($debug === '1' || $debug === 'true') {
+                $counts = [];
+                try {
+                    $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacoes WHERE produto_id = ?');
+                    $st->execute([$produtoId]);
+                    $counts['produto_variacoes'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['produto_variacoes'] = null;
+                }
+                try {
+                    $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacao_itens pvi INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id WHERE pv.produto_id = ?');
+                    $st->execute([$produtoId]);
+                    $counts['produto_variacao_itens'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['produto_variacao_itens'] = null;
+                }
+                try {
+                    $st = $pdo->query('SELECT COUNT(*) FROM variacao_tipos WHERE ativo = 1');
+                    $counts['variacao_tipos_ativos'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['variacao_tipos_ativos'] = null;
+                }
+                try {
+                    $st = $pdo->query('SELECT COUNT(*) FROM variacao_opcoes WHERE ativo = 1');
+                    $counts['variacao_opcoes_ativas'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['variacao_opcoes_ativas'] = null;
+                }
+
+                $data['debug_counts'] = $counts;
+                $data['debug_error'] = $err;
+                $data['debug_produto_id'] = $produtoId;
+            }
+
             $this->json($data);
         } catch (\Throwable $e) {
             $this->json(['enabled' => false, 'atributos' => [], 'variacoes' => [], 'fotos_por_variacao' => []]);
