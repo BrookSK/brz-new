@@ -24,6 +24,8 @@ class AdminVariacoesController extends Controller {
             id INT AUTO_INCREMENT PRIMARY KEY,
             tipo_id INT NOT NULL,
             valor VARCHAR(120) NOT NULL,
+            nome_exibicao VARCHAR(120) NULL,
+            imagem VARCHAR(500) NULL,
             slug VARCHAR(120) NOT NULL,
             ordem INT NOT NULL DEFAULT 0,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
@@ -32,6 +34,37 @@ class AdminVariacoesController extends Controller {
             KEY idx_variacao_opcoes_tipo (tipo_id),
             UNIQUE KEY uq_variacao_opcoes_tipo_slug (tipo_id, slug)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Backfill idempotente para bases já existentes
+        try {
+            $pdo->exec("ALTER TABLE variacao_opcoes ADD COLUMN nome_exibicao VARCHAR(120) NULL AFTER valor");
+        } catch (\Throwable $e) {
+        }
+        try {
+            $pdo->exec("ALTER TABLE variacao_opcoes ADD COLUMN imagem VARCHAR(500) NULL AFTER nome_exibicao");
+        } catch (\Throwable $e) {
+        }
+    }
+
+    private function ensureDir(string $dir): void {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+    }
+
+    private function getVariacoesUploadsDir(): string {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $candidates = [
+            $docRoot . '/public/uploads/variacoes/',
+            $docRoot . '/uploads/variacoes/',
+            __DIR__ . '/../../public/uploads/variacoes/',
+        ];
+        foreach ($candidates as $c) {
+            if (is_string($c) && $c !== '' && (is_dir($c) || @mkdir($c, 0777, true))) {
+                return rtrim($c, '/\\') . DIRECTORY_SEPARATOR;
+            }
+        }
+        return rtrim((string) $candidates[0], '/\\') . DIRECTORY_SEPARATOR;
     }
 
     private function slugify(string $value): string {
@@ -190,12 +223,16 @@ class AdminVariacoesController extends Controller {
                     <div class="fw-semibold">Tipo selecionado: ' . htmlspecialchars($tipoNome, ENT_QUOTES, 'UTF-8') . '</div>
                   </div>';
 
-            echo '<form method="POST" action="/admin/variacoes/opcoes/salvar" class="row g-2 mb-3">
+            echo '<form method="POST" action="/admin/variacoes/opcoes/salvar" class="row g-2 mb-3" enctype="multipart/form-data">
                     <input type="hidden" name="id" value="0">
                     <input type="hidden" name="tipo_id" value="' . (int) $tipoId . '">
                     <div class="col-md-6">
                         <label class="form-label">Valor</label>
                         <input type="text" name="valor" class="form-control" placeholder="Ex: Preto" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nome de exibição (opcional)</label>
+                        <input type="text" name="nome_exibicao" class="form-control" placeholder="Ex: Azul Royal">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Slug (opcional)</label>
@@ -204,6 +241,10 @@ class AdminVariacoesController extends Controller {
                     <div class="col-md-2">
                         <label class="form-label">Ordem</label>
                         <input type="number" name="ordem" class="form-control" value="0" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Imagem (opcional)</label>
+                        <input type="file" name="imagem" class="form-control" accept="image/*">
                     </div>
                     <div class="col-12">
                         <button class="btn btn-primary w-100" type="submit"><i class="fas fa-plus me-2"></i>Adicionar opção</button>
@@ -217,7 +258,9 @@ class AdminVariacoesController extends Controller {
                         <table class="table table-sm align-middle">
                             <thead>
                                 <tr>
+                                    <th style="width: 56px;"></th>
                                     <th>Valor</th>
+                                    <th>Exibição</th>
                                     <th>Slug</th>
                                     <th>Ordem</th>
                                     <th>Status</th>
@@ -229,12 +272,22 @@ class AdminVariacoesController extends Controller {
                 foreach ($opcoes as $o) {
                     $oid = (int) ($o['id'] ?? 0);
                     $valor = (string) ($o['valor'] ?? '');
+                    $nomeExibicao = (string) ($o['nome_exibicao'] ?? '');
+                    $imagem = (string) ($o['imagem'] ?? '');
                     $slug = (string) ($o['slug'] ?? '');
                     $ordem = (int) ($o['ordem'] ?? 0);
                     $ativo = (int) ($o['ativo'] ?? 0);
 
                     echo '<tr>
+                            <td>';
+                    if ($imagem !== '') {
+                        echo '<img src="' . htmlspecialchars($imagem, ENT_QUOTES, 'UTF-8') . '?v=' . time() . '" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:10px;border:1px solid rgba(15,23,42,0.12)">';
+                    } else {
+                        echo '<div class="text-muted" style="width:40px;height:40px;border-radius:10px;border:1px dashed rgba(15,23,42,0.14);display:flex;align-items:center;justify-content:center">-</div>';
+                    }
+                    echo    '</td>
                             <td class="fw-semibold">' . htmlspecialchars($valor, ENT_QUOTES, 'UTF-8') . '</td>
+                            <td class="text-muted">' . htmlspecialchars($nomeExibicao, ENT_QUOTES, 'UTF-8') . '</td>
                             <td class="text-muted">' . htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') . '</td>
                             <td>' . $ordem . '</td>
                             <td>' . ($ativo ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>') . '</td>
@@ -329,6 +382,7 @@ class AdminVariacoesController extends Controller {
     public function salvarOpcao(Request $request) {
         $tipoId = (int) $request->getParam('tipo_id', 0);
         $valor = trim((string) $request->getParam('valor', ''));
+        $nomeExibicao = trim((string) $request->getParam('nome_exibicao', ''));
         $slug = trim((string) $request->getParam('slug', ''));
         $ordem = (int) $request->getParam('ordem', 0);
 
@@ -354,10 +408,29 @@ class AdminVariacoesController extends Controller {
             $pdo = $this->getPdo();
             $this->ensureTables($pdo);
 
-            $stmt = $pdo->prepare('INSERT INTO variacao_opcoes (tipo_id, valor, slug, ordem, ativo, created_at, updated_at) VALUES (:tipo_id, :valor, :slug, :ordem, 1, NOW(), NOW())');
+            $imagemPath = null;
+            if (isset($_FILES['imagem']) && !empty($_FILES['imagem']['name']) && ($_FILES['imagem']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadDir = $this->getVariacoesUploadsDir();
+                $this->ensureDir($uploadDir);
+                $webDir = '/uploads/variacoes/';
+
+                $nameFile = (string) $_FILES['imagem']['name'];
+                $clean = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $nameFile);
+                $fileName = time() . '_' . $tipoId . '_' . $clean;
+                $filePath = $uploadDir . $fileName;
+                $webPath = $webDir . $fileName;
+
+                if (move_uploaded_file($_FILES['imagem']['tmp_name'], $filePath)) {
+                    $imagemPath = $webPath;
+                }
+            }
+
+            $stmt = $pdo->prepare('INSERT INTO variacao_opcoes (tipo_id, valor, nome_exibicao, imagem, slug, ordem, ativo, created_at, updated_at) VALUES (:tipo_id, :valor, :nome_exibicao, :imagem, :slug, :ordem, 1, NOW(), NOW())');
             $stmt->execute([
                 ':tipo_id' => $tipoId,
                 ':valor' => $valor,
+                ':nome_exibicao' => ($nomeExibicao !== '' ? $nomeExibicao : null),
+                ':imagem' => $imagemPath,
                 ':slug' => $slug,
                 ':ordem' => $ordem,
             ]);

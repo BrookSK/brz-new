@@ -173,6 +173,8 @@ class CarrinhoController extends Controller {
         
         $produtoId = $request->getParam('id');
         $quantidade = $request->getParam('quantidade', 1);
+        $produtoVariacaoId = $request->getParam('produto_variacao_id', null);
+        $variacaoDescricao = $request->getParam('variacao_descricao', null);
         
         $this->debugLog("Produto ID: $produtoId");
         $this->debugLog("Quantidade: $quantidade");
@@ -207,7 +209,15 @@ class CarrinhoController extends Controller {
             $this->debugLog('Criando array de carrinho vazio');
         }
         
-        $itemKey = $produtoId;
+        $pvId = null;
+        if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
+            $pvId = (int) $produtoVariacaoId;
+            if ($pvId <= 0) {
+                $pvId = null;
+            }
+        }
+
+        $itemKey = ((string) $produtoId) . ':' . ((string) ($pvId ?? 0));
         
         $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
         
@@ -220,6 +230,8 @@ class CarrinhoController extends Controller {
         } else {
             $_SESSION['carrinho'][$itemKey] = [
                 'produto_id' => $produtoId,
+                'produto_variacao_id' => $pvId,
+                'variacao_descricao' => ($variacaoDescricao !== null && $variacaoDescricao !== '' ? (string) $variacaoDescricao : null),
                 'nome' => $produto['nome'],
                 'price' => $itemPrice,
                 'preco_unitario' => $itemPrice,

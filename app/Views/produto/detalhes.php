@@ -10,9 +10,9 @@
         </ol>
     </nav>
 
-    <div class="row">
+    <div class="row g-4">
         <!-- Galeria de Fotos -->
-        <div class="col-lg-6 mb-4">
+        <div class="col-lg-6">
             <div class="product-gallery">
                 <!-- Foto Principal -->
                 <div class="main-image-container mb-3">
@@ -114,124 +114,133 @@
         <!-- Informações do Produto -->
         <div class="col-lg-6">
             <div class="product-info">
-                <!-- Nome e Categoria -->
                 <h1 class="h2 mb-2"><?= htmlspecialchars($produto['nome']) ?></h1>
-                <p class="text-muted mb-3">
-                    <small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small>
-                </p>
+                <p class="text-muted mb-3"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></p>
 
-                <!-- Preço -->
-                <div class="price-section mb-4">
-                    <div class="current-price">
-                        <?php
-                        $currencySymbols = [
-                            'BRL' => 'R$',
-                            'USD' => '$',
-                            'EUR' => '€',
-                            'GBP' => '£',
-                            'JPY' => '¥',
-                        ];
-                        $currencyCode = strtoupper((string) ($produto['moeda'] ?? ''));
-                        $currencyLabel = $currencySymbols[$currencyCode] ?? $currencyCode;
-                        ?>
-                        <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
-                        <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
-                    </div>
-                </div>
-
-                <!-- Descrição -->
-                <div class="description mb-4">
-                    <h5>Descrição</h5>
-                    <p class="text-muted"><?= nl2br(htmlspecialchars($produto['descricao_curta'] ?? $produto['descricao'] ?? '')) ?></p>
-                    
-                    <?php if (!empty($produto['descricao_completa'])): ?>
-                        <div class="mt-3">
-                            <h6>Descrição Completa</h6>
-                            <div class="text-muted">
-                                <?= nl2br(htmlspecialchars($produto['descricao_completa'])) ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Especificações -->
-                <div class="specifications mb-4">
-                    <h5>Especificações</h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <tr>
-                                <td><strong>SKU:</strong></td>
-                                <td><?= htmlspecialchars($produto['sku']) ?></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Peso:</strong></td>
-                                <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
-                            </tr>
-                            <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
-                            <tr>
-                                <td><strong>Dimensões:</strong></td>
-                                <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
-                            </tr>
-                            <?php endif; ?>
-                            <tr>
-                                <td><strong>Estoque:</strong></td>
-                                <td>
-                                    <?php if ($produto['estoque'] > 0): ?>
-                                        <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
-                                            <?= $produto['estoque'] ?> unidades
-                                        </span>
-                                    <?php else: ?>
-                                        <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                            Fora de estoque
-                                        </span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
+                <?php
+                $currencySymbols = [
+                    'BRL' => 'R$',
+                    'USD' => '$',
+                    'EUR' => '€',
+                    'GBP' => '£',
+                    'JPY' => '¥',
+                ];
+                $currencyCode = strtoupper((string) ($produto['moeda'] ?? ''));
+                $currencyLabel = $currencySymbols[$currencyCode] ?? $currencyCode;
+                ?>
 
                 <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
                 <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
-                <div class="card mb-4" id="variacoes-card" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                <div class="card mb-3" id="variacoes-card" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
                     <div class="card-body">
                         <h5 class="mb-3">Variações</h5>
-                        <div class="row g-3" id="variacoes-selectors">
-                            <?php foreach (($variacoesUi['atributos'] ?? []) as $attr): ?>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label fw-semibold"><?= htmlspecialchars((string) ($attr['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></label>
-                                    <select class="form-select variacao-select" data-tipo-id="<?= (int) ($attr['tipo_id'] ?? 0) ?>">
-                                        <option value="">Selecione...</option>
-                                        <?php foreach (($attr['opcoes'] ?? []) as $op): ?>
-                                            <option value="<?= (int) ($op['opcao_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($op['valor'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                        <div id="variacoes-selectors"></div>
                         <div class="mt-3 small text-muted" id="variacao-status"></div>
                     </div>
                 </div>
 
-                <!-- Adicionar ao Carrinho -->
-                <div class="add-to-cart-section">
+                <div class="accordion" id="produtoAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingDesc">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDesc" aria-expanded="true" aria-controls="collapseDesc">Descrição</button>
+                        </h2>
+                        <div id="collapseDesc" class="accordion-collapse collapse show" aria-labelledby="headingDesc" data-bs-parent="#produtoAccordion">
+                            <div class="accordion-body">
+                                <div class="text-muted"><?= nl2br(htmlspecialchars($produto['descricao_curta'] ?? $produto['descricao'] ?? '')) ?></div>
+                                <?php if (!empty($produto['descricao_completa'])): ?>
+                                    <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($produto['descricao_completa'])) ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingSpecs">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpecs" aria-expanded="false" aria-controls="collapseSpecs">Especificações</button>
+                        </h2>
+                        <div id="collapseSpecs" class="accordion-collapse collapse" aria-labelledby="headingSpecs" data-bs-parent="#produtoAccordion">
+                            <div class="accordion-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tr>
+                                            <td><strong>SKU:</strong></td>
+                                            <td><?= htmlspecialchars($produto['sku']) ?></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Peso:</strong></td>
+                                            <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
+                                        </tr>
+                                        <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
+                                        <tr>
+                                            <td><strong>Dimensões:</strong></td>
+                                            <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
+                                        </tr>
+                                        <?php endif; ?>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingImport">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport">Informações de Importação</button>
+                        </h2>
+                        <div id="collapseImport" class="accordion-collapse collapse" aria-labelledby="headingImport" data-bs-parent="#produtoAccordion">
+                            <div class="accordion-body">
+                                <ul class="mb-0 small text-muted">
+                                    <li>Produto importado dos EUA</li>
+                                    <li>Tempo estimado de entrega: 15-30 dias</li>
+                                    <li>Impostos inclusos no preço final</li>
+                                    <li>Taxa de serviço: US$ 39/kg</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-lg-6 offset-lg-6">
+            <div class="buybox card" id="buybox">
+                <div class="card-body">
+                    <div class="d-flex align-items-baseline gap-2 mb-2">
+                        <div class="fs-4 fw-bold">
+                            <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
+                            <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="text-muted small">Disponibilidade</div>
+                        <div>
+                            <?php if ($produto['estoque'] > 0): ?>
+                                <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                    <?= $produto['estoque'] ?> unidades
+                                </span>
+                            <?php else: ?>
+                                <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                    Fora de estoque
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
                     <form id="add-to-cart-form" class="row g-3">
                         <input type="hidden" name="id" value="<?= $produto['id'] ?>">
                         <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
-                        
+
                         <div class="col-12">
-                            <label for="quantity" class="form-label">Quantidade:</label>
-                            <div class="input-group" style="max-width: 200px;">
+                            <label for="quantity" class="form-label">Quantidade</label>
+                            <div class="input-group" style="max-width: 220px;">
                                 <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                <input type="number" class="form-control text-center" name="quantidade" id="quantity" 
-                                       value="1" min="1" max="<?= $produto['estoque'] ?>">
+                                <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
                                 <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
                             </div>
                         </div>
-                        
+
                         <div class="col-12">
-                            <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" 
-                                    <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
+                            <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
                                 <?php if ($produto['estoque'] > 0): ?>
                                     <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
                                 <?php else: ?>
@@ -240,19 +249,6 @@
                             </button>
                         </div>
                     </form>
-                </div>
-
-                <!-- Informações de Importação -->
-                <div class="import-info mt-4">
-                    <div class="alert alert-info">
-                        <h6><i class="fas fa-info-circle"></i> Informações de Importação</h6>
-                        <ul class="mb-0 small">
-                            <li>Produto importado dos EUA</li>
-                            <li>Tempo estimado de entrega: 15-30 dias</li>
-                            <li>Impostos inclusos no preço final</li>
-                            <li>Taxa de serviço: US$ 39/kg</li>
-                        </ul>
-                    </div>
                 </div>
             </div>
         </div>
@@ -290,6 +286,52 @@
 .product-gallery {
     position: sticky;
     top: 20px;
+}
+
+.buybox {
+    position: sticky;
+    top: 20px;
+}
+
+.variacao-attr + .variacao-attr {
+    margin-top: 14px;
+}
+
+.variacao-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.variacao-option {
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.variacao-option[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.variacao-option.is-selected {
+    border-color: rgba(29, 78, 216, 0.55);
+    box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.10);
+}
+
+.variacao-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid rgba(15, 23, 42, 0.10);
 }
 
 .main-image-container {
@@ -464,20 +506,37 @@ function inicializarDetalhesProduto() {
         (ui.atributos || []).forEach((attr) => {
             const tipoId = Number(attr.tipo_id || 0);
             const nome = String(attr.nome || '');
-            const col = $('<div class="col-12 col-md-6"></div>');
-            const label = $('<label class="form-label fw-semibold"></label>').text(nome);
-            const select = $('<select class="form-select variacao-select"></select>');
-            select.attr('data-tipo-id', String(tipoId));
-            select.append('<option value="">Selecione...</option>');
+            const block = $('<div class="variacao-attr"></div>');
+            const label = $('<div class="form-label fw-semibold mb-2"></div>').text(nome);
+            const options = $('<div class="variacao-options" role="list"></div>');
+            options.attr('data-tipo-id', String(tipoId));
+
             (attr.opcoes || []).forEach((op) => {
                 const oid = Number(op.opcao_id || 0);
-                const val = String(op.valor || '');
-                const opt = $('<option></option>').attr('value', String(oid)).text(val);
-                select.append(opt);
+                const display = String(op.nome_exibicao || op.valor || '');
+                const img = String(op.imagem || '');
+
+                const btn = $('<button type="button" class="variacao-option" role="listitem"></button>');
+                btn.attr('data-tipo-id', String(tipoId));
+                btn.attr('data-opcao-id', String(oid));
+                btn.attr('aria-disabled', 'false');
+
+                if (img) {
+                    const thumb = $('<img class="variacao-thumb" alt="" />');
+                    thumb.attr('src', img);
+                    btn.append(thumb);
+                }
+                if (display) {
+                    const txt = $('<span class="variacao-label"></span>').text(display);
+                    btn.append(txt);
+                }
+
+                options.append(btn);
             });
-            col.append(label);
-            col.append(select);
-            container.append(col);
+
+            block.append(label);
+            block.append(options);
+            container.append(block);
         });
     }
 
@@ -504,9 +563,10 @@ function inicializarDetalhesProduto() {
         const currentSel = readSelection();
         const allVars = Array.isArray(variacoesState.variacoes) ? variacoesState.variacoes : [];
 
-        $('.variacao-select').each(function() {
-            const $select = $(this);
-            const tipoId = String($select.data('tipo-id') || '');
+        const $groups = $('.variacao-options[data-tipo-id]');
+        $groups.each(function() {
+            const $group = $(this);
+            const tipoId = String($group.data('tipo-id') || '');
             if (!tipoId) return;
 
             const selMinusThis = { ...currentSel };
@@ -521,21 +581,16 @@ function inicializarDetalhesProduto() {
                 }
             });
 
-            $select.find('option').each(function() {
-                const $opt = $(this);
-                const val = String($opt.attr('value') || '');
-                if (!val) {
-                    $opt.prop('disabled', false);
-                    return;
+            $group.find('.variacao-option').each(function() {
+                const $btn = $(this);
+                const oid = String($btn.data('opcao-id') || '');
+                const ok = allowed.has(oid);
+                $btn.attr('aria-disabled', ok ? 'false' : 'true');
+                $btn.prop('disabled', !ok);
+                if (!ok) {
+                    $btn.removeClass('is-selected');
                 }
-                const ok = allowed.has(val);
-                $opt.prop('disabled', !ok);
             });
-
-            const selected = String($select.val() || '');
-            if (selected && !allowed.has(selected)) {
-                $select.val('');
-            }
         });
 
         const stillSel = readSelection();
@@ -639,20 +694,30 @@ function inicializarDetalhesProduto() {
 
     function readSelection() {
         const sel = {};
-        $('.variacao-select').each(function() {
-            const tipoId = $(this).data('tipo-id');
-            const v = $(this).val();
-            if (v && tipoId) sel[String(tipoId)] = String(v);
-        });
+        if ($('.variacao-option').length) {
+            $('.variacao-option.is-selected').each(function() {
+                const tipoId = $(this).data('tipo-id');
+                const oid = $(this).data('opcao-id');
+                if (tipoId && oid) sel[String(tipoId)] = String(oid);
+            });
+        } else {
+            $('.variacao-select').each(function() {
+                const tipoId = $(this).data('tipo-id');
+                const v = $(this).val();
+                if (v && tipoId) sel[String(tipoId)] = String(v);
+            });
+        }
         return sel;
     }
 
     function allSelected() {
-        let ok = true;
-        $('.variacao-select').each(function() {
-            if (!$(this).val()) ok = false;
+        const attrs = Array.isArray(variacoesState.atributos) ? variacoesState.atributos : [];
+        if (attrs.length === 0) return true;
+        const sel = readSelection();
+        return attrs.every((a) => {
+            const tid = String(a.tipo_id || '');
+            return tid && !!sel[tid];
         });
-        return ok;
     }
 
     function onVariationChange() {
@@ -858,6 +923,16 @@ function inicializarDetalhesProduto() {
     
     if (variacoesState.enabled) {
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
+        $('#variacoes-selectors').on('click', '.variacao-option', function() {
+            const $btn = $(this);
+            if ($btn.attr('aria-disabled') === 'true' || $btn.prop('disabled')) return;
+            const tipoId = String($btn.data('tipo-id') || '');
+            if (!tipoId) return;
+
+            $('.variacao-option[data-tipo-id="' + tipoId.replace(/"/g, '') + '"]').removeClass('is-selected');
+            $btn.addClass('is-selected');
+            onVariationChange();
+        });
         // Inicial
         $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
         refreshOptionAvailability();
@@ -907,6 +982,15 @@ function inicializarDetalhesProduto() {
 
                 renderVariacaoSelectors(variacoesState);
                 $('#variacoes-selectors').off('change.variacoesDyn').on('change.variacoesDyn', '.variacao-select', onVariationChange);
+                $('#variacoes-selectors').off('click.variacoesDyn').on('click.variacoesDyn', '.variacao-option', function() {
+                    const $btn = $(this);
+                    if ($btn.attr('aria-disabled') === 'true' || $btn.prop('disabled')) return;
+                    const tipoId = String($btn.data('tipo-id') || '');
+                    if (!tipoId) return;
+                    $('.variacao-option[data-tipo-id="' + tipoId.replace(/"/g, '') + '"]').removeClass('is-selected');
+                    $btn.addClass('is-selected');
+                    onVariationChange();
+                });
                 refreshOptionAvailability();
             })
             .catch(() => {
