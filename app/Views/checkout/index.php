@@ -368,34 +368,71 @@ console.log('🔍 [DEBUG] Script carregado - início - VERSÃO ATUALIZADA');
 let stripeClient = null;
 let stripeElements = null;
 let stripeCard = null;
+let stripeCardMounted = false;
 
 function ensureStripeInit() {
     const publishableKey = <?php echo json_encode((string) ($stripe_publishable_key ?? '')); ?>;
     const stripeEnabled = <?php echo json_encode((bool) ($stripe_enabled ?? false)); ?>;
 
     if (!stripeEnabled || !publishableKey) {
+        console.error('[STRIPE] Não inicializado: stripe_enabled ou publishable_key ausente', { stripeEnabled, publishableKeyPresent: !!publishableKey });
         return false;
     }
     if (typeof Stripe !== 'function') {
+        console.error('[STRIPE] Não inicializado: Stripe.js (window.Stripe) não está disponível');
+        return false;
+    }
+
+    const mountEl = document.getElementById('stripe-card-element');
+    if (!mountEl) {
+        console.error('[STRIPE] Não inicializado: elemento #stripe-card-element não encontrado');
         return false;
     }
 
     if (!stripeClient) {
-        stripeClient = Stripe(publishableKey);
-        stripeElements = stripeClient.elements();
-        stripeCard = stripeElements.create('card');
-        stripeCard.mount('#stripe-card-element');
-        stripeCard.on('change', function(event) {
-            const errEl = document.getElementById('stripe-card-errors');
-            if (!errEl) return;
-            if (event.error) {
-                errEl.style.display = 'block';
-                errEl.textContent = event.error.message;
-            } else {
-                errEl.style.display = 'none';
-                errEl.textContent = '';
-            }
-        });
+        try {
+            stripeClient = Stripe(publishableKey);
+            stripeElements = stripeClient.elements();
+            stripeCard = stripeElements.create('card');
+            stripeCardMounted = false;
+
+            stripeCard.on('change', function(event) {
+                const errEl = document.getElementById('stripe-card-errors');
+                if (!errEl) return;
+                if (event.error) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = event.error.message;
+                } else {
+                    errEl.style.display = 'none';
+                    errEl.textContent = '';
+                }
+            });
+        } catch (e) {
+            console.error('[STRIPE] Falha ao criar client/elements', e);
+            return false;
+        }
+    }
+
+    // Montar somente quando ainda não montado (e após o bloco ficar visível)
+    if (stripeCard && !stripeCardMounted) {
+        try {
+            requestAnimationFrame(() => {
+                try {
+                    stripeCard.mount('#stripe-card-element');
+                    stripeCardMounted = true;
+                    console.log('[STRIPE] CardElement montado');
+                } catch (err) {
+                    console.error('[STRIPE] Falha ao montar CardElement', err);
+                    const errEl = document.getElementById('stripe-card-errors');
+                    if (errEl) {
+                        errEl.style.display = 'block';
+                        errEl.textContent = 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.';
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('[STRIPE] requestAnimationFrame falhou', e);
+        }
     }
     return true;
 }
