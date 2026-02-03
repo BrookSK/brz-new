@@ -800,6 +800,65 @@ class AdminRemessaInternacionalController extends Controller {
             }
         }
 
+        // Alguns ambientes não devolvem o PDF/URL da etiqueta no GET /shipping/{id};
+        // então tentamos endpoints comuns para download do label.
+        $labelPaths = [
+            '/shipping/' . rawurlencode($shipId) . '/label/',
+            '/shipping/' . rawurlencode($shipId) . '/label',
+            '/shipping/' . rawurlencode($shipId) . '/labels/',
+            '/shipping/' . rawurlencode($shipId) . '/labels',
+            '/shipping/' . rawurlencode($shipId) . '/documents/label/',
+            '/shipping/' . rawurlencode($shipId) . '/documents/label',
+            '/shipping/' . rawurlencode($shipId) . '/document/label/',
+            '/shipping/' . rawurlencode($shipId) . '/document/label',
+            '/shipping/' . rawurlencode($shipId) . '/pdf/',
+            '/shipping/' . rawurlencode($shipId) . '/pdf',
+        ];
+
+        foreach ($labelPaths as $p) {
+            try {
+                $raw = $svc->requestRaw('GET', $p);
+                $ct = strtolower((string) ($raw['content_type'] ?? ''));
+                $body = $raw['body'] ?? '';
+
+                $isPdf = (strpos($ct, 'application/pdf') !== false);
+                if (!$isPdf && is_string($body)) {
+                    $isPdf = (strncmp($body, '%PDF', 4) === 0);
+                }
+
+                if ($isPdf) {
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: attachment; filename="etiqueta_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $shipId) . '.pdf"');
+                    echo $body;
+                    exit;
+                }
+
+                // Se devolver JSON com link
+                $decoded = null;
+                if (is_string($body)) {
+                    $decoded = json_decode($body, true);
+                }
+                if (is_array($decoded)) {
+                    $found2 = $this->findWexpressLabelResource($decoded);
+                    if (is_array($found2) && ($found2['type'] ?? '') === 'url' && !empty($found2['value'])) {
+                        header('Location: ' . $found2['value']);
+                        exit;
+                    }
+                    if (is_array($found2) && ($found2['type'] ?? '') === 'base64_pdf' && !empty($found2['value'])) {
+                        $bin = base64_decode((string) $found2['value']);
+                        if ($bin !== false) {
+                            header('Content-Type: application/pdf');
+                            header('Content-Disposition: attachment; filename="etiqueta_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $shipId) . '.pdf"');
+                            echo $bin;
+                            exit;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // ignora e tenta o próximo
+            }
+        }
+
         $found = $this->findWexpressLabelResource($data);
         if (is_array($found) && ($found['type'] ?? '') === 'url' && !empty($found['value'])) {
             header('Location: ' . $found['value']);
