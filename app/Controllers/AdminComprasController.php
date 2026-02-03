@@ -1034,6 +1034,11 @@ class AdminComprasController extends Controller {
             $temImages = $this->columnExists('produtos', 'images');
             $temLojaText = $this->columnExists('produtos', 'loja');
 
+            $temImagem = $this->columnExists('produtos', 'imagem');
+            $temImage = $this->columnExists('produtos', 'image');
+            $temThumb = $this->columnExists('produtos', 'thumb');
+            $temThumbnail = $this->columnExists('produtos', 'thumbnail');
+
             $selectCols = [
                 'p.id as produto_id',
                 'p.sku as sku',
@@ -1051,6 +1056,10 @@ class AdminComprasController extends Controller {
             if ($temLojaText) $selectCols[] = 'p.loja as produto_loja';
             if ($temFoto) $selectCols[] = 'p.foto_principal as foto_principal';
             if ($temImages) $selectCols[] = 'p.images as images';
+            if ($temImagem) $selectCols[] = 'p.imagem as imagem';
+            if ($temImage) $selectCols[] = 'p.image as image';
+            if ($temThumb) $selectCols[] = 'p.thumb as thumb';
+            if ($temThumbnail) $selectCols[] = 'p.thumbnail as thumbnail';
 
             // Consolidar por produto + loja (para não repetir linhas)
             $rankExpr = "CASE lc.prioridade WHEN 'urgente' THEN 4 WHEN 'alta' THEN 3 WHEN 'media' THEN 2 WHEN 'baixa' THEN 1 ELSE 0 END";
