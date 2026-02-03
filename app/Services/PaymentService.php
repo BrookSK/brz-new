@@ -316,6 +316,22 @@ class PaymentService {
         $shippingValueCents = (int) ($dados['shipping_value_cents'] ?? 0);
         $discountValueCents = (int) ($dados['discount_value_cents'] ?? 0);
 
+        // AppMax v3 pode rejeitar order com frete/shipping = 0.
+        // Para não alterar o total cobrado (products + shipping - discount), movemos 1 centavo de products para shipping.
+        if ($shippingValueCents <= 0) {
+            if ($productsValueCents > 1) {
+                $productsValueCents -= 1;
+                $shippingValueCents = 1;
+            } elseif ($productsValueCents === 1) {
+                // Total mínimo: não há como mover sem zerar produtos.
+                // Neste caso, ainda assim enviar shipping=1 pode alterar o total em 1 centavo,
+                // mas evita falha total no gateway.
+                $shippingValueCents = 1;
+            } else {
+                $shippingValueCents = 1;
+            }
+        }
+
         $customerId = $this->appmaxCreateCustomer($dados, $products);
         $orderId = $this->appmaxCreateOrder($customerId, $productsValueCents, $discountValueCents, $shippingValueCents, $products);
 
