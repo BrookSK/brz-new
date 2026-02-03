@@ -1,0 +1,55 @@
+{
+	"shipment_purpose": "personal",
+	"external_shipping_id": "419-WS9-170",
+	"external_shipping_reference": "WS9-170",
+	"service_code": "wexpress_premium",
+	"incoterms": "DDU",
+	"dimensions_unit": "cm",
+	"weight_unit": "g",
+	"currency": "USD",
+	"freight_value": 2.5,
+	"insurance_value": 3.33,
+	"packages": [{
+		"weight": 2480,
+		"width": 20.32,
+		"length": 27.94,
+		"height": 17.78
+	}],
+	"sender": {
+		"first_name": "The",
+		"last_name": "Outlet Cor",
+		"website": "wexpress.me",
+		"address": {
+			"address_line_1": "4714 W CLEAR AVE",
+			"address_line_2": "",
+			"address_number": "",
+			"postal_code": "33629",
+			"city": "TAMPA",
+			"state": "Florida",
+			"country": "US"
+		}
+	},
+	"recipient": {
+		"type": "individual",
+		"business_name": " ",
+		"first_name": "Valeria",
+		"last_name": "Goncalves",
+		"tax_id_type": "CPF",
+		"tax_id": "81946694991",
+		"email": "info@wexpress.me",
+		"phone": "4133423911",
+		"address": {
+			"address_number": "",
+			"address_line_1": "Rua General Aristides Athayde Júnior, 588, 204, Bigorrilho",
+			"address_line_2": "",
+			"postal_code": "80730370",
+			"city": "Curitiba",
+			"state": "PR"
+		}
+	},
+	"items": [{
+		"description": "HLF Roll on",
+		"quantity": 17,
+		"unit_value": 20
+	}]
+}

@@ -6,6 +6,7 @@ class WExpressService {
     private string $ambiente;
     private string $serviceCode;
     private ?array $sender;
+    private ?string $senderJsonError;
     private int $lastHttpCode = 0;
 
     public function __construct() {
@@ -14,7 +15,12 @@ class WExpressService {
         $this->serviceCode = (string) $this->getConfig('entrega', 'wexpress_service_code', 'wexpress_correios_std');
 
         $senderJson = (string) $this->getConfig('entrega', 'wexpress_sender_json', '');
+        $senderJson = trim($senderJson);
+        $this->senderJsonError = null;
         $decoded = $senderJson !== '' ? json_decode($senderJson, true) : null;
+        if ($senderJson !== '' && !is_array($decoded)) {
+            $this->senderJsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'JSON inválido';
+        }
         $this->sender = is_array($decoded) ? $decoded : null;
     }
 
@@ -26,12 +32,16 @@ class WExpressService {
         return $this->sender;
     }
 
+    public function getSenderJsonError(): ?string {
+        return $this->senderJsonError;
+    }
+
     public function getLastHttpCode(): int {
         return $this->lastHttpCode;
     }
 
     public function createShipping(array $payload): array {
-        return $this->request('POST', '/shipping', $payload);
+        return $this->request('POST', '/shipping/', $payload);
     }
 
     public function getShipping(string $wexpressId): array {
@@ -44,11 +54,11 @@ class WExpressService {
 
     private function getBaseUrl(): string {
         $amb = strtolower(trim($this->ambiente));
-        // Swagger expõe sandbox.wexpress.me
         if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
-            return 'https://wexpress.me';
+            return 'https://api.wexpress.me';
         }
-        return 'https://sandbox.wexpress.me';
+        // Se houver base de sandbox distinta, ajustar aqui. Por ora, seguir a doc do endpoint /shipping.
+        return 'https://api.wexpress.me';
     }
 
     private function request(string $method, string $path, ?array $body = null): array {

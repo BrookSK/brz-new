@@ -1,0 +1,152 @@
+{
+	"shipment_purpose": "commercial",
+	"external_shipping_id": "418-MA42-27",
+	"external_shipping_reference": "MA42-27",
+	"service_code": "wexpress_premium",
+	"incoterms": "DDU",
+	"dimensions_unit": "cm",
+	"weight_unit": "g",
+	"currency": "USD",
+	"freight_value": 12.5,
+	"insurance_value": 3,
+	"invoice_number": "Americas Shoppers",
+	"packages": [{
+		"weight": 4940,
+		"width": 35.56,
+		"length": 45.72,
+		"height": 22.86
+	}],
+	"sender": {
+		"first_name": "Mariana",
+		"last_name": "Arruda",
+		"website": "wexpress.me",
+		"address": {
+			"address_line_1": "5562 Tranquila Ln",
+			"address_line_2": "",
+			"address_number": "",
+			"postal_code": "33897",
+			"city": "Davenport",
+			"state": "FL",
+			"country": "US"
+		}
+	},
+	"recipient": {
+		"type": "business",
+		"business_name": "44.920.194 FRANCINE DE CASSIA BATISTA MACIEL 44.920.194 FRANCINE DE CASSIA BATISTA MACIEL",
+		"first_name": "FRANCINE",
+		"last_name": "DE CÁSSIA BATISTA MACIEL",
+		"tax_id_type": "CNPJ",
+		"tax_id": "44920194000119",
+		"email": "info@wexpress.me",
+		"phone": "4133423911",
+		"address": {
+			"address_number": "",
+			"address_line_1": "R. Pedro Blageski, 455, Apto 11 bl 3, Estrela",
+			"address_line_2": "",
+			"postal_code": "84050180",
+			"city": "Ponta Grossa",
+			"state": "PR"
+		}
+	},
+	"items": [{
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé azul carrinho 12m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé azul carrinho 18m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé azul carrinho 24m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé azul carrinho 2 anos Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé azul carrinho 3 anos Carters",
+		"quantity": 1,
+		"unit_value": 2.99
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé marrom bichinhos 2anos Carters",
+		"quantity": 1,
+		"unit_value": 2.99
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé marrom bichinhos 3 anos Carters",
+		"quantity": 1,
+		"unit_value": 2.99
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé marrom bichinhos 12m Carters",
+		"quantity": 1,
+		"unit_value": 2.39
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé marrom bichinhos 18m Carters",
+		"quantity": 1,
+		"unit_value": 2.39
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé marrom bichinhos 24m  Carters",
+		"quantity": 1,
+		"unit_value": 2.39
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé vermelho tigre 12m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé vermelho tigre 18m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 61112000,
+		"description": "macacão bebe com pé vermelho tigre 24m Carters",
+		"quantity": 1,
+		"unit_value": 2.69
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama menina 4 pecas blusa, bermuda e calca lilás coala 2 anos Carters",
+		"quantity": 1,
+		"unit_value": 3.89
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama menina 4 pecas blusa, bermuda e calca lilás coala 2 anos Carters",
+		"quantity": 1,
+		"unit_value": 3.89
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama menina 4 pecas blusa, bermuda e calca lilás coala 3 anos Carters",
+		"quantity": 1,
+		"unit_value": 3.89
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama menina 4 pecas blusa, bermuda e calca lilás coala 4 anos Carters",
+		"quantity": 1,
+		"unit_value": 3.89
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama menina 4 pecas blusa, bermuda e calca lilás coala 5 anos Carters",
+		"quantity": 1,
+		"unit_value": 3.89
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama Menina 4 pecas blusa e calca manga longa rosa e cinza 8 anos Carters",
+		"quantity": 1,
+		"unit_value": 5.39
+	}, {
+		"tariff_code": 62082100,
+		"description": "Pijama Menina 4 pecas blusa e calca manga longa rosa e cinza 5 anos Carters",
+		"quantity": 1,
+		"unit_value": 5.39
+	}]
+}

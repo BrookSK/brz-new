@@ -3188,6 +3188,30 @@ HTML;
                     $columnMap['email'] = $emailColumnMap;
                 }
 
+                // Entrega / W-Express (configuracoes_sistema legado)
+                $wexpressCols = [
+                    'wexpress_enabled',
+                    'wexpress_ambiente',
+                    'wexpress_api_key',
+                    'wexpress_service_code',
+                    'wexpress_sender_json',
+                ];
+                $temWexpress = false;
+                foreach ($wexpressCols as $wc) {
+                    if (in_array($wc, $cols, true)) {
+                        $temWexpress = true;
+                        break;
+                    }
+                }
+                if ($temWexpress) {
+                    $columnMap['entrega'] = $columnMap['entrega'] ?? [];
+                    foreach ($wexpressCols as $wc) {
+                        if (in_array($wc, $cols, true)) {
+                            $columnMap['entrega'][$wc] = $wc;
+                        }
+                    }
+                }
+
                 return [
                     'mode' => 'single_row',
                     'table' => $table,
