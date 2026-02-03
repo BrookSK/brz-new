@@ -80,7 +80,7 @@ class PedidoManualService {
         }
 
         if ($moeda === 'BRL') {
-            return $this->gerarLinkPagamentoAsaasPedidoManual($pedidoId, $billingType);
+            return $this->gerarLinkPagamentoAppMaxPedidoManual($pedidoId, $billingType);
         }
 
         return $this->gerarLinkPagamentoStripePedidoManual($pedidoId);
@@ -337,6 +337,10 @@ class PedidoManualService {
         return 'pedido_itens';
     }
 
+    public function gerarLinkPagamentoAppMaxPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+        return $this->gerarLinkPagamentoAsaasPedidoManual($pedidoId, $billingType);
+    }
+
     private function getConfig(string $categoria, string $chave, $default = null) {
         $db = $this->db;
 
@@ -418,13 +422,8 @@ class PedidoManualService {
 
         if ($formaPagamento !== null) {
             $fpNorm = trim((string) $formaPagamento);
-            if ($fpNorm === 'pagdev') {
-                // ok para testes em qualquer moeda
-            } elseif ($fpNorm === 'nomad_transferencia' && $moeda !== 'USD') {
-                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
-            }
-            if ($fpNorm === 'appmax_pix' && $moeda !== 'BRL') {
-                throw new \Exception('Forma de pagamento inválida para a moeda selecionada');
+            if ($fpNorm !== '' && $fpNorm !== 'pagdev') {
+                throw new \Exception('Forma de pagamento inválida');
             }
         }
 
@@ -559,10 +558,10 @@ class PedidoManualService {
 
             $this->salvarItensPedido($pedidoId, $itens, $moeda);
 
-            // Se for pagamento offline (nomad/appmax_pix), cria pendência de comprovante quando a tabela existir
+            // Se for pagamento offline (PagDev), cria pendência de comprovante quando a tabela existir
             if ($formaPagamento !== null) {
                 $fp = strtolower(trim((string) $formaPagamento));
-                if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+                if ($fp === 'pagdev') {
                     $this->criarPendenciaComprovantePedido($pedidoId, $fp, $adminCriadorId);
                 }
             }
