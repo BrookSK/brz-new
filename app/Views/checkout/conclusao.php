@@ -159,10 +159,12 @@
 
                     $badgeClass = 'bg-warning text-dark';
                     $statusLabel = 'Aguardando';
+                    $isPago = false;
                     if (!empty($statusPagamento)) {
                         if (in_array($statusPagamento, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
                             $badgeClass = 'bg-success';
                             $statusLabel = 'Pago';
+                            $isPago = true;
                         } elseif (in_array($statusPagamento, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
                             $badgeClass = 'bg-danger';
                             $statusLabel = 'Cancelado';
@@ -184,7 +186,7 @@
                     $digitableLine = $paymentDetails['digitableLine'] ?? null;
                     ?>
 
-                    <?php if ($billingType === 'PIX' && !empty($pixQrCode)): ?>
+                    <?php if (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
                         <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                         <?php if (!empty($pixImage)): ?>

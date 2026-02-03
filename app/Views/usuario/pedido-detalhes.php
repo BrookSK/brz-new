@@ -281,10 +281,12 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
 
                             $badgeClass = 'bg-warning text-dark';
                             $statusLabel = 'Aguardando';
+                            $isPago = false;
                             if (!empty($statusPagamento)) {
                                 if (in_array($statusPagamento, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
                                     $badgeClass = 'bg-success';
                                     $statusLabel = 'Pago';
+                                    $isPago = true;
                                 } elseif (in_array($statusPagamento, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
                                     $badgeClass = 'bg-danger';
                                     $statusLabel = 'Cancelado';
@@ -304,7 +306,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                 <small>Status do pagamento: <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
                             </p>
 
-                            <?php if ($billingType === 'PIX' && !empty($pixQrCode)): ?>
+                            <?php if (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                                 <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
                                 <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                                 <?php if (!empty($pixImage)): ?>
