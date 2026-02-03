@@ -52,14 +52,21 @@ class PedidoEcommerce {
                 return [];
             }
 
+            $colCreatedAt = $this->pickColumn($cols, ['created_at', 'data_criacao', 'data_pedido']);
+            $orderCol = $colCreatedAt ? ('p.' . $colCreatedAt) : 'p.id';
+
             $select = ['p.id'];
-            foreach (['codigo_pedido', 'numero_pedido', 'created_at', 'updated_at', 'status', 'payment_status', 'status_pagamento', 'moeda', 'currency', 'valor_total', 'total', 'valor', 'amount'] as $c) {
+            if (in_array('codigo_pedido', $cols, true)) $select[] = 'p.codigo_pedido';
+            if (in_array('numero_pedido', $cols, true)) $select[] = 'p.numero_pedido';
+            if ($colCreatedAt) $select[] = 'p.' . $colCreatedAt . ' AS created_at';
+            if (in_array('updated_at', $cols, true)) $select[] = 'p.updated_at';
+            foreach (['status', 'payment_status', 'status_pagamento', 'moeda', 'currency', 'valor_total', 'total', 'valor', 'amount'] as $c) {
                 if (in_array($c, $cols, true)) {
                     $select[] = 'p.' . $c;
                 }
             }
 
-            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid ORDER BY p.created_at DESC LIMIT :lim OFFSET :off';
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid ORDER BY ' . $orderCol . ' DESC LIMIT :lim OFFSET :off';
             $stmt = $this->connection->prepare($sql);
             $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
             $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
@@ -68,14 +75,57 @@ class PedidoEcommerce {
 
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             foreach ($rows as &$r) {
+                if (empty($r['created_at']) && !empty($r['data_criacao'])) {
+                    $r['created_at'] = $r['data_criacao'];
+                }
                 if (empty($r['codigo_pedido']) && !empty($r['numero_pedido'])) {
                     $r['codigo_pedido'] = $r['numero_pedido'];
                 }
                 if (empty($r['codigo_pedido'])) {
                     $r['codigo_pedido'] = 'PED-' . str_pad((string) ((int) ($r['id'] ?? 0)), 6, '0', STR_PAD_LEFT);
                 }
+                if (!isset($r['total_itens'])) {
+                    $r['total_itens'] = 0;
+                }
             }
             unset($r);
+
+            // total_itens: SUM(quantidade) por pedido
+            $ids = [];
+            foreach ($rows as $r) {
+                $pid = (int) ($r['id'] ?? 0);
+                if ($pid > 0) $ids[$pid] = true;
+            }
+            $ids = array_keys($ids);
+            if (!empty($ids)) {
+                $temPedidoItens = $this->tableExists('pedido_itens');
+                $temPedidoItems = $this->tableExists('pedido_items');
+                $itensTable = $temPedidoItens ? 'pedido_itens' : ($temPedidoItems ? 'pedido_items' : null);
+                if ($itensTable) {
+                    $colsItens = $this->getTableColumns($itensTable);
+                    $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+                    $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+                    if ($colPedidoId && $colQtd) {
+                        try {
+                            $in = implode(',', array_fill(0, count($ids), '?'));
+                            $st = $this->connection->prepare('SELECT ' . $colPedidoId . ' AS pid, SUM(COALESCE(' . $colQtd . ',0)) AS total_itens FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' IN (' . $in . ') GROUP BY ' . $colPedidoId);
+                            $st->execute($ids);
+                            $map = [];
+                            foreach (($st->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $row) {
+                                $map[(int) ($row['pid'] ?? 0)] = (int) ($row['total_itens'] ?? 0);
+                            }
+                            foreach ($rows as &$r) {
+                                $pid = (int) ($r['id'] ?? 0);
+                                if ($pid > 0 && isset($map[$pid])) {
+                                    $r['total_itens'] = $map[$pid];
+                                }
+                            }
+                            unset($r);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            }
 
             return $rows;
         } catch (\Exception $e) {
@@ -280,6 +330,94 @@ class PedidoEcommerce {
         }
 
         if (!$pedido) return null;
+
+        // Normalizar totais + endereço para o formato esperado nas views do usuário
+        try {
+            $colsPedido = $this->getTableColumns('pedidos');
+
+            $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
+            if ($moeda === '') $moeda = 'BRL';
+            $pedido['moeda'] = $moeda;
+
+            $subtotalProdutos = null;
+            foreach (['subtotal_produtos', 'subtotal'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $subtotalProdutos = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($subtotalProdutos === null) {
+                $subtotalProdutos = 0.0;
+            }
+
+            $valorFrete = null;
+            foreach (['valor_frete', 'frete', 'frete_manual'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $valorFrete = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($valorFrete === null) {
+                $valorFrete = 0.0;
+            }
+
+            $taxaServico = null;
+            foreach (['taxa_servico', 'servicos', 'service_fee'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $taxaServico = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($taxaServico === null) {
+                $taxaServico = 0.0;
+            }
+
+            $valorImpostos = null;
+            foreach (['valor_impostos', 'impostos', 'taxes'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $valorImpostos = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($valorImpostos === null) {
+                $valorImpostos = 0.0;
+            }
+
+            $valorTotal = null;
+            foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $valorTotal = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($valorTotal === null || $valorTotal <= 0) {
+                $valorTotal = $subtotalProdutos + $valorFrete + $taxaServico + $valorImpostos;
+            }
+
+            $pedido['subtotal_produtos'] = $subtotalProdutos;
+            $pedido['valor_frete'] = $valorFrete;
+            $pedido['taxa_servico'] = $taxaServico;
+            $pedido['valor_impostos'] = $valorImpostos;
+            $pedido['valor_total'] = $valorTotal;
+
+            // Endereço de entrega: aceitar diferentes nomes de colunas
+            $endereco = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ($pedido['endereco_envio'] ?? null));
+            $numero = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? ($pedido['numero_envio'] ?? null));
+            $complemento = $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? null);
+            $bairro = $pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? null);
+            $cidade = $pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? null);
+            $estado = $pedido['estado_entrega'] ?? ($pedido['estado'] ?? null);
+            $cep = $pedido['cep_entrega'] ?? ($pedido['cep'] ?? null);
+
+            $pedido['endereco_entrega'] = $endereco;
+            $pedido['numero_entrega'] = $numero;
+            $pedido['complemento_entrega'] = $complemento;
+            $pedido['bairro_entrega'] = $bairro;
+            $pedido['cidade_entrega'] = $cidade;
+            $pedido['estado_entrega'] = $estado;
+            $pedido['cep_entrega'] = $cep;
+        } catch (\Exception $e) {
+        }
 
         $pedido['items'] = [];
         $pedido['historico'] = [];
