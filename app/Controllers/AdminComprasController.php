@@ -2117,10 +2117,42 @@ class AdminComprasController extends Controller {
                 // tentar inferir loja pelo produto
                 $lojaId = 0;
                 try {
-                    if ($this->columnExists('produtos', 'loja_id')) {
+                    $temLojaIdProduto = $this->columnExists('produtos', 'loja_id');
+                    $temLojaSlugProduto = $this->columnExists('produtos', 'loja');
+
+                    if ($temLojaIdProduto && $temLojaSlugProduto) {
+                        $stmtL = $this->connection->prepare('SELECT loja_id, loja FROM produtos WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $produtoId]);
+                        $rowL = $stmtL->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $lojaId = (int) ($rowL['loja_id'] ?? 0);
+
+                        if ($lojaId <= 0 && $this->tableExists('lojas')) {
+                            $slug = trim((string) ($rowL['loja'] ?? ''));
+                            if ($slug !== '') {
+                                $stmtFind = $this->connection->prepare('SELECT id FROM lojas WHERE slug = :s OR nome = :s LIMIT 1');
+                                $stmtFind->execute([':s' => $slug]);
+                                $found = (int) ($stmtFind->fetchColumn() ?: 0);
+                                if ($found > 0) {
+                                    $lojaId = $found;
+                                }
+                            }
+                        }
+                    } elseif ($temLojaIdProduto) {
                         $stmtL = $this->connection->prepare('SELECT loja_id FROM produtos WHERE id = :id LIMIT 1');
                         $stmtL->execute([':id' => $produtoId]);
                         $lojaId = (int) $stmtL->fetchColumn();
+                    } elseif ($temLojaSlugProduto && $this->tableExists('lojas')) {
+                        $stmtL = $this->connection->prepare('SELECT loja FROM produtos WHERE id = :id LIMIT 1');
+                        $stmtL->execute([':id' => $produtoId]);
+                        $slug = trim((string) ($stmtL->fetchColumn() ?: ''));
+                        if ($slug !== '') {
+                            $stmtFind = $this->connection->prepare('SELECT id FROM lojas WHERE slug = :s OR nome = :s LIMIT 1');
+                            $stmtFind->execute([':s' => $slug]);
+                            $found = (int) ($stmtFind->fetchColumn() ?: 0);
+                            if ($found > 0) {
+                                $lojaId = $found;
+                            }
+                        }
                     }
                 } catch (\Exception $e) {
                     $lojaId = 0;
