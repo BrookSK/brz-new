@@ -2104,23 +2104,39 @@ class CheckoutController extends Controller {
             $this->debugLog('[CRIAR_PEDIDO] Peso total: ' . $pesoTotal);
             
             // Taxas baseadas na moeda selecionada
+            // Base dos cálculos é USD (produtos/carrinho normalmente estão em USD). Se BRL, converter no final.
+            $taxaConversao = 1.0;
             if ($moedaSelecionada === 'BRL') {
-                // Valores em BRL (sem conversão fixa para evitar conversão dupla)
-                $taxaConversao = 1.0;
-                $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-                $impostos = $subtotal * 0.80;
-                $frete = $this->calcularFrete($subtotal, $pesoTotal, 'BRL');
-                $total = $subtotal + $taxaServico + $impostos + $frete;
-                
-                $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL - Taxa conversao: ' . $taxaConversao);
+                try {
+                    $stTx = $db->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                    $stTx->execute();
+                    $rowTx = $stTx->fetch(\PDO::FETCH_ASSOC);
+                    $tx = (float) ($rowTx['taxa_conversao'] ?? 0);
+                    if ($tx > 1.01) {
+                        $taxaConversao = $tx;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Calcular em USD
+            $taxaServicoUsd = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
+            $impostosUsd = $subtotal * 0.80;
+            $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+            $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
+
+            if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
+                $taxaServico = $taxaServicoUsd * $taxaConversao;
+                $impostos = $impostosUsd * $taxaConversao;
+                $frete = $freteUsd * $taxaConversao;
+                $subtotal = $subtotal * $taxaConversao;
+                $total = $totalUsd * $taxaConversao;
+                $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL (convertido de USD) - Taxa conversao: ' . $taxaConversao);
             } else {
-                // Valores em USD (padrão)
-                $taxaConversao = 1.0;
-                $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
-                $impostos = $subtotal * 0.80; // 80%
-                $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
-                $total = $subtotal + $taxaServico + $impostos + $frete;
-                
+                $taxaServico = $taxaServicoUsd;
+                $impostos = $impostosUsd;
+                $frete = $freteUsd;
+                $total = $totalUsd;
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
             }
             
