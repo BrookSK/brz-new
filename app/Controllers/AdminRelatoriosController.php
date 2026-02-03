@@ -113,6 +113,348 @@ class AdminRelatoriosController extends Controller {
         return null;
     }
 
+    public function movimentacao(Request $request) {
+        $usuarioId = (int) $request->getParam('usuario_id', 0);
+        $dataInicio = (string) $request->getParam('data_inicio', '');
+        $dataFim = (string) $request->getParam('data_fim', '');
+        $tipo = strtolower(trim((string) $request->getParam('tipo', '')));
+        $q = trim((string) $request->getParam('q', ''));
+
+        $page = (int) $request->getParam('page', 1);
+        if ($page < 1) $page = 1;
+        $perPage = 50;
+        $offset = ($page - 1) * $perPage;
+
+        $usuarios = [];
+        try {
+            $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['usuarios']);
+            if ($st->fetchColumn()) {
+                $stU = $this->connection->query('SELECT id, COALESCE(nome, name, email) AS nome, email FROM usuarios ORDER BY id DESC LIMIT 500');
+                $usuarios = $stU ? ($stU->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Exception $e) {
+            $usuarios = [];
+        }
+
+        $hasAuditoria = false;
+        try {
+            $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['auditoria_logs']);
+            $hasAuditoria = (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            $hasAuditoria = false;
+        }
+
+        $hasMov = false;
+        try {
+            $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $st->execute(['estoque_movimentacao']);
+            $hasMov = (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            $hasMov = false;
+        }
+
+        $rows = [];
+        $totalRows = 0;
+
+        // 1) Carregar movimentações de estoque
+        $movRows = [];
+        if ($hasMov && ($tipo === '' || $tipo === 'estoque')) {
+            $where = [];
+            $params = [];
+            if ($usuarioId > 0) {
+                $where[] = 'em.usuario_id = :uid';
+                $params[':uid'] = $usuarioId;
+            }
+            if ($dataInicio !== '') {
+                $where[] = 'DATE(em.data_movimentacao) >= :di';
+                $params[':di'] = $dataInicio;
+            }
+            if ($dataFim !== '') {
+                $where[] = 'DATE(em.data_movimentacao) <= :df';
+                $params[':df'] = $dataFim;
+            }
+            if ($q !== '') {
+                $where[] = '(em.motivo LIKE :q OR p.name LIKE :q OR p.sku LIKE :q OR CAST(em.produto_id AS CHAR) LIKE :q)';
+                $params[':q'] = '%' . $q . '%';
+            }
+            $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+            try {
+                $stCount = $this->connection->prepare('SELECT COUNT(*) FROM estoque_movimentacao em JOIN produtos p ON p.id = em.produto_id ' . $whereSql);
+                $stCount->execute($params);
+                $totalRows += (int) ($stCount->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $sql = 'SELECT em.*, p.name AS produto_nome, p.sku, COALESCE(u.nome, u.name, u.email) AS usuario_nome, u.email AS usuario_email '
+                    . 'FROM estoque_movimentacao em '
+                    . 'JOIN produtos p ON p.id = em.produto_id '
+                    . 'LEFT JOIN usuarios u ON u.id = em.usuario_id '
+                    . $whereSql
+                    . ' ORDER BY em.data_movimentacao DESC, em.id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+                $st = $this->connection->prepare($sql);
+                $st->execute($params);
+                $movRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $movRows = [];
+            }
+        }
+
+        // 2) Carregar auditoria (ações que impactam fluxo)
+        $audRows = [];
+        if ($hasAuditoria && ($tipo === '' || $tipo === 'fluxo' || $tipo === 'pedidos' || $tipo === 'compras')) {
+            $where = [];
+            $params = [];
+
+            // Rotas/ações alvo
+            $patterns = [
+                '/admin/pedidos/atualizar-status%',
+                '/admin/pedidos/salvar%',
+                '/admin/pedidos/excluir%',
+                '/admin/estoque/salvar%',
+                '/admin/estoque/editar/salvar%',
+                '/admin/estoque/editar/excluir%',
+                '/admin/estoque/compras/%',
+            ];
+
+            // Se o schema tiver coluna route, filtramos por ela. Se não, caímos no campo acao.
+            $cols = [];
+            try {
+                $stCols = $this->connection->query('DESCRIBE auditoria_logs');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $hasRouteCol = is_array($cols) && in_array('route', $cols, true);
+
+            if ($usuarioId > 0) {
+                $where[] = 'l.usuario_id = :uid';
+                $params[':uid'] = $usuarioId;
+            }
+            if ($dataInicio !== '') {
+                $where[] = 'DATE(l.created_at) >= :di';
+                $params[':di'] = $dataInicio;
+            }
+            if ($dataFim !== '') {
+                $where[] = 'DATE(l.created_at) <= :df';
+                $params[':df'] = $dataFim;
+            }
+            if ($q !== '') {
+                $where[] = '(l.acao LIKE :q OR l.valores_novos LIKE :q OR l.valores_antigos LIKE :q)';
+                $params[':q'] = '%' . $q . '%';
+            }
+
+            $routeWhere = [];
+            foreach ($patterns as $i => $patt) {
+                $key = ':p' . $i;
+                if ($hasRouteCol) {
+                    $routeWhere[] = 'l.route LIKE ' . $key;
+                } else {
+                    $routeWhere[] = 'l.acao LIKE ' . $key;
+                }
+                $params[$key] = $patt;
+            }
+            if (!empty($routeWhere)) {
+                $where[] = '(' . implode(' OR ', $routeWhere) . ')';
+            }
+
+            // filtro por tipo (pedidos/compras)
+            if ($tipo === 'pedidos') {
+                $where[] = ($hasRouteCol ? "(l.route LIKE '/admin/pedidos/%')" : "(l.acao LIKE '%/admin/pedidos/%')");
+            }
+            if ($tipo === 'compras') {
+                $where[] = ($hasRouteCol ? "(l.route LIKE '/admin/estoque/compras/%')" : "(l.acao LIKE '%/admin/estoque/compras/%')");
+            }
+
+            $joinUser = '';
+            $selectUser = '';
+            try {
+                $st = $this->connection->prepare('SHOW TABLES LIKE ?');
+                $st->execute(['usuarios']);
+                if ($st->fetchColumn()) {
+                    $joinUser = ' LEFT JOIN usuarios u ON u.id = l.usuario_id ';
+                    $selectUser = ', u.email AS usuario_email, COALESCE(u.nome, u.name, u.email) AS usuario_nome';
+                }
+            } catch (\Exception $e) {
+            }
+
+            $baseSql = 'FROM auditoria_logs l' . $joinUser . (!empty($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
+            try {
+                $stCount = $this->connection->prepare('SELECT COUNT(*) ' . $baseSql);
+                $stCount->execute($params);
+                $totalRows += (int) ($stCount->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $sql = 'SELECT l.*' . $selectUser . ' ' . $baseSql . ' ORDER BY l.id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+                $st = $this->connection->prepare($sql);
+                $st->execute($params);
+                $audRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $audRows = [];
+            }
+        }
+
+        // Unificar
+        foreach ($movRows as $m) {
+            $rows[] = [
+                'origem' => 'estoque',
+                'data' => (string) ($m['data_movimentacao'] ?? ''),
+                'usuario' => trim((string) (($m['usuario_nome'] ?? '') . ($m['usuario_email'] ? (' <' . $m['usuario_email'] . '>') : ''))),
+                'acao' => strtoupper((string) ($m['tipo_movimentacao'] ?? '')),
+                'alvo' => 'Produto #' . (int) ($m['produto_id'] ?? 0) . ' - ' . (string) ($m['produto_nome'] ?? ''),
+                'detalhes' => [
+                    'produto_id' => (int) ($m['produto_id'] ?? 0),
+                    'sku' => (string) ($m['sku'] ?? ''),
+                    'quantidade' => $m['quantidade'] ?? null,
+                    'anterior' => $m['quantidade_anterior'] ?? null,
+                    'nova' => $m['quantidade_nova'] ?? null,
+                    'motivo' => (string) ($m['motivo'] ?? ''),
+                ],
+            ];
+        }
+        foreach ($audRows as $a) {
+            $rows[] = [
+                'origem' => 'fluxo',
+                'data' => (string) ($a['created_at'] ?? ''),
+                'usuario' => trim((string) (($a['usuario_nome'] ?? '') . (!empty($a['usuario_email']) ? (' <' . $a['usuario_email'] . '>') : ''))),
+                'acao' => (string) ($a['acao'] ?? ''),
+                'alvo' => (string) ($a['route'] ?? ($a['tabela'] ?? '')),
+                'detalhes' => [
+                    'registro_id' => $a['registro_id'] ?? null,
+                    'valores_antigos' => $a['valores_antigos'] ?? null,
+                    'valores_novos' => $a['valores_novos'] ?? null,
+                    'ip' => $a['ip'] ?? null,
+                    'user_agent' => $a['user_agent'] ?? null,
+                ],
+            ];
+        }
+
+        usort($rows, function ($x, $y) {
+            $tx = strtotime((string) ($x['data'] ?? '')) ?: 0;
+            $ty = strtotime((string) ($y['data'] ?? '')) ?: 0;
+            return $ty <=> $tx;
+        });
+
+        // paginação simples em memória (já limitamos cada fonte, mas aqui garantimos a página)
+        $totalRows = (int) $totalRows;
+        $totalPages = $perPage > 0 ? (int) ceil($totalRows / $perPage) : 1;
+        if ($totalPages < 1) $totalPages = 1;
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movimentação do Fluxo - Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head><body><div class="container-fluid"><div class="row">';
+        renderAdminSidebar('relatorios');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
+            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
+            . '<h1 class="h2"><i class="fas fa-exchange-alt me-2"></i>Movimentação do Fluxo</h1>'
+            . '</div>';
+
+        if (!$hasMov) {
+            echo '<div class="alert alert-warning">A tabela <strong>estoque_movimentacao</strong> não existe no banco.</div>';
+        }
+        if (!$hasAuditoria) {
+            echo '<div class="alert alert-warning">A tabela <strong>auditoria_logs</strong> não existe no banco. Rode as migrations 068 e 069.</div>';
+        }
+
+        echo '<div class="card mb-3"><div class="card-body">'
+            . '<form method="GET" class="row g-2 align-items-end">'
+            . '<div class="col-md-3"><label class="form-label">Usuário</label><select class="form-select" name="usuario_id">'
+            . '<option value="0">Todos</option>';
+        foreach ($usuarios as $u) {
+            $uid = (int) ($u['id'] ?? 0);
+            $label = trim((string) (($u['nome'] ?? '') . ' ' . ($u['email'] ?? '')));
+            if ($label === '') $label = 'Usuário #' . $uid;
+            echo '<option value="' . $uid . '" ' . ($usuarioId === $uid ? 'selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+        }
+        echo '</select></div>'
+            . '<div class="col-md-2"><label class="form-label">De</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">Até</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>'
+            . '<div class="col-md-2"><label class="form-label">Tipo</label><select class="form-select" name="tipo">'
+            . '<option value="" ' . ($tipo === '' ? 'selected' : '') . '>Todos</option>'
+            . '<option value="fluxo" ' . ($tipo === 'fluxo' ? 'selected' : '') . '>Fluxo (Pedidos/Compras)</option>'
+            . '<option value="estoque" ' . ($tipo === 'estoque' ? 'selected' : '') . '>Estoque</option>'
+            . '<option value="pedidos" ' . ($tipo === 'pedidos' ? 'selected' : '') . '>Pedidos</option>'
+            . '<option value="compras" ' . ($tipo === 'compras' ? 'selected' : '') . '>Compras</option>'
+            . '</select></div>'
+            . '<div class="col-md-2"><label class="form-label">Buscar</label><input type="text" class="form-control" name="q" value="' . htmlspecialchars($q) . '" placeholder="pedido, produto, sku..."></div>'
+            . '<div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>'
+            . '</form>'
+            . '</div></div>';
+
+        echo '<div class="d-flex justify-content-between align-items-center mb-2">'
+            . '<div class="text-muted small">Total: <strong>' . number_format($totalRows) . '</strong> registros</div>'
+            . '<div class="text-muted small">Página <strong>' . $page . '</strong> de <strong>' . $totalPages . '</strong></div>'
+            . '</div>';
+
+        echo '<div class="card"><div class="card-body">'
+            . '<div class="table-responsive">'
+            . '<table class="table table-sm table-hover">'
+            . '<thead><tr>'
+            . '<th>Data</th><th>Origem</th><th>Usuário</th><th>Ação</th><th>Alvo</th><th>Detalhes</th>'
+            . '</tr></thead><tbody>';
+
+        if (empty($rows)) {
+            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
+        } else {
+            foreach ($rows as $r) {
+                $dt = !empty($r['data']) ? date('d/m/Y H:i:s', strtotime((string) $r['data'])) : '-';
+                $origem = (string) ($r['origem'] ?? '');
+                $acao = (string) ($r['acao'] ?? '');
+                $alvo = (string) ($r['alvo'] ?? '');
+                $user = (string) ($r['usuario'] ?? '');
+                if ($user === '') $user = '-';
+
+                $detailId = 'mov_' . substr(md5($dt . $origem . $acao . $alvo), 0, 10);
+                $pretty = json_encode($r['detalhes'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                if ($pretty === false) $pretty = '';
+
+                echo '<tr>'
+                    . '<td>' . htmlspecialchars($dt) . '</td>'
+                    . '<td><span class="badge bg-' . ($origem === 'estoque' ? 'success' : 'info') . '">' . htmlspecialchars($origem) . '</span></td>'
+                    . '<td>' . htmlspecialchars($user) . '</td>'
+                    . '<td><code>' . htmlspecialchars($acao) . '</code></td>'
+                    . '<td>' . htmlspecialchars($alvo) . '</td>'
+                    . '<td>'
+                    . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">Ver</button>'
+                    . '<div class="collapse mt-2" id="' . $detailId . '">'
+                    . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($pretty) . '</pre>'
+                    . '</div>'
+                    . '</td>'
+                    . '</tr>';
+            }
+        }
+
+        echo '</tbody></table></div></div></div>';
+
+        $qs = $_GET;
+        echo '<nav class="mt-3"><ul class="pagination pagination-sm">';
+        $prev = max(1, $page - 1);
+        $next = min($totalPages, $page + 1);
+        $qs['page'] = $prev;
+        echo '<li class="page-item ' . ($page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Anterior</a></li>';
+        $qs['page'] = $next;
+        echo '<li class="page-item ' . ($page >= $totalPages ? 'disabled' : '') . '"><a class="page-link" href="?' . htmlspecialchars(http_build_query($qs)) . '">Próxima</a></li>';
+        echo '</ul></nav>';
+
+        echo '</main></div></div>'
+            . '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>'
+            . '</body></html>';
+        exit;
+    }
+
     public function auditoriaLogs(Request $request) {
         $usuarioId = (int) $request->getParam('usuario_id', 0);
         $dataInicio = (string) $request->getParam('data_inicio', '');

@@ -357,7 +357,7 @@ $router->get('/admin/estoque/verificar-estoque/{produto_id}', 'AdminComprasContr
 $router->get('/admin/estoque/relatorios', 'AdminRelatoriosController', 'index');
 $router->get('/admin/estoque/relatorios/financeiro', 'AdminRelatoriosController', 'financeiro');
 $router->get('/admin/estoque/relatorios/financeiro/export', 'AdminRelatoriosController', 'exportFinanceiro');
-$router->get('/admin/estoque/relatorios/movimentacao', 'AdminRelatoriosController', 'auditoriaLogs');
+$router->get('/admin/estoque/relatorios/movimentacao', 'AdminRelatoriosController', 'movimentacao');
 $router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerarPDF');
 
 // Rotas de Remessa Internacional
