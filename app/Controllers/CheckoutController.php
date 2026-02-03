@@ -937,6 +937,28 @@ class CheckoutController extends Controller {
         $items = [];
         $subtotal = 0;
         $pesoTotal = 0;
+
+        // Fallback de peso via tabela produtos (quando o item do carrinho não trouxer)
+        $pesoCol = null;
+        $pesoCache = [];
+        $stPeso = null;
+        try {
+            $dbPeso = \Config\Database::getConnection();
+            $stmtColsProd = $dbPeso->query('DESCRIBE produtos');
+            $colsProd = $stmtColsProd ? ($stmtColsProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            foreach (['peso', 'weight', 'product_weight'] as $c) {
+                if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                    $pesoCol = $c;
+                    break;
+                }
+            }
+            if ($pesoCol) {
+                $stPeso = $dbPeso->prepare('SELECT ' . $pesoCol . ' AS peso FROM produtos WHERE id = ? LIMIT 1');
+            }
+        } catch (\Exception $e) {
+            $pesoCol = null;
+            $stPeso = null;
+        }
         
         foreach ($carrinho as $produtoId => $item) {
             // Verificar diferentes campos de preço
@@ -944,7 +966,32 @@ class CheckoutController extends Controller {
             $quantidade = $item['quantidade'] ?? 1;
 
             // Peso real (kg) quando disponível; fallback para 0.5kg
-            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            $pesoRaw = $item['peso'] ?? ($item['weight'] ?? 0);
+            if (is_string($pesoRaw)) {
+                $pesoRaw = str_replace(',', '.', trim($pesoRaw));
+            }
+            $pesoUnit = (float) $pesoRaw;
+
+            if ($pesoUnit <= 0) {
+                $pid = (int) ($item['produto_id'] ?? 0);
+                if ($pid > 0) {
+                    if (array_key_exists($pid, $pesoCache)) {
+                        $pesoUnit = (float) $pesoCache[$pid];
+                    } elseif ($stPeso) {
+                        try {
+                            $stPeso->execute([$pid]);
+                            $pesoDb = $stPeso->fetchColumn();
+                            if (is_string($pesoDb)) {
+                                $pesoDb = str_replace(',', '.', trim($pesoDb));
+                            }
+                            $pesoUnit = (float) ($pesoDb ?: 0);
+                            $pesoCache[$pid] = $pesoUnit;
+                        } catch (\Exception $e) {
+                            $pesoCache[$pid] = 0.0;
+                        }
+                    }
+                }
+            }
             if ($pesoUnit <= 0) {
                 $pesoUnit = 0.5;
             }
