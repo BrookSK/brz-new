@@ -38,6 +38,94 @@ class PedidoEcommerce {
         return null;
     }
 
+    private function getConfigValue(string $categoria, string $chave, $default = null) {
+        try {
+            $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+            $table = null;
+            foreach ($tableCandidates as $t) {
+                if ($this->tableExists($t)) {
+                    $table = $t;
+                    break;
+                }
+            }
+            if (!$table) {
+                return $default;
+            }
+
+            $cols = $this->getTableColumns($table);
+
+            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+                if ($valCol) {
+                    $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE categoria = ? AND chave = ? ORDER BY id DESC LIMIT 1');
+                    $st->execute([$categoria, $chave]);
+                    $v = $st->fetchColumn();
+                    return ($v !== false && $v !== null) ? $v : $default;
+                }
+            }
+
+            $keyCol = $this->pickColumn($cols, ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro']);
+            $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+            if ($keyCol && $valCol) {
+                $fullKey = $categoria . '_' . $chave;
+                $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE ' . $keyCol . ' = ? ORDER BY id DESC LIMIT 1');
+                $st->execute([$fullKey]);
+                $v = $st->fetchColumn();
+                return ($v !== false && $v !== null) ? $v : $default;
+            }
+
+            if (in_array('id', $cols, true) && !in_array('categoria', $cols, true) && !in_array('chave', $cols, true)) {
+                if (in_array($chave, $cols, true)) {
+                    $st = $this->connection->query('SELECT ' . $chave . ' FROM ' . $table . ' ORDER BY id ASC LIMIT 1');
+                    $v = $st ? $st->fetchColumn() : null;
+                    return ($v !== false && $v !== null) ? $v : $default;
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
+    }
+
+    private function getConfigNumber(string $categoria, string $chave, float $default = 0.0): float {
+        $v = $this->getConfigValue($categoria, $chave, null);
+        if ($v === null) {
+            return $default;
+        }
+        $s = str_replace(',', '.', trim((string) $v));
+        return is_numeric($s) ? (float) $s : $default;
+    }
+
+    private function getComissaoManualFaixasConfig(): array {
+        $raw = $this->getConfigValue('comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]');
+        $decoded = null;
+        try {
+            $decoded = json_decode((string) $raw, true);
+        } catch (\Exception $e) {
+            $decoded = null;
+        }
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function resolvePercentualPorFaixas(float $faturadoBrl, array $faixas): float {
+        $f = max(0.0, (float) $faturadoBrl);
+        foreach ($faixas as $fx) {
+            if (!is_array($fx)) {
+                continue;
+            }
+            $min = isset($fx['min']) ? (float) $fx['min'] : 0.0;
+            $max = isset($fx['max']) ? (float) $fx['max'] : 0.0;
+            $percent = isset($fx['percent']) ? (float) $fx['percent'] : 0.0;
+            if ($max <= 0) {
+                $max = 999999999.0;
+            }
+            if ($f >= $min && $f <= $max) {
+                return max(0.0, $percent);
+            }
+        }
+        return 0.0;
+    }
+
     public function getPedidos(int $usuarioId, int $limit = 10, int $offset = 0): array {
         $usuarioId = (int) $usuarioId;
         if ($usuarioId <= 0) return [];
@@ -306,6 +394,7 @@ class PedidoEcommerce {
             $colStatus = $this->pickColumn($cols, ['status', 'status_pedido', 'pedido_status']);
             $colPaymentStatus = $this->pickColumn($cols, ['payment_status', 'status_pagamento']);
             $colValorTotal = $this->pickColumn($cols, ['valor_total', 'total', 'valor', 'amount']);
+            $colImpostos = $this->pickColumn($cols, ['valor_impostos', 'impostos']);
 
             if (!$colAdminCriador) {
                 return $resumoBase;
@@ -337,6 +426,7 @@ class PedidoEcommerce {
             if ($colCreatedAt) $select[] = 'p.' . $colCreatedAt . ' AS created_at';
             if ($colMoeda) $select[] = 'p.' . $colMoeda . ' AS moeda';
             if ($colValorTotal) $select[] = 'p.' . $colValorTotal . ' AS valor_total';
+            if ($colImpostos) $select[] = 'p.' . $colImpostos . ' AS impostos';
 
             $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE ' . implode(' AND ', $where) . ' ORDER BY ' . ($colCreatedAt ? ('p.' . $colCreatedAt) : 'p.id') . ' DESC';
             $stmt = $this->connection->prepare($sql);
@@ -350,6 +440,7 @@ class PedidoEcommerce {
                 $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
                 if ($moeda === '') $moeda = 'BRL';
                 $fat = (float) ($r['valor_total'] ?? 0);
+                $impostos = (float) ($r['impostos'] ?? 0);
 
                 // custo (tolerante): tenta somar custo_unitario * qtd nos itens
                 $custo = 0.0;
@@ -377,7 +468,7 @@ class PedidoEcommerce {
                     $custo = 0.0;
                 }
 
-                $liq = $fat - $custo;
+                $liq = $fat - $custo - $impostos;
                 $pedidosOut[] = [
                     'id' => $pid,
                     'codigo' => (string) ($r['codigo'] ?? $pid),
@@ -412,14 +503,39 @@ class PedidoEcommerce {
             $resumoBase['total_custo_produtos'] = $totCus;
             $resumoBase['total_liquido'] = $totLiq;
 
-            // Comissão (se futuramente houver regra, calcular aqui). Por enquanto zero para evitar erro.
-            $resumoBase['percentual_comissao'] = 0.0;
-            $resumoBase['valor_comissao'] = 0.0;
+            $faixas = $this->getComissaoManualFaixasConfig();
+            $resumoBase['faixas'] = $faixas;
+
+            $usdBrlRate = $this->getConfigNumber('sistema', 'usd_brl_rate', 0.0);
+            if ($usdBrlRate <= 0) {
+                $usdBrlRate = 0.0;
+            }
+
+            // Percentual é definido pela soma do faturado (convertido para BRL quando possível)
+            $faturadoBrlParaFaixa = 0.0;
+            foreach ($resumoBase['por_moeda'] as $m => $t) {
+                $m = strtoupper(trim((string) $m));
+                $fatMoeda = (float) ($t['total_faturado'] ?? 0);
+                if ($m === 'BRL') {
+                    $faturadoBrlParaFaixa += $fatMoeda;
+                } elseif ($m === 'USD' && $usdBrlRate > 0) {
+                    $faturadoBrlParaFaixa += ($fatMoeda * $usdBrlRate);
+                }
+            }
+
+            $percent = $this->resolvePercentualPorFaixas($faturadoBrlParaFaixa, $faixas);
+            $resumoBase['percentual_comissao'] = $percent;
+
+            $valorComissaoTotal = 0.0;
             foreach ($resumoBase['por_moeda'] as $m => &$t) {
-                $t['percentual_comissao'] = 0.0;
-                $t['valor_comissao'] = 0.0;
+                $totalLiquidoMoeda = (float) ($t['total_liquido'] ?? 0);
+                $valorComissaoMoeda = max(0.0, $totalLiquidoMoeda) * ($percent / 100.0);
+                $t['percentual_comissao'] = $percent;
+                $t['valor_comissao'] = $valorComissaoMoeda;
+                $valorComissaoTotal += $valorComissaoMoeda;
             }
             unset($t);
+            $resumoBase['valor_comissao'] = $valorComissaoTotal;
 
             return $resumoBase;
         } catch (\Exception $e) {
