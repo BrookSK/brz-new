@@ -1076,6 +1076,17 @@ class AdminRemessaInternacionalController extends Controller {
             exit;
         }
 
+        $colsPedidos = [];
+        try {
+            $stCols = $this->connection->query('DESCRIBE pedidos');
+            $colsPedidos = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsPedidos = [];
+        }
+
+        $hasMoeda = is_array($colsPedidos) && in_array('moeda', $colsPedidos, true);
+        $hasCurrency = is_array($colsPedidos) && in_array('currency', $colsPedidos, true);
+
         // Pedidos da janela
         $sql = "
             SELECT 
@@ -1088,6 +1099,8 @@ class AdminRemessaInternacionalController extends Controller {
                 rjp.wexpress_status,
                 p.created_at,
                 p.total,
+                " . ($hasMoeda ? 'p.moeda,' : "'' AS moeda,") . "
+                " . ($hasCurrency ? 'p.currency,' : "'' AS currency,") . "
                 p.status,
                 u.nome AS cliente_nome,
                 u.email AS cliente_email
@@ -1192,6 +1205,8 @@ class AdminRemessaInternacionalController extends Controller {
         if (!$pedidos) {
             echo '<tr><td colspan="6" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
         } else {
+            $usdToBrl = $this->getUsdToBrlRate();
+            $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['pedido_id'] ?? 0);
                 $et = (int) ($p['etiqueta_gerada'] ?? 0);
@@ -1201,13 +1216,19 @@ class AdminRemessaInternacionalController extends Controller {
                 $wxShipId = (string) ($p['wexpress_shipping_id'] ?? '');
                 $wxCourier = (string) ($p['courier_tracking_number'] ?? '');
                 $dt = !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-';
-                $totalV = is_numeric($p['total'] ?? null) ? number_format((float) $p['total'], 2, ',', '.') : '-';
+                $moeda = strtoupper(trim((string) ($p['moeda'] ?? ($p['currency'] ?? 'USD'))));
+                if ($moeda === '') $moeda = 'USD';
+                $totalValue = is_numeric($p['total'] ?? null) ? (float) $p['total'] : null;
+                if ($totalValue !== null && $moeda === 'BRL') {
+                    $totalValue = $totalValue * $brlToUsd;
+                }
+                $totalV = $totalValue !== null ? number_format((float) $totalValue, 2, ',', '.') : '-';
 
                 echo '<tr>
                     <td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>
                     <td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? 'N/A')) . '<br><small class="text-muted">' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</small></td>
                     <td>' . $dt . '</td>
-                    <td>R$ ' . $totalV . '</td>
+                    <td>US$ ' . $totalV . '</td>
                     <td>
                         <span class="badge bg-' . $etBadge . '">' . $etLabel . '</span>';
 
@@ -1312,6 +1333,14 @@ function fecharJanela() {
             exit;
         }
 
+        $usdToBrl = $this->getUsdToBrlRate();
+        $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
+
+        $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moedaPedido === '') {
+            $moedaPedido = 'USD';
+        }
+
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1398,7 +1427,16 @@ function fecharJanela() {
                         <div class="card-header"><strong>Pedido</strong></div>
                         <div class="card-body">
                             <div><strong>Data:</strong> ' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string) $pedido['created_at'])) : '-') . '</div>
-                            <div><strong>Total:</strong> R$ ' . (is_numeric($pedido['total'] ?? null) ? number_format((float) $pedido['total'], 2, ',', '.') : '-') . '</div>
+                            <div><strong>Total:</strong> ';
+
+        $totalUsd = null;
+        if (is_numeric($pedido['total'] ?? null)) {
+            $totalUsd = (float) $pedido['total'];
+            if ($moedaPedido === 'BRL') {
+                $totalUsd = $totalUsd * $brlToUsd;
+            }
+        }
+        echo 'US$ ' . ($totalUsd !== null ? number_format((float) $totalUsd, 2, ',', '.') : '-') . '</div>
                             <div><strong>Status:</strong> ' . htmlspecialchars((string) ($pedido['status'] ?? '')) . '</div>
                         </div>
                     </div>
@@ -1439,11 +1477,15 @@ function fecharJanela() {
                         break;
                     }
                 }
+
+                if ($precoUnit !== null && $moedaPedido === 'BRL') {
+                    $precoUnit = $precoUnit * $brlToUsd;
+                }
                 echo '<tr>
                     <td>' . htmlspecialchars((string) ($it['produto_nome'] ?? '')) . '</td>
                     <td>' . htmlspecialchars((string) ($it['sku'] ?? '')) . '</td>
                     <td>' . (int) ($it['quantidade'] ?? 0) . '</td>
-                    <td>R$ ' . ($precoUnit !== null ? number_format((float) $precoUnit, 2, ',', '.') : '-') . '</td>
+                    <td>US$ ' . ($precoUnit !== null ? number_format((float) $precoUnit, 2, ',', '.') : '-') . '</td>
                 </tr>';
             }
         }
@@ -1799,7 +1841,7 @@ function gerarEtiqueta() {
             if (!is_array($cols) || empty($cols) || !in_array('taxa_conversao', $cols, true)) {
                 return 1.0;
             }
-            $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' LIMIT 1");
+            $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
             $stTx->execute();
             $tx = (float) ($stTx->fetchColumn() ?: 0);
             return $tx > 0 ? $tx : 1.0;
