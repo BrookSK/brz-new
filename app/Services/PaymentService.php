@@ -52,7 +52,6 @@ class PaymentService {
                 $baseUrl = 'https://admin.appmax.com.br/api/v3';
             }
         }
-
         $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
@@ -62,14 +61,12 @@ class PaymentService {
         ];
 
         $payloadArr = is_array($body) ? $body : [];
-        // Documentação oficial: access-token vai no corpo JSON
+        // API v3 usa access-token no corpo da requisição.
         if (!array_key_exists('access-token', $payloadArr)) {
             $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
         $payload = json_encode($payloadArr);
 
-        $respBody = '';
-        $httpCode = 0;
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -86,30 +83,26 @@ class PaymentService {
             if (!empty($err)) {
                 throw new \Exception('Erro de conexão com AppMax: ' . $err);
             }
-        } else {
-            $context = stream_context_create([
-                'http' => [
-                    'method' => strtoupper($method),
-                    'header' => implode("\r\n", $headers),
-                    'content' => $payload,
-                    'ignore_errors' => true,
-                ]
-            ]);
-            $respBody = @file_get_contents($url, false, $context);
-            $httpCode = 200;
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
         }
 
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload,
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
         $decoded = json_decode((string) $respBody, true);
-        if ($httpCode < 200 || $httpCode >= 300) {
-            $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg . ' url=' . $url);
-        }
-
-        if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
-            $msg = json_encode($decoded);
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg . ' url=' . $url);
-        }
-
         return is_array($decoded) ? $decoded : [];
     }
 
@@ -117,7 +110,7 @@ class PaymentService {
         $nome = trim((string) ($dados['customer_name'] ?? ''));
         $email = trim((string) ($dados['customer_email'] ?? ''));
         $phone = preg_replace('/\D+/', '', (string) ($dados['customer_phone'] ?? ''));
-        // Documento não é obrigatório para criar/atualizar o cliente (lead)
+        $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
 
         $firstName = $nome;
         $lastName = '';
@@ -194,10 +187,9 @@ class PaymentService {
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
+        $total = round(((float) $productsValueCents) / 100, 2);
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
-        // Total final (AppMax): total = products + shipping - discount
-        $total = round(((float) ($productsValueCents + $shippingValueCents - $discountValueCents)) / 100, 2);
 
         $payloadProducts = [];
         foreach ($products as $p) {
@@ -307,20 +299,8 @@ class PaymentService {
         ];
 
         $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
-        if ($doc === '' && isset($dados['documento'])) {
-            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
-        }
-        if ($doc === '' && isset($dados['document_number'])) {
-            $doc = preg_replace('/\D+/', '', (string) ($dados['document_number'] ?? ''));
-        }
-
-        if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) {
-            throw new \Exception('AppMax: documento (CPF/CNPJ) inválido para pagamento');
-        }
 
         if ($forma === 'PIX') {
-            // A doc permite expiration_date; alguns ambientes retornam erro genérico quando não informado.
-            $exp = date('Y-m-d H:i:s', time() + (60 * 60 * 24));
             $pixResp = $this->appmaxRequest('POST', 'payment/pix', [
                 'cart' => [
                     'order_id' => $orderId,
@@ -331,7 +311,6 @@ class PaymentService {
                 'payment' => [
                     'pix' => [
                         'document_number' => $doc,
-                        'expiration_date' => $exp,
                     ],
                 ],
             ]);

@@ -721,24 +721,6 @@ class PedidoEcommerce {
             $pedido['estado_entrega'] = $estado;
             $pedido['cep_entrega'] = $cep;
 
-            // Aliases esperados por algumas views (ex.: checkout/conclusao)
-            if (!array_key_exists('endereco', $pedido) || $pedido['endereco'] === null) $pedido['endereco'] = $pedido['endereco_entrega'] ?? '';
-            if (!array_key_exists('numero', $pedido) || $pedido['numero'] === null) $pedido['numero'] = $pedido['numero_entrega'] ?? '';
-            if (!array_key_exists('bairro', $pedido) || $pedido['bairro'] === null) $pedido['bairro'] = $pedido['bairro_entrega'] ?? '';
-            if (!array_key_exists('cidade', $pedido) || $pedido['cidade'] === null) $pedido['cidade'] = $pedido['cidade_entrega'] ?? '';
-            if (!array_key_exists('estado', $pedido) || $pedido['estado'] === null) $pedido['estado'] = $pedido['estado_entrega'] ?? '';
-            if (!array_key_exists('cep', $pedido) || $pedido['cep'] === null) $pedido['cep'] = $pedido['cep_entrega'] ?? '';
-
-            if (!array_key_exists('cliente_nome', $pedido) || $pedido['cliente_nome'] === null || $pedido['cliente_nome'] === '') {
-                $pedido['cliente_nome'] = (string) ($pedido['nome'] ?? ($pedido['nome_cliente'] ?? ($pedido['customer_name'] ?? ($pedido['cliente'] ?? ''))));
-            }
-            if (!array_key_exists('cliente_email', $pedido) || $pedido['cliente_email'] === null || $pedido['cliente_email'] === '') {
-                $pedido['cliente_email'] = (string) ($pedido['email'] ?? ($pedido['email_cliente'] ?? ($pedido['customer_email'] ?? ($pedido['cliente_email'] ?? ''))));
-            }
-            if (!array_key_exists('cliente_telefone', $pedido) || $pedido['cliente_telefone'] === null || $pedido['cliente_telefone'] === '') {
-                $pedido['cliente_telefone'] = (string) ($pedido['telefone'] ?? ($pedido['telefone_cliente'] ?? ($pedido['customer_phone'] ?? ($pedido['cliente_telefone'] ?? ''))));
-            }
-
             // Se houver endereco_entrega_id, buscar dados completos em enderecos
             $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
             if ($enderecoEntregaId > 0 && $this->tableExists('enderecos')) {
@@ -834,7 +816,6 @@ class PedidoEcommerce {
             $colSubtotal = $pick(['subtotal']);
             $colNomeProduto = $pick(['nome_produto', 'produto_nome', 'nome']);
             $colSku = $pick(['nome_produto_sku', 'sku']);
-            $colUrlOriginalItem = $pick(['url_original', 'url', 'link', 'produto_url', 'url_produto', 'original_url']);
 
             if (!$colPedidoId) {
                 throw new \Exception('Tabela de itens sem pedido_id');
@@ -849,7 +830,6 @@ class PedidoEcommerce {
             if ($colSubtotal) $selectParts[] = 'pi.' . $colSubtotal . ' AS subtotal';
             if ($colNomeProduto) $selectParts[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
-            if ($colUrlOriginalItem) $selectParts[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
             if ($ncmCol && $colProdutoId) {
                 $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
@@ -857,18 +837,6 @@ class PedidoEcommerce {
                 $selectParts[] = "'' AS ncm";
             }
             $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
-
-            // URL original do produto (fallback via produtos)
-            if (!$colUrlOriginalItem && $this->tableExists('produtos')) {
-                try {
-                    $colsProd = $this->getTableColumns('produtos');
-                    $colUrlProduto = $this->pickColumn($colsProd, ['url_original', 'url', 'link', 'produto_url', 'url_produto', 'original_url', 'url_externa']);
-                    if ($colUrlProduto) {
-                        $selectParts[] = "(SELECT p." . $colUrlProduto . " FROM produtos p WHERE p.id = pi." . ($colProdutoId ?: 'produto_id') . " LIMIT 1) AS url_original";
-                    }
-                } catch (\Exception $e) {
-                }
-            }
 
             $sqlItens = 'SELECT ' . implode(', ', $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
             $stmtItens = $this->connection->prepare($sqlItens);
@@ -926,16 +894,9 @@ class PedidoEcommerce {
                 if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
                     $item['ncm'] = '';
                 }
-                if (!isset($item['url_original']) || $item['url_original'] === null) {
-                    $item['url_original'] = '';
-                }
-                $item['url_original'] = trim((string) $item['url_original']);
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
-                }
-                if (!array_key_exists('nome', $item) || $item['nome'] === null || $item['nome'] === '') {
-                    $item['nome'] = $item['nome_produto'];
                 }
 
                 $pvId = (int) ($item['produto_variacao_id'] ?? 0);
