@@ -374,6 +374,141 @@ HTML;
         exit;
     }
 
+    public function uploadFotosVariacao(Request $request, $id = null) {
+        $varId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $hasLegenda = false;
+            try {
+                $stCol = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_fotos' AND column_name = 'legenda'");
+                $stCol->execute();
+                $hasLegenda = ((int) $stCol->fetchColumn()) > 0;
+            } catch (\Throwable $e) {
+                $hasLegenda = false;
+            }
+
+            $inserted = [];
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                // ordem base
+                $ordBase = 0;
+                try {
+                    $stMax = $pdo->prepare('SELECT COALESCE(MAX(ordem),0) FROM produto_variacao_fotos WHERE produto_variacao_id = ?');
+                    $stMax->execute([$varId]);
+                    $ordBase = (int) ($stMax->fetchColumn() ?: 0);
+                    $ordBase++;
+                } catch (\Exception $e) {
+                    $ordBase = 0;
+                }
+
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if (($_FILES['imagens']['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+
+                    $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $name);
+                    $fileName = time() . '_' . $varId . '_' . $fileName;
+                    $filePath = $uploadDir . $fileName;
+                    $webPath = $webDir . $fileName;
+
+                    if (!move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
+                        continue;
+                    }
+
+                    if ($hasLegenda) {
+                        $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem) VALUES (?, ?, ?, ?, ?)');
+                        $stmt->execute([$varId, $webPath, $name, null, $ordBase + (int) $key]);
+                    } else {
+                        $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, ordem) VALUES (?, ?, ?, ?)');
+                        $stmt->execute([$varId, $webPath, $name, $ordBase + (int) $key]);
+                    }
+                    $insertId = (int) $pdo->lastInsertId();
+                    $inserted[] = ['id' => $insertId, 'url' => Url::absolute($webPath)];
+                }
+            }
+
+            $pdo->commit();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => true, 'fotos' => $inserted]);
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    public function removerFotoVariacao(Request $request, $id = null) {
+        $fotoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $stmt = $pdo->prepare('SELECT nome_arquivo, produto_variacao_id FROM produto_variacao_fotos WHERE id = ?');
+            $stmt->execute([$fotoId]);
+            $foto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$foto) {
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+                exit;
+            }
+
+            $path = (string) ($foto['nome_arquivo'] ?? '');
+            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($path, '/');
+            if ($path !== '' && file_exists($filePath)) {
+                @unlink($filePath);
+            }
+
+            $stmtD = $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE id = ?');
+            $stmtD->execute([$fotoId]);
+
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        } catch (\Exception $e) {
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        }
+    }
+
+    public function salvarOrdemFotosVariacao(Request $request, $id = null) {
+        $varId = (int) ($id ?? $request->getParam('id'));
+        $ordens = $request->getParam('ordens_variacao', []);
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $pdo->beginTransaction();
+            if (is_array($ordens)) {
+                foreach ($ordens as $fotoId => $ordem) {
+                    $fotoId = (int) $fotoId;
+                    $ordem = (int) $ordem;
+                    if ($fotoId <= 0) continue;
+                    $st = $pdo->prepare('UPDATE produto_variacao_fotos SET ordem = ? WHERE id = ? AND produto_variacao_id = ?');
+                    $st->execute([$ordem, $fotoId, $varId]);
+                }
+            }
+            $pdo->commit();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        }
+    }
+
     private function salvarCadastroRapido(Request $request): array {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         $pdo->beginTransaction();
@@ -1250,6 +1385,37 @@ HTML;
             $produtoTipoIds = $variacoesSchemaOk ? $this->getProdutoAtributos($pdo, (int) $id) : [];
             $produtoOpcoesPorTipo = $variacoesSchemaOk ? $this->getProdutoOpcoesUsadasPorTipo($pdo, (int) $id) : [];
             $produtoVariacoes = $variacoesSchemaOk ? $this->getProdutoVariacoesComDescricao($pdo, (int) $id) : [];
+
+            $fotosPorVariacao = [];
+            if ($variacoesSchemaOk && $this->tableExists($pdo, 'produto_variacao_fotos') && !empty($produtoVariacoes)) {
+                $varIds = [];
+                foreach ($produtoVariacoes as $vv) {
+                    $vId = (int) ($vv['id'] ?? 0);
+                    if ($vId > 0) $varIds[] = $vId;
+                }
+                $varIds = array_values(array_unique($varIds));
+                if (!empty($varIds)) {
+                    $in = implode(',', array_fill(0, count($varIds), '?'));
+                    $sql = 'SELECT * FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
+                    $st = $pdo->prepare($sql);
+                    $st->execute($varIds);
+                    $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rows as $r) {
+                        $pvId = (int) ($r['produto_variacao_id'] ?? 0);
+                        if ($pvId <= 0) continue;
+                        if (!isset($fotosPorVariacao[$pvId])) $fotosPorVariacao[$pvId] = [];
+                        $webPath = $this->normalizeUploadsWebPath((string) ($r['nome_arquivo'] ?? ''));
+                        $filePath = !empty($webPath) ? $this->resolveUploadsPublicPath($webPath) : null;
+                        $url = (!empty($webPath) && !empty($filePath)) ? Url::absolute($webPath) : Url::absolute('/uploads/produtos/placeholder.jpg');
+                        $fotosPorVariacao[$pvId][] = [
+                            'id' => (int) ($r['id'] ?? 0),
+                            'nome_arquivo' => $webPath,
+                            'url' => $url,
+                            'ordem' => (int) ($r['ordem'] ?? 0),
+                        ];
+                    }
+                }
+            }
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
@@ -1456,7 +1622,7 @@ HTML;
 
             echo '<div class="card mb-3">
                     <div class="card-body">
-                        <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/atributos">
+                        <div>
                             <div class="row g-2">';
 
             foreach ($variacaoTipos as $t) {
@@ -1492,35 +1658,27 @@ HTML;
             }
 
             echo '          <div class="col-12">
-                                <button type="submit" class="btn btn-outline-primary w-100">Salvar atributos/opções</button>
+                                <button type="submit" class="btn btn-outline-primary w-100" formaction="/admin/produtos/' . (int) $id . '/variacoes/atributos" formmethod="POST" formnovalidate>Salvar atributos/opções</button>
                             </div>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>';
 
             echo '<div class="d-flex flex-wrap gap-2 mb-3">
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Gerar variações com base nas opções selecionadas?\')">
-                        <input type="hidden" name="replace" value="0">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-cogs"></i> Gerar todas</button>
-                    </form>
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')">
-                        <input type="hidden" name="replace" value="1">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-redo"></i> Apagar e gerar</button>
-                    </form>
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/apagar" onsubmit="return confirm(\'Apagar todas as variações deste produto?\')">
-                        <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Apagar todas</button>
-                    </form>
+                    <button type="submit" class="btn btn-primary" name="replace" value="0" formaction="/admin/produtos/' . (int) $id . '/variacoes/gerar" formmethod="POST" formnovalidate onclick="return confirm(\'Gerar variações com base nas opções selecionadas?\')"><i class="fas fa-cogs"></i> Gerar todas</button>
+                    <button type="submit" class="btn btn-outline-primary" name="replace" value="1" formaction="/admin/produtos/' . (int) $id . '/variacoes/gerar" formmethod="POST" formnovalidate onclick="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')"><i class="fas fa-redo"></i> Apagar e gerar</button>
+                    <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/' . (int) $id . '/variacoes/apagar" formmethod="POST" formnovalidate onclick="return confirm(\'Apagar todas as variações deste produto?\')"><i class="fas fa-trash"></i> Apagar todas</button>
                   </div>';
 
             echo '<div class="card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <strong>Variações cadastradas</strong>
-                        <form class="d-flex gap-2" method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/criar">
+                        <div class="d-flex gap-2">
                             <input type="number" name="stock" class="form-control form-control-sm" style="width:120px" placeholder="Estoque" value="0" min="0">
                             <input type="text" name="price_override" class="form-control form-control-sm" style="width:160px" placeholder="Preço variação">
-                            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-plus"></i> Criar individual</button>
-                        </form>
+                            <button class="btn btn-sm btn-outline-primary" type="submit" formaction="/admin/produtos/' . (int) $id . '/variacoes/criar" formmethod="POST" formnovalidate><i class="fas fa-plus"></i> Criar individual</button>
+                        </div>
                     </div>
                     <div class="card-body">';
 
@@ -1532,9 +1690,9 @@ HTML;
                             <thead>
                                 <tr>
                                     <th>Variação</th>
-                                    <th>Preço</th>
-                                    <th>Estoque</th>
-                                    <th>Status</th>
+                                    <th style="width:180px">Preço (override)</th>
+                                    <th style="width:140px">Estoque</th>
+                                    <th style="width:140px">Ativa</th>
                                 </tr>
                             </thead>
                             <tbody>';
@@ -1544,22 +1702,91 @@ HTML;
                     $priceOv = $v['price_override'] ?? null;
                     $stockV = (int) ($v['stock'] ?? 0);
                     $ativoV = (int) ($v['ativo'] ?? 0);
+                    $priceUi = ($priceOv === null || $priceOv === '') ? '' : (string) $priceOv;
                     echo '<tr>
                             <td>
                                 <div class="fw-semibold">#' . $vId . '</div>
                                 <div class="text-muted small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</div>
                             </td>
-                            <td>' . htmlspecialchars(($priceOv === null || $priceOv === '' ? '-' : (string) $priceOv), ENT_QUOTES, 'UTF-8') . '</td>
-                            <td>' . $stockV . '</td>
-                            <td>' . ($ativoV ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') . '</td>
+                            <td><input type="text" class="form-control form-control-sm" name="variacao_price_override[' . $vId . ']" value="' . htmlspecialchars($priceUi, ENT_QUOTES, 'UTF-8') . '" placeholder="Ex: 19,90"></td>
+                            <td><input type="number" class="form-control form-control-sm" name="variacao_stock[' . $vId . ']" value="' . (int) $stockV . '" min="0"></td>
+                            <td class="text-center"><input type="hidden" name="variacao_ativo[' . $vId . ']" value="0"><input type="checkbox" class="form-check-input" name="variacao_ativo[' . $vId . ']" value="1" ' . ($ativoV ? 'checked' : '') . '></td>
                           </tr>';
                 }
                 echo '      </tbody>
                         </table>
                     </div>';
+
+                echo '<div class="d-flex justify-content-end mt-2">
+                        <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/' . (int) $id . '/variacoes/salvar" formmethod="POST" formnovalidate><i class="fas fa-save"></i> Salvar variações</button>
+                      </div>';
             }
 
             echo '      </div>
+                </div>';
+
+            echo '<div class="card mt-3">
+                    <div class="card-header bg-white">
+                        <strong>Galeria por variação (SKU)</strong>
+                        <div class="text-muted small">Cada variação pode ter sua própria galeria. Essas fotos serão exibidas na página do produto quando o cliente selecionar a variação.</div>
+                    </div>
+                    <div class="card-body">';
+
+            if (empty($produtoVariacoes)) {
+                echo '<div class="text-muted">Nenhuma variação criada ainda.</div>';
+            } else {
+                echo '<div class="accordion" id="accVarFotos">';
+                foreach ($produtoVariacoes as $idx => $v) {
+                    $vId = (int) ($v['id'] ?? 0);
+                    if ($vId <= 0) continue;
+                    $desc = (string) ($v['descricao'] ?? '');
+                    $headingId = 'varFotosHeading_' . $vId;
+                    $collapseId = 'varFotosCollapse_' . $vId;
+
+                    echo '<div class="accordion-item">
+                            <h2 class="accordion-header" id="' . $headingId . '">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' . $collapseId . '" aria-expanded="false" aria-controls="' . $collapseId . '">
+                                    <span class="fw-semibold">#' . $vId . '</span>
+                                    <span class="text-muted ms-2 small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</span>
+                                </button>
+                            </h2>
+                            <div id="' . $collapseId . '" class="accordion-collapse collapse" aria-labelledby="' . $headingId . '" data-bs-parent="#accVarFotos">
+                                <div class="accordion-body">';
+
+                    echo '<div id="varGaleriaRow_' . $vId . '" class="row mb-3">';
+                    $fotosV = $fotosPorVariacao[$vId] ?? [];
+                    foreach ($fotosV as $foto) {
+                        $fotoId = (int) ($foto['id'] ?? 0);
+                        $url = (string) ($foto['url'] ?? '');
+                        $ordem = (int) ($foto['ordem'] ?? 0);
+                        echo '<div class="col-6 col-md-2 mb-2">
+                                <a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank">
+                                    <img src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">
+                                </a>
+                                <div class="mt-2">
+                                    <input type="number" class="form-control form-control-sm" name="ordens_variacao[' . $fotoId . ']" value="' . $ordem . '" min="0">
+                                </div>
+                                <div class="mt-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/variacoes/fotos/remover/' . $fotoId . '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto da variação?\')">Remover</button>
+                                </div>
+                              </div>';
+                    }
+                    echo '</div>';
+
+                    echo '<div class="d-flex gap-2 align-items-center flex-wrap">
+                            <input id="varGaleriaFiles_' . $vId . '" type="file" class="form-control" style="max-width: 520px;" multiple accept="image/*">
+                            <button type="button" class="btn btn-outline-primary btnUploadVarGaleria" data-var-id="' . $vId . '" data-url="/admin/produtos/variacoes/' . $vId . '/fotos/upload">Enviar fotos</button>
+                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/variacoes/' . $vId . '/fotos/ordem" formmethod="POST" formnovalidate>Salvar ordem</button>
+                          </div>';
+
+                    echo '            </div>
+                            </div>
+                        </div>';
+                }
+                echo '</div>';
+            }
+
+            echo '    </div>
                 </div>';
         }
 
@@ -1738,6 +1965,47 @@ HTML;
                     }
                 });
             }
+
+            // Upload de galeria por variação
+            document.querySelectorAll('.btnUploadVarGaleria').forEach((btn) => {
+                btn.addEventListener('click', async function() {
+                    const varId = btn.getAttribute('data-var-id');
+                    const input = document.getElementById('varGaleriaFiles_' + varId);
+                    const row = document.getElementById('varGaleriaRow_' + varId);
+                    if (!varId || !input || !row) return;
+                    if (!input.files || input.files.length === 0) return;
+                    const url = btn.getAttribute('data-url');
+                    const fd = new FormData();
+                    for (const f of input.files) fd.append('imagens[]', f);
+                    btn.disabled = true;
+                    try {
+                        const data = await postFormData(url, fd);
+                        const fotos = (data && data.fotos) ? data.fotos : [];
+                        fotos.forEach(function(item) {
+                            const col = document.createElement('div');
+                            col.className = 'col-6 col-md-2 mb-2';
+                            const fotoId = item && item.id ? item.id : 0;
+                            const url = item && item.url ? item.url : '';
+                            col.innerHTML =
+                                '<a href="' + url + '" target="_blank">' +
+                                '<img src="' + url + '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">' +
+                                '</a>' +
+                                '<div class="mt-2">' +
+                                '<input type="number" class="form-control form-control-sm" name="ordens_variacao[' + fotoId + ']" value="0" min="0">' +
+                                '</div>' +
+                                '<div class="mt-2">' +
+                                '<button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/variacoes/fotos/remover/' + fotoId + '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto da variação?\')">Remover</button>' +
+                                '</div>';
+                            row.appendChild(col);
+                        });
+                        input.value = '';
+                    } catch (e) {
+                        alert(e.message || 'Erro ao enviar fotos da variação');
+                    } finally {
+                        btn.disabled = false;
+                    }
+                });
+            });
         })();
 </script>
 HTMLSCRIPT;
@@ -1936,11 +2204,29 @@ HTMLSCRIPT;
             $stmtDel = $pdo->prepare('DELETE FROM produto_atributos WHERE produto_id = :pid');
             $stmtDel->execute([':pid' => $produtoId]);
 
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes')) {
+                $pdo->prepare('DELETE FROM produto_atributo_opcoes WHERE produto_id = :pid')->execute([':pid' => $produtoId]);
+            }
+
             if (!empty($tipoIds)) {
                 $stmtIns = $pdo->prepare('INSERT INTO produto_atributos (produto_id, tipo_id, created_at, updated_at) VALUES (:pid, :tid, NOW(), NOW())');
                 foreach ($tipoIds as $tid) {
                     if ($tid <= 0) continue;
                     $stmtIns->execute([':pid' => $produtoId, ':tid' => $tid]);
+                }
+            }
+
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes') && !empty($opcoes)) {
+                $stmtInsOp = $pdo->prepare('INSERT IGNORE INTO produto_atributo_opcoes (produto_id, tipo_id, opcao_id, created_at) VALUES (:pid, :tid, :oid, NOW())');
+                foreach ($opcoes as $tid => $list) {
+                    $tid = (int) $tid;
+                    if ($tid <= 0) continue;
+                    if (!is_array($list)) continue;
+                    foreach ($list as $oid) {
+                        $oid = (int) $oid;
+                        if ($oid <= 0) continue;
+                        $stmtInsOp->execute([':pid' => $produtoId, ':tid' => $tid, ':oid' => $oid]);
+                    }
                 }
             }
 
@@ -1950,6 +2236,80 @@ HTMLSCRIPT;
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
             $_SESSION['message'] = 'Erro ao salvar atributos.';
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/produtos/editar/' . $produtoId);
+        exit;
+    }
+
+    public function salvarVariacoes(Request $request, $id = null) {
+        $produtoId = (int) ($id ?? $request->getParam('id'));
+        if ($produtoId <= 0) {
+            header('Location: /admin/produtos');
+            exit;
+        }
+
+        $stocks = $request->getParam('variacao_stock', []);
+        if (!is_array($stocks)) $stocks = [];
+
+        $prices = $request->getParam('variacao_price_override', []);
+        if (!is_array($prices)) $prices = [];
+
+        $ativos = $request->getParam('variacao_ativo', []);
+        if (!is_array($ativos)) $ativos = [];
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \Exception('Tabelas de variações não encontradas');
+            }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare('UPDATE produto_variacoes SET stock = :st, price_override = :po, ativo = :at, updated_at = NOW() WHERE id = :vid AND produto_id = :pid');
+
+            $varIds = [];
+            foreach ($stocks as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+            foreach ($prices as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+            foreach ($ativos as $k => $_) {
+                $vid = (int) $k;
+                if ($vid > 0) $varIds[$vid] = true;
+            }
+
+            foreach (array_keys($varIds) as $vid) {
+                $stock = (int) ($stocks[$vid] ?? 0);
+                $poRaw = trim((string) ($prices[$vid] ?? ''));
+                $po = ($poRaw !== '') ? $this->parseMoneyToDb($poRaw) : null;
+
+                $ativo = 0;
+                if (array_key_exists($vid, $ativos)) {
+                    $ativo = ((string) $ativos[$vid] === '1' || (int) $ativos[$vid] === 1) ? 1 : 0;
+                }
+
+                $stmt->bindValue(':st', $stock, \PDO::PARAM_INT);
+                if ($po === null) {
+                    $stmt->bindValue(':po', null, \PDO::PARAM_NULL);
+                } else {
+                    $stmt->bindValue(':po', $po);
+                }
+                $stmt->bindValue(':at', $ativo, \PDO::PARAM_INT);
+                $stmt->bindValue(':vid', $vid, \PDO::PARAM_INT);
+                $stmt->bindValue(':pid', $produtoId, \PDO::PARAM_INT);
+                $stmt->execute();
+            }
+
+            $pdo->commit();
+            $_SESSION['message'] = 'Variações atualizadas.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['message'] = 'Erro ao atualizar variações.';
             $_SESSION['message_type'] = 'danger';
         }
 
@@ -2174,6 +2534,26 @@ HTMLSCRIPT;
     private function getProdutoOpcoesUsadasPorTipo(\PDO $pdo, int $produtoId): array {
         $map = [];
         try {
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes')) {
+                $stmt = $pdo->prepare('SELECT tipo_id, opcao_id FROM produto_atributo_opcoes WHERE produto_id = :pid');
+                $stmt->execute([':pid' => $produtoId]);
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $tid = (int) ($r['tipo_id'] ?? 0);
+                    $oid = (int) ($r['opcao_id'] ?? 0);
+                    if ($tid <= 0 || $oid <= 0) continue;
+                    if (!isset($map[$tid])) $map[$tid] = [];
+                    $map[$tid][$oid] = true;
+                }
+                foreach ($map as $tid => $set) {
+                    $map[$tid] = array_map('intval', array_keys($set));
+                }
+                if (!empty($map)) {
+                    return $map;
+                }
+            }
+
+            // Fallback: deduzir opções a partir das variações existentes
             $stmt = $pdo->prepare('
                 SELECT pvi.tipo_id, pvi.opcao_id
                 FROM produto_variacao_itens pvi

@@ -54,11 +54,11 @@
                                  src="<?= $fotoAbsUrl ?>?v=<?= time() ?>" 
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
-                                 style="cursor: pointer;"
+                                 style="object-fit: cover; cursor: pointer;"
                                  title="Clique para ver imagem em tamanho real">
                         </a>
                     <?php else: ?>
-                        <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 400px;">
+                        <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
                             <i class="fas fa-image text-muted fa-3x"></i>
                         </div>
                     <?php endif; ?>
@@ -114,9 +114,6 @@
         <!-- Informações do Produto -->
         <div class="col-lg-6">
             <div class="product-info">
-                <h1 class="h2 mb-2"><?= htmlspecialchars($produto['nome']) ?></h1>
-                <p class="text-muted mb-3"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></p>
-
                 <?php
                 $currencySymbols = [
                     'BRL' => 'R$',
@@ -131,11 +128,63 @@
 
                 <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
                 <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
-                <div class="card mb-3" id="variacoes-card" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                <div class="buybox card mb-3" id="buybox">
                     <div class="card-body">
-                        <h5 class="mb-3">Variações</h5>
-                        <div id="variacoes-selectors"></div>
-                        <div class="mt-3 small text-muted" id="variacao-status"></div>
+                        <div class="mb-2">
+                            <h1 class="h2 mb-1"><?= htmlspecialchars($produto['nome']) ?></h1>
+                            <div class="text-muted"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></div>
+                        </div>
+
+                        <div class="d-flex align-items-baseline gap-2 mb-2">
+                            <div class="fs-4 fw-bold">
+                                <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                            </div>
+                        </div>
+
+                        <div id="variacoes-card" class="mb-3" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                            <div class="fw-semibold mb-2">Variações</div>
+                            <div id="variacoes-selectors"></div>
+                            <div class="mt-2 small text-muted" id="variacao-status"></div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="text-muted small">Disponibilidade</div>
+                            <div>
+                                <?php if ($produto['estoque'] > 0): ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                        <?= $produto['estoque'] ?> unidades
+                                    </span>
+                                <?php else: ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                        Fora de estoque
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <form id="add-to-cart-form" class="row g-3">
+                            <input type="hidden" name="id" value="<?= $produto['id'] ?>">
+                            <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
+
+                            <div class="col-12">
+                                <label for="quantity" class="form-label">Quantidade</label>
+                                <div class="input-group" style="max-width: 220px;">
+                                    <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
+                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
+                                    <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
+                                    <?php if ($produto['estoque'] > 0): ?>
+                                        <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
+                                    <?php else: ?>
+                                        <i class="fas fa-times"></i> Produto Indisponível
+                                    <?php endif; ?>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
@@ -195,60 +244,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-lg-6 offset-lg-6">
-            <div class="buybox card" id="buybox">
-                <div class="card-body">
-                    <div class="d-flex align-items-baseline gap-2 mb-2">
-                        <div class="fs-4 fw-bold">
-                            <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
-                            <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
-                        </div>
-                    </div>
-
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="text-muted small">Disponibilidade</div>
-                        <div>
-                            <?php if ($produto['estoque'] > 0): ?>
-                                <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
-                                    <?= $produto['estoque'] ?> unidades
-                                </span>
-                            <?php else: ?>
-                                <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                    Fora de estoque
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <form id="add-to-cart-form" class="row g-3">
-                        <input type="hidden" name="id" value="<?= $produto['id'] ?>">
-                        <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
-
-                        <div class="col-12">
-                            <label for="quantity" class="form-label">Quantidade</label>
-                            <div class="input-group" style="max-width: 220px;">
-                                <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
-                                <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
-                            </div>
-                        </div>
-
-                        <div class="col-12">
-                            <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
-                                <?php if ($produto['estoque'] > 0): ?>
-                                    <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
-                                <?php else: ?>
-                                    <i class="fas fa-times"></i> Produto Indisponível
-                                <?php endif; ?>
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
@@ -334,16 +329,41 @@
     border: 1px solid rgba(15, 23, 42, 0.10);
 }
 
+.variacao-thumb-wrap {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    background: rgba(15, 23, 42, 0.04);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    overflow: hidden;
+}
+
 .main-image-container {
     position: relative;
     overflow: hidden;
     border-radius: 8px;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    min-height: 320px;
+    max-height: 560px;
+}
+
+.main-image-container > a {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .main-product-image {
     width: 100%;
-    height: auto;
+    height: 100%;
     cursor: zoom-in;
+    object-fit: cover;
+    display: block;
 }
 
 .thumbnail-image {
@@ -475,6 +495,34 @@ document.addEventListener('DOMContentLoaded', function() {
 function inicializarDetalhesProduto() {
     console.log('Inicializando detalhes do produto...');
 
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const pedirSelecao = params.get('selecionar_variacao');
+        if (pedirSelecao === '1' || (pedirSelecao || '').toLowerCase() === 'true') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Selecione a variação',
+                    text: 'Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.'
+                });
+            } else {
+                alert('Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.');
+            }
+
+            params.delete('selecionar_variacao');
+            const newQs = params.toString();
+            const newUrl = window.location.pathname + (newQs ? ('?' + newQs) : '') + (window.location.hash || '');
+            window.history.replaceState({}, document.title, newUrl);
+
+            const target = document.getElementById('variacoes-card') || document.getElementById('buybox');
+            if (target && typeof target.scrollIntoView === 'function') {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    } catch (e) {
+        // noop
+    }
+
     const variacoesUi = <?= json_encode($variacoesUi ?? ['enabled' => false]) ?>;
     const variacoesEnabled = !!(variacoesUi && (variacoesUi.enabled || ((variacoesUi.atributos || []).length > 0 && (variacoesUi.variacoes || []).length > 0)));
     const fotosProdutoBase = <?= json_encode(array_values(array_map(function($f) {
@@ -484,7 +532,6 @@ function inicializarDetalhesProduto() {
         ];
     }, $fotos ?? []))) ?>;
 
-    const currencyLabel = <?= json_encode($currencyLabel ?? '') ?>;
     const basePrice = Number($('.amount').data('original-price') || 0);
 
     const produtoId = <?= (int) ($produto['id'] ?? 0) ?>;
@@ -521,11 +568,13 @@ function inicializarDetalhesProduto() {
                 btn.attr('data-opcao-id', String(oid));
                 btn.attr('aria-disabled', 'false');
 
+                const thumbWrap = $('<span class="variacao-thumb-wrap" aria-hidden="true"></span>');
                 if (img) {
                     const thumb = $('<img class="variacao-thumb" alt="" />');
                     thumb.attr('src', img);
-                    btn.append(thumb);
+                    thumbWrap.append(thumb);
                 }
+                btn.append(thumbWrap);
                 if (display) {
                     const txt = $('<span class="variacao-label"></span>').text(display);
                     btn.append(txt);
@@ -679,13 +728,23 @@ function inicializarDetalhesProduto() {
         if (s <= 0) qty.val('1');
     }
 
-    function setPriceUi(price) {
-        const p = Number(price || 0);
+    function setPriceUi(priceUsd) {
+        const p = Number(priceUsd || 0);
         const amount = $('.amount');
         if (!amount.length) return;
-        const formatted = p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        amount.text(formatted);
-        $('.currency').text(currencyLabel);
+
+        // Manter o valor original em USD para o conversor global
+        amount.attr('data-original-price', String(p));
+
+        // Renderizar o valor conforme a moeda selecionada
+        const cc = (window.CurrencyConverter && typeof window.CurrencyConverter === 'object') ? window.CurrencyConverter : null;
+        const cur = (cc && cc.currentCurrency) ? String(cc.currentCurrency) : (localStorage.getItem('selected_currency') || 'USD');
+        const rates = (cc && cc.exchangeRates) ? cc.exchangeRates : (window.exchangeRates || { BRL: 5.50, USD: 1.00 });
+        const rate = Number(rates[cur] || 1);
+        const symbol = (cur === 'BRL') ? 'R$' : '$';
+        const converted = p * rate;
+        const formatted = converted.toFixed(2).replace('.', ',');
+        amount.text(symbol + ' ' + formatted);
     }
 
     function findMatchingVariation(selectionMap) {
@@ -747,8 +806,8 @@ function inicializarDetalhesProduto() {
         hidden.val(String(v.id));
         status.text(v.descricao || 'Variação selecionada');
 
-        const price = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
-        setPriceUi(price);
+        const priceUsd = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
+        setPriceUi(priceUsd);
         setStockUi(v.stock);
 
         const fotosMap = variacoesState.fotos_por_variacao || {};
@@ -922,6 +981,8 @@ function inicializarDetalhesProduto() {
     }
     
     if (variacoesState.enabled) {
+        $('#variacoes-card').show();
+        renderVariacaoSelectors(variacoesState);
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
         $('#variacoes-selectors').on('click', '.variacao-option', function() {
             const $btn = $(this);

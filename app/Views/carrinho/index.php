@@ -321,6 +321,26 @@ function removerItem(itemKey, produtoId) {
         });
     }
 }
+
+function limparCarrinho() {
+    if (!confirm('Deseja limpar o carrinho?')) return;
+
+    $.ajax({
+        url: '/carrinho/limpar',
+        method: 'POST',
+        data: {},
+        success: function(response) {
+            if (response && response.success) {
+                location.reload();
+            } else {
+                alert((response && response.error) ? response.error : 'Erro ao limpar carrinho');
+            }
+        },
+        error: function() {
+            alert('Erro ao limpar carrinho');
+        }
+    });
+}
 </script>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

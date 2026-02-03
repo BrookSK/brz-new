@@ -219,12 +219,16 @@ $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atua
 $router->post('/admin/produtos/{id}/variacoes/atributos', 'AdminProdutosController', 'salvarAtributosVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/gerar', 'AdminProdutosController', 'gerarVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/apagar', 'AdminProdutosController', 'apagarVariacoes');
+$router->post('/admin/produtos/{id}/variacoes/salvar', 'AdminProdutosController', 'salvarVariacoes');
 $router->post('/admin/produtos/{id}/variacoes/criar', 'AdminProdutosController', 'criarVariacaoIndividual');
 $router->post('/admin/produtos/upload-capa/{id}', 'AdminProdutosController', 'uploadCapa');
 $router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 'uploadGaleria');
 $router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'removerCapa');
 $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
 $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
+$router->post('/admin/produtos/variacoes/{id}/fotos/upload', 'AdminProdutosController', 'uploadFotosVariacao');
+$router->post('/admin/produtos/variacoes/fotos/remover/{id}', 'AdminProdutosController', 'removerFotoVariacao');
+$router->post('/admin/produtos/variacoes/{id}/fotos/ordem', 'AdminProdutosController', 'salvarOrdemFotosVariacao');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
 // Lojas

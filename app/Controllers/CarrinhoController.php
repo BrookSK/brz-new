@@ -12,6 +12,43 @@ class CarrinhoController extends Controller {
     private $produtoFotoModel;
     private $authService;
 
+    private function tableExists(string $table): bool {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function getVariacaoInfo(int $produtoVariacaoId): ?array {
+        if ($produtoVariacaoId <= 0) return null;
+        if (!$this->tableExists('produto_variacoes')) return null;
+
+        try {
+            $db = \Config\Database::getConnection();
+            $cols = [];
+            try {
+                $stCols = $db->query("DESCRIBE produto_variacoes");
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+
+            $hasAtivo = in_array('ativo', $cols, true);
+            $select = 'id, produto_id, price_override, stock' . ($hasAtivo ? ', ativo' : '');
+            $sql = 'SELECT ' . $select . ' FROM produto_variacoes WHERE id = ?' . ($hasAtivo ? ' AND ativo = 1' : '') . ' LIMIT 1';
+            $st = $db->prepare($sql);
+            $st->execute([$produtoVariacaoId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private function getConfigValue(string $chave, $default = null) {
         try {
             $db = \Config\Database::getConnection();
@@ -101,10 +138,38 @@ class CarrinhoController extends Controller {
                     }
                 }
                 
-                // Usar campos mapeados do Model
+                // Usar campos mapeados do Model (com override da variação, quando existir)
+                $pvId = (int) ($item['produto_variacao_id'] ?? 0);
                 $itemPrice = floatval($produto['preco'] ?? 0);
                 $itemStock = intval($produto['estoque'] ?? 0);
-                $itemSubtotal = $item['quantidade'] * $itemPrice;
+                if ($pvId > 0) {
+                    $infoVar = $this->getVariacaoInfo($pvId);
+                    if ($infoVar) {
+                        $ov = $infoVar['price_override'] ?? null;
+                        if ($ov !== null && $ov !== '' && floatval($ov) > 0) {
+                            $itemPrice = floatval($ov);
+                        }
+                        if (array_key_exists('stock', $infoVar) && $infoVar['stock'] !== null && $infoVar['stock'] !== '') {
+                            $itemStock = (int) $infoVar['stock'];
+                        }
+                    }
+                }
+
+                $itemSubtotal = ((int) ($item['quantidade'] ?? 0)) * $itemPrice;
+
+                // Normalizar sessão para refletir os valores corretos na view/resumo
+                if (isset($_SESSION['carrinho'][$k]) && is_array($_SESSION['carrinho'][$k])) {
+                    $_SESSION['carrinho'][$k]['price'] = $itemPrice;
+                    $_SESSION['carrinho'][$k]['preco_unitario'] = $itemPrice;
+                    $_SESSION['carrinho'][$k]['subtotal'] = $itemSubtotal;
+                }
+
+                // Normalizar o carrinho local usado pela view
+                if (isset($carrinho[$k]) && is_array($carrinho[$k])) {
+                    $carrinho[$k]['price'] = $itemPrice;
+                    $carrinho[$k]['preco_unitario'] = $itemPrice;
+                    $carrinho[$k]['subtotal'] = $itemSubtotal;
+                }
                 
                 $this->debugLog('[CARRINHO] Preco: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
                 
@@ -220,6 +285,15 @@ class CarrinhoController extends Controller {
         $itemKey = ((string) $produtoId) . ':' . ((string) ($pvId ?? 0));
         
         $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+        if ($pvId !== null && $pvId > 0) {
+            $infoVar = $this->getVariacaoInfo($pvId);
+            if ($infoVar) {
+                $ov = $infoVar['price_override'] ?? null;
+                if ($ov !== null && $ov !== '' && floatval($ov) > 0) {
+                    $itemPrice = floatval($ov);
+                }
+            }
+        }
         
         if (isset($_SESSION['carrinho'][$itemKey])) {
             $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
@@ -357,10 +431,20 @@ class CarrinhoController extends Controller {
                 return;
             }
 
-            // Garantir preço numérico (não depender de formatação)
+            // Garantir preço numérico (com override da variação, quando existir)
             $itemPrice = 0.0;
             if ($produto) {
                 $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+            }
+            $pvId = (int) ($_SESSION['carrinho'][$itemKey]['produto_variacao_id'] ?? 0);
+            if ($pvId > 0) {
+                $infoVar = $this->getVariacaoInfo($pvId);
+                if ($infoVar) {
+                    $ov = $infoVar['price_override'] ?? null;
+                    if ($ov !== null && $ov !== '' && floatval($ov) > 0) {
+                        $itemPrice = floatval($ov);
+                    }
+                }
             }
             if ($itemPrice <= 0) {
                 $itemPrice = floatval($_SESSION['carrinho'][$itemKey]['price'] ?? $_SESSION['carrinho'][$itemKey]['preco_unitario'] ?? 0);

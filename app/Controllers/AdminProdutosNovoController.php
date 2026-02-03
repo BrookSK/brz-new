@@ -854,7 +854,20 @@ HTML;
 
                 $stmtInsVarFoto = null;
                 if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
-                    $stmtInsVarFoto = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                    $hasLegenda = false;
+                    try {
+                        $stCol = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_fotos' AND column_name = 'legenda'");
+                        $stCol->execute();
+                        $hasLegenda = ((int) $stCol->fetchColumn()) > 0;
+                    } catch (\Throwable $e) {
+                        $hasLegenda = false;
+                    }
+
+                    if ($hasLegenda) {
+                        $stmtInsVarFoto = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                    } else {
+                        $stmtInsVarFoto = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())');
+                    }
                 }
 
                 foreach ($variacoes as $idx => $v) {
@@ -901,7 +914,11 @@ HTML;
                                 $filePath = $uploadDir . $fileName;
                                 $webPath = $webDir . $fileName;
                                 if (move_uploaded_file($tmps[$k] ?? '', $filePath)) {
-                                    $stmtInsVarFoto->execute([$varId, $webPath, $nm, null, $ord]);
+                                    if (stripos((string) $stmtInsVarFoto->queryString, 'legenda') !== false) {
+                                        $stmtInsVarFoto->execute([$varId, $webPath, $nm, null, $ord]);
+                                    } else {
+                                        $stmtInsVarFoto->execute([$varId, $webPath, $nm, $ord]);
+                                    }
                                     $ord++;
                                 }
                             }
