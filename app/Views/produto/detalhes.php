@@ -114,9 +114,6 @@
         <!-- Informações do Produto -->
         <div class="col-lg-6">
             <div class="product-info">
-                <h1 class="h2 mb-2"><?= htmlspecialchars($produto['nome']) ?></h1>
-                <p class="text-muted mb-3"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></p>
-
                 <?php
                 $currencySymbols = [
                     'BRL' => 'R$',
@@ -133,6 +130,11 @@
                 <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
                 <div class="buybox card mb-3" id="buybox">
                     <div class="card-body">
+                        <div class="mb-2">
+                            <h1 class="h2 mb-1"><?= htmlspecialchars($produto['nome']) ?></h1>
+                            <div class="text-muted"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></div>
+                        </div>
+
                         <div class="d-flex align-items-baseline gap-2 mb-2">
                             <div class="fs-4 fw-bold">
                                 <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
