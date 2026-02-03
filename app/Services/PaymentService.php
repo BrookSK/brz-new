@@ -187,7 +187,7 @@ class PaymentService {
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
-        $total = round(((float) $productsValueCents) / 100, 2);
+        $total = round(((float) ($productsValueCents + $shippingValueCents - $discountValueCents)) / 100, 2);
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
 
@@ -1445,7 +1445,7 @@ class PaymentService {
     }
 
     public function reemitirCobrancaAsaasPorPedido(int $pedidoId): array {
-        $pedido = $this->pedidoModel->find($pedidoId);
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
         if (!$pedido) {
             throw new \Exception('Pedido não encontrado');
         }
@@ -1564,7 +1564,7 @@ class PaymentService {
     }
     
     public function estornarPagamento($pedidoId, $motivo = '') {
-        $pedido = $this->pedidoModel->find($pedidoId);
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
         
         if (!$pedido || $pedido['payment_status'] !== 'approved') {
             throw new \Exception('Pagamento não pode ser estornado');

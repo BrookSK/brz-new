@@ -714,6 +714,15 @@ class PedidoEcommerce {
             $pedido['estado_entrega'] = $estado;
             $pedido['cep_entrega'] = $cep;
 
+            // Aliases usados por views legadas (ex: checkout/conclusao.php)
+            $pedido['endereco'] = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? null);
+            $pedido['numero'] = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? null);
+            $pedido['complemento'] = $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? null);
+            $pedido['bairro'] = $pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? null);
+            $pedido['cidade'] = $pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? null);
+            $pedido['estado'] = $pedido['estado_entrega'] ?? ($pedido['estado'] ?? null);
+            $pedido['cep'] = $pedido['cep_entrega'] ?? ($pedido['cep'] ?? null);
+
             // Se houver endereco_entrega_id, buscar dados completos em enderecos
             $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
             if ($enderecoEntregaId > 0 && $this->tableExists('enderecos')) {
@@ -732,9 +741,59 @@ class PedidoEcommerce {
                             $pedido['cidade_entrega'] = $rowE['cidade'] ?? ($pedido['cidade_entrega'] ?? null);
                             $pedido['estado_entrega'] = $rowE['estado'] ?? ($pedido['estado_entrega'] ?? null);
                             $pedido['cep_entrega'] = $rowE['cep'] ?? ($pedido['cep_entrega'] ?? null);
+
+                            // atualizar aliases após buscar endereço
+                            $pedido['endereco'] = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? null);
+                            $pedido['numero'] = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? null);
+                            $pedido['complemento'] = $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? null);
+                            $pedido['bairro'] = $pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? null);
+                            $pedido['cidade'] = $pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? null);
+                            $pedido['estado'] = $pedido['estado_entrega'] ?? ($pedido['estado'] ?? null);
+                            $pedido['cep'] = $pedido['cep_entrega'] ?? ($pedido['cep'] ?? null);
                         }
                     }
                 } catch (\Exception $e) {
+                }
+            }
+
+            // Cliente: preencher campos esperados pela conclusão
+            if (empty($pedido['cliente_nome']) || empty($pedido['cliente_email']) || empty($pedido['cliente_telefone'])) {
+                $uid = (int) ($pedido['usuario_id'] ?? 0);
+                if ($uid > 0 && $this->tableExists('usuarios')) {
+                    try {
+                        $colsU = $this->getTableColumns('usuarios');
+                        $colNome = $this->pickColumn($colsU, ['nome', 'name', 'full_name']);
+                        $colEmail = $this->pickColumn($colsU, ['email']);
+                        $colTel = $this->pickColumn($colsU, ['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
+                        $sel = ['id'];
+                        if ($colNome) $sel[] = $colNome . ' AS nome';
+                        if ($colEmail) $sel[] = $colEmail . ' AS email';
+                        if ($colTel) $sel[] = $colTel . ' AS telefone';
+                        $stU = $this->connection->prepare('SELECT ' . implode(', ', $sel) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                        $stU->execute([$uid]);
+                        $rowU = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        if (empty($pedido['cliente_nome']) && !empty($rowU['nome'])) {
+                            $pedido['cliente_nome'] = $rowU['nome'];
+                        }
+                        if (empty($pedido['cliente_email']) && !empty($rowU['email'])) {
+                            $pedido['cliente_email'] = $rowU['email'];
+                        }
+                        if (empty($pedido['cliente_telefone']) && !empty($rowU['telefone'])) {
+                            $pedido['cliente_telefone'] = $rowU['telefone'];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                // Fallback para colunas do próprio pedido
+                if (empty($pedido['cliente_nome'])) {
+                    $pedido['cliente_nome'] = $pedido['nome'] ?? ($pedido['customer_name'] ?? '');
+                }
+                if (empty($pedido['cliente_email'])) {
+                    $pedido['cliente_email'] = $pedido['email'] ?? ($pedido['customer_email'] ?? '');
+                }
+                if (empty($pedido['cliente_telefone'])) {
+                    $pedido['cliente_telefone'] = $pedido['telefone'] ?? ($pedido['customer_phone'] ?? '');
                 }
             }
         } catch (\Exception $e) {
@@ -890,6 +949,11 @@ class PedidoEcommerce {
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
+                }
+
+                // Alias usado por checkout/conclusao.php
+                if (empty($item['nome']) && !empty($item['nome_produto'])) {
+                    $item['nome'] = $item['nome_produto'];
                 }
 
                 $pvId = (int) ($item['produto_variacao_id'] ?? 0);
