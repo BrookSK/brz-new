@@ -219,6 +219,55 @@ class ProdutoController extends Controller {
                 $data['debug_counts'] = $counts;
                 $data['debug_error'] = $err;
                 $data['debug_produto_id'] = $produtoId;
+
+                $schema = [];
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacoes' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['produto_variacoes_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['produto_variacoes_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_itens' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['produto_variacao_itens_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['produto_variacao_itens_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'variacao_tipos' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['variacao_tipos_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['variacao_tipos_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'variacao_opcoes' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['variacao_opcoes_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['variacao_opcoes_cols'] = null;
+                }
+
+                $samples = [];
+                try {
+                    $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC LIMIT 10');
+                    $st->execute([$produtoId]);
+                    $samples['produto_variacoes'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $samples['produto_variacoes'] = null;
+                }
+                try {
+                    $st = $pdo->prepare('SELECT pvi.* FROM produto_variacao_itens pvi INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id WHERE pv.produto_id = ? ORDER BY pvi.produto_variacao_id ASC, pvi.tipo_id ASC, pvi.opcao_id ASC LIMIT 50');
+                    $st->execute([$produtoId]);
+                    $samples['produto_variacao_itens'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $samples['produto_variacao_itens'] = null;
+                }
+
+                $data['debug_schema'] = $schema;
+                $data['debug_samples'] = $samples;
             }
 
             $this->json($data);
