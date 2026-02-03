@@ -192,7 +192,8 @@
                 </div>
 
                 <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
-                <?php if (!empty($variacoesUi['enabled'])): ?>
+                <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
+                <?php if (!empty($variacoesEnabled)): ?>
                     <div class="card mb-4">
                         <div class="card-body">
                             <h5 class="mb-3">Variações</h5>
@@ -435,6 +436,7 @@ function inicializarDetalhesProduto() {
     console.log('Inicializando detalhes do produto...');
 
     const variacoesUi = <?= json_encode($variacoesUi ?? ['enabled' => false]) ?>;
+    const variacoesEnabled = !!(variacoesUi && (variacoesUi.enabled || ((variacoesUi.atributos || []).length > 0 && (variacoesUi.variacoes || []).length > 0)));
     const fotosProdutoBase = <?= json_encode(array_values(array_map(function($f) {
         return [
             'url' => ($f['url_completa'] ?? (isset($f['nome_arquivo']) ? Url::absolute((string) $f['nome_arquivo']) : null)),
@@ -515,7 +517,7 @@ function inicializarDetalhesProduto() {
     }
 
     function findMatchingVariation(selectionMap) {
-        if (!variacoesUi || !variacoesUi.enabled) return null;
+        if (!variacoesUi || !variacoesEnabled) return null;
         const vars = variacoesUi.variacoes || [];
         for (let i = 0; i < vars.length; i++) {
             const v = vars[i];
@@ -552,7 +554,7 @@ function inicializarDetalhesProduto() {
     }
 
     function onVariationChange() {
-        if (!variacoesUi || !variacoesUi.enabled) return;
+        if (!variacoesUi || !variacoesEnabled) return;
         const selection = readSelection();
         const status = $('#variacao-status');
         const hidden = $('#produto_variacao_id');
@@ -658,7 +660,7 @@ function inicializarDetalhesProduto() {
     $('#add-to-cart-form').on('submit', function(e) {
         e.preventDefault();
 
-        if (variacoesUi && variacoesUi.enabled) {
+        if (variacoesUi && variacoesEnabled) {
             const pv = $('#produto_variacao_id').val();
             if (!pv) {
                 if (typeof Swal !== 'undefined') {
@@ -751,7 +753,7 @@ function inicializarDetalhesProduto() {
         }
     }
     
-    if (variacoesUi && variacoesUi.enabled) {
+    if (variacoesUi && variacoesEnabled) {
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
         // Inicial
         $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
