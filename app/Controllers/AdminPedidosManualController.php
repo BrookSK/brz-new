@@ -2,11 +2,11 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Models\Usuario;
-use App\Services\PedidoManualService;
 use App\Services\AuthService;
+use App\Services\PedidoManualService;
+use App\Models\Carrinho;
 
-class AdminPedidosManualController extends Controller {
+class AdminPedidosManualController extends BaseController {
     public function novo(Request $request) {
         $usuarioModel = new Usuario();
         $usuarios = [];
@@ -615,6 +615,7 @@ function calcTotal(){
     let subtotal = 0;
     let pesoTotal = 0;
     let qtdItens = 0;
+    const itensPayload = [];
     const rows = document.querySelectorAll('#itensTable tbody tr');
     rows.forEach(r => {
         const qtd = Number(r.querySelector('.qtdInp')?.value || 0);
@@ -622,54 +623,93 @@ function calcTotal(){
         const val = Number(moeda === 'BRL' ? raw.replace('.', '').replace(',', '.') : raw.replace(',', '.'));
         const pid = Number(r.querySelector('.produtoIdInp')?.value || 0);
         const prod = PRODUTOS.find(p => Number(p.id) === pid);
-        const peso = prod ? Number(prod.peso || 0) : 0;
+        const peso = prod ? Number(prod.peso || prod.weight || prod.peso_kg || prod.product_weight || 0) : 0;
         if (qtd > 0 && val >= 0) {
             subtotal += (qtd * val);
             qtdItens += qtd;
             pesoTotal += (peso * qtd);
+            if (pid > 0) {
+                itensPayload.push({ produto_id: pid, quantidade: qtd, valor_unitario: val });
+            }
         }
     });
 
-    const frete = 0;
-    // Cobrança padrão: taxa de serviço usa peso arredondado para cima
-    const pesoParaTaxa = Math.ceil(pesoTotal);
-    const taxaKg = moeda === 'BRL' ? Number(TAXA_SERVICO_POR_KG_BRL || 0) : Number(TAXA_SERVICO_POR_KG_USD || 0);
-    const taxaServico = (taxaKg > 0) ? (pesoParaTaxa * taxaKg) : 0;
-    const baseImpostos = subtotal + frete;
-    const icms = (Number(ALIQUOTA_ICMS || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_ICMS) / 100)) : 0;
-    const ipi = (Number(ALIQUOTA_IPI || 0) > 0) ? (baseImpostos * (Number(ALIQUOTA_IPI) / 100)) : 0;
-    const impostos = icms + ipi;
-    const total = subtotal + frete + taxaServico + impostos;
-
+    // Atualiza imediatamente parte visual básica (subtotal/peso/itens)
     document.getElementById('resumoQtdItens').textContent = String(qtdItens);
     document.getElementById('resumoPeso').textContent = formatPeso(pesoTotal);
     const setSym = (id) => { const el = document.getElementById(id); if (el) el.textContent = sym; };
     ['resumoMoedaSymbol','resumoMoedaSymbol2','resumoMoedaSymbol3','resumoMoedaSymbol4','resumoMoedaSymbol5','resumoMoedaSymbol6'].forEach(setSym);
-
     document.getElementById('resumoSubtotal').textContent = formatForDisplay(subtotal, moeda);
-    document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
-    document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
-    const freteWrap = document.getElementById('resumoFreteWrap');
-    if (Number(frete) <= 0) {
-        if (freteWrap) freteWrap.textContent = 'Frete grátis';
-    } else {
-        if (freteWrap) freteWrap.innerHTML = `<span id="resumoMoedaSymbol5">${escapeHtml(sym)}</span> <span id="resumoFrete">${escapeHtml(formatForDisplay(frete, moeda))}</span>`;
-        const rf = document.getElementById('resumoFrete');
-        if (rf) rf.textContent = formatForDisplay(frete, moeda);
-    }
-    document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
-    document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
 
-    const setVal = (id, v) => {
-        const el = document.getElementById(id);
-        if (el) el.value = String(v);
-    };
-    setVal('subtotal_produtos', subtotal.toFixed(2));
-    setVal('peso_total', pesoTotal.toFixed(3));
-    setVal('taxa_servico', taxaServico.toFixed(2));
-    setVal('valor_impostos', impostos.toFixed(2));
-    setVal('valor_frete', frete.toFixed(2));
-    setVal('valor_total', total.toFixed(2));
+    // Chama backend para calcular taxa/impostos/frete/total com a mesma regra do carrinho/checkout
+    window.__CALC_SEQ__ = (window.__CALC_SEQ__ || 0) + 1;
+    const seq = window.__CALC_SEQ__;
+
+    const fd = new FormData();
+    fd.append('moeda', moeda);
+    fd.append('subtotal', String(subtotal.toFixed(2)));
+    fd.append('peso_total', String(pesoTotal.toFixed(3)));
+    fd.append('itens', JSON.stringify(itensPayload));
+    fetch('/admin/pedidos/novo-manual/calcular-resumo', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (seq !== window.__CALC_SEQ__) return;
+            if (!data || !data.success) {
+                throw new Error((data && data.error) ? data.error : 'Falha ao calcular resumo');
+            }
+
+            const frete = Number(data.frete || 0);
+            const taxaServico = Number(data.taxa_servico || 0);
+            const impostos = Number(data.impostos || 0);
+            const total = Number(data.total || 0);
+
+            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
+            document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
+
+            const freteWrap = document.getElementById('resumoFreteWrap');
+            if (Number(frete) <= 0) {
+                if (freteWrap) freteWrap.textContent = 'Frete grátis';
+            } else {
+                if (freteWrap) freteWrap.innerHTML = `<span id="resumoMoedaSymbol5">${escapeHtml(sym)}</span> <span id="resumoFrete">${escapeHtml(formatForDisplay(frete, moeda))}</span>`;
+                const rf = document.getElementById('resumoFrete');
+                if (rf) rf.textContent = formatForDisplay(frete, moeda);
+            }
+
+            document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
+            document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
+
+            const setVal = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = String(v);
+            };
+            setVal('subtotal_produtos', Number(data.subtotal || subtotal).toFixed(2));
+            setVal('peso_total', Number(data.peso_total || pesoTotal).toFixed(3));
+            setVal('taxa_servico', taxaServico.toFixed(2));
+            setVal('valor_impostos', impostos.toFixed(2));
+            setVal('valor_frete', frete.toFixed(2));
+            setVal('valor_total', total.toFixed(2));
+        })
+        .catch(_err => {
+            // fallback simples (não quebra o formulário)
+            const frete = 0;
+            const taxaServico = 0;
+            const impostos = 0;
+            const total = subtotal;
+            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
+            document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
+            document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
+            document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
+            const setVal = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = String(v);
+            };
+            setVal('subtotal_produtos', subtotal.toFixed(2));
+            setVal('peso_total', pesoTotal.toFixed(3));
+            setVal('taxa_servico', taxaServico.toFixed(2));
+            setVal('valor_impostos', impostos.toFixed(2));
+            setVal('valor_frete', frete.toFixed(2));
+            setVal('valor_total', total.toFixed(2));
+        });
 }
 
 function getSelectedClienteLabel(){
@@ -1194,6 +1234,109 @@ JS;
             $svc = new PedidoManualService();
             $result = $svc->gerarLinkPagamentoPedidoManual($pedidoId, $billingType);
             $this->json($result);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function calcularResumo(Request $request) {
+        try {
+            $moeda = strtoupper(trim((string) $request->getParam('moeda', 'USD')));
+            if (!in_array($moeda, ['BRL', 'USD'], true)) {
+                $moeda = 'USD';
+            }
+
+            $subtotalRaw = str_replace(',', '.', (string) $request->getParam('subtotal', '0'));
+            $subtotal = is_numeric($subtotalRaw) ? (float) $subtotalRaw : 0.0;
+
+            $pesoRaw = str_replace(',', '.', (string) $request->getParam('peso_total', '0'));
+            $pesoTotal = is_numeric($pesoRaw) ? (float) $pesoRaw : 0.0;
+
+            $itensRaw = (string) $request->getParam('itens', '[]');
+            $itens = json_decode($itensRaw, true);
+            if (!is_array($itens)) {
+                $itens = [];
+            }
+
+            // Recalcular peso de forma autoritativa (garante peso real do produto)
+            $pesoTotal = 0.0;
+            $db = \Config\Database::getConnection();
+            $pesoCache = [];
+            $stPeso = null;
+            try {
+                $stPeso = $db->prepare('SELECT COALESCE(peso, weight, product_weight, peso_kg, 0) AS peso FROM produtos WHERE id = ? LIMIT 1');
+            } catch (\Exception $e) {
+                $stPeso = null;
+            }
+
+            foreach ($itens as $it) {
+                if (!is_array($it)) continue;
+                $pid = (int) ($it['produto_id'] ?? 0);
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($pid <= 0 || $qtd <= 0) continue;
+
+                $pesoUnit = 0.0;
+                if (array_key_exists($pid, $pesoCache)) {
+                    $pesoUnit = (float) $pesoCache[$pid];
+                } elseif ($stPeso) {
+                    try {
+                        $stPeso->execute([$pid]);
+                        $pesoUnit = (float) ($stPeso->fetchColumn() ?: 0);
+                        $pesoCache[$pid] = $pesoUnit;
+                    } catch (\Exception $e) {
+                        $pesoCache[$pid] = 0.0;
+                    }
+                }
+
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoTotal += ($pesoUnit * $qtd);
+            }
+
+            // Frete manual: por padrão, segue grátis (mesma UI atual). Se quiser, evoluímos depois.
+            $frete = 0.0;
+
+            $carrinhoModel = new Carrinho();
+
+            // Calcular usando as mesmas regras do carrinho/checkout.
+            // Base Receita Federal opera em USD; quando moeda for BRL, converte para USD para calcular e converte de volta.
+            $taxaConversao = 1.0;
+            if ($moeda === 'BRL') {
+                try {
+                    $r = (float) $carrinhoModel->getTaxaConversao('BRL');
+                    if ($r > 1.01) {
+                        $taxaConversao = $r;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($moeda === 'BRL' && $taxaConversao > 1.01) {
+                $subtotalUsd = $subtotal / $taxaConversao;
+                $freteUsd = $frete / $taxaConversao;
+                $taxaServicoUsd = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+                $impostosUsd = (float) $carrinhoModel->calcularImpostos((float) $subtotalUsd, (float) $freteUsd);
+
+                $taxaServico = $taxaServicoUsd * $taxaConversao;
+                $impostos = $impostosUsd * $taxaConversao;
+                $total = $subtotal + $frete + $taxaServico + $impostos;
+            } else {
+                $taxaServico = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+                $impostos = (float) $carrinhoModel->calcularImpostos((float) $subtotal, (float) $frete);
+                $total = $subtotal + $frete + $taxaServico + $impostos;
+            }
+
+            $this->json([
+                'success' => true,
+                'moeda' => $moeda,
+                'subtotal' => round($subtotal, 2),
+                'peso_total' => round($pesoTotal, 3),
+                'taxa_servico' => round((float) $taxaServico, 2),
+                'impostos' => round((float) $impostos, 2),
+                'frete' => round((float) $frete, 2),
+                'total' => round((float) $total, 2),
+            ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
         }

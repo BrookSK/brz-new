@@ -263,6 +263,7 @@ $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
+$router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
