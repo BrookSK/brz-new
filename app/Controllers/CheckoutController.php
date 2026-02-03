@@ -396,7 +396,7 @@ class CheckoutController extends Controller {
             $billingType = 'BOLETO';
         }
 
-        $valor = (float) ($pedidoRow['total'] ?? 0);
+        $valor = $this->normalizeValorCobranca($pedidoRow);
         $moeda = (string) ($pedidoRow['moeda'] ?? 'BRL');
         $descricao = 'Pedido #' . (string) ($pedidoRow['numero_pedido'] ?? $pedidoId);
 
@@ -670,6 +670,46 @@ class CheckoutController extends Controller {
         $this->usuarioModel = new Usuario();
         $this->enderecoModel = new Endereco();
         $this->pedidoModel = new PedidoEcommerce();
+    }
+
+    private function normalizeValorCobranca(array $pedidoRow): float {
+        $moeda = strtoupper(trim((string) ($pedidoRow['moeda'] ?? ($pedidoRow['currency'] ?? 'BRL'))));
+        if ($moeda === '') $moeda = 'BRL';
+
+        $total = (float) ($pedidoRow['total'] ?? ($pedidoRow['valor_total'] ?? 0));
+        if ($total <= 0) {
+            return 0.0;
+        }
+
+        if ($moeda !== 'BRL') {
+            return $total;
+        }
+
+        // Preferir total BRL explícito se existir
+        foreach (['valor_total_brl', 'total_brl', 'amount_brl'] as $c) {
+            if (array_key_exists($c, $pedidoRow)) {
+                $v = (float) ($pedidoRow[$c] ?? 0);
+                if ($v > 0) {
+                    return $v;
+                }
+            }
+        }
+
+        $taxa = (float) ($pedidoRow['taxa_conversao'] ?? ($pedidoRow['exchange_rate'] ?? 0));
+        if ($taxa <= 1.01) {
+            return $total;
+        }
+
+        $moedaOriginal = strtoupper(trim((string) ($pedidoRow['moeda_original'] ?? ($pedidoRow['currency_original'] ?? ''))));
+        $deveConverter = ($moedaOriginal === 'USD');
+        if (!$deveConverter) {
+            // heurística: totals baixos + taxa alta normalmente indicam USD salvo como BRL
+            if ($total > 0 && $total <= 2000) {
+                $deveConverter = true;
+            }
+        }
+
+        return $deveConverter ? ($total * $taxa) : $total;
     }
 
     private function getCarrinhoForCheckout(?array $usuario): array {
@@ -1128,7 +1168,7 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido, taxa_conversao, moeda_original, valor_total_brl, total_brl FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
                 } catch (\Exception $e) {
