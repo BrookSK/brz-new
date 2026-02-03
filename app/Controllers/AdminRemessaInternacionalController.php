@@ -905,13 +905,18 @@ class AdminRemessaInternacionalController extends Controller {
             exit;
         }
 
+        $printUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($shipId);
+        header('Location: ' . $printUrl);
+        exit;
+
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'success' => false,
-            'error' => 'Etiqueta não encontrada no retorno da W-Express. Envie o JSON de retorno para mapear o campo correto.',
+            'error' => 'Etiqueta não encontrada no retorno da W-Express. Use a URL de impressão para visualizar a label.',
             'shipping_id' => $shipId,
             'data' => $data,
             'label_attempts' => $attempts,
+            'print_url' => $printUrl,
         ]);
         exit;
     }
