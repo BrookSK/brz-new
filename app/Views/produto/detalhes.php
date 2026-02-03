@@ -137,8 +137,7 @@
 
                         <div class="d-flex align-items-baseline gap-2 mb-2">
                             <div class="fs-4 fw-bold">
-                                <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
-                                <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                                <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($produto['preco'], 2, ',', '.') ?></span>
                             </div>
                         </div>
 
@@ -533,7 +532,6 @@ function inicializarDetalhesProduto() {
         ];
     }, $fotos ?? []))) ?>;
 
-    const currencyLabel = <?= json_encode($currencyLabel ?? '') ?>;
     const basePrice = Number($('.amount').data('original-price') || 0);
 
     const produtoId = <?= (int) ($produto['id'] ?? 0) ?>;
@@ -730,13 +728,23 @@ function inicializarDetalhesProduto() {
         if (s <= 0) qty.val('1');
     }
 
-    function setPriceUi(price) {
-        const p = Number(price || 0);
+    function setPriceUi(priceUsd) {
+        const p = Number(priceUsd || 0);
         const amount = $('.amount');
         if (!amount.length) return;
-        const formatted = p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        amount.text(formatted);
-        $('.currency').text(currencyLabel);
+
+        // Manter o valor original em USD para o conversor global
+        amount.attr('data-original-price', String(p));
+
+        // Renderizar o valor conforme a moeda selecionada
+        const cc = (window.CurrencyConverter && typeof window.CurrencyConverter === 'object') ? window.CurrencyConverter : null;
+        const cur = (cc && cc.currentCurrency) ? String(cc.currentCurrency) : (localStorage.getItem('selected_currency') || 'USD');
+        const rates = (cc && cc.exchangeRates) ? cc.exchangeRates : (window.exchangeRates || { BRL: 5.50, USD: 1.00 });
+        const rate = Number(rates[cur] || 1);
+        const symbol = (cur === 'BRL') ? 'R$' : '$';
+        const converted = p * rate;
+        const formatted = converted.toFixed(2).replace('.', ',');
+        amount.text(symbol + ' ' + formatted);
     }
 
     function findMatchingVariation(selectionMap) {
@@ -798,8 +806,8 @@ function inicializarDetalhesProduto() {
         hidden.val(String(v.id));
         status.text(v.descricao || 'Variação selecionada');
 
-        const price = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
-        setPriceUi(price);
+        const priceUsd = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
+        setPriceUi(priceUsd);
         setStockUi(v.stock);
 
         const fotosMap = variacoesState.fotos_por_variacao || {};
