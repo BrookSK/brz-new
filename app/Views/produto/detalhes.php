@@ -483,6 +483,68 @@ function inicializarDetalhesProduto() {
 
     let variacoesState = normalizeVariacoesUi(variacoesUi);
 
+    function getCandidateVariations(selectionMap) {
+        if (!variacoesState.enabled) return [];
+        const vars = Array.isArray(variacoesState.variacoes) ? variacoesState.variacoes : [];
+        const keys = Object.keys(selectionMap || {});
+        if (keys.length === 0) return vars;
+        return vars.filter((v) => {
+            const map = v && v.map ? v.map : {};
+            for (let i = 0; i < keys.length; i++) {
+                const k = keys[i];
+                if (String(map[k] || '') !== String(selectionMap[k] || '')) return false;
+            }
+            return true;
+        });
+    }
+
+    function refreshOptionAvailability() {
+        if (!variacoesState.enabled) return;
+
+        const currentSel = readSelection();
+        const allVars = Array.isArray(variacoesState.variacoes) ? variacoesState.variacoes : [];
+
+        $('.variacao-select').each(function() {
+            const $select = $(this);
+            const tipoId = String($select.data('tipo-id') || '');
+            if (!tipoId) return;
+
+            const selMinusThis = { ...currentSel };
+            delete selMinusThis[tipoId];
+            const candidates = getCandidateVariations(selMinusThis);
+
+            const allowed = new Set();
+            candidates.forEach((v) => {
+                const map = v && v.map ? v.map : {};
+                if (map[tipoId] !== null && map[tipoId] !== undefined) {
+                    allowed.add(String(map[tipoId]));
+                }
+            });
+
+            $select.find('option').each(function() {
+                const $opt = $(this);
+                const val = String($opt.attr('value') || '');
+                if (!val) {
+                    $opt.prop('disabled', false);
+                    return;
+                }
+                const ok = allowed.has(val);
+                $opt.prop('disabled', !ok);
+            });
+
+            const selected = String($select.val() || '');
+            if (selected && !allowed.has(selected)) {
+                $select.val('');
+            }
+        });
+
+        const stillSel = readSelection();
+        const status = $('#variacao-status');
+        if (Object.keys(stillSel).length === 0 && allVars.length > 0) {
+            if (status.length) status.text('Selecione as opções para ver disponibilidade.');
+        }
+    }
+
     function findMatchingVariationDynamic(selectionMap) {
         if (!variacoesState.enabled) return null;
         const vars = variacoesState.variacoes || [];
@@ -595,6 +657,7 @@ function inicializarDetalhesProduto() {
 
     function onVariationChange() {
         if (!variacoesState.enabled) return;
+        refreshOptionAvailability();
         const selection = readSelection();
         const status = $('#variacao-status');
         const hidden = $('#produto_variacao_id');
@@ -797,6 +860,7 @@ function inicializarDetalhesProduto() {
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
         // Inicial
         $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
+        refreshOptionAvailability();
     }
 
     if (!variacoesState.enabled && produtoId > 0) {
@@ -843,6 +907,7 @@ function inicializarDetalhesProduto() {
 
                 renderVariacaoSelectors(variacoesState);
                 $('#variacoes-selectors').off('change.variacoesDyn').on('change.variacoesDyn', '.variacao-select', onVariationChange);
+                refreshOptionAvailability();
             })
             .catch(() => {
                 $('#variacoes-card').show();

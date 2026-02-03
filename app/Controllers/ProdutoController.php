@@ -360,7 +360,7 @@ class ProdutoController extends Controller {
         ];
 
         try {
-            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC');
+            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND ativo = 1 ORDER BY id ASC');
             $stmtVars->execute([$produtoId]);
             $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             if (empty($vars)) {
