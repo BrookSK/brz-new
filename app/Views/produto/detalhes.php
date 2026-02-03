@@ -801,13 +801,39 @@ function inicializarDetalhesProduto() {
 
     if (!variacoesState.enabled && produtoId > 0) {
         fetch('/produto/variacoes/' + produtoId, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then((data) => {
+            .then(async (r) => {
+                const contentType = (r.headers.get('content-type') || '').toLowerCase();
+                const text = await r.text();
+                let data = null;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = null;
+                }
+
+                if (!data || typeof data !== 'object') {
+                    const status = $('#variacao-status');
+                    if (status.length) {
+                        status.text('Não foi possível carregar as variações.');
+                    }
+                    if (contentType.indexOf('text/html') !== -1 || text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
+                        if (status.length) {
+                            status.text('Não foi possível carregar as variações (resposta HTML).');
+                        }
+                    }
+                    return;
+                }
+
                 variacoesState = normalizeVariacoesUi(data);
-                if (!variacoesState.enabled) return;
+                if (!variacoesState.enabled) {
+                    const status = $('#variacao-status');
+                    if (status.length) {
+                        status.text('Este produto não possui variações disponíveis.');
+                    }
+                    return;
+                }
 
                 $('#variacoes-card').show();
-
                 const status = $('#variacao-status');
                 if (status.length) {
                     status.text('Selecione as opções para ver disponibilidade.');
@@ -816,7 +842,12 @@ function inicializarDetalhesProduto() {
                 renderVariacaoSelectors(variacoesState);
                 $('#variacoes-selectors').off('change.variacoesDyn').on('change.variacoesDyn', '.variacao-select', onVariationChange);
             })
-            .catch(() => {});
+            .catch(() => {
+                const status = $('#variacao-status');
+                if (status.length) {
+                    status.text('Erro ao carregar variações.');
+                }
+            });
     }
 }
 </script>
