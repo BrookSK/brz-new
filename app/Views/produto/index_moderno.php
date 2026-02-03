@@ -53,12 +53,11 @@
             <?php foreach ($produtos as $produto): ?>
             <div class="col-lg-3 col-md-6 mb-4">
                 <div class="card h-100 product-card-modern border-0 shadow-sm">
-                    <div class="position-relative overflow-hidden">
+                    <div class="position-relative overflow-hidden product-image-frame">
                         <?php if ($produto['foto_principal']): ?>
                             <img src="<?= $produto['foto_principal'] ?>" 
                                  alt="<?= htmlspecialchars($produto['name']) ?>"
-                                 class="card-img-top product-image-modern"
-                                 style="height: 250px; object-fit: cover;">
+                                 class="card-img-top product-image-modern">
                             <!-- Badge de Estoque Baixo -->
                             <?php if ($produto['stock'] <= 5 && $produto['stock'] > 0): ?>
                                 <span class="position-absolute top-0 end-0 m-2 badge bg-warning">
@@ -73,8 +72,7 @@
                                 </span>
                             <?php endif; ?>
                         <?php else: ?>
-                            <div class="card-img-top product-image-modern bg-light d-flex align-items-center justify-content-center" 
-                                 style="height: 250px;">
+                            <div class="card-img-top product-image-modern bg-light d-flex align-items-center justify-content-center">
                                 <i class="fas fa-image text-muted fa-3x"></i>
                             </div>
                         <?php endif; ?>
@@ -153,6 +151,10 @@
     border-radius: 15px;
 }
 
+.product-image-frame {
+    aspect-ratio: 4 / 3;
+}
+
 .product-card-modern:hover {
     transform: none;
     box-shadow: var(--shadow-md);
@@ -160,6 +162,9 @@
 
 .product-image-modern {
     transition: none;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .product-card-modern:hover .product-image-modern {
