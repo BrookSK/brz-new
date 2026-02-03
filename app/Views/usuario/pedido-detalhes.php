@@ -168,6 +168,9 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <div class="product-info flex-grow-1">
                                             <h6><?= htmlspecialchars($item['nome_produto'] ?? 'Produto sem nome') ?></h6>
                                             <small class="text-muted"><?= htmlspecialchars($item['referencia'] ?? '') ?></small>
+                                            <?php if (!empty($item['variacao_descricao'])): ?>
+                                                <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="quantity-badge"><?= $item['quantidade'] ?? 1 ?></span>

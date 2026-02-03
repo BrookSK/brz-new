@@ -441,7 +441,7 @@ class ProdutoController extends Controller {
             $itens = [];
             try {
                 $sqlItens = '
-                    SELECT pvi.produto_variacao_id, pvi.tipo_id, pvi.opcao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
+                    SELECT pvi.produto_variacao_id, pvi.tipo_id, pvi.opcao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor, vo.nome_exibicao AS opcao_nome_exibicao, vo.imagem AS opcao_imagem
                     FROM produto_variacao_itens pvi
                     INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
                     INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
@@ -495,6 +495,8 @@ class ProdutoController extends Controller {
                     foreach ($itens2 as $it) {
                         $it['tipo_nome'] = $tiposById[(int) ($it['tipo_id'] ?? 0)] ?? '';
                         $it['opcao_valor'] = $opById[(int) ($it['opcao_id'] ?? 0)] ?? '';
+                        $it['opcao_nome_exibicao'] = '';
+                        $it['opcao_imagem'] = '';
                         $itens[] = $it;
                     }
                 } catch (\Exception $e) {
@@ -513,12 +515,16 @@ class ProdutoController extends Controller {
                 $opId = (int) ($it['opcao_id'] ?? 0);
                 $tipoNome = (string) ($it['tipo_nome'] ?? '');
                 $opValor = (string) ($it['opcao_valor'] ?? '');
+                $opNomeExibicao = (string) ($it['opcao_nome_exibicao'] ?? '');
+                $opImagem = (string) ($it['opcao_imagem'] ?? '');
 
                 $itensPorVar[$vId][] = [
                     'tipo_id' => $tipoId,
                     'opcao_id' => $opId,
                     'tipo_nome' => $tipoNome,
                     'opcao_valor' => $opValor,
+                    'opcao_nome_exibicao' => $opNomeExibicao,
+                    'opcao_imagem' => $opImagem,
                 ];
 
                 if (!isset($atributos[$tipoId])) {
@@ -531,6 +537,8 @@ class ProdutoController extends Controller {
                 $atributos[$tipoId]['opcoes'][$opId] = [
                     'opcao_id' => $opId,
                     'valor' => $opValor,
+                    'nome_exibicao' => $opNomeExibicao,
+                    'imagem' => $opImagem,
                 ];
             }
 

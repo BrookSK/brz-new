@@ -5,6 +5,112 @@ use App\Core\Request;
 
 class AdminProdutosNovoController extends Controller {
 
+    private function getNcmOptions(): array {
+        return [
+            '09019000' => 'Cafés',
+            '09024000' => 'Chá Preto',
+            '17041000' => 'Chicletes',
+            '17049020' => 'Balas, Confeitos, Pastilhas, Pirulitos',
+            '18063110' => 'Chocolates',
+            '19012090' => 'Massas para Bolos, Panquecas, Paes',
+            '19041000' => 'Pipocas e Cereais',
+            '19049000' => 'Salgadinhos e Snacks',
+            '19059090' => 'Bolachas e Biscoitos',
+            '21011110' => 'Cafés Soluveis',
+            '21039021' => 'Temperos e Preparações',
+            '21039099' => 'Molhos (geral)',
+            '21069030' => 'Suplementos',
+            '23091000' => 'Petisco para caes e gatos',
+            '30051090' => 'Curativos',
+            '33030010' => 'Perfumes',
+            '33041000' => 'Maquiagem para os Labios',
+            '33042090' => 'Maquiagem para os Olhos',
+            '33043000' => 'Manicure e Pedicure',
+            '33049910' => 'Cremes de Beleza, Tonicos',
+            '33049990' => 'Protetor Solar e Bronzeadores',
+            '33051000' => 'Shampoos',
+            '33059000' => 'Produtos p Cabelo (geral)',
+            '33061000' => 'Creme Dental',
+            '33062000' => 'Fio Dental',
+            '33069000' => 'Enxaguante Bucal (outros)',
+            '33071000' => 'Creme de Barbear',
+            '33072090' => 'Desodorantes',
+            '33073000' => 'Sais de Banho e outras Preparações',
+            '33074900' => 'Cheirinho de Carro e Casa',
+            '34011190' => 'Lenços Umedecidos',
+            '34013000' => 'Sabonete Liquido, Detergente',
+            '34024190' => 'Produtos de Limpeza',
+            '34060000' => 'Velas e Pavis',
+            '38089199' => 'Repelentes para Corpo',
+            '38099190' => 'Lenços Para Secadora',
+            '38229000' => 'NIMA, Fita Teste e outros medidores',
+            '39204390' => 'Plastico Filme e Semelhantes',
+            '39232190' => 'Sacos de Lixo/ Sacos Ziplock',
+            '39241000' => 'Utensilios de Cozinha, Banheiro e Geral (PLÁSTICO)',
+            '39264000' => 'Decorações e Estatuetas',
+            '40149090' => 'Chupetas',
+            '42029900' => 'Bolsas (geral)',
+            '42010090' => 'Coleiras de Cachorro',
+            '48182000' => 'Lenços, lenços (toalhitas) demaquilantes e toalhas de mão',
+            '48201000' => 'Post It, Papel para Cartas e Agendas',
+            '48202000' => 'Cadernos',
+            '48236900' => 'Forro de AirFryer (papel)',
+            '49019900' => 'Livros',
+            '48025610' => 'Folha Sulfite',
+            '62099090' => 'Roupas Bebe (geral)',
+            '62121000' => 'Sutias e Topes',
+            '63022900' => 'Roupas de Cama',
+            '63026000' => 'Toalhas de Banho',
+            '63071000' => 'Pano de Chão, Pano Prato, Esponja de Louça',
+            '63079090' => 'Brinquedo Pelucia Pet',
+            '63080000' => 'Capas de Tecido, Tapetes, Toalhas de Mesa, Guardanapos, Cestos',
+            '63090090' => 'Roupas (geral)',
+            '64059000' => 'Sapatos em Geral',
+            '67049000' => 'Cílios Postiços, Perucas',
+            '69119000' => 'Utensilios de Cozinha, Banheiro e Geral (PORCELANA)',
+            '70109090' => 'Recipientes de Vidro',
+            '70134210' => 'Cafeteiras e Chaleiras (VIDRO)',
+            '70134900' => 'Utensilios de Cozinha, Banheiro e Geral  (VIDRO)',
+            '71179000' => 'Bijuterias',
+            '73102190' => 'Latas (Lavanderia)',
+            '76151000' => 'Utensilios de Cozinha (Panelas), Banheiro e Geral (ALUMINIO)',
+            '82059000' => 'Ferramentas Manuais',
+            '82119290' => 'Facas de Cozinha',
+            '82130000' => 'Tesouras',
+            '82159990' => 'Talheres (Aço)',
+            '84141000' => 'Bombas de Leite Materno',
+            '84145990' => 'Ventiladores',
+            '84148019' => 'Compressores de Ar',
+            '84433240' => 'Impressoras a folhas',
+            '84672100' => 'Furadeiras',
+            '84716052' => 'Teclados',
+            '84716053' => 'Mouses e Canetas Digitais',
+            '85044010' => 'Carregadores (geral)',
+            '85068090' => 'Pilhas e Baterias',
+            '85086000' => 'Aspiradores',
+            '85094010' => 'Liquidificadores',
+            '85094020' => 'Batedeiras',
+            '85094040' => 'Extratores de Suco e Polpas',
+            '85094050' => 'Processadores de Alimentos',
+            '85098090' => 'Esfregões e Escovas Elétricas de Limpeza',
+            '85101000' => 'Aparelhos de Barbear',
+            '85102000' => 'Máquinas de Cortar Cabelo',
+            '85103000' => 'Aparelhos de Depilar',
+            '85163100' => 'Secadores de Cabelo',
+            '85163200' => 'Outros Aparelhos para Arranjo de Cabelo',
+            '85164000' => 'Ferros de Passar Roupas',
+            '85166000' => 'Fornos, Grelhas e Assadeiras',
+            '85167100' => 'Aparelhos para fazer chás e cafés',
+            '85167990' => 'Dash, Panela Ninja',
+            '85171300' => 'Celulares',
+            '85183000' => 'Fones de Ouvido',
+            '85235190' => 'Cartão de Memória',
+            '85258929' => 'Cameras e Baba Eletronicas',
+            '85269200' => 'Controles Remotos',
+            '85393120' => 'Lampadas',
+        ];
+    }
+
     private function getPdo(): \PDO {
         return new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
@@ -126,11 +232,10 @@ class AdminProdutosNovoController extends Controller {
     }
 
     public function index(Request $request) {
-        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
-
         $categorias = $this->getCategorias();
         $lojas = $this->getLojasSafe();
         $tipos = $this->getVariacaoTiposComOpcoes();
+        $ncmOptions = $this->getNcmOptions();
 
         $schemaOk = true;
         try {
@@ -144,25 +249,10 @@ class AdminProdutosNovoController extends Controller {
             $schemaOk = false;
         }
 
-        renderAdminSidebarStyles();
+        ob_start();
 
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Produto - Braziliana Shop Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid admin-shell">
-        <div class="row">';
-
-        renderAdminSidebar('produtos');
-
-        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        echo '<div class="pt-3">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
                     <h1 class="h2">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>';
@@ -214,7 +304,16 @@ class AdminProdutosNovoController extends Controller {
 
                                 <div class="mb-3">
                                     <label class="form-label">NCM</label>
-                                    <input type="text" class="form-control" name="ncm" placeholder="Pesquisar NCM...">
+                                    <input type="text" class="form-control" id="ncmSearchVar" placeholder="Pesquisar NCM...">
+                                    <select class="form-select mt-2" name="ncm" id="ncmSelectVar">
+                                        <option value="">Selecione...</option>';
+
+        foreach ($ncmOptions as $code => $label) {
+            echo '<option value="' . htmlspecialchars((string) $code, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars((string) $code . ' - ' . $label, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+
+        echo '                     </select>
+                                    <small class="text-muted">Opcional</small>
                                 </div>
 
                                 <div class="mb-3">
@@ -407,13 +506,6 @@ class AdminProdutosNovoController extends Controller {
               </form>';
 
         echo <<<'HTML'
-      </div>
-            </div>
-            </main>
-        </div>
-    </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function() {
     const simplesContainer = document.getElementById('novoProdutoSimplesContainer');
@@ -448,6 +540,22 @@ class AdminProdutosNovoController extends Controller {
     if (tabSimples) {
         tabSimples.addEventListener('shown.bs.tab', loadSimplesOnce);
     }
+
+    // Busca no select de NCM (aba Variável)
+    (function() {
+        const input = document.getElementById('ncmSearchVar');
+        const select = document.getElementById('ncmSelectVar');
+        if (!input || !select) return;
+
+        input.addEventListener('input', function() {
+            const q = (input.value || '').toLowerCase().trim();
+            Array.from(select.options).forEach((opt) => {
+                if (opt.value === '') return;
+                const text = (opt.text || '').toLowerCase();
+                opt.hidden = q !== '' && !text.includes(q);
+            });
+        });
+    })();
 
     const btnGerar = document.getElementById('btnGerarVariacoes');
     const btnLimpar = document.getElementById('btnLimparVariacoes');
@@ -557,10 +665,13 @@ class AdminProdutosNovoController extends Controller {
     });
 })();
 </script>
-</body>
-</html>
 HTML;
 
+        echo '</div>';
+
+        $content = ob_get_clean();
+        $title = 'Novo Produto - Braziliana Shop Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
 

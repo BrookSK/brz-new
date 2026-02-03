@@ -820,32 +820,11 @@ HTML;
         $lojas = $this->fetchLojasSafe();
         $ncmOptions = $this->getNcmOptions();
 
-        // Incluir o partial do menu lateral
-        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
-
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Produto - Braziliana Shop Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
-
-        // Renderizar estilos do menu
-        renderAdminSidebarStyles();
-
-        echo '</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">';
-
-        // Renderizar menu lateral usando o partial
-        renderAdminSidebar('produtos');
+        ob_start();
 
         echo <<<HTML
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div class="pt-3">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
                     <h1 class="h2">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
@@ -1001,10 +980,6 @@ HTML;
                         </div>
                     </div>
                 </form>
-            </main>
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Preview de capa ao selecionar
         var capaInput = document.getElementById('capaInput');
@@ -1066,9 +1041,13 @@ HTML;
             });
         })();
     </script>
-</body>
-</html>
 HTML;
+
+        echo '</div>';
+
+        $content = ob_get_clean();
+        $title = 'Novo Produto - Braziliana Shop Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
     

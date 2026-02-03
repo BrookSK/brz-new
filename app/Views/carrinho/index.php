@@ -96,6 +96,9 @@
                                 </div>
                                 <div class="col-8 col-md-5">
                                     <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
+                                    <?php if (!empty($item['variacao_descricao'])): ?>
+                                        <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
                                         <button class="btn btn-outline-secondary" onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
