@@ -802,24 +802,48 @@ class AdminRemessaInternacionalController extends Controller {
 
         // Alguns ambientes não devolvem o PDF/URL da etiqueta no GET /shipping/{id};
         // então tentamos endpoints comuns para download do label.
+        $sid = rawurlencode($shipId);
         $labelPaths = [
-            '/shipping/' . rawurlencode($shipId) . '/label/',
-            '/shipping/' . rawurlencode($shipId) . '/label',
-            '/shipping/' . rawurlencode($shipId) . '/labels/',
-            '/shipping/' . rawurlencode($shipId) . '/labels',
-            '/shipping/' . rawurlencode($shipId) . '/documents/label/',
-            '/shipping/' . rawurlencode($shipId) . '/documents/label',
-            '/shipping/' . rawurlencode($shipId) . '/document/label/',
-            '/shipping/' . rawurlencode($shipId) . '/document/label',
-            '/shipping/' . rawurlencode($shipId) . '/pdf/',
-            '/shipping/' . rawurlencode($shipId) . '/pdf',
+            '/shipping/' . $sid . '/label/',
+            '/shipping/' . $sid . '/label',
+            '/shipping/' . $sid . '/label/?format=pdf',
+            '/shipping/' . $sid . '/label?format=pdf',
+            '/shipping/' . $sid . '/labels/',
+            '/shipping/' . $sid . '/labels',
+            '/shipping/' . $sid . '/labels/?format=pdf',
+            '/shipping/' . $sid . '/labels?format=pdf',
+            '/shipping/' . $sid . '/documents/label/',
+            '/shipping/' . $sid . '/documents/label',
+            '/shipping/' . $sid . '/documents/label?format=pdf',
+            '/shipping/' . $sid . '/document/label/',
+            '/shipping/' . $sid . '/document/label',
+            '/shipping/' . $sid . '/pdf/',
+            '/shipping/' . $sid . '/pdf',
+            // variações alternativas
+            '/shipping/label/' . $sid,
+            '/shipping/label/' . $sid . '/',
+            '/shipping/labels/' . $sid,
+            '/shipping/labels/' . $sid . '/',
+            '/labels/' . $sid,
+            '/label/' . $sid,
+            '/shipping/' . $sid . '/print/',
+            '/shipping/' . $sid . '/print',
         ];
 
+        $attempts = [];
         foreach ($labelPaths as $p) {
             try {
                 $raw = $svc->requestRaw('GET', $p);
                 $ct = strtolower((string) ($raw['content_type'] ?? ''));
                 $body = $raw['body'] ?? '';
+                $attempts[] = [
+                    'path' => $p,
+                    'http_code' => (int) ($raw['http_code'] ?? 0),
+                    'content_type' => (string) ($raw['content_type'] ?? ''),
+                    'len' => is_string($body) ? strlen($body) : null,
+                    'first4' => is_string($body) ? substr($body, 0, 4) : null,
+                    'url' => (string) ($raw['url'] ?? ''),
+                ];
 
                 $isPdf = (strpos($ct, 'application/pdf') !== false);
                 if (!$isPdf && is_string($body)) {
@@ -856,6 +880,10 @@ class AdminRemessaInternacionalController extends Controller {
                 }
             } catch (\Exception $e) {
                 // ignora e tenta o próximo
+                $attempts[] = [
+                    'path' => $p,
+                    'error' => $e->getMessage(),
+                ];
             }
         }
 
@@ -883,6 +911,7 @@ class AdminRemessaInternacionalController extends Controller {
             'error' => 'Etiqueta não encontrada no retorno da W-Express. Envie o JSON de retorno para mapear o campo correto.',
             'shipping_id' => $shipId,
             'data' => $data,
+            'label_attempts' => $attempts,
         ]);
         exit;
     }
