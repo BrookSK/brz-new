@@ -922,6 +922,10 @@ class AdminComprasController extends Controller {
                                 if (preg_match('#^https?://#i', $s) || strpos($s, '//') === 0) {
                                     return $s;
                                 }
+                                // Correção: alguns registros salvam URL pública como "/uploads/produtos/https://..."
+                                if (strpos($s, '/uploads/produtos/http://') === 0 || strpos($s, '/uploads/produtos/https://') === 0) {
+                                    return substr($s, strlen('/uploads/produtos/'));
+                                }
                                 // Se já estiver no path correto, manter
                                 if (strpos($s, '/uploads/produtos/') === 0) {
                                     return $s;
@@ -1024,6 +1028,11 @@ class AdminComprasController extends Controller {
 
                 if (preg_match('#^https?://#i', $s) || strpos($s, '//') === 0) {
                     return $s;
+                }
+
+                // Correção: alguns registros salvam URL pública como "/uploads/produtos/https://..."
+                if (strpos($s, '/uploads/produtos/http://') === 0 || strpos($s, '/uploads/produtos/https://') === 0) {
+                    return substr($s, strlen('/uploads/produtos/'));
                 }
                 if (strpos($s, '/uploads/produtos/') === 0) {
                     return $s;
