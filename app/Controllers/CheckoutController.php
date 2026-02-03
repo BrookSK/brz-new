@@ -2276,6 +2276,64 @@ class CheckoutController extends Controller {
             $pedidoId = $db->lastInsertId();
             $this->debugLog('[CRIAR_PEDIDO] ID gerado: ' . $pedidoId);
 
+            // Persistir dados do cliente/endereço no pedido quando o schema suportar
+            try {
+                $colsPed = [];
+                try {
+                    $stmtColsPed = $db->query('DESCRIBE pedidos');
+                    $colsPed = $stmtColsPed ? $stmtColsPed->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsPed = [];
+                }
+
+                if (is_array($colsPed) && !empty($colsPed)) {
+                    $set = [];
+                    $p = [];
+
+                    foreach ([
+                        'cliente_nome' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? '')),
+                        'cliente_email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                        'cliente_telefone' => (string) ($dados['telefone'] ?? ''),
+                        'cliente_documento' => (string) ($dados['documento'] ?? ''),
+                        'documento' => (string) ($dados['documento'] ?? ''),
+                    ] as $col => $val) {
+                        if (in_array($col, $colsPed, true) && $val !== '') {
+                            $set[] = $col . ' = :' . $col;
+                            $p[$col] = $val;
+                        }
+                    }
+
+                    foreach ([
+                        'endereco' => (string) ($dados['endereco'] ?? ''),
+                        'numero' => (string) ($dados['numero'] ?? ''),
+                        'complemento' => (string) ($dados['complemento'] ?? ''),
+                        'bairro' => (string) ($dados['bairro'] ?? ''),
+                        'cidade' => (string) ($dados['cidade'] ?? ''),
+                        'estado' => (string) ($dados['estado'] ?? ''),
+                        'cep' => (string) ($dados['cep'] ?? ''),
+                        'endereco_entrega' => (string) ($dados['endereco'] ?? ''),
+                        'numero_entrega' => (string) ($dados['numero'] ?? ''),
+                        'complemento_entrega' => (string) ($dados['complemento'] ?? ''),
+                        'bairro_entrega' => (string) ($dados['bairro'] ?? ''),
+                        'cidade_entrega' => (string) ($dados['cidade'] ?? ''),
+                        'estado_entrega' => (string) ($dados['estado'] ?? ''),
+                        'cep_entrega' => (string) ($dados['cep'] ?? ''),
+                    ] as $col => $val) {
+                        if (in_array($col, $colsPed, true) && $val !== '') {
+                            $set[] = $col . ' = :' . $col;
+                            $p[$col] = $val;
+                        }
+                    }
+
+                    if (!empty($set)) {
+                        $p['id'] = (int) $pedidoId;
+                        $stmtUpd = $db->prepare('UPDATE pedidos SET ' . implode(', ', array_unique($set)) . ' WHERE id = :id');
+                        $stmtUpd->execute($p);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
             // Origem do pedido (orgânico/checkout) quando a coluna existir
             try {
                 $colsPed = [];
