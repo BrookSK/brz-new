@@ -913,6 +913,7 @@ class AdminComprasController extends Controller {
                         if (isset($decoded['principal'])) $paths[] = $decoded['principal'];
                         if (isset($decoded['capa'])) $paths[] = $decoded['capa'];
                         if (isset($decoded['url'])) $paths[] = $decoded['url'];
+                        if (isset($decoded['src'])) $paths[] = $decoded['src'];
                         if (isset($decoded[0])) $paths[] = $decoded[0];
                         foreach ($paths as $p) {
                             if (is_string($p) && trim($p) !== '') {
@@ -927,6 +928,10 @@ class AdminComprasController extends Controller {
                                 // Se vier como 'uploads/produtos/...' (sem barra inicial), normalizar
                                 if (strpos($s, 'uploads/produtos/') === 0) {
                                     $s = substr($s, strlen('uploads/produtos/'));
+                                }
+                                // Se vier como 'images/...' (sem barra inicial), manter em /images
+                                if (strpos($s, 'images/') === 0) {
+                                    return '/' . ltrim($s, '/');
                                 }
                                 if (strpos($s, '/') === 0) {
                                     return $s;
@@ -945,6 +950,29 @@ class AdminComprasController extends Controller {
                                 if (strpos($s, 'uploads/produtos/') === 0) {
                                     $s = substr($s, strlen('uploads/produtos/'));
                                 }
+                                if (strpos($s, 'images/') === 0) {
+                                    return '/' . ltrim($s, '/');
+                                }
+                                if (strpos($s, '/') === 0) {
+                                    return $s;
+                                }
+                                return '/uploads/produtos/' . ltrim($s, '/');
+                            }
+                            if (is_array($p) && !empty($p['src']) && is_string($p['src'])) {
+                                $s = trim((string) $p['src']);
+                                if ($s === '') continue;
+                                if (preg_match('#^https?://#i', $s) || strpos($s, '//') === 0) {
+                                    return $s;
+                                }
+                                if (strpos($s, '/uploads/produtos/') === 0) {
+                                    return $s;
+                                }
+                                if (strpos($s, 'uploads/produtos/') === 0) {
+                                    $s = substr($s, strlen('uploads/produtos/'));
+                                }
+                                if (strpos($s, 'images/') === 0) {
+                                    return '/' . ltrim($s, '/');
+                                }
                                 if (strpos($s, '/') === 0) {
                                     return $s;
                                 }
@@ -961,6 +989,9 @@ class AdminComprasController extends Controller {
                                 }
                                 if (strpos($s, 'uploads/produtos/') === 0) {
                                     $s = substr($s, strlen('uploads/produtos/'));
+                                }
+                                if (strpos($s, 'images/') === 0) {
+                                    return '/' . ltrim($s, '/');
                                 }
                                 if (strpos($s, '/') === 0) {
                                     return $s;
@@ -979,6 +1010,9 @@ class AdminComprasController extends Controller {
                 }
                 if (strpos($s, 'uploads/produtos/') === 0) {
                     $s = substr($s, strlen('uploads/produtos/'));
+                }
+                if (strpos($s, 'images/') === 0) {
+                    return '/' . ltrim($s, '/');
                 }
                 if (strpos($s, '/') === 0) {
                     return $s;
