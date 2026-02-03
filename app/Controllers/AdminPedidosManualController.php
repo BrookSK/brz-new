@@ -5,6 +5,7 @@ use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PedidoManualService;
 use App\Models\Carrinho;
+use App\Models\Usuario;
 
 class AdminPedidosManualController extends Controller {
     public function novo(Request $request) {
