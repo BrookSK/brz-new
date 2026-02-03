@@ -190,6 +190,13 @@ class ProdutoController extends Controller {
                     $counts['produto_variacoes'] = null;
                 }
                 try {
+                    $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacoes WHERE produto_id = ? AND ativo = 1');
+                    $st->execute([$produtoId]);
+                    $counts['produto_variacoes_ativas'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['produto_variacoes_ativas'] = null;
+                }
+                try {
                     $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacao_itens pvi INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id WHERE pv.produto_id = ?');
                     $st->execute([$produtoId]);
                     $counts['produto_variacao_itens'] = (int) $st->fetchColumn();
@@ -360,9 +367,16 @@ class ProdutoController extends Controller {
         ];
 
         try {
-            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND ativo = 1 ORDER BY id ASC');
-            $stmtVars->execute([$produtoId]);
-            $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $vars = [];
+            try {
+                $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND ativo = 1 ORDER BY id ASC');
+                $stmtVars->execute([$produtoId]);
+                $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $stmtVars = $pdo->prepare('SELECT id, price_override, stock FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC');
+                $stmtVars->execute([$produtoId]);
+                $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
             if (empty($vars)) {
                 return $out;
             }
