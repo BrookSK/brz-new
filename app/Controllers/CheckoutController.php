@@ -170,6 +170,104 @@ class CheckoutController extends Controller {
         }
     }
 
+    private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
+        $uid = (int) ($usuario['id'] ?? 0);
+        $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
+        $items = [];
+        foreach ($carrinho as $it) {
+            $pid = (int) ($it['produto_id'] ?? ($it['id'] ?? 0));
+            $qtd = (int) ($it['quantidade'] ?? 1);
+            $vid = (int) ($it['produto_variacao_id'] ?? 0);
+            $vu = (float) ($it['preco_unitario'] ?? ($it['price'] ?? ($it['preco'] ?? 0)));
+            $items[] = [$pid, $vid, $qtd, round($vu, 2)];
+        }
+        sort($items);
+        $payload = json_encode([
+            'uid' => $uid,
+            'email' => $email,
+            'moeda' => strtoupper(trim($moeda)),
+            'total' => round($total, 2),
+            'items' => $items,
+        ]);
+        return sha1((string) $payload);
+    }
+
+    private function findExistingPedidoByIdempotency(int $usuarioId, string $moeda, float $total, string $idemHash): ?int {
+        try {
+            $db = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE pedidos');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $colUser = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+            $colMoeda = in_array('moeda', $cols, true) ? 'moeda' : (in_array('currency', $cols, true) ? 'currency' : '');
+            $colTotal = in_array('total', $cols, true) ? 'total' : (in_array('valor_total', $cols, true) ? 'valor_total' : '');
+            $colObs = in_array('observacoes', $cols, true) ? 'observacoes' : (in_array('observacao', $cols, true) ? 'observacao' : '');
+            $colCreated = in_array('created_at', $cols, true) ? 'created_at' : (in_array('data_criacao', $cols, true) ? 'data_criacao' : '');
+
+            if ($colUser === '' || $colTotal === '') {
+                return null;
+            }
+
+            // Sem coluna de observações não dá para garantir que é a mesma tentativa (risco de reaproveitar pedido errado)
+            if ($colObs === '') {
+                return null;
+            }
+
+            $where = [];
+            $params = [];
+
+            $where[] = $colUser . ' = :uid';
+            $params[':uid'] = $usuarioId;
+
+            if ($colMoeda !== '') {
+                $where[] = $colMoeda . ' = :moeda';
+                $params[':moeda'] = strtoupper(trim($moeda));
+            }
+
+            // total aproximado (evita problemas de float)
+            $where[] = 'ABS(' . $colTotal . ' - :total) < 0.01';
+            $params[':total'] = round($total, 2);
+
+            if ($colCreated !== '') {
+                $where[] = $colCreated . " >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)";
+            }
+
+            $where[] = $colObs . ' LIKE :idem';
+            $params[':idem'] = '%[IDEMPOTENCY:' . $idemHash . ']%';
+
+            $sql = 'SELECT id FROM pedidos WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 1';
+            $st = $db->prepare($sql);
+            $st->execute($params);
+            $id = (int) ($st->fetchColumn() ?: 0);
+            return $id > 0 ? $id : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function pedidoJaTemItens(int $pedidoId): bool {
+        try {
+            $db = \Config\Database::getConnection();
+            foreach (['pedido_itens', 'pedido_items'] as $t) {
+                try {
+                    $st = $db->prepare('SELECT COUNT(*) FROM ' . $t . ' WHERE pedido_id = ?');
+                    $st->execute([(int) $pedidoId]);
+                    $cnt = (int) ($st->fetchColumn() ?: 0);
+                    if ($cnt > 0) return true;
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+        return false;
+    }
+
     private function atualizarPagamentoNoPedido(int $pedidoId, array $paymentResult, string $gateway): void {
         try {
             $db = \Config\Database::getConnection();
@@ -897,21 +995,30 @@ class CheckoutController extends Controller {
             $usuario = $this->authService->getUsuarioLogado();
             $this->debugLog('[CHECKOUT] Usuario: ' . ($usuario ? $usuario['email'] : 'Nao logado'));
             
-            // Criar pedido
+            // Criar pedido (idempotente)
             $this->debugLog('[CHECKOUT] Chamando criarPedido()...');
-            $pedidoId = $this->criarPedido($dados, $carrinho, $usuario);
-            $this->debugLog('[CHECKOUT] Pedido criado com ID: ' . $pedidoId);
+            $pedidoCreateResult = $this->criarPedido($dados, $carrinho, $usuario);
+            $pedidoId = is_array($pedidoCreateResult) ? (int) ($pedidoCreateResult['pedido_id'] ?? 0) : (int) $pedidoCreateResult;
+            $reused = is_array($pedidoCreateResult) ? (bool) ($pedidoCreateResult['reused'] ?? false) : false;
+            $idemHash = is_array($pedidoCreateResult) ? (string) ($pedidoCreateResult['idem'] ?? '') : '';
+            $this->debugLog('[CHECKOUT] Pedido retornado com ID: ' . $pedidoId . ' (reused=' . ($reused ? '1' : '0') . ')' . ($idemHash !== '' ? (' idem=' . $idemHash) : ''));
             
             if ($pedidoId) {
-                // Salvar itens do pedido
-                $this->debugLog('[CHECKOUT] Salvando itens do pedido...');
-                $this->salvarItensPedido($pedidoId, $carrinho);
-                $this->debugLog('[CHECKOUT] Itens do pedido salvos');
-                
-                // Salvar dados do cliente
-                $this->debugLog('[CHECKOUT] Salvando dados do cliente...');
-                $this->salvarDadosCliente($pedidoId, $dados, $usuario);
-                $this->debugLog('[CHECKOUT] Dados do cliente salvos');
+                // Se reaproveitou pedido e ele já tem itens, não repetir inserts
+                $jaTemItens = $reused ? $this->pedidoJaTemItens($pedidoId) : false;
+                if (!$reused || !$jaTemItens) {
+                    // Salvar itens do pedido
+                    $this->debugLog('[CHECKOUT] Salvando itens do pedido...');
+                    $this->salvarItensPedido($pedidoId, $carrinho);
+                    $this->debugLog('[CHECKOUT] Itens do pedido salvos');
+
+                    // Salvar dados do cliente
+                    $this->debugLog('[CHECKOUT] Salvando dados do cliente...');
+                    $this->salvarDadosCliente($pedidoId, $dados, $usuario);
+                    $this->debugLog('[CHECKOUT] Dados do cliente salvos');
+                } else {
+                    $this->debugLog('[CHECKOUT] Pedido reutilizado já possui itens; pulando salvarItensPedido/salvarDadosCliente');
+                }
 
                 // Persistir forma_pagamento no pedido (alguns schemas exibem isso no admin)
                 try {
@@ -933,13 +1040,18 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
 
-                // Registrar pagamento (status inicial)
-                $this->registrarPagamentoPedido($pedidoId, $dados);
+                // Registrar pagamento + notificação apenas quando não reutilizado
+                if (!$reused) {
+                    // Registrar pagamento (status inicial)
+                    $this->registrarPagamentoPedido($pedidoId, $dados);
 
-                // Notificar criação do pedido
-                try {
-                    $this->pedidoModel->dispararEvento('novo_pedido', (int) $pedidoId);
-                } catch (\Exception $e) {
+                    // Notificar criação do pedido
+                    try {
+                        $this->pedidoModel->dispararEvento('novo_pedido', (int) $pedidoId);
+                    } catch (\Exception $e) {
+                    }
+                } else {
+                    $this->debugLog('[CHECKOUT] Pedido reutilizado; pulando registrarPagamentoPedido/dispararEvento');
                 }
 
                 // Processar pagamento
@@ -956,7 +1068,7 @@ class CheckoutController extends Controller {
                 }
 
                 $moedaPedido = (string) ($pedidoRowPay['moeda'] ?? 'BRL');
-                if (strtoupper(trim($moedaPedido)) === 'BRL') {
+                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     try {
                         $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                         $gateway = 'appmax';
@@ -988,7 +1100,7 @@ class CheckoutController extends Controller {
                 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
                 // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
-                if (strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     unset($_SESSION['carrinho']);
                     $this->debugLog('[CHECKOUT] Carrinho limpo');
                 }
@@ -2012,6 +2124,22 @@ class CheckoutController extends Controller {
             $this->debugLog('[CRIAR_PEDIDO] Impostos: ' . $impostos);
             $this->debugLog('[CRIAR_PEDIDO] Frete: ' . $frete . ' (' . (($frete == 0) ? 'GRATIS' : 'PAGO') . ')');
             $this->debugLog('[CRIAR_PEDIDO] Total: ' . $total);
+
+            // Idempotência: evitar pedidos duplicados para a mesma tentativa de checkout
+            $usuarioIdForIdem = (int) ($usuarioId ?? 0);
+            $usuarioForIdem = is_array($usuario) ? $usuario : [];
+            $usuarioForIdem['id'] = $usuarioIdForIdem;
+            if (empty($usuarioForIdem['email']) && !empty($dados['email'])) {
+                $usuarioForIdem['email'] = (string) $dados['email'];
+            }
+            $idemHash = $this->getIdempotencySignature((array) $dados, (array) $carrinho, (array) $usuarioForIdem, (float) $total, (string) $moedaSelecionada);
+            $this->debugLog('[CRIAR_PEDIDO] Idempotency hash: ' . $idemHash);
+
+            $existingPedidoId = $this->findExistingPedidoByIdempotency($usuarioIdForIdem, (string) $moedaSelecionada, (float) $total, $idemHash);
+            if (!empty($existingPedidoId)) {
+                $this->debugLog('[CRIAR_PEDIDO] Pedido já existe para esta assinatura. Reutilizando ID: ' . $existingPedidoId);
+                return ['pedido_id' => (int) $existingPedidoId, 'reused' => true, 'idem' => $idemHash];
+            }
             
             // Criar número do pedido
             $numeroPedido = 'BZS' . date('YmdHis') . rand(1000, 9999);
@@ -2047,7 +2175,7 @@ class CheckoutController extends Controller {
                 $taxaConversao, // Taxa de conversão aplicada
                 null, // endereco_entrega_id
                 null, // endereco_cobranca_id
-                $dados['observacoes'] ?? ''
+                trim((string) (($dados['observacoes'] ?? '') . ' [IDEMPOTENCY:' . $idemHash . ']'))
             ];
             
             $this->debugLog('[CRIAR_PEDIDO] Parametros: ' . json_encode($params));
@@ -2117,7 +2245,7 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CRIAR_PEDIDO] Falha ao criar/vincular endereco: ' . $e->getMessage());
             }
             
-            return $pedidoId;
+            return ['pedido_id' => (int) $pedidoId, 'reused' => false, 'idem' => $idemHash];
             
         } catch (\Exception $e) {
             $this->debugLog('[CRIAR_PEDIDO] Erro ao criar pedido: ' . $e->getMessage());
