@@ -240,32 +240,81 @@ class Carrinho extends Model {
     }
 
     public function calcularImpostos($valorProdutos, $valorFrete) {
-        $stmt = $this->connection->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'ipi_aliquota')");
-        $stmt->execute();
-        $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        $icms = 0;
-        $ipi = 0;
-        
-        foreach ($configs as $config) {
-            if ($config['chave'] === 'icms_aliquota') {
-                $icms = floatval($config['valor']);
-            } elseif ($config['chave'] === 'ipi_aliquota') {
-                $ipi = floatval($config['valor']);
+        // Regra baseada na Receita Federal (Remessas Postal/Expressa):
+        // - Valor aduaneiro ("valor da compra") = produto + frete + seguro
+        // - II (Imposto de Importação):
+        //   - Remessa Conforme (certificado):
+        //     - até US$ 50: 20%
+        //     - acima de US$ 50: 60% com desconto de US$ 20
+        //   - Não certificado: 60% sem desconto
+        // - ICMS: cálculo "por dentro" e incide sobre (valor aduaneiro + II)
+        //   BC = (valor aduaneiro + II) / (1 - aliquota_icms)
+        //   ICMS = BC * aliquota_icms
+
+        $valorProdutos = (float) $valorProdutos;
+        $valorFrete = (float) $valorFrete;
+
+        $aliqIcms = 17.0;
+        $certificado = false;
+        $seguro = 0.0;
+        try {
+            $stmt = $this->connection->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'remessa_conforme_certificado', 'remessa_conforme_prc', 'seguro_valor')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($configs as $cfg) {
+                $k = (string) ($cfg['chave'] ?? '');
+                $vRaw = (string) ($cfg['valor'] ?? '');
+                $vRaw = str_replace(',', '.', trim($vRaw));
+                if ($k === 'icms_aliquota' && $vRaw !== '') {
+                    $a = (float) $vRaw;
+                    if ($a > 0 && $a < 100) {
+                        $aliqIcms = $a;
+                    }
+                }
+                if (($k === 'remessa_conforme_certificado' || $k === 'remessa_conforme_prc') && $vRaw !== '') {
+                    $vv = strtolower($vRaw);
+                    $certificado = ($vv === '1' || $vv === 'true' || $vv === 'yes' || $vv === 'on');
+                }
+                if ($k === 'seguro_valor' && $vRaw !== '') {
+                    $s = (float) $vRaw;
+                    if ($s > 0) {
+                        $seguro = $s;
+                    }
+                }
             }
-        }
-        
-        $baseCalculo = $valorProdutos + $valorFrete;
-        $valorICMS = $baseCalculo * ($icms / 100);
-        $valorIPI = $baseCalculo * ($ipi / 100);
-
-        $total = $valorICMS + $valorIPI;
-        // Fallback compatível com o comportamento legado do carrinho (80% sobre subtotal)
-        if ($total <= 0 && $icms <= 0 && $ipi <= 0) {
-            return ((float) $valorProdutos) * 0.80;
+        } catch (\Exception $e) {
         }
 
-        return $total;
+        $valorAduaneiro = $valorProdutos + $valorFrete + $seguro;
+        if ($valorAduaneiro < 0) {
+            $valorAduaneiro = 0.0;
+        }
+
+        // II
+        $ii = 0.0;
+        if ($certificado) {
+            if ($valorAduaneiro <= 50.0) {
+                $ii = 0.20 * $valorAduaneiro;
+            } else {
+                $ii = (0.60 * $valorAduaneiro) - 20.0;
+                if ($ii < 0) {
+                    $ii = 0.0;
+                }
+            }
+        } else {
+            $ii = 0.60 * $valorAduaneiro;
+        }
+
+        // ICMS "por dentro" sobre (valor aduaneiro + II)
+        $baseIcms = $valorAduaneiro + $ii;
+        $p = ((float) $aliqIcms) / 100.0;
+        $icms = 0.0;
+        if ($p > 0 && $p < 1) {
+            $bc = $baseIcms / (1.0 - $p);
+            $icms = $bc * $p;
+        }
+
+        return $ii + $icms;
     }
 
     public function getItems($carrinhoId) {
