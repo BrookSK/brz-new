@@ -248,10 +248,8 @@ class AdminPedidosManualController extends Controller {
                             <div class="col-md-6">
                                 <label class="form-label">Método de Pagamento</label>
                                 <select class="form-select" name="forma_pagamento" id="forma_pagamento">
-                                    <option value="" selected>Online (link de pagamento)</option>
-                                    <option value="nomad_transferencia">Nomad (transferência USD)</option>
-                                    <option value="appmax_pix">AppMax - Pix (BRL)</option>
-                                    <option value="pagdev">PagDev (teste)</option>
+                                    <option value="" selected>Online</option>
+                                    <option value="pagdev">PagDev (offline)</option>
                                 </select>
                                 <div class="form-text">Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
                             </div>
@@ -363,7 +361,7 @@ class AdminPedidosManualController extends Controller {
             </form>
 
             <div class="card mb-4" id="linkPagamentoCard">
-                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Stripe</span>)</strong></div>
+                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">AppMax</span>)</strong></div>
                 <div class="card-body">
                     <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
                     <div class="row g-3 align-items-end">
@@ -916,29 +914,24 @@ document.addEventListener('DOMContentLoaded', function(){
 
     function updateManualPaymentMethodsForCurrency(){
         if (!fpSel) return;
-        const moeda = getSelectedMoeda();
         const prev = String(fpSel.value || '');
-
         fpSel.innerHTML = '';
-        if (moeda === 'BRL') {
-            fpSel.appendChild(new Option('Online (link de pagamento - Asaas)', ''));
-            fpSel.appendChild(new Option('AppMax - Pix (BRL)', 'appmax_pix'));
-            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
-        } else {
-            fpSel.appendChild(new Option('Online (link de pagamento - Stripe)', ''));
-            fpSel.appendChild(new Option('Nomad (transferência USD)', 'nomad_transferencia'));
-            fpSel.appendChild(new Option('PagDev (teste)', 'pagdev'));
-        }
-
+        fpSel.appendChild(new Option('Online', ''));
+        fpSel.appendChild(new Option('PagDev (offline)', 'pagdev'));
         const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
-        fpSel.value = stillValid ? prev : 'pagdev';
+        fpSel.value = stillValid ? prev : '';
     }
 
     if (moedaSel) {
         moedaSel.value = (EXISTING_PEDIDO && String(EXISTING_PEDIDO.moeda || '').toUpperCase() === 'BRL') ? 'BRL' : 'USD';
         moedaSel.addEventListener('change', function(){
+            const moedaNow = getSelectedMoeda();
             const g = document.getElementById('gatewayLabel');
-            if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Asaas' : 'Stripe';
+            if (g) g.textContent = (moedaNow === 'BRL') ? 'AppMax' : 'Stripe';
+
+            // Link/QR só é emitido no Admin quando for BRL (AppMax). Para USD (Stripe), o pagamento segue o fluxo padrão do checkout.
+            if (linkCard) linkCard.style.display = (moedaNow === 'BRL') ? '' : 'none';
+
             updateManualPaymentMethodsForCurrency();
             try { refreshOffline(); } catch (e) {}
             calcTotal();
@@ -949,23 +942,20 @@ document.addEventListener('DOMContentLoaded', function(){
     const offlineBox = document.getElementById('offlineInfoBox');
     const refreshOffline = function(){
         const v = fpSel ? String(fpSel.value || '') : '';
-        const moeda = getSelectedMoeda();
         if (!offlineWrap || !offlineBox) return;
-        if (v === 'nomad_transferencia') {
+
+        const isOffline = (v === 'pagdev');
+        if (isOffline) {
             offlineWrap.style.display = 'block';
-            offlineBox.textContent = 'Pagamento via transferência (USD) - Nomad. Após o depósito, anexe o comprovante no pedido para que possamos alterar o status para pago.';
-        } else if (v === 'appmax_pix') {
-            offlineWrap.style.display = 'block';
-            offlineBox.textContent = 'Pagamento via Pix (BRL) - AppMax. Após o pagamento, anexe o comprovante no pedido para que possamos alterar o status para pago.';
+            offlineBox.textContent = 'Pagamento offline (PagDev). Após o pagamento, anexe o comprovante no pedido para que possamos alterar o status para pago.';
         } else {
             offlineWrap.style.display = 'none';
             offlineBox.textContent = '';
         }
 
         // Pagamentos offline não devem gerar link
-        const isOffline = (v === 'nomad_transferencia' || v === 'appmax_pix');
         if (linkCard) {
-            linkCard.style.display = isOffline ? 'none' : '';
+            linkCard.style.display = isOffline ? 'none' : (getSelectedMoeda() === 'BRL' ? '' : 'none');
         }
         if (linkInfo) {
             linkInfo.style.display = isOffline ? 'none' : '';
@@ -975,13 +965,6 @@ document.addEventListener('DOMContentLoaded', function(){
             linkResult.innerHTML = '';
         }
 
-        // Ajuste simples: se método exige moeda, mantém compatibilidade de seleção
-        if (v === 'nomad_transferencia' && moeda !== 'USD') {
-            if (moedaSel) moedaSel.value = 'USD';
-        }
-        if (v === 'appmax_pix' && moeda !== 'BRL') {
-            if (moedaSel) moedaSel.value = 'BRL';
-        }
         try { calcTotal(); } catch (e) {}
     };
     if (fpSel) {
@@ -991,7 +974,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     const g = document.getElementById('gatewayLabel');
-    if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Asaas' : 'Stripe';
+    if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'AppMax' : 'Stripe';
     if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
         const sel = document.getElementById('cliente_id');
         if (sel) {
