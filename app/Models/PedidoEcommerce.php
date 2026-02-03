@@ -695,13 +695,6 @@ class PedidoEcommerce {
             $pedido['valor_impostos'] = $valorImpostos;
             $pedido['valor_total'] = $valorTotal;
 
-            // Aliases legados usados em algumas telas (ex.: checkout/conclusao)
-            $pedido['subtotal'] = $subtotalProdutos;
-            $pedido['frete'] = $valorFrete;
-            $pedido['servicos'] = $taxaServico;
-            $pedido['impostos'] = $valorImpostos;
-            $pedido['total'] = $valorTotal;
-
             $pedido['__converted_to_brl'] = ($moeda === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL);
 
             // Endereço de entrega: aceitar diferentes nomes de colunas
