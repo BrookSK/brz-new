@@ -989,30 +989,6 @@ class CheckoutController extends Controller {
         // Obter dados do formulário
         $dados = $request->getParams();
         
-        // Salvar endereço automaticamente para futuras compras (quando logado)
-        if (!empty($usuario)) {
-            // Salvar novo endereço
-            $enderecoData = [
-                'usuario_id' => $usuario['id'],
-                'cep' => $dados['cep'],
-                'endereco' => $dados['endereco'],
-                'numero' => $dados['numero'],
-                'complemento' => $dados['complemento'] ?? '',
-                'bairro' => $dados['bairro'],
-                'cidade' => $dados['cidade'],
-                'estado' => $dados['estado'],
-                'principal' => 0 // Não é principal por padrão
-            ];
-            
-            // Verificar se é o primeiro endereço (torna automático principal)
-            $enderecosExistentes = $this->usuarioModel->getEnderecos($usuario['id']);
-            if (empty($enderecosExistentes)) {
-                $enderecoData['principal'] = 1;
-            }
-            
-            $this->enderecoModel->create($enderecoData);
-        }
-        
         // Resto do processamento do pedido...
         $this->debugLog('[CHECKOUT] processar() chamado - INICIO');
         
@@ -2393,6 +2369,63 @@ class CheckoutController extends Controller {
             try {
                 $enderecoModelApp = new \App\Models\Endereco();
 
+                // Se o usuário selecionou um endereço já cadastrado, reutilizar (não criar novo)
+                $enderecoEntregaId = 0;
+                foreach (['endereco_entrega_id', 'endereco_id', 'enderecoEntregaId', 'enderecoId'] as $k) {
+                    if (isset($dados[$k])) {
+                        $enderecoEntregaId = (int) $dados[$k];
+                        if ($enderecoEntregaId > 0) {
+                            break;
+                        }
+                    }
+                }
+
+                $enderecoCobrancaId = 0;
+                foreach (['endereco_cobranca_id', 'enderecoCobrancaId'] as $k) {
+                    if (isset($dados[$k])) {
+                        $enderecoCobrancaId = (int) $dados[$k];
+                        if ($enderecoCobrancaId > 0) {
+                            break;
+                        }
+                    }
+                }
+
+                if ($enderecoEntregaId > 0) {
+                    try {
+                        // Validar se o endereço pertence ao usuário
+                        $stVal = $db->prepare('SELECT usuario_id FROM enderecos WHERE id = ? LIMIT 1');
+                        $stVal->execute([(int) $enderecoEntregaId]);
+                        $uidEnd = (int) ($stVal->fetchColumn() ?: 0);
+                        if ($uidEnd !== (int) $usuarioId) {
+                            $enderecoEntregaId = 0;
+                        }
+                    } catch (\Exception $e) {
+                        $enderecoEntregaId = 0;
+                    }
+                }
+
+                if ($enderecoCobrancaId > 0) {
+                    try {
+                        $stVal = $db->prepare('SELECT usuario_id FROM enderecos WHERE id = ? LIMIT 1');
+                        $stVal->execute([(int) $enderecoCobrancaId]);
+                        $uidEnd = (int) ($stVal->fetchColumn() ?: 0);
+                        if ($uidEnd !== (int) $usuarioId) {
+                            $enderecoCobrancaId = 0;
+                        }
+                    } catch (\Exception $e) {
+                        $enderecoCobrancaId = 0;
+                    }
+                }
+
+                if ($enderecoEntregaId > 0) {
+                    if ($enderecoCobrancaId <= 0) {
+                        $enderecoCobrancaId = $enderecoEntregaId;
+                    }
+                    $stmtUpd = $db->prepare('UPDATE pedidos SET endereco_entrega_id = ?, endereco_cobranca_id = ? WHERE id = ?');
+                    $stmtUpd->execute([(int) $enderecoEntregaId, (int) $enderecoCobrancaId, (int) $pedidoId]);
+                    return ['pedido_id' => (int) $pedidoId, 'reused' => false, 'idem' => $idemHash];
+                }
+
                 $enderecosExistentes = [];
                 try {
                     $usuarioModelApp = new \App\Models\Usuario();
@@ -2415,17 +2448,17 @@ class CheckoutController extends Controller {
                     'principal' => $principal,
                 ];
 
-                $enderecoEntregaId = null;
+                $enderecoEntregaIdNovo = null;
                 if ($enderecoModelApp->create($enderecoEntregaData)) {
-                    $enderecoEntregaId = $enderecoModelApp->getConnection()->lastInsertId();
+                    $enderecoEntregaIdNovo = $enderecoModelApp->getConnection()->lastInsertId();
                 }
 
                 // Por enquanto, usar o mesmo endereço para cobrança (pode ser separado depois)
-                $enderecoCobrancaId = $enderecoEntregaId;
+                $enderecoCobrancaIdNovo = $enderecoEntregaIdNovo;
 
-                if (!empty($enderecoEntregaId)) {
+                if (!empty($enderecoEntregaIdNovo)) {
                     $stmtUpd = $db->prepare('UPDATE pedidos SET endereco_entrega_id = ?, endereco_cobranca_id = ? WHERE id = ?');
-                    $stmtUpd->execute([$enderecoEntregaId, $enderecoCobrancaId, $pedidoId]);
+                    $stmtUpd->execute([(int) $enderecoEntregaIdNovo, (int) $enderecoCobrancaIdNovo, (int) $pedidoId]);
                 }
             } catch (\Exception $e) {
                 $this->debugLog('[CRIAR_PEDIDO] Falha ao criar/vincular endereco: ' . $e->getMessage());
