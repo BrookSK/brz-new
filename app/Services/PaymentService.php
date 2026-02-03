@@ -355,6 +355,10 @@ class PaymentService {
                     'base64',
                     'image_base64',
                     'pix_qrcode_base64',
+                    'pix_qrcode',
+                    'pixQrCode',
+                    'pix_qr_code',
+                    'pix_qr',
                 ]);
                 $payload = $findFirstString($pixData, [
                     'payload',
@@ -365,6 +369,8 @@ class PaymentService {
                     'br_code',
                     'pixCopiaECola',
                     'pix_copia_cola',
+                    'pix_emv',
+                    'pix_brcode',
                     'copia_e_cola',
                 ]);
                 $expirationDate = $findFirstString($pixData, [
@@ -384,17 +390,19 @@ class PaymentService {
                 }
 
                 if ($encodedImage === '' && $payload === '') {
-                    $debug = false;
-                    if (isset($_ENV['APP_DEBUG'])) {
-                        $debug = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
-                    } elseif (isset($_SERVER['APP_DEBUG'])) {
-                        $debug = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
-                    }
-                    if ($debug) {
+                    try {
+                        $keysTop = is_array($pixResp) ? implode(',', array_slice(array_keys($pixResp), 0, 30)) : '';
+                        $json = '';
                         try {
-                            error_log('[APPMAX][PIX] Não foi possível extrair QR/payload. Response=' . json_encode($pixResp, JSON_UNESCAPED_UNICODE));
+                            $json = json_encode($pixResp, JSON_UNESCAPED_UNICODE);
                         } catch (\Exception $e) {
+                            $json = '';
                         }
+                        if (is_string($json) && strlen($json) > 2500) {
+                            $json = substr($json, 0, 2500) . '...';
+                        }
+                        error_log('[APPMAX][PIX] Não foi possível extrair QR/payload. top_keys=' . $keysTop . ' response_head=' . $json);
+                    } catch (\Exception $e) {
                     }
                 }
 
