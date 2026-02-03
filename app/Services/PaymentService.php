@@ -16,6 +16,9 @@ class PaymentService {
     private $appmaxClientId;
     private $appmaxClientSecret;
     private $appmaxAppId;
+    private $appmaxV3AccessToken;
+    private $appmaxAmbiente;
+    private $appmaxBaseUrl;
     private $appmaxAccessToken;
     private $appmaxAccessTokenExpiresAt;
     
@@ -34,20 +37,35 @@ class PaymentService {
             throw new \Exception('AppMax está desativado');
         }
 
-        $token = $this->getAppmaxAccessToken();
-        $url = 'https://api.appmax.com.br' . '/' . ltrim($path, '/');
+        if (empty($this->appmaxV3AccessToken)) {
+            throw new \Exception('AppMax não configurado (access-token ausente)');
+        }
+
+        $baseUrl = '';
+        if (!empty($this->appmaxBaseUrl)) {
+            $baseUrl = (string) $this->appmaxBaseUrl;
+        } else {
+            $amb = strtolower(trim((string) $this->appmaxAmbiente));
+            if ($amb === 'homolog' || $amb === 'homologacao' || $amb === 'sandbox' || $amb === 'test') {
+                $baseUrl = 'https://homolog.sandboxappmax.com.br/api/v3';
+            } else {
+                $baseUrl = 'https://admin.appmax.com.br/api/v3';
+            }
+        }
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $token,
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
 
-        $payload = null;
-        if ($body !== null) {
-            $payload = json_encode($body);
+        $payloadArr = is_array($body) ? $body : [];
+        // API v3 usa access-token no corpo da requisição.
+        if (!array_key_exists('access-token', $payloadArr)) {
+            $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
+        $payload = json_encode($payloadArr);
 
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
@@ -79,7 +97,7 @@ class PaymentService {
             'http' => [
                 'method' => strtoupper($method),
                 'header' => implode("\r\n", $headers),
-                'content' => $payload ?? '',
+                'content' => $payload,
                 'ignore_errors' => true,
             ]
         ]);
@@ -107,50 +125,132 @@ class PaymentService {
 
         $ip = (string) ($dados['customer_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
 
-        $address = [
-            'postcode' => preg_replace('/\D+/', '', (string) ($dados['customer_zipcode'] ?? '')),
-            'street' => (string) ($dados['customer_address'] ?? ''),
-            'number' => (string) ($dados['customer_address_number'] ?? ''),
-            'complement' => (string) ($dados['customer_address_complement'] ?? ''),
-            'district' => (string) ($dados['customer_province'] ?? ''),
-            'city' => (string) ($dados['customer_city'] ?? ''),
-            'state' => (string) ($dados['customer_state'] ?? ''),
-        ];
-
         $payload = [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
+            'firstname' => $firstName,
+            'lastname' => $lastName,
             'email' => $email,
-            'phone' => $phone,
-            'document_number' => $doc,
-            'address' => $address,
+            'telephone' => $phone,
+            'postcode' => (string) ($dados['customer_zipcode'] ?? ''),
+            'address_street' => (string) ($dados['customer_address'] ?? ''),
+            'address_street_number' => (string) ($dados['customer_address_number'] ?? ''),
+            'address_street_complement' => (string) ($dados['customer_address_complement'] ?? ''),
+            'address_street_district' => (string) ($dados['customer_province'] ?? ''),
+            'address_city' => (string) ($dados['customer_city'] ?? ''),
+            'address_state' => (string) ($dados['customer_state'] ?? ''),
             'ip' => $ip,
         ];
 
         if (!empty($products)) {
-            $payload['products'] = $products;
+            // A doc aceita products com product_sku/product_qty (produto de interesse)
+            $payload['products'] = array_map(function ($p) {
+                if (!is_array($p)) return $p;
+                $sku = (string) ($p['sku'] ?? ($p['product_sku'] ?? ''));
+                $qty = (int) ($p['quantity'] ?? ($p['qty'] ?? ($p['product_qty'] ?? 1)));
+                return [
+                    'product_sku' => $sku,
+                    'product_qty' => $qty,
+                ];
+            }, $products);
         }
 
-        $created = $this->appmaxRequest('POST', '/v1/customers', $payload);
-        $customerId = (int) ($created['data']['customer']['id'] ?? 0);
+        $created = $this->appmaxRequest('POST', 'customer', $payload);
+        $customerId = 0;
+        if (isset($created['data']['customer_id'])) {
+            $customerId = (int) $created['data']['customer_id'];
+        } elseif (isset($created['customer_id'])) {
+            $customerId = (int) $created['customer_id'];
+        } elseif (isset($created['data']['id'])) {
+            $customerId = (int) $created['data']['id'];
+        } elseif (isset($created['data']['customer']['id'])) {
+            $customerId = (int) $created['data']['customer']['id'];
+        }
         if ($customerId <= 0) {
-            throw new \Exception('AppMax: customer_id não retornado');
+            $msg = '';
+            foreach (['message', 'mensagem', 'error', 'erro'] as $k) {
+                if (!empty($created[$k]) && is_string($created[$k])) {
+                    $msg = $created[$k];
+                    break;
+                }
+            }
+            if ($msg === '' && !empty($created['data']['message']) && is_string($created['data']['message'])) {
+                $msg = (string) $created['data']['message'];
+            }
+            $details = '';
+            try {
+                $details = json_encode($created, JSON_UNESCAPED_UNICODE);
+            } catch (\Exception $e) {
+                $details = '';
+            }
+            throw new \Exception('AppMax: customer_id não retornado' . ($msg !== '' ? (' - ' . $msg) : '') . ($details !== '' ? (' | response=' . $details) : ''));
         }
         return $customerId;
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
+        $total = round(((float) $productsValueCents) / 100, 2);
+        $shipping = round(((float) $shippingValueCents) / 100, 2);
+        $discount = round(((float) $discountValueCents) / 100, 2);
+
+        $payloadProducts = [];
+        foreach ($products as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $sku = (string) ($p['sku'] ?? '');
+            $name = (string) ($p['name'] ?? ($p['titulo'] ?? ''));
+            $qty = (int) ($p['quantity'] ?? ($p['qty'] ?? 1));
+            $unitCents = (int) ($p['unit_value'] ?? ($p['unit_value_cents'] ?? 0));
+            $price = $unitCents > 0 ? round(((float) $unitCents) / 100, 2) : null;
+
+            $row = [
+                'sku' => $sku,
+                'name' => $name !== '' ? $name : $sku,
+                'qty' => $qty > 0 ? $qty : 1,
+            ];
+            if ($price !== null) {
+                $row['price'] = $price;
+            }
+            $payloadProducts[] = $row;
+        }
+
         $payload = [
+            'total' => $total,
+            'products' => $payloadProducts,
+            'shipping' => $shipping,
             'customer_id' => $customerId,
-            'products_value' => $productsValueCents,
-            'discount_value' => $discountValueCents,
-            'shipping_value' => $shippingValueCents,
-            'products' => $products,
+            'discount' => $discount,
+            'freight_type' => (string) ($products[0]['freight_type'] ?? ($products[0]['frete_tipo'] ?? '')),
         ];
-        $created = $this->appmaxRequest('POST', '/v1/orders', $payload);
-        $orderId = (int) ($created['data']['order']['id'] ?? 0);
+
+        $created = $this->appmaxRequest('POST', 'order', $payload);
+        $orderId = 0;
+        if (isset($created['data']['order_id'])) {
+            $orderId = (int) $created['data']['order_id'];
+        } elseif (isset($created['order_id'])) {
+            $orderId = (int) $created['order_id'];
+        } elseif (isset($created['data']['id'])) {
+            $orderId = (int) $created['data']['id'];
+        } elseif (isset($created['data']['order']['id'])) {
+            $orderId = (int) $created['data']['order']['id'];
+        }
         if ($orderId <= 0) {
-            throw new \Exception('AppMax: order_id não retornado');
+            $msg = '';
+            foreach (['message', 'mensagem', 'error', 'erro'] as $k) {
+                if (!empty($created[$k]) && is_string($created[$k])) {
+                    $msg = $created[$k];
+                    break;
+                }
+            }
+            if ($msg === '' && !empty($created['data']['message']) && is_string($created['data']['message'])) {
+                $msg = (string) $created['data']['message'];
+            }
+            $details = '';
+            try {
+                $details = json_encode($created, JSON_UNESCAPED_UNICODE);
+            } catch (\Exception $e) {
+                $details = '';
+            }
+            throw new \Exception('AppMax: order_id não retornado' . ($msg !== '' ? (' - ' . $msg) : '') . ($details !== '' ? (' | response=' . $details) : ''));
         }
         return $orderId;
     }
@@ -201,9 +301,14 @@ class PaymentService {
         $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
 
         if ($forma === 'PIX') {
-            $pixResp = $this->appmaxRequest('POST', '/v1/payments/pix', [
-                'order_id' => $orderId,
-                'payment_data' => [
+            $pixResp = $this->appmaxRequest('POST', 'payment/pix', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
                     'pix' => [
                         'document_number' => $doc,
                     ],
@@ -214,9 +319,85 @@ class PaymentService {
             // Normalização para as views (padrão legado Asaas)
             $pixData = $pixResp['data'] ?? $pixResp;
             if (is_array($pixData)) {
-                $encodedImage = (string) ($pixData['encodedImage'] ?? ($pixData['qr_code_base64'] ?? ($pixData['qrCodeBase64'] ?? '')));
-                $payload = (string) ($pixData['payload'] ?? ($pixData['emv'] ?? ($pixData['copy_paste'] ?? '')));
-                $expirationDate = (string) ($pixData['expirationDate'] ?? ($pixData['expires_at'] ?? ''));
+                $encodedImage = '';
+                $payload = '';
+                $expirationDate = '';
+
+                $findFirstString = function ($data, array $keys) use (&$findFirstString): string {
+                    if (!is_array($data)) {
+                        return '';
+                    }
+                    foreach ($keys as $k) {
+                        if (array_key_exists($k, $data) && is_string($data[$k]) && trim($data[$k]) !== '') {
+                            return trim($data[$k]);
+                        }
+                    }
+                    foreach ($data as $v) {
+                        if (is_array($v)) {
+                            $found = $findFirstString($v, $keys);
+                            if ($found !== '') {
+                                return $found;
+                            }
+                        }
+                    }
+                    return '';
+                };
+
+                // Tentar chaves diretas e também recursivamente no payload completo
+                $encodedImage = $findFirstString($pixData, [
+                    'encodedImage',
+                    'encoded_image',
+                    'qr_code_base64',
+                    'qrCodeBase64',
+                    'qrcode_base64',
+                    'qr_code',
+                    'qrcode',
+                    'base64',
+                    'image_base64',
+                    'pix_qrcode_base64',
+                ]);
+                $payload = $findFirstString($pixData, [
+                    'payload',
+                    'emv',
+                    'copy_paste',
+                    'copyPaste',
+                    'brcode',
+                    'br_code',
+                    'pixCopiaECola',
+                    'pix_copia_cola',
+                    'copia_e_cola',
+                ]);
+                $expirationDate = $findFirstString($pixData, [
+                    'expirationDate',
+                    'expiration_date',
+                    'expires_at',
+                    'expiresAt',
+                ]);
+
+                // Se vier como data:image/png;base64,..., remover prefixo
+                if ($encodedImage !== '') {
+                    $encodedImage = preg_replace('#^data:image/[^;]+;base64,#', '', $encodedImage);
+                    $encodedImage = trim((string) $encodedImage);
+                }
+                if ($payload !== '') {
+                    $payload = trim((string) $payload);
+                }
+
+                if ($encodedImage === '' && $payload === '') {
+                    $debug = false;
+                    if (isset($_ENV['APP_DEBUG'])) {
+                        $debug = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+                    } elseif (isset($_SERVER['APP_DEBUG'])) {
+                        $debug = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+                    }
+                    if ($debug) {
+                        try {
+                            error_log('[APPMAX][PIX] Não foi possível extrair QR/payload. Response=' . json_encode($pixResp, JSON_UNESCAPED_UNICODE));
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
                 $result['pix'] = [
                     'encodedImage' => $encodedImage !== '' ? $encodedImage : null,
                     'payload' => $payload !== '' ? $payload : null,
@@ -227,10 +408,15 @@ class PaymentService {
         }
 
         if ($forma === 'BOLETO') {
-            $bolResp = $this->appmaxRequest('POST', '/v1/payments/boleto', [
-                'order_id' => $orderId,
-                'payment_data' => [
-                    'boleto' => [
+            $bolResp = $this->appmaxRequest('POST', 'payment/boleto', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
+                    'Boleto' => [
                         'document_number' => $doc,
                     ],
                 ],
@@ -260,10 +446,10 @@ class PaymentService {
             $cc = [
                 'number' => preg_replace('/\D+/', '', (string) ($dados['card_number'] ?? '')),
                 'cvv' => (string) ($dados['card_cvv'] ?? ''),
-                'expiration_month' => (string) ($dados['card_expiry_month'] ?? ''),
-                'expiration_year' => (string) ($dados['card_expiry_year'] ?? ''),
-                'holder_document_number' => $doc,
-                'holder_name' => (string) ($dados['card_holder_name'] ?? ($dados['customer_name'] ?? '')),
+                'month' => (int) ($dados['card_expiry_month'] ?? 0),
+                'year' => (int) ($dados['card_expiry_year'] ?? 0),
+                'document_number' => $doc,
+                'name' => (string) ($dados['card_holder_name'] ?? ($dados['customer_name'] ?? '')),
                 'installments' => (int) ($dados['installments'] ?? 1),
                 'soft_descriptor' => (string) ($dados['soft_descriptor'] ?? ($this->appmaxAppId !== '' ? $this->appmaxAppId : 'BRZ')),
             ];
@@ -274,11 +460,15 @@ class PaymentService {
                 $cc['upsell_hash'] = (string) $dados['upsell_hash'];
             }
 
-            $ccResp = $this->appmaxRequest('POST', '/v1/payments/credit-card', [
-                'order_id' => $orderId,
-                'customer_id' => $customerId,
-                'payment_data' => [
-                    'credit_card' => $cc,
+            $ccResp = $this->appmaxRequest('POST', 'payment/credit-card', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
+                    'CreditCard' => $cc,
                 ],
             ]);
             $result['appmax']['credit_card_response'] = $ccResp;
@@ -301,6 +491,11 @@ class PaymentService {
         $this->appmaxClientId = (string) $this->getConfig('pagamentos', 'appmax_client_id', '');
         $this->appmaxClientSecret = (string) $this->getConfig('pagamentos', 'appmax_client_secret', '');
         $this->appmaxAppId = (string) $this->getConfig('pagamentos', 'appmax_app_id', '');
+        // API v3: access-token (fornecido pela AppMax). Mantém fallback para instalações antigas.
+        $this->appmaxV3AccessToken = (string) $this->getConfig('pagamentos', 'appmax_access_token', (string) $this->appmaxAppId);
+        $this->appmaxAmbiente = (string) $this->getConfig('pagamentos', 'appmax_ambiente', 'production');
+        // Se vazio, a URL será determinada automaticamente pelo appmax_ambiente.
+        $this->appmaxBaseUrl = (string) $this->getConfig('pagamentos', 'appmax_base_url', '');
         $this->appmaxAccessToken = null;
         $this->appmaxAccessTokenExpiresAt = null;
     }
@@ -313,6 +508,12 @@ class PaymentService {
             $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
             $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
             if (is_array($cols) && !empty($cols)) {
+                // Se a tabela tem colunas 'chave'/'valor', então ela está no formato key/value.
+                // Nesse caso, NÃO devemos tentar ler como single-row com colunas diretas.
+                if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                    throw new \Exception('configuracoes_sistema está em formato chave/valor');
+                }
+
                 $colName = null;
                 if ($categoria === 'pagamentos') {
                     $direct = [
@@ -356,28 +557,126 @@ class PaymentService {
         } catch (\Exception $e) {
         }
 
-        // Tenta schema chave/valor em configuracoes_sistema (sem coluna categoria)
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
+        $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTry as $table) {
+            try {
+                $stmtT = $db->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$table]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+            } catch (\Exception $e) {
+                continue;
             }
-        } catch (\Exception $e) {
-        }
 
-        // Tenta schema chave/valor (configuracoes)
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE ' . $table);
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+            } catch (\Exception $e) {
+                $cols = [];
             }
-        } catch (\Exception $e) {
+
+            $valueCol = null;
+            foreach (['valor', 'value', 'conteudo', 'content', 'config_value'] as $vc) {
+                if (in_array($vc, $cols, true)) {
+                    $valueCol = $vc;
+                    break;
+                }
+            }
+            if (!$valueCol) {
+                continue;
+            }
+
+            // Schema categoria+chave
+            if (in_array('categoria', $cols, true)) {
+                $keyCol = null;
+                foreach (['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'] as $kc) {
+                    if (in_array($kc, $cols, true)) {
+                        $keyCol = $kc;
+                        break;
+                    }
+                }
+                if ($keyCol) {
+                    try {
+                        $orderCol = null;
+                        if (in_array('updated_at', $cols, true)) {
+                            $orderCol = 'updated_at';
+                        } elseif (in_array('id', $cols, true)) {
+                            $orderCol = 'id';
+                        }
+                        $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE categoria = ? AND ' . $keyCol . ' = ?';
+                        if ($orderCol) {
+                            $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                        }
+                        $sql .= ' LIMIT 1';
+                        $stmt = $db->prepare($sql);
+                        $stmt->execute([$categoria, $chave]);
+                        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($row && array_key_exists('valor', $row)) {
+                            return $row['valor'];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+
+            // Schema chave/valor (sem categoria)
+            $keyCol = null;
+            foreach (['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'] as $kc) {
+                if (in_array($kc, $cols, true)) {
+                    $keyCol = $kc;
+                    break;
+                }
+            }
+            if ($keyCol) {
+                try {
+                    $key = $categoria . '_' . $chave;
+                    $orderCol = null;
+                    if (in_array('updated_at', $cols, true)) {
+                        $orderCol = 'updated_at';
+                    } elseif (in_array('id', $cols, true)) {
+                        $orderCol = 'id';
+                    }
+                    $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ?';
+                    if ($orderCol) {
+                        $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stmt = $db->prepare($sql);
+                    $stmt->execute([$key]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                } catch (\Exception $e) {
+                }
+
+                // Fallback: algumas instalações usam chave sem prefixo de categoria (ex: stripe_enabled)
+                try {
+                    $orderCol = null;
+                    if (in_array('updated_at', $cols, true)) {
+                        $orderCol = 'updated_at';
+                    } elseif (in_array('id', $cols, true)) {
+                        $orderCol = 'id';
+                    }
+                    $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ?';
+                    if ($orderCol) {
+                        $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stmt = $db->prepare($sql);
+                    $stmt->execute([$chave]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                } catch (\Exception $e) {
+                }
+            }
         }
 
         return $default;
@@ -662,17 +961,17 @@ class PaymentService {
         }
 
         $internal = 'pending';
-        if (str_contains($eventNorm, 'PAGO') || str_contains($eventNorm, 'APROVADO') || str_contains($eventNorm, 'APPROVED') || str_contains($eventNorm, 'PAID')) {
+        // Eventos oficiais (docs): OrderApproved, OrderPaid, OrderRefund, PaymentNotAuthorized, etc.
+        if (in_array($eventNorm, ['ORDERAPPROVED', 'ORDERPAID'], true) || str_contains($eventNorm, 'APPROVED') || str_contains($eventNorm, 'PAID')) {
             $internal = 'approved';
-        } elseif (str_contains($eventNorm, 'ESTORN') || str_contains($eventNorm, 'REFUND')) {
+        } elseif (in_array($eventNorm, ['ORDERREFUND'], true) || str_contains($eventNorm, 'REFUND')) {
             $internal = 'refunded';
-        } elseif (str_contains($eventNorm, 'NAO AUTORIZ') || str_contains($eventNorm, 'NÃO AUTORIZ') || str_contains($eventNorm, 'NOTAUTHORIZED') || str_contains($eventNorm, 'NOT_AUTHORIZED')) {
-            $internal = 'rejected';
-        } elseif (str_contains($eventNorm, 'EXPIR')) {
+        } elseif (in_array($eventNorm, ['PAYMENTNOTAUTHORIZED', 'PAYMENTNOTAUTHORIZEDWITHDELAY(60M)'], true) || str_contains($eventNorm, 'NOTAUTHORIZED') || str_contains($eventNorm, 'NOT_AUTHORIZED')) {
             $internal = 'rejected';
         }
 
-        if ($paymentId !== '') {
+        // Para AppMax, normalmente atualizamos pelo order_id.
+        if ($paymentId !== '' && ctype_digit($paymentId)) {
             $this->atualizarPagamentoPedidoPorGateway($paymentId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
             return ['status' => 'processed', 'match' => 'payment_id'];
         }
@@ -683,6 +982,19 @@ class PaymentService {
                 $this->atualizarPagamentoPedidoPorPedidoId($pid, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
                 return ['status' => 'processed', 'match' => 'pedido_id'];
             }
+        }
+
+        // Fallback: tenta extrair order_id/id do payload
+        $orderId = '';
+        foreach (['order_id', 'orderId', 'id'] as $k) {
+            if (isset($data[$k]) && (is_string($data[$k]) || is_numeric($data[$k]))) {
+                $orderId = (string) $data[$k];
+                break;
+            }
+        }
+        if ($orderId !== '' && ctype_digit($orderId)) {
+            $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
+            return ['status' => 'processed', 'match' => 'order_id'];
         }
 
         return ['status' => 'ignored'];

@@ -978,6 +978,38 @@ class AdminConfiguracoesController extends Controller {
                                                                 </div>
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
+                                                                        <label class="form-label">Access Token</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_appmax_access_token" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_access_token', '') . '" placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Ambiente</label>
+                                                                        <select class="form-select" name="pagamentos_appmax_ambiente">
+                                                                            <option value="production" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                                            <option value="homolog" ' . ($this->getConfigValue($config, 'pagamentos', 'appmax_ambiente', 'production') === 'homolog' ? 'selected' : '') . '>Homologação</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Base URL (opcional)</label>
+                                                                        <input type="url" class="form-control" name="pagamentos_appmax_base_url" value="' . $this->getConfigValue($config, 'pagamentos', 'appmax_base_url', '') . '" placeholder="https://admin.appmax.com.br/api/v3">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
                                                                         <label class="form-label">Webhook URL</label>
                                                                         <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/appmax', ENT_QUOTES, 'UTF-8') . '" readonly>
                                                                     </div>
@@ -2072,7 +2104,7 @@ HTML;
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],

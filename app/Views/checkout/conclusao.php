@@ -5,8 +5,15 @@
         <div class="success-icon mb-4">
             <i class="fas fa-check-circle" style="font-size: 4rem; color: var(--primary-color);"></i>
         </div>
-        <h1 class="display-4 fw-bold" style="color: var(--primary-color);">Pedido Confirmado!</h1>
-        <p class="lead text-muted">Seu pedido foi processado com sucesso e está sendo preparado.</p>
+        <?php
+        $statusPagamentoHeader = $pedido['payment_status'] ?? ($paymentDetails['status'] ?? null);
+        if (is_string($statusPagamentoHeader)) {
+            $statusPagamentoHeader = strtoupper($statusPagamentoHeader);
+        }
+        $isPagoHeader = !empty($statusPagamentoHeader) && in_array($statusPagamentoHeader, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);
+        ?>
+        <h1 class="display-4 fw-bold" style="color: var(--primary-color);"><?= $isPagoHeader ? 'Pedido Confirmado!' : 'Pedido realizado!' ?></h1>
+        <p class="lead text-muted"><?= $isPagoHeader ? 'Seu pedido foi processado com sucesso e está sendo preparado.' : 'Seu pedido foi criado. Finalize o pagamento para confirmar.' ?></p>
     </div>
 
     <!-- Resumo do Pedido -->
