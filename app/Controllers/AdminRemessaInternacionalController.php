@@ -905,13 +905,18 @@ class AdminRemessaInternacionalController extends Controller {
             exit;
         }
 
+        $printUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($shipId);
+        header('Location: ' . $printUrl);
+        exit;
+
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'success' => false,
-            'error' => 'Etiqueta não encontrada no retorno da W-Express. Envie o JSON de retorno para mapear o campo correto.',
+            'error' => 'Etiqueta não encontrada no retorno da W-Express. Use a URL de impressão para visualizar a label.',
             'shipping_id' => $shipId,
             'data' => $data,
             'label_attempts' => $attempts,
+            'print_url' => $printUrl,
         ]);
         exit;
     }
@@ -1243,6 +1248,8 @@ function fecharJanela() {
         $wxTrack = (string) ($rel['wexpress_tracking_number'] ?? '');
         $wxCourier = (string) ($rel['courier_tracking_number'] ?? '');
 
+        $wxHasLabel = ($et === 1) || ($wxShipId !== '') || ($wxStatus === 'LABEL_CREATED');
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
@@ -1252,7 +1259,7 @@ function fecharJanela() {
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-internacional/janela/' . (int) $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
                     ' . ($wxShipId !== '' ? ('<a class="btn btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $jid . '/pedido/' . (int) $pid . '/etiqueta-download" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>') : '') . '
-                    <button class="btn btn-success" type="button" onclick="gerarEtiqueta()"><i class="fas fa-tag"></i> Gerar etiqueta</button>
+                    <button class="btn btn-success" type="button" onclick="gerarEtiqueta()" ' . ($wxHasLabel ? 'disabled' : '') . '><i class="fas fa-tag"></i> ' . ($wxHasLabel ? 'Etiqueta já gerada' : 'Gerar etiqueta') . '</button>
                 </div>
             </div>
 
@@ -1273,24 +1280,19 @@ function fecharJanela() {
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label">Finalidade do envio (shipment_purpose)</label>
-                            <select class="form-select" id="wexpress_shipment_purpose">
-                                <option value="personal" ' . ($wexpressPurpose === 'personal' || $wexpressPurpose === '' ? 'selected' : '') . '>personal</option>
-                                <option value="commercial" ' . ($wexpressPurpose === 'commercial' ? 'selected' : '') . '>commercial (revenda)</option>
-                            </select>
-                            <div class="form-text">CPF: personal | CNPJ revenda: commercial | CNPJ não revenda: personal</div>
+                            <input class="form-control" value="personal" disabled />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Invoice number (obrigatório p/ commercial)</label>
-                            <input class="form-control" id="wexpress_invoice_number" value="' . htmlspecialchars($wexpressInvoice, ENT_QUOTES, 'UTF-8') . '" placeholder="12345" />
+                            <label class="form-label">Invoice number</label>
+                            <input class="form-control" value="' . htmlspecialchars((string) $pid, ENT_QUOTES, 'UTF-8') . '" disabled />
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Tariff code (NCM)</label>
-                            <div class="form-text">Em commercial, o NCM vira obrigatório por item (tentaremos usar o NCM do produto).</div>
+                            <div class="form-text">Será sempre enviado com base no NCM cadastrado no produto.</div>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="row">
                 <div class="col-md-6">
                     <div class="card mb-3">
@@ -1366,12 +1368,7 @@ const pedidoId = ' . (int) $pid . ';
 
 function gerarEtiqueta() {
     if (!confirm("Gerar etiqueta agora?")) return;
-    const purposeEl = document.getElementById("wexpress_shipment_purpose");
-    const invEl = document.getElementById("wexpress_invoice_number");
-    const payload = {
-        wexpress_shipment_purpose: purposeEl ? purposeEl.value : "",
-        wexpress_invoice_number: invEl ? invEl.value : "",
-    };
+    const payload = {};
     fetch("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId + "/etiqueta-gerada", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1406,6 +1403,22 @@ function gerarEtiqueta() {
         try {
             $this->syncPedidosParaJanela($jid);
 
+            $stCheck = $this->connection->prepare('SELECT etiqueta_gerada, wexpress_shipping_id, wexpress_status FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
+            $stCheck->execute([$jid, $pid]);
+            $rowCheck = $stCheck->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $hasShipId = trim((string) ($rowCheck['wexpress_shipping_id'] ?? '')) !== '';
+            $hasEtiqueta = ((int) ($rowCheck['etiqueta_gerada'] ?? 0)) === 1;
+            $status = (string) ($rowCheck['wexpress_status'] ?? '');
+            if ($hasShipId || $hasEtiqueta || $status === 'LABEL_CREATED') {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Etiqueta já foi gerada para este pedido nesta janela. Para reemitir, remova o shipping_id/status no vínculo da janela/pedido.',
+                    'shipping_id' => (string) ($rowCheck['wexpress_shipping_id'] ?? ''),
+                    'wexpress_status' => $status,
+                ]);
+                exit;
+            }
+
             $pedido = $this->getPedidoCompleto($pid);
             if (!$pedido) {
                 echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
@@ -1414,29 +1427,7 @@ function gerarEtiqueta() {
 
             $svc = new WExpressService();
 
-            $raw = file_get_contents('php://input');
-            $body = json_decode((string) $raw, true);
-            $purpose = '';
-            $invoiceNumber = '';
-            if (is_array($body)) {
-                $purpose = (string) ($body['wexpress_shipment_purpose'] ?? '');
-                $invoiceNumber = (string) ($body['wexpress_invoice_number'] ?? '');
-            }
-
-            // Persistir preferências no vínculo janela/pedido (se colunas existirem)
-            try {
-                $this->connection->query('SELECT wexpress_shipment_purpose, wexpress_invoice_number FROM remessa_janela_pedidos LIMIT 1');
-                $stSave = $this->connection->prepare('UPDATE remessa_janela_pedidos SET wexpress_shipment_purpose = ?, wexpress_invoice_number = ? WHERE janela_id = ? AND pedido_id = ?');
-                $stSave->execute([
-                    $purpose !== '' ? $purpose : null,
-                    $invoiceNumber !== '' ? $invoiceNumber : null,
-                    $jid,
-                    $pid,
-                ]);
-            } catch (\Exception $e) {
-            }
-
-            $payload = $this->buildWExpressShippingPayload($svc, $pedido, $jid, $purpose, $invoiceNumber);
+            $payload = $this->buildWExpressShippingPayload($svc, $pedido, $jid, '', '');
 
             $resp = null;
             $httpCode = null;
@@ -1494,6 +1485,18 @@ function gerarEtiqueta() {
                     $pedidoModel->atualizarStatus((int) $pid, 'em_transporte', 'Etiqueta internacional gerada (W-Express)', $_SESSION['usuario_id'] ?? null);
                 } catch (\Exception $e) {
                 }
+
+                try {
+                    $notif = new \App\Services\NotificationService();
+                    $labelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId !== '' ? $wxShipId : $shipId ?? '');
+                    $notif->notificarEventoPedido('wexpress_label_created', (int) $pid, [
+                        'courier_tracking_number' => $wxCourier,
+                        'wexpress_tracking_number' => $wxTrack,
+                        'shipping_id' => $wxShipId,
+                        'label_url' => $labelUrl,
+                    ]);
+                } catch (\Exception $e) {
+                }
             }
 
             if ($errorMsg !== null) {
@@ -1530,14 +1533,10 @@ function gerarEtiqueta() {
 
         $recipientType = ($taxType === 'CPF') ? 'individual' : 'business';
 
-        $shipmentPurpose = strtolower(trim($shipmentPurposeOverride));
-        if ($shipmentPurpose !== 'commercial' && $shipmentPurpose !== 'personal') {
-            $shipmentPurpose = 'personal';
-        }
-
-        $invoiceNumber = trim((string) $invoiceNumberOverride);
-        if ($shipmentPurpose === 'commercial' && $invoiceNumber === '') {
-            throw new \Exception('W-Express: invoice_number é obrigatório quando shipment_purpose = commercial');
+        $shipmentPurpose = 'personal';
+        $invoiceNumber = (string) ((int) ($pedido['id'] ?? 0));
+        if ($invoiceNumber === '0') {
+            $invoiceNumber = (string) ('PEDIDO-' . (int) ($pedido['id'] ?? 0));
         }
 
         $end = $pedido['endereco'] ?? [];
@@ -1555,34 +1554,73 @@ function gerarEtiqueta() {
 
         $itens = $pedido['itens'] ?? [];
         $items = [];
+
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+
+        $usdToBrl = $this->getUsdToBrlRate();
+        $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
+
         if (is_array($itens)) {
             foreach ($itens as $it) {
                 $qtd = (int) ($it['quantidade'] ?? 1);
                 if ($qtd <= 0) $qtd = 1;
+
+                $unitValue = null;
+                foreach (['preco_unitario', 'valor_unitario', 'price', 'preco'] as $c) {
+                    if (isset($it[$c]) && is_numeric($it[$c])) {
+                        $unitValue = (float) $it[$c];
+                        break;
+                    }
+                }
+                if ($unitValue === null) {
+                    $unitValue = 1.0;
+                }
+                if ($moeda === 'BRL') {
+                    $unitValue = $unitValue * $brlToUsd;
+                }
+
                 $row = [
                     'description' => (string) ($it['produto_nome'] ?? ($it['nome_produto'] ?? 'item')),
                     'quantity' => $qtd,
-                    'unit_value' => is_numeric($it['preco'] ?? null) ? (float) $it['preco'] : 1,
+                    'unit_value' => round((float) $unitValue, 2),
                 ];
 
-                // Em commercial (revenda) o tariff_code (NCM) é obrigatório
-                if ($shipmentPurpose === 'commercial') {
-                    $ncm = (string) ($it['ncm'] ?? ($it['tariff_code'] ?? ''));
-                    $ncmDigits = preg_replace('/\D+/', '', $ncm);
-                    if ($ncmDigits === '') {
-                        throw new \Exception('W-Express: items.tariff_code (NCM) é obrigatório quando shipment_purpose = commercial');
-                    }
-                    $row['tariff_code'] = (int) $ncmDigits;
+                $ncm = (string) ($it['ncm'] ?? ($it['tariff_code'] ?? ''));
+                $ncmDigits = preg_replace('/\D+/', '', $ncm);
+                if ($ncmDigits === '') {
+                    throw new \Exception('W-Express: NCM (tariff_code) não encontrado no produto. Cadastre o NCM em todos os produtos antes de gerar etiqueta.');
                 }
+                $row['tariff_code'] = (int) $ncmDigits;
 
                 $items[] = $row;
             }
         }
 
-        $pesoTotal = 1.0;
-        if (is_numeric($pedido['peso_total'] ?? null)) {
-            $pesoTotal = max(0.001, (float) $pedido['peso_total']);
+        $pesoTotal = 0.0;
+        if (is_array($itens)) {
+            foreach ($itens as $it) {
+                $qtd = (int) ($it['quantidade'] ?? 1);
+                if ($qtd <= 0) $qtd = 1;
+                $peso = null;
+                foreach (['peso', 'weight', 'peso_kg'] as $c) {
+                    if (isset($it[$c]) && is_numeric($it[$c])) {
+                        $peso = (float) $it[$c];
+                        break;
+                    }
+                }
+                if ($peso !== null && $peso > 0) {
+                    $pesoTotal += ($peso * $qtd);
+                }
+            }
         }
+        if ($pesoTotal <= 0 && is_numeric($pedido['peso_total'] ?? null)) {
+            $pesoTotal = (float) $pedido['peso_total'];
+        }
+        if ($pesoTotal <= 0) {
+            $pesoTotal = 1.0;
+        }
+        $pesoTotal = max(0.001, (float) $pesoTotal);
 
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
@@ -1592,8 +1630,14 @@ function gerarEtiqueta() {
         ]];
 
         $declared = 0.0;
-        if (is_numeric($pedido['total'] ?? null)) {
-            $declared = (float) $pedido['total'];
+        foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+            if (isset($pedido[$c]) && is_numeric($pedido[$c])) {
+                $declared = (float) $pedido[$c];
+                break;
+            }
+        }
+        if ($moeda === 'BRL') {
+            $declared = $declared * $brlToUsd;
         }
 
         $externalShippingId = (string) (($pedido['codigo_pedido'] ?? '') !== '' ? $pedido['codigo_pedido'] : ('PEDIDO-' . (int) ($pedido['id'] ?? 0)));
@@ -1608,10 +1652,10 @@ function gerarEtiqueta() {
             'dimensions_unit' => 'cm',
             'weight_unit' => 'g',
             'currency' => 'USD',
-            'declared_value' => $declared,
+            'declared_value' => round((float) $declared, 2),
             'freight_value' => 0.01,
             'insurance_value' => 0,
-            'invoice_number' => ($shipmentPurpose === 'commercial' ? $invoiceNumber : null),
+            'invoice_number' => $invoiceNumber,
             'packages' => $packages,
             'sender' => $sender,
             'recipient' => [
@@ -1635,6 +1679,22 @@ function gerarEtiqueta() {
             ],
             'items' => $items,
         ];
+    }
+
+    private function getUsdToBrlRate(): float {
+        try {
+            $st = $this->connection->query('DESCRIBE configuracoes_moeda');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols) || empty($cols) || !in_array('taxa_conversao', $cols, true)) {
+                return 1.0;
+            }
+            $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' LIMIT 1");
+            $stTx->execute();
+            $tx = (float) ($stTx->fetchColumn() ?: 0);
+            return $tx > 0 ? $tx : 1.0;
+        } catch (\Exception $e) {
+            return 1.0;
+        }
     }
 
     public function fecharJanela($request, $id) {
@@ -1808,9 +1868,17 @@ function gerarEtiqueta() {
         }
         $temNcm = is_array($produtoCols) && in_array('ncm', $produtoCols, true);
         $selNcm = $temNcm ? ', pr.ncm as ncm' : '';
+        $pesoCol = null;
+        foreach (['peso', 'weight', 'peso_kg'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $pesoCol = $c;
+                break;
+            }
+        }
+        $selPeso = $pesoCol ? (', pr.' . $pesoCol . ' as peso') : '';
 
         $stmt = $this->connection->prepare("
-            SELECT pi.*, pr.{$produtoNomeCol} as produto_nome, pr.sku{$selNcm}
+            SELECT pi.*, pr.{$produtoNomeCol} as produto_nome, pr.sku{$selNcm}{$selPeso}
             FROM pedido_itens pi 
             LEFT JOIN produtos pr ON pi.produto_id = pr.id 
             WHERE pi.pedido_id = ?
