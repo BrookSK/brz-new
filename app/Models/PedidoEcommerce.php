@@ -777,6 +777,21 @@ class PedidoEcommerce {
                 $colsItens = [];
             }
 
+            $ncmCol = null;
+            try {
+                if ($this->tableExists('produtos')) {
+                    $colsProd = $this->getTableColumns('produtos');
+                    foreach (['ncm', 'tariff_code', 'ncm_code', 'codigo_ncm', 'ncm_produto'] as $c) {
+                        if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                            $ncmCol = $c;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $ncmCol = null;
+            }
+
             $pick = function(array $cands) use ($colsItens) {
                 foreach ($cands as $c) {
                     if (is_array($colsItens) && in_array($c, $colsItens, true)) {
@@ -809,6 +824,11 @@ class PedidoEcommerce {
             if ($colNomeProduto) $selectParts[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
+            if ($ncmCol && $colProdutoId) {
+                $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
+            } else {
+                $selectParts[] = "'' AS ncm";
+            }
             $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
 
             $sqlItens = 'SELECT ' . implode(', ', $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
@@ -864,6 +884,9 @@ class PedidoEcommerce {
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+                if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
+                    $item['ncm'] = '';
+                }
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
