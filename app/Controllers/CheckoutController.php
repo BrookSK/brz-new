@@ -868,6 +868,7 @@ class CheckoutController extends Controller {
                             'preco_unitario' => $vu,
                             'quantidade' => $qtd,
                             'subtotal' => $sub,
+                            'peso' => (float) ($it['peso'] ?? ($it['weight'] ?? 0)),
                         ];
                     }
                     if (!empty($out)) {
@@ -934,10 +935,13 @@ class CheckoutController extends Controller {
             // Verificar diferentes campos de preço
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
             $quantidade = $item['quantidade'] ?? 1;
-            
-            // Calcular peso por item e arredondar para cima
-            $pesoItem = 0.5 * $quantidade; // Peso padrão por item
-            $pesoArredondado = ceil($pesoItem); // Arredondar para cima
+
+            // Peso real (kg) quando disponível; fallback para 0.5kg
+            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            if ($pesoUnit <= 0) {
+                $pesoUnit = 0.5;
+            }
+            $pesoItem = $pesoUnit * (int) $quantidade;
             
             // Buscar detalhes do produto (simulado por enquanto)
             $produto = [
@@ -946,7 +950,7 @@ class CheckoutController extends Controller {
                 'preco' => $precoUnitario,
                 'quantidade' => $quantidade,
                 'subtotal' => $precoUnitario * $quantidade,
-                'peso' => $pesoArredondado, // Usar peso arredondado
+                'peso' => $pesoUnit,
                 'foto_principal' => $item['foto_principal'] ?? null,
                 'produto_variacao_id' => $item['produto_variacao_id'] ?? null,
                 'variacao_descricao' => $item['variacao_descricao'] ?? null,
@@ -954,7 +958,7 @@ class CheckoutController extends Controller {
             
             $items[] = $produto;
             $subtotal += $produto['subtotal'];
-            $pesoTotal += $produto['peso'] * $quantidade;
+            $pesoTotal += $pesoItem;
 
             $this->debugLog('[CHECKOUT_INDEX] Item: ' . json_encode($item));
             $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
@@ -2296,6 +2300,31 @@ class CheckoutController extends Controller {
             // Calcular totais
             $subtotal = 0;
             $pesoTotal = 0;
+
+            // Descobrir coluna de peso em produtos (peso/weight)
+            $pesoCol = null;
+            $pesoCache = [];
+            try {
+                $stmtColsProd = $db->query('DESCRIBE produtos');
+                $colsProd = $stmtColsProd ? ($stmtColsProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                foreach (['peso', 'weight'] as $c) {
+                    if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                        $pesoCol = $c;
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                $pesoCol = null;
+            }
+
+            $stPeso = null;
+            if ($pesoCol) {
+                try {
+                    $stPeso = $db->prepare('SELECT ' . $pesoCol . ' AS peso FROM produtos WHERE id = ? LIMIT 1');
+                } catch (\Exception $e) {
+                    $stPeso = null;
+                }
+            }
             
             $this->debugLog('[CRIAR_PEDIDO] Calculando totais...');
             
@@ -2305,14 +2334,35 @@ class CheckoutController extends Controller {
                 $quantidade = $item['quantidade'] ?? 1;
                 
                 $subtotal += $precoUnitario * $quantidade;
-                
-                // Calcular peso por item e arredondar para cima
-                $pesoItem = 0.5 * $quantidade; // Peso padrão por item
-                $pesoArredondado = ceil($pesoItem); // Arredondar para cima
-                $pesoTotal += $pesoArredondado;
+
+                // Peso real (kg) quando disponível
+                $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+                if ($pesoUnit <= 0) {
+                    $pid = (int) ($item['produto_id'] ?? 0);
+                    if ($pid > 0) {
+                        if (array_key_exists($pid, $pesoCache)) {
+                            $pesoUnit = (float) $pesoCache[$pid];
+                        } elseif ($stPeso) {
+                            try {
+                                $stPeso->execute([$pid]);
+                                $pesoDb = (float) ($stPeso->fetchColumn() ?: 0);
+                                if ($pesoDb > 0) {
+                                    $pesoUnit = $pesoDb;
+                                }
+                                $pesoCache[$pid] = $pesoUnit;
+                            } catch (\Exception $e) {
+                                $pesoCache[$pid] = 0.0;
+                            }
+                        }
+                    }
+                }
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoTotal += ($pesoUnit * (int) $quantidade);
                 
                 $this->debugLog('[CRIAR_PEDIDO] Item processado: ' . json_encode($item));
-                $this->debugLog('[CRIAR_PEDIDO] Preco unitario: ' . $precoUnitario . ', Quantidade: ' . $quantidade . ', Peso item: ' . $pesoItem . ', Peso arredondado: ' . $pesoArredondado);
+                $this->debugLog('[CRIAR_PEDIDO] Preco unitario: ' . $precoUnitario . ', Quantidade: ' . $quantidade . ', Peso unit: ' . $pesoUnit . ', Peso item: ' . ($pesoUnit * (int) $quantidade));
             }
             
             $this->debugLog('[CRIAR_PEDIDO] Subtotal: ' . $subtotal);
