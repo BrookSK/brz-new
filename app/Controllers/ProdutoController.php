@@ -81,13 +81,7 @@ class ProdutoController extends Controller {
         ];
         try {
             $pdo = \Config\Database::getConnection();
-            if ($this->tableExists($pdo, 'produto_variacoes')
-                && $this->tableExists($pdo, 'produto_variacao_itens')
-                && $this->tableExists($pdo, 'variacao_tipos')
-                && $this->tableExists($pdo, 'variacao_opcoes')
-            ) {
-                $variacoesUi = $this->buildVariacoesUiData($pdo, (int) $produtoId);
-            }
+            $variacoesUi = $this->buildVariacoesUiData($pdo, (int) $produtoId);
         } catch (\Exception $e) {
         }
 
@@ -188,25 +182,23 @@ class ProdutoController extends Controller {
             if ($pvId > 0) {
                 try {
                     $pdo = \Config\Database::getConnection();
-                    if ($this->tableExists($pdo, 'produto_variacoes') && $this->tableExists($pdo, 'produto_variacao_itens')) {
-                        $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE id = ? LIMIT 1');
-                        $st->execute([$pvId]);
-                        $row = $st->fetch(\PDO::FETCH_ASSOC);
-                        if (!$row || (int) ($row['produto_id'] ?? 0) !== (int) $produtoId) {
-                            $this->json(['error' => 'Variação inválida para este produto'], 400);
-                        }
-                        if (!(int) ($row['ativo'] ?? 1)) {
-                            $this->json(['error' => 'Variação indisponível'], 400);
-                        }
-
-                        $itemStock = (int) ($row['stock'] ?? 0);
-                        $po = $row['price_override'];
-                        if ($po !== null && $po !== '') {
-                            $itemPrice = (float) $po;
-                        }
-
-                        $variacaoDescricao = $this->buildVariacaoDescricao($pdo, $pvId);
+                    $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE id = ? LIMIT 1');
+                    $st->execute([$pvId]);
+                    $row = $st->fetch(\PDO::FETCH_ASSOC);
+                    if (!$row || (int) ($row['produto_id'] ?? 0) !== (int) $produtoId) {
+                        $this->json(['error' => 'Variação inválida para este produto'], 400);
                     }
+                    if (!(int) ($row['ativo'] ?? 1)) {
+                        $this->json(['error' => 'Variação indisponível'], 400);
+                    }
+
+                    $itemStock = (int) ($row['stock'] ?? 0);
+                    $po = $row['price_override'];
+                    if ($po !== null && $po !== '') {
+                        $itemPrice = (float) $po;
+                    }
+
+                    $variacaoDescricao = $this->buildVariacaoDescricao($pdo, $pvId);
                 } catch (\Exception $e) {
                 }
             }
@@ -305,8 +297,7 @@ class ProdutoController extends Controller {
         ];
 
         try {
-            // Buscar variações do produto
-            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND (ativo = 1 OR ativo IS NULL) ORDER BY id ASC');
+            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC');
             $stmtVars->execute([$produtoId]);
             $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             if (empty($vars)) {
@@ -321,17 +312,69 @@ class ProdutoController extends Controller {
 
             // Itens de variação
             $in = implode(',', array_fill(0, count($varIds), '?'));
-            $sqlItens = '
-                SELECT pvi.produto_variacao_id, pvi.tipo_id, pvi.opcao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
-                FROM produto_variacao_itens pvi
-                INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
-                INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
-                WHERE pvi.produto_variacao_id IN (' . $in . ')
-                ORDER BY pvi.produto_variacao_id ASC, vt.nome ASC, vo.valor ASC
-            ';
-            $stmtItens = $pdo->prepare($sqlItens);
-            $stmtItens->execute($varIds);
-            $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $itens = [];
+            try {
+                $sqlItens = '
+                    SELECT pvi.produto_variacao_id, pvi.tipo_id, pvi.opcao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
+                    FROM produto_variacao_itens pvi
+                    INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
+                    INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
+                    WHERE pvi.produto_variacao_id IN (' . $in . ')
+                    ORDER BY pvi.produto_variacao_id ASC, vt.nome ASC, vo.valor ASC
+                ';
+                $stmtItens = $pdo->prepare($sqlItens);
+                $stmtItens->execute($varIds);
+                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $itens = [];
+            }
+
+            if (empty($itens)) {
+                try {
+                    $sqlItens2 = 'SELECT produto_variacao_id, tipo_id, opcao_id FROM produto_variacao_itens WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, tipo_id ASC, opcao_id ASC';
+                    $stmtItens2 = $pdo->prepare($sqlItens2);
+                    $stmtItens2->execute($varIds);
+                    $itens2 = $stmtItens2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    $tipoIds = [];
+                    $opIds = [];
+                    foreach ($itens2 as $it) {
+                        $tid = (int) ($it['tipo_id'] ?? 0);
+                        $oid = (int) ($it['opcao_id'] ?? 0);
+                        if ($tid > 0) $tipoIds[$tid] = true;
+                        if ($oid > 0) $opIds[$oid] = true;
+                    }
+
+                    $tiposById = [];
+                    if (!empty($tipoIds)) {
+                        $ids = array_keys($tipoIds);
+                        $inTipos = implode(',', array_fill(0, count($ids), '?'));
+                        $stT = $pdo->prepare('SELECT id, nome FROM variacao_tipos WHERE id IN (' . $inTipos . ')');
+                        $stT->execute($ids);
+                        foreach (($stT->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $r) {
+                            $tiposById[(int) ($r['id'] ?? 0)] = (string) ($r['nome'] ?? '');
+                        }
+                    }
+
+                    $opById = [];
+                    if (!empty($opIds)) {
+                        $ids = array_keys($opIds);
+                        $inOps = implode(',', array_fill(0, count($ids), '?'));
+                        $stO = $pdo->prepare('SELECT id, valor FROM variacao_opcoes WHERE id IN (' . $inOps . ')');
+                        $stO->execute($ids);
+                        foreach (($stO->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $r) {
+                            $opById[(int) ($r['id'] ?? 0)] = (string) ($r['valor'] ?? '');
+                        }
+                    }
+
+                    foreach ($itens2 as $it) {
+                        $it['tipo_nome'] = $tiposById[(int) ($it['tipo_id'] ?? 0)] ?? '';
+                        $it['opcao_valor'] = $opById[(int) ($it['opcao_id'] ?? 0)] ?? '';
+                        $itens[] = $it;
+                    }
+                } catch (\Exception $e) {
+                    $itens = [];
+                }
+            }
 
             $itensPorVar = [];
             $atributos = [];
