@@ -179,7 +179,7 @@ class Carrinho extends Model {
     }
 
     public function calcularImpostos($valorProdutos, $valorFrete) {
-        $stmt = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'ipi_aliquota')");
+        $stmt = $this->connection->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'ipi_aliquota')");
         $stmt->execute();
         $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
