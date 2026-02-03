@@ -169,98 +169,18 @@
                 </div>
             </div>
             
-            <!-- Recent Orders -->
-            <div class="card border-0 shadow-sm">
+            <!-- Orçamentos da Assessoria -->
+            <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 fw-bold">
-                            <i class="fas fa-clock me-2"></i> Pedidos Recentes
+                            <i class="fas fa-clipboard-list me-2"></i> Orçamentos da Assessoria
                         </h5>
-                        <a href="/meus-pedidos" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                        <a href="/assessoria" class="btn btn-sm btn-outline-primary">Novo Orçamento</a>
                     </div>
                 </div>
                 <div class="card-body">
-                    <?php if (empty($pedidos_recentes)): ?>
-                        <div class="text-center py-5">
-                            <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
-                                <i class="fas fa-shopping-bag text-muted fs-2"></i>
-                            </div>
-                            <h5 class="mb-2">Nenhum pedido ainda</h5>
-                            <p class="text-muted mb-4">Comece comprando produtos incríveis!</p>
-                            <a href="/produtos" class="btn btn-primary">
-                                <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
-                            </a>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Data</th>
-                                        <th>Status</th>
-                                        <th>Valor</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($pedidos_recentes as $pedido): ?>
-                                    <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
-                                                    <i class="fas fa-receipt text-primary fs-6"></i>
-                                                </div>
-                                                <strong><?= htmlspecialchars($pedido['codigo_pedido']) ?></strong>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div>
-                                                <div class="small fw-semibold"><?= date('d/m/Y', strtotime($pedido['created_at'])) ?></div>
-                                                <div class="text-muted small"><?= date('H:i', strtotime($pedido['created_at'])) ?></div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <?php
-                                            $statusColors = [
-                                                'pendente' => 'warning',
-                                                'processando' => 'info',
-                                                'enviado' => 'primary',
-                                                'entregue' => 'success',
-                                                'cancelado' => 'danger'
-                                            ];
-                                            $statusLabels = [
-                                                'pendente' => 'Pendente',
-                                                'processando' => 'Processando',
-                                                'enviado' => 'Enviado',
-                                                'entregue' => 'Entregue',
-                                                'cancelado' => 'Cancelado'
-                                            ];
-                                            $color = $statusColors[$pedido['status']] ?? 'secondary';
-                                            $label = $statusLabels[$pedido['status']] ?? ucfirst($pedido['status']);
-                                            ?>
-                                            <span class="badge bg-<?= $color ?> px-3 py-2">
-                                                <?= $label ?>
-                                            </span>
-                                        </td>
-                                        <td class="fw-semibold">R$ <?= number_format($pedido['valor_total'], 2, ',', '.') ?></td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
-                                                   class="btn btn-sm btn-outline-primary">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <button class="btn btn-sm btn-outline-success" onclick="rastrearPedido('<?= $pedido['codigo_pedido'] ?>')">
-                                                    <i class="fas fa-search-location"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
+                    <!-- Conteúdo do orçamento -->
                 </div>
             </div>
             
