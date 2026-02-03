@@ -2099,6 +2099,25 @@ HTML;
             $table = $tableInfo['table'];
             $valueCol = $tableInfo['valueCol'];
             $updatedAtCol = $tableInfo['updatedAtCol'];
+
+            // Se for schema single_row, garantir que existe uma linha (e descobrir o id correto)
+            if (($tableInfo['mode'] ?? '') === 'single_row') {
+                $idCol = $tableInfo['idCol'] ?? 'id';
+                try {
+                    $stmtFirst = $pdo->query("SELECT {$idCol} AS id FROM {$table} ORDER BY {$idCol} ASC LIMIT 1");
+                    $firstRow = $stmtFirst ? ($stmtFirst->fetch(\PDO::FETCH_ASSOC) ?: null) : null;
+                    $firstId = is_array($firstRow) ? (int) ($firstRow['id'] ?? 0) : 0;
+                    if ($firstId <= 0) {
+                        // cria uma linha vazia com defaults
+                        $pdo->exec("INSERT INTO {$table} () VALUES ()");
+                        $firstId = (int) $pdo->lastInsertId();
+                    }
+                    if ($firstId > 0) {
+                        $tableInfo['idVal'] = $firstId;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
             
             // Mapeamento de configurações
             $configMap = [
