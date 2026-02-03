@@ -17,6 +17,8 @@ class Carrinho extends Model {
         }
         
         $where[] = "expira_em > NOW()";
+        $where[] = "moeda = :moeda";
+        $params[':moeda'] = $moeda;
         
         $sql = "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . " ORDER BY created_at DESC LIMIT 1";
         $stmt = $this->connection->prepare($sql);
@@ -177,7 +179,7 @@ class Carrinho extends Model {
     }
 
     public function calcularImpostos($valorProdutos, $valorFrete) {
-        $stmt = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'ipi_aliquota')");
+        $stmt = $this->connection->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'ipi_aliquota')");
         $stmt->execute();
         $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
@@ -200,8 +202,23 @@ class Carrinho extends Model {
     }
 
     public function getItems($carrinhoId) {
+        $pesoCol = 'peso';
+        try {
+            $stCols = $this->connection->query('DESCRIBE produtos');
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (is_array($cols) && !empty($cols)) {
+                if (!in_array('peso', $cols, true) && in_array('weight', $cols, true)) {
+                    $pesoCol = 'weight';
+                } elseif (!in_array('peso', $cols, true) && in_array('product_weight', $cols, true)) {
+                    $pesoCol = 'product_weight';
+                }
+            }
+        } catch (\Exception $e) {
+            $pesoCol = 'peso';
+        }
+
         $stmt = $this->connection->prepare("
-            SELECT ci.*, p.nome, p.sku, p.descricao, p.peso, p.moeda as moeda_produto
+            SELECT ci.*, p.nome, p.sku, p.descricao, p." . $pesoCol . " AS peso, p.moeda as moeda_produto
             FROM carrinho_items ci 
             JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id
