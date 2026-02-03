@@ -162,7 +162,23 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <?php if (!empty($pedido['items'])): ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
-                                        <img src="<?= Url::absolute('/uploads/produtos/' . ($item['imagem'] ?? 'default.jpg')) ?>" 
+                                        <?php
+                                            $imgRaw = (string) ($item['imagem'] ?? '');
+                                            if ($imgRaw === '') {
+                                                $imgRaw = 'default.jpg';
+                                            }
+                                            $imgSrc = '';
+                                            if (preg_match('#^https?://#i', $imgRaw) || strpos($imgRaw, '//') === 0) {
+                                                $imgSrc = (strpos($imgRaw, '//') === 0) ? ('https:' . $imgRaw) : $imgRaw;
+                                            } else {
+                                                $imgFile = $imgRaw;
+                                                if (strpos($imgFile, 'uploads/produtos/') !== false) {
+                                                    $imgFile = str_replace('uploads/produtos/', '', $imgFile);
+                                                }
+                                                $imgSrc = Url::absolute('/uploads/produtos/' . $imgFile);
+                                            }
+                                        ?>
+                                        <img src="<?= htmlspecialchars($imgSrc) ?>" 
                                              alt="<?= htmlspecialchars($item['nome_produto'] ?? 'Produto') ?>" 
                                              class="product-image">
                                         <div class="product-info flex-grow-1">
