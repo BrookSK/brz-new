@@ -356,28 +356,82 @@ class PaymentService {
         } catch (\Exception $e) {
         }
 
-        // Tenta schema chave/valor em configuracoes_sistema (sem coluna categoria)
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
+        $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTry as $table) {
+            try {
+                $stmtT = $db->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$table]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+            } catch (\Exception $e) {
+                continue;
             }
-        } catch (\Exception $e) {
-        }
 
-        // Tenta schema chave/valor (configuracoes)
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE ' . $table);
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+            } catch (\Exception $e) {
+                $cols = [];
             }
-        } catch (\Exception $e) {
+
+            $valueCol = null;
+            foreach (['valor', 'value', 'conteudo', 'content', 'config_value'] as $vc) {
+                if (in_array($vc, $cols, true)) {
+                    $valueCol = $vc;
+                    break;
+                }
+            }
+            if (!$valueCol) {
+                continue;
+            }
+
+            // Schema categoria+chave
+            if (in_array('categoria', $cols, true)) {
+                $keyCol = null;
+                foreach (['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'] as $kc) {
+                    if (in_array($kc, $cols, true)) {
+                        $keyCol = $kc;
+                        break;
+                    }
+                }
+                if ($keyCol) {
+                    try {
+                        $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE categoria = ? AND ' . $keyCol . ' = ? LIMIT 1');
+                        $stmt->execute([$categoria, $chave]);
+                        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($row && array_key_exists('valor', $row)) {
+                            return $row['valor'];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+
+            // Schema chave/valor (sem categoria)
+            $keyCol = null;
+            foreach (['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'] as $kc) {
+                if (in_array($kc, $cols, true)) {
+                    $keyCol = $kc;
+                    break;
+                }
+            }
+            if ($keyCol) {
+                try {
+                    $key = $categoria . '_' . $chave;
+                    $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute([$key]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                } catch (\Exception $e) {
+                }
+            }
         }
 
         return $default;
