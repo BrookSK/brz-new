@@ -61,7 +61,12 @@
                             <tbody>
                                 <?php foreach ($itens as $item): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($item['nome']) ?></td>
+                                    <td>
+                                        <?= htmlspecialchars($item['nome']) ?>
+                                        <?php if (!empty($item['variacao_descricao']) || !empty($item['variacao_label'])): ?>
+                                            <div class="small text-muted"><?= htmlspecialchars((string) ($item['variacao_descricao'] ?? $item['variacao_label']), ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="text-center"><?= $item['quantidade'] ?></td>
                                     <td class="text-end"><?= $pedido['moeda'] ?> <?= number_format($item['preco_unitario'], 2, ',', '.') ?></td>
                                     <td class="text-end"><?= $pedido['moeda'] ?> <?= number_format($item['subtotal'], 2, ',', '.') ?></td>
