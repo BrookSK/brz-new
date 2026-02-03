@@ -795,14 +795,18 @@ class AdminPedidosController extends Controller {
                                             <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>
-                                            <tr><td><strong>Subtotal</strong></td><td>R$ ' . number_format($pedido['subtotal'], 2, ',', '.') . '</td></tr>
-                                            <tr><td><strong>Serviços</strong></td><td>R$ ' . number_format($pedido['servicos'], 2, ',', '.') . '</td></tr>
-                                            <tr><td><strong>Impostos</strong></td><td>R$ ' . number_format($pedido['impostos'], 2, ',', '.') . '</td></tr>
-                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</td></tr>
-                                            <tr><td><strong>Desconto</strong></td><td>R$ ' . number_format($pedido['desconto'], 2, ',', '.') . '</td></tr>
-                                            <tr><td><strong>Total</strong></td><td><strong>R$ ' . number_format($pedido['total'], 2, ',', '.') . '</strong></td></tr>
-                                            <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars($pedido['moeda']) . '</td></tr>
-                                            <tr><td><strong>Taxa Conversão</strong></td><td>' . $pedido['taxa_conversao'] . '</td></tr>
+                                            <tr><td><strong>Subtotal</strong></td><td>' . $this->formatarMoeda((float) ($pedido['subtotal'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>Serviços</strong></td><td>' . $this->formatarMoeda((float) ($pedido['servicos'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>Impostos</strong></td><td>' . $this->formatarMoeda((float) ($pedido['impostos'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</td></tr>
+                                            <tr><td><strong>Desconto</strong></td><td>' . $this->formatarMoeda((float) ($pedido['desconto'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>Total</strong></td><td><strong>' . $this->formatarMoeda((float) ($pedido['total'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</strong></td></tr>
+                                            <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
+                                            <tr><td><strong>Taxa Conversão</strong></td><td>' . (
+                                                (strtoupper((string) ($pedido['moeda'] ?? '')) === 'BRL' && (float) ($pedido['taxa_conversao'] ?? 1) > 1.01)
+                                                    ? ('1 USD = R$ ' . number_format((float) $pedido['taxa_conversao'], 2, ',', '.'))
+                                                    : htmlspecialchars((string) ($pedido['taxa_conversao'] ?? '1'))
+                                            ) . '</td></tr>
                                             <tr><td><strong>End. Entrega ID</strong></td><td>' . ($pedido['endereco_entrega_id'] ?? 'N/A') . '</td></tr>
                                             <tr><td><strong>End. Cobrança ID</strong></td><td>' . ($pedido['endereco_cobranca_id'] ?? 'N/A') . '</td></tr>
                                             <tr><td><strong>Observações</strong></td><td>' . htmlspecialchars($pedido['observacoes'] ?? 'Nenhuma') . '</td></tr>
@@ -811,7 +815,7 @@ class AdminPedidosController extends Controller {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div>';
                     
                     <div class="col-md-6">
                         <div class="card mb-4">
