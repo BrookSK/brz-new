@@ -764,7 +764,8 @@ class UsuarioController extends Controller {
             $paymentDetails = null;
             $pixQrCode = null;
 
-            if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'appmax') {
+            $gatewayPedido = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+            if ($gatewayPedido === 'appmax') {
                 $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
                 if ($billingType === 'CARTAO_CREDITO') {
                     $billingType = 'CREDIT_CARD';

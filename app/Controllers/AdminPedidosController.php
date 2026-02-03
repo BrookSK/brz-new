@@ -744,7 +744,7 @@ class AdminPedidosController extends Controller {
                                             . '</form>';
                                     }
 
-                                    $pgGateway2 = (string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''));
+                                    $pgGateway2 = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
                                     $pgMetodo2 = strtoupper((string) ($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? '')));
                                     $pgStatus2 = strtoupper((string) ($pedido['payment_status'] ?? ($pedido['pagamento_status'] ?? '')));
                                     $isPending2 = !in_array($pgStatus2, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);

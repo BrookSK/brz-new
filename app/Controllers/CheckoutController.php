@@ -1067,7 +1067,8 @@ class CheckoutController extends Controller {
         $pixQrCode = null;
 
         // AppMax: não depende de consulta externa aqui; usar dados persistidos no pedido (quando disponíveis)
-        if (!empty($pedido['payment_gateway']) && $pedido['payment_gateway'] === 'appmax') {
+        $gatewayPedido = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gatewayPedido === 'appmax') {
             $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
             if ($billingType === 'CARTAO_CREDITO') {
                 $billingType = 'CREDIT_CARD';
