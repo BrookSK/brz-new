@@ -4,6 +4,27 @@ namespace App\Models;
 class Carrinho extends Model {
     protected $table = 'carrinhos';
 
+    private function isDebugEnabled(): bool {
+        $v = '';
+        if (isset($_ENV['APP_DEBUG'])) {
+            $v = (string) $_ENV['APP_DEBUG'];
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $v = (string) $_SERVER['APP_DEBUG'];
+        }
+        $v = strtolower(trim($v));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function debugLog(string $message): void {
+        if (!$this->isDebugEnabled()) {
+            return;
+        }
+        try {
+            error_log($message);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getPesoExpressionForProdutos(string $alias = 'p'): string {
         $cols = [];
         try {
@@ -267,6 +288,10 @@ class Carrinho extends Model {
                 $vRaw = str_replace(',', '.', trim($vRaw));
                 if ($k === 'icms_aliquota' && $vRaw !== '') {
                     $a = (float) $vRaw;
+                    // Aceitar percentual (17) ou fração (0.17)
+                    if ($a > 0 && $a <= 1.0) {
+                        $a = $a * 100.0;
+                    }
                     if ($a > 0 && $a < 100) {
                         $aliqIcms = $a;
                     }
@@ -305,6 +330,8 @@ class Carrinho extends Model {
             $ii = 0.60 * $valorAduaneiro;
         }
 
+        $this->debugLog('[IMPOSTOS] valorProdutos=' . $valorProdutos . ' valorFrete=' . $valorFrete . ' seguro=' . $seguro . ' valorAduaneiro=' . $valorAduaneiro . ' certificado=' . ($certificado ? '1' : '0') . ' II=' . $ii);
+
         // ICMS "por dentro" sobre (valor aduaneiro + II)
         $baseIcms = $valorAduaneiro + $ii;
         $p = ((float) $aliqIcms) / 100.0;
@@ -313,6 +340,8 @@ class Carrinho extends Model {
             $bc = $baseIcms / (1.0 - $p);
             $icms = $bc * $p;
         }
+
+        $this->debugLog('[IMPOSTOS] aliqIcms=' . $aliqIcms . ' baseIcms=' . $baseIcms . ' icms=' . $icms);
 
         return $ii + $icms;
     }

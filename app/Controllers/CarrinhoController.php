@@ -264,9 +264,11 @@ class CarrinhoController extends Controller {
         
         // Calcular taxas e impostos com arredondamento
         $pesoArredondado = ceil($pesoTotal); // Arredondar para cima
-        $taxaServico = $pesoArredondado * 39; // US$39 por kg arredondado
-        $impostos = $subtotal * 0.80; // 80% de impostos
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+
+        // Mesma regra do checkout (Model Carrinho): taxa por kg configurada + impostos (Receita Federal)
+        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+        $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
         
@@ -657,14 +659,13 @@ class CarrinhoController extends Controller {
         }
         
         // Taxas fixas
-        $taxaServicoPorKg = 39; // USD por kg
-        $taxaServico = $taxaServicoPorKg * $pesoArredondado;
+        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
         
         // Frete baseado no peso arredondado
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
         
-        // Impostos (80% sobre subtotal + taxa de serviço)
-        $impostos = ($subtotal + $taxaServico) * 0.8;
+        // Impostos (Receita Federal)
+        $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         
         // Total
         $total = $subtotal + $taxaServico + $impostos + $frete;
