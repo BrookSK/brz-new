@@ -80,7 +80,7 @@ class ProdutoController extends Controller {
             'fotos_por_variacao' => [],
         ];
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             if ($this->tableExists($pdo, 'produto_variacoes')
                 && $this->tableExists($pdo, 'produto_variacao_itens')
                 && $this->tableExists($pdo, 'variacao_tipos')
@@ -187,7 +187,7 @@ class ProdutoController extends Controller {
             $pvId = (int) $produtoVariacaoId;
             if ($pvId > 0) {
                 try {
-                    $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $pdo = \Config\Database::getConnection();
                     if ($this->tableExists($pdo, 'produto_variacoes') && $this->tableExists($pdo, 'produto_variacao_itens')) {
                         $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE id = ? LIMIT 1');
                         $st->execute([$pvId]);
