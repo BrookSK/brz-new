@@ -102,12 +102,12 @@ class PaymentService {
         $decoded = json_decode((string) $respBody, true);
         if ($httpCode < 200 || $httpCode >= 300) {
             $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
+            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg . ' url=' . $url);
         }
 
         if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
             $msg = json_encode($decoded);
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
+            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg . ' url=' . $url);
         }
 
         return is_array($decoded) ? $decoded : [];
