@@ -396,9 +396,58 @@ class CheckoutController extends Controller {
             $billingType = 'BOLETO';
         }
 
-        $valor = $this->normalizeValorCobranca($pedidoRow);
+        $valor = (float) ($pedidoRow['total'] ?? 0);
         $moeda = (string) ($pedidoRow['moeda'] ?? 'BRL');
         $descricao = 'Pedido #' . (string) ($pedidoRow['numero_pedido'] ?? $pedidoId);
+
+        // Alguns pedidos podem estar marcados como BRL, mas terem valores persistidos em USD.
+        // Para AppMax (BRL), devemos converter antes de criar o pedido/cobrança.
+        $taxaConversao = 1.0;
+        $deveConverterUSDParaBRL = false;
+        try {
+            $taxaFromRow = 0.0;
+            foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate'] as $c) {
+                if (is_array($pedidoRow) && array_key_exists($c, $pedidoRow)) {
+                    $taxaFromRow = (float) ($pedidoRow[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($taxaFromRow > 1.01) {
+                $taxaConversao = $taxaFromRow;
+            }
+
+            if ($taxaConversao <= 1.01) {
+                $dbTx = \Config\Database::getConnection();
+                $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                $stTx->execute();
+                $tx = (float) ($stTx->fetchColumn() ?: 0);
+                if ($tx > 1.01) {
+                    $taxaConversao = $tx;
+                }
+            }
+
+            $moedaPedido = strtoupper(trim((string) $moeda));
+            if ($moedaPedido === 'BRL' && $taxaConversao > 1.01) {
+                $moedaOriginal = '';
+                foreach (['moeda_original', 'currency_original', 'original_currency'] as $c) {
+                    if (is_array($pedidoRow) && array_key_exists($c, $pedidoRow)) {
+                        $moedaOriginal = strtoupper(trim((string) ($pedidoRow[$c] ?? '')));
+                        break;
+                    }
+                }
+                if ($moedaOriginal === 'USD') {
+                    $deveConverterUSDParaBRL = true;
+                } elseif ($valor > 0 && $valor <= 2000) {
+                    // Heurística: valores "baixos" com taxa>1 normalmente são USD persistido com moeda BRL
+                    $deveConverterUSDParaBRL = true;
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        if (strtoupper(trim((string) $moeda)) === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
+            $valor = $valor * $taxaConversao;
+        }
 
         $payload = [
             'billingType' => $billingType,
@@ -443,7 +492,11 @@ class CheckoutController extends Controller {
                         $stmtF = $db->prepare('SELECT ' . $freteCol . ' AS frete FROM pedidos WHERE id = ? LIMIT 1');
                         $stmtF->execute([$pedidoId]);
                         $rowF = $stmtF->fetch(\PDO::FETCH_ASSOC) ?: [];
-                        $shippingValueCents = (int) round(((float) ($rowF['frete'] ?? 0)) * 100);
+                        $freteValue = (float) ($rowF['frete'] ?? 0);
+                        if ($taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
+                            $freteValue = $freteValue * $taxaConversao;
+                        }
+                        $shippingValueCents = (int) round($freteValue * 100);
                     }
                 } catch (\Exception $e) {
                 }
@@ -476,6 +529,9 @@ class CheckoutController extends Controller {
                             $qtd = (int) ($it['quantidade'] ?? 1);
                             if ($qtd <= 0) $qtd = 1;
                             $preco = (float) ($it['preco_unitario'] ?? 0);
+                            if ($taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
+                                $preco = $preco * $taxaConversao;
+                            }
                             $unitValueCents = (int) round($preco * 100);
                             if ($unitValueCents <= 0) {
                                 continue;
@@ -670,46 +726,6 @@ class CheckoutController extends Controller {
         $this->usuarioModel = new Usuario();
         $this->enderecoModel = new Endereco();
         $this->pedidoModel = new PedidoEcommerce();
-    }
-
-    private function normalizeValorCobranca(array $pedidoRow): float {
-        $moeda = strtoupper(trim((string) ($pedidoRow['moeda'] ?? ($pedidoRow['currency'] ?? 'BRL'))));
-        if ($moeda === '') $moeda = 'BRL';
-
-        $total = (float) ($pedidoRow['total'] ?? ($pedidoRow['valor_total'] ?? 0));
-        if ($total <= 0) {
-            return 0.0;
-        }
-
-        if ($moeda !== 'BRL') {
-            return $total;
-        }
-
-        // Preferir total BRL explícito se existir
-        foreach (['valor_total_brl', 'total_brl', 'amount_brl'] as $c) {
-            if (array_key_exists($c, $pedidoRow)) {
-                $v = (float) ($pedidoRow[$c] ?? 0);
-                if ($v > 0) {
-                    return $v;
-                }
-            }
-        }
-
-        $taxa = (float) ($pedidoRow['taxa_conversao'] ?? ($pedidoRow['exchange_rate'] ?? 0));
-        if ($taxa <= 1.01) {
-            return $total;
-        }
-
-        $moedaOriginal = strtoupper(trim((string) ($pedidoRow['moeda_original'] ?? ($pedidoRow['currency_original'] ?? ''))));
-        $deveConverter = ($moedaOriginal === 'USD');
-        if (!$deveConverter) {
-            // heurística: totals baixos + taxa alta normalmente indicam USD salvo como BRL
-            if ($total > 0 && $total <= 2000) {
-                $deveConverter = true;
-            }
-        }
-
-        return $deveConverter ? ($total * $taxa) : $total;
     }
 
     private function getCarrinhoForCheckout(?array $usuario): array {
@@ -1168,35 +1184,9 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    // SELECT mínimo (evita 500 em schemas onde algumas colunas não existem)
                     $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
-
-                    // Complementar com colunas opcionais quando existirem
-                    $colsPed = [];
-                    try {
-                        $stColsPed = $dbPay->query('DESCRIBE pedidos');
-                        $colsPed = $stColsPed ? ($stColsPed->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                    } catch (\Exception $e) {
-                        $colsPed = [];
-                    }
-
-                    $opt = [];
-                    foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate', 'moeda_original', 'currency_original', 'valor_total_brl', 'total_brl', 'amount_brl'] as $c) {
-                        if (is_array($colsPed) && in_array($c, $colsPed, true)) {
-                            $opt[] = $c;
-                        }
-                    }
-
-                    if (!empty($opt)) {
-                        $stmtOpt = $dbPay->prepare('SELECT ' . implode(', ', $opt) . ' FROM pedidos WHERE id = ? LIMIT 1');
-                        $stmtOpt->execute([$pedidoId]);
-                        $rowOpt = $stmtOpt->fetch(\PDO::FETCH_ASSOC) ?: [];
-                        if (!empty($rowOpt)) {
-                            $pedidoRowPay = array_merge($pedidoRowPay, $rowOpt);
-                        }
-                    }
                 } catch (\Exception $e) {
                     $pedidoRowPay = [];
                 }
