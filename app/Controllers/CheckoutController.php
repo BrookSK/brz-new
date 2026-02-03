@@ -1168,9 +1168,35 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido, taxa_conversao, moeda_original, valor_total_brl, total_brl FROM pedidos WHERE id = ? LIMIT 1');
+                    // SELECT mínimo (evita 500 em schemas onde algumas colunas não existem)
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                    // Complementar com colunas opcionais quando existirem
+                    $colsPed = [];
+                    try {
+                        $stColsPed = $dbPay->query('DESCRIBE pedidos');
+                        $colsPed = $stColsPed ? ($stColsPed->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsPed = [];
+                    }
+
+                    $opt = [];
+                    foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate', 'moeda_original', 'currency_original', 'valor_total_brl', 'total_brl', 'amount_brl'] as $c) {
+                        if (is_array($colsPed) && in_array($c, $colsPed, true)) {
+                            $opt[] = $c;
+                        }
+                    }
+
+                    if (!empty($opt)) {
+                        $stmtOpt = $dbPay->prepare('SELECT ' . implode(', ', $opt) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                        $stmtOpt->execute([$pedidoId]);
+                        $rowOpt = $stmtOpt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        if (!empty($rowOpt)) {
+                            $pedidoRowPay = array_merge($pedidoRowPay, $rowOpt);
+                        }
+                    }
                 } catch (\Exception $e) {
                     $pedidoRowPay = [];
                 }
