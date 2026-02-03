@@ -268,21 +268,90 @@ class AdminRelatoriosController extends Controller {
                 $acao = (string) ($r['acao'] ?? '');
                 $ip = (string) ($r['ip'] ?? '');
                 $payload = (string) ($r['valores_novos'] ?? '');
-                $short = $payload;
-                if (strlen($short) > 240) {
-                    $short = substr($short, 0, 240) . '...';
+
+                $method = '';
+                $route = '';
+                $handler = '';
+                $badgeClass = 'secondary';
+                if (preg_match('#^(GET|POST|PUT|PATCH|DELETE)\s+([^\s]+)(?:\s+->\s+(.+))?$#i', $acao, $m)) {
+                    $method = strtoupper((string) ($m[1] ?? ''));
+                    $route = (string) ($m[2] ?? '');
+                    $handler = (string) ($m[3] ?? '');
+                } else {
+                    $handler = $acao;
+                }
+                if ($method === 'POST') $badgeClass = 'danger';
+                elseif ($method === 'DELETE') $badgeClass = 'dark';
+                elseif ($method === 'PUT' || $method === 'PATCH') $badgeClass = 'warning';
+                elseif ($method === 'GET') $badgeClass = 'info';
+
+                $decoded = null;
+                try {
+                    $decoded = json_decode($payload, true);
+                } catch (\Exception $e) {
+                    $decoded = null;
+                }
+                $payloadArr = is_array($decoded) ? (array) ($decoded['payload'] ?? []) : [];
+                $metaArr = is_array($decoded) ? (array) ($decoded['meta'] ?? []) : [];
+
+                $resumo = '';
+                if ($method !== '' && $route !== '') {
+                    $resumo = $method . ' ' . $route;
+                } elseif ($handler !== '') {
+                    $resumo = $handler;
+                }
+
+                // criar resumo com base no payload
+                $keys = [];
+                if (is_array($payloadArr) && !empty($payloadArr)) {
+                    foreach ($payloadArr as $k => $v) {
+                        if (is_string($k)) {
+                            $keys[] = $k;
+                        }
+                    }
+                }
+                $keys = array_slice($keys, 0, 6);
+                $resumoCampos = '';
+                if (!empty($keys)) {
+                    $resumoCampos = 'Campos: ' . implode(', ', $keys);
+                }
+
+                // resumo especial (algumas ações comuns)
+                $resumoExtra = '';
+                if (strpos($route, '/admin/pedidos/novo-manual/gerar-link') !== false) {
+                    $resumoExtra = 'Gerou link de pagamento';
+                } elseif (strpos($route, '/admin/pedidos/novo-manual/criar') !== false) {
+                    $resumoExtra = 'Criou pedido manual';
+                } elseif (stripos($handler, 'atualizar_perfil') !== false) {
+                    $resumoExtra = 'Atualizou perfil';
                 }
 
                 $detailId = 'log_' . (int) ($r['id'] ?? 0);
+                $detailObj = [
+                    'acao' => $acao,
+                    'payload' => $payloadArr,
+                    'meta' => $metaArr,
+                ];
+                $pretty = json_encode($detailObj, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                if ($pretty === false) {
+                    $pretty = $payload;
+                }
+
                 echo '<tr>'
                     . '<td>' . htmlspecialchars($dt) . '</td>'
                     . '<td>' . htmlspecialchars($uLabel) . '</td>'
-                    . '<td><code>' . htmlspecialchars($acao) . '</code></td>'
+                    . '<td>'
+                    . ($method !== '' ? ('<span class="badge bg-' . $badgeClass . '">' . htmlspecialchars($method) . '</span> ') : '')
+                    . '<div class="small"><code>' . htmlspecialchars($route !== '' ? $route : $acao) . '</code></div>'
+                    . ($handler !== '' ? ('<div class="text-muted small">' . htmlspecialchars($handler) . '</div>') : '')
+                    . ($resumoExtra !== '' ? ('<div class="small"><strong>' . htmlspecialchars($resumoExtra) . '</strong></div>') : '')
+                    . ($resumoCampos !== '' ? ('<div class="text-muted small">' . htmlspecialchars($resumoCampos) . '</div>') : '')
+                    . '</td>'
                     . '<td>' . htmlspecialchars($ip) . '</td>'
                     . '<td>'
                     . '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detailId . '">Ver</button>'
                     . '<div class="collapse mt-2" id="' . $detailId . '">'
-                    . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($payload) . '</pre>'
+                    . '<pre class="small mb-0" style="white-space:pre-wrap;">' . htmlspecialchars($pretty) . '</pre>'
                     . '</div>'
                     . '</td>'
                     . '</tr>';
