@@ -119,69 +119,92 @@ class WExpressService {
     private function getConfig(string $categoria, string $chave, $default = null) {
         $db = \Config\Database::getConnection();
 
-        // single-row (colunas diretas)
-        try {
-            $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
-            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
-            if (is_array($cols) && !empty($cols)) {
-                $colName = null;
-                if ($categoria === 'entrega') {
-                    $direct = [
-                        'wexpress_api_key',
-                        'wexpress_ambiente',
-                        'wexpress_enabled',
-                        'wexpress_service_code',
-                        'wexpress_sender_json',
-                    ];
-                    if (in_array($chave, $direct, true) && in_array($chave, $cols, true)) {
-                        $colName = $chave;
+        $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'];
+        $valueCandidates = ['valor', 'value', 'conteudo', 'content', 'config_value'];
+
+        foreach ($tableCandidates as $table) {
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE ' . $table);
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                continue;
+            }
+            if (!is_array($cols) || empty($cols)) {
+                continue;
+            }
+
+            $hasCategoria = in_array('categoria', $cols, true);
+            $hasChave = in_array('chave', $cols, true);
+
+            if (!$hasCategoria && !$hasChave && in_array('id', $cols, true)) {
+                $direct = [
+                    'wexpress_api_key',
+                    'wexpress_ambiente',
+                    'wexpress_enabled',
+                    'wexpress_service_code',
+                    'wexpress_sender_json',
+                ];
+                if ($categoria === 'entrega' && in_array($chave, $direct, true) && in_array($chave, $cols, true)) {
+                    try {
+                        $stmt = $db->query('SELECT ' . $chave . ' AS v FROM ' . $table . ' ORDER BY id ASC LIMIT 1');
+                        $row = $stmt ? ($stmt->fetch(\PDO::FETCH_ASSOC) ?: null) : null;
+                        if (is_array($row) && array_key_exists('v', $row)) {
+                            return $row['v'];
+                        }
+                    } catch (\Exception $e) {
                     }
                 }
+            }
 
-                if (!empty($colName)) {
-                    $stmt = $db->query('SELECT ' . $colName . ' AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            if ($hasCategoria && $hasChave) {
+                $valueCol = null;
+                foreach ($valueCandidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $valueCol = $c;
+                        break;
+                    }
+                }
+                if ($valueCol) {
+                    try {
+                        $stmt = $db->prepare('SELECT ' . $valueCol . ' AS v FROM ' . $table . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute([$categoria, $chave]);
+                        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($row && array_key_exists('v', $row)) {
+                            return $row['v'];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+
+            $keyCol = null;
+            foreach ($keyCandidates as $c) {
+                if (in_array($c, $cols, true)) {
+                    $keyCol = $c;
+                    break;
+                }
+            }
+            $valueCol = null;
+            foreach ($valueCandidates as $c) {
+                if (in_array($c, $cols, true)) {
+                    $valueCol = $c;
+                    break;
+                }
+            }
+            if ($keyCol && $valueCol) {
+                $fullKey = $categoria . '_' . $chave;
+                try {
+                    $stmt = $db->prepare('SELECT ' . $valueCol . ' AS v FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute([$fullKey]);
                     $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    if ($row && array_key_exists('valor', $row)) {
-                        return $row['valor'];
+                    if ($row && array_key_exists('v', $row)) {
+                        return $row['v'];
                     }
+                } catch (\Exception $e) {
                 }
             }
-        } catch (\Exception $e) {
-        }
-
-        // categoria+chave
-        try {
-            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
-            $stmt->execute([$categoria, $chave]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
-            }
-        } catch (\Exception $e) {
-        }
-
-        // chave/valor configuracoes_sistema sem categoria
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
-            }
-        } catch (\Exception $e) {
-        }
-
-        // chave/valor configuracoes
-        try {
-            $key = $categoria . '_' . $chave;
-            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = ? LIMIT 1");
-            $stmt->execute([$key]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
-            }
-        } catch (\Exception $e) {
         }
 
         return $default;
