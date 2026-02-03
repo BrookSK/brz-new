@@ -915,11 +915,47 @@ class AdminComprasController extends Controller {
                         if (isset($decoded['url'])) $paths[] = $decoded['url'];
                         if (isset($decoded[0])) $paths[] = $decoded[0];
                         foreach ($paths as $p) {
-                            if (is_string($p) && trim($p) !== '') return $p;
-                            if (is_array($p) && !empty($p['url']) && is_string($p['url'])) return $p['url'];
-                            if (is_array($p) && !empty($p['path']) && is_string($p['path'])) return $p['path'];
+                            if (is_string($p) && trim($p) !== '') {
+                                $s = trim($p);
+                                if (strpos($s, 'uploads/produtos/') !== false) {
+                                    $s = str_replace('uploads/produtos/', '', $s);
+                                }
+                                if (!(preg_match('#^https?://#i', $s) || strpos($s, '//') === 0 || strpos($s, '/') === 0)) {
+                                    $s = '/uploads/produtos/' . ltrim($s, '/');
+                                }
+                                return $s;
+                            }
+                            if (is_array($p) && !empty($p['url']) && is_string($p['url'])) {
+                                $s = trim((string) $p['url']);
+                                if ($s === '') continue;
+                                if (strpos($s, 'uploads/produtos/') !== false) {
+                                    $s = str_replace('uploads/produtos/', '', $s);
+                                }
+                                if (!(preg_match('#^https?://#i', $s) || strpos($s, '//') === 0 || strpos($s, '/') === 0)) {
+                                    $s = '/uploads/produtos/' . ltrim($s, '/');
+                                }
+                                return $s;
+                            }
+                            if (is_array($p) && !empty($p['path']) && is_string($p['path'])) {
+                                $s = trim((string) $p['path']);
+                                if ($s === '') continue;
+                                if (strpos($s, 'uploads/produtos/') !== false) {
+                                    $s = str_replace('uploads/produtos/', '', $s);
+                                }
+                                if (!(preg_match('#^https?://#i', $s) || strpos($s, '//') === 0 || strpos($s, '/') === 0)) {
+                                    $s = '/uploads/produtos/' . ltrim($s, '/');
+                                }
+                                return $s;
+                            }
                         }
                     }
+                }
+
+                if (strpos($s, 'uploads/produtos/') !== false) {
+                    $s = str_replace('uploads/produtos/', '', $s);
+                }
+                if (!(preg_match('#^https?://#i', $s) || strpos($s, '//') === 0 || strpos($s, '/') === 0)) {
+                    $s = '/uploads/produtos/' . ltrim($s, '/');
                 }
                 return $s;
             }
