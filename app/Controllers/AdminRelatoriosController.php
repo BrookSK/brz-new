@@ -390,7 +390,7 @@ class AdminRelatoriosController extends Controller {
         }
 
         $custoEnvioPorItemUsd = $this->getConfigNumber('entrega', 'custo_envio_por_item_usd', 0.0);
-        $comissaoPercentual = $this->getConfigNumber('entrega', 'comissao_percentual', 0.0);
+        $comissaoPercentual = 0.0;
 
         $itensTable = $this->getPedidoItensTable();
         $temItens = ($itensTable !== null);
