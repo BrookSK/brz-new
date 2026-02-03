@@ -133,7 +133,7 @@ class AdminProdutosNovoController extends Controller {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container-fluid">
+    <div class="container-fluid admin-shell">
         <div class="row">';
 
         renderAdminSidebar('produtos');
@@ -155,8 +155,17 @@ class AdminProdutosNovoController extends Controller {
 
         echo '<div class="tab-content pt-3" id="novoProdutoTabsContent">
                 <div class="tab-pane fade show active" id="pane-simples" role="tabpanel">
-                    <div class="alert alert-info">Cadastro simples (original) sem alterações.</div>
-                    <iframe src="/admin/produtos/novo-simples" style="width:100%; height: 1200px; border:0;"></iframe>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="text-muted">Cadastro simples (original)</div>
+                                <a class="btn btn-sm btn-outline-primary" href="/admin/produtos/novo-simples" target="_blank">Abrir em nova aba</a>
+                            </div>
+                            <div id="novoProdutoSimplesContainer">
+                                <div class="text-muted">Carregando formulário...</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-pane fade" id="pane-variavel" role="tabpanel">';
@@ -234,7 +243,12 @@ class AdminProdutosNovoController extends Controller {
                             <div class="card-body">';
 
         if (empty($tipos)) {
-            echo '<div class="text-muted">Cadastre tipos/opções em <a href="/admin/variacoes">Variações</a> antes de criar um produto variável.</div>';
+            echo '<div class="alert alert-warning mb-0">
+                    Para gerar combinações (WooCommerce), você precisa cadastrar <strong>Tipos</strong> e <strong>Opções</strong> em <a href="/admin/variacoes" target="_blank">Variações</a>.
+                  </div>
+                  <div class="mt-3">
+                    <a class="btn btn-primary" href="/admin/variacoes" target="_blank"><i class="fas fa-sliders-h"></i> Ir para Variações</a>
+                  </div>';
         } else {
             echo '<div class="alert alert-info">Selecione as opções por tipo e clique em <strong>Gerar variações</strong>. Você pode ajustar preço/estoque por variação.</div>';
 
@@ -252,7 +266,7 @@ class AdminProdutosNovoController extends Controller {
                     $ovalor = (string) ($o['valor'] ?? '');
                     echo '<div class="col-6 col-md-4">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="opcoes[' . $tid . '][]" value="' . $oid . '" id="nv_opt_' . $tid . '_' . $oid . '">
+                                <input class="form-check-input" type="checkbox" data-tipo-nome="' . htmlspecialchars($tnome, ENT_QUOTES, 'UTF-8') . '" name="opcoes[' . $tid . '][]" value="' . $oid . '" id="nv_opt_' . $tid . '_' . $oid . '">
                                 <label class="form-check-label" for="nv_opt_' . $tid . '_' . $oid . '">' . htmlspecialchars($ovalor, ENT_QUOTES, 'UTF-8') . '</label>
                             </div>
                           </div>';
@@ -347,6 +361,39 @@ class AdminProdutosNovoController extends Controller {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function() {
+    const simplesContainer = document.getElementById('novoProdutoSimplesContainer');
+    let simplesLoaded = false;
+
+    async function loadSimplesOnce() {
+        if (!simplesContainer || simplesLoaded) return;
+        simplesLoaded = true;
+
+        try {
+            const res = await fetch('/admin/produtos/novo-simples', { credentials: 'same-origin' });
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const form = doc.querySelector('main form');
+            if (!form) {
+                simplesContainer.innerHTML = '<div class="text-danger">Não foi possível carregar o formulário simples.</div>';
+                return;
+            }
+
+            // Renderizar apenas o formulário para evitar duplicar cabeçalho/layout do admin
+            simplesContainer.innerHTML = form.outerHTML;
+        } catch (e) {
+            simplesContainer.innerHTML = '<div class="text-danger">Erro ao carregar o formulário simples.</div>';
+        }
+    }
+
+    // Carrega ao abrir a página (aba Simples é a default)
+    loadSimplesOnce();
+
+    const tabSimples = document.getElementById('tab-simples');
+    if (tabSimples) {
+        tabSimples.addEventListener('shown.bs.tab', loadSimplesOnce);
+    }
+
     const btnGerar = document.getElementById('btnGerarVariacoes');
     const btnLimpar = document.getElementById('btnLimparVariacoes');
     const tableBody = document.querySelector('#tabelaVariacoes tbody');
@@ -365,6 +412,7 @@ class AdminProdutosNovoController extends Controller {
             selected[tid].push({
                 tipo_id: Number(tid),
                 opcao_id: Number(el.value),
+                tipo_label: (el.getAttribute('data-tipo-nome') || '').trim(),
                 label: (el.nextElementSibling ? el.nextElementSibling.textContent : '').trim(),
             });
         });
@@ -438,7 +486,7 @@ class AdminProdutosNovoController extends Controller {
         const types = typeIds.map((tid) => {
             return {
                 tipo_id: Number(tid),
-                options: sel[tid].map((x) => ({ tipo_id: x.tipo_id, opcao_id: x.opcao_id, label: x.label, tipo_label: '' })),
+                options: sel[tid].map((x) => ({ tipo_id: x.tipo_id, opcao_id: x.opcao_id, label: x.label, tipo_label: x.tipo_label || '' })),
             };
         });
 
