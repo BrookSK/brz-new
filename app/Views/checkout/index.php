@@ -174,9 +174,14 @@
                                 <div id="items-resumo">
                                     <?php foreach ($items as $item): ?>
                                     <div class="d-flex justify-content-between">
-                                    <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
-                                    <small class="item-price" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></small>
-                                </div>
+                                        <div>
+                                            <small><?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)</small>
+                                            <?php if (!empty($item['variacao_descricao'])): ?>
+                                                <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <small class="item-price" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></small>
+                                    </div>
                                     <?php endforeach; ?>
                                 </div>
                             </div>

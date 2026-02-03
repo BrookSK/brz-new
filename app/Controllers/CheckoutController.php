@@ -26,6 +26,63 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function tableExists(string $table): bool {
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
+        $temPedidoItens = false;
+        $temPedidoItems = false;
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_itens']);
+            $temPedidoItens = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItens = false;
+        }
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_items']);
+            $temPedidoItems = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItems = false;
+        }
+
+        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
+        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+
+        // Se ambos existirem, preferir a tabela que já possui itens desse pedido
+        if ($pedidoId > 0) {
+            $c1 = 0;
+            $c2 = 0;
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c1 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c1 = 0;
+            }
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c2 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c2 = 0;
+            }
+            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+        }
+
+        return 'pedido_itens';
+    }
+
     private function formatarErroParaUsuario(string $mensagem): string {
         $m = trim($mensagem);
 
@@ -555,7 +612,9 @@ class CheckoutController extends Controller {
                 'quantidade' => $quantidade,
                 'subtotal' => $precoUnitario * $quantidade,
                 'peso' => $pesoArredondado, // Usar peso arredondado
-                'foto_principal' => $item['foto_principal'] ?? null
+                'foto_principal' => $item['foto_principal'] ?? null,
+                'produto_variacao_id' => $item['produto_variacao_id'] ?? null,
+                'variacao_descricao' => $item['variacao_descricao'] ?? null,
             ];
             
             $items[] = $produto;
@@ -1123,11 +1182,13 @@ class CheckoutController extends Controller {
     private function salvarItensPedido($pedidoId, $carrinho) {
         $db = \Config\Database::getConnection();
 
-        // Descobrir colunas disponíveis em pedido_itens (compatibilidade entre schemas)
+        $itensTable = $this->pickPedidoItensTable($db, (int) $pedidoId);
+
+        // Descobrir colunas disponíveis na tabela de itens (compatibilidade entre schemas)
         $colsItens = [];
         try {
-            $stmtCols = $db->query('DESCRIBE pedido_itens');
-            $colsItens = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+            $stmtCols = $db->query('DESCRIBE ' . $itensTable);
+            $colsItens = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
         } catch (\Exception $e) {
             $colsItens = [];
         }
@@ -1248,7 +1309,7 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
-            $sql = 'INSERT INTO pedido_itens (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+            $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
             $stmt = $db->prepare($sql);
             $stmt->execute($vals);
             
@@ -1511,6 +1572,8 @@ class CheckoutController extends Controller {
     private function obterItensPedido($pedidoId) {
         $db = \Config\Database::getConnection();
 
+        $itensTable = $this->pickPedidoItensTable($db, (int) $pedidoId);
+
         $produtoNomeCol = null;
         try {
             $stmtCols = $db->query('DESCRIBE produtos');
@@ -1531,14 +1594,14 @@ class CheckoutController extends Controller {
             $sql = "SELECT 
                         pi.*,
                         COALESCE(pi.nome_produto, pr.{$produtoNomeCol}) AS nome
-                    FROM pedido_itens pi
+                    FROM {$itensTable} pi
                     LEFT JOIN produtos pr ON pi.produto_id = pr.id
                     WHERE pi.pedido_id = ?";
         } else {
             $sql = "SELECT 
                         pi.*,
                         pi.nome_produto AS nome
-                    FROM pedido_itens pi
+                    FROM {$itensTable} pi
                     WHERE pi.pedido_id = ?";
         }
         
@@ -1547,10 +1610,73 @@ class CheckoutController extends Controller {
 
         $itens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         if (is_array($itens)) {
+            // Mapear descrições de variação (quando existir produto_variacao_id)
+            $colsItens = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE ' . $itensTable);
+                $colsItens = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsItens = [];
+            }
+
+            $hasProdutoVariacaoId = (is_array($colsItens) && in_array('produto_variacao_id', $colsItens, true));
+            $variacaoDescById = [];
+            if ($hasProdutoVariacaoId) {
+                $pvIds = [];
+                foreach ($itens as $it) {
+                    $pvi = (int) ($it['produto_variacao_id'] ?? 0);
+                    if ($pvi > 0) {
+                        $pvIds[$pvi] = true;
+                    }
+                }
+                $pvIds = array_keys($pvIds);
+                if (!empty($pvIds)) {
+                    try {
+                        $in = implode(',', array_fill(0, count($pvIds), '?'));
+                        $sqlVar = '
+                            SELECT pvi.produto_variacao_id, vt.nome AS tipo_nome, vo.valor AS opcao_valor
+                            FROM produto_variacao_itens pvi
+                            INNER JOIN variacao_tipos vt ON vt.id = pvi.tipo_id
+                            INNER JOIN variacao_opcoes vo ON vo.id = pvi.opcao_id
+                            WHERE pvi.produto_variacao_id IN (' . $in . ')
+                            ORDER BY pvi.produto_variacao_id ASC, vt.nome ASC, vo.valor ASC
+                        ';
+                        $stVar = $db->prepare($sqlVar);
+                        $stVar->execute($pvIds);
+                        $rows = $stVar->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        $tmpPairs = [];
+                        foreach ($rows as $r) {
+                            $vid = (int) ($r['produto_variacao_id'] ?? 0);
+                            if ($vid <= 0) continue;
+                            $tn = (string) ($r['tipo_nome'] ?? '');
+                            $ov = (string) ($r['opcao_valor'] ?? '');
+                            if ($tn === '' || $ov === '') continue;
+                            if (!isset($tmpPairs[$vid])) $tmpPairs[$vid] = [];
+                            $tmpPairs[$vid][] = $tn . '=' . $ov;
+                        }
+                        foreach ($tmpPairs as $vid => $parts) {
+                            $variacaoDescById[(int) $vid] = implode(' / ', $parts);
+                        }
+                    } catch (\Exception $e) {
+                        $variacaoDescById = [];
+                    }
+                }
+            }
+
             foreach ($itens as &$item) {
                 if (empty($item['nome'])) {
                     $produtoId = $item['produto_id'] ?? null;
                     $item['nome'] = !empty($produtoId) ? ('Produto #' . $produtoId) : 'Produto';
+                }
+
+                $pvId = (int) ($item['produto_variacao_id'] ?? 0);
+                if ($pvId > 0) {
+                    $desc = (string) ($variacaoDescById[$pvId] ?? '');
+                    if ($desc !== '') {
+                        $item['variacao_descricao'] = $desc;
+                        $item['variacao_label'] = $desc;
+                    }
                 }
             }
         }
