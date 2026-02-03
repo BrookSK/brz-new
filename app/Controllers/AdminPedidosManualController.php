@@ -597,6 +597,34 @@ function removeRow(btn){
     calcTotal();
 }
 
+function updateLinkVisibility(){
+    const moeda = getSelectedMoeda();
+    const fpSel = document.getElementById('forma_pagamento');
+    const linkCard = document.getElementById('linkPagamentoCard');
+    const linkInfo = document.getElementById('linkPagamentoInfo');
+    const linkResult = document.getElementById('linkResult');
+
+    const v = fpSel ? String(fpSel.value || '') : '';
+    const isOffline = (v === 'pagdev');
+
+    // Regras:
+    // - Offline (PagDev): não gera link
+    // - Online BRL: AppMax (gera link)
+    // - Online USD: Stripe (checkout normal; não gera link aqui)
+    const canShowLinkCard = (!isOffline && moeda === 'BRL');
+
+    if (linkCard) {
+        linkCard.style.display = canShowLinkCard ? '' : 'none';
+    }
+    if (linkInfo) {
+        linkInfo.style.display = isOffline ? 'none' : '';
+    }
+    if (linkResult && !canShowLinkCard) {
+        linkResult.style.display = 'none';
+        linkResult.innerHTML = '';
+    }
+}
+
 function onProdutoSearchInput(inp){
     const tr = inp.closest('tr');
     if (!tr) return;
