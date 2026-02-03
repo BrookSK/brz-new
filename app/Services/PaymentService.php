@@ -90,8 +90,10 @@ class PaymentService {
         $lastHttpCode = 0;
         $lastDecoded = null;
         $lastRespBody = '';
+        $lastUrl = '';
         foreach ($tryBases as $b) {
             $url = $buildUrl((string) $b, $path, (string) $this->appmaxV3AccessToken);
+            $lastUrl = (string) $url;
 
             if (function_exists('curl_init')) {
                 $ch = curl_init($url);
@@ -154,7 +156,19 @@ class PaymentService {
         }
 
         $msg = is_array($lastDecoded) ? json_encode($lastDecoded) : (string) $lastRespBody;
-        throw new \Exception('Erro AppMax HTTP ' . (int) $lastHttpCode . ': ' . $msg);
+        $safeUrl = (string) $lastUrl;
+        if ($safeUrl !== '') {
+            $safeUrl = preg_replace('#([\?&]access-token=)[^&]+#i', '$1***', $safeUrl);
+        }
+
+        if (is_array($lastDecoded) && (isset($lastDecoded['success']) && $lastDecoded['success'] === false)) {
+            $txt = strtolower(trim((string) ($lastDecoded['text'] ?? '')));
+            if ($txt === 'not found') {
+                throw new \Exception('AppMax: endpoint/token inválido (Not Found). Verifique pagamentos.appmax_access_token e pagamentos.appmax_base_url. url=' . $safeUrl . ' resp=' . $msg);
+            }
+        }
+
+        throw new \Exception('Erro AppMax HTTP ' . (int) $lastHttpCode . ': ' . $msg . ($safeUrl !== '' ? (' url=' . $safeUrl) : ''));
     }
 
     private function appmaxCreateCustomer(array $dados, array $products = []): int {
