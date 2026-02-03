@@ -536,23 +536,40 @@ class ProdutoController extends Controller {
 
             $fotosPorVar = [];
             if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
-                $sqlFotos = 'SELECT id, produto_variacao_id, nome_arquivo, legenda, ordem FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
-                $stmtFotos = $pdo->prepare($sqlFotos);
-                $stmtFotos->execute($varIds);
-                $rowsFotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                foreach ($rowsFotos as $f) {
-                    $vId = (int) ($f['produto_variacao_id'] ?? 0);
-                    if ($vId <= 0) continue;
-                    if (!isset($fotosPorVar[$vId])) $fotosPorVar[$vId] = [];
+                try {
+                    $hasLegenda = false;
+                    try {
+                        $stCol = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_fotos' AND column_name = 'legenda'");
+                        $stCol->execute();
+                        $hasLegenda = ((int) $stCol->fetchColumn()) > 0;
+                    } catch (\Throwable $e) {
+                        $hasLegenda = false;
+                    }
 
-                    $path = $this->normalizeProdutoImagemPath($f['nome_arquivo'] ?? null);
-                    $fotosPorVar[$vId][] = [
-                        'id' => (int) ($f['id'] ?? 0),
-                        'nome_arquivo' => $path,
-                        'url_completa' => $path ? Url::absolute($path) : null,
-                        'legenda' => $f['legenda'] ?? null,
-                        'ordem' => (int) ($f['ordem'] ?? 0),
-                    ];
+                    $cols = $hasLegenda
+                        ? 'id, produto_variacao_id, nome_arquivo, legenda, ordem'
+                        : 'id, produto_variacao_id, nome_arquivo, ordem';
+
+                    $sqlFotos = 'SELECT ' . $cols . ' FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
+                    $stmtFotos = $pdo->prepare($sqlFotos);
+                    $stmtFotos->execute($varIds);
+                    $rowsFotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsFotos as $f) {
+                        $vId = (int) ($f['produto_variacao_id'] ?? 0);
+                        if ($vId <= 0) continue;
+                        if (!isset($fotosPorVar[$vId])) $fotosPorVar[$vId] = [];
+
+                        $path = $this->normalizeProdutoImagemPath($f['nome_arquivo'] ?? null);
+                        $fotosPorVar[$vId][] = [
+                            'id' => (int) ($f['id'] ?? 0),
+                            'nome_arquivo' => $path,
+                            'url_completa' => $path ? Url::absolute($path) : null,
+                            'legenda' => $f['legenda'] ?? null,
+                            'ordem' => (int) ($f['ordem'] ?? 0),
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    $fotosPorVar = [];
                 }
             }
 
