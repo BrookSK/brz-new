@@ -158,6 +158,9 @@ class AdminRelatoriosController extends Controller {
         $rows = [];
         $totalRows = 0;
 
+        // Para a tela de "Movimentação do Fluxo", buscamos um lote maior e paginamos após mesclar.
+        $fetchLimit = 2000;
+
         // 1) Carregar movimentações de estoque
         $movRows = [];
         if ($hasMov && ($tipo === '' || $tipo === 'estoque')) {
@@ -182,19 +185,12 @@ class AdminRelatoriosController extends Controller {
             $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
             try {
-                $stCount = $this->connection->prepare('SELECT COUNT(*) FROM estoque_movimentacao em JOIN produtos p ON p.id = em.produto_id ' . $whereSql);
-                $stCount->execute($params);
-                $totalRows += (int) ($stCount->fetchColumn() ?: 0);
-            } catch (\Exception $e) {
-            }
-
-            try {
                 $sql = 'SELECT em.*, p.name AS produto_nome, p.sku, COALESCE(u.nome, u.name, u.email) AS usuario_nome, u.email AS usuario_email '
                     . 'FROM estoque_movimentacao em '
                     . 'JOIN produtos p ON p.id = em.produto_id '
                     . 'LEFT JOIN usuarios u ON u.id = em.usuario_id '
                     . $whereSql
-                    . ' ORDER BY em.data_movimentacao DESC, em.id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+                    . ' ORDER BY em.data_movimentacao DESC, em.id DESC LIMIT ' . (int) $fetchLimit;
                 $st = $this->connection->prepare($sql);
                 $st->execute($params);
                 $movRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -203,22 +199,12 @@ class AdminRelatoriosController extends Controller {
             }
         }
 
-        // 2) Carregar auditoria (ações que impactam fluxo)
+        // 2) Carregar auditoria (tudo que impacta o fluxo)
+        // Por padrão (tipo vazio), listamos TUDO do admin (auditoria_logs já registra /admin).
         $audRows = [];
         if ($hasAuditoria && ($tipo === '' || $tipo === 'fluxo' || $tipo === 'pedidos' || $tipo === 'compras')) {
             $where = [];
             $params = [];
-
-            // Rotas/ações alvo
-            $patterns = [
-                '/admin/pedidos/atualizar-status%',
-                '/admin/pedidos/salvar%',
-                '/admin/pedidos/excluir%',
-                '/admin/estoque/salvar%',
-                '/admin/estoque/editar/salvar%',
-                '/admin/estoque/editar/excluir%',
-                '/admin/estoque/compras/%',
-            ];
 
             // Se o schema tiver coluna route, filtramos por ela. Se não, caímos no campo acao.
             $cols = [];
@@ -247,20 +233,6 @@ class AdminRelatoriosController extends Controller {
                 $params[':q'] = '%' . $q . '%';
             }
 
-            $routeWhere = [];
-            foreach ($patterns as $i => $patt) {
-                $key = ':p' . $i;
-                if ($hasRouteCol) {
-                    $routeWhere[] = 'l.route LIKE ' . $key;
-                } else {
-                    $routeWhere[] = 'l.acao LIKE ' . $key;
-                }
-                $params[$key] = $patt;
-            }
-            if (!empty($routeWhere)) {
-                $where[] = '(' . implode(' OR ', $routeWhere) . ')';
-            }
-
             // filtro por tipo (pedidos/compras)
             if ($tipo === 'pedidos') {
                 $where[] = ($hasRouteCol ? "(l.route LIKE '/admin/pedidos/%')" : "(l.acao LIKE '%/admin/pedidos/%')");
@@ -282,15 +254,9 @@ class AdminRelatoriosController extends Controller {
             }
 
             $baseSql = 'FROM auditoria_logs l' . $joinUser . (!empty($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
-            try {
-                $stCount = $this->connection->prepare('SELECT COUNT(*) ' . $baseSql);
-                $stCount->execute($params);
-                $totalRows += (int) ($stCount->fetchColumn() ?: 0);
-            } catch (\Exception $e) {
-            }
 
             try {
-                $sql = 'SELECT l.*' . $selectUser . ' ' . $baseSql . ' ORDER BY l.id DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset;
+                $sql = 'SELECT l.*' . $selectUser . ' ' . $baseSql . ' ORDER BY l.id DESC LIMIT ' . (int) $fetchLimit;
                 $st = $this->connection->prepare($sql);
                 $st->execute($params);
                 $audRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -340,10 +306,11 @@ class AdminRelatoriosController extends Controller {
             return $ty <=> $tx;
         });
 
-        // paginação simples em memória (já limitamos cada fonte, mas aqui garantimos a página)
-        $totalRows = (int) $totalRows;
+        // paginação correta após mesclar
+        $totalRows = (int) count($rows);
         $totalPages = $perPage > 0 ? (int) ceil($totalRows / $perPage) : 1;
         if ($totalPages < 1) $totalPages = 1;
+        $rows = array_slice($rows, $offset, $perPage);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         echo '<!DOCTYPE html>
