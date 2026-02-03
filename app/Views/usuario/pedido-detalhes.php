@@ -162,6 +162,11 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <?php if (!empty($pedido['items'])): ?>
                                 <?php $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL')); ?>
                                 <?php $simboloMoeda = ($moedaPedido === 'USD') ? 'US$' : 'R$'; ?>
+                                <?php if ($moedaPedido === 'BRL' && !empty($pedido['taxa_conversao']) && (float) $pedido['taxa_conversao'] > 1.01): ?>
+                                    <div class="alert alert-info small mb-3">
+                                        Taxa de conversão aplicada: 1 USD = R$ <?= number_format((float) $pedido['taxa_conversao'], 2, ',', '.') ?>
+                                    </div>
+                                <?php endif; ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
                                         <?php
