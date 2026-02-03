@@ -193,27 +193,25 @@
 
                 <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
                 <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
-                <?php if (!empty($variacoesEnabled)): ?>
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h5 class="mb-3">Variações</h5>
-                            <div class="row g-3" id="variacoes-selectors">
-                                <?php foreach (($variacoesUi['atributos'] ?? []) as $attr): ?>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-semibold"><?= htmlspecialchars((string) ($attr['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></label>
-                                        <select class="form-select variacao-select" data-tipo-id="<?= (int) ($attr['tipo_id'] ?? 0) ?>">
-                                            <option value="">Selecione...</option>
-                                            <?php foreach (($attr['opcoes'] ?? []) as $op): ?>
-                                                <option value="<?= (int) ($op['opcao_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($op['valor'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="mt-3 small text-muted" id="variacao-status"></div>
+                <div class="card mb-4" id="variacoes-card" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                    <div class="card-body">
+                        <h5 class="mb-3">Variações</h5>
+                        <div class="row g-3" id="variacoes-selectors">
+                            <?php foreach (($variacoesUi['atributos'] ?? []) as $attr): ?>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label fw-semibold"><?= htmlspecialchars((string) ($attr['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></label>
+                                    <select class="form-select variacao-select" data-tipo-id="<?= (int) ($attr['tipo_id'] ?? 0) ?>">
+                                        <option value="">Selecione...</option>
+                                        <?php foreach (($attr['opcoes'] ?? []) as $op): ?>
+                                            <option value="<?= (int) ($op['opcao_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($op['valor'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
+                        <div class="mt-3 small text-muted" id="variacao-status"></div>
                     </div>
-                <?php endif; ?>
+                </div>
 
                 <!-- Adicionar ao Carrinho -->
                 <div class="add-to-cart-section">
@@ -447,6 +445,63 @@ function inicializarDetalhesProduto() {
     const currencyLabel = <?= json_encode($currencyLabel ?? '') ?>;
     const basePrice = Number($('.amount').data('original-price') || 0);
 
+    const produtoId = <?= (int) ($produto['id'] ?? 0) ?>;
+
+    function normalizeVariacoesUi(raw) {
+        const r = raw && typeof raw === 'object' ? raw : {};
+        const attrs = Array.isArray(r.atributos) ? r.atributos : [];
+        const vars = Array.isArray(r.variacoes) ? r.variacoes : [];
+        const fotos = r.fotos_por_variacao && typeof r.fotos_por_variacao === 'object' ? r.fotos_por_variacao : {};
+        const enabled = !!(r.enabled || (attrs.length > 0 && vars.length > 0));
+        return { enabled, atributos: attrs, variacoes: vars, fotos_por_variacao: fotos };
+    }
+
+    function renderVariacaoSelectors(ui) {
+        const container = $('#variacoes-selectors');
+        if (!container.length) return;
+        container.empty();
+
+        (ui.atributos || []).forEach((attr) => {
+            const tipoId = Number(attr.tipo_id || 0);
+            const nome = String(attr.nome || '');
+            const col = $('<div class="col-12 col-md-6"></div>');
+            const label = $('<label class="form-label fw-semibold"></label>').text(nome);
+            const select = $('<select class="form-select variacao-select"></select>');
+            select.attr('data-tipo-id', String(tipoId));
+            select.append('<option value="">Selecione...</option>');
+            (attr.opcoes || []).forEach((op) => {
+                const oid = Number(op.opcao_id || 0);
+                const val = String(op.valor || '');
+                const opt = $('<option></option>').attr('value', String(oid)).text(val);
+                select.append(opt);
+            });
+            col.append(label);
+            col.append(select);
+            container.append(col);
+        });
+    }
+
+    let variacoesState = normalizeVariacoesUi(variacoesUi);
+
+    function findMatchingVariationDynamic(selectionMap) {
+        if (!variacoesState.enabled) return null;
+        const vars = variacoesState.variacoes || [];
+        for (let i = 0; i < vars.length; i++) {
+            const v = vars[i];
+            const map = v.map || {};
+            let ok = true;
+            for (const k in selectionMap) {
+                if (!Object.prototype.hasOwnProperty.call(selectionMap, k)) continue;
+                if (String(map[k] || '') !== String(selectionMap[k] || '')) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) return v;
+        }
+        return null;
+    }
+
     function renderGallery(photos) {
         const safe = Array.isArray(photos) ? photos.filter(p => p && p.url) : [];
         if (safe.length === 0) return;
@@ -517,22 +572,7 @@ function inicializarDetalhesProduto() {
     }
 
     function findMatchingVariation(selectionMap) {
-        if (!variacoesUi || !variacoesEnabled) return null;
-        const vars = variacoesUi.variacoes || [];
-        for (let i = 0; i < vars.length; i++) {
-            const v = vars[i];
-            const map = v.map || {};
-            let ok = true;
-            for (const k in selectionMap) {
-                if (!Object.prototype.hasOwnProperty.call(selectionMap, k)) continue;
-                if (String(map[k] || '') !== String(selectionMap[k] || '')) {
-                    ok = false;
-                    break;
-                }
-            }
-            if (ok) return v;
-        }
-        return null;
+        return findMatchingVariationDynamic(selectionMap);
     }
 
     function readSelection() {
@@ -554,7 +594,7 @@ function inicializarDetalhesProduto() {
     }
 
     function onVariationChange() {
-        if (!variacoesUi || !variacoesEnabled) return;
+        if (!variacoesState.enabled) return;
         const selection = readSelection();
         const status = $('#variacao-status');
         const hidden = $('#produto_variacao_id');
@@ -583,7 +623,7 @@ function inicializarDetalhesProduto() {
         setPriceUi(price);
         setStockUi(v.stock);
 
-        const fotosMap = variacoesUi.fotos_por_variacao || {};
+        const fotosMap = variacoesState.fotos_por_variacao || {};
         const fotosVar = fotosMap[String(v.id)] || fotosMap[v.id] || [];
         if (Array.isArray(fotosVar) && fotosVar.length > 0) {
             renderGallery(fotosVar.map(x => ({ url: x.url_completa || x.url, legenda: x.legenda || null })));
@@ -753,10 +793,30 @@ function inicializarDetalhesProduto() {
         }
     }
     
-    if (variacoesUi && variacoesEnabled) {
+    if (variacoesState.enabled) {
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
         // Inicial
         $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
+    }
+
+    if (!variacoesState.enabled && produtoId > 0) {
+        fetch('/produto/variacoes/' + produtoId, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then((data) => {
+                variacoesState = normalizeVariacoesUi(data);
+                if (!variacoesState.enabled) return;
+
+                $('#variacoes-card').show();
+
+                const status = $('#variacao-status');
+                if (status.length) {
+                    status.text('Selecione as opções para ver disponibilidade.');
+                }
+
+                renderVariacaoSelectors(variacoesState);
+                $('#variacoes-selectors').off('change.variacoesDyn').on('change.variacoesDyn', '.variacao-select', onVariationChange);
+            })
+            .catch(() => {});
     }
 }
 </script>

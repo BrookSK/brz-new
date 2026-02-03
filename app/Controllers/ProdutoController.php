@@ -157,6 +157,21 @@ class ProdutoController extends Controller {
         ]);
     }
 
+    public function variacoes(Request $request) {
+        $produtoId = (int) $request->getParam('id');
+        if ($produtoId <= 0) {
+            $this->json(['enabled' => false, 'atributos' => [], 'variacoes' => [], 'fotos_por_variacao' => []], 400);
+        }
+
+        try {
+            $pdo = $this->produtoModel->getConnection();
+            $data = $this->buildVariacoesUiData($pdo, $produtoId);
+            $this->json($data);
+        } catch (\Throwable $e) {
+            $this->json(['enabled' => false, 'atributos' => [], 'variacoes' => [], 'fotos_por_variacao' => []]);
+        }
+    }
+
     public function selecionar(Request $request) {
         $produtoId = $request->getParam('id');
         $produtoVariacaoId = $request->getParam('produto_variacao_id');

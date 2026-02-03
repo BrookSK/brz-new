@@ -7,6 +7,7 @@ $router = new Router();
 $router->get('/', 'HomeController', 'index');
 $router->get('/produtos', 'ProdutoController', 'index');
 $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
+$router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
 $router->post('/produtos/carrinho', 'ProdutoController', 'adicionarAoCarrinho');
 $router->get('/carrinho', 'CarrinhoController', 'index');
