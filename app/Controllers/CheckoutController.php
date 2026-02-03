@@ -682,30 +682,22 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
 
-                // Ajustar para que a cobrança cubra o TOTAL do pedido (não apenas subtotal)
-                // AppMax: total = products + shipping - discount
-                // Então: products = total - shipping + discount
-                $totalCents = (int) round(((float) $valor) * 100);
-                $targetProductsValueCents = $totalCents - $shippingValueCents + $discountValueCents;
-                if ($targetProductsValueCents < 0) {
-                    $targetProductsValueCents = 0;
-                }
-
-                $diff = $targetProductsValueCents - $productsValueCents;
-                if ($diff > 0) {
-                    // Incluir serviços/impostos como item adicional para fechar o valor
-                    // (evita cobrar somente o valor dos produtos)
-                    $products[] = [
-                        'sku' => 'SERVICOS',
-                        'name' => 'Serviços/Frete/Impostos',
-                        'quantity' => 1,
-                        'unit_value' => (int) $diff,
-                        'type' => 'service',
+                // Forçar cobrança exatamente pelo TOTAL exibido ao usuário (BRL)
+                // (elimina divergência USD/BRL e diferenças entre itens/frete/tabelas)
+                if ($valor > 0) {
+                    $totalCents = (int) round(((float) $valor) * 100);
+                    $products = [
+                        [
+                            'sku' => 'PEDIDO_' . (string) $pedidoId,
+                            'name' => $descricao,
+                            'quantity' => 1,
+                            'unit_value' => $totalCents,
+                            'type' => 'service',
+                        ]
                     ];
-                    $productsValueCents += (int) $diff;
-                } elseif ($diff < 0) {
-                    // Se o somatório de produtos+serviços excedeu o total, compensar aumentando o desconto
-                    $discountValueCents += (int) abs($diff);
+                    $productsValueCents = $totalCents;
+                    $shippingValueCents = 0;
+                    $discountValueCents = 0;
                 }
 
                 if (!empty($products)) {
