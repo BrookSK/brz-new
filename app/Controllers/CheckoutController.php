@@ -1018,21 +1018,10 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
 
-        // Calcular valores com a mesma regra do carrinho (config do admin)
-        $moedaCalc = strtoupper(trim((string) ($_GET['moeda'] ?? 'BRL')));
-        if (!in_array($moedaCalc, ['BRL', 'USD', 'EUR'], true)) {
-            $moedaCalc = 'BRL';
-        }
-        $taxaConv = 1.0;
-        try {
-            $taxaConv = (float) $this->carrinhoModel->getTaxaConversao($moedaCalc);
-            if ($taxaConv <= 0) $taxaConv = 1.0;
-        } catch (\Exception $e) {
-            $taxaConv = 1.0;
-        }
-
-        $frete = $this->calcularFrete($subtotal, $pesoTotal, $moedaCalc);
-        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, $moedaCalc, $taxaConv);
+        // Calcular valores no backend sempre em USD (moeda base), para evitar mistura de moedas.
+        // A conversão para BRL é feita no JS da view (assim como no carrinho).
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
         
