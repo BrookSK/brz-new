@@ -374,6 +374,127 @@ HTML;
         exit;
     }
 
+    public function uploadFotosVariacao(Request $request, $id = null) {
+        $varId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $inserted = [];
+            if (isset($_FILES['imagens']) && !empty($_FILES['imagens']['name'][0])) {
+                $uploadDir = $this->getProdutoUploadsDir();
+                $webDir = '/uploads/produtos/';
+                $this->ensureDir($uploadDir);
+
+                // ordem base
+                $ordBase = 0;
+                try {
+                    $stMax = $pdo->prepare('SELECT COALESCE(MAX(ordem),0) FROM produto_variacao_fotos WHERE produto_variacao_id = ?');
+                    $stMax->execute([$varId]);
+                    $ordBase = (int) ($stMax->fetchColumn() ?: 0);
+                    $ordBase++;
+                } catch (\Exception $e) {
+                    $ordBase = 0;
+                }
+
+                foreach ($_FILES['imagens']['name'] as $key => $name) {
+                    if (($_FILES['imagens']['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+
+                    $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $name);
+                    $fileName = time() . '_' . $varId . '_' . $fileName;
+                    $filePath = $uploadDir . $fileName;
+                    $webPath = $webDir . $fileName;
+
+                    if (!move_uploaded_file($_FILES['imagens']['tmp_name'][$key], $filePath)) {
+                        continue;
+                    }
+
+                    $stmt = $pdo->prepare('INSERT INTO produto_variacao_fotos (produto_variacao_id, nome_arquivo, arquivo_original, legenda, ordem) VALUES (?, ?, ?, ?, ?)');
+                    $stmt->execute([$varId, $webPath, $name, null, $ordBase + (int) $key]);
+                    $insertId = (int) $pdo->lastInsertId();
+                    $inserted[] = ['id' => $insertId, 'url' => Url::absolute($webPath)];
+                }
+            }
+
+            $pdo->commit();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => true, 'fotos' => $inserted]);
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    public function removerFotoVariacao(Request $request, $id = null) {
+        $fotoId = (int) ($id ?? $request->getParam('id'));
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $stmt = $pdo->prepare('SELECT nome_arquivo, produto_variacao_id FROM produto_variacao_fotos WHERE id = ?');
+            $stmt->execute([$fotoId]);
+            $foto = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$foto) {
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+                exit;
+            }
+
+            $path = (string) ($foto['nome_arquivo'] ?? '');
+            $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($path, '/');
+            if ($path !== '' && file_exists($filePath)) {
+                @unlink($filePath);
+            }
+
+            $stmtD = $pdo->prepare('DELETE FROM produto_variacao_fotos WHERE id = ?');
+            $stmtD->execute([$fotoId]);
+
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        } catch (\Exception $e) {
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        }
+    }
+
+    public function salvarOrdemFotosVariacao(Request $request, $id = null) {
+        $varId = (int) ($id ?? $request->getParam('id'));
+        $ordens = $request->getParam('ordens_variacao', []);
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
+                throw new \Exception('Tabela produto_variacao_fotos não encontrada');
+            }
+
+            $pdo->beginTransaction();
+            if (is_array($ordens)) {
+                foreach ($ordens as $fotoId => $ordem) {
+                    $fotoId = (int) $fotoId;
+                    $ordem = (int) $ordem;
+                    if ($fotoId <= 0) continue;
+                    $st = $pdo->prepare('UPDATE produto_variacao_fotos SET ordem = ? WHERE id = ? AND produto_variacao_id = ?');
+                    $st->execute([$ordem, $fotoId, $varId]);
+                }
+            }
+            $pdo->commit();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
+            exit;
+        }
+    }
+
     private function salvarCadastroRapido(Request $request): array {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         $pdo->beginTransaction();
@@ -1250,6 +1371,37 @@ HTML;
             $produtoTipoIds = $variacoesSchemaOk ? $this->getProdutoAtributos($pdo, (int) $id) : [];
             $produtoOpcoesPorTipo = $variacoesSchemaOk ? $this->getProdutoOpcoesUsadasPorTipo($pdo, (int) $id) : [];
             $produtoVariacoes = $variacoesSchemaOk ? $this->getProdutoVariacoesComDescricao($pdo, (int) $id) : [];
+
+            $fotosPorVariacao = [];
+            if ($variacoesSchemaOk && $this->tableExists($pdo, 'produto_variacao_fotos') && !empty($produtoVariacoes)) {
+                $varIds = [];
+                foreach ($produtoVariacoes as $vv) {
+                    $vId = (int) ($vv['id'] ?? 0);
+                    if ($vId > 0) $varIds[] = $vId;
+                }
+                $varIds = array_values(array_unique($varIds));
+                if (!empty($varIds)) {
+                    $in = implode(',', array_fill(0, count($varIds), '?'));
+                    $sql = 'SELECT * FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
+                    $st = $pdo->prepare($sql);
+                    $st->execute($varIds);
+                    $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rows as $r) {
+                        $pvId = (int) ($r['produto_variacao_id'] ?? 0);
+                        if ($pvId <= 0) continue;
+                        if (!isset($fotosPorVariacao[$pvId])) $fotosPorVariacao[$pvId] = [];
+                        $webPath = $this->normalizeUploadsWebPath((string) ($r['nome_arquivo'] ?? ''));
+                        $filePath = !empty($webPath) ? $this->resolveUploadsPublicPath($webPath) : null;
+                        $url = (!empty($webPath) && !empty($filePath)) ? Url::absolute($webPath) : Url::absolute('/uploads/produtos/placeholder.jpg');
+                        $fotosPorVariacao[$pvId][] = [
+                            'id' => (int) ($r['id'] ?? 0),
+                            'nome_arquivo' => $webPath,
+                            'url' => $url,
+                            'ordem' => (int) ($r['ordem'] ?? 0),
+                        ];
+                    }
+                }
+            }
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
@@ -1561,6 +1713,70 @@ HTML;
 
             echo '      </div>
                 </div>';
+
+            echo '<div class="card mt-3">
+                    <div class="card-header bg-white">
+                        <strong>Galeria por variação (SKU)</strong>
+                        <div class="text-muted small">Cada variação pode ter sua própria galeria. Essas fotos serão exibidas na página do produto quando o cliente selecionar a variação.</div>
+                    </div>
+                    <div class="card-body">';
+
+            if (empty($produtoVariacoes)) {
+                echo '<div class="text-muted">Nenhuma variação criada ainda.</div>';
+            } else {
+                echo '<div class="accordion" id="accVarFotos">';
+                foreach ($produtoVariacoes as $idx => $v) {
+                    $vId = (int) ($v['id'] ?? 0);
+                    if ($vId <= 0) continue;
+                    $desc = (string) ($v['descricao'] ?? '');
+                    $headingId = 'varFotosHeading_' . $vId;
+                    $collapseId = 'varFotosCollapse_' . $vId;
+
+                    echo '<div class="accordion-item">
+                            <h2 class="accordion-header" id="' . $headingId . '">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' . $collapseId . '" aria-expanded="false" aria-controls="' . $collapseId . '">
+                                    <span class="fw-semibold">#' . $vId . '</span>
+                                    <span class="text-muted ms-2 small">' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</span>
+                                </button>
+                            </h2>
+                            <div id="' . $collapseId . '" class="accordion-collapse collapse" aria-labelledby="' . $headingId . '" data-bs-parent="#accVarFotos">
+                                <div class="accordion-body">';
+
+                    echo '<div id="varGaleriaRow_' . $vId . '" class="row mb-3">';
+                    $fotosV = $fotosPorVariacao[$vId] ?? [];
+                    foreach ($fotosV as $foto) {
+                        $fotoId = (int) ($foto['id'] ?? 0);
+                        $url = (string) ($foto['url'] ?? '');
+                        $ordem = (int) ($foto['ordem'] ?? 0);
+                        echo '<div class="col-6 col-md-2 mb-2">
+                                <a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank">
+                                    <img src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">
+                                </a>
+                                <div class="mt-2">
+                                    <input type="number" class="form-control form-control-sm" name="ordens_variacao[' . $fotoId . ']" value="' . $ordem . '" min="0">
+                                </div>
+                                <div class="mt-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/variacoes/fotos/remover/' . $fotoId . '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto da variação?\')">Remover</button>
+                                </div>
+                              </div>';
+                    }
+                    echo '</div>';
+
+                    echo '<div class="d-flex gap-2 align-items-center flex-wrap">
+                            <input id="varGaleriaFiles_' . $vId . '" type="file" class="form-control" style="max-width: 520px;" multiple accept="image/*">
+                            <button type="button" class="btn btn-outline-primary btnUploadVarGaleria" data-var-id="' . $vId . '" data-url="/admin/produtos/variacoes/' . $vId . '/fotos/upload">Enviar fotos</button>
+                            <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/variacoes/' . $vId . '/fotos/ordem" formmethod="POST" formnovalidate>Salvar ordem</button>
+                          </div>';
+
+                    echo '            </div>
+                            </div>
+                        </div>';
+                }
+                echo '</div>';
+            }
+
+            echo '    </div>
+                </div>';
         }
 
         echo '                        </div>
@@ -1738,6 +1954,47 @@ HTML;
                     }
                 });
             }
+
+            // Upload de galeria por variação
+            document.querySelectorAll('.btnUploadVarGaleria').forEach((btn) => {
+                btn.addEventListener('click', async function() {
+                    const varId = btn.getAttribute('data-var-id');
+                    const input = document.getElementById('varGaleriaFiles_' + varId);
+                    const row = document.getElementById('varGaleriaRow_' + varId);
+                    if (!varId || !input || !row) return;
+                    if (!input.files || input.files.length === 0) return;
+                    const url = btn.getAttribute('data-url');
+                    const fd = new FormData();
+                    for (const f of input.files) fd.append('imagens[]', f);
+                    btn.disabled = true;
+                    try {
+                        const data = await postFormData(url, fd);
+                        const fotos = (data && data.fotos) ? data.fotos : [];
+                        fotos.forEach(function(item) {
+                            const col = document.createElement('div');
+                            col.className = 'col-6 col-md-2 mb-2';
+                            const fotoId = item && item.id ? item.id : 0;
+                            const url = item && item.url ? item.url : '';
+                            col.innerHTML =
+                                '<a href="' + url + '" target="_blank">' +
+                                '<img src="' + url + '" alt="Foto" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">' +
+                                '</a>' +
+                                '<div class="mt-2">' +
+                                '<input type="number" class="form-control form-control-sm" name="ordens_variacao[' + fotoId + ']" value="0" min="0">' +
+                                '</div>' +
+                                '<div class="mt-2">' +
+                                '<button type="submit" class="btn btn-sm btn-outline-danger w-100" formaction="/admin/produtos/variacoes/fotos/remover/' + fotoId + '" formmethod="POST" formnovalidate onclick="return confirm(\'Remover esta foto da variação?\')">Remover</button>' +
+                                '</div>';
+                            row.appendChild(col);
+                        });
+                        input.value = '';
+                    } catch (e) {
+                        alert(e.message || 'Erro ao enviar fotos da variação');
+                    } finally {
+                        btn.disabled = false;
+                    }
+                });
+            });
         })();
 </script>
 HTMLSCRIPT;

@@ -334,6 +334,19 @@
     border: 1px solid rgba(15, 23, 42, 0.10);
 }
 
+.variacao-thumb-wrap {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    background: rgba(15, 23, 42, 0.04);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    overflow: hidden;
+}
+
 .main-image-container {
     position: relative;
     overflow: hidden;
@@ -521,11 +534,13 @@ function inicializarDetalhesProduto() {
                 btn.attr('data-opcao-id', String(oid));
                 btn.attr('aria-disabled', 'false');
 
+                const thumbWrap = $('<span class="variacao-thumb-wrap" aria-hidden="true"></span>');
                 if (img) {
                     const thumb = $('<img class="variacao-thumb" alt="" />');
                     thumb.attr('src', img);
-                    btn.append(thumb);
+                    thumbWrap.append(thumb);
                 }
+                btn.append(thumbWrap);
                 if (display) {
                     const txt = $('<span class="variacao-label"></span>').text(display);
                     btn.append(txt);

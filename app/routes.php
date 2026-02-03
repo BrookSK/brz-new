@@ -225,6 +225,9 @@ $router->post('/admin/produtos/upload-galeria/{id}', 'AdminProdutosController', 
 $router->post('/admin/produtos/remover-capa/{id}', 'AdminProdutosController', 'removerCapa');
 $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'removerFoto');
 $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
+$router->post('/admin/produtos/variacoes/{id}/fotos/upload', 'AdminProdutosController', 'uploadFotosVariacao');
+$router->post('/admin/produtos/variacoes/fotos/remover/{id}', 'AdminProdutosController', 'removerFotoVariacao');
+$router->post('/admin/produtos/variacoes/{id}/fotos/ordem', 'AdminProdutosController', 'salvarOrdemFotosVariacao');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
 // Lojas

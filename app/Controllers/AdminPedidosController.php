@@ -637,9 +637,7 @@ class AdminPedidosController extends Controller {
                                             if ($urlOriginal !== '') {
                                                 $extraHtml .= '<div class="small text-muted">link de acesso original</div>';
                                             }
-                                            if ($variacaoLabel !== '') {
-                                                $extraHtml .= '<div style="font-weight: 700; font-size: 1.05rem;">Variação: ' . htmlspecialchars($variacaoLabel) . '</div>';
-                                            }
+                                            $variacaoLinha = '';
                                             if (is_array($variacaoAttrs) && !empty($variacaoAttrs)) {
                                                 $pairs = [];
                                                 foreach ($variacaoAttrs as $k => $v) {
@@ -647,8 +645,14 @@ class AdminPedidosController extends Controller {
                                                     $pairs[] = (string) $k . ': ' . (string) $v;
                                                 }
                                                 if (!empty($pairs)) {
-                                                    $extraHtml .= '<div style="font-weight: 700; font-size: 1.05rem;">' . htmlspecialchars(implode(' | ', $pairs)) . '</div>';
+                                                    $variacaoLinha = implode(' | ', $pairs);
                                                 }
+                                            }
+                                            if ($variacaoLinha === '' && $variacaoLabel !== '') {
+                                                $variacaoLinha = $variacaoLabel;
+                                            }
+                                            if ($variacaoLinha !== '') {
+                                                $extraHtml .= '<div class="small text-muted" style="margin-top: 6px;">' . htmlspecialchars($variacaoLinha) . '</div>';
                                             }
 
                                             echo '</td>
