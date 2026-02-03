@@ -817,7 +817,7 @@ class AdminPedidosController extends Controller {
                         </div>
                     </div>';
                     
-                    <div class="col-md-6">
+                    echo '<div class="col-md-6">
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Informações do Pedido</h5>
