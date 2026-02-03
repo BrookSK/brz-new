@@ -923,16 +923,13 @@ class PedidoEcommerce {
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
-<<<<<<< HEAD
+                if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
+                    $item['ncm'] = '';
+                }
                 if (!isset($item['url_original']) || $item['url_original'] === null) {
                     $item['url_original'] = '';
                 }
                 $item['url_original'] = trim((string) $item['url_original']);
-=======
-                if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
-                    $item['ncm'] = '';
-                }
->>>>>>> 25e4dfe28914548118d204286e6c5d495d83b7a4
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
