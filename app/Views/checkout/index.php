@@ -1076,12 +1076,7 @@ function toggleButton() {
 
 <script>
 // Usar taxas de conversão globais se existirem, senão definir locais
-if (typeof exchangeRates === 'undefined') {
-    window.exchangeRates = {
-        'BRL': 5.50,
-        'USD': 1.00
-    };
-}
+window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.50, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
 
 // Função para atualizar valores com base na moeda
 function updatePrices(currency) {

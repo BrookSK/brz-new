@@ -1050,6 +1050,15 @@ class CheckoutController extends Controller {
             'estado' => (string) ($enderecoPrincipal['estado'] ?? ($usuario['estado'] ?? '')),
         ];
 
+        $rateBRL = 5.5;
+        try {
+            $r = (float) $this->carrinhoModel->getTaxaConversao('BRL');
+            if ($r > 1.01) {
+                $rateBRL = $r;
+            }
+        } catch (\Exception $e) {
+        }
+
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
             'items' => $items,
@@ -1067,6 +1076,10 @@ class CheckoutController extends Controller {
             'impostos' => $impostos,
             'total' => $total,
             'frete_gratis' => ($frete == 0),
+            'exchange_rates' => [
+                'BRL' => $rateBRL,
+                'USD' => 1.0,
+            ],
             'stripe_publishable_key' => $this->paymentService->getStripePublishableKey(),
             'stripe_enabled' => $this->paymentService->isStripeEnabled(),
         ]);
