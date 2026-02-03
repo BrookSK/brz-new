@@ -264,7 +264,7 @@ class ProdutoController extends Controller {
 
     private function tableExists(\PDO $pdo, string $table): bool {
         try {
-            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
             $st->execute([$table]);
             return (bool) $st->fetchColumn();
         } catch (\Exception $e) {
