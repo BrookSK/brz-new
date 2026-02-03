@@ -400,55 +400,6 @@ class CheckoutController extends Controller {
         $moeda = (string) ($pedidoRow['moeda'] ?? 'BRL');
         $descricao = 'Pedido #' . (string) ($pedidoRow['numero_pedido'] ?? $pedidoId);
 
-        // Alguns pedidos podem estar marcados como BRL, mas terem valores persistidos em USD.
-        // Para AppMax (BRL), devemos converter antes de criar o pedido/cobrança.
-        $taxaConversao = 1.0;
-        $deveConverterUSDParaBRL = false;
-        try {
-            $taxaFromRow = 0.0;
-            foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate'] as $c) {
-                if (is_array($pedidoRow) && array_key_exists($c, $pedidoRow)) {
-                    $taxaFromRow = (float) ($pedidoRow[$c] ?? 0);
-                    break;
-                }
-            }
-            if ($taxaFromRow > 1.01) {
-                $taxaConversao = $taxaFromRow;
-            }
-
-            if ($taxaConversao <= 1.01) {
-                $dbTx = \Config\Database::getConnection();
-                $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                $stTx->execute();
-                $tx = (float) ($stTx->fetchColumn() ?: 0);
-                if ($tx > 1.01) {
-                    $taxaConversao = $tx;
-                }
-            }
-
-            $moedaPedido = strtoupper(trim((string) $moeda));
-            if ($moedaPedido === 'BRL' && $taxaConversao > 1.01) {
-                $moedaOriginal = '';
-                foreach (['moeda_original', 'currency_original', 'original_currency'] as $c) {
-                    if (is_array($pedidoRow) && array_key_exists($c, $pedidoRow)) {
-                        $moedaOriginal = strtoupper(trim((string) ($pedidoRow[$c] ?? '')));
-                        break;
-                    }
-                }
-                if ($moedaOriginal === 'USD') {
-                    $deveConverterUSDParaBRL = true;
-                } elseif ($valor > 0 && $valor <= 2000) {
-                    // Heurística: valores "baixos" com taxa>1 normalmente são USD persistido com moeda BRL
-                    $deveConverterUSDParaBRL = true;
-                }
-            }
-        } catch (\Exception $e) {
-        }
-
-        if (strtoupper(trim((string) $moeda)) === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
-            $valor = $valor * $taxaConversao;
-        }
-
         $payload = [
             'billingType' => $billingType,
             'externalReference' => (string) $pedidoId,
@@ -492,11 +443,7 @@ class CheckoutController extends Controller {
                         $stmtF = $db->prepare('SELECT ' . $freteCol . ' AS frete FROM pedidos WHERE id = ? LIMIT 1');
                         $stmtF->execute([$pedidoId]);
                         $rowF = $stmtF->fetch(\PDO::FETCH_ASSOC) ?: [];
-                        $freteValue = (float) ($rowF['frete'] ?? 0);
-                        if ($taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
-                            $freteValue = $freteValue * $taxaConversao;
-                        }
-                        $shippingValueCents = (int) round($freteValue * 100);
+                        $shippingValueCents = (int) round(((float) ($rowF['frete'] ?? 0)) * 100);
                     }
                 } catch (\Exception $e) {
                 }
@@ -529,9 +476,6 @@ class CheckoutController extends Controller {
                             $qtd = (int) ($it['quantidade'] ?? 1);
                             if ($qtd <= 0) $qtd = 1;
                             $preco = (float) ($it['preco_unitario'] ?? 0);
-                            if ($taxaConversao > 1.01 && $deveConverterUSDParaBRL) {
-                                $preco = $preco * $taxaConversao;
-                            }
                             $unitValueCents = (int) round($preco * 100);
                             if ($unitValueCents <= 0) {
                                 continue;
@@ -1184,7 +1128,7 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido, payment_gateway, payment_id, taxa_conversao, moeda_original FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
                 } catch (\Exception $e) {
@@ -1192,11 +1136,7 @@ class CheckoutController extends Controller {
                 }
 
                 $moedaPedido = (string) ($pedidoRowPay['moeda'] ?? 'BRL');
-                $hasPaymentId = trim((string) ($pedidoRowPay['payment_id'] ?? '')) !== '';
-                $hasGateway = trim((string) ($pedidoRowPay['payment_gateway'] ?? '')) !== '';
-                $deveProcessarPagamento = (!$reused) || (!$hasPaymentId && !$hasGateway);
-
-                if ($deveProcessarPagamento && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     try {
                         $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                         $gateway = 'appmax';

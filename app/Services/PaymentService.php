@@ -52,7 +52,6 @@ class PaymentService {
                 $baseUrl = 'https://admin.appmax.com.br/api/v3';
             }
         }
-
         $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
@@ -62,14 +61,12 @@ class PaymentService {
         ];
 
         $payloadArr = is_array($body) ? $body : [];
-        // Documentação oficial: access-token vai no corpo JSON
+        // API v3 usa access-token no corpo da requisição.
         if (!array_key_exists('access-token', $payloadArr)) {
             $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
         $payload = json_encode($payloadArr);
 
-        $respBody = '';
-        $httpCode = 0;
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -86,30 +83,26 @@ class PaymentService {
             if (!empty($err)) {
                 throw new \Exception('Erro de conexão com AppMax: ' . $err);
             }
-        } else {
-            $context = stream_context_create([
-                'http' => [
-                    'method' => strtoupper($method),
-                    'header' => implode("\r\n", $headers),
-                    'content' => $payload,
-                    'ignore_errors' => true,
-                ]
-            ]);
-            $respBody = @file_get_contents($url, false, $context);
-            $httpCode = 200;
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
         }
 
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload,
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
         $decoded = json_decode((string) $respBody, true);
-        if ($httpCode < 200 || $httpCode >= 300) {
-            $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
-        }
-
-        if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
-            $msg = json_encode($decoded);
-            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
-        }
-
         return is_array($decoded) ? $decoded : [];
     }
 
@@ -194,10 +187,9 @@ class PaymentService {
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
+        $total = round(((float) $productsValueCents) / 100, 2);
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
-        // Total final (AppMax): total = products + shipping - discount
-        $total = round(((float) ($productsValueCents + $shippingValueCents - $discountValueCents)) / 100, 2);
 
         $payloadProducts = [];
         foreach ($products as $p) {
