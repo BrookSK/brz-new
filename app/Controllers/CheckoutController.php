@@ -1190,6 +1190,14 @@ class CheckoutController extends Controller {
                 $variacaoLabel = $item['variacao']['label'] ?? null;
                 $variacaoAtributos = $item['variacao']['atributos'] ?? null;
             }
+
+            $produtoVariacaoId = null;
+            if (isset($item['produto_variacao_id']) && $item['produto_variacao_id'] !== '' && $item['produto_variacao_id'] !== null) {
+                $pv = (int) $item['produto_variacao_id'];
+                if ($pv > 0) {
+                    $produtoVariacaoId = $pv;
+                }
+            }
             
             // Verificar diferentes campos de preço
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
@@ -1233,11 +1241,31 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
+            if (is_array($colsItens) && in_array('produto_variacao_id', $colsItens, true)) {
+                $cols[] = 'produto_variacao_id';
+                $vals[] = $produtoVariacaoId;
+                $placeholders[] = '?';
+            }
+
             $sql = 'INSERT INTO pedido_itens (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
             $stmt = $db->prepare($sql);
             $stmt->execute($vals);
             
             $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
+
+            if ($produtoVariacaoId !== null) {
+                try {
+                    $stmtStock = $db->prepare('UPDATE produto_variacoes SET stock = stock - ? WHERE id = ? AND stock >= ?');
+                    $stmtStock->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
+                } catch (\Exception $e) {
+                }
+            } else {
+                try {
+                    $stmtStock = $db->prepare('UPDATE produtos SET stock = stock - ? WHERE id = ? AND stock >= ?');
+                    $stmtStock->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
+                } catch (\Exception $e) {
+                }
+            }
         }
     }
     
