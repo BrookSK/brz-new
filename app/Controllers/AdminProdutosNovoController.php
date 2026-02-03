@@ -591,6 +591,14 @@ HTML;
                 exit;
             }
 
+            $skuInput = trim((string) $request->getParam('sku', ''));
+            if (in_array('sku', $cols, true) && $skuInput === '') {
+                $_SESSION['message'] = 'Informe o SKU do produto.';
+                $_SESSION['message_type'] = 'danger';
+                header('Location: /admin/produtos/novo');
+                exit;
+            }
+
             $pdo->beginTransaction();
 
             $price = $this->parseMoneyToDb($request->getParam('price'));
@@ -602,7 +610,8 @@ HTML;
 
             $data = [];
             if (in_array('name', $cols, true)) $data['name'] = $name;
-            if (in_array('sku', $cols, true)) $data['sku'] = trim((string) $request->getParam('sku', ''));
+            if (in_array('nome', $cols, true)) $data['nome'] = $name;
+            if (in_array('sku', $cols, true)) $data['sku'] = $skuInput;
             $lojaParam = $request->getParam('loja');
             $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
             if (in_array('loja_id', $cols, true) && $lojaId > 0) {
@@ -614,21 +623,37 @@ HTML;
             if (in_array('ncm', $cols, true)) $data['ncm'] = (string) $request->getParam('ncm', '');
             if (in_array('description', $cols, true)) $data['description'] = (string) $request->getParam('description', '');
             if (in_array('short_description', $cols, true)) $data['short_description'] = (string) $request->getParam('short_description', '');
+            if (in_array('descricao', $cols, true)) $data['descricao'] = (string) $request->getParam('description', '');
+            if (in_array('descricao_curta', $cols, true)) $data['descricao_curta'] = (string) $request->getParam('short_description', '');
 
             $cat = $request->getParam('category_id');
             if (in_array('category_id', $cols, true)) $data['category_id'] = ($cat !== '' ? $cat : null);
+            if (in_array('categoria_id', $cols, true)) $data['categoria_id'] = ($cat !== '' ? $cat : null);
 
             if (in_array('price', $cols, true)) $data['price'] = $price;
+            if (in_array('preco', $cols, true)) $data['preco'] = $price;
+            if (in_array('valor', $cols, true)) $data['valor'] = $price;
             if (in_array('cost_price', $cols, true) && $costPrice !== '') $data['cost_price'] = $costPrice;
             if (in_array('sale_price', $cols, true) && $salePrice !== '') $data['sale_price'] = $salePrice;
             if (in_array('stock', $cols, true)) $data['stock'] = $stock;
             if (in_array('min_stock', $cols, true)) $data['min_stock'] = $minStock;
             if (in_array('weight', $cols, true)) $data['weight'] = $weight;
+            if (in_array('estoque', $cols, true)) $data['estoque'] = $stock;
+            if (in_array('estoque_minimo', $cols, true)) $data['estoque_minimo'] = $minStock;
+            if (in_array('peso', $cols, true)) $data['peso'] = $weight;
+            if (in_array('moeda', $cols, true)) {
+                $data['moeda'] = 'USD';
+            }
             if (in_array('status', $cols, true)) $data['status'] = (string) $request->getParam('status', 'published');
             if (in_array('active', $cols, true)) $data['active'] = (int) $request->getParam('active', 1);
             if (in_array('featured', $cols, true)) $data['featured'] = (int) $request->getParam('featured', 0);
+            if (in_array('ativo', $cols, true)) $data['ativo'] = (int) $request->getParam('active', 1);
             if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
             if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
+
+            if (empty($data)) {
+                throw new \Exception('Não foi possível salvar: nenhuma coluna compatível foi encontrada na tabela produtos.');
+            }
 
             $columnsSql = implode(', ', array_keys($data));
             $placeholders = ':' . implode(', :', array_keys($data));
@@ -785,7 +810,7 @@ HTML;
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $_SESSION['message'] = 'Erro ao criar produto variável.';
+            $_SESSION['message'] = 'Erro ao criar produto variável: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
             header('Location: /admin/produtos/novo');
             exit;
