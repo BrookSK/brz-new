@@ -16,6 +16,9 @@ class PaymentService {
     private $appmaxClientId;
     private $appmaxClientSecret;
     private $appmaxAppId;
+    private $appmaxV3AccessToken;
+    private $appmaxAmbiente;
+    private $appmaxBaseUrl;
     private $appmaxAccessToken;
     private $appmaxAccessTokenExpiresAt;
     
@@ -34,20 +37,35 @@ class PaymentService {
             throw new \Exception('AppMax está desativado');
         }
 
-        $token = $this->getAppmaxAccessToken();
-        $url = 'https://api.appmax.com.br' . '/' . ltrim($path, '/');
+        if (empty($this->appmaxV3AccessToken)) {
+            throw new \Exception('AppMax não configurado (access-token ausente)');
+        }
+
+        $baseUrl = '';
+        if (!empty($this->appmaxBaseUrl)) {
+            $baseUrl = (string) $this->appmaxBaseUrl;
+        } else {
+            $amb = strtolower(trim((string) $this->appmaxAmbiente));
+            if ($amb === 'homolog' || $amb === 'homologacao' || $amb === 'sandbox' || $amb === 'test') {
+                $baseUrl = 'https://homolog.sandboxappmax.com.br/api/v3';
+            } else {
+                $baseUrl = 'https://admin.appmax.com.br/api/v3';
+            }
+        }
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $token,
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
 
-        $payload = null;
-        if ($body !== null) {
-            $payload = json_encode($body);
+        $payloadArr = is_array($body) ? $body : [];
+        // API v3 usa access-token no corpo da requisição.
+        if (!array_key_exists('access-token', $payloadArr)) {
+            $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
+        $payload = json_encode($payloadArr);
 
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
@@ -79,7 +97,7 @@ class PaymentService {
             'http' => [
                 'method' => strtoupper($method),
                 'header' => implode("\r\n", $headers),
-                'content' => $payload ?? '',
+                'content' => $payload,
                 'ignore_errors' => true,
             ]
         ]);
@@ -107,32 +125,36 @@ class PaymentService {
 
         $ip = (string) ($dados['customer_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
 
-        $address = [
-            'postcode' => preg_replace('/\D+/', '', (string) ($dados['customer_zipcode'] ?? '')),
-            'street' => (string) ($dados['customer_address'] ?? ''),
-            'number' => (string) ($dados['customer_address_number'] ?? ''),
-            'complement' => (string) ($dados['customer_address_complement'] ?? ''),
-            'district' => (string) ($dados['customer_province'] ?? ''),
-            'city' => (string) ($dados['customer_city'] ?? ''),
-            'state' => (string) ($dados['customer_state'] ?? ''),
-        ];
-
         $payload = [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
+            'firstname' => $firstName,
+            'lastname' => $lastName,
             'email' => $email,
-            'phone' => $phone,
-            'document_number' => $doc,
-            'address' => $address,
+            'telephone' => $phone,
+            'postcode' => (string) ($dados['customer_zipcode'] ?? ''),
+            'address_street' => (string) ($dados['customer_address'] ?? ''),
+            'address_street_number' => (string) ($dados['customer_address_number'] ?? ''),
+            'address_street_complement' => (string) ($dados['customer_address_complement'] ?? ''),
+            'address_street_district' => (string) ($dados['customer_province'] ?? ''),
+            'address_city' => (string) ($dados['customer_city'] ?? ''),
+            'address_state' => (string) ($dados['customer_state'] ?? ''),
             'ip' => $ip,
         ];
 
         if (!empty($products)) {
-            $payload['products'] = $products;
+            // A doc aceita products com product_sku/product_qty (produto de interesse)
+            $payload['products'] = array_map(function ($p) {
+                if (!is_array($p)) return $p;
+                $sku = (string) ($p['sku'] ?? ($p['product_sku'] ?? ''));
+                $qty = (int) ($p['quantity'] ?? ($p['qty'] ?? ($p['product_qty'] ?? 1)));
+                return [
+                    'product_sku' => $sku,
+                    'product_qty' => $qty,
+                ];
+            }, $products);
         }
 
-        $created = $this->appmaxRequest('POST', '/v1/customers', $payload);
-        $customerId = (int) ($created['data']['customer']['id'] ?? 0);
+        $created = $this->appmaxRequest('POST', 'customer', $payload);
+        $customerId = (int) ($created['data']['customer_id'] ?? ($created['customer_id'] ?? 0));
         if ($customerId <= 0) {
             throw new \Exception('AppMax: customer_id não retornado');
         }
@@ -140,15 +162,43 @@ class PaymentService {
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
+        $total = round(((float) $productsValueCents) / 100, 2);
+        $shipping = round(((float) $shippingValueCents) / 100, 2);
+        $discount = round(((float) $discountValueCents) / 100, 2);
+
+        $payloadProducts = [];
+        foreach ($products as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $sku = (string) ($p['sku'] ?? '');
+            $name = (string) ($p['name'] ?? ($p['titulo'] ?? ''));
+            $qty = (int) ($p['quantity'] ?? ($p['qty'] ?? 1));
+            $unitCents = (int) ($p['unit_value'] ?? ($p['unit_value_cents'] ?? 0));
+            $price = $unitCents > 0 ? round(((float) $unitCents) / 100, 2) : null;
+
+            $row = [
+                'sku' => $sku,
+                'name' => $name !== '' ? $name : $sku,
+                'qty' => $qty > 0 ? $qty : 1,
+            ];
+            if ($price !== null) {
+                $row['price'] = $price;
+            }
+            $payloadProducts[] = $row;
+        }
+
         $payload = [
+            'total' => $total,
+            'products' => $payloadProducts,
+            'shipping' => $shipping,
             'customer_id' => $customerId,
-            'products_value' => $productsValueCents,
-            'discount_value' => $discountValueCents,
-            'shipping_value' => $shippingValueCents,
-            'products' => $products,
+            'discount' => $discount,
+            'freight_type' => (string) ($products[0]['freight_type'] ?? ($products[0]['frete_tipo'] ?? '')),
         ];
-        $created = $this->appmaxRequest('POST', '/v1/orders', $payload);
-        $orderId = (int) ($created['data']['order']['id'] ?? 0);
+
+        $created = $this->appmaxRequest('POST', 'order', $payload);
+        $orderId = (int) ($created['data']['order_id'] ?? ($created['order_id'] ?? 0));
         if ($orderId <= 0) {
             throw new \Exception('AppMax: order_id não retornado');
         }
@@ -201,9 +251,14 @@ class PaymentService {
         $doc = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
 
         if ($forma === 'PIX') {
-            $pixResp = $this->appmaxRequest('POST', '/v1/payments/pix', [
-                'order_id' => $orderId,
-                'payment_data' => [
+            $pixResp = $this->appmaxRequest('POST', 'payment/pix', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
                     'pix' => [
                         'document_number' => $doc,
                     ],
@@ -227,10 +282,15 @@ class PaymentService {
         }
 
         if ($forma === 'BOLETO') {
-            $bolResp = $this->appmaxRequest('POST', '/v1/payments/boleto', [
-                'order_id' => $orderId,
-                'payment_data' => [
-                    'boleto' => [
+            $bolResp = $this->appmaxRequest('POST', 'payment/boleto', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
+                    'Boleto' => [
                         'document_number' => $doc,
                     ],
                 ],
@@ -260,10 +320,10 @@ class PaymentService {
             $cc = [
                 'number' => preg_replace('/\D+/', '', (string) ($dados['card_number'] ?? '')),
                 'cvv' => (string) ($dados['card_cvv'] ?? ''),
-                'expiration_month' => (string) ($dados['card_expiry_month'] ?? ''),
-                'expiration_year' => (string) ($dados['card_expiry_year'] ?? ''),
-                'holder_document_number' => $doc,
-                'holder_name' => (string) ($dados['card_holder_name'] ?? ($dados['customer_name'] ?? '')),
+                'month' => (int) ($dados['card_expiry_month'] ?? 0),
+                'year' => (int) ($dados['card_expiry_year'] ?? 0),
+                'document_number' => $doc,
+                'name' => (string) ($dados['card_holder_name'] ?? ($dados['customer_name'] ?? '')),
                 'installments' => (int) ($dados['installments'] ?? 1),
                 'soft_descriptor' => (string) ($dados['soft_descriptor'] ?? ($this->appmaxAppId !== '' ? $this->appmaxAppId : 'BRZ')),
             ];
@@ -274,11 +334,15 @@ class PaymentService {
                 $cc['upsell_hash'] = (string) $dados['upsell_hash'];
             }
 
-            $ccResp = $this->appmaxRequest('POST', '/v1/payments/credit-card', [
-                'order_id' => $orderId,
-                'customer_id' => $customerId,
-                'payment_data' => [
-                    'credit_card' => $cc,
+            $ccResp = $this->appmaxRequest('POST', 'payment/credit-card', [
+                'cart' => [
+                    'order_id' => $orderId,
+                ],
+                'customer' => [
+                    'customer_id' => $customerId,
+                ],
+                'payment' => [
+                    'CreditCard' => $cc,
                 ],
             ]);
             $result['appmax']['credit_card_response'] = $ccResp;
@@ -301,6 +365,10 @@ class PaymentService {
         $this->appmaxClientId = (string) $this->getConfig('pagamentos', 'appmax_client_id', '');
         $this->appmaxClientSecret = (string) $this->getConfig('pagamentos', 'appmax_client_secret', '');
         $this->appmaxAppId = (string) $this->getConfig('pagamentos', 'appmax_app_id', '');
+        // API v3: access-token (fornecido pela AppMax). Mantém fallback para instalações antigas.
+        $this->appmaxV3AccessToken = (string) $this->getConfig('pagamentos', 'appmax_access_token', (string) $this->appmaxAppId);
+        $this->appmaxAmbiente = (string) $this->getConfig('pagamentos', 'appmax_ambiente', 'production');
+        $this->appmaxBaseUrl = (string) $this->getConfig('pagamentos', 'appmax_base_url', 'https://admin.appmax.com.br/api/v3');
         $this->appmaxAccessToken = null;
         $this->appmaxAccessTokenExpiresAt = null;
     }
@@ -766,17 +834,17 @@ class PaymentService {
         }
 
         $internal = 'pending';
-        if (str_contains($eventNorm, 'PAGO') || str_contains($eventNorm, 'APROVADO') || str_contains($eventNorm, 'APPROVED') || str_contains($eventNorm, 'PAID')) {
+        // Eventos oficiais (docs): OrderApproved, OrderPaid, OrderRefund, PaymentNotAuthorized, etc.
+        if (in_array($eventNorm, ['ORDERAPPROVED', 'ORDERPAID'], true) || str_contains($eventNorm, 'APPROVED') || str_contains($eventNorm, 'PAID')) {
             $internal = 'approved';
-        } elseif (str_contains($eventNorm, 'ESTORN') || str_contains($eventNorm, 'REFUND')) {
+        } elseif (in_array($eventNorm, ['ORDERREFUND'], true) || str_contains($eventNorm, 'REFUND')) {
             $internal = 'refunded';
-        } elseif (str_contains($eventNorm, 'NAO AUTORIZ') || str_contains($eventNorm, 'NÃO AUTORIZ') || str_contains($eventNorm, 'NOTAUTHORIZED') || str_contains($eventNorm, 'NOT_AUTHORIZED')) {
-            $internal = 'rejected';
-        } elseif (str_contains($eventNorm, 'EXPIR')) {
+        } elseif (in_array($eventNorm, ['PAYMENTNOTAUTHORIZED', 'PAYMENTNOTAUTHORIZEDWITHDELAY(60M)'], true) || str_contains($eventNorm, 'NOTAUTHORIZED') || str_contains($eventNorm, 'NOT_AUTHORIZED')) {
             $internal = 'rejected';
         }
 
-        if ($paymentId !== '') {
+        // Para AppMax, normalmente atualizamos pelo order_id.
+        if ($paymentId !== '' && ctype_digit($paymentId)) {
             $this->atualizarPagamentoPedidoPorGateway($paymentId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
             return ['status' => 'processed', 'match' => 'payment_id'];
         }
@@ -787,6 +855,19 @@ class PaymentService {
                 $this->atualizarPagamentoPedidoPorPedidoId($pid, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
                 return ['status' => 'processed', 'match' => 'pedido_id'];
             }
+        }
+
+        // Fallback: tenta extrair order_id/id do payload
+        $orderId = '';
+        foreach (['order_id', 'orderId', 'id'] as $k) {
+            if (isset($data[$k]) && (is_string($data[$k]) || is_numeric($data[$k]))) {
+                $orderId = (string) $data[$k];
+                break;
+            }
+        }
+        if ($orderId !== '' && ctype_digit($orderId)) {
+            $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
+            return ['status' => 'processed', 'match' => 'order_id'];
         }
 
         return ['status' => 'ignored'];
