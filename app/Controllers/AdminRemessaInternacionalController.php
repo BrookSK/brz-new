@@ -1306,6 +1306,10 @@ function gerarEtiqueta() {
     private function buildWExpressShippingPayload(WExpressService $svc, array $pedido, int $janelaId, string $shipmentPurposeOverride = '', string $invoiceNumberOverride = ''): array {
         $sender = $svc->getSender();
         if (!is_array($sender) || empty($sender)) {
+            $err = method_exists($svc, 'getSenderJsonError') ? $svc->getSenderJsonError() : null;
+            if (!empty($err)) {
+                throw new \Exception('W-Express: Sender (JSON) inválido em /admin/configuracoes > Entrega: ' . $err);
+            }
             throw new \Exception('W-Express: configure o Sender (JSON) em /admin/configuracoes > Entrega');
         }
 

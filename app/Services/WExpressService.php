@@ -6,6 +6,7 @@ class WExpressService {
     private string $ambiente;
     private string $serviceCode;
     private ?array $sender;
+    private ?string $senderJsonError;
     private int $lastHttpCode = 0;
 
     public function __construct() {
@@ -14,7 +15,12 @@ class WExpressService {
         $this->serviceCode = (string) $this->getConfig('entrega', 'wexpress_service_code', 'wexpress_correios_std');
 
         $senderJson = (string) $this->getConfig('entrega', 'wexpress_sender_json', '');
+        $senderJson = trim($senderJson);
+        $this->senderJsonError = null;
         $decoded = $senderJson !== '' ? json_decode($senderJson, true) : null;
+        if ($senderJson !== '' && !is_array($decoded)) {
+            $this->senderJsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'JSON inválido';
+        }
         $this->sender = is_array($decoded) ? $decoded : null;
     }
 
@@ -24,6 +30,10 @@ class WExpressService {
 
     public function getSender(): ?array {
         return $this->sender;
+    }
+
+    public function getSenderJsonError(): ?string {
+        return $this->senderJsonError;
     }
 
     public function getLastHttpCode(): int {
