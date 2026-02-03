@@ -20,6 +20,252 @@ class PedidoEcommerce {
         }
     }
 
+    private function getTableColumns(string $table): array {
+        try {
+            $stmtCols = $this->connection->query('DESCRIBE ' . $table);
+            return $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $cols, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    public function getPedidos(int $usuarioId, int $limit = 10, int $offset = 0): array {
+        $usuarioId = (int) $usuarioId;
+        if ($usuarioId <= 0) return [];
+        if ($limit < 1) $limit = 10;
+        if ($offset < 0) $offset = 0;
+
+        try {
+            $cols = $this->getTableColumns('pedidos');
+
+            $colUsuarioId = $this->pickColumn($cols, ['usuario_id', 'user_id']);
+            if (!$colUsuarioId) {
+                return [];
+            }
+
+            $select = ['p.id'];
+            foreach (['codigo_pedido', 'numero_pedido', 'created_at', 'updated_at', 'status', 'payment_status', 'status_pagamento', 'moeda', 'currency', 'valor_total', 'total', 'valor', 'amount'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $select[] = 'p.' . $c;
+                }
+            }
+
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid ORDER BY p.created_at DESC LIMIT :lim OFFSET :off';
+            $stmt = $this->connection->prepare($sql);
+            $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
+            $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
+            $stmt->bindValue(':off', $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$r) {
+                if (empty($r['codigo_pedido']) && !empty($r['numero_pedido'])) {
+                    $r['codigo_pedido'] = $r['numero_pedido'];
+                }
+                if (empty($r['codigo_pedido'])) {
+                    $r['codigo_pedido'] = 'PED-' . str_pad((string) ((int) ($r['id'] ?? 0)), 6, '0', STR_PAD_LEFT);
+                }
+            }
+            unset($r);
+
+            return $rows;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function getTotalPedidosUsuario(int $usuarioId): int {
+        $usuarioId = (int) $usuarioId;
+        if ($usuarioId <= 0) return 0;
+
+        try {
+            $cols = $this->getTableColumns('pedidos');
+            $colUsuarioId = $this->pickColumn($cols, ['usuario_id', 'user_id']);
+            if (!$colUsuarioId) {
+                return 0;
+            }
+
+            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM pedidos WHERE ' . $colUsuarioId . ' = ?');
+            $stmt->execute([$usuarioId]);
+            return (int) ($stmt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    public function getResumoComissoesPedidosManuaisPorAdminCriador(int $adminId): array {
+        $adminId = (int) $adminId;
+        if ($adminId <= 0) {
+            return [
+                'pedidos' => [],
+                'total_faturado' => 0.0,
+                'total_custo_produtos' => 0.0,
+                'total_liquido' => 0.0,
+                'percentual_comissao' => 0.0,
+                'valor_comissao' => 0.0,
+                'faixas' => [],
+                'por_moeda' => [
+                    'USD' => ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0, 'pedidos' => []],
+                    'BRL' => ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0, 'pedidos' => []],
+                ],
+            ];
+        }
+
+        $resumoBase = [
+            'pedidos' => [],
+            'total_faturado' => 0.0,
+            'total_custo_produtos' => 0.0,
+            'total_liquido' => 0.0,
+            'percentual_comissao' => 0.0,
+            'valor_comissao' => 0.0,
+            'faixas' => [],
+            'por_moeda' => [
+                'USD' => ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0, 'pedidos' => []],
+                'BRL' => ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0, 'pedidos' => []],
+            ],
+        ];
+
+        try {
+            $cols = $this->getTableColumns('pedidos');
+
+            $colOrigem = $this->pickColumn($cols, ['origem_pedido', 'origem', 'tipo']);
+            $colAdminCriador = $this->pickColumn($cols, ['admin_criador_id', 'admin_creator_id', 'admin_id', 'created_by_admin_id', 'criador_admin_id']);
+            $colMoeda = $this->pickColumn($cols, ['moeda', 'currency']);
+            $colCodigo = $this->pickColumn($cols, ['codigo_pedido', 'numero_pedido']);
+            $colCreatedAt = $this->pickColumn($cols, ['created_at', 'data_criacao', 'data_pedido']);
+            $colStatus = $this->pickColumn($cols, ['status', 'status_pedido', 'pedido_status']);
+            $colPaymentStatus = $this->pickColumn($cols, ['payment_status', 'status_pagamento']);
+            $colValorTotal = $this->pickColumn($cols, ['valor_total', 'total', 'valor', 'amount']);
+
+            if (!$colAdminCriador) {
+                return $resumoBase;
+            }
+
+            $where = [];
+            $params = [];
+            $where[] = 'p.' . $colAdminCriador . ' = :admin_id';
+            $params[':admin_id'] = $adminId;
+
+            if ($colOrigem) {
+                $where[] = 'LOWER(COALESCE(p.' . $colOrigem . ", '')) = 'manual'";
+            }
+
+            // Considerar apenas pedidos pagos
+            $paidParts = [];
+            if ($colStatus) {
+                $paidParts[] = 'LOWER(COALESCE(p.' . $colStatus . ", '')) IN ('pago','paid','approved','aprovado')";
+            }
+            if ($colPaymentStatus) {
+                $paidParts[] = 'LOWER(COALESCE(p.' . $colPaymentStatus . ", '')) IN ('approved','paid','pago','aprovado','confirmed','received','succeeded','success')";
+            }
+            if (!empty($paidParts)) {
+                $where[] = '(' . implode(' OR ', $paidParts) . ')';
+            }
+
+            $select = ['p.id'];
+            if ($colCodigo) $select[] = 'p.' . $colCodigo . ' AS codigo';
+            if ($colCreatedAt) $select[] = 'p.' . $colCreatedAt . ' AS created_at';
+            if ($colMoeda) $select[] = 'p.' . $colMoeda . ' AS moeda';
+            if ($colValorTotal) $select[] = 'p.' . $colValorTotal . ' AS valor_total';
+
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE ' . implode(' AND ', $where) . ' ORDER BY ' . ($colCreatedAt ? ('p.' . $colCreatedAt) : 'p.id') . ' DESC';
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $pedidosOut = [];
+            foreach ($rows as $r) {
+                $pid = (int) ($r['id'] ?? 0);
+                if ($pid <= 0) continue;
+                $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                if ($moeda === '') $moeda = 'BRL';
+                $fat = (float) ($r['valor_total'] ?? 0);
+
+                // custo (tolerante): tenta somar custo_unitario * qtd nos itens
+                $custo = 0.0;
+                try {
+                    $temPedidoItens = $this->tableExists('pedido_itens');
+                    $temPedidoItems = $this->tableExists('pedido_items');
+                    $itensTable = $temPedidoItens ? 'pedido_itens' : ($temPedidoItems ? 'pedido_items' : null);
+                    if ($itensTable) {
+                        $colsItens = $this->getTableColumns($itensTable);
+                        $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+                        $colProdutoId = $this->pickColumn($colsItens, ['produto_id']);
+                        $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+                        if ($colPedidoId && $colProdutoId && $colQtd) {
+                            // custo do produto (tolerante)
+                            $colsProd = $this->getTableColumns('produtos');
+                            $colCusto = $this->pickColumn($colsProd, ['preco_custo', 'custo', 'cost_price', 'valor_custo']);
+                            if ($colCusto) {
+                                $stC = $this->connection->prepare('SELECT SUM(COALESCE(pr.' . $colCusto . ',0) * COALESCE(pi.' . $colQtd . ',0)) AS custo_total FROM ' . $itensTable . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId . ' WHERE pi.' . $colPedidoId . ' = ?');
+                                $stC->execute([$pid]);
+                                $custo = (float) ($stC->fetchColumn() ?: 0);
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $custo = 0.0;
+                }
+
+                $liq = $fat - $custo;
+                $pedidosOut[] = [
+                    'id' => $pid,
+                    'codigo' => (string) ($r['codigo'] ?? $pid),
+                    'created_at' => $r['created_at'] ?? null,
+                    'moeda' => $moeda,
+                    'faturado' => $fat,
+                    'custo' => $custo,
+                    'liquido' => $liq,
+                ];
+
+                if (!isset($resumoBase['por_moeda'][$moeda])) {
+                    $resumoBase['por_moeda'][$moeda] = ['total_faturado' => 0.0, 'total_custo_produtos' => 0.0, 'total_liquido' => 0.0, 'percentual_comissao' => 0.0, 'valor_comissao' => 0.0, 'pedidos' => []];
+                }
+                $resumoBase['por_moeda'][$moeda]['total_faturado'] += $fat;
+                $resumoBase['por_moeda'][$moeda]['total_custo_produtos'] += $custo;
+                $resumoBase['por_moeda'][$moeda]['total_liquido'] += $liq;
+                $resumoBase['por_moeda'][$moeda]['pedidos'][] = end($pedidosOut);
+            }
+
+            $resumoBase['pedidos'] = $pedidosOut;
+            // Campos agregados "legado" (mantém compatibilidade com AdminPedidosController)
+            // Somar BRL + USD (quando existir)
+            $totFat = 0.0;
+            $totCus = 0.0;
+            $totLiq = 0.0;
+            foreach ($resumoBase['por_moeda'] as $m => $t) {
+                $totFat += (float) ($t['total_faturado'] ?? 0);
+                $totCus += (float) ($t['total_custo_produtos'] ?? 0);
+                $totLiq += (float) ($t['total_liquido'] ?? 0);
+            }
+            $resumoBase['total_faturado'] = $totFat;
+            $resumoBase['total_custo_produtos'] = $totCus;
+            $resumoBase['total_liquido'] = $totLiq;
+
+            // Comissão (se futuramente houver regra, calcular aqui). Por enquanto zero para evitar erro.
+            $resumoBase['percentual_comissao'] = 0.0;
+            $resumoBase['valor_comissao'] = 0.0;
+            foreach ($resumoBase['por_moeda'] as $m => &$t) {
+                $t['percentual_comissao'] = 0.0;
+                $t['valor_comissao'] = 0.0;
+            }
+            unset($t);
+
+            return $resumoBase;
+        } catch (\Exception $e) {
+            return $resumoBase;
+        }
+    }
+
     public function getComDetalhes($pedidoId) {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) return null;
