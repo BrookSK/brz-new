@@ -133,7 +133,14 @@ class CheckoutController extends Controller {
     }
 
     private function getTaxaServicoPorKg(): float {
-        return floatval($this->getConfigValue('entrega_taxa_servico_kg', '39'));
+        $v = $this->getConfigValue('taxa_servico_usd_por_kg', null);
+        if ($v === null || $v === '') {
+            $v = $this->getConfigValue('entrega_taxa_servico_kg', null);
+        }
+        if ($v === null || $v === '') {
+            $v = '39';
+        }
+        return floatval($v);
     }
 
     private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {

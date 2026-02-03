@@ -17,6 +17,8 @@ class Carrinho extends Model {
         }
         
         $where[] = "expira_em > NOW()";
+        $where[] = "moeda = :moeda";
+        $params[':moeda'] = $moeda;
         
         $sql = "SELECT * FROM {$this->table} WHERE " . implode(' AND ', $where) . " ORDER BY created_at DESC LIMIT 1";
         $stmt = $this->connection->prepare($sql);
