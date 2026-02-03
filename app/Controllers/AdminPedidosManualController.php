@@ -468,6 +468,21 @@ function formatForDisplay(value, moeda){
     return n.toFixed(2);
 }
 
+function getUsdBrlRateSafe(){
+    const r = Number(USD_BRL_RATE || 0);
+    return (isFinite(r) && r > 0) ? r : 1;
+}
+
+function convertValueBetweenCurrencies(value, fromMoeda, toMoeda){
+    const n = Number(value || 0);
+    if (!isFinite(n) || n === 0) return 0;
+    if (fromMoeda === toMoeda) return n;
+    const rate = getUsdBrlRateSafe();
+    if (fromMoeda === 'USD' && toMoeda === 'BRL') return n * rate;
+    if (fromMoeda === 'BRL' && toMoeda === 'USD') return n / rate;
+    return n;
+}
+
 function produtoLabel(p){
     const name = (p && p.name) ? String(p.name) : '';
     const sku = (p && p.sku) ? String(p.sku) : '';
@@ -627,7 +642,12 @@ function selectProdutoFromSearch(btn, produtoId){
     if (hidden) hidden.value = String(prod.id);
     if (search) search.value = produtoLabel(prod);
     if (imgEl) imgEl.src = produtoImagem(prod);
-    if (valor) valor.value = formatMoney(prod.price || 0);
+    if (valor) {
+        const moeda = getSelectedMoeda();
+        const unitUsd = Number(prod.price || 0);
+        const shown = (moeda === 'BRL') ? convertValueBetweenCurrencies(unitUsd, 'USD', 'BRL') : unitUsd;
+        valor.value = formatMoney(shown);
+    }
 
     const resultsEl = tr.querySelector('.prodResults');
     if (resultsEl) {
@@ -987,6 +1007,17 @@ document.addEventListener('DOMContentLoaded', function(){
     const linkInfo = document.getElementById('linkPagamentoInfo');
     const linkResult = document.getElementById('linkResult');
 
+    function convertAllItemValues(fromMoeda, toMoeda){
+        const rows = document.querySelectorAll('#itensTable tbody tr');
+        rows.forEach(r => {
+            const inp = r.querySelector('.valorInp');
+            if (!inp) return;
+            const current = parseMoneyInput(String(inp.value || '0'));
+            const converted = convertValueBetweenCurrencies(current, fromMoeda, toMoeda);
+            inp.value = formatMoney(converted);
+        });
+    }
+
     function updateManualPaymentMethodsForCurrency(){
         if (!fpSel) return;
         const prev = String(fpSel.value || '');
@@ -1001,17 +1032,25 @@ document.addEventListener('DOMContentLoaded', function(){
     if (moedaSel) {
         moedaSel.value = (EXISTING_PEDIDO && String(EXISTING_PEDIDO.moeda || '').toUpperCase() === 'BRL') ? 'BRL' : 'USD';
         moedaSel.addEventListener('change', function(){
+            const moedaBefore = (this.__prevMoeda || 'USD');
             const moedaNow = getSelectedMoeda();
+            if (moedaBefore !== moedaNow) {
+                convertAllItemValues(moedaBefore, moedaNow);
+            }
+            this.__prevMoeda = moedaNow;
             const g = document.getElementById('gatewayLabel');
-            if (g) g.textContent = (moedaNow === 'BRL') ? 'AppMax' : 'Stripe';
-
-            // Link/QR só é emitido no Admin quando for BRL (AppMax). Para USD (Stripe), o pagamento segue o fluxo padrão do checkout.
-            if (linkCard) linkCard.style.display = (moedaNow === 'BRL') ? '' : 'none';
-
+            if (g) {
+                g.textContent = (moedaNow === 'BRL') ? 'AppMax' : 'Stripe';
+            }
             updateManualPaymentMethodsForCurrency();
-            try { refreshOffline(); } catch (e) {}
+            updateLinkVisibility();
             calcTotal();
         });
+
+        moedaSel.__prevMoeda = getSelectedMoeda();
+        updateManualPaymentMethodsForCurrency();
+        updateLinkVisibility();
+        calcTotal();
     }
 
     const offlineWrap = document.getElementById('offlineInfoWrap');
@@ -1358,8 +1397,40 @@ JS;
                 $pesoTotal += ($pesoUnit * $qtd);
             }
 
-            // Frete manual: por padrão, segue grátis (mesma UI atual). Se quiser, evoluímos depois.
-            $frete = 0.0;
+            // Frete (mesma regra do carrinho/checkout): configuracoes_sistema entrega_* e ceil(peso)
+            $getConfigValue = function(string $chave, $default = null) use ($db) {
+                try {
+                    $st = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute([$chave]);
+                    $row = $st->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                } catch (\Exception $e) {
+                }
+                return $default;
+            };
+
+            $calcularFrete = function(float $subtotalUsd, float $pesoTotalKg) use ($getConfigValue): float {
+                $calcularAutomatico = (string) $getConfigValue('entrega_calcular_automatico', '1');
+                $calcularAutomatico = ($calcularAutomatico === '1' || strtolower($calcularAutomatico) === 'true');
+                if (!$calcularAutomatico) {
+                    return 0.0;
+                }
+
+                $freteGratisAcima = (float) $getConfigValue('entrega_frete_gratis_acima', '0');
+                if ($freteGratisAcima <= 0 || $subtotalUsd >= $freteGratisAcima) {
+                    return 0.0;
+                }
+
+                $fretePorKg = (float) $getConfigValue('entrega_frete_padrao', '15');
+                if ($fretePorKg <= 0) {
+                    return 0.0;
+                }
+
+                $pesoArredondado = (float) ceil((float) $pesoTotalKg);
+                return $fretePorKg * $pesoArredondado;
+            };
 
             $carrinhoModel = new Carrinho();
 
@@ -1378,15 +1449,17 @@ JS;
 
             if ($moeda === 'BRL' && $taxaConversao > 1.01) {
                 $subtotalUsd = $subtotal / $taxaConversao;
-                $freteUsd = $frete / $taxaConversao;
+                $freteUsd = (float) $calcularFrete((float) $subtotalUsd, (float) $pesoTotal);
                 $taxaServicoUsd = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
                 $impostosUsd = (float) $carrinhoModel->calcularImpostos((float) $subtotalUsd, (float) $freteUsd);
 
                 $taxaServico = $taxaServicoUsd * $taxaConversao;
                 $impostos = $impostosUsd * $taxaConversao;
+                $frete = $freteUsd * $taxaConversao;
                 $total = $subtotal + $frete + $taxaServico + $impostos;
             } else {
                 $taxaServico = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+                $frete = (float) $calcularFrete((float) $subtotal, (float) $pesoTotal);
                 $impostos = (float) $carrinhoModel->calcularImpostos((float) $subtotal, (float) $frete);
                 $total = $subtotal + $frete + $taxaServico + $impostos;
             }
