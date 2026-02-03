@@ -34,6 +34,71 @@ class AdminRemessaInternacionalController extends Controller {
         }
     }
 
+    private function isPedidoPago(array $pedido): bool {
+        $pagoEm = $pedido['pago_em'] ?? null;
+        if ($pagoEm !== null && (string) $pagoEm !== '') {
+            return true;
+        }
+
+        $status = strtolower(trim((string) ($pedido['status'] ?? '')));
+        if (in_array($status, ['pago', 'paid', 'approved', 'aprovado', 'confirmado', 'confirmed'], true)) {
+            return true;
+        }
+
+        $stPag = $pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? ($pedido['pagamento_status'] ?? null));
+        if (is_string($stPag)) {
+            $stPag = strtoupper(trim($stPag));
+            if (in_array($stPag, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS', 'PAGO', 'APROVADO'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isValidCpf(string $cpfDigits): bool {
+        $cpf = preg_replace('/\D+/', '', $cpfDigits);
+        if ($cpf === null) $cpf = '';
+        if (strlen($cpf) !== 11) return false;
+        if (preg_match('/^(\d)\1{10}$/', $cpf)) return false;
+
+        $sum = 0;
+        for ($i = 0, $w = 10; $i < 9; $i++, $w--) {
+            $sum += ((int) $cpf[$i]) * $w;
+        }
+        $d1 = 11 - ($sum % 11);
+        if ($d1 >= 10) $d1 = 0;
+
+        $sum = 0;
+        for ($i = 0, $w = 11; $i < 10; $i++, $w--) {
+            $sum += ((int) $cpf[$i]) * $w;
+        }
+        $d2 = 11 - ($sum % 11);
+        if ($d2 >= 10) $d2 = 0;
+
+        return ((int) $cpf[9] === $d1) && ((int) $cpf[10] === $d2);
+    }
+
+    private function isValidCnpj(string $cnpjDigits): bool {
+        $cnpj = preg_replace('/\D+/', '', $cnpjDigits);
+        if ($cnpj === null) $cnpj = '';
+        if (strlen($cnpj) !== 14) return false;
+        if (preg_match('/^(\d)\1{13}$/', $cnpj)) return false;
+
+        $calc = function (string $base, array $weights): int {
+            $sum = 0;
+            foreach ($weights as $i => $w) {
+                $sum += ((int) $base[$i]) * $w;
+            }
+            $r = $sum % 11;
+            return ($r < 2) ? 0 : (11 - $r);
+        };
+
+        $d1 = $calc(substr($cnpj, 0, 12), [5,4,3,2,9,8,7,6,5,4,3,2]);
+        $d2 = $calc(substr($cnpj, 0, 13), [6,5,4,3,2,9,8,7,6,5,4,3,2]);
+        return ((int) $cnpj[12] === $d1) && ((int) $cnpj[13] === $d2);
+    }
+
     private function ensureTables(): void {
         return;
     }
@@ -179,9 +244,33 @@ class AdminRemessaInternacionalController extends Controller {
         $inicio = (string) $j['data_inicio'];
         $fim = (string) $j['data_fim'];
 
-        // Todos os pedidos dentro do período entram na janela
-        $stP = $this->connection->prepare("SELECT id FROM pedidos WHERE pago_em IS NOT NULL AND pago_em >= ? AND pago_em <= ?");
-        $stP->execute([$inicio, $fim]);
+        // Apenas pedidos pagos dentro do período entram na janela
+        $cols = [];
+        try {
+            $stCols = $this->connection->query('DESCRIBE pedidos');
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $paidStatusWhere = "(LOWER(COALESCE(status,'')) IN ('pago','paid','approved','aprovado','confirmado','confirmed'))";
+        if (is_array($cols) && in_array('payment_status', $cols, true)) {
+            $paidStatusWhere .= " OR (UPPER(COALESCE(payment_status,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS'))";
+        }
+        if (is_array($cols) && in_array('status_pagamento', $cols, true)) {
+            $paidStatusWhere .= " OR (UPPER(COALESCE(status_pagamento,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS','PAGO','APROVADO'))";
+        }
+
+        $dateCol = (is_array($cols) && in_array('pago_em', $cols, true)) ? 'pago_em' : ((is_array($cols) && in_array('created_at', $cols, true)) ? 'created_at' : 'id');
+        $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
+
+        $sql = "SELECT id FROM pedidos WHERE ({$paidStatusWhere}) AND {$dateWhere}";
+        $stP = $this->connection->prepare($sql);
+        if ($dateCol === 'id') {
+            $stP->execute();
+        } else {
+            $stP->execute([$inicio, $fim]);
+        }
         $pedidoIds = $stP->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
         if (!$pedidoIds) {
@@ -1006,7 +1095,7 @@ class AdminRemessaInternacionalController extends Controller {
             LEFT JOIN pedidos p ON p.id = rjp.pedido_id
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             WHERE rjp.janela_id = ?
-            ORDER BY p.created_at ASC
+            ORDER BY (p.created_at IS NULL) ASC, p.created_at DESC, rjp.pedido_id DESC
         ";
         $st = $this->connection->prepare($sql);
         $st->execute([$janelaId]);
@@ -1343,11 +1432,18 @@ function fecharJanela() {
             echo '<tr><td colspan="4" class="text-center text-muted">Nenhum item.</td></tr>';
         } else {
             foreach ($itens as $it) {
+                $precoUnit = null;
+                foreach (['preco_unitario', 'valor_unitario', 'preco', 'price'] as $c) {
+                    if (isset($it[$c]) && is_numeric($it[$c])) {
+                        $precoUnit = (float) $it[$c];
+                        break;
+                    }
+                }
                 echo '<tr>
                     <td>' . htmlspecialchars((string) ($it['produto_nome'] ?? '')) . '</td>
                     <td>' . htmlspecialchars((string) ($it['sku'] ?? '')) . '</td>
                     <td>' . (int) ($it['quantidade'] ?? 0) . '</td>
-                    <td>R$ ' . (is_numeric($it['preco'] ?? null) ? number_format((float) $it['preco'], 2, ',', '.') : '-') . '</td>
+                    <td>R$ ' . ($precoUnit !== null ? number_format((float) $precoUnit, 2, ',', '.') : '-') . '</td>
                 </tr>';
             }
         }
@@ -1422,6 +1518,11 @@ function gerarEtiqueta() {
             $pedido = $this->getPedidoCompleto($pid);
             if (!$pedido) {
                 echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                exit;
+            }
+
+            if (!$this->isPedidoPago($pedido)) {
+                echo json_encode(['success' => false, 'error' => 'Pedido ainda não está pago. Marque como pago antes de gerar a etiqueta internacional.']);
                 exit;
             }
 
@@ -1527,9 +1628,19 @@ function gerarEtiqueta() {
         $lastName = count($partes) > 1 ? implode(' ', array_slice($partes, 1)) : '';
 
         $doc = (string) ($pedido['documento'] ?? ($pedido['cliente_documento'] ?? ''));
-        $docDigits = preg_replace('/\D+/', '', $doc);
-        $taxType = strlen((string) $docDigits) > 11 ? 'CNPJ' : 'CPF';
-        $taxId = (string) $docDigits;
+        $docDigits = (string) preg_replace('/\D+/', '', $doc);
+        $taxType = strlen($docDigits) > 11 ? 'CNPJ' : 'CPF';
+        $taxId = $docDigits;
+
+        if ($taxType === 'CPF') {
+            if (!$this->isValidCpf($taxId)) {
+                throw new \Exception('W-Express: CPF do destinatário inválido. Corrija o documento do cliente antes de gerar a etiqueta. [' . $taxId . ']');
+            }
+        } else {
+            if (!$this->isValidCnpj($taxId)) {
+                throw new \Exception('W-Express: CNPJ do destinatário inválido. Corrija o documento do cliente antes de gerar a etiqueta. [' . $taxId . ']');
+            }
+        }
 
         $recipientType = ($taxType === 'CPF') ? 'individual' : 'business';
 
@@ -1866,8 +1977,14 @@ function gerarEtiqueta() {
         } catch (\Exception $e) {
             $produtoCols = [];
         }
-        $temNcm = is_array($produtoCols) && in_array('ncm', $produtoCols, true);
-        $selNcm = $temNcm ? ', pr.ncm as ncm' : '';
+        $ncmCol = null;
+        foreach (['ncm', 'tariff_code', 'ncm_code', 'codigo_ncm', 'ncm_produto'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $ncmCol = $c;
+                break;
+            }
+        }
+        $selNcm = $ncmCol ? (', pr.' . $ncmCol . ' as ncm') : '';
         $pesoCol = null;
         foreach (['peso', 'weight', 'peso_kg'] as $c) {
             if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
