@@ -2207,11 +2207,29 @@ HTMLSCRIPT;
             $stmtDel = $pdo->prepare('DELETE FROM produto_atributos WHERE produto_id = :pid');
             $stmtDel->execute([':pid' => $produtoId]);
 
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes')) {
+                $pdo->prepare('DELETE FROM produto_atributo_opcoes WHERE produto_id = :pid')->execute([':pid' => $produtoId]);
+            }
+
             if (!empty($tipoIds)) {
                 $stmtIns = $pdo->prepare('INSERT INTO produto_atributos (produto_id, tipo_id, created_at, updated_at) VALUES (:pid, :tid, NOW(), NOW())');
                 foreach ($tipoIds as $tid) {
                     if ($tid <= 0) continue;
                     $stmtIns->execute([':pid' => $produtoId, ':tid' => $tid]);
+                }
+            }
+
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes') && !empty($opcoes)) {
+                $stmtInsOp = $pdo->prepare('INSERT IGNORE INTO produto_atributo_opcoes (produto_id, tipo_id, opcao_id, created_at) VALUES (:pid, :tid, :oid, NOW())');
+                foreach ($opcoes as $tid => $list) {
+                    $tid = (int) $tid;
+                    if ($tid <= 0) continue;
+                    if (!is_array($list)) continue;
+                    foreach ($list as $oid) {
+                        $oid = (int) $oid;
+                        if ($oid <= 0) continue;
+                        $stmtInsOp->execute([':pid' => $produtoId, ':tid' => $tid, ':oid' => $oid]);
+                    }
                 }
             }
 
@@ -2445,6 +2463,26 @@ HTMLSCRIPT;
     private function getProdutoOpcoesUsadasPorTipo(\PDO $pdo, int $produtoId): array {
         $map = [];
         try {
+            if ($this->tableExists($pdo, 'produto_atributo_opcoes')) {
+                $stmt = $pdo->prepare('SELECT tipo_id, opcao_id FROM produto_atributo_opcoes WHERE produto_id = :pid');
+                $stmt->execute([':pid' => $produtoId]);
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $tid = (int) ($r['tipo_id'] ?? 0);
+                    $oid = (int) ($r['opcao_id'] ?? 0);
+                    if ($tid <= 0 || $oid <= 0) continue;
+                    if (!isset($map[$tid])) $map[$tid] = [];
+                    $map[$tid][$oid] = true;
+                }
+                foreach ($map as $tid => $set) {
+                    $map[$tid] = array_map('intval', array_keys($set));
+                }
+                if (!empty($map)) {
+                    return $map;
+                }
+            }
+
+            // Fallback: deduzir opções a partir das variações existentes
             $stmt = $pdo->prepare('
                 SELECT pvi.tipo_id, pvi.opcao_id
                 FROM produto_variacao_itens pvi

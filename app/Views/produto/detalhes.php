@@ -131,11 +131,59 @@
 
                 <?php $variacoesUi = $variacoesUi ?? ['enabled' => false]; ?>
                 <?php $variacoesEnabled = (!empty($variacoesUi['enabled']) || (!empty($variacoesUi['atributos']) && !empty($variacoesUi['variacoes']))); ?>
-                <div class="card mb-3" id="variacoes-card" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                <div class="buybox card mb-3" id="buybox">
                     <div class="card-body">
-                        <h5 class="mb-3">Variações</h5>
-                        <div id="variacoes-selectors"></div>
-                        <div class="mt-3 small text-muted" id="variacao-status"></div>
+                        <div class="d-flex align-items-baseline gap-2 mb-2">
+                            <div class="fs-4 fw-bold">
+                                <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
+                                <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                            </div>
+                        </div>
+
+                        <div id="variacoes-card" class="mb-3" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
+                            <div class="fw-semibold mb-2">Variações</div>
+                            <div id="variacoes-selectors"></div>
+                            <div class="mt-2 small text-muted" id="variacao-status"></div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="text-muted small">Disponibilidade</div>
+                            <div>
+                                <?php if ($produto['estoque'] > 0): ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                        <?= $produto['estoque'] ?> unidades
+                                    </span>
+                                <?php else: ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                        Fora de estoque
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <form id="add-to-cart-form" class="row g-3">
+                            <input type="hidden" name="id" value="<?= $produto['id'] ?>">
+                            <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
+
+                            <div class="col-12">
+                                <label for="quantity" class="form-label">Quantidade</label>
+                                <div class="input-group" style="max-width: 220px;">
+                                    <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
+                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
+                                    <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
+                                    <?php if ($produto['estoque'] > 0): ?>
+                                        <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
+                                    <?php else: ?>
+                                        <i class="fas fa-times"></i> Produto Indisponível
+                                    <?php endif; ?>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
@@ -195,60 +243,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-lg-6 offset-lg-6">
-            <div class="buybox card" id="buybox">
-                <div class="card-body">
-                    <div class="d-flex align-items-baseline gap-2 mb-2">
-                        <div class="fs-4 fw-bold">
-                            <span class="currency"><?= htmlspecialchars($currencyLabel) ?></span>
-                            <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= number_format($produto['preco'], 2, ',', '.') ?></span>
-                        </div>
-                    </div>
-
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="text-muted small">Disponibilidade</div>
-                        <div>
-                            <?php if ($produto['estoque'] > 0): ?>
-                                <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
-                                    <?= $produto['estoque'] ?> unidades
-                                </span>
-                            <?php else: ?>
-                                <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                    Fora de estoque
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <form id="add-to-cart-form" class="row g-3">
-                        <input type="hidden" name="id" value="<?= $produto['id'] ?>">
-                        <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
-
-                        <div class="col-12">
-                            <label for="quantity" class="form-label">Quantidade</label>
-                            <div class="input-group" style="max-width: 220px;">
-                                <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
-                                <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
-                            </div>
-                        </div>
-
-                        <div class="col-12">
-                            <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
-                                <?php if ($produto['estoque'] > 0): ?>
-                                    <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
-                                <?php else: ?>
-                                    <i class="fas fa-times"></i> Produto Indisponível
-                                <?php endif; ?>
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
