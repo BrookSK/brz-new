@@ -154,9 +154,34 @@ class PaymentService {
         }
 
         $created = $this->appmaxRequest('POST', 'customer', $payload);
-        $customerId = (int) ($created['data']['customer_id'] ?? ($created['customer_id'] ?? 0));
+        $customerId = 0;
+        if (isset($created['data']['customer_id'])) {
+            $customerId = (int) $created['data']['customer_id'];
+        } elseif (isset($created['customer_id'])) {
+            $customerId = (int) $created['customer_id'];
+        } elseif (isset($created['data']['id'])) {
+            $customerId = (int) $created['data']['id'];
+        } elseif (isset($created['data']['customer']['id'])) {
+            $customerId = (int) $created['data']['customer']['id'];
+        }
         if ($customerId <= 0) {
-            throw new \Exception('AppMax: customer_id não retornado');
+            $msg = '';
+            foreach (['message', 'mensagem', 'error', 'erro'] as $k) {
+                if (!empty($created[$k]) && is_string($created[$k])) {
+                    $msg = $created[$k];
+                    break;
+                }
+            }
+            if ($msg === '' && !empty($created['data']['message']) && is_string($created['data']['message'])) {
+                $msg = (string) $created['data']['message'];
+            }
+            $details = '';
+            try {
+                $details = json_encode($created, JSON_UNESCAPED_UNICODE);
+            } catch (\Exception $e) {
+                $details = '';
+            }
+            throw new \Exception('AppMax: customer_id não retornado' . ($msg !== '' ? (' - ' . $msg) : '') . ($details !== '' ? (' | response=' . $details) : ''));
         }
         return $customerId;
     }
@@ -368,7 +393,8 @@ class PaymentService {
         // API v3: access-token (fornecido pela AppMax). Mantém fallback para instalações antigas.
         $this->appmaxV3AccessToken = (string) $this->getConfig('pagamentos', 'appmax_access_token', (string) $this->appmaxAppId);
         $this->appmaxAmbiente = (string) $this->getConfig('pagamentos', 'appmax_ambiente', 'production');
-        $this->appmaxBaseUrl = (string) $this->getConfig('pagamentos', 'appmax_base_url', 'https://admin.appmax.com.br/api/v3');
+        // Se vazio, a URL será determinada automaticamente pelo appmax_ambiente.
+        $this->appmaxBaseUrl = (string) $this->getConfig('pagamentos', 'appmax_base_url', '');
         $this->appmaxAccessToken = null;
         $this->appmaxAccessTokenExpiresAt = null;
     }
