@@ -505,6 +505,32 @@ class CheckoutController extends Controller {
                 } catch (\Exception $e) {
                 }
 
+                // Ajustar para que a cobrança cubra o TOTAL do pedido (não apenas subtotal)
+                // AppMax: total = products + shipping - discount
+                // Então: products = total - shipping + discount
+                $totalCents = (int) round(((float) $valor) * 100);
+                $targetProductsValueCents = $totalCents - $shippingValueCents + $discountValueCents;
+                if ($targetProductsValueCents < 0) {
+                    $targetProductsValueCents = 0;
+                }
+
+                $diff = $targetProductsValueCents - $productsValueCents;
+                if ($diff > 0) {
+                    // Incluir serviços/impostos como item adicional para fechar o valor
+                    // (evita cobrar somente o valor dos produtos)
+                    $products[] = [
+                        'sku' => 'SERVICOS',
+                        'name' => 'Serviços/Frete/Impostos',
+                        'quantity' => 1,
+                        'unit_value' => (int) $diff,
+                        'type' => 'service',
+                    ];
+                    $productsValueCents += (int) $diff;
+                } elseif ($diff < 0) {
+                    // Se o somatório de produtos+serviços excedeu o total, compensar aumentando o desconto
+                    $discountValueCents += (int) abs($diff);
+                }
+
                 if (!empty($products)) {
                     $payload['products'] = $products;
                     $payload['products_value_cents'] = $productsValueCents;
