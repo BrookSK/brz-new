@@ -2071,7 +2071,11 @@ class CheckoutController extends Controller {
             }
             
             // Obter moeda selecionada pelo cliente
-            $moedaSelecionada = $dados['moeda'] ?? 'USD';
+            // Default deve ser BRL (a loja opera em BRL por padrão; USD é opcional)
+            $moedaSelecionada = strtoupper(trim((string) ($dados['moeda'] ?? 'BRL')));
+            if (!in_array($moedaSelecionada, ['BRL', 'USD', 'EUR'], true)) {
+                $moedaSelecionada = 'BRL';
+            }
             $this->debugLog('[CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
             
             // Calcular totais
