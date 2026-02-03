@@ -427,6 +427,33 @@ class AdminNotificacoesController extends Controller {
     private function ensureEmailTemplatesTable(\PDO $pdo): void {
         try {
             $pdo->query('SELECT 1 FROM email_templates LIMIT 1');
+            // tabela já existe; ainda assim garantir template padrão do WExpress
+            try {
+                $this->ensureEventosSistemaTable($pdo);
+
+                $evento = 'wexpress_label_created';
+                $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
+                $stmtEv->execute([$evento]);
+                $eventoId = (int) ($stmtEv->fetchColumn() ?: 0);
+
+                if ($eventoId <= 0) {
+                    $stmtInsEv = $pdo->prepare('INSERT INTO eventos_sistema (nome, descricao, ativo, created_at) VALUES (?, ?, 1, NOW())');
+                    $stmtInsEv->execute([$evento, 'Etiqueta WExpress gerada (envio de tracking ao cliente)']);
+                    $eventoId = (int) $pdo->lastInsertId();
+                }
+
+                $stTpl = $pdo->prepare('SELECT id FROM email_templates WHERE nome = ? ORDER BY id DESC LIMIT 1');
+                $stTpl->execute([$evento]);
+                $tplId = (int) ($stTpl->fetchColumn() ?: 0);
+                if ($tplId <= 0) {
+                    $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
+                    $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{courier_tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                    $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
+                    $stIns->execute([$eventoId, $evento, $assunto, $html]);
+                }
+            } catch (\Exception $e) {
+            }
+
             return;
         } catch (\Exception $e) {
         }
@@ -449,6 +476,33 @@ class AdminNotificacoesController extends Controller {
         }
         try {
             $pdo->exec('CREATE INDEX idx_email_templates_nome ON email_templates (nome)');
+        } catch (\Exception $e) {
+        }
+
+        // Seed template padrão do WExpress
+        try {
+            $this->ensureEventosSistemaTable($pdo);
+
+            $evento = 'wexpress_label_created';
+            $stmtEv = $pdo->prepare('SELECT id FROM eventos_sistema WHERE nome = ? LIMIT 1');
+            $stmtEv->execute([$evento]);
+            $eventoId = (int) ($stmtEv->fetchColumn() ?: 0);
+
+            if ($eventoId <= 0) {
+                $stmtInsEv = $pdo->prepare('INSERT INTO eventos_sistema (nome, descricao, ativo, created_at) VALUES (?, ?, 1, NOW())');
+                $stmtInsEv->execute([$evento, 'Etiqueta WExpress gerada (envio de tracking ao cliente)']);
+                $eventoId = (int) $pdo->lastInsertId();
+            }
+
+            $stTpl = $pdo->prepare('SELECT id FROM email_templates WHERE nome = ? ORDER BY id DESC LIMIT 1');
+            $stTpl->execute([$evento]);
+            $tplId = (int) ($stTpl->fetchColumn() ?: 0);
+            if ($tplId <= 0) {
+                $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
+                $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{courier_tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
+                $stIns->execute([$eventoId, $evento, $assunto, $html]);
+            }
         } catch (\Exception $e) {
         }
     }

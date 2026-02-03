@@ -1485,6 +1485,18 @@ function gerarEtiqueta() {
                     $pedidoModel->atualizarStatus((int) $pid, 'em_transporte', 'Etiqueta internacional gerada (W-Express)', $_SESSION['usuario_id'] ?? null);
                 } catch (\Exception $e) {
                 }
+
+                try {
+                    $notif = new \App\Services\NotificationService();
+                    $labelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId !== '' ? $wxShipId : $shipId ?? '');
+                    $notif->notificarEventoPedido('wexpress_label_created', (int) $pid, [
+                        'courier_tracking_number' => $wxCourier,
+                        'wexpress_tracking_number' => $wxTrack,
+                        'shipping_id' => $wxShipId,
+                        'label_url' => $labelUrl,
+                    ]);
+                } catch (\Exception $e) {
+                }
             }
 
             if ($errorMsg !== null) {
@@ -1542,14 +1554,36 @@ function gerarEtiqueta() {
 
         $itens = $pedido['itens'] ?? [];
         $items = [];
+
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+
+        $usdToBrl = $this->getUsdToBrlRate();
+        $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
+
         if (is_array($itens)) {
             foreach ($itens as $it) {
                 $qtd = (int) ($it['quantidade'] ?? 1);
                 if ($qtd <= 0) $qtd = 1;
+
+                $unitValue = null;
+                foreach (['preco_unitario', 'valor_unitario', 'price', 'preco'] as $c) {
+                    if (isset($it[$c]) && is_numeric($it[$c])) {
+                        $unitValue = (float) $it[$c];
+                        break;
+                    }
+                }
+                if ($unitValue === null) {
+                    $unitValue = 1.0;
+                }
+                if ($moeda === 'BRL') {
+                    $unitValue = $unitValue * $brlToUsd;
+                }
+
                 $row = [
                     'description' => (string) ($it['produto_nome'] ?? ($it['nome_produto'] ?? 'item')),
                     'quantity' => $qtd,
-                    'unit_value' => is_numeric($it['preco'] ?? null) ? (float) $it['preco'] : 1,
+                    'unit_value' => round((float) $unitValue, 2),
                 ];
 
                 $ncm = (string) ($it['ncm'] ?? ($it['tariff_code'] ?? ''));
@@ -1563,10 +1597,30 @@ function gerarEtiqueta() {
             }
         }
 
-        $pesoTotal = 1.0;
-        if (is_numeric($pedido['peso_total'] ?? null)) {
-            $pesoTotal = max(0.001, (float) $pedido['peso_total']);
+        $pesoTotal = 0.0;
+        if (is_array($itens)) {
+            foreach ($itens as $it) {
+                $qtd = (int) ($it['quantidade'] ?? 1);
+                if ($qtd <= 0) $qtd = 1;
+                $peso = null;
+                foreach (['peso', 'weight', 'peso_kg'] as $c) {
+                    if (isset($it[$c]) && is_numeric($it[$c])) {
+                        $peso = (float) $it[$c];
+                        break;
+                    }
+                }
+                if ($peso !== null && $peso > 0) {
+                    $pesoTotal += ($peso * $qtd);
+                }
+            }
         }
+        if ($pesoTotal <= 0 && is_numeric($pedido['peso_total'] ?? null)) {
+            $pesoTotal = (float) $pedido['peso_total'];
+        }
+        if ($pesoTotal <= 0) {
+            $pesoTotal = 1.0;
+        }
+        $pesoTotal = max(0.001, (float) $pesoTotal);
 
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
@@ -1576,8 +1630,14 @@ function gerarEtiqueta() {
         ]];
 
         $declared = 0.0;
-        if (is_numeric($pedido['total'] ?? null)) {
-            $declared = (float) $pedido['total'];
+        foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+            if (isset($pedido[$c]) && is_numeric($pedido[$c])) {
+                $declared = (float) $pedido[$c];
+                break;
+            }
+        }
+        if ($moeda === 'BRL') {
+            $declared = $declared * $brlToUsd;
         }
 
         $externalShippingId = (string) (($pedido['codigo_pedido'] ?? '') !== '' ? $pedido['codigo_pedido'] : ('PEDIDO-' . (int) ($pedido['id'] ?? 0)));
@@ -1592,7 +1652,7 @@ function gerarEtiqueta() {
             'dimensions_unit' => 'cm',
             'weight_unit' => 'g',
             'currency' => 'USD',
-            'declared_value' => $declared,
+            'declared_value' => round((float) $declared, 2),
             'freight_value' => 0.01,
             'insurance_value' => 0,
             'invoice_number' => $invoiceNumber,
@@ -1619,6 +1679,22 @@ function gerarEtiqueta() {
             ],
             'items' => $items,
         ];
+    }
+
+    private function getUsdToBrlRate(): float {
+        try {
+            $st = $this->connection->query('DESCRIBE configuracoes_moeda');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols) || empty($cols) || !in_array('taxa_conversao', $cols, true)) {
+                return 1.0;
+            }
+            $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' LIMIT 1");
+            $stTx->execute();
+            $tx = (float) ($stTx->fetchColumn() ?: 0);
+            return $tx > 0 ? $tx : 1.0;
+        } catch (\Exception $e) {
+            return 1.0;
+        }
     }
 
     public function fecharJanela($request, $id) {
@@ -1792,9 +1868,17 @@ function gerarEtiqueta() {
         }
         $temNcm = is_array($produtoCols) && in_array('ncm', $produtoCols, true);
         $selNcm = $temNcm ? ', pr.ncm as ncm' : '';
+        $pesoCol = null;
+        foreach (['peso', 'weight', 'peso_kg'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $pesoCol = $c;
+                break;
+            }
+        }
+        $selPeso = $pesoCol ? (', pr.' . $pesoCol . ' as peso') : '';
 
         $stmt = $this->connection->prepare("
-            SELECT pi.*, pr.{$produtoNomeCol} as produto_nome, pr.sku{$selNcm}
+            SELECT pi.*, pr.{$produtoNomeCol} as produto_nome, pr.sku{$selNcm}{$selPeso}
             FROM pedido_itens pi 
             LEFT JOIN produtos pr ON pi.produto_id = pr.id 
             WHERE pi.pedido_id = ?
