@@ -1382,7 +1382,7 @@ function gerarEtiqueta() {
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
             'width' => 10,
-            'length' => 10,
+            'length' => 15,
             'height' => 10,
         ]];
 
@@ -1404,7 +1404,7 @@ function gerarEtiqueta() {
             'weight_unit' => 'g',
             'currency' => 'USD',
             'declared_value' => $declared,
-            'freight_value' => 0,
+            'freight_value' => 0.01,
             'insurance_value' => 0,
             'invoice_number' => ($shipmentPurpose === 'commercial' ? $invoiceNumber : null),
             'packages' => $packages,
