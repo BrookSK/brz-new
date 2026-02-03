@@ -57,7 +57,7 @@ class WExpressService {
         if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
             return 'https://api.wexpress.me';
         }
-        // Se houver base de sandbox distinta, ajustar aqui. Por ora, seguir a doc do endpoint /shipping.
+        // O suporte informou o endpoint https://api.wexpress.me/shipping/
         return 'https://api.wexpress.me';
     }
 
@@ -66,7 +66,8 @@ class WExpressService {
             throw new \Exception('W-Express não configurado (API Key ausente)');
         }
 
-        $url = rtrim($this->getBaseUrl(), '/') . '/' . ltrim($path, '/');
+        $baseUrl = $this->getBaseUrl();
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
             'Content-Type: application/json',
@@ -84,18 +85,41 @@ class WExpressService {
             throw new \Exception('cURL não disponível no servidor');
         }
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 40);
-        if ($payload !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        $respBody = false;
+        $httpCode = 0;
+        $err = '';
+
+        // fallback para ambientes onde o host principal não resolve
+        $tryUrls = [$url];
+        $tryUrls[] = preg_replace('#^https?://api\.wexpress\.me#i', 'https://wexpress.me', $url);
+        $tryUrls[] = preg_replace('#^https?://api\.wexpress\.me#i', 'https://sandbox.wexpress.me', $url);
+        // Se a base já vier sem o subdomínio api, ainda assim tentamos api
+        if (stripos($url, 'api.wexpress.me') === false) {
+            $tryUrls[] = preg_replace('#^https?://#i', 'https://api.wexpress.me/', rtrim($baseUrl, '/')) . '/' . ltrim($path, '/');
         }
-        $respBody = curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
-        curl_close($ch);
+
+        // Dedup simples
+        $tryUrls = array_values(array_unique(array_filter($tryUrls)));
+
+        foreach ($tryUrls as $tryUrl) {
+            $ch = curl_init($tryUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = (string) curl_error($ch);
+            curl_close($ch);
+
+            if ($err === '' || stripos($err, 'Could not resolve host') === false) {
+                $url = $tryUrl;
+                break;
+            }
+        }
 
         $this->lastHttpCode = $httpCode;
 
