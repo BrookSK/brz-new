@@ -47,9 +47,9 @@ class PaymentService {
         } else {
             $amb = strtolower(trim((string) $this->appmaxAmbiente));
             if ($amb === 'homolog' || $amb === 'homologacao' || $amb === 'sandbox' || $amb === 'test') {
-                $baseUrl = 'https://homolog.sandboxappmax.com.br/api/v3';
+                $baseUrl = 'https://homolog.sandboxappmax.com.br/api';
             } else {
-                $baseUrl = 'https://admin.appmax.com.br/api/v3';
+                $baseUrl = 'https://admin.appmax.com.br/api';
             }
         }
         $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
