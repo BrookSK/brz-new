@@ -31,7 +31,13 @@ class AdminPedidosManualController extends Controller {
             $nameCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : '');
             $priceCol = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : '');
             $activeCol = in_array('active', $cols, true) ? 'active' : (in_array('ativo', $cols, true) ? 'ativo' : '');
-            $pesoCol = in_array('peso', $cols, true) ? 'peso' : '';
+            $pesoCol = '';
+            foreach (['peso', 'weight', 'product_weight', 'peso_kg'] as $cPeso) {
+                if (in_array($cPeso, $cols, true)) {
+                    $pesoCol = $cPeso;
+                    break;
+                }
+            }
 
             $select = ['id'];
             if ($nameCol !== '') $select[] = $nameCol . ' AS name';
@@ -405,6 +411,28 @@ function formatMoney(v){
     return n.toFixed(2);
 }
 
+function parseMoneyInput(raw){
+    let s = String(raw || '').trim();
+    if (!s) return 0;
+    s = s.replace(/\s+/g, '');
+    s = s.replace(/[^0-9,\.\-]/g, '');
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    let decSep = '';
+    if (lastDot >= 0 || lastComma >= 0) {
+        decSep = (lastDot > lastComma) ? '.' : ',';
+    }
+    if (decSep) {
+        const thousandSep = (decSep === '.') ? ',' : '.';
+        s = s.split(thousandSep).join('');
+        if (decSep === ',') {
+            s = s.replace(',', '.');
+        }
+    }
+    const n = Number(s);
+    return isFinite(n) ? n : 0;
+}
+
 function formatPeso(v){
     const n = Number(v || 0);
     return n.toFixed(3);
@@ -621,7 +649,7 @@ function calcTotal(){
     rows.forEach(r => {
         const qtd = Number(r.querySelector('.qtdInp')?.value || 0);
         const raw = String(r.querySelector('.valorInp')?.value || '0');
-        const val = Number(moeda === 'BRL' ? raw.replace('.', '').replace(',', '.') : raw.replace(',', '.'));
+        const val = parseMoneyInput(raw);
         const pid = Number(r.querySelector('.produtoIdInp')?.value || 0);
         const prod = PRODUTOS.find(p => Number(p.id) === pid);
         const peso = prod ? Number(prod.peso || prod.weight || prod.peso_kg || prod.product_weight || 0) : 0;
@@ -663,6 +691,12 @@ function calcTotal(){
             const taxaServico = Number(data.taxa_servico || 0);
             const impostos = Number(data.impostos || 0);
             const total = Number(data.total || 0);
+
+            const pesoBack = Number(data.peso_total || 0);
+            const pesoEl = document.getElementById('resumoPeso');
+            if (pesoEl) {
+                pesoEl.textContent = formatPeso(pesoBack);
+            }
 
             document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
             document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
@@ -956,8 +990,9 @@ document.addEventListener('DOMContentLoaded', function(){
     function updateManualPaymentMethodsForCurrency(){
         if (!fpSel) return;
         const prev = String(fpSel.value || '');
+        const moeda = getSelectedMoeda();
         fpSel.innerHTML = '';
-        fpSel.appendChild(new Option('Online', ''));
+        fpSel.appendChild(new Option(moeda === 'BRL' ? 'Online (AppMax)' : 'Online (Stripe)', ''));
         fpSel.appendChild(new Option('PagDev (offline)', 'pagdev'));
         const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
         fpSel.value = stillValid ? prev : '';
@@ -1265,7 +1300,27 @@ JS;
             $pesoCache = [];
             $stPeso = null;
             try {
-                $stPeso = $db->prepare('SELECT COALESCE(peso, weight, product_weight, peso_kg, 0) AS peso FROM produtos WHERE id = ? LIMIT 1');
+                $colsP = [];
+                try {
+                    $stCols = $db->query('DESCRIBE produtos');
+                    $colsP = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    $colsP = [];
+                }
+
+                $pesoCol = '';
+                foreach (['peso', 'weight', 'product_weight', 'peso_kg'] as $cPeso) {
+                    if (is_array($colsP) && in_array($cPeso, $colsP, true)) {
+                        $pesoCol = $cPeso;
+                        break;
+                    }
+                }
+
+                if ($pesoCol !== '') {
+                    $stPeso = $db->prepare('SELECT ' . $pesoCol . ' AS peso FROM produtos WHERE id = ? LIMIT 1');
+                } else {
+                    $stPeso = null;
+                }
             } catch (\Exception $e) {
                 $stPeso = null;
             }
