@@ -914,6 +914,7 @@ class AdminComprasController extends Controller {
                         if (isset($decoded['capa'])) $paths[] = $decoded['capa'];
                         if (isset($decoded['url'])) $paths[] = $decoded['url'];
                         if (isset($decoded['src'])) $paths[] = $decoded['src'];
+                        if (isset($decoded['0'])) $paths[] = $decoded['0'];
                         if (isset($decoded[0])) $paths[] = $decoded[0];
                         foreach ($paths as $p) {
                             if (is_string($p) && trim($p) !== '') {
@@ -998,6 +999,25 @@ class AdminComprasController extends Controller {
                                 }
                                 return '/uploads/produtos/' . ltrim($s, '/');
                             }
+                            if (is_array($p) && isset($p[0]) && is_string($p[0]) && trim((string) $p[0]) !== '') {
+                                $s = trim((string) $p[0]);
+                                if (preg_match('#^https?://#i', $s) || strpos($s, '//') === 0) {
+                                    return $s;
+                                }
+                                if (strpos($s, '/uploads/produtos/') === 0) {
+                                    return $s;
+                                }
+                                if (strpos($s, 'uploads/produtos/') === 0) {
+                                    $s = substr($s, strlen('uploads/produtos/'));
+                                }
+                                if (strpos($s, 'images/') === 0) {
+                                    return '/' . ltrim($s, '/');
+                                }
+                                if (strpos($s, '/') === 0) {
+                                    return $s;
+                                }
+                                return '/uploads/produtos/' . ltrim($s, '/');
+                            }
                         }
                     }
                 }
@@ -1030,6 +1050,9 @@ class AdminComprasController extends Controller {
                 $file = (string) ($stmt->fetchColumn() ?: '');
                 if ($file !== '') {
                     $file = trim($file);
+                    if (strpos($file, 'images/') === 0) {
+                        return '/' . ltrim($file, '/');
+                    }
                     if ($file !== '' && !(preg_match('#^https?://#i', $file) || strpos($file, '//') === 0 || strpos($file, '/') === 0)) {
                         return '/uploads/produtos/' . ltrim($file, '/');
                     }
