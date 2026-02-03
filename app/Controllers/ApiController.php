@@ -5,16 +5,90 @@ use App\Core\Request;
 use App\Models\Produto;
 use App\Models\ProdutoFoto;
 use App\Models\Carrinho;
+use App\Services\AuthService;
 
 class ApiController extends Controller {
     private $produtoModel;
     private $produtoFotoModel;
     private $carrinhoModel;
+    private $authService;
 
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
         $this->carrinhoModel = new Carrinho();
+        $this->authService = new AuthService();
+    }
+
+    private function getCarrinhoSessionItems(): array {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $c = $_SESSION['carrinho'] ?? [];
+        return is_array($c) ? $c : [];
+    }
+
+    private function setCarrinhoSessionItems(array $items): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['carrinho'] = $items;
+    }
+
+    private function getLoggedUserId(): int {
+        $u = $this->authService->getUsuarioLogado();
+        $uid = (int) ($u['id'] ?? 0);
+        return $uid > 0 ? $uid : 0;
+    }
+
+    private function normalizeSessionTotals(array $sessionCarrinho): array {
+        $totalItens = 0;
+        $totalValor = 0.0;
+        foreach ($sessionCarrinho as $it) {
+            $totalItens += (int) ($it['quantidade'] ?? 0);
+            $totalValor += (float) ($it['subtotal'] ?? 0);
+        }
+        return [$totalItens, $totalValor];
+    }
+
+    public function totaisCarrinho(Request $request) {
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId > 0) {
+                    $stmt = $this->carrinhoModel->getConnection()->prepare('SELECT subtotal_produtos, valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                    $stmt->execute([$cartId]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $subtotal = (float) ($row['subtotal_produtos'] ?? 0);
+                    $total = (float) ($row['valor_total'] ?? 0);
+
+                    $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cartId]);
+                    $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                    $this->json([
+                        'success' => true,
+                        'total_itens' => $totalItens,
+                        'subtotal' => $subtotal,
+                        'total' => $total,
+                    ]);
+                    return;
+                }
+            } catch (\Exception $e) {
+                // fallback session
+            }
+        }
+
+        $carrinho = $this->getCarrinhoSessionItems();
+        [$totalItens, $totalValor] = $this->normalizeSessionTotals($carrinho);
+        $this->json([
+            'success' => true,
+            'total_itens' => $totalItens,
+            'subtotal' => $totalValor,
+            'total' => $totalValor,
+        ]);
     }
 
     public function buscarProdutos(Request $request) {
@@ -88,6 +162,7 @@ class ApiController extends Controller {
     public function adicionarAoCarrinho(Request $request) {
         $produtoId = $request->getParam('produto_id');
         $quantidade = $request->getParam('quantidade', 1);
+        $produtoVariacaoId = $request->getParam('produto_variacao_id', null);
         
         if (!$produtoId) {
             $this->json(['error' => 'Produto não informado'], 400);
@@ -106,34 +181,62 @@ class ApiController extends Controller {
             return;
         }
         
-        session_start();
-        
-        if (!isset($_SESSION['carrinho'])) {
-            $_SESSION['carrinho'] = [];
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $pvId = null;
+                if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
+                    $tmp = (int) $produtoVariacaoId;
+                    if ($tmp > 0) $pvId = $tmp;
+                }
+                $ok = $this->carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, $pvId, null);
+                if (!$ok) {
+                    $this->json(['error' => 'Não foi possível adicionar o item ao carrinho'], 400);
+                    return;
+                }
+
+                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Produto adicionado ao carrinho',
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Exception $e) {
+                // fallback session
+            }
         }
-        
+
+        $carrinho = $this->getCarrinhoSessionItems();
         $itemKey = $produtoId;
-        
-        if (isset($_SESSION['carrinho'][$itemKey])) {
-            $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $produto['valor'];
+        if (isset($carrinho[$itemKey])) {
+            $carrinho[$itemKey]['quantidade'] += (int) $quantidade;
+            $carrinho[$itemKey]['subtotal'] = $carrinho[$itemKey]['quantidade'] * $produto['valor'];
         } else {
-            $_SESSION['carrinho'][$itemKey] = [
+            $carrinho[$itemKey] = [
                 'produto_id' => $produtoId,
                 'nome' => $produto['nome'],
                 'preco_unitario' => $produto['valor'],
-                'quantidade' => $quantidade,
-                'subtotal' => $quantidade * $produto['valor']
+                'quantidade' => (int) $quantidade,
+                'subtotal' => ((int) $quantidade) * $produto['valor']
             ];
         }
-        
-        $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-        $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
+        $this->setCarrinhoSessionItems($carrinho);
+        [$totalItens, $totalValor] = $this->normalizeSessionTotals($carrinho);
         
         $this->json([
             'success' => true,
             'message' => 'Produto adicionado ao carrinho',
-            'carrinho' => $_SESSION['carrinho'],
             'total_itens' => $totalItens,
             'total_valor' => $totalValor
         ]);
@@ -141,66 +244,164 @@ class ApiController extends Controller {
 
     public function removerDoCarrinho(Request $request) {
         $produtoId = $request->getParam('produto_id');
+        $produtoVariacaoId = $request->getParam('produto_variacao_id', null);
         
         if (!$produtoId) {
             $this->json(['error' => 'Produto não informado'], 400);
             return;
         }
         
-        session_start();
-        
-        if (isset($_SESSION['carrinho'][$produtoId])) {
-            unset($_SESSION['carrinho'][$produtoId]);
-            
-            $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-            $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
-            
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $pvId = null;
+                if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
+                    $tmp = (int) $produtoVariacaoId;
+                    if ($tmp > 0) $pvId = $tmp;
+                }
+                $this->carrinhoModel->removerItem($cartId, (int) $produtoId, $pvId);
+
+                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Produto removido do carrinho',
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Exception $e) {
+                // fallback session
+            }
+        }
+
+        $carrinho = $this->getCarrinhoSessionItems();
+        if (isset($carrinho[$produtoId])) {
+            unset($carrinho[$produtoId]);
+            $this->setCarrinhoSessionItems($carrinho);
+            [$totalItens, $totalValor] = $this->normalizeSessionTotals($carrinho);
             $this->json([
                 'success' => true,
                 'message' => 'Produto removido do carrinho',
                 'total_itens' => $totalItens,
                 'total_valor' => $totalValor
             ]);
-        } else {
-            $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+            return;
         }
+
+        $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
     }
 
     public function atualizarCarrinho(Request $request) {
         $produtoId = $request->getParam('produto_id');
         $quantidade = $request->getParam('quantidade');
+        $produtoVariacaoId = $request->getParam('produto_variacao_id', null);
         
         if (!$produtoId || !$quantidade) {
             $this->json(['error' => 'Dados incompletos'], 400);
             return;
         }
         
-        session_start();
-        
-        if (isset($_SESSION['carrinho'][$produtoId])) {
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+
+                $pvId = null;
+                if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
+                    $tmp = (int) $produtoVariacaoId;
+                    if ($tmp > 0) $pvId = $tmp;
+                }
+
+                $produto = $this->produtoModel->find($produtoId);
+                if ($produto && (int) ($produto['estoque'] ?? 0) < (int) $quantidade) {
+                    $this->json(['error' => 'Estoque insuficiente'], 400);
+                    return;
+                }
+
+                $ok = $this->carrinhoModel->setQuantidadeItem($cartId, (int) $produtoId, (int) $quantidade, $pvId);
+                if (!$ok) {
+                    $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+                    return;
+                }
+
+                $stItem = $this->carrinhoModel->getConnection()->prepare('SELECT subtotal FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? AND COALESCE(produto_variacao_id,0) = COALESCE(?,0) LIMIT 1');
+                $stItem->execute([$cartId, (int) $produtoId, $pvId]);
+                $itemSubtotal = (float) ($stItem->fetchColumn() ?: 0);
+
+                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Carrinho atualizado',
+                    'item_subtotal' => $itemSubtotal,
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Exception $e) {
+                // fallback session
+            }
+        }
+
+        $carrinho = $this->getCarrinhoSessionItems();
+        if (isset($carrinho[$produtoId])) {
             $produto = $this->produtoModel->find($produtoId);
-            
-            if ($produto['estoque'] < $quantidade) {
+            if ($produto && (int) ($produto['estoque'] ?? 0) < (int) $quantidade) {
                 $this->json(['error' => 'Estoque insuficiente'], 400);
                 return;
             }
-            
-            $_SESSION['carrinho'][$produtoId]['quantidade'] = $quantidade;
-            $_SESSION['carrinho'][$produtoId]['subtotal'] = $quantidade * $_SESSION['carrinho'][$produtoId]['preco_unitario'];
-            
-            $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
-            $totalValor = array_sum(array_column($_SESSION['carrinho'], 'subtotal'));
-            
+
+            $carrinho[$produtoId]['quantidade'] = (int) $quantidade;
+            $carrinho[$produtoId]['subtotal'] = ((int) $quantidade) * (float) ($carrinho[$produtoId]['preco_unitario'] ?? 0);
+            $this->setCarrinhoSessionItems($carrinho);
+            [$totalItens, $totalValor] = $this->normalizeSessionTotals($carrinho);
             $this->json([
                 'success' => true,
                 'message' => 'Carrinho atualizado',
-                'item_subtotal' => $_SESSION['carrinho'][$produtoId]['subtotal'],
+                'item_subtotal' => (float) ($carrinho[$produtoId]['subtotal'] ?? 0),
                 'total_itens' => $totalItens,
                 'total_valor' => $totalValor
             ]);
-        } else {
-            $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+            return;
         }
+
+        $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+    }
+
+    public function limparCarrinho(Request $request) {
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId > 0) {
+                    $this->carrinhoModel->limparCarrinho($cartId);
+                }
+                $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
+                return;
+            } catch (\Exception $e) {
+                // fallback session
+            }
+        }
+
+        $this->setCarrinhoSessionItems([]);
+        $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
     }
 
     public function consultarCEP(Request $request) {

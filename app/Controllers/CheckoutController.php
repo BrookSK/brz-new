@@ -645,10 +645,53 @@ class CheckoutController extends Controller {
         $this->enderecoModel = new Endereco();
         $this->pedidoModel = new PedidoEcommerce();
     }
+
+    private function getCarrinhoForCheckout(?array $usuario): array {
+        $uid = (int) (($usuario['id'] ?? 0));
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId > 0) {
+                    $items = $this->carrinhoModel->getItems($cartId);
+                    $out = [];
+                    foreach (($items ?: []) as $it) {
+                        $pid = (int) ($it['produto_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        $pvId = (int) ($it['produto_variacao_id'] ?? 0);
+                        $key = ((string) $pid) . ':' . ((string) $pvId);
+                        $qtd = (int) ($it['quantidade'] ?? 1);
+                        if ($qtd < 1) $qtd = 1;
+                        $vu = (float) ($it['valor_unitario'] ?? 0);
+                        $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
+                        $out[$key] = [
+                            'produto_id' => $pid,
+                            'produto_variacao_id' => ($pvId > 0 ? $pvId : null),
+                            'variacao_descricao' => $it['variacao_descricao'] ?? null,
+                            'nome' => $it['nome'] ?? null,
+                            'price' => $vu,
+                            'preco_unitario' => $vu,
+                            'quantidade' => $qtd,
+                            'subtotal' => $sub,
+                        ];
+                    }
+                    if (!empty($out)) {
+                        return $out;
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $_SESSION['carrinho'] ?? [];
+    }
     
     public function index(Request $request) {
-        // Obter carrinho da sessão
-        $carrinho = $_SESSION['carrinho'] ?? [];
+        // Obter usuário logado
+        $usuario = $this->authService->getUsuarioLogado();
+
+        // Obter carrinho (DB quando logado, sessão como fallback)
+        $carrinho = $this->getCarrinhoForCheckout($usuario);
         
         // Verificar se o carrinho tem itens
         if (empty($carrinho)) {
@@ -656,8 +699,7 @@ class CheckoutController extends Controller {
             return;
         }
         
-        // Obter usuário logado
-        $usuario = $this->authService->getUsuarioLogado();
+        // Obter usuário logado (já carregado acima)
         $usuarioCompletoDb = null;
         if (!empty($usuario) && !empty($usuario['id'])) {
             try {
@@ -844,17 +886,17 @@ class CheckoutController extends Controller {
     }
     
     public function processar(Request $request) {
-        // Obter carrinho da sessão
-        $carrinho = $_SESSION['carrinho'] ?? [];
+        // Obter usuário logado
+        $usuario = $this->authService->getUsuarioLogado();
+
+        // Obter carrinho (DB quando logado, sessão como fallback)
+        $carrinho = $this->getCarrinhoForCheckout($usuario);
         
         if (empty($carrinho)) {
             $this->redirect('/produtos');
             return;
         }
         
-        // Obter usuário logado
-        $usuario = $this->authService->getUsuarioLogado();
-
         // Se está logado, exigir perfil completo + termos aceitos previamente
         if (!empty($usuario) && !empty($usuario['id'])) {
             try {
@@ -950,8 +992,8 @@ class CheckoutController extends Controller {
             return;
         }
         
-        // Obter carrinho da sessão
-        $carrinho = $_SESSION['carrinho'] ?? [];
+        // Obter carrinho novamente (DB quando logado, sessão como fallback)
+        $carrinho = $this->getCarrinhoForCheckout($usuario);
         $this->debugLog('[CHECKOUT] Carrinho encontrado: ' . json_encode($carrinho));
         
         if (empty($carrinho)) {

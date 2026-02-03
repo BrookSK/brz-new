@@ -318,6 +318,7 @@ $router->post('/webhook/appmax', 'WebhookController', 'appmax');
 // API
 $router->get('/api/produtos/buscar', 'ApiController', 'buscarProdutos');
 $router->get('/api/produtos/destaque', 'ApiController', 'produtosDestaque');
+$router->get('/api/carrinho/totais', 'ApiController', 'totaisCarrinho');
 $router->post('/api/carrinho/adicionar', 'ApiController', 'adicionarAoCarrinho');
 $router->post('/api/carrinho/remover', 'ApiController', 'removerDoCarrinho');
 $router->post('/api/carrinho/atualizar', 'ApiController', 'atualizarCarrinho');

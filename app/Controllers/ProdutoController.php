@@ -5,6 +5,8 @@ use App\Core\Request;
 use App\Core\Url;
 use App\Models\Produto;
 use App\Models\ProdutoFoto;
+use App\Models\Carrinho;
+use App\Services\AuthService;
 
 class ProdutoController extends Controller {
     private $produtoModel;
@@ -369,8 +371,41 @@ class ProdutoController extends Controller {
             $this->json(['error' => 'Estoque insuficiente'], 400);
         }
         
-        session_start();
+        $auth = new AuthService();
+        $u = $auth->getUsuarioLogado();
+        $uid = (int) ($u['id'] ?? 0);
+        if ($uid > 0) {
+            try {
+                $cartModel = new Carrinho();
+                $cart = $cartModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $ok = $cartModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, $pvId, $variacaoDescricao);
+                if (!$ok) {
+                    $this->json(['error' => 'Não foi possível adicionar o item ao carrinho'], 400);
+                    return;
+                }
 
+                $stCnt = $cartModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $cartModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Produto adicionado ao carrinho',
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Throwable $e) {
+                // fallback session
+            }
+        }
+
+        session_start();
         if (!isset($_SESSION['carrinho'])) {
             $_SESSION['carrinho'] = [];
         }
