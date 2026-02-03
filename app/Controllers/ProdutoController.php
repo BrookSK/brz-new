@@ -10,6 +10,12 @@ class ProdutoController extends Controller {
     private $produtoModel;
     private $produtoFotoModel;
 
+    private function getDirectPdo(): \PDO {
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        return $pdo;
+    }
+
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
@@ -80,7 +86,7 @@ class ProdutoController extends Controller {
             'fotos_por_variacao' => [],
         ];
         try {
-            $pdo = $this->produtoModel->getConnection();
+            $pdo = $this->getDirectPdo();
             $variacoesUi = $this->buildVariacoesUiData($pdo, (int) $produtoId);
         } catch (\Throwable $e) {
         }
@@ -164,7 +170,7 @@ class ProdutoController extends Controller {
         }
 
         try {
-            $pdo = $this->produtoModel->getConnection();
+            $pdo = $this->getDirectPdo();
             $data = $this->buildVariacoesUiData($pdo, $produtoId);
             $this->json($data);
         } catch (\Throwable $e) {
@@ -196,7 +202,7 @@ class ProdutoController extends Controller {
             $pvId = (int) $produtoVariacaoId;
             if ($pvId > 0) {
                 try {
-                    $pdo = $this->produtoModel->getConnection();
+                    $pdo = $this->getDirectPdo();
                     $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE id = ? LIMIT 1');
                     $st->execute([$pvId]);
                     $row = $st->fetch(\PDO::FETCH_ASSOC);

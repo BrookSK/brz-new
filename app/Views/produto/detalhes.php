@@ -812,6 +812,7 @@ function inicializarDetalhesProduto() {
                 }
 
                 if (!data || typeof data !== 'object') {
+                    $('#variacoes-card').show();
                     const status = $('#variacao-status');
                     if (status.length) {
                         status.text('Não foi possível carregar as variações.');
@@ -826,6 +827,7 @@ function inicializarDetalhesProduto() {
 
                 variacoesState = normalizeVariacoesUi(data);
                 if (!variacoesState.enabled) {
+                    $('#variacoes-card').show();
                     const status = $('#variacao-status');
                     if (status.length) {
                         status.text('Este produto não possui variações disponíveis.');
@@ -843,6 +845,7 @@ function inicializarDetalhesProduto() {
                 $('#variacoes-selectors').off('change.variacoesDyn').on('change.variacoesDyn', '.variacao-select', onVariationChange);
             })
             .catch(() => {
+                $('#variacoes-card').show();
                 const status = $('#variacao-status');
                 if (status.length) {
                     status.text('Erro ao carregar variações.');
