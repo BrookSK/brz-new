@@ -52,6 +52,48 @@ class ProdutoController extends Controller {
         }
 
         unset($produto);
+
+        // Marcar quais produtos possuem variações (para impedir add-to-cart direto na listagem)
+        try {
+            $pdo = $this->produtoModel->getConnection();
+            $ids = array_values(array_filter(array_map(function ($p) {
+                return (int) ($p['id'] ?? 0);
+            }, $produtos)));
+            $ids = array_values(array_unique($ids));
+
+            $hasTable = false;
+            try {
+                $st = $pdo->query("SHOW TABLES LIKE 'produto_variacoes'");
+                $hasTable = (bool) ($st && $st->fetch());
+            } catch (\Throwable $e) {
+                $hasTable = false;
+            }
+
+            $variavelMap = [];
+            if ($hasTable && !empty($ids)) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $st = $pdo->prepare('SELECT produto_id, COUNT(*) AS cnt FROM produto_variacoes WHERE produto_id IN (' . $in . ') GROUP BY produto_id');
+                $st->execute($ids);
+                foreach (($st->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $r) {
+                    $pid = (int) ($r['produto_id'] ?? 0);
+                    $cnt = (int) ($r['cnt'] ?? 0);
+                    if ($pid > 0) {
+                        $variavelMap[$pid] = ($cnt > 0);
+                    }
+                }
+            }
+
+            foreach ($produtos as &$p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $p['is_variavel'] = ($pid > 0 && !empty($variavelMap[$pid]));
+            }
+            unset($p);
+        } catch (\Throwable $e) {
+            foreach ($produtos as &$p) {
+                $p['is_variavel'] = false;
+            }
+            unset($p);
+        }
         
         $categorias = $this->produtoModel->getCategorias();
         

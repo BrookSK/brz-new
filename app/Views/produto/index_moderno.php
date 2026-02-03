@@ -133,6 +133,7 @@
                                     data-produto-id="<?= $produto['id'] ?>"
                                     data-produto-nome="<?= htmlspecialchars($produto['name']) ?>"
                                     data-produto-preco="<?= $produto['price'] ?>"
+                                    data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
                                     <?= $produto['stock'] > 0 ? '' : 'disabled' ?>>
                                 <i class="fas fa-cart-plus me-2"></i>
                                 <?= $produto['stock'] > 0 ? 'Adicionar ao Carrinho' : 'Indisponível' ?>
@@ -251,6 +252,13 @@ function updateProductPrices(currency) {
 function adicionarAoCarrinhoModerno(botao) {
     const produtoId = botao.getAttribute('data-produto-id');
     const quantidade = 1; // Simplificado - sempre 1 por agora
+
+    const isVariavel = String(botao.getAttribute('data-is-variavel') || '0') === '1';
+    if (isVariavel) {
+        const url = `/produto/detalhes/${encodeURIComponent(produtoId)}?selecionar_variacao=1`;
+        window.location.href = url;
+        return;
+    }
     
     if (botao.disabled) {
         return;

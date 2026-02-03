@@ -484,6 +484,34 @@ document.addEventListener('DOMContentLoaded', function() {
 function inicializarDetalhesProduto() {
     console.log('Inicializando detalhes do produto...');
 
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const pedirSelecao = params.get('selecionar_variacao');
+        if (pedirSelecao === '1' || (pedirSelecao || '').toLowerCase() === 'true') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Selecione a variação',
+                    text: 'Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.'
+                });
+            } else {
+                alert('Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.');
+            }
+
+            params.delete('selecionar_variacao');
+            const newQs = params.toString();
+            const newUrl = window.location.pathname + (newQs ? ('?' + newQs) : '') + (window.location.hash || '');
+            window.history.replaceState({}, document.title, newUrl);
+
+            const target = document.getElementById('variacoes-card') || document.getElementById('buybox');
+            if (target && typeof target.scrollIntoView === 'function') {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    } catch (e) {
+        // noop
+    }
+
     const variacoesUi = <?= json_encode($variacoesUi ?? ['enabled' => false]) ?>;
     const variacoesEnabled = !!(variacoesUi && (variacoesUi.enabled || ((variacoesUi.atributos || []).length > 0 && (variacoesUi.variacoes || []).length > 0)));
     const fotosProdutoBase = <?= json_encode(array_values(array_map(function($f) {
