@@ -695,6 +695,13 @@ class PedidoEcommerce {
             $pedido['valor_impostos'] = $valorImpostos;
             $pedido['valor_total'] = $valorTotal;
 
+            // Campos esperados por views (checkout/conclusao.php e outras)
+            $pedido['subtotal'] = $subtotalProdutos;
+            $pedido['frete'] = $valorFrete;
+            $pedido['impostos'] = $valorImpostos;
+            $pedido['servicos'] = $taxaServico;
+            $pedido['total'] = $valorTotal;
+
             $pedido['__converted_to_brl'] = ($moeda === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL);
 
             // Endereço de entrega: aceitar diferentes nomes de colunas
