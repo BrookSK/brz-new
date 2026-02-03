@@ -160,6 +160,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                         </div>
                         <div class="card-body">
                             <?php if (!empty($pedido['items'])): ?>
+                                <?php $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL')); ?>
+                                <?php $simboloMoeda = ($moedaPedido === 'USD') ? 'US$' : 'R$'; ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
                                         <?php
@@ -191,10 +193,10 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="quantity-badge"><?= $item['quantidade'] ?? 1 ?></span>
                                             <span class="text-muted">x</span>
-                                            <span class="fw-bold">R$ <?= number_format($item['preco_unitario'] ?? 0, 2, ',', '.') ?></span>
+                                            <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($item['preco_unitario'] ?? 0, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
-                                            <small class="text-muted">Subtotal: R$ <?= number_format($item['subtotal'] ?? 0, 2, ',', '.') ?></small>
+                                            <small class="text-muted">Subtotal: <?= $simboloMoeda ?> <?= number_format($item['subtotal'] ?? 0, 2, ',', '.') ?></small>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -238,25 +240,25 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                 <div class="card-body">
                                     <div class="price-row">
                                         <span>Subtotal:</span>
-                                        <span>R$ <?= number_format($pedido['subtotal_produtos'] ?? 0, 2, ',', '.') ?></span>
+                                        <span><?= $simboloMoeda ?> <?= number_format($pedido['subtotal_produtos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Frete:</span>
                                         <?php $freteVal = (float) ($pedido['valor_frete'] ?? 0); ?>
-                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ('R$ ' . number_format($freteVal, 2, ',', '.'))) ?></span>
+                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Taxa de Serviço:</span>
-                                        <span>R$ <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
+                                        <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Impostos:</span>
-                                        <span>R$ <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
+                                        <span><?= $simboloMoeda ?> <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <hr>
                                     <div class="price-row">
                                         <span>Total:</span>
-                                        <span class="text-primary">R$ <?= number_format($pedido['valor_total'] ?? 0, 2, ',', '.') ?></span>
+                                        <span class="text-primary"><?= $simboloMoeda ?> <?= number_format($pedido['valor_total'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                 </div>
                             </div>

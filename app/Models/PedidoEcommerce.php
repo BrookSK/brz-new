@@ -339,6 +339,35 @@ class PedidoEcommerce {
             if ($moeda === '') $moeda = 'BRL';
             $pedido['moeda'] = $moeda;
 
+            $taxaConversao = null;
+            foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $taxaConversao = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($taxaConversao === null || $taxaConversao <= 0) {
+                $taxaConversao = 1.0;
+            }
+
+            // Se o pedido é BRL mas a taxa veio como 1.0, tentar buscar na tabela configuracoes_moeda
+            if ($moeda === 'BRL' && $taxaConversao <= 1.01) {
+                try {
+                    if ($this->tableExists('configuracoes_moeda')) {
+                        $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' LIMIT 1");
+                        $stTx->execute();
+                        $txRow = $stTx->fetch(\PDO::FETCH_ASSOC);
+                        $tx = (float) ($txRow['taxa_conversao'] ?? 0);
+                        if ($tx > 1.01) {
+                            $taxaConversao = $tx;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            $pedido['taxa_conversao'] = $taxaConversao;
+
             $subtotalProdutos = null;
             foreach (['subtotal_produtos', 'subtotal'] as $c) {
                 if (array_key_exists($c, $pedido)) {
@@ -370,6 +399,15 @@ class PedidoEcommerce {
             }
             if ($taxaServico === null) {
                 $taxaServico = 0.0;
+            }
+
+            // Conversão: se o pedido é BRL, mas a taxa de serviço foi calculada em USD em alguns fluxos,
+            // multiplicar pela taxa de conversão quando fizer sentido.
+            if ($moeda === 'BRL' && $taxaConversao > 1.01 && $taxaServico > 0) {
+                // Heurística segura: converter apenas valores baixos (típico 39/78/117...) para não converter subtotal BRL indevidamente
+                if ($taxaServico <= 300) {
+                    $taxaServico = $taxaServico * $taxaConversao;
+                }
             }
 
             $valorImpostos = null;
@@ -416,6 +454,30 @@ class PedidoEcommerce {
             $pedido['cidade_entrega'] = $cidade;
             $pedido['estado_entrega'] = $estado;
             $pedido['cep_entrega'] = $cep;
+
+            // Se houver endereco_entrega_id, buscar dados completos em enderecos
+            $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
+            if ($enderecoEntregaId > 0 && $this->tableExists('enderecos')) {
+                try {
+                    $colsEnd = $this->getTableColumns('enderecos');
+                    $colId = $this->pickColumn($colsEnd, ['id']);
+                    if ($colId) {
+                        $stE = $this->connection->prepare('SELECT * FROM enderecos WHERE id = ? LIMIT 1');
+                        $stE->execute([$enderecoEntregaId]);
+                        $rowE = $stE->fetch(\PDO::FETCH_ASSOC);
+                        if (is_array($rowE) && !empty($rowE)) {
+                            $pedido['endereco_entrega'] = $rowE['endereco'] ?? ($rowE['logradouro'] ?? ($pedido['endereco_entrega'] ?? null));
+                            $pedido['numero_entrega'] = $rowE['numero'] ?? ($pedido['numero_entrega'] ?? null);
+                            $pedido['complemento_entrega'] = $rowE['complemento'] ?? ($pedido['complemento_entrega'] ?? null);
+                            $pedido['bairro_entrega'] = $rowE['bairro'] ?? ($pedido['bairro_entrega'] ?? null);
+                            $pedido['cidade_entrega'] = $rowE['cidade'] ?? ($pedido['cidade_entrega'] ?? null);
+                            $pedido['estado_entrega'] = $rowE['estado'] ?? ($pedido['estado_entrega'] ?? null);
+                            $pedido['cep_entrega'] = $rowE['cep'] ?? ($pedido['cep_entrega'] ?? null);
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
         } catch (\Exception $e) {
         }
 
