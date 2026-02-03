@@ -937,6 +937,28 @@ class CheckoutController extends Controller {
         $items = [];
         $subtotal = 0;
         $pesoTotal = 0;
+
+        // Fallback de peso via tabela produtos (quando o item do carrinho não trouxer)
+        $pesoCol = null;
+        $pesoCache = [];
+        $stPeso = null;
+        try {
+            $dbPeso = \Config\Database::getConnection();
+            $stmtColsProd = $dbPeso->query('DESCRIBE produtos');
+            $colsProd = $stmtColsProd ? ($stmtColsProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            foreach (['peso', 'weight', 'product_weight'] as $c) {
+                if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                    $pesoCol = $c;
+                    break;
+                }
+            }
+            if ($pesoCol) {
+                $stPeso = $dbPeso->prepare('SELECT ' . $pesoCol . ' AS peso FROM produtos WHERE id = ? LIMIT 1');
+            }
+        } catch (\Exception $e) {
+            $pesoCol = null;
+            $stPeso = null;
+        }
         
         foreach ($carrinho as $produtoId => $item) {
             // Verificar diferentes campos de preço
@@ -944,7 +966,32 @@ class CheckoutController extends Controller {
             $quantidade = $item['quantidade'] ?? 1;
 
             // Peso real (kg) quando disponível; fallback para 0.5kg
-            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            $pesoRaw = $item['peso'] ?? ($item['weight'] ?? 0);
+            if (is_string($pesoRaw)) {
+                $pesoRaw = str_replace(',', '.', trim($pesoRaw));
+            }
+            $pesoUnit = (float) $pesoRaw;
+
+            if ($pesoUnit <= 0) {
+                $pid = (int) ($item['produto_id'] ?? 0);
+                if ($pid > 0) {
+                    if (array_key_exists($pid, $pesoCache)) {
+                        $pesoUnit = (float) $pesoCache[$pid];
+                    } elseif ($stPeso) {
+                        try {
+                            $stPeso->execute([$pid]);
+                            $pesoDb = $stPeso->fetchColumn();
+                            if (is_string($pesoDb)) {
+                                $pesoDb = str_replace(',', '.', trim($pesoDb));
+                            }
+                            $pesoUnit = (float) ($pesoDb ?: 0);
+                            $pesoCache[$pid] = $pesoUnit;
+                        } catch (\Exception $e) {
+                            $pesoCache[$pid] = 0.0;
+                        }
+                    }
+                }
+            }
             if ($pesoUnit <= 0) {
                 $pesoUnit = 0.5;
             }
@@ -971,21 +1018,10 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
 
-        // Calcular valores com a mesma regra do carrinho (config do admin)
-        $moedaCalc = strtoupper(trim((string) ($_GET['moeda'] ?? 'BRL')));
-        if (!in_array($moedaCalc, ['BRL', 'USD', 'EUR'], true)) {
-            $moedaCalc = 'BRL';
-        }
-        $taxaConv = 1.0;
-        try {
-            $taxaConv = (float) $this->carrinhoModel->getTaxaConversao($moedaCalc);
-            if ($taxaConv <= 0) $taxaConv = 1.0;
-        } catch (\Exception $e) {
-            $taxaConv = 1.0;
-        }
-
-        $frete = $this->calcularFrete($subtotal, $pesoTotal, $moedaCalc);
-        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, $moedaCalc, $taxaConv);
+        // Calcular valores no backend sempre em USD (moeda base), para evitar mistura de moedas.
+        // A conversão para BRL é feita no JS da view (assim como no carrinho).
+        $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
+        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
         
