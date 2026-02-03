@@ -695,6 +695,13 @@ class PedidoEcommerce {
             $pedido['valor_impostos'] = $valorImpostos;
             $pedido['valor_total'] = $valorTotal;
 
+            // Aliases legados usados em algumas telas (ex.: checkout/conclusao)
+            $pedido['subtotal'] = $subtotalProdutos;
+            $pedido['frete'] = $valorFrete;
+            $pedido['servicos'] = $taxaServico;
+            $pedido['impostos'] = $valorImpostos;
+            $pedido['total'] = $valorTotal;
+
             $pedido['__converted_to_brl'] = ($moeda === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL);
 
             // Endereço de entrega: aceitar diferentes nomes de colunas
@@ -713,6 +720,24 @@ class PedidoEcommerce {
             $pedido['cidade_entrega'] = $cidade;
             $pedido['estado_entrega'] = $estado;
             $pedido['cep_entrega'] = $cep;
+
+            // Aliases esperados por algumas views (ex.: checkout/conclusao)
+            if (!array_key_exists('endereco', $pedido) || $pedido['endereco'] === null) $pedido['endereco'] = $pedido['endereco_entrega'] ?? '';
+            if (!array_key_exists('numero', $pedido) || $pedido['numero'] === null) $pedido['numero'] = $pedido['numero_entrega'] ?? '';
+            if (!array_key_exists('bairro', $pedido) || $pedido['bairro'] === null) $pedido['bairro'] = $pedido['bairro_entrega'] ?? '';
+            if (!array_key_exists('cidade', $pedido) || $pedido['cidade'] === null) $pedido['cidade'] = $pedido['cidade_entrega'] ?? '';
+            if (!array_key_exists('estado', $pedido) || $pedido['estado'] === null) $pedido['estado'] = $pedido['estado_entrega'] ?? '';
+            if (!array_key_exists('cep', $pedido) || $pedido['cep'] === null) $pedido['cep'] = $pedido['cep_entrega'] ?? '';
+
+            if (!array_key_exists('cliente_nome', $pedido) || $pedido['cliente_nome'] === null || $pedido['cliente_nome'] === '') {
+                $pedido['cliente_nome'] = (string) ($pedido['nome'] ?? ($pedido['nome_cliente'] ?? ($pedido['customer_name'] ?? ($pedido['cliente'] ?? ''))));
+            }
+            if (!array_key_exists('cliente_email', $pedido) || $pedido['cliente_email'] === null || $pedido['cliente_email'] === '') {
+                $pedido['cliente_email'] = (string) ($pedido['email'] ?? ($pedido['email_cliente'] ?? ($pedido['customer_email'] ?? ($pedido['cliente_email'] ?? ''))));
+            }
+            if (!array_key_exists('cliente_telefone', $pedido) || $pedido['cliente_telefone'] === null || $pedido['cliente_telefone'] === '') {
+                $pedido['cliente_telefone'] = (string) ($pedido['telefone'] ?? ($pedido['telefone_cliente'] ?? ($pedido['customer_phone'] ?? ($pedido['cliente_telefone'] ?? ''))));
+            }
 
             // Se houver endereco_entrega_id, buscar dados completos em enderecos
             $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
@@ -777,6 +802,21 @@ class PedidoEcommerce {
                 $colsItens = [];
             }
 
+            $ncmCol = null;
+            try {
+                if ($this->tableExists('produtos')) {
+                    $colsProd = $this->getTableColumns('produtos');
+                    foreach (['ncm', 'tariff_code', 'ncm_code', 'codigo_ncm', 'ncm_produto'] as $c) {
+                        if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                            $ncmCol = $c;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $ncmCol = null;
+            }
+
             $pick = function(array $cands) use ($colsItens) {
                 foreach ($cands as $c) {
                     if (is_array($colsItens) && in_array($c, $colsItens, true)) {
@@ -811,6 +851,11 @@ class PedidoEcommerce {
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
             if ($colUrlOriginalItem) $selectParts[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
+            if ($ncmCol && $colProdutoId) {
+                $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
+            } else {
+                $selectParts[] = "'' AS ncm";
+            }
             $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
 
             // URL original do produto (fallback via produtos)
@@ -878,13 +923,22 @@ class PedidoEcommerce {
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+<<<<<<< HEAD
                 if (!isset($item['url_original']) || $item['url_original'] === null) {
                     $item['url_original'] = '';
                 }
                 $item['url_original'] = trim((string) $item['url_original']);
+=======
+                if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
+                    $item['ncm'] = '';
+                }
+>>>>>>> 25e4dfe28914548118d204286e6c5d495d83b7a4
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
+                }
+                if (!array_key_exists('nome', $item) || $item['nome'] === null || $item['nome'] === '') {
+                    $item['nome'] = $item['nome_produto'];
                 }
 
                 $pvId = (int) ($item['produto_variacao_id'] ?? 0);
