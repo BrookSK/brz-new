@@ -319,9 +319,68 @@ class PaymentService {
             // Normalização para as views (padrão legado Asaas)
             $pixData = $pixResp['data'] ?? $pixResp;
             if (is_array($pixData)) {
-                $encodedImage = (string) ($pixData['encodedImage'] ?? ($pixData['qr_code_base64'] ?? ($pixData['qrCodeBase64'] ?? '')));
-                $payload = (string) ($pixData['payload'] ?? ($pixData['emv'] ?? ($pixData['copy_paste'] ?? '')));
-                $expirationDate = (string) ($pixData['expirationDate'] ?? ($pixData['expires_at'] ?? ''));
+                $encodedImage = '';
+                $payload = '';
+                $expirationDate = '';
+
+                // Alguns retornos vem aninhados
+                $pixInner = null;
+                if (!empty($pixData['pix']) && is_array($pixData['pix'])) {
+                    $pixInner = $pixData['pix'];
+                } elseif (!empty($pixData['data']['pix']) && is_array($pixData['data']['pix'])) {
+                    $pixInner = $pixData['data']['pix'];
+                }
+
+                $candidates = [$pixData];
+                if (is_array($pixInner)) {
+                    $candidates[] = $pixInner;
+                }
+
+                foreach ($candidates as $c) {
+                    if (!is_array($c)) {
+                        continue;
+                    }
+                    if ($encodedImage === '') {
+                        $encodedImage = (string) (
+                            $c['encodedImage'] ??
+                            $c['qr_code_base64'] ??
+                            $c['qrCodeBase64'] ??
+                            $c['qr_code'] ??
+                            $c['qrcode'] ??
+                            $c['qrcode_base64'] ??
+                            $c['base64'] ??
+                            ''
+                        );
+                    }
+                    if ($payload === '') {
+                        $payload = (string) (
+                            $c['payload'] ??
+                            $c['emv'] ??
+                            $c['copy_paste'] ??
+                            $c['brcode'] ??
+                            $c['pixCopiaECola'] ??
+                            ''
+                        );
+                    }
+                    if ($expirationDate === '') {
+                        $expirationDate = (string) (
+                            $c['expirationDate'] ??
+                            $c['expiration_date'] ??
+                            $c['expires_at'] ??
+                            ''
+                        );
+                    }
+                }
+
+                // Se vier como data:image/png;base64,..., remover prefixo
+                if ($encodedImage !== '') {
+                    $encodedImage = preg_replace('#^data:image/[^;]+;base64,#', '', $encodedImage);
+                    $encodedImage = trim((string) $encodedImage);
+                }
+                if ($payload !== '') {
+                    $payload = trim((string) $payload);
+                }
+
                 $result['pix'] = [
                     'encodedImage' => $encodedImage !== '' ? $encodedImage : null,
                     'payload' => $payload !== '' ? $payload : null,

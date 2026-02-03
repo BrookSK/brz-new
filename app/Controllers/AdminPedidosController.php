@@ -744,6 +744,30 @@ class AdminPedidosController extends Controller {
                                             . '</form>';
                                     }
 
+                                    $pgGateway2 = (string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''));
+                                    $pgMetodo2 = strtoupper((string) ($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? '')));
+                                    $pgStatus2 = strtoupper((string) ($pedido['payment_status'] ?? ($pedido['pagamento_status'] ?? '')));
+                                    $isPending2 = !in_array($pgStatus2, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);
+                                    $pixPayload = '';
+                                    if ($pgGateway2 === 'appmax' && $pgMetodo2 === 'PIX' && $isPending2) {
+                                        $pixPayload = (string) (
+                                            $pedido['payment_pix_payload'] ??
+                                            $pedido['pix_payload'] ??
+                                            $pedido['pix_emv'] ??
+                                            $pedido['pix_copy_paste'] ??
+                                            ''
+                                        );
+                                    }
+
+                                    if ($pixPayload !== '') {
+                                        $pixPayloadEsc = htmlspecialchars($pixPayload, ENT_QUOTES, 'UTF-8');
+                                        echo '<div class="mt-3">'
+                                            . '<div class="small text-muted mb-1">PIX (copia e cola)</div>'
+                                            . '<textarea class="form-control" rows="3" readonly id="admin-pix-payload">' . $pixPayloadEsc . '</textarea>'
+                                            . '<button type="button" class="btn btn-sm btn-outline-dark mt-2" onclick="copiarPixAdmin()">Copiar PIX</button>'
+                                            . '</div>';
+                                    }
+
                                     $pdoLocal = null;
                                     try {
                                         if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
@@ -885,6 +909,23 @@ class AdminPedidosController extends Controller {
             const status = document.getElementById("novo_status").value;
             if (status) {
                 window.location.href = "/admin/pedidos/atualizar-status/' . $id . '/" + status;
+            }
+        }
+
+        function copiarPixAdmin() {
+            const el = document.getElementById("admin-pix-payload");
+            if (!el) return;
+            const txt = el.value || el.textContent || "";
+            if (!txt) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(txt);
+                return;
+            }
+            el.focus();
+            el.select();
+            try {
+                document.execCommand("copy");
+            } catch (e) {
             }
         }
     </script>';
