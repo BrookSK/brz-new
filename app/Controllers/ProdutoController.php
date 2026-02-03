@@ -190,6 +190,13 @@ class ProdutoController extends Controller {
                     $counts['produto_variacoes'] = null;
                 }
                 try {
+                    $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacoes WHERE produto_id = ? AND ativo = 1');
+                    $st->execute([$produtoId]);
+                    $counts['produto_variacoes_ativas'] = (int) $st->fetchColumn();
+                } catch (\Throwable $e) {
+                    $counts['produto_variacoes_ativas'] = null;
+                }
+                try {
                     $st = $pdo->prepare('SELECT COUNT(*) FROM produto_variacao_itens pvi INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id WHERE pv.produto_id = ?');
                     $st->execute([$produtoId]);
                     $counts['produto_variacao_itens'] = (int) $st->fetchColumn();
@@ -212,6 +219,55 @@ class ProdutoController extends Controller {
                 $data['debug_counts'] = $counts;
                 $data['debug_error'] = $err;
                 $data['debug_produto_id'] = $produtoId;
+
+                $schema = [];
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacoes' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['produto_variacoes_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['produto_variacoes_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_itens' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['produto_variacao_itens_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['produto_variacao_itens_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'variacao_tipos' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['variacao_tipos_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['variacao_tipos_cols'] = null;
+                }
+                try {
+                    $st = $pdo->prepare("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'variacao_opcoes' ORDER BY ORDINAL_POSITION ASC");
+                    $st->execute();
+                    $schema['variacao_opcoes_cols'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $schema['variacao_opcoes_cols'] = null;
+                }
+
+                $samples = [];
+                try {
+                    $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC LIMIT 10');
+                    $st->execute([$produtoId]);
+                    $samples['produto_variacoes'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $samples['produto_variacoes'] = null;
+                }
+                try {
+                    $st = $pdo->prepare('SELECT pvi.* FROM produto_variacao_itens pvi INNER JOIN produto_variacoes pv ON pv.id = pvi.produto_variacao_id WHERE pv.produto_id = ? ORDER BY pvi.produto_variacao_id ASC, pvi.tipo_id ASC, pvi.opcao_id ASC LIMIT 50');
+                    $st->execute([$produtoId]);
+                    $samples['produto_variacao_itens'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $samples['produto_variacao_itens'] = null;
+                }
+
+                $data['debug_schema'] = $schema;
+                $data['debug_samples'] = $samples;
             }
 
             $this->json($data);
@@ -360,9 +416,16 @@ class ProdutoController extends Controller {
         ];
 
         try {
-            $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND ativo = 1 ORDER BY id ASC');
-            $stmtVars->execute([$produtoId]);
-            $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $vars = [];
+            try {
+                $stmtVars = $pdo->prepare('SELECT id, price_override, stock, ativo FROM produto_variacoes WHERE produto_id = ? AND ativo = 1 ORDER BY id ASC');
+                $stmtVars->execute([$produtoId]);
+                $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $stmtVars = $pdo->prepare('SELECT id, price_override, stock FROM produto_variacoes WHERE produto_id = ? ORDER BY id ASC');
+                $stmtVars->execute([$produtoId]);
+                $vars = $stmtVars->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
             if (empty($vars)) {
                 return $out;
             }
@@ -473,23 +536,40 @@ class ProdutoController extends Controller {
 
             $fotosPorVar = [];
             if ($this->tableExists($pdo, 'produto_variacao_fotos')) {
-                $sqlFotos = 'SELECT id, produto_variacao_id, nome_arquivo, legenda, ordem FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
-                $stmtFotos = $pdo->prepare($sqlFotos);
-                $stmtFotos->execute($varIds);
-                $rowsFotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                foreach ($rowsFotos as $f) {
-                    $vId = (int) ($f['produto_variacao_id'] ?? 0);
-                    if ($vId <= 0) continue;
-                    if (!isset($fotosPorVar[$vId])) $fotosPorVar[$vId] = [];
+                try {
+                    $hasLegenda = false;
+                    try {
+                        $stCol = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'produto_variacao_fotos' AND column_name = 'legenda'");
+                        $stCol->execute();
+                        $hasLegenda = ((int) $stCol->fetchColumn()) > 0;
+                    } catch (\Throwable $e) {
+                        $hasLegenda = false;
+                    }
 
-                    $path = $this->normalizeProdutoImagemPath($f['nome_arquivo'] ?? null);
-                    $fotosPorVar[$vId][] = [
-                        'id' => (int) ($f['id'] ?? 0),
-                        'nome_arquivo' => $path,
-                        'url_completa' => $path ? Url::absolute($path) : null,
-                        'legenda' => $f['legenda'] ?? null,
-                        'ordem' => (int) ($f['ordem'] ?? 0),
-                    ];
+                    $cols = $hasLegenda
+                        ? 'id, produto_variacao_id, nome_arquivo, legenda, ordem'
+                        : 'id, produto_variacao_id, nome_arquivo, ordem';
+
+                    $sqlFotos = 'SELECT ' . $cols . ' FROM produto_variacao_fotos WHERE produto_variacao_id IN (' . $in . ') ORDER BY produto_variacao_id ASC, ordem ASC, id ASC';
+                    $stmtFotos = $pdo->prepare($sqlFotos);
+                    $stmtFotos->execute($varIds);
+                    $rowsFotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsFotos as $f) {
+                        $vId = (int) ($f['produto_variacao_id'] ?? 0);
+                        if ($vId <= 0) continue;
+                        if (!isset($fotosPorVar[$vId])) $fotosPorVar[$vId] = [];
+
+                        $path = $this->normalizeProdutoImagemPath($f['nome_arquivo'] ?? null);
+                        $fotosPorVar[$vId][] = [
+                            'id' => (int) ($f['id'] ?? 0),
+                            'nome_arquivo' => $path,
+                            'url_completa' => $path ? Url::absolute($path) : null,
+                            'legenda' => $f['legenda'] ?? null,
+                            'ordem' => (int) ($f['ordem'] ?? 0),
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    $fotosPorVar = [];
                 }
             }
 
