@@ -24,6 +24,8 @@
                     <h5 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h5>
                 </div>
                 <div class="card-body">
+                    <?php $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL'))); ?>
+                    <?php $simboloMoeda = ($moedaPedido === 'USD') ? 'US$' : 'R$'; ?>
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <strong>Número do Pedido:</strong>
@@ -42,7 +44,7 @@
                         </div>
                         <div class="col-md-6">
                             <strong>Moeda:</strong>
-                            <span><?= $pedido['moeda'] ?></span>
+                            <span><?= htmlspecialchars($moedaPedido) ?></span>
                         </div>
                     </div>
 
@@ -68,8 +70,8 @@
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center"><?= $item['quantidade'] ?></td>
-                                    <td class="text-end"><?= $pedido['moeda'] ?> <?= number_format($item['preco_unitario'], 2, ',', '.') ?></td>
-                                    <td class="text-end"><?= $pedido['moeda'] ?> <?= number_format($item['subtotal'], 2, ',', '.') ?></td>
+                                    <td class="text-end"><?= $simboloMoeda ?> <?= number_format($item['preco_unitario'], 2, ',', '.') ?></td>
+                                    <td class="text-end"><?= $simboloMoeda ?> <?= number_format($item['subtotal'], 2, ',', '.') ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -109,25 +111,25 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
-                        <span><?= $pedido['moeda'] ?> <?= number_format($pedido['subtotal'], 2, ',', '.') ?></span>
+                        <span><?= $simboloMoeda ?> <?= number_format($pedido['subtotal'], 2, ',', '.') ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Frete:</span>
                         <?php $freteVal = (float) ($pedido['frete'] ?? 0); ?>
-                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($pedido['moeda'] . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
+                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço:</span>
-                        <span><?= $pedido['moeda'] ?> <?= number_format($pedido['taxa_servico'], 2, ',', '.') ?></span>
+                        <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'], 2, ',', '.') ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Impostos:</span>
-                        <span><?= $pedido['moeda'] ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
+                        <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between">
                         <strong>Total:</strong>
-                        <strong style="color: var(--primary-color);"><?= $pedido['moeda'] ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
+                        <strong style="color: var(--primary-color);"><?= $simboloMoeda ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
                     </div>
                 </div>
             </div>

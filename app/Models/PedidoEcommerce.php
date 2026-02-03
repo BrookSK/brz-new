@@ -368,6 +368,21 @@ class PedidoEcommerce {
 
             $pedido['taxa_conversao'] = $taxaConversao;
 
+            $deveConverterUSDParaBRL = false;
+            if ($moeda === 'BRL' && $taxaConversao > 1.01) {
+                // Preferir sinal explícito do schema, quando existir
+                $moedaOriginal = '';
+                foreach (['moeda_original', 'currency_original', 'original_currency'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $moedaOriginal = strtoupper(trim((string) ($pedido[$c] ?? '')));
+                        break;
+                    }
+                }
+                if ($moedaOriginal === 'USD') {
+                    $deveConverterUSDParaBRL = true;
+                }
+            }
+
             $subtotalProdutos = null;
             foreach (['subtotal_produtos', 'subtotal'] as $c) {
                 if (array_key_exists($c, $pedido)) {
@@ -377,6 +392,20 @@ class PedidoEcommerce {
             }
             if ($subtotalProdutos === null) {
                 $subtotalProdutos = 0.0;
+            }
+
+            // Se houver colunas específicas em BRL, usar como fonte em pedidos BRL
+            $subtotalProdutosBRL = null;
+            if ($moeda === 'BRL') {
+                foreach (['subtotal_produtos_brl', 'subtotal_brl'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $v = (float) ($pedido[$c] ?? 0);
+                        if ($v > 0) {
+                            $subtotalProdutosBRL = $v;
+                            break;
+                        }
+                    }
+                }
             }
 
             $valorFrete = null;
@@ -390,6 +419,19 @@ class PedidoEcommerce {
                 $valorFrete = 0.0;
             }
 
+            $valorFreteBRL = null;
+            if ($moeda === 'BRL') {
+                foreach (['valor_frete_brl', 'frete_brl'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $v = (float) ($pedido[$c] ?? 0);
+                        if ($v > 0) {
+                            $valorFreteBRL = $v;
+                            break;
+                        }
+                    }
+                }
+            }
+
             $taxaServico = null;
             foreach (['taxa_servico', 'servicos', 'service_fee'] as $c) {
                 if (array_key_exists($c, $pedido)) {
@@ -401,12 +443,16 @@ class PedidoEcommerce {
                 $taxaServico = 0.0;
             }
 
-            // Conversão: se o pedido é BRL, mas a taxa de serviço foi calculada em USD em alguns fluxos,
-            // multiplicar pela taxa de conversão quando fizer sentido.
-            if ($moeda === 'BRL' && $taxaConversao > 1.01 && $taxaServico > 0) {
-                // Heurística segura: converter apenas valores baixos (típico 39/78/117...) para não converter subtotal BRL indevidamente
-                if ($taxaServico <= 300) {
-                    $taxaServico = $taxaServico * $taxaConversao;
+            $taxaServicoBRL = null;
+            if ($moeda === 'BRL') {
+                foreach (['taxa_servico_brl', 'servicos_brl'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $v = (float) ($pedido[$c] ?? 0);
+                        if ($v > 0) {
+                            $taxaServicoBRL = $v;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -421,6 +467,19 @@ class PedidoEcommerce {
                 $valorImpostos = 0.0;
             }
 
+            $valorImpostosBRL = null;
+            if ($moeda === 'BRL') {
+                foreach (['valor_impostos_brl', 'impostos_brl', 'taxes_brl'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $v = (float) ($pedido[$c] ?? 0);
+                        if ($v > 0) {
+                            $valorImpostosBRL = $v;
+                            break;
+                        }
+                    }
+                }
+            }
+
             $valorTotal = null;
             foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
                 if (array_key_exists($c, $pedido)) {
@@ -432,11 +491,67 @@ class PedidoEcommerce {
                 $valorTotal = $subtotalProdutos + $valorFrete + $taxaServico + $valorImpostos;
             }
 
+            $valorTotalBRL = null;
+            if ($moeda === 'BRL') {
+                foreach (['valor_total_brl', 'total_brl', 'amount_brl'] as $c) {
+                    if (array_key_exists($c, $pedido)) {
+                        $v = (float) ($pedido[$c] ?? 0);
+                        if ($v > 0) {
+                            $valorTotalBRL = $v;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Se não há coluna BRL, decidir conversão por heurística
+            if ($moeda === 'BRL' && $taxaConversao > 1.01 && !$deveConverterUSDParaBRL) {
+                // Heurística: totals "baixos" + taxa>1 normalmente indicam USD salvo com moeda BRL
+                if ($valorTotal > 0 && $valorTotal <= 2000 && $subtotalProdutos <= 2000) {
+                    $deveConverterUSDParaBRL = true;
+                }
+            }
+
+            if ($moeda === 'BRL' && $taxaConversao > 1.01) {
+                // Preferência: valores explicitamente em BRL quando existirem
+                if ($valorTotalBRL !== null) {
+                    $valorTotal = $valorTotalBRL;
+                } elseif ($deveConverterUSDParaBRL) {
+                    $valorTotal = $valorTotal * $taxaConversao;
+                }
+
+                if ($subtotalProdutosBRL !== null) {
+                    $subtotalProdutos = $subtotalProdutosBRL;
+                } elseif ($deveConverterUSDParaBRL) {
+                    $subtotalProdutos = $subtotalProdutos * $taxaConversao;
+                }
+
+                if ($valorFreteBRL !== null) {
+                    $valorFrete = $valorFreteBRL;
+                } elseif ($deveConverterUSDParaBRL) {
+                    $valorFrete = $valorFrete * $taxaConversao;
+                }
+
+                if ($taxaServicoBRL !== null) {
+                    $taxaServico = $taxaServicoBRL;
+                } elseif ($deveConverterUSDParaBRL) {
+                    $taxaServico = $taxaServico * $taxaConversao;
+                }
+
+                if ($valorImpostosBRL !== null) {
+                    $valorImpostos = $valorImpostosBRL;
+                } elseif ($deveConverterUSDParaBRL) {
+                    $valorImpostos = $valorImpostos * $taxaConversao;
+                }
+            }
+
             $pedido['subtotal_produtos'] = $subtotalProdutos;
             $pedido['valor_frete'] = $valorFrete;
             $pedido['taxa_servico'] = $taxaServico;
             $pedido['valor_impostos'] = $valorImpostos;
             $pedido['valor_total'] = $valorTotal;
+
+            $pedido['__converted_to_brl'] = ($moeda === 'BRL' && $taxaConversao > 1.01 && $deveConverterUSDParaBRL);
 
             // Endereço de entrega: aceitar diferentes nomes de colunas
             $endereco = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ($pedido['endereco_envio'] ?? null));
@@ -637,6 +752,13 @@ class PedidoEcommerce {
                 $pu = (float) ($item['preco_unitario'] ?? 0);
                 if (!isset($item['subtotal']) || $item['subtotal'] === null) {
                     $item['subtotal'] = $pu * $q;
+                }
+
+                // Se normalizou pedido para BRL mas itens vieram em USD, converter aqui também
+                if (!empty($pedido['__converted_to_brl']) && !empty($pedido['taxa_conversao']) && (float) $pedido['taxa_conversao'] > 1.01) {
+                    $tx = (float) $pedido['taxa_conversao'];
+                    $item['preco_unitario'] = ((float) ($item['preco_unitario'] ?? 0)) * $tx;
+                    $item['subtotal'] = ((float) ($item['subtotal'] ?? 0)) * $tx;
                 }
             }
             unset($item);
