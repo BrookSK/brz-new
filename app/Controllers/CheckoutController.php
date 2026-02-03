@@ -398,6 +398,37 @@ class CheckoutController extends Controller {
 
         $valor = (float) ($pedidoRow['total'] ?? 0);
         $moeda = (string) ($pedidoRow['moeda'] ?? 'BRL');
+        $taxaConversao = (float) ($pedidoRow['taxa_conversao'] ?? 1.0);
+        if ($taxaConversao <= 0) {
+            $taxaConversao = 1.0;
+        }
+
+        // Se o pedido está como BRL mas o total parece estar em USD, converter antes de cobrar
+        $deveConverterParaBRL = false;
+        if (strtoupper(trim((string) $moeda)) === 'BRL') {
+            if ($taxaConversao <= 1.01) {
+                try {
+                    $dbTx = \Config\Database::getConnection();
+                    $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                    $stTx->execute();
+                    $v = (string) ($stTx->fetchColumn() ?: '0');
+                    $tx = (float) str_replace(',', '.', $v);
+                    if ($tx > 1.01) {
+                        $taxaConversao = $tx;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // heurística: total "baixo" com taxa>1 normalmente significa que total está em USD
+            if ($taxaConversao > 1.01 && $valor > 0 && $valor <= 2000) {
+                $deveConverterParaBRL = true;
+            }
+        }
+
+        if ($deveConverterParaBRL) {
+            $valor = $valor * $taxaConversao;
+        }
         $descricao = 'Pedido #' . (string) ($pedidoRow['numero_pedido'] ?? $pedidoId);
 
         $payload = [
@@ -443,7 +474,11 @@ class CheckoutController extends Controller {
                         $stmtF = $db->prepare('SELECT ' . $freteCol . ' AS frete FROM pedidos WHERE id = ? LIMIT 1');
                         $stmtF->execute([$pedidoId]);
                         $rowF = $stmtF->fetch(\PDO::FETCH_ASSOC) ?: [];
-                        $shippingValueCents = (int) round(((float) ($rowF['frete'] ?? 0)) * 100);
+                        $freteValor = (float) ($rowF['frete'] ?? 0);
+                        if ($deveConverterParaBRL) {
+                            $freteValor = $freteValor * $taxaConversao;
+                        }
+                        $shippingValueCents = (int) round($freteValor * 100);
                     }
                 } catch (\Exception $e) {
                 }
@@ -476,6 +511,9 @@ class CheckoutController extends Controller {
                             $qtd = (int) ($it['quantidade'] ?? 1);
                             if ($qtd <= 0) $qtd = 1;
                             $preco = (float) ($it['preco_unitario'] ?? 0);
+                            if ($deveConverterParaBRL) {
+                                $preco = $preco * $taxaConversao;
+                            }
                             $unitValueCents = (int) round($preco * 100);
                             if ($unitValueCents <= 0) {
                                 continue;
@@ -1128,7 +1166,7 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, taxa_conversao, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
                 } catch (\Exception $e) {
