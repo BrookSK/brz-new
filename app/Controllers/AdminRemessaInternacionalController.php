@@ -1076,6 +1076,17 @@ class AdminRemessaInternacionalController extends Controller {
             exit;
         }
 
+        $colsPedidos = [];
+        try {
+            $stCols = $this->connection->query('DESCRIBE pedidos');
+            $colsPedidos = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsPedidos = [];
+        }
+
+        $hasMoeda = is_array($colsPedidos) && in_array('moeda', $colsPedidos, true);
+        $hasCurrency = is_array($colsPedidos) && in_array('currency', $colsPedidos, true);
+
         // Pedidos da janela
         $sql = "
             SELECT 
@@ -1088,8 +1099,8 @@ class AdminRemessaInternacionalController extends Controller {
                 rjp.wexpress_status,
                 p.created_at,
                 p.total,
-                p.moeda,
-                p.currency,
+                " . ($hasMoeda ? 'p.moeda,' : "'' AS moeda,") . "
+                " . ($hasCurrency ? 'p.currency,' : "'' AS currency,") . "
                 p.status,
                 u.nome AS cliente_nome,
                 u.email AS cliente_email
