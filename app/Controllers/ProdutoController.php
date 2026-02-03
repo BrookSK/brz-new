@@ -80,9 +80,9 @@ class ProdutoController extends Controller {
             'fotos_por_variacao' => [],
         ];
         try {
-            $pdo = \Config\Database::getConnection();
+            $pdo = $this->produtoModel->getConnection();
             $variacoesUi = $this->buildVariacoesUiData($pdo, (int) $produtoId);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
         }
 
         $fotoPrincipal = null;
@@ -181,7 +181,7 @@ class ProdutoController extends Controller {
             $pvId = (int) $produtoVariacaoId;
             if ($pvId > 0) {
                 try {
-                    $pdo = \Config\Database::getConnection();
+                    $pdo = $this->produtoModel->getConnection();
                     $st = $pdo->prepare('SELECT id, produto_id, price_override, stock, ativo FROM produto_variacoes WHERE id = ? LIMIT 1');
                     $st->execute([$pvId]);
                     $row = $st->fetch(\PDO::FETCH_ASSOC);
@@ -199,7 +199,7 @@ class ProdutoController extends Controller {
                     }
 
                     $variacaoDescricao = $this->buildVariacaoDescricao($pdo, $pvId);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                 }
             }
         }
