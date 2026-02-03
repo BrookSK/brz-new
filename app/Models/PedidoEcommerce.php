@@ -66,6 +66,12 @@ class PedidoEcommerce {
                 }
             }
 
+            foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate', 'moeda_original', 'moeda_original', 'valor_total_brl', 'total_brl'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $select[] = 'p.' . $c;
+                }
+            }
+
             $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid ORDER BY ' . $orderCol . ' DESC LIMIT :lim OFFSET :off';
             $stmt = $this->connection->prepare($sql);
             $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
@@ -86,6 +92,111 @@ class PedidoEcommerce {
                 }
                 if (!isset($r['total_itens'])) {
                     $r['total_itens'] = 0;
+                }
+
+                $moeda = strtoupper((string) ($r['moeda'] ?? ($r['currency'] ?? 'BRL')));
+                if ($moeda === '') {
+                    $moeda = 'BRL';
+                }
+                $r['moeda'] = $moeda;
+
+                $taxaConversao = null;
+                foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate'] as $c) {
+                    if (array_key_exists($c, $r)) {
+                        $taxaConversao = (float) ($r[$c] ?? 0);
+                        break;
+                    }
+                }
+                if ($taxaConversao === null || $taxaConversao <= 0) {
+                    $taxaConversao = 1.0;
+                }
+
+                if ($moeda === 'BRL' && $taxaConversao <= 1.01) {
+                    try {
+                        $rateFromConfig = 0.0;
+                        foreach (['configuracoes_sistema', 'configuracoes', 'settings', 'config'] as $tbl) {
+                            if (!$this->tableExists($tbl)) {
+                                continue;
+                            }
+                            $colsCfg = $this->getTableColumns($tbl);
+                            $colChave = $this->pickColumn($colsCfg, ['chave', 'key', 'nome', 'config_key', 'slug', 'parametro']);
+                            $colValor = $this->pickColumn($colsCfg, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+                            if (!$colChave || !$colValor) {
+                                continue;
+                            }
+
+                            $keys = ['usd_brl_rate', 'sistema_usd_brl_rate'];
+                            foreach ($keys as $k) {
+                                try {
+                                    $stCfg = $this->connection->prepare('SELECT ' . $colValor . ' AS v FROM ' . $tbl . ' WHERE ' . $colChave . ' = ? LIMIT 1');
+                                    $stCfg->execute([$k]);
+                                    $val = $stCfg->fetchColumn();
+                                    $v = (float) str_replace(',', '.', (string) ($val ?? '0'));
+                                    if ($v > 1.01) {
+                                        $rateFromConfig = $v;
+                                        break 2;
+                                    }
+                                } catch (\Exception $e) {
+                                }
+                            }
+                        }
+                        if ($rateFromConfig > 1.01) {
+                            $taxaConversao = $rateFromConfig;
+                        }
+
+                        if ($this->tableExists('configuracoes_moeda')) {
+                            $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                            $stTx->execute();
+                            $txRow = $stTx->fetch(\PDO::FETCH_ASSOC);
+                            $tx = (float) ($txRow['taxa_conversao'] ?? 0);
+                            if ($tx > 1.01) {
+                                $taxaConversao = $tx;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $r['taxa_conversao'] = $taxaConversao;
+
+                if ($moeda === 'BRL' && $taxaConversao > 1.01) {
+                    $valorTotalBRL = null;
+                    foreach (['valor_total_brl', 'total_brl'] as $c) {
+                        if (array_key_exists($c, $r)) {
+                            $v = (float) ($r[$c] ?? 0);
+                            if ($v > 0) {
+                                $valorTotalBRL = $v;
+                                break;
+                            }
+                        }
+                    }
+
+                    $totalField = null;
+                    foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+                        if (array_key_exists($c, $r)) {
+                            $totalField = $c;
+                            break;
+                        }
+                    }
+
+                    if ($totalField !== null) {
+                        $baseTotal = (float) ($r[$totalField] ?? 0);
+                        if ($valorTotalBRL !== null) {
+                            $r[$totalField] = $valorTotalBRL;
+                            $r['valor_total'] = $valorTotalBRL;
+                        } else {
+                            $moedaOriginal = strtoupper(trim((string) ($r['moeda_original'] ?? '')));
+                            $deveConverter = ($moedaOriginal === 'USD');
+                            if (!$deveConverter && $baseTotal > 0 && $baseTotal <= 2000) {
+                                $deveConverter = true;
+                            }
+                            if ($deveConverter) {
+                                $conv = $baseTotal * $taxaConversao;
+                                $r[$totalField] = $conv;
+                                $r['valor_total'] = $conv;
+                            }
+                        }
+                    }
                 }
             }
             unset($r);
@@ -353,8 +464,41 @@ class PedidoEcommerce {
             // Se o pedido é BRL mas a taxa veio como 1.0, tentar buscar na tabela configuracoes_moeda
             if ($moeda === 'BRL' && $taxaConversao <= 1.01) {
                 try {
+                    // 1) Tentar configuracoes_sistema/configuracoes/settings/config (chave/valor)
+                    $rateFromConfig = 0.0;
+                    foreach (['configuracoes_sistema', 'configuracoes', 'settings', 'config'] as $tbl) {
+                        if (!$this->tableExists($tbl)) {
+                            continue;
+                        }
+                        $colsCfg = $this->getTableColumns($tbl);
+                        $colChave = $this->pickColumn($colsCfg, ['chave', 'key', 'nome', 'config_key', 'slug', 'parametro']);
+                        $colValor = $this->pickColumn($colsCfg, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+                        if (!$colChave || !$colValor) {
+                            continue;
+                        }
+
+                        // formatos aceitos
+                        $keys = ['usd_brl_rate', 'sistema_usd_brl_rate'];
+                        foreach ($keys as $k) {
+                            try {
+                                $stCfg = $this->connection->prepare('SELECT ' . $colValor . ' AS v FROM ' . $tbl . ' WHERE ' . $colChave . ' = ? LIMIT 1');
+                                $stCfg->execute([$k]);
+                                $val = $stCfg->fetchColumn();
+                                $v = (float) str_replace(',', '.', (string) ($val ?? '0'));
+                                if ($v > 1.01) {
+                                    $rateFromConfig = $v;
+                                    break 2;
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+                    }
+                    if ($rateFromConfig > 1.01) {
+                        $taxaConversao = $rateFromConfig;
+                    }
+
                     if ($this->tableExists('configuracoes_moeda')) {
-                        $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' LIMIT 1");
+                        $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
                         $stTx->execute();
                         $txRow = $stTx->fetch(\PDO::FETCH_ASSOC);
                         $tx = (float) ($txRow['taxa_conversao'] ?? 0);

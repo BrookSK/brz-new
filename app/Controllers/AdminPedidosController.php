@@ -17,6 +17,27 @@ class AdminPedidosController extends Controller {
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
             $status = $request->getParam('status', '');
+
+            $colsPedidos = [];
+            try {
+                $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
+            $rateUSDBRL = 5.5;
+            try {
+                $stmtTx = $pdo->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                $stmtTx->execute();
+                $rowTx = $stmtTx->fetch(\PDO::FETCH_ASSOC);
+                $tx = (float) ($rowTx['taxa_conversao'] ?? 0);
+                if ($tx > 1.01) {
+                    $rateUSDBRL = $tx;
+                }
+            } catch (\Exception $e) {
+            }
             
             $sql = "SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $params = [];
@@ -38,6 +59,80 @@ class AdminPedidosController extends Controller {
             $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Normalizar moeda/total para exibição (sem alterar o banco)
+            if (is_array($pedidos) && !empty($pedidos)) {
+                foreach ($pedidos as &$p) {
+                    $moeda = strtoupper(trim((string) ($p['moeda'] ?? ($p['currency'] ?? 'BRL'))));
+                    if ($moeda === '') {
+                        $moeda = 'BRL';
+                    }
+                    $p['moeda'] = $moeda;
+
+                    $taxaConversao = null;
+                    foreach (['taxa_conversao', 'exchange_rate', 'conversion_rate'] as $c) {
+                        if (array_key_exists($c, $p)) {
+                            $taxaConversao = (float) ($p[$c] ?? 0);
+                            break;
+                        }
+                    }
+                    if ($taxaConversao === null || $taxaConversao <= 0) {
+                        $taxaConversao = 1.0;
+                    }
+                    if ($moeda === 'BRL' && $taxaConversao <= 1.01 && $rateUSDBRL > 1.01) {
+                        $taxaConversao = $rateUSDBRL;
+                    }
+                    $p['taxa_conversao'] = $taxaConversao;
+
+                    // Total base usado pela tela
+                    $totalField = '';
+                    foreach (['total', 'valor_total', 'amount', 'valor'] as $c) {
+                        if (array_key_exists($c, $p)) {
+                            $totalField = $c;
+                            break;
+                        }
+                    }
+                    if ($totalField === '') {
+                        continue;
+                    }
+
+                    if ($moeda === 'BRL' && $taxaConversao > 1.01) {
+                        // Preferir total BRL quando existir
+                        $valorTotalBRL = null;
+                        foreach (['valor_total_brl', 'total_brl'] as $c) {
+                            if (array_key_exists($c, $p)) {
+                                $v = (float) ($p[$c] ?? 0);
+                                if ($v > 0) {
+                                    $valorTotalBRL = $v;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $baseTotal = (float) ($p[$totalField] ?? 0);
+                        $moedaOriginal = strtoupper(trim((string) ($p['moeda_original'] ?? '')));
+                        $deveConverter = ($moedaOriginal === 'USD');
+                        if (!$deveConverter && $baseTotal > 0 && $baseTotal <= 2000) {
+                            $deveConverter = true;
+                        }
+
+                        if ($valorTotalBRL !== null) {
+                            $p[$totalField] = $valorTotalBRL;
+                            $p['total'] = $valorTotalBRL;
+                        } elseif ($deveConverter) {
+                            $conv = $baseTotal * $taxaConversao;
+                            $p[$totalField] = $conv;
+                            $p['total'] = $conv;
+                        }
+                    } else {
+                        // Garantir que a view tenha total preenchido
+                        if (!array_key_exists('total', $p) && $totalField !== '') {
+                            $p['total'] = (float) ($p[$totalField] ?? 0);
+                        }
+                    }
+                }
+                unset($p);
+            }
             
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];

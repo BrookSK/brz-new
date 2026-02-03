@@ -1268,8 +1268,10 @@ class CheckoutController extends Controller {
             return;
         }
         
-        // Obter dados do pedido
-        $pedido = $this->obterPedidoCompleto($pedidoId);
+        // Obter dados do pedido (normalizado para exibição)
+        // Importante: não altera registros; converte apenas na camada de leitura quando necessário.
+        $pedidoModel = new \App\Models\PedidoEcommerce();
+        $pedido = $pedidoModel->getComDetalhes((int) $pedidoId);
         
         if (!$pedido) {
             $this->redirect('/produtos');
@@ -1327,7 +1329,7 @@ class CheckoutController extends Controller {
         
         $this->view('checkout/conclusao', [
             'pedido' => $pedido,
-            'itens' => $this->obterItensPedido($pedidoId),
+            'itens' => (array) ($pedido['items'] ?? []),
             'paymentDetails' => $paymentDetails,
             'pixQrCode' => $pixQrCode
         ]);
