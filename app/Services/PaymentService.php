@@ -431,6 +431,17 @@ class PaymentService {
                     }
                 } catch (\Exception $e) {
                 }
+
+                // Fallback: algumas instalações usam chave sem prefixo de categoria (ex: stripe_enabled)
+                try {
+                    $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute([$chave]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($row && array_key_exists('valor', $row)) {
+                        return $row['valor'];
+                    }
+                } catch (\Exception $e) {
+                }
             }
         }
 
