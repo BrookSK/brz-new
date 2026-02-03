@@ -53,86 +53,40 @@ class PaymentService {
             }
         }
 
-        $buildUrl = function (string $base, string $p, string $token): string {
-            $u = rtrim($base, '/') . '/' . ltrim($p, '/');
-            // Muitas integrações AppMax usam access-token na query string.
-            if (strpos($u, '?') === false) {
-                $u .= '?access-token=' . rawurlencode($token);
-            } else {
-                $u .= '&access-token=' . rawurlencode($token);
-            }
-            return $u;
-        };
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
 
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json',
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
-            'access-token: ' . (string) $this->appmaxV3AccessToken,
         ];
 
         $payloadArr = is_array($body) ? $body : [];
-        // Manter access-token no corpo também (compatibilidade)
+        // Documentação oficial: access-token vai no corpo JSON
         if (!array_key_exists('access-token', $payloadArr)) {
             $payloadArr['access-token'] = (string) $this->appmaxV3AccessToken;
         }
         $payload = json_encode($payloadArr);
 
-        $tryBases = [];
-        $tryBases[] = (string) $baseUrl;
-        // Fallback automático trocando /api/v3 <-> /api
-        if (preg_match('#/api/v3/?$#i', $baseUrl)) {
-            $tryBases[] = preg_replace('#/api/v3/?$#i', '/api', $baseUrl);
-        } elseif (preg_match('#/api/?$#i', $baseUrl)) {
-            $tryBases[] = preg_replace('#/api/?$#i', '/api/v3', $baseUrl);
-        }
-
-        $lastHttpCode = 0;
-        $lastDecoded = null;
-        $lastRespBody = '';
-        $lastUrl = '';
-        foreach ($tryBases as $b) {
-            $url = $buildUrl((string) $b, $path, (string) $this->appmaxV3AccessToken);
-            $lastUrl = (string) $url;
-
-            if (function_exists('curl_init')) {
-                $ch = curl_init($url);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-                if ($payload !== null) {
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-                }
-                $respBody = curl_exec($ch);
-                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $err = curl_error($ch);
-                curl_close($ch);
-
-                if (!empty($err)) {
-                    throw new \Exception('Erro de conexão com AppMax: ' . $err);
-                }
-
-                $decoded = json_decode((string) $respBody, true);
-                $lastHttpCode = $httpCode;
-                $lastDecoded = $decoded;
-                $lastRespBody = (string) $respBody;
-
-                // Se HTTP erro, tentar próxima base antes de falhar
-                if ($httpCode < 200 || $httpCode >= 300) {
-                    continue;
-                }
-
-                // Alguns endpoints errados retornam 200 com success=false e text=Not Found
-                if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
-                    $txt = (string) ($decoded['text'] ?? '');
-                    if (stripos($txt, 'not found') !== false) {
-                        continue;
-                    }
-                }
-
-                return is_array($decoded) ? $decoded : [];
+        $respBody = '';
+        $httpCode = 0;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
             }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
 
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com AppMax: ' . $err);
+            }
+        } else {
             $context = stream_context_create([
                 'http' => [
                     'method' => strtoupper($method),
@@ -142,33 +96,21 @@ class PaymentService {
                 ]
             ]);
             $respBody = @file_get_contents($url, false, $context);
-            $decoded = json_decode((string) $respBody, true);
-            $lastHttpCode = 200;
-            $lastDecoded = $decoded;
-            $lastRespBody = (string) $respBody;
-            if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
-                $txt = (string) ($decoded['text'] ?? '');
-                if (stripos($txt, 'not found') !== false) {
-                    continue;
-                }
-            }
-            return is_array($decoded) ? $decoded : [];
+            $httpCode = 200;
         }
 
-        $msg = is_array($lastDecoded) ? json_encode($lastDecoded) : (string) $lastRespBody;
-        $safeUrl = (string) $lastUrl;
-        if ($safeUrl !== '') {
-            $safeUrl = preg_replace('#([\?&]access-token=)[^&]+#i', '$1***', $safeUrl);
+        $decoded = json_decode((string) $respBody, true);
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
         }
 
-        if (is_array($lastDecoded) && (isset($lastDecoded['success']) && $lastDecoded['success'] === false)) {
-            $txt = strtolower(trim((string) ($lastDecoded['text'] ?? '')));
-            if ($txt === 'not found') {
-                throw new \Exception('AppMax: endpoint/token inválido (Not Found). Verifique pagamentos.appmax_access_token e pagamentos.appmax_base_url. url=' . $safeUrl . ' resp=' . $msg);
-            }
+        if (is_array($decoded) && (isset($decoded['success']) && $decoded['success'] === false)) {
+            $msg = json_encode($decoded);
+            throw new \Exception('Erro AppMax HTTP ' . $httpCode . ': ' . $msg);
         }
 
-        throw new \Exception('Erro AppMax HTTP ' . (int) $lastHttpCode . ': ' . $msg . ($safeUrl !== '' ? (' url=' . $safeUrl) : ''));
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function appmaxCreateCustomer(array $dados, array $products = []): int {
