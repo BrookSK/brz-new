@@ -355,6 +355,10 @@ class PaymentService {
                     'base64',
                     'image_base64',
                     'pix_qrcode_base64',
+                    'pix_qrcode',
+                    'pixQrCode',
+                    'pix_qr_code',
+                    'pix_qr',
                 ]);
                 $payload = $findFirstString($pixData, [
                     'payload',
@@ -365,6 +369,8 @@ class PaymentService {
                     'br_code',
                     'pixCopiaECola',
                     'pix_copia_cola',
+                    'pix_emv',
+                    'pix_brcode',
                     'copia_e_cola',
                 ]);
                 $expirationDate = $findFirstString($pixData, [
