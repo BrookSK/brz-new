@@ -1622,7 +1622,7 @@ HTML;
 
             echo '<div class="card mb-3">
                     <div class="card-body">
-                        <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/atributos">
+                        <div>
                             <div class="row g-2">';
 
             foreach ($variacaoTipos as $t) {
@@ -1658,10 +1658,10 @@ HTML;
             }
 
             echo '          <div class="col-12">
-                                <button type="submit" class="btn btn-outline-primary w-100">Salvar atributos/opções</button>
+                                <button type="submit" class="btn btn-outline-primary w-100" formaction="/admin/produtos/' . (int) $id . '/variacoes/atributos" formmethod="POST" formnovalidate>Salvar atributos/opções</button>
                             </div>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>';
 
