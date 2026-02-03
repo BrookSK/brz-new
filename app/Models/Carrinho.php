@@ -77,12 +77,44 @@ class Carrinho extends Model {
     }
 
     public function getTaxaConversao($moeda) {
-        $stmt = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = :moeda");
-        $stmt->bindParam(':moeda', $moeda);
-        $stmt->execute();
-        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        return $result ? $result['taxa_conversao'] : 5.5;
+        $m = strtoupper(trim((string) $moeda));
+        if ($m === '') {
+            $m = 'BRL';
+        }
+
+        // Preferir taxa configurada pelo admin em configuracoes_sistema
+        if ($m === 'BRL') {
+            try {
+                foreach (['usd_brl_rate', 'sistema_usd_brl_rate'] as $k) {
+                    try {
+                        $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                        $st->execute([$k]);
+                        $val = $st->fetchColumn();
+                        $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                        if ($v > 1.01) {
+                            return $v;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        // Fallback: tabela configuracoes_moeda
+        try {
+            $stmt = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = :moeda ORDER BY id DESC LIMIT 1");
+            $stmt->bindParam(':moeda', $m);
+            $stmt->execute();
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $tx = $result ? (float) ($result['taxa_conversao'] ?? 0) : 0.0;
+            if ($tx > 0) {
+                return $tx;
+            }
+        } catch (\Exception $e) {
+        }
+
+        return 5.5;
     }
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
