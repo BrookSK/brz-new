@@ -1282,20 +1282,28 @@ JS;
                 $moeda = 'USD';
             }
 
-            $subtotalRaw = str_replace(',', '.', (string) $request->getParam('subtotal', '0'));
-            $subtotal = is_numeric($subtotalRaw) ? (float) $subtotalRaw : 0.0;
-
-            $pesoRaw = str_replace(',', '.', (string) $request->getParam('peso_total', '0'));
-            $pesoTotal = is_numeric($pesoRaw) ? (float) $pesoRaw : 0.0;
-
             $itensRaw = (string) $request->getParam('itens', '[]');
             $itens = json_decode($itensRaw, true);
             if (!is_array($itens)) {
                 $itens = [];
             }
 
-            // Recalcular peso de forma autoritativa (garante peso real do produto)
+            // Subtotal autoritativo: soma dos itens (evita divergências de parsing no front)
+            $subtotal = 0.0;
+            foreach ($itens as $it) {
+                if (!is_array($it)) continue;
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                $vu = (float) ($it['valor_unitario'] ?? 0);
+                if ($qtd > 0 && $vu >= 0) {
+                    $subtotal += ($qtd * $vu);
+                }
+            }
+            $subtotal = round($subtotal, 2);
+
+            // Peso enviado pelo front é ignorado; recalculamos via BD.
             $pesoTotal = 0.0;
+
+            // Recalcular peso de forma autoritativa (garante peso real do produto)
             $db = \Config\Database::getConnection();
             $pesoCache = [];
             $stPeso = null;
