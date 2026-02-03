@@ -762,6 +762,194 @@ class AdminRemessaInternacionalController extends Controller {
         exit;
     }
 
+    public function baixarEtiquetaWexpress($request, $janelaId, $pedidoId) {
+        $this->requireAdmin();
+
+        $jid = (int) $janelaId;
+        $pid = (int) $pedidoId;
+        if ($jid <= 0 || $pid <= 0) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => 'Parâmetros inválidos']);
+            exit;
+        }
+
+        $st = $this->connection->prepare('SELECT wexpress_shipping_id, wexpress_last_response_json FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
+        $st->execute([$jid, $pid]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $shipId = trim((string) ($row['wexpress_shipping_id'] ?? ''));
+        if ($shipId === '') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => 'Shipping ID não encontrado para este pedido']);
+            exit;
+        }
+
+        $svc = new \App\Services\WExpressService();
+        $data = null;
+        try {
+            $data = $svc->getShipping($shipId);
+        } catch (\Exception $e) {
+            // fallback para a última resposta salva
+            $raw = (string) ($row['wexpress_last_response_json'] ?? '');
+            $decoded = $raw !== '' ? json_decode($raw, true) : null;
+            if (is_array($decoded)) {
+                $data = $decoded;
+            } else {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                exit;
+            }
+        }
+
+        // Alguns ambientes não devolvem o PDF/URL da etiqueta no GET /shipping/{id};
+        // então tentamos endpoints comuns para download do label.
+        $sid = rawurlencode($shipId);
+        $labelPaths = [
+            '/shipping/' . $sid . '/label/',
+            '/shipping/' . $sid . '/label',
+            '/shipping/' . $sid . '/label/?format=pdf',
+            '/shipping/' . $sid . '/label?format=pdf',
+            '/shipping/' . $sid . '/labels/',
+            '/shipping/' . $sid . '/labels',
+            '/shipping/' . $sid . '/labels/?format=pdf',
+            '/shipping/' . $sid . '/labels?format=pdf',
+            '/shipping/' . $sid . '/documents/label/',
+            '/shipping/' . $sid . '/documents/label',
+            '/shipping/' . $sid . '/documents/label?format=pdf',
+            '/shipping/' . $sid . '/document/label/',
+            '/shipping/' . $sid . '/document/label',
+            '/shipping/' . $sid . '/pdf/',
+            '/shipping/' . $sid . '/pdf',
+            // variações alternativas
+            '/shipping/label/' . $sid,
+            '/shipping/label/' . $sid . '/',
+            '/shipping/labels/' . $sid,
+            '/shipping/labels/' . $sid . '/',
+            '/labels/' . $sid,
+            '/label/' . $sid,
+            '/shipping/' . $sid . '/print/',
+            '/shipping/' . $sid . '/print',
+        ];
+
+        $attempts = [];
+        foreach ($labelPaths as $p) {
+            try {
+                $raw = $svc->requestRaw('GET', $p);
+                $ct = strtolower((string) ($raw['content_type'] ?? ''));
+                $body = $raw['body'] ?? '';
+                $attempts[] = [
+                    'path' => $p,
+                    'http_code' => (int) ($raw['http_code'] ?? 0),
+                    'content_type' => (string) ($raw['content_type'] ?? ''),
+                    'len' => is_string($body) ? strlen($body) : null,
+                    'first4' => is_string($body) ? substr($body, 0, 4) : null,
+                    'url' => (string) ($raw['url'] ?? ''),
+                ];
+
+                $isPdf = (strpos($ct, 'application/pdf') !== false);
+                if (!$isPdf && is_string($body)) {
+                    $isPdf = (strncmp($body, '%PDF', 4) === 0);
+                }
+
+                if ($isPdf) {
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: attachment; filename="etiqueta_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $shipId) . '.pdf"');
+                    echo $body;
+                    exit;
+                }
+
+                // Se devolver JSON com link
+                $decoded = null;
+                if (is_string($body)) {
+                    $decoded = json_decode($body, true);
+                }
+                if (is_array($decoded)) {
+                    $found2 = $this->findWexpressLabelResource($decoded);
+                    if (is_array($found2) && ($found2['type'] ?? '') === 'url' && !empty($found2['value'])) {
+                        header('Location: ' . $found2['value']);
+                        exit;
+                    }
+                    if (is_array($found2) && ($found2['type'] ?? '') === 'base64_pdf' && !empty($found2['value'])) {
+                        $bin = base64_decode((string) $found2['value']);
+                        if ($bin !== false) {
+                            header('Content-Type: application/pdf');
+                            header('Content-Disposition: attachment; filename="etiqueta_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $shipId) . '.pdf"');
+                            echo $bin;
+                            exit;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // ignora e tenta o próximo
+                $attempts[] = [
+                    'path' => $p,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        $found = $this->findWexpressLabelResource($data);
+        if (is_array($found) && ($found['type'] ?? '') === 'url' && !empty($found['value'])) {
+            header('Location: ' . $found['value']);
+            exit;
+        }
+        if (is_array($found) && ($found['type'] ?? '') === 'base64_pdf' && !empty($found['value'])) {
+            $bin = base64_decode((string) $found['value']);
+            if ($bin === false) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => 'Falha ao decodificar PDF (base64)']);
+                exit;
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="etiqueta_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $shipId) . '.pdf"');
+            echo $bin;
+            exit;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'error' => 'Etiqueta não encontrada no retorno da W-Express. Envie o JSON de retorno para mapear o campo correto.',
+            'shipping_id' => $shipId,
+            'data' => $data,
+            'label_attempts' => $attempts,
+        ]);
+        exit;
+    }
+
+    private function findWexpressLabelResource($data): ?array {
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $queue = [$data];
+        while (!empty($queue)) {
+            $cur = array_shift($queue);
+            if (!is_array($cur)) {
+                continue;
+            }
+            foreach ($cur as $k => $v) {
+                $key = strtolower((string) $k);
+
+                if (is_string($v)) {
+                    $val = trim($v);
+                    // URL
+                    if (preg_match('#^https?://#i', $val) && (strpos($key, 'label') !== false || strpos($key, 'etiqueta') !== false || strpos($key, 'pdf') !== false)) {
+                        return ['type' => 'url', 'value' => $val, 'key' => (string) $k];
+                    }
+                    // base64 pdf
+                    if ((strpos($key, 'label') !== false || strpos($key, 'etiqueta') !== false || strpos($key, 'pdf') !== false) && strlen($val) > 200 && preg_match('#^[A-Za-z0-9+/=\r\n]+$#', $val)) {
+                        return ['type' => 'base64_pdf', 'value' => preg_replace('/\s+/', '', $val), 'key' => (string) $k];
+                    }
+                }
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function getJanelasByStatus(array $statuses): array {
         $statuses = array_values(array_filter(array_map('strval', $statuses)));
         if (!$statuses) {
@@ -1007,7 +1195,7 @@ function fecharJanela() {
 
         $this->syncPedidosParaJanela($jid);
 
-        $stChk = $this->connection->prepare('SELECT etiqueta_gerada, etiqueta_gerada_em FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
+        $stChk = $this->connection->prepare('SELECT etiqueta_gerada, etiqueta_gerada_em, wexpress_shipping_id, wexpress_status, wexpress_tracking_number, courier_tracking_number FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
         $stChk->execute([$jid, $pid]);
         $rel = $stChk->fetch(\PDO::FETCH_ASSOC) ?: [];
 
@@ -1050,6 +1238,11 @@ function fecharJanela() {
         $etBadge = $et === 1 ? 'success' : 'warning';
         $etLabel = $et === 1 ? 'Gerada' : 'Pendente';
 
+        $wxShipId = (string) ($rel['wexpress_shipping_id'] ?? '');
+        $wxStatus = (string) ($rel['wexpress_status'] ?? '');
+        $wxTrack = (string) ($rel['wexpress_tracking_number'] ?? '');
+        $wxCourier = (string) ($rel['courier_tracking_number'] ?? '');
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
@@ -1058,9 +1251,21 @@ function fecharJanela() {
                 </div>
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-internacional/janela/' . (int) $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    ' . ($wxShipId !== '' ? ('<a class="btn btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $jid . '/pedido/' . (int) $pid . '/etiqueta-download" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>') : '') . '
                     <button class="btn btn-success" type="button" onclick="gerarEtiqueta()"><i class="fas fa-tag"></i> Gerar etiqueta</button>
                 </div>
             </div>
+
+            ' . ($wxStatus !== '' || $wxShipId !== '' || $wxCourier !== '' ? ('
+            <div class="alert alert-light border mb-3">
+                <div class="small">
+                    ' . ($wxStatus !== '' ? ('<div><strong>Status:</strong> ' . htmlspecialchars($wxStatus) . '</div>') : '') . '
+                    ' . ($wxShipId !== '' ? ('<div><strong>Shipping ID:</strong> ' . htmlspecialchars($wxShipId) . '</div>') : '') . '
+                    ' . ($wxTrack !== '' ? ('<div><strong>WExpress tracking:</strong> ' . htmlspecialchars($wxTrack) . '</div>') : '') . '
+                    ' . ($wxCourier !== '' ? ('<div><strong>Courier tracking:</strong> ' . htmlspecialchars($wxCourier) . '</div>') : '') . '
+                </div>
+            </div>
+            ') : '') . '
 
             <div class="card mb-3">
                 <div class="card-header"><strong>W-Express</strong></div>

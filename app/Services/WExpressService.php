@@ -52,6 +52,92 @@ class WExpressService {
         return $this->request('GET', '/shipping/' . rawurlencode($wexpressId));
     }
 
+    public function requestRaw(string $method, string $path, ?array $body = null): array {
+        if (empty($this->apiKey)) {
+            throw new \Exception('W-Express não configurado (API Key ausente)');
+        }
+
+        $baseUrl = $this->getBaseUrl();
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
+
+        $headers = [
+            'Accept: */*',
+            'x-api-key: ' . $this->apiKey,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+        if ($body !== null) {
+            $headers[] = 'Content-Type: application/json';
+        }
+
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body);
+        }
+
+        if (!function_exists('curl_init')) {
+            throw new \Exception('cURL não disponível no servidor');
+        }
+
+        $respBody = false;
+        $httpCode = 0;
+        $err = '';
+        $contentType = '';
+
+        $tryUrls = [$url];
+        $tryUrls[] = preg_replace('#^https?://api\.wexpress\.me#i', 'https://wexpress.me', $url);
+        $tryUrls[] = preg_replace('#^https?://api\.wexpress\.me#i', 'https://sandbox.wexpress.me', $url);
+        $tryUrls = array_values(array_unique(array_filter($tryUrls)));
+
+        foreach ($tryUrls as $tryUrl) {
+            $respHeaders = [];
+            $ch = curl_init($tryUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$respHeaders) {
+                $len = strlen($header);
+                $header = trim($header);
+                if ($header !== '') {
+                    $respHeaders[] = $header;
+                }
+                return $len;
+            });
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $err = (string) curl_error($ch);
+            curl_close($ch);
+
+            if ($err === '' || stripos($err, 'Could not resolve host') === false) {
+                $url = $tryUrl;
+                break;
+            }
+        }
+
+        $this->lastHttpCode = $httpCode;
+
+        if ($err) {
+            throw new \Exception('Erro ao chamar W-Express: ' . $err);
+        }
+
+        if ($httpCode >= 400) {
+            $decoded = $respBody !== false ? json_decode((string) $respBody, true) : null;
+            $msg = is_array($decoded) ? ($decoded['message'] ?? json_encode($decoded)) : (string) $respBody;
+            throw new \Exception('W-Express HTTP ' . $httpCode . ': ' . $msg);
+        }
+
+        return [
+            'http_code' => $httpCode,
+            'content_type' => $contentType,
+            'body' => $respBody,
+            'url' => $url,
+        ];
+    }
+
     private function getBaseUrl(): string {
         $amb = strtolower(trim($this->ambiente));
         if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
