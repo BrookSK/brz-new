@@ -31,7 +31,7 @@ class WExpressService {
     }
 
     public function createShipping(array $payload): array {
-        return $this->request('POST', '/shipping', $payload);
+        return $this->request('POST', '/shipping/', $payload);
     }
 
     public function getShipping(string $wexpressId): array {
@@ -44,11 +44,11 @@ class WExpressService {
 
     private function getBaseUrl(): string {
         $amb = strtolower(trim($this->ambiente));
-        // Swagger expõe sandbox.wexpress.me
         if ($amb === 'production' || $amb === 'prod' || $amb === 'live') {
-            return 'https://wexpress.me';
+            return 'https://api.wexpress.me';
         }
-        return 'https://sandbox.wexpress.me';
+        // Se houver base de sandbox distinta, ajustar aqui. Por ora, seguir a doc do endpoint /shipping.
+        return 'https://api.wexpress.me';
     }
 
     private function request(string $method, string $path, ?array $body = null): array {

@@ -1,0 +1,55 @@
+{
+	"shipment_purpose": "personal",
+	"external_shipping_id": "418-FG-298",
+	"external_shipping_reference": "FG-298",
+	"service_code": "wexpress_premium",
+	"incoterms": "DDU",
+	"dimensions_unit": "cm",
+	"weight_unit": "g",
+	"currency": "USD",
+	"freight_value": 19.14,
+	"insurance_value": 3,
+	"packages": [{
+		"weight": 770,
+		"width": 17.78,
+		"length": 33.02,
+		"height": 10.16
+	}],
+	"sender": {
+		"first_name": "Br-USA",
+		"last_name": "Connection LLC",
+		"website": "wexpress.me",
+		"address": {
+			"address_line_1": "5088 Ernst Ct",
+			"address_line_2": "#36",
+			"address_number": "",
+			"postal_code": "32819-7553",
+			"city": "Orlando",
+			"state": "FL",
+			"country": "US"
+		}
+	},
+	"recipient": {
+		"type": "business",
+		"business_name": "EBARA BOMBAS AMERICA DO SUL LTDA EBARA BOMBAS AMERICA DO SUL LTDA",
+		"first_name": "Ebara",
+		"last_name": "Bombas América Do Sul Ltda",
+		"tax_id_type": "CNPJ",
+		"tax_id": "46138319000774",
+		"email": "info@wexpress.me",
+		"phone": "4133423911",
+		"address": {
+			"address_number": "",
+			"address_line_1": "Av. Manoel Gomes Casaca, 840, Empresa, Pq. Industrial",
+			"address_line_2": "",
+			"postal_code": "13880000",
+			"city": "Vargem Grande do Sul",
+			"state": "SP"
+		}
+	},
+	"items": [{
+		"description": "sapatilha de atletismo Kike HJ salto em altura white pink size 11",
+		"quantity": 1,
+		"unit_value": 26.79
+	}]
+}
