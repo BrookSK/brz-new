@@ -27,9 +27,14 @@ class Router {
         return $out;
     }
 
-    private function registrarAuditoriaAuto(string $httpMethod, string $path, $controllerClass, ?string $controllerMethod, array $params, Request $request): void {
+    private function registrarAuditoriaAuto(string $httpMethod, string $path, $controllerClass, ?string $controllerMethod, array $params, Request $request, ?int $statusCode = null, ?int $durationMs = null): void {
         try {
-            if (!in_array($httpMethod, ['POST', 'DELETE'], true)) {
+            // Registrar todos os acessos do admin
+            if (strpos($path, '/admin') !== 0) {
+                return;
+            }
+            // Evitar loop ao abrir a própria tela de logs
+            if (strpos($path, '/admin/estoque/relatorios/movimentacao') === 0) {
                 return;
             }
             if (session_status() === PHP_SESSION_NONE) {
@@ -63,13 +68,74 @@ class Router {
                 'referer' => (string) ($_SERVER['HTTP_REFERER'] ?? ''),
             ];
 
+            $handler = '';
+            if (is_string($controllerClass) && $controllerMethod) {
+                $handler = $controllerClass . '::' . $controllerMethod;
+            }
+
             $db = Database::getConnection();
-            $st = $db->prepare('INSERT INTO auditoria_logs (usuario_id, acao, tabela, registro_id, valores_antigos, valores_novos, ip, user_agent) VALUES (:uid, :acao, NULL, NULL, NULL, :novos, :ip, :ua)');
-            $st->bindValue(':uid', $usuarioId);
-            $st->bindValue(':acao', $acao);
-            $st->bindValue(':novos', json_encode(['payload' => $payload, 'meta' => $meta], JSON_UNESCAPED_UNICODE));
-            $st->bindValue(':ip', (string) ($_SERVER['REMOTE_ADDR'] ?? ''));
-            $st->bindValue(':ua', substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500));
+
+            $cols = [];
+            try {
+                $stCols = $db->query('DESCRIBE auditoria_logs');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $insertCols = ['usuario_id', 'acao', 'tabela', 'registro_id', 'valores_antigos', 'valores_novos', 'ip', 'user_agent'];
+            $place = [':uid', ':acao', 'NULL', 'NULL', 'NULL', ':novos', ':ip', ':ua'];
+            $bind = [
+                ':uid' => $usuarioId,
+                ':acao' => $acao,
+                ':novos' => json_encode(['payload' => $payload, 'meta' => $meta], JSON_UNESCAPED_UNICODE),
+                ':ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+                ':ua' => substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500),
+            ];
+
+            if (is_array($cols) && !empty($cols)) {
+                if (in_array('http_method', $cols, true)) {
+                    $insertCols[] = 'http_method';
+                    $place[] = ':hm';
+                    $bind[':hm'] = $httpMethod;
+                }
+                if (in_array('route', $cols, true)) {
+                    $insertCols[] = 'route';
+                    $place[] = ':route';
+                    $bind[':route'] = $path;
+                }
+                if (in_array('handler', $cols, true)) {
+                    $insertCols[] = 'handler';
+                    $place[] = ':handler';
+                    $bind[':handler'] = $handler;
+                }
+                if (in_array('status_code', $cols, true) && $statusCode !== null) {
+                    $insertCols[] = 'status_code';
+                    $place[] = ':sc';
+                    $bind[':sc'] = (int) $statusCode;
+                }
+                if (in_array('duration_ms', $cols, true) && $durationMs !== null) {
+                    $insertCols[] = 'duration_ms';
+                    $place[] = ':dm';
+                    $bind[':dm'] = (int) $durationMs;
+                }
+                if (in_array('session_id', $cols, true)) {
+                    $insertCols[] = 'session_id';
+                    $place[] = ':sid';
+                    $bind[':sid'] = (string) session_id();
+                }
+                if (in_array('referer', $cols, true)) {
+                    $insertCols[] = 'referer';
+                    $place[] = ':ref';
+                    $bind[':ref'] = substr((string) ($_SERVER['HTTP_REFERER'] ?? ''), 0, 500);
+                }
+            }
+
+            $sql = 'INSERT INTO auditoria_logs (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $place) . ')';
+            $st = $db->prepare($sql);
+            foreach ($bind as $k => $v) {
+                $st->bindValue($k, $v);
+            }
             $st->execute();
         } catch (\Exception $e) {
         }
@@ -109,6 +175,8 @@ class Router {
         $method = $request->getMethod();
         $path = $request->getPath();
 
+        $t0 = microtime(true);
+
         $matchedRoute = null;
         $params = [];
 
@@ -142,22 +210,23 @@ class Router {
         $controllerClass = $matchedRoute['controller'];
         $controllerMethod = $matchedRoute['method'];
 
-        // Registrar auditoria automática para ações mutáveis
-        $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request);
+        try {
+            // Verificar se é uma função anônima/closure
+            if ($controllerClass instanceof \Closure) {
+                call_user_func($controllerClass, $request);
+                $statusCode = http_response_code();
+                $dt = (int) round((microtime(true) - $t0) * 1000);
+                $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request, $statusCode, $dt);
+                return;
+            }
 
-        // Verificar se é uma função anônima/closure
-        if ($controllerClass instanceof \Closure) {
-            // Executar função anônima diretamente
-            call_user_func($controllerClass, $request);
-            return;
-        }
-
-        // Verificar se é uma função (string)
-        if (is_string($controllerClass) && function_exists($controllerClass)) {
-            // Executar função diretamente
-            call_user_func($controllerClass, $request);
-            return;
-        }
+            if (is_string($controllerClass) && function_exists($controllerClass)) {
+                call_user_func($controllerClass, $request);
+                $statusCode = http_response_code();
+                $dt = (int) round((microtime(true) - $t0) * 1000);
+                $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request, $statusCode, $dt);
+                return;
+            }
 
         // Se não for closure e não tiver método, é um erro
         if (!$controllerMethod) {
@@ -173,24 +242,42 @@ class Router {
             return;
         }
 
-        $controller = new ("App\\Controllers\\{$controllerClass}")();
-        
-        if (!method_exists($controller, $controllerMethod)) {
-            http_response_code(500);
-            echo "Método não encontrado";
-            return;
-        }
+            $controller = new ("App\\Controllers\\{$controllerClass}")();
+            
+            if (!method_exists($controller, $controllerMethod)) {
+                http_response_code(500);
+                echo "Método não encontrado";
+                $statusCode = http_response_code();
+                $dt = (int) round((microtime(true) - $t0) * 1000);
+                $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request, $statusCode, $dt);
+                return;
+            }
 
         // Adicionar parâmetros ao request
         foreach ($params as $key => $value) {
             $request->setParam($key, $value);
         }
 
-        // Chamar método com parâmetros
-        if (!empty($params)) {
-            $controller->$controllerMethod($request, ...array_values($params));
-        } else {
-            $controller->$controllerMethod($request);
+            // Chamar método com parâmetros
+            if (!empty($params)) {
+                $controller->$controllerMethod($request, ...array_values($params));
+            } else {
+                $controller->$controllerMethod($request);
+            }
+
+            $statusCode = http_response_code();
+            $dt = (int) round((microtime(true) - $t0) * 1000);
+            $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request, $statusCode, $dt);
+            return;
+        } catch (\Throwable $e) {
+            $statusCode = http_response_code();
+            if (!$statusCode) {
+                http_response_code(500);
+                $statusCode = 500;
+            }
+            $dt = (int) round((microtime(true) - $t0) * 1000);
+            $this->registrarAuditoriaAuto((string) $method, (string) $path, $controllerClass, $controllerMethod, $params, $request, $statusCode, $dt);
+            throw $e;
         }
     }
 }
