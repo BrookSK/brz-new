@@ -363,6 +363,7 @@ $router->post('/admin/remessa-internacional/reenviar-webhook/{id}', 'AdminRemess
 $router->get('/admin/remessa-internacional/janela/{id}', 'AdminRemessaInternacionalController', 'verJanela');
 $router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaInternacionalController', 'detalhesPedidoJanela');
 $router->post('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-gerada', 'AdminRemessaInternacionalController', 'marcarEtiquetaGerada');
+$router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-download', 'AdminRemessaInternacionalController', 'baixarEtiquetaWexpress');
 $router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaInternacionalController', 'fecharJanela');
 
 // Rotas de Remessa Correios
