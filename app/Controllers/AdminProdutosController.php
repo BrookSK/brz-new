@@ -1666,27 +1666,19 @@ HTML;
             </div>';
 
             echo '<div class="d-flex flex-wrap gap-2 mb-3">
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Gerar variações com base nas opções selecionadas?\')">
-                        <input type="hidden" name="replace" value="0">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-cogs"></i> Gerar todas</button>
-                    </form>
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/gerar" onsubmit="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')">
-                        <input type="hidden" name="replace" value="1">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-redo"></i> Apagar e gerar</button>
-                    </form>
-                    <form method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/apagar" onsubmit="return confirm(\'Apagar todas as variações deste produto?\')">
-                        <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Apagar todas</button>
-                    </form>
+                    <button type="submit" class="btn btn-primary" name="replace" value="0" formaction="/admin/produtos/' . (int) $id . '/variacoes/gerar" formmethod="POST" formnovalidate onclick="return confirm(\'Gerar variações com base nas opções selecionadas?\')"><i class="fas fa-cogs"></i> Gerar todas</button>
+                    <button type="submit" class="btn btn-outline-primary" name="replace" value="1" formaction="/admin/produtos/' . (int) $id . '/variacoes/gerar" formmethod="POST" formnovalidate onclick="return confirm(\'Isso vai apagar e recriar as variações. Continuar?\')"><i class="fas fa-redo"></i> Apagar e gerar</button>
+                    <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/' . (int) $id . '/variacoes/apagar" formmethod="POST" formnovalidate onclick="return confirm(\'Apagar todas as variações deste produto?\')"><i class="fas fa-trash"></i> Apagar todas</button>
                   </div>';
 
             echo '<div class="card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <strong>Variações cadastradas</strong>
-                        <form class="d-flex gap-2" method="POST" action="/admin/produtos/' . (int) $id . '/variacoes/criar">
+                        <div class="d-flex gap-2">
                             <input type="number" name="stock" class="form-control form-control-sm" style="width:120px" placeholder="Estoque" value="0" min="0">
                             <input type="text" name="price_override" class="form-control form-control-sm" style="width:160px" placeholder="Preço variação">
-                            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-plus"></i> Criar individual</button>
-                        </form>
+                            <button class="btn btn-sm btn-outline-primary" type="submit" formaction="/admin/produtos/' . (int) $id . '/variacoes/criar" formmethod="POST" formnovalidate><i class="fas fa-plus"></i> Criar individual</button>
+                        </div>
                     </div>
                     <div class="card-body">';
 
