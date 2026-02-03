@@ -924,6 +924,24 @@ class AdminComprasController extends Controller {
                 return $s;
             }
         }
+
+        // Fallback: buscar em produto_fotos quando existir
+        $pid = (int) ($produto['produto_id'] ?? ($produto['id'] ?? 0));
+        if ($pid > 0 && $this->tableExists('produto_fotos')) {
+            try {
+                $stmt = $this->connection->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = :pid ORDER BY principal DESC, ordem ASC, id DESC LIMIT 1');
+                $stmt->execute([':pid' => $pid]);
+                $file = (string) ($stmt->fetchColumn() ?: '');
+                if ($file !== '') {
+                    $file = trim($file);
+                    if ($file !== '' && !(preg_match('#^https?://#i', $file) || strpos($file, '//') === 0 || strpos($file, '/') === 0)) {
+                        return '/uploads/produtos/' . ltrim($file, '/');
+                    }
+                    return $file;
+                }
+            } catch (\Exception $e) {
+            }
+        }
         return null;
     }
 
