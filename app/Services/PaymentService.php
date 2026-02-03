@@ -187,9 +187,10 @@ class PaymentService {
     }
 
     private function appmaxCreateOrder(int $customerId, int $productsValueCents, int $discountValueCents, int $shippingValueCents, array $products): int {
-        $total = round(((float) $productsValueCents) / 100, 2);
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
+        // Total final (AppMax): total = products + shipping - discount
+        $total = round(((float) ($productsValueCents + $shippingValueCents - $discountValueCents)) / 100, 2);
 
         $payloadProducts = [];
         foreach ($products as $p) {

@@ -1184,7 +1184,7 @@ class CheckoutController extends Controller {
                 $pedidoRowPay = [];
                 try {
                     $dbPay = \Config\Database::getConnection();
-                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtPedidoPay = $dbPay->prepare('SELECT id, total, moeda, numero_pedido, payment_gateway, payment_id, taxa_conversao, moeda_original FROM pedidos WHERE id = ? LIMIT 1');
                     $stmtPedidoPay->execute([$pedidoId]);
                     $pedidoRowPay = $stmtPedidoPay->fetch(\PDO::FETCH_ASSOC) ?: [];
                 } catch (\Exception $e) {
@@ -1192,7 +1192,11 @@ class CheckoutController extends Controller {
                 }
 
                 $moedaPedido = (string) ($pedidoRowPay['moeda'] ?? 'BRL');
-                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                $hasPaymentId = trim((string) ($pedidoRowPay['payment_id'] ?? '')) !== '';
+                $hasGateway = trim((string) ($pedidoRowPay['payment_gateway'] ?? '')) !== '';
+                $deveProcessarPagamento = (!$reused) || (!$hasPaymentId && !$hasGateway);
+
+                if ($deveProcessarPagamento && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     try {
                         $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                         $gateway = 'appmax';

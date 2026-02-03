@@ -721,6 +721,24 @@ class PedidoEcommerce {
             $pedido['estado_entrega'] = $estado;
             $pedido['cep_entrega'] = $cep;
 
+            // Aliases esperados por algumas views (ex.: checkout/conclusao)
+            if (!array_key_exists('endereco', $pedido) || $pedido['endereco'] === null) $pedido['endereco'] = $pedido['endereco_entrega'] ?? '';
+            if (!array_key_exists('numero', $pedido) || $pedido['numero'] === null) $pedido['numero'] = $pedido['numero_entrega'] ?? '';
+            if (!array_key_exists('bairro', $pedido) || $pedido['bairro'] === null) $pedido['bairro'] = $pedido['bairro_entrega'] ?? '';
+            if (!array_key_exists('cidade', $pedido) || $pedido['cidade'] === null) $pedido['cidade'] = $pedido['cidade_entrega'] ?? '';
+            if (!array_key_exists('estado', $pedido) || $pedido['estado'] === null) $pedido['estado'] = $pedido['estado_entrega'] ?? '';
+            if (!array_key_exists('cep', $pedido) || $pedido['cep'] === null) $pedido['cep'] = $pedido['cep_entrega'] ?? '';
+
+            if (!array_key_exists('cliente_nome', $pedido) || $pedido['cliente_nome'] === null || $pedido['cliente_nome'] === '') {
+                $pedido['cliente_nome'] = (string) ($pedido['nome'] ?? ($pedido['nome_cliente'] ?? ($pedido['customer_name'] ?? ($pedido['cliente'] ?? ''))));
+            }
+            if (!array_key_exists('cliente_email', $pedido) || $pedido['cliente_email'] === null || $pedido['cliente_email'] === '') {
+                $pedido['cliente_email'] = (string) ($pedido['email'] ?? ($pedido['email_cliente'] ?? ($pedido['customer_email'] ?? ($pedido['cliente_email'] ?? ''))));
+            }
+            if (!array_key_exists('cliente_telefone', $pedido) || $pedido['cliente_telefone'] === null || $pedido['cliente_telefone'] === '') {
+                $pedido['cliente_telefone'] = (string) ($pedido['telefone'] ?? ($pedido['telefone_cliente'] ?? ($pedido['customer_phone'] ?? ($pedido['cliente_telefone'] ?? ''))));
+            }
+
             // Se houver endereco_entrega_id, buscar dados completos em enderecos
             $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
             if ($enderecoEntregaId > 0 && $this->tableExists('enderecos')) {
@@ -897,6 +915,9 @@ class PedidoEcommerce {
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
+                }
+                if (!array_key_exists('nome', $item) || $item['nome'] === null || $item['nome'] === '') {
+                    $item['nome'] = $item['nome_produto'];
                 }
 
                 $pvId = (int) ($item['produto_variacao_id'] ?? 0);
