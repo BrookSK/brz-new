@@ -114,8 +114,6 @@ class CarrinhoController extends Controller {
 
     private function getCarrinhoFromDb(int $usuarioId): array {
         if ($usuarioId <= 0) return [];
-        if (!$this->tableExists('carrinhos') || !$this->tableExists('carrinho_items')) return [];
-
         try {
             $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
             $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
