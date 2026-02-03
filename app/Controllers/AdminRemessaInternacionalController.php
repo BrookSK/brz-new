@@ -1248,6 +1248,8 @@ function fecharJanela() {
         $wxTrack = (string) ($rel['wexpress_tracking_number'] ?? '');
         $wxCourier = (string) ($rel['courier_tracking_number'] ?? '');
 
+        $wxHasLabel = ($et === 1) || ($wxShipId !== '') || ($wxStatus === 'LABEL_CREATED');
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
@@ -1257,7 +1259,7 @@ function fecharJanela() {
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-internacional/janela/' . (int) $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
                     ' . ($wxShipId !== '' ? ('<a class="btn btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $jid . '/pedido/' . (int) $pid . '/etiqueta-download" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>') : '') . '
-                    <button class="btn btn-success" type="button" onclick="gerarEtiqueta()"><i class="fas fa-tag"></i> Gerar etiqueta</button>
+                    <button class="btn btn-success" type="button" onclick="gerarEtiqueta()" ' . ($wxHasLabel ? 'disabled' : '') . '><i class="fas fa-tag"></i> ' . ($wxHasLabel ? 'Etiqueta já gerada' : 'Gerar etiqueta') . '</button>
                 </div>
             </div>
 
@@ -1410,6 +1412,22 @@ function gerarEtiqueta() {
 
         try {
             $this->syncPedidosParaJanela($jid);
+
+            $stCheck = $this->connection->prepare('SELECT etiqueta_gerada, wexpress_shipping_id, wexpress_status FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id = ? LIMIT 1');
+            $stCheck->execute([$jid, $pid]);
+            $rowCheck = $stCheck->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $hasShipId = trim((string) ($rowCheck['wexpress_shipping_id'] ?? '')) !== '';
+            $hasEtiqueta = ((int) ($rowCheck['etiqueta_gerada'] ?? 0)) === 1;
+            $status = (string) ($rowCheck['wexpress_status'] ?? '');
+            if ($hasShipId || $hasEtiqueta || $status === 'LABEL_CREATED') {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Etiqueta já foi gerada para este pedido nesta janela. Para reemitir, remova o shipping_id/status no vínculo da janela/pedido.',
+                    'shipping_id' => (string) ($rowCheck['wexpress_shipping_id'] ?? ''),
+                    'wexpress_status' => $status,
+                ]);
+                exit;
+            }
 
             $pedido = $this->getPedidoCompleto($pid);
             if (!$pedido) {
