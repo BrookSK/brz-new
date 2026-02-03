@@ -794,6 +794,7 @@ class PedidoEcommerce {
             $colSubtotal = $pick(['subtotal']);
             $colNomeProduto = $pick(['nome_produto', 'produto_nome', 'nome']);
             $colSku = $pick(['nome_produto_sku', 'sku']);
+            $colUrlOriginalItem = $pick(['url_original', 'url', 'link', 'produto_url', 'url_produto', 'original_url']);
 
             if (!$colPedidoId) {
                 throw new \Exception('Tabela de itens sem pedido_id');
@@ -808,8 +809,21 @@ class PedidoEcommerce {
             if ($colSubtotal) $selectParts[] = 'pi.' . $colSubtotal . ' AS subtotal';
             if ($colNomeProduto) $selectParts[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
+            if ($colUrlOriginalItem) $selectParts[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
             $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
+
+            // URL original do produto (fallback via produtos)
+            if (!$colUrlOriginalItem && $this->tableExists('produtos')) {
+                try {
+                    $colsProd = $this->getTableColumns('produtos');
+                    $colUrlProduto = $this->pickColumn($colsProd, ['url_original', 'url', 'link', 'produto_url', 'url_produto', 'original_url', 'url_externa']);
+                    if ($colUrlProduto) {
+                        $selectParts[] = "(SELECT p." . $colUrlProduto . " FROM produtos p WHERE p.id = pi." . ($colProdutoId ?: 'produto_id') . " LIMIT 1) AS url_original";
+                    }
+                } catch (\Exception $e) {
+                }
+            }
 
             $sqlItens = 'SELECT ' . implode(', ', $selectParts) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' = :id ORDER BY pi.id';
             $stmtItens = $this->connection->prepare($sqlItens);
@@ -864,6 +878,10 @@ class PedidoEcommerce {
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+                if (!isset($item['url_original']) || $item['url_original'] === null) {
+                    $item['url_original'] = '';
+                }
+                $item['url_original'] = trim((string) $item['url_original']);
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
                     $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
