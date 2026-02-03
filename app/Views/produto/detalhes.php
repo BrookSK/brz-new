@@ -937,6 +937,8 @@ function inicializarDetalhesProduto() {
     }
     
     if (variacoesState.enabled) {
+        $('#variacoes-card').show();
+        renderVariacaoSelectors(variacoesState);
         $('#variacoes-selectors').on('change', '.variacao-select', onVariationChange);
         $('#variacoes-selectors').on('click', '.variacao-option', function() {
             const $btn = $(this);
