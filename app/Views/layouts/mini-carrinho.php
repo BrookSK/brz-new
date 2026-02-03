@@ -311,20 +311,24 @@ function addToMiniCart(product) {
     }
     
     // Criar elemento do item
+    const varId = product.produto_variacao_id ? parseInt(product.produto_variacao_id) : 0;
+    const qtyId = `qty-${product.id}-${varId}`;
     const itemElement = document.createElement('div');
     itemElement.className = 'mini-cart-item new-item';
+    itemElement.dataset.produtoId = String(product.id);
+    itemElement.dataset.variacaoId = String(varId);
     itemElement.innerHTML = `
         ${product.imagem ? `<img src="/uploads/produtos/${product.imagem}" alt="${product.nome}">` : '<div class="bg-light d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;"><i class="fas fa-image text-muted"></i></div>'}
         <div class="mini-cart-item-info">
             <div class="mini-cart-item-title">${product.nome}</div>
             <div class="mini-cart-item-price">R$ ${parseFloat(product.preco).toFixed(2)}</div>
             <div class="mini-cart-item-quantity">
-                <button onclick="updateCartItemQuantity(${product.id}, -1)">-</button>
-                <input type="number" value="${product.quantidade || 1}" min="1" id="qty-${product.id}" readonly>
-                <button onclick="updateCartItemQuantity(${product.id}, 1)">+</button>
+                <button onclick="updateCartItemQuantity(${product.id}, ${varId}, -1)">-</button>
+                <input type="number" value="${product.quantidade || 1}" min="1" id="${qtyId}" readonly>
+                <button onclick="updateCartItemQuantity(${product.id}, ${varId}, 1)">+</button>
             </div>
         </div>
-        <button class="mini-cart-item-remove" onclick="removeFromMiniCart(${product.id})">
+        <button class="mini-cart-item-remove" onclick="removeFromMiniCart(${product.id}, ${varId})">
             <i class="fas fa-trash"></i>
         </button>
     `;
@@ -359,8 +363,9 @@ function updateMiniCartTotals() {
 }
 
 // Função para atualizar quantidade
-function updateCartItemQuantity(productId, change) {
-    const input = document.getElementById(`qty-${productId}`);
+function updateCartItemQuantity(productId, variacaoId, change) {
+    const vid = variacaoId ? parseInt(variacaoId) : 0;
+    const input = document.getElementById(`qty-${productId}-${vid}`);
     const newQuantity = Math.max(1, parseInt(input.value) + change);
     input.value = newQuantity;
     
@@ -372,6 +377,7 @@ function updateCartItemQuantity(productId, change) {
         },
         body: JSON.stringify({
             produto_id: productId,
+            produto_variacao_id: (vid > 0 ? vid : null),
             quantidade: newQuantity
         })
     })
@@ -387,7 +393,8 @@ function updateCartItemQuantity(productId, change) {
 }
 
 // Função para remover item
-function removeFromMiniCart(productId) {
+function removeFromMiniCart(productId, variacaoId) {
+    const vid = variacaoId ? parseInt(variacaoId) : 0;
     if (confirm('Tem certeza que deseja remover este item?')) {
         fetch('/api/carrinho/remover', {
             method: 'POST',
@@ -395,14 +402,15 @@ function removeFromMiniCart(productId) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                produto_id: productId
+                produto_id: productId,
+                produto_variacao_id: (vid > 0 ? vid : null)
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 // Remover elemento do DOM
-                const item = document.querySelector(`.mini-cart-item:has(button[onclick*="${productId}"])`);
+                const item = document.querySelector(`.mini-cart-item[data-produto-id="${productId}"][data-variacao-id="${vid}"]`);
                 if (item) {
                     item.remove();
                 }

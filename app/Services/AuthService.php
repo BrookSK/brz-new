@@ -2,12 +2,68 @@
 namespace App\Services;
 
 use App\Models\Usuario;
+use App\Models\Carrinho;
 
 class AuthService {
     private $usuarioModel;
+    private $carrinhoModel;
     
     public function __construct() {
         $this->usuarioModel = new Usuario();
+        $this->carrinhoModel = new Carrinho();
+    }
+
+    private function mergeSessionCartToUser(int $usuarioId): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $sessCart = $_SESSION['carrinho'] ?? [];
+        if (!is_array($sessCart) || empty($sessCart)) {
+            return;
+        }
+
+        try {
+            $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
+            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+            if ($cartId <= 0) {
+                return;
+            }
+
+            foreach ($sessCart as $k => $it) {
+                if (!is_array($it)) continue;
+                $pid = (int) ($it['produto_id'] ?? 0);
+                if ($pid <= 0) continue;
+                $qtd = (int) ($it['quantidade'] ?? 1);
+                if ($qtd < 1) $qtd = 1;
+
+                $pvId = null;
+                if (isset($it['produto_variacao_id']) && $it['produto_variacao_id'] !== '' && $it['produto_variacao_id'] !== null) {
+                    $tmp = (int) $it['produto_variacao_id'];
+                    if ($tmp > 0) $pvId = $tmp;
+                } else {
+                    // tentativa de extrair da key "produtoId:variacaoId"
+                    if (is_string($k) && strpos($k, ':') !== false) {
+                        $parts = explode(':', $k);
+                        if (count($parts) >= 2) {
+                            $tmp = (int) ($parts[1] ?? 0);
+                            if ($tmp > 0) $pvId = $tmp;
+                        }
+                    }
+                }
+
+                $varDesc = isset($it['variacao_descricao']) ? (string) $it['variacao_descricao'] : null;
+                $this->carrinhoModel->adicionarItem($cartId, $pid, $qtd, $pvId, $varDesc);
+            }
+
+            unset($_SESSION['carrinho']);
+        } catch (\Exception $e) {
+            // se falhar, mantém sessão como fallback
+        }
     }
     
     public function login($email, $senha) {
@@ -65,6 +121,8 @@ class AuthService {
         if (!isset($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
+
+        $this->mergeSessionCartToUser((int) ($usuario['id'] ?? 0));
     }
     
     public function estaLogado() {

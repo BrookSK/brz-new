@@ -56,11 +56,12 @@ class Carrinho extends Model {
         return $result ? $result['taxa_conversao'] : 5.5;
     }
 
-    public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1) {
+    public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
         // Verificar se item já existe
-        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id");
+        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0)");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->bindParam(':produto_id', $produtoId);
+        $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
         $stmt->execute();
         $itemExistente = $stmt->fetch(\PDO::FETCH_ASSOC);
         
@@ -91,11 +92,13 @@ class Carrinho extends Model {
             $subtotal = $quantidade * $produto['valor'];
             
             $stmt = $this->connection->prepare("
-                INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, valor_unitario, subtotal) 
-                VALUES (:carrinho_id, :produto_id, :quantidade, :valor_unitario, :subtotal)
+                INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, valor_unitario, subtotal) 
+                VALUES (:carrinho_id, :produto_id, :produto_variacao_id, :variacao_descricao, :quantidade, :valor_unitario, :subtotal)
             ");
             $stmt->bindParam(':carrinho_id', $carrinhoId);
             $stmt->bindParam(':produto_id', $produtoId);
+            $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
+            $stmt->bindValue(':variacao_descricao', $variacaoDescricao);
             $stmt->bindParam(':quantidade', $quantidade);
             $stmt->bindParam(':valor_unitario', $produto['valor']);
             $stmt->bindParam(':subtotal', $subtotal);
@@ -216,12 +219,43 @@ class Carrinho extends Model {
         $this->atualizarTotais($carrinhoId);
     }
 
-    public function removerItem($carrinhoId, $produtoId) {
-        $stmt = $this->connection->prepare("DELETE FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id");
+    public function removerItem($carrinhoId, $produtoId, $produtoVariacaoId = null) {
+        $stmt = $this->connection->prepare("DELETE FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0)");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->bindParam(':produto_id', $produtoId);
+        $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
         $stmt->execute();
         
         $this->atualizarTotais($carrinhoId);
+    }
+
+    public function setQuantidadeItem($carrinhoId, $produtoId, $quantidade, $produtoVariacaoId = null) {
+        $quantidade = (int) $quantidade;
+        if ($quantidade < 1) {
+            $quantidade = 1;
+        }
+
+        // Obter item
+        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
+        $stmt->bindParam(':carrinho_id', $carrinhoId);
+        $stmt->bindParam(':produto_id', $produtoId);
+        $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
+        $stmt->execute();
+        $item = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$item) {
+            return false;
+        }
+
+        $valorUnitario = (float) ($item['valor_unitario'] ?? 0);
+        $subtotal = $quantidade * $valorUnitario;
+
+        $stmt = $this->connection->prepare("UPDATE carrinho_items SET quantidade = :q, subtotal = :s WHERE id = :id");
+        $stmt->bindValue(':q', $quantidade);
+        $stmt->bindValue(':s', $subtotal);
+        $stmt->bindValue(':id', (int) $item['id']);
+        $stmt->execute();
+
+        $this->atualizarTotais($carrinhoId);
+        return true;
     }
 }
