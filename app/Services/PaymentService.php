@@ -323,54 +323,56 @@ class PaymentService {
                 $payload = '';
                 $expirationDate = '';
 
-                // Alguns retornos vem aninhados
-                $pixInner = null;
-                if (!empty($pixData['pix']) && is_array($pixData['pix'])) {
-                    $pixInner = $pixData['pix'];
-                } elseif (!empty($pixData['data']['pix']) && is_array($pixData['data']['pix'])) {
-                    $pixInner = $pixData['data']['pix'];
-                }
+                $findFirstString = function ($data, array $keys) use (&$findFirstString): string {
+                    if (!is_array($data)) {
+                        return '';
+                    }
+                    foreach ($keys as $k) {
+                        if (array_key_exists($k, $data) && is_string($data[$k]) && trim($data[$k]) !== '') {
+                            return trim($data[$k]);
+                        }
+                    }
+                    foreach ($data as $v) {
+                        if (is_array($v)) {
+                            $found = $findFirstString($v, $keys);
+                            if ($found !== '') {
+                                return $found;
+                            }
+                        }
+                    }
+                    return '';
+                };
 
-                $candidates = [$pixData];
-                if (is_array($pixInner)) {
-                    $candidates[] = $pixInner;
-                }
-
-                foreach ($candidates as $c) {
-                    if (!is_array($c)) {
-                        continue;
-                    }
-                    if ($encodedImage === '') {
-                        $encodedImage = (string) (
-                            $c['encodedImage'] ??
-                            $c['qr_code_base64'] ??
-                            $c['qrCodeBase64'] ??
-                            $c['qr_code'] ??
-                            $c['qrcode'] ??
-                            $c['qrcode_base64'] ??
-                            $c['base64'] ??
-                            ''
-                        );
-                    }
-                    if ($payload === '') {
-                        $payload = (string) (
-                            $c['payload'] ??
-                            $c['emv'] ??
-                            $c['copy_paste'] ??
-                            $c['brcode'] ??
-                            $c['pixCopiaECola'] ??
-                            ''
-                        );
-                    }
-                    if ($expirationDate === '') {
-                        $expirationDate = (string) (
-                            $c['expirationDate'] ??
-                            $c['expiration_date'] ??
-                            $c['expires_at'] ??
-                            ''
-                        );
-                    }
-                }
+                // Tentar chaves diretas e também recursivamente no payload completo
+                $encodedImage = $findFirstString($pixData, [
+                    'encodedImage',
+                    'encoded_image',
+                    'qr_code_base64',
+                    'qrCodeBase64',
+                    'qrcode_base64',
+                    'qr_code',
+                    'qrcode',
+                    'base64',
+                    'image_base64',
+                    'pix_qrcode_base64',
+                ]);
+                $payload = $findFirstString($pixData, [
+                    'payload',
+                    'emv',
+                    'copy_paste',
+                    'copyPaste',
+                    'brcode',
+                    'br_code',
+                    'pixCopiaECola',
+                    'pix_copia_cola',
+                    'copia_e_cola',
+                ]);
+                $expirationDate = $findFirstString($pixData, [
+                    'expirationDate',
+                    'expiration_date',
+                    'expires_at',
+                    'expiresAt',
+                ]);
 
                 // Se vier como data:image/png;base64,..., remover prefixo
                 if ($encodedImage !== '') {
@@ -379,6 +381,21 @@ class PaymentService {
                 }
                 if ($payload !== '') {
                     $payload = trim((string) $payload);
+                }
+
+                if ($encodedImage === '' && $payload === '') {
+                    $debug = false;
+                    if (isset($_ENV['APP_DEBUG'])) {
+                        $debug = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+                    } elseif (isset($_SERVER['APP_DEBUG'])) {
+                        $debug = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+                    }
+                    if ($debug) {
+                        try {
+                            error_log('[APPMAX][PIX] Não foi possível extrair QR/payload. Response=' . json_encode($pixResp, JSON_UNESCAPED_UNICODE));
+                        } catch (\Exception $e) {
+                        }
+                    }
                 }
 
                 $result['pix'] = [
