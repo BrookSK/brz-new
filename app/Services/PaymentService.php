@@ -313,6 +313,12 @@ class PaymentService {
             $stmtCols = $db->query('DESCRIBE configuracoes_sistema');
             $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
             if (is_array($cols) && !empty($cols)) {
+                // Se a tabela tem colunas 'chave'/'valor', então ela está no formato key/value.
+                // Nesse caso, NÃO devemos tentar ler como single-row com colunas diretas.
+                if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                    throw new \Exception('configuracoes_sistema está em formato chave/valor');
+                }
+
                 $colName = null;
                 if ($categoria === 'pagamentos') {
                     $direct = [
@@ -401,7 +407,18 @@ class PaymentService {
                 }
                 if ($keyCol) {
                     try {
-                        $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE categoria = ? AND ' . $keyCol . ' = ? LIMIT 1');
+                        $orderCol = null;
+                        if (in_array('updated_at', $cols, true)) {
+                            $orderCol = 'updated_at';
+                        } elseif (in_array('id', $cols, true)) {
+                            $orderCol = 'id';
+                        }
+                        $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE categoria = ? AND ' . $keyCol . ' = ?';
+                        if ($orderCol) {
+                            $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                        }
+                        $sql .= ' LIMIT 1';
+                        $stmt = $db->prepare($sql);
                         $stmt->execute([$categoria, $chave]);
                         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                         if ($row && array_key_exists('valor', $row)) {
@@ -423,7 +440,18 @@ class PaymentService {
             if ($keyCol) {
                 try {
                     $key = $categoria . '_' . $chave;
-                    $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $orderCol = null;
+                    if (in_array('updated_at', $cols, true)) {
+                        $orderCol = 'updated_at';
+                    } elseif (in_array('id', $cols, true)) {
+                        $orderCol = 'id';
+                    }
+                    $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ?';
+                    if ($orderCol) {
+                        $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stmt = $db->prepare($sql);
                     $stmt->execute([$key]);
                     $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                     if ($row && array_key_exists('valor', $row)) {
@@ -434,7 +462,18 @@ class PaymentService {
 
                 // Fallback: algumas instalações usam chave sem prefixo de categoria (ex: stripe_enabled)
                 try {
-                    $stmt = $db->prepare('SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $orderCol = null;
+                    if (in_array('updated_at', $cols, true)) {
+                        $orderCol = 'updated_at';
+                    } elseif (in_array('id', $cols, true)) {
+                        $orderCol = 'id';
+                    }
+                    $sql = 'SELECT ' . $valueCol . ' AS valor FROM ' . $table . ' WHERE ' . $keyCol . ' = ?';
+                    if ($orderCol) {
+                        $sql .= ' ORDER BY ' . $orderCol . ' DESC';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stmt = $db->prepare($sql);
                     $stmt->execute([$chave]);
                     $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                     if ($row && array_key_exists('valor', $row)) {
