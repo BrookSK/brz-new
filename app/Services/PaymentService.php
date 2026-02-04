@@ -224,6 +224,11 @@ class PaymentService {
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
 
+        // A AppMax pode rejeitar shipping=0. Garantir mínimo de 0.01.
+        if ($shipping <= 0) {
+            $shipping = 0.01;
+        }
+
         $payloadProducts = [];
         foreach ($products as $p) {
             if (!is_array($p)) {
@@ -246,13 +251,18 @@ class PaymentService {
             $payloadProducts[] = $row;
         }
 
+        $freightType = (string) ($products[0]['freight_type'] ?? ($products[0]['frete_tipo'] ?? ''));
+        if (trim($freightType) === '') {
+            $freightType = 'normal';
+        }
+
         $payload = [
             'total' => $total,
             'products' => $payloadProducts,
             'shipping' => $shipping,
             'customer_id' => $customerId,
             'discount' => $discount,
-            'freight_type' => (string) ($products[0]['freight_type'] ?? ($products[0]['frete_tipo'] ?? '')),
+            'freight_type' => $freightType,
         ];
 
         $created = $this->appmaxRequest('POST', 'order', $payload);
