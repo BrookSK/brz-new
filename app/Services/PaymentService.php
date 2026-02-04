@@ -224,9 +224,10 @@ class PaymentService {
         $shipping = round(((float) $shippingValueCents) / 100, 2);
         $discount = round(((float) $discountValueCents) / 100, 2);
 
-        // A AppMax pode rejeitar shipping=0. Garantir mínimo de 0.01.
-        if ($shipping <= 0) {
-            $shipping = 0.01;
+        // A AppMax pode rejeitar shipping=0 e, em alguns cenários, valores muito pequenos podem ser truncados.
+        // Garantir mínimo de 1.00.
+        if ($shipping < 1.0) {
+            $shipping = 1.0;
         }
 
         $payloadProducts = [];
@@ -326,19 +327,16 @@ class PaymentService {
         $shippingValueCents = (int) ($dados['shipping_value_cents'] ?? 0);
         $discountValueCents = (int) ($dados['discount_value_cents'] ?? 0);
 
-        // AppMax v3 pode rejeitar order com frete/shipping = 0.
-        // Para não alterar o total cobrado (products + shipping - discount), movemos 1 centavo de products para shipping.
-        if ($shippingValueCents <= 0) {
-            if ($productsValueCents > 1) {
-                $productsValueCents -= 1;
-                $shippingValueCents = 1;
-            } elseif ($productsValueCents === 1) {
-                // Total mínimo: não há como mover sem zerar produtos.
-                // Neste caso, ainda assim enviar shipping=1 pode alterar o total em 1 centavo,
-                // mas evita falha total no gateway.
-                $shippingValueCents = 1;
+        // AppMax v3 pode rejeitar order com frete/shipping = 0 (e pode truncar valores pequenos).
+        // Para não alterar o total cobrado (products + shipping - discount), movemos R$1,00 (100 centavos) de products para shipping.
+        if ($shippingValueCents < 100) {
+            $need = 100 - max(0, $shippingValueCents);
+            if ($productsValueCents > $need) {
+                $productsValueCents -= $need;
+                $shippingValueCents += $need;
             } else {
-                $shippingValueCents = 1;
+                // Fallback: garante shipping mínimo mesmo que impacte 1.00 no total (casos extremos)
+                $shippingValueCents = 100;
             }
         }
 
