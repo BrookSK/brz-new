@@ -26,6 +26,21 @@ class AdminPedidosController extends Controller {
                 $colsPedidos = [];
             }
 
+            $pickCol = function (array $cols, array $candidates): ?string {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        return $c;
+                    }
+                }
+                return null;
+            };
+
+            // Campos opcionais para enriquecer a listagem (sem depender de schema fixo)
+            $colPais = $pickCol($colsPedidos, ['pais', 'country', 'pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais_entrega_nome']);
+            $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
+            $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
+            $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
+
             // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
             $rateUSDBRL = 5.5;
             try {
@@ -129,6 +144,11 @@ class AdminPedidosController extends Controller {
                         if (!array_key_exists('total', $p) && $totalField !== '') {
                             $p['total'] = (float) ($p[$totalField] ?? 0);
                         }
+                    }
+
+                    // Normalizar/garantir alguns campos para exibição
+                    if (!array_key_exists('numero_pedido', $p) && $colNumero) {
+                        $p['numero_pedido'] = (string) ($p[$colNumero] ?? '');
                     }
                 }
                 unset($p);
@@ -262,6 +282,32 @@ class AdminPedidosController extends Controller {
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
                     
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $origemTxt = '';
+                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
+                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
+                    }
+                    if ($origemTxt === '') {
+                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
+                    }
+
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                    }
+                    
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -278,7 +324,13 @@ class AdminPedidosController extends Controller {
                                     <div class="col-md-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3"><strong>' . htmlspecialchars($paisTxt) . '</strong></span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
@@ -338,6 +390,32 @@ class AdminPedidosController extends Controller {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
+
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $origemTxt = '';
+                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
+                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
+                    }
+                    if ($origemTxt === '') {
+                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
+                    }
+
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                    }
                     
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
@@ -355,7 +433,13 @@ class AdminPedidosController extends Controller {
                                     <div class="col-md-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3"><strong>' . htmlspecialchars($paisTxt) . '</strong></span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
@@ -412,6 +496,32 @@ class AdminPedidosController extends Controller {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
+
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $origemTxt = '';
+                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
+                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
+                    }
+                    if ($origemTxt === '') {
+                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
+                    }
+
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                    }
                     
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
@@ -422,17 +532,6 @@ class AdminPedidosController extends Controller {
                                             <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
                                                 <i class="' . $statusIcon . '"></i>
                                             </div>
-                                            <h6 class="mb-0">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h6>
-                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
-                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="text-center">
                                             <h5 class="mb-0 text-info">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
                                             <small class="text-muted">Total (BRL)</small>
                                         </div>
