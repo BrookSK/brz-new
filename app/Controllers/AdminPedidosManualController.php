@@ -1247,17 +1247,8 @@ document.addEventListener('DOMContentLoaded', function(){
             offlineBox.textContent = '';
         }
 
-        // Pagamentos offline não devem gerar link
-        if (linkCard) {
-            linkCard.style.display = isOffline ? 'none' : (getSelectedMoeda() === 'BRL' ? '' : 'none');
-        }
-        if (linkInfo) {
-            linkInfo.style.display = isOffline ? 'none' : '';
-        }
-        if (linkResult && isOffline) {
-            linkResult.style.display = 'none';
-            linkResult.innerHTML = '';
-        }
+        // Delegar visibilidade do link para a regra central (updateLinkVisibility)
+        try { updateLinkVisibility(); } catch (e) {}
 
         try { calcTotal(); } catch (e) {}
     };
@@ -1265,6 +1256,7 @@ document.addEventListener('DOMContentLoaded', function(){
         fpSel.addEventListener('change', refreshOffline);
         updateManualPaymentMethodsForCurrency();
         refreshOffline();
+        updateLinkVisibility();
     }
 
     const g = document.getElementById('gatewayLabel');
