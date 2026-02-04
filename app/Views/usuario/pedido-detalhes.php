@@ -70,7 +70,30 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center p-4">
                     <?php
-                        $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=6366f1&color=fff&size=128';
+                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                        $avatarUrl = null;
+                        foreach ($avatarColumnCandidates as $c) {
+                            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                                $avatarUrl = $usuario[$c];
+                                break;
+                            }
+                        }
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                        }
+                        if (empty($avatarUrl)) {
+                            $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=6366f1&color=fff&size=128';
+                        } else {
+                            $raw = trim((string) $avatarUrl);
+                            if (preg_match('#^https?://#i', $raw) || strpos($raw, '//') === 0) {
+                                $avatarUrl = (strpos($raw, '//') === 0) ? ('https:' . $raw) : $raw;
+                            } else {
+                                if ($raw !== '' && $raw[0] !== '/') {
+                                    $raw = '/' . $raw;
+                                }
+                                $avatarUrl = Url::absolute($raw);
+                            }
+                        }
                     ?>
                     <div class="user-avatar mx-auto mb-3">
                         <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome'] ?? '') ?>" class="rounded-circle" width="80" height="80" style="object-fit: cover;">
@@ -172,7 +195,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <?php
                                             $imgRaw = (string) ($item['imagem'] ?? '');
                                             if ($imgRaw === '') {
-                                                $imgRaw = 'default.jpg';
+                                                $imgRaw = 'placeholder.jpg';
                                             }
                                             $imgSrc = '';
                                             if (preg_match('#^https?://#i', $imgRaw) || strpos($imgRaw, '//') === 0) {

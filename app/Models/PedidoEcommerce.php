@@ -275,9 +275,6 @@ class PedidoEcommerce {
                         } else {
                             $moedaOriginal = strtoupper(trim((string) ($r['moeda_original'] ?? '')));
                             $deveConverter = ($moedaOriginal === 'USD');
-                            if (!$deveConverter && $baseTotal > 0 && $baseTotal <= 2000) {
-                                $deveConverter = true;
-                            }
                             if ($deveConverter) {
                                 $conv = $baseTotal * $taxaConversao;
                                 $r[$totalField] = $conv;
@@ -620,6 +617,50 @@ class PedidoEcommerce {
                         $tx = (float) ($txRow['taxa_conversao'] ?? 0);
                         if ($tx > 1.01) {
                             $taxaConversao = $tx;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            $enderecoEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
+
+            // Fallback: se não veio endereço no pedido, tentar puxar endereço principal do usuário (apenas para exibição)
+            if (
+                $enderecoEntregaId <= 0
+                && $this->tableExists('enderecos')
+                && (trim((string) ($pedido['endereco_entrega'] ?? '')) === '')
+                && (trim((string) ($pedido['cep_entrega'] ?? '')) === '')
+            ) {
+                try {
+                    $uid = (int) ($pedido['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $colsEnd = $this->getTableColumns('enderecos');
+                        if (in_array('usuario_id', $colsEnd, true)) {
+                            $orderBy = 'id DESC';
+                            if (in_array('principal', $colsEnd, true)) {
+                                $orderBy = 'principal DESC, id DESC';
+                            }
+                            $stE = $this->connection->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
+                            $stE->execute([$uid]);
+                            $rowE = $stE->fetch(\PDO::FETCH_ASSOC);
+                            if (is_array($rowE) && !empty($rowE)) {
+                                $pedido['endereco_entrega'] = $rowE['endereco'] ?? ($rowE['logradouro'] ?? ($pedido['endereco_entrega'] ?? null));
+                                $pedido['numero_entrega'] = $rowE['numero'] ?? ($pedido['numero_entrega'] ?? null);
+                                $pedido['complemento_entrega'] = $rowE['complemento'] ?? ($pedido['complemento_entrega'] ?? null);
+                                $pedido['bairro_entrega'] = $rowE['bairro'] ?? ($pedido['bairro_entrega'] ?? null);
+                                $pedido['cidade_entrega'] = $rowE['cidade'] ?? ($pedido['cidade_entrega'] ?? null);
+                                $pedido['estado_entrega'] = $rowE['estado'] ?? ($pedido['estado_entrega'] ?? null);
+                                $pedido['cep_entrega'] = $rowE['cep'] ?? ($pedido['cep_entrega'] ?? null);
+
+                                $pedido['endereco'] = $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? null);
+                                $pedido['numero'] = $pedido['numero_entrega'] ?? ($pedido['numero'] ?? null);
+                                $pedido['complemento'] = $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? null);
+                                $pedido['bairro'] = $pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? null);
+                                $pedido['cidade'] = $pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? null);
+                                $pedido['estado'] = $pedido['estado_entrega'] ?? ($pedido['estado'] ?? null);
+                                $pedido['cep'] = $pedido['cep_entrega'] ?? ($pedido['cep'] ?? null);
+                            }
                         }
                     }
                 } catch (\Exception $e) {
@@ -983,6 +1024,10 @@ class PedidoEcommerce {
             $colProdutoVariacaoId = $pick(['produto_variacao_id']);
             $colQtd = $pick(['quantidade', 'qty']);
             $colPrecoUnit = $pick(['preco_unitario', 'valor_unitario', 'price', 'preco']);
+            $colValorUnitAlt = null;
+            if ($colPrecoUnit === 'preco_unitario' && $pick(['valor_unitario']) !== null) {
+                $colValorUnitAlt = 'valor_unitario';
+            }
             $colSubtotal = $pick(['subtotal']);
             $colNomeProduto = $pick(['nome_produto', 'produto_nome', 'nome']);
             $colSku = $pick(['nome_produto_sku', 'sku']);
@@ -998,6 +1043,7 @@ class PedidoEcommerce {
             if ($colProdutoVariacaoId) $selectParts[] = 'pi.' . $colProdutoVariacaoId . ' AS produto_variacao_id';
             if ($colQtd) $selectParts[] = 'pi.' . $colQtd . ' AS quantidade';
             if ($colPrecoUnit) $selectParts[] = 'pi.' . $colPrecoUnit . ' AS preco_unitario';
+            if ($colValorUnitAlt) $selectParts[] = 'pi.' . $colValorUnitAlt . ' AS valor_unitario_alt';
             if ($colSubtotal) $selectParts[] = 'pi.' . $colSubtotal . ' AS subtotal';
             if ($colNomeProduto) $selectParts[] = 'pi.' . $colNomeProduto . ' AS nome_produto';
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
@@ -1074,7 +1120,13 @@ class PedidoEcommerce {
 
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
-                $item['imagem'] = $item['imagem_principal'] ?? 'default.jpg';
+                $item['imagem'] = $item['imagem_principal'] ?? 'placeholder.jpg';
+                if ((float) ($item['preco_unitario'] ?? 0) <= 0 && isset($item['valor_unitario_alt'])) {
+                    $vuAlt = (float) ($item['valor_unitario_alt'] ?? 0);
+                    if ($vuAlt > 0) {
+                        $item['preco_unitario'] = $vuAlt;
+                    }
+                }
                 if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
                     $item['ncm'] = '';
                 }

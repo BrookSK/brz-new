@@ -249,6 +249,45 @@ class AdminPedidosManualController extends Controller {
                 </div>
 
                 <div class="card mb-4">
+                    <div class="card-header"><strong>Endereço de Entrega</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">CEP</label>
+                                <input type="text" class="form-control" name="endereco_entrega_cep" id="endereco_entrega_cep" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Endereço</label>
+                                <input type="text" class="form-control" name="endereco_entrega_endereco" id="endereco_entrega_endereco" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Número</label>
+                                <input type="text" class="form-control" name="endereco_entrega_numero" id="endereco_entrega_numero" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Complemento</label>
+                                <input type="text" class="form-control" name="endereco_entrega_complemento" id="endereco_entrega_complemento" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Bairro</label>
+                                <input type="text" class="form-control" name="endereco_entrega_bairro" id="endereco_entrega_bairro" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cidade</label>
+                                <input type="text" class="form-control" name="endereco_entrega_cidade" id="endereco_entrega_cidade" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Estado</label>
+                                <input type="text" class="form-control" name="endereco_entrega_estado" id="endereco_entrega_estado" value="">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-text">Se o cliente não tiver endereço cadastrado, preencha aqui para criar e vincular ao pedido manual.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
                     <div class="card-header"><strong>Pagamento</strong></div>
                     <div class="card-body">
                         <div class="row g-3">
@@ -1242,6 +1281,16 @@ JS;
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
 
+            $enderecoEntrega = [
+                'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
+                'endereco' => (string) $request->getParam('endereco_entrega_endereco', ''),
+                'numero' => (string) $request->getParam('endereco_entrega_numero', ''),
+                'complemento' => (string) $request->getParam('endereco_entrega_complemento', ''),
+                'bairro' => (string) $request->getParam('endereco_entrega_bairro', ''),
+                'cidade' => (string) $request->getParam('endereco_entrega_cidade', ''),
+                'estado' => (string) $request->getParam('endereco_entrega_estado', ''),
+            ];
+
             $resumo = [
                 'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
                 'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
@@ -1286,7 +1335,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
@@ -1302,6 +1351,16 @@ JS;
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
 
+            $enderecoEntrega = [
+                'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
+                'endereco' => (string) $request->getParam('endereco_entrega_endereco', ''),
+                'numero' => (string) $request->getParam('endereco_entrega_numero', ''),
+                'complemento' => (string) $request->getParam('endereco_entrega_complemento', ''),
+                'bairro' => (string) $request->getParam('endereco_entrega_bairro', ''),
+                'cidade' => (string) $request->getParam('endereco_entrega_cidade', ''),
+                'estado' => (string) $request->getParam('endereco_entrega_estado', ''),
+            ];
+
             $resumo = [
                 'subtotal_produtos' => (float) str_replace(',', '.', (string) $request->getParam('subtotal_produtos', '0')),
                 'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
@@ -1346,7 +1405,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);

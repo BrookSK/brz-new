@@ -8,6 +8,89 @@ class PedidoManualService {
         $this->db = $db ?? \Config\Database::getConnection();
     }
 
+    private function criarEnderecoEntregaParaCliente(int $clienteId, ?array $enderecoEntrega): int {
+        if ($clienteId <= 0) {
+            return 0;
+        }
+        if (!$this->tableExists('enderecos')) {
+            return 0;
+        }
+        if (!is_array($enderecoEntrega)) {
+            return 0;
+        }
+
+        $cep = trim((string) ($enderecoEntrega['cep'] ?? ''));
+        $endereco = trim((string) ($enderecoEntrega['endereco'] ?? ''));
+        $numero = trim((string) ($enderecoEntrega['numero'] ?? ''));
+        $bairro = trim((string) ($enderecoEntrega['bairro'] ?? ''));
+        $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ''));
+        $estado = trim((string) ($enderecoEntrega['estado'] ?? ''));
+        $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
+
+        if ($cep === '' || $endereco === '' || $numero === '' || $bairro === '' || $cidade === '' || $estado === '') {
+            return 0;
+        }
+
+        try {
+            $colsEnd = $this->getCols('enderecos');
+            if (empty($colsEnd) || !in_array('id', $colsEnd, true) || !in_array('usuario_id', $colsEnd, true)) {
+                return 0;
+            }
+
+            $map = [
+                'cep' => ['cep'],
+                'endereco' => ['endereco', 'logradouro'],
+                'numero' => ['numero'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro'],
+                'cidade' => ['cidade'],
+                'estado' => ['estado', 'uf'],
+            ];
+
+            $cols = ['usuario_id'];
+            $vals = [':usuario_id'];
+            $params = [':usuario_id' => $clienteId];
+
+            $resolved = [];
+            foreach ($map as $key => $cands) {
+                $col = $this->pickFirstExistingColumn($colsEnd, $cands);
+                if ($col !== '') {
+                    $resolved[$key] = $col;
+                }
+            }
+
+            $valueByKey = [
+                'cep' => $cep,
+                'endereco' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'estado' => $estado,
+            ];
+
+            foreach ($resolved as $key => $col) {
+                $cols[] = $col;
+                $vals[] = ':' . $key;
+                $params[':' . $key] = $valueByKey[$key] ?? '';
+            }
+
+            if (in_array('principal', $colsEnd, true)) {
+                $cols[] = 'principal';
+                $vals[] = ':principal';
+                $params[':principal'] = 1;
+            }
+
+            $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $newId = (int) $this->db->lastInsertId();
+            return $newId > 0 ? $newId : 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
     private function criarPendenciaComprovantePedido(int $pedidoId, string $metodo, ?int $usuarioId = null): void {
         if ($pedidoId <= 0) {
             return;
@@ -407,7 +490,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -469,6 +552,33 @@ class PedidoManualService {
         $valorTotalCalc = isset($resumo['valor_total']) ? (float) $resumo['valor_total'] : 0.0;
         $total = ($valorTotalCalc > 0) ? round($valorTotalCalc, 2) : $subtotalItens;
 
+        // Endereço: em pedidos manuais, preferir o endereço principal do cliente quando existir.
+        // Se não houver endereço cadastrado, permitir que o admin informe os dados de entrega para criar o endereço.
+        $enderecoEntregaId = 0;
+        if (in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
+            try {
+                $colsEnd = $this->getCols('enderecos');
+                if (!empty($colsEnd) && in_array('usuario_id', $colsEnd, true) && in_array('id', $colsEnd, true)) {
+                    $orderBy = 'id DESC';
+                    if (in_array('principal', $colsEnd, true)) {
+                        $orderBy = 'principal DESC, id DESC';
+                    }
+                    $stE = $this->db->prepare('SELECT id FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
+                    $stE->execute([(int) $clienteId]);
+                    $enderecoEntregaId = (int) ($stE->fetchColumn() ?: 0);
+                }
+            } catch (\Exception $e) {
+                $enderecoEntregaId = 0;
+            }
+
+            if ($enderecoEntregaId <= 0) {
+                $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                if ($enderecoEntregaId <= 0) {
+                    throw new \Exception('Cliente sem endereço de entrega cadastrado. Informe o endereço de entrega para criar o pedido manual.');
+                }
+            }
+        }
+
         $cols = [$usuarioCol, $colTotal];
         $vals = [':usuario_id', ':total'];
         $params = [':usuario_id' => $clienteId, ':total' => $total];
@@ -486,6 +596,12 @@ class PedidoManualService {
                 $vals[] = ':forma_pagamento';
                 $params[':forma_pagamento'] = $fp;
             }
+        }
+
+        if ($enderecoEntregaId > 0 && in_array('endereco_entrega_id', $colsPedidos, true)) {
+            $cols[] = 'endereco_entrega_id';
+            $vals[] = ':endereco_entrega_id';
+            $params[':endereco_entrega_id'] = $enderecoEntregaId;
         }
 
         // Persistir resumo quando colunas existirem
@@ -649,7 +765,7 @@ class PedidoManualService {
                 $params[':sku'] = $sku;
             }
 
-            $colUnit = in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : ''));
+            $colUnit = in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : '')));
             if ($colUnit !== '') {
                 $cols[] = $colUnit;
                 $vals[] = ':vu';
@@ -851,9 +967,65 @@ class PedidoManualService {
             $set[] = 'payment_gateway = :pg';
             $params[':pg'] = $gateway;
         }
+        if (in_array('forma_pagamento', $colsPedidos, true)) {
+            $bt = (string) ($payResult['billingType'] ?? ($payResult['billing_type'] ?? ''));
+            $bt = strtoupper(trim($bt));
+            if ($bt !== '') {
+                $set[] = 'forma_pagamento = :fp';
+                $params[':fp'] = $bt;
+            }
+        }
         if (in_array('payment_id', $colsPedidos, true)) {
             $set[] = 'payment_id = :pid';
             $params[':pid'] = (string) ($payResult['payment_id'] ?? '');
+        }
+        if (in_array('payment_invoice_url', $colsPedidos, true)) {
+            $inv = (string) ($payResult['invoiceUrl'] ?? ($payResult['invoice_url'] ?? ''));
+            if ($inv !== '') {
+                $set[] = 'payment_invoice_url = :inv';
+                $params[':inv'] = $inv;
+            }
+        }
+        if (in_array('payment_bank_slip_url', $colsPedidos, true)) {
+            $bol = (string) ($payResult['bankSlipUrl'] ?? ($payResult['bank_slip_url'] ?? ''));
+            if ($bol !== '') {
+                $set[] = 'payment_bank_slip_url = :bol';
+                $params[':bol'] = $bol;
+            }
+        }
+        if (in_array('payment_digitable_line', $colsPedidos, true)) {
+            $dig = (string) ($payResult['digitableLine'] ?? ($payResult['digitable_line'] ?? ($payResult['linha_digitavel'] ?? '')));
+            if ($dig !== '') {
+                $set[] = 'payment_digitable_line = :dig';
+                $params[':dig'] = $dig;
+            }
+        }
+        if (in_array('payment_pix_payload', $colsPedidos, true) || in_array('payment_pix_encoded_image', $colsPedidos, true)) {
+            $pix = null;
+            if (isset($payResult['pix']) && is_array($payResult['pix'])) {
+                $pix = $payResult['pix'];
+            }
+            $pixPayload = '';
+            $pixImg = '';
+            if (is_array($pix)) {
+                $pixPayload = (string) ($pix['payload'] ?? ($pix['pix_payload'] ?? ''));
+                $pixImg = (string) ($pix['encodedImage'] ?? ($pix['encoded_image'] ?? ($pix['qrCode'] ?? ($pix['qr_code'] ?? ''))));
+            }
+            if ($pixPayload === '') {
+                $pixPayload = (string) ($payResult['pixPayload'] ?? ($payResult['pix_payload'] ?? ''));
+            }
+            if ($pixImg === '') {
+                $pixImg = (string) ($payResult['pixImg'] ?? ($payResult['pix_encoded_image'] ?? ''));
+            }
+
+            if ($pixPayload !== '' && in_array('payment_pix_payload', $colsPedidos, true)) {
+                $set[] = 'payment_pix_payload = :pix_payload';
+                $params[':pix_payload'] = $pixPayload;
+            }
+            if ($pixImg !== '' && in_array('payment_pix_encoded_image', $colsPedidos, true)) {
+                $set[] = 'payment_pix_encoded_image = :pix_img';
+                $params[':pix_img'] = $pixImg;
+            }
         }
         if (in_array('payment_status', $colsPedidos, true)) {
             $set[] = 'payment_status = :pst';
