@@ -286,8 +286,8 @@ class PaymentService {
 
         // A AppMax pode rejeitar shipping=0 e, em alguns cenários, valores muito pequenos podem ser truncados.
         // Garantir mínimo de 1.00.
-        if ($shipping < 1.0) {
-            $shipping = 1.0;
+        if ($shipping < 0) {
+            $shipping = 0.0;
         }
 
         $payloadProducts = [];
