@@ -221,9 +221,14 @@ function renderAdminSidebarStyles() {
             color: inherit !important;
         }
 
+        // .container-fluid {
+        //     padding-top: 18px;
+        //     padding-bottom: 18px;
+        // }
+
         .container-fluid {
-            padding-top: 18px;
-            padding-bottom: 18px;
+            padding-top: 0px;
+            padding-bottom: 0px;
         }
 
         .card-header {
