@@ -4,16 +4,50 @@ namespace App\Controllers;
 class AdminUsuariosViews {
     
     public static function renderCardUsuario($usuario) {
+        $perfil = '';
+        if (is_array($usuario)) {
+            if (array_key_exists('perfil', $usuario) && $usuario['perfil'] !== null && trim((string) $usuario['perfil']) !== '') {
+                $perfil = (string) $usuario['perfil'];
+            } elseif (array_key_exists('role', $usuario) && $usuario['role'] !== null && trim((string) $usuario['role']) !== '') {
+                $perfil = (string) $usuario['role'];
+            }
+        }
+        $perfil = strtolower(trim((string) $perfil));
+        if ($perfil === '') {
+            $perfil = 'cliente';
+        }
+        $perfilLabel = $perfil;
+        $perfilBadge = 'bg-secondary';
+        if ($perfil === 'admin') {
+            $perfilLabel = 'Admin';
+            $perfilBadge = 'bg-dark';
+        } elseif ($perfil === 'vendedor') {
+            $perfilLabel = 'Vendedor';
+            $perfilBadge = 'bg-primary';
+        } elseif ($perfil === 'suporte') {
+            $perfilLabel = 'Suporte';
+            $perfilBadge = 'bg-info';
+        } elseif ($perfil === 'redirecionador') {
+            $perfilLabel = 'Redirecionador';
+            $perfilBadge = 'bg-secondary';
+        } elseif ($perfil === 'cliente') {
+            $perfilLabel = 'Cliente';
+            $perfilBadge = 'bg-light text-dark';
+        }
+
         return '
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card user-card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
                             <img src="https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=4e73df&color=fff&size=60" class="user-avatar me-3" alt="Avatar">
-                            <div>
+                            <div class="flex-grow-1">
                                 <h6 class="card-title mb-1">' . htmlspecialchars($usuario['nome']) . '</h6>
                                 <p class="text-muted small mb-0">' . htmlspecialchars($usuario['email']) . '</p>
                                 ' . (!empty($usuario['suite']) ? '<p class="text-muted small mb-0">Suite: <strong>' . (int) $usuario['suite'] . '</strong></p>' : '') . '
+                            </div>
+                            <div class="ms-auto">
+                                <span class="badge ' . $perfilBadge . '">' . htmlspecialchars($perfilLabel) . '</span>
                             </div>
                         </div>
                         <div class="row text-center mb-3">
@@ -96,6 +130,37 @@ class AdminUsuariosViews {
     }
     
     public static function renderDetalhesUsuario($usuario, $pedidos) {
+        $perfil = '';
+        if (is_array($usuario)) {
+            if (array_key_exists('perfil', $usuario) && $usuario['perfil'] !== null && trim((string) $usuario['perfil']) !== '') {
+                $perfil = (string) $usuario['perfil'];
+            } elseif (array_key_exists('role', $usuario) && $usuario['role'] !== null && trim((string) $usuario['role']) !== '') {
+                $perfil = (string) $usuario['role'];
+            }
+        }
+        $perfil = strtolower(trim((string) $perfil));
+        if ($perfil === '') {
+            $perfil = 'cliente';
+        }
+        $perfilLabel = $perfil;
+        $perfilBadge = 'bg-secondary';
+        if ($perfil === 'admin') {
+            $perfilLabel = 'Admin';
+            $perfilBadge = 'bg-dark';
+        } elseif ($perfil === 'vendedor') {
+            $perfilLabel = 'Vendedor';
+            $perfilBadge = 'bg-primary';
+        } elseif ($perfil === 'suporte') {
+            $perfilLabel = 'Suporte';
+            $perfilBadge = 'bg-info';
+        } elseif ($perfil === 'redirecionador') {
+            $perfilLabel = 'Redirecionador';
+            $perfilBadge = 'bg-secondary';
+        } elseif ($perfil === 'cliente') {
+            $perfilLabel = 'Cliente';
+            $perfilBadge = 'bg-light text-dark';
+        }
+
         $html = '
             <div class="row">
                 <div class="col-md-4">
@@ -104,7 +169,10 @@ class AdminUsuariosViews {
                             <img src="https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=4e73df&color=fff&size=120" class="rounded-circle mb-3" style="width: 120px; height: 120px;">
                             <h4>' . htmlspecialchars($usuario['nome']) . '</h4>
                             <p class="text-muted">' . htmlspecialchars($usuario['email']) . '</p>
-                            <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                            <div>
+                                <span class="badge ' . ($usuario['ativo'] ? 'bg-success' : 'bg-danger') . '">' . ($usuario['ativo'] ? 'Ativo' : 'Inativo') . '</span>
+                                <span class="badge ' . $perfilBadge . ' ms-1">' . htmlspecialchars($perfilLabel) . '</span>
+                            </div>
                         </div>
                     </div>
                     
