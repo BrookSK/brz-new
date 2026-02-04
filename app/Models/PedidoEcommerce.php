@@ -948,10 +948,12 @@ class PedidoEcommerce {
                         $colNome = $this->pickColumn($colsU, ['nome', 'name', 'full_name']);
                         $colEmail = $this->pickColumn($colsU, ['email']);
                         $colTel = $this->pickColumn($colsU, ['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
+                        $colSuite = $this->pickColumn($colsU, ['suite']);
                         $sel = ['id'];
                         if ($colNome) $sel[] = $colNome . ' AS nome';
                         if ($colEmail) $sel[] = $colEmail . ' AS email';
                         if ($colTel) $sel[] = $colTel . ' AS telefone';
+                        if ($colSuite) $sel[] = $colSuite . ' AS suite';
                         $stU = $this->connection->prepare('SELECT ' . implode(', ', $sel) . ' FROM usuarios WHERE id = ? LIMIT 1');
                         $stU->execute([$uid]);
                         $rowU = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
@@ -963,6 +965,9 @@ class PedidoEcommerce {
                         }
                         if (empty($pedido['cliente_telefone']) && !empty($rowU['telefone'])) {
                             $pedido['cliente_telefone'] = $rowU['telefone'];
+                        }
+                        if (empty($pedido['cliente_suite']) && !empty($rowU['suite'])) {
+                            $pedido['cliente_suite'] = $rowU['suite'];
                         }
                     } catch (\Exception $e) {
                     }
