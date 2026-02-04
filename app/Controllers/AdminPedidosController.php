@@ -112,9 +112,6 @@ class AdminPedidosController extends Controller {
                         $baseTotal = (float) ($p[$totalField] ?? 0);
                         $moedaOriginal = strtoupper(trim((string) ($p['moeda_original'] ?? '')));
                         $deveConverter = ($moedaOriginal === 'USD');
-                        if (!$deveConverter && $baseTotal > 0 && $baseTotal <= 2000) {
-                            $deveConverter = true;
-                        }
 
                         if ($valorTotalBRL !== null) {
                             $p[$totalField] = $valorTotalBRL;
@@ -123,6 +120,9 @@ class AdminPedidosController extends Controller {
                             $conv = $baseTotal * $taxaConversao;
                             $p[$totalField] = $conv;
                             $p['total'] = $conv;
+                        } else {
+                            // Pedido já está em BRL; não converter novamente.
+                            $p['total'] = $baseTotal;
                         }
                     } else {
                         // Garantir que a view tenha total preenchido
