@@ -1099,6 +1099,8 @@ document.addEventListener('DOMContentLoaded', function(){
     const linkResult = document.getElementById('linkResult');
     const clienteSel = document.getElementById('cliente_id');
 
+    let __lastEnderecoPrefillClienteId = 0;
+
     function enderecoFormHasAnyValue(){
         const ids = [
             'endereco_entrega_cep',
@@ -1120,6 +1122,47 @@ document.addEventListener('DOMContentLoaded', function(){
         const el = document.getElementById(id);
         if (!el) return;
         el.value = String(v || '');
+        el.dataset.prefilled = '1';
+    }
+
+    function clearEnderecoFieldsIfPrefilled(){
+        const ids = [
+            'endereco_entrega_cep',
+            'endereco_entrega_endereco',
+            'endereco_entrega_numero',
+            'endereco_entrega_complemento',
+            'endereco_entrega_bairro',
+            'endereco_entrega_cidade',
+            'endereco_entrega_estado'
+        ];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (String(el.dataset.prefilled || '') === '1') {
+                el.value = '';
+            }
+            el.dataset.prefilled = '';
+        });
+    }
+
+    function hookEnderecoManualEdits(){
+        const ids = [
+            'endereco_entrega_cep',
+            'endereco_entrega_endereco',
+            'endereco_entrega_numero',
+            'endereco_entrega_complemento',
+            'endereco_entrega_bairro',
+            'endereco_entrega_cidade',
+            'endereco_entrega_estado'
+        ];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', function(){
+                // Se o admin mexeu manualmente, não sobrescrever automaticamente.
+                this.dataset.prefilled = '0';
+            });
+        });
     }
 
     function fetchAndPrefillEndereco(clienteId, force){
@@ -1131,6 +1174,7 @@ document.addEventListener('DOMContentLoaded', function(){
             .then(resp => {
                 if (!resp || !resp.success || !resp.endereco) return;
                 const e = resp.endereco;
+                __lastEnderecoPrefillClienteId = cid;
                 setEnderecoValue('endereco_entrega_cep', e.cep);
                 setEnderecoValue('endereco_entrega_endereco', e.endereco);
                 setEnderecoValue('endereco_entrega_numero', e.numero);
@@ -1234,8 +1278,22 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     if (clienteSel) {
+        hookEnderecoManualEdits();
         clienteSel.addEventListener('change', function(){
-            fetchAndPrefillEndereco(this.value, false);
+            const nextId = Number(this.value || 0);
+            const shouldOverride = (
+                nextId > 0 &&
+                __lastEnderecoPrefillClienteId > 0 &&
+                nextId !== __lastEnderecoPrefillClienteId
+            );
+
+            if (shouldOverride) {
+                clearEnderecoFieldsIfPrefilled();
+                fetchAndPrefillEndereco(nextId, true);
+                return;
+            }
+
+            fetchAndPrefillEndereco(nextId, false);
         });
     }
 
