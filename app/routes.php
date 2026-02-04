@@ -38,6 +38,8 @@ $router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
 $router->get('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->post('/recuperar-senha', 'AuthController', 'recuperarSenha');
+$router->get('/redefinir-senha/{token}', 'AuthController', 'redefinirSenha');
+$router->post('/redefinir-senha/{token}', 'AuthController', 'redefinirSenha');
 $router->get('/register', 'AuthController', 'register');
 $router->post('/register', 'AuthController', 'register');
 $router->get('/perfil', 'AuthController', 'perfil');

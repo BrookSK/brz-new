@@ -51,6 +51,116 @@ class Usuario extends Model {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 
+    private function ensurePasswordResetsTable(): void {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute(['password_resets']);
+            $exists = (bool) $stmt->fetchColumn();
+            if ($exists) {
+                return;
+            }
+
+            $this->connection->exec("CREATE TABLE IF NOT EXISTS password_resets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                token_hash VARCHAR(64) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_token_hash (token_hash),
+                INDEX idx_usuario_id (usuario_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function requestPasswordResetToken(string $email): string {
+        $email = trim((string) $email);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return '';
+        }
+
+        $user = $this->findByEmail($email);
+        if (!$user || empty($user['id'])) {
+            return '';
+        }
+
+        $this->ensurePasswordResetsTable();
+
+        $token = bin2hex(random_bytes(32));
+        $hash = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+        $createdAt = date('Y-m-d H:i:s');
+
+        try {
+            $stDel = $this->connection->prepare('DELETE FROM password_resets WHERE usuario_id = ?');
+            $stDel->execute([(int) $user['id']]);
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $st = $this->connection->prepare('INSERT INTO password_resets (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)');
+            $st->execute([(int) $user['id'], $hash, $expiresAt, $createdAt]);
+        } catch (\Exception $e) {
+            return '';
+        }
+
+        return $token;
+    }
+
+    private function getUserIdByResetToken(string $token): ?int {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return null;
+        }
+
+        $this->ensurePasswordResetsTable();
+
+        $hash = hash('sha256', $token);
+        try {
+            $st = $this->connection->prepare('SELECT usuario_id FROM password_resets WHERE token_hash = ? AND expires_at >= NOW() ORDER BY id DESC LIMIT 1');
+            $st->execute([$hash]);
+            $uid = $st->fetchColumn();
+            if ($uid === false || $uid === null) {
+                return null;
+            }
+            $uid = (int) $uid;
+            return $uid > 0 ? $uid : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function consumeResetToken(string $token): void {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return;
+        }
+
+        $hash = hash('sha256', $token);
+        try {
+            $st = $this->connection->prepare('DELETE FROM password_resets WHERE token_hash = ?');
+            $st->execute([$hash]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function resetPasswordByToken(string $token, string $newPassword): bool {
+        $uid = $this->getUserIdByResetToken($token);
+        if (!$uid) {
+            return false;
+        }
+
+        if (trim($newPassword) === '' || strlen((string) $newPassword) < 6) {
+            return false;
+        }
+
+        $ok = (bool) $this->updatePassword((int) $uid, $newPassword);
+        if ($ok) {
+            $this->consumeResetToken($token);
+        }
+        return $ok;
+    }
+
     public function authenticate($email, $senha) {
         $usuario = $this->findByEmail($email);
 

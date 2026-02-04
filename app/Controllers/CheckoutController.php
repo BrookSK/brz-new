@@ -26,6 +26,33 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
+        if (empty($missing)) {
+            return $missing;
+        }
+        if (!is_array($selectedAddress) || empty($selectedAddress)) {
+            return $missing;
+        }
+
+        $addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+        $hasAll = true;
+        foreach ($addrFields as $f) {
+            $v = trim((string) ($selectedAddress[$f] ?? ''));
+            if ($v === '') {
+                $hasAll = false;
+                break;
+            }
+        }
+        if (!$hasAll) {
+            return $missing;
+        }
+
+        // Se o endereço selecionado já tem os campos, não considerar esses campos como pendentes no perfil.
+        return array_values(array_filter($missing, function ($it) use ($addrFields) {
+            return !in_array((string) $it, $addrFields, true);
+        }));
+    }
+
     private function tableExists(string $table): bool {
         try {
             $db = \Config\Database::getConnection();
@@ -1039,6 +1066,12 @@ class CheckoutController extends Controller {
             }
         }
 
+        // Ajustar pendências do perfil com base no endereço selecionado (quando existir)
+        if (!empty($usuario) && !empty($usuario['id']) && is_array($enderecoPrincipal) && !empty($enderecoPrincipal)) {
+            $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $enderecoPrincipal);
+            $perfilOk = empty($faltando);
+        }
+
         $enderecoPrefill = [
             'pais' => (string) ($enderecoPrincipal['pais'] ?? ($usuario['pais_residencia'] ?? 'BR')),
             'cep' => (string) ($enderecoPrincipal['cep'] ?? ($usuario['cep'] ?? '')),
@@ -1788,6 +1821,11 @@ class CheckoutController extends Controller {
                     $paramsU['documento'] = $dados['documento'];
                 }
 
+                if (!empty($dados['data_nascimento']) && is_array($colsU) && in_array('data_nascimento', $colsU, true)) {
+                    $setU[] = 'data_nascimento = :data_nascimento';
+                    $paramsU['data_nascimento'] = $dados['data_nascimento'];
+                }
+
                 if (!empty($setU)) {
                     $sqlU = 'UPDATE usuarios SET ' . implode(', ', $setU) . ' WHERE id = :id';
                     $stmtU = $db->prepare($sqlU);
@@ -2102,6 +2140,7 @@ class CheckoutController extends Controller {
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
         if (empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
+        if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         
         // Endereço
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
@@ -2149,6 +2188,7 @@ class CheckoutController extends Controller {
             'senha' => $dados['senha'],
             'telefone' => $dados['telefone'],
             'documento' => $dados['documento'],
+            'data_nascimento' => $dados['data_nascimento'] ?? null,
             'perfil' => 'cliente'
         ]);
     }

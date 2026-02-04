@@ -6,15 +6,15 @@
         <div class="col-lg-8 mb-4 mb-lg-0">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
-                        <?php if (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))): ?>
-                            <div class="alert alert-warning">
-                                <div><strong>Atenção:</strong> você precisa completar seus dados e aceitar os termos para finalizar a compra.</div>
-                                <?php if (!empty($campos_faltando) && is_array($campos_faltando)): ?>
-                                    <div class="small mt-1">Campos pendentes: <strong><?= htmlspecialchars(implode(', ', $campos_faltando)) ?></strong></div>
-                                <?php endif; ?>
-                                <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados">Completar cadastro</a></div>
-                            </div>
-                        <?php endif; ?>
+                        <?php
+                            $warnPerfil = (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true)));
+                            $warnMissing = (!empty($campos_faltando) && is_array($campos_faltando)) ? array_values($campos_faltando) : [];
+                        ?>
+                        <div class="alert alert-warning" id="checkout-perfil-warning" style="display: <?= $warnPerfil ? 'block' : 'none' ?>;" data-missing='<?= htmlspecialchars(json_encode($warnMissing, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>' data-termos-ok="<?= (!empty($termos_ok) ? '1' : '0') ?>">
+                            <div><strong>Atenção:</strong> você precisa completar seus dados e aceitar os termos para finalizar a compra.</div>
+                            <div class="small mt-1" id="checkout-perfil-warning-missing" style="display:none;">Campos pendentes: <strong></strong></div>
+                            <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados">Completar cadastro</a></div>
+                        </div>
 
                         <!-- Campo oculto para moeda -->
                         <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
@@ -42,6 +42,11 @@
                                     <label class="form-label">Telefone com WhatsApp *</label>
                                     <input type="tel" class="form-control" name="telefone" required 
                                            value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Data de Nascimento *</label>
+                                    <input type="date" class="form-control" name="data_nascimento" required
+                                           value="<?= htmlspecialchars((string) ($usuario['data_nascimento'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                             </div>
                         </div>
@@ -158,6 +163,64 @@
                 </div>
             </div>
         </div>
+
+        <script>
+        (function() {
+            function computeMissingFiltered() {
+                var warn = document.getElementById('checkout-perfil-warning');
+                if (!warn) return;
+
+                var missing = [];
+                try {
+                    missing = JSON.parse(warn.getAttribute('data-missing') || '[]') || [];
+                } catch (e) {
+                    missing = [];
+                }
+
+                var termosOk = (warn.getAttribute('data-termos-ok') === '1');
+
+                var sel = document.getElementById('endereco-select');
+                if (sel && sel.value) {
+                    var opt = sel.options[sel.selectedIndex];
+                    if (opt) {
+                        var addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+                        var hasAll = true;
+                        for (var i = 0; i < addrFields.length; i++) {
+                            var k = 'data-' + addrFields[i];
+                            var v = (opt.getAttribute(k) || '').toString().trim();
+                            if (!v) { hasAll = false; break; }
+                        }
+                        if (hasAll) {
+                            missing = missing.filter(function(it) { return addrFields.indexOf((it || '').toString()) === -1; });
+                        }
+                    }
+                }
+
+                var show = (!termosOk) || (missing && missing.length > 0);
+                warn.style.display = show ? 'block' : 'none';
+
+                var box = document.getElementById('checkout-perfil-warning-missing');
+                if (box) {
+                    var strong = box.querySelector('strong');
+                    if (missing && missing.length > 0) {
+                        if (strong) strong.textContent = missing.join(', ');
+                        box.style.display = 'block';
+                    } else {
+                        if (strong) strong.textContent = '';
+                        box.style.display = 'none';
+                    }
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                computeMissingFiltered();
+                var sel = document.getElementById('endereco-select');
+                if (sel) {
+                    sel.addEventListener('change', computeMissingFiltered);
+                }
+            });
+        })();
+        </script>
 
         <!-- Resumo do Pedido (Fixo) -->
         <div class="col-lg-4">

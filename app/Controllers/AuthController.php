@@ -267,7 +267,36 @@ class AuthController extends Controller {
                 return;
             }
 
-            // Por compatibilidade: não vazar se email existe. Fluxo real de envio de email pode ser implementado depois.
+            $token = '';
+            try {
+                $token = $this->usuarioModel->requestPasswordResetToken($email);
+            } catch (\Exception $e) {
+                $token = '';
+            }
+
+            if ($token !== '') {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+                $base = $host !== '' ? ($scheme . '://' . $host) : '';
+                $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
+
+                $subject = 'Recuperação de senha - Braziliana Shop';
+                $html = 'Olá,<br><br>'
+                    . 'Recebemos uma solicitação para redefinir sua senha. Clique no link abaixo para criar uma nova senha:<br><br>'
+                    . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
+                    . 'Se você não solicitou isso, ignore este e-mail.<br><br>'
+                    . 'Este link expira em 1 hora.';
+
+                $fromEmail = 'noreply@brazilianashop.com.br';
+                $fromName = 'Braziliana Shop';
+                $headers = [];
+                $headers[] = 'MIME-Version: 1.0';
+                $headers[] = 'Content-Type: text/html; charset=UTF-8';
+                $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
+                @mail($email, $subject, $html, implode("\r\n", $headers));
+            }
+
+            // Por segurança, mesma mensagem para email existente ou não
             $_SESSION['message'] = 'Se o e-mail estiver cadastrado, você receberá instruções para recuperar sua senha.';
             $_SESSION['message_type'] = 'success';
             $this->redirect('/login');
@@ -275,6 +304,55 @@ class AuthController extends Controller {
         }
 
         $this->view('auth/recuperar-senha');
+    }
+
+    public function redefinirSenha(Request $request) {
+        $token = (string) ($request->getParam('token') ?? '');
+        $token = trim($token);
+        if ($token === '') {
+            $_SESSION['message'] = 'Link inválido.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/recuperar-senha');
+            return;
+        }
+
+        if ($request->getMethod() === 'POST') {
+            $senha = (string) ($request->getParam('senha') ?? '');
+            $confirm = (string) ($request->getParam('senha_confirmacao') ?? '');
+            if (trim($senha) === '' || strlen($senha) < 6) {
+                $_SESSION['message'] = 'A nova senha deve ter pelo menos 6 caracteres.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/redefinir-senha/' . rawurlencode($token));
+                return;
+            }
+            if ($senha !== $confirm) {
+                $_SESSION['message'] = 'As senhas não conferem.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/redefinir-senha/' . rawurlencode($token));
+                return;
+            }
+
+            $ok = false;
+            try {
+                $ok = $this->usuarioModel->resetPasswordByToken($token, $senha);
+            } catch (\Exception $e) {
+                $ok = false;
+            }
+
+            if ($ok) {
+                $_SESSION['message'] = 'Senha redefinida com sucesso. Você já pode fazer login.';
+                $_SESSION['message_type'] = 'success';
+                $this->redirect('/login');
+                return;
+            }
+
+            $_SESSION['message'] = 'Link inválido ou expirado. Solicite a recuperação novamente.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/recuperar-senha');
+            return;
+        }
+
+        $this->view('auth/redefinir-senha', ['token' => $token]);
     }
 
     public function logout(Request $request) {
