@@ -80,6 +80,43 @@ $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cro
 
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function() {
+    $perfil = '';
+    try {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
+    } catch (\Exception $e) {
+        $perfil = '';
+    }
+    $perfil = strtolower(trim($perfil));
+    if ($perfil === '') {
+        $perfil = 'cliente';
+    }
+
+    $menuItems = [
+        ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
+        ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
+        ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
+        ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
+    ];
+
+    $renderItems = $menuItems;
+    if ($perfil !== 'cliente') {
+        $renderItems = array_values(array_filter($menuItems, function ($it) use ($perfil) {
+            $roles = isset($it['roles']) && is_array($it['roles']) ? $it['roles'] : [];
+            if (empty($roles)) {
+                return true;
+            }
+            return in_array($perfil, $roles, true);
+        }));
+    }
+
     echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -156,44 +193,16 @@ $router->get('/admin', function() {
             <h1 class="admin-title">Braziliana Shop Admin</h1>
             <p class="text-muted mb-4">Painel Administrativo da Loja</p>
             
-            <div class="admin-menu">
-                <a href="/admin/dashboard" class="admin-menu-item">
-                    <i class="fas fa-tachometer-alt"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="/admin/produtos" class="admin-menu-item">
-                    <i class="fas fa-box"></i>
-                    <span>Produtos</span>
-                </a>
-                <a href="/admin/pedidos" class="admin-menu-item">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span>Pedidos</span>
-                </a>
-                <a href="/admin/estoque" class="admin-menu-item">
-                    <i class="fas fa-warehouse"></i>
-                    <span>Estoque</span>
-                </a>
-                <a href="/admin/estoque/compras" class="admin-menu-item">
-                    <i class="fas fa-shopping-basket"></i>
-                    <span>Compras</span>
-                </a>
-                <a href="/admin/estoque/relatorios" class="admin-menu-item">
-                    <i class="fas fa-file-pdf"></i>
-                    <span>Relatórios</span>
-                </a>
-                <a href="/admin/usuarios" class="admin-menu-item">
-                    <i class="fas fa-users"></i>
-                    <span>Usuários</span>
-                </a>
-                <a href="/admin/pagamentos" class="admin-menu-item">
-                    <i class="fas fa-credit-card"></i>
-                    <span>Pagamentos</span>
-                </a>
-                <a href="/admin/configuracoes" class="admin-menu-item">
-                    <i class="fas fa-cog"></i>
-                    <span>Configurações</span>
-                </a>
-            </div>
+            <div class="admin-menu">';
+
+    foreach ($renderItems as $item) {
+        echo '<a href="' . $item['url'] . '" class="admin-menu-item">'
+            . '<i class="' . $item['icon'] . '"></i>'
+            . '<span>' . htmlspecialchars((string) $item['label']) . '</span>'
+            . '</a>';
+    }
+
+    echo '</div>
             
             <div class="mt-4">
                 <a href="/" class="btn btn-outline-secondary">
