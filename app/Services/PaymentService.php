@@ -1826,6 +1826,359 @@ class PaymentService {
         return $this->stripeRequest('GET', '/v1/payment_intents/' . rawurlencode($paymentIntentId), null);
     }
 
+    public function retrieveStripeCheckoutSession(string $checkoutSessionId): array {
+        if (empty($this->stripeApiKey)) {
+            throw new \Exception('Stripe não configurado (Secret Key ausente).');
+        }
+        $id = trim($checkoutSessionId);
+        if ($id === '') {
+            throw new \Exception('Stripe: checkout session id vazio.');
+        }
+        // Expand do payment_intent para facilitar
+        return $this->stripeRequest('GET', '/v1/checkout/sessions/' . rawurlencode($id) . '?expand[]=payment_intent', null);
+    }
+
+    private function normalizeStripePaymentIntentIdFromStoredId(string $storedPaymentId): array {
+        $pid = trim($storedPaymentId);
+        if ($pid === '') {
+            return ['payment_intent_id' => '', 'source' => 'empty', 'session' => null];
+        }
+        if (str_starts_with($pid, 'pi_')) {
+            return ['payment_intent_id' => $pid, 'source' => 'payment_intent', 'session' => null];
+        }
+        if (str_starts_with($pid, 'cs_')) {
+            $session = $this->retrieveStripeCheckoutSession($pid);
+            $pi = (string) ($session['payment_intent']['id'] ?? ($session['payment_intent'] ?? ''));
+            $pi = trim($pi);
+            return ['payment_intent_id' => $pi, 'source' => 'checkout_session', 'session' => $session];
+        }
+        // Unknown id format; try as PI
+        return ['payment_intent_id' => $pid, 'source' => 'unknown', 'session' => null];
+    }
+
+    private function atualizarPedidoStripeComPaymentIntent(int $pedidoId, string $paymentIntentId, ?array $session = null): void {
+        $pi = trim($paymentIntentId);
+        if ($pedidoId <= 0 || $pi === '') {
+            return;
+        }
+        try {
+            $db = \Config\Database::getConnection();
+            $stmtCols = $db->query('DESCRIBE pedidos');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols) || empty($cols)) {
+                return;
+            }
+
+            $set = [];
+            $params = [':id' => $pedidoId];
+
+            if (in_array('payment_gateway', $cols, true)) {
+                $set[] = 'payment_gateway = :pg';
+                $params[':pg'] = 'stripe';
+            }
+
+            if (in_array('payment_id', $cols, true)) {
+                $set[] = 'payment_id = :pid';
+                $params[':pid'] = $pi;
+            }
+
+            if (is_array($session) && in_array('payment_invoice_url', $cols, true)) {
+                $url = (string) ($session['url'] ?? '');
+                $url = trim($url);
+                if ($url !== '') {
+                    $set[] = 'payment_invoice_url = :inv';
+                    $params[':inv'] = $url;
+                }
+            }
+
+            if (empty($set)) {
+                return;
+            }
+
+            $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+            $st = $db->prepare($sql);
+            $st->execute($params);
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function atualizarStatusPagamentoStripePorPedido(int $pedidoId): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'stripe') {
+            return ['success' => false, 'error' => 'Gateway não é Stripe'];
+        }
+
+        $storedPaymentId = (string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? ($pedido['pagamento_id'] ?? '')));
+        $storedPaymentId = trim($storedPaymentId);
+        if ($storedPaymentId === '') {
+            return ['success' => false, 'error' => 'Pedido sem payment_id'];
+        }
+
+        $norm = $this->normalizeStripePaymentIntentIdFromStoredId($storedPaymentId);
+        $paymentId = (string) ($norm['payment_intent_id'] ?? '');
+        $source = (string) ($norm['source'] ?? '');
+        $session = $norm['session'] ?? null;
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id'];
+        }
+
+        if ($source === 'checkout_session') {
+            $this->atualizarPedidoStripeComPaymentIntent($pedidoId, $paymentId, is_array($session) ? $session : null);
+        }
+
+        $pi = $this->retrieveStripePaymentIntent($paymentId);
+        $st = strtolower(trim((string) ($pi['status'] ?? '')));
+
+        $internal = 'pending';
+        if (in_array($st, ['succeeded'], true)) {
+            $internal = 'approved';
+        } elseif (in_array($st, ['canceled'], true)) {
+            $internal = 'rejected';
+        } elseif (in_array($st, ['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture'], true)) {
+            $internal = 'pending';
+        }
+
+        $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', $internal, strtoupper($st));
+
+        return [
+            'success' => true,
+            'gateway' => 'stripe',
+            'payment_id' => $paymentId,
+            'payment_status' => $internal,
+            'stripe_status' => $st,
+            'source' => $source,
+            'raw' => $pi,
+        ];
+    }
+
+    public function cancelarPagamentoStripePorPedido(int $pedidoId): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'stripe') {
+            return ['success' => false, 'error' => 'Gateway não é Stripe'];
+        }
+
+        $storedPaymentId = (string) ($pedido['payment_id'] ?? '');
+        $storedPaymentId = trim($storedPaymentId);
+        if ($storedPaymentId === '') {
+            return ['success' => false, 'error' => 'Pedido sem payment_id'];
+        }
+
+        $norm = $this->normalizeStripePaymentIntentIdFromStoredId($storedPaymentId);
+        $paymentId = (string) ($norm['payment_intent_id'] ?? '');
+        $source = (string) ($norm['source'] ?? '');
+        $session = $norm['session'] ?? null;
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id'];
+        }
+        if ($source === 'checkout_session') {
+            $this->atualizarPedidoStripeComPaymentIntent($pedidoId, $paymentId, is_array($session) ? $session : null);
+        }
+
+        $resp = $this->stripeRequest('POST', '/v1/payment_intents/' . rawurlencode($paymentId) . '/cancel', []);
+        $st = strtolower(trim((string) ($resp['status'] ?? 'canceled')));
+        $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'rejected', strtoupper($st !== '' ? $st : 'CANCELED'));
+
+        return [
+            'success' => true,
+            'gateway' => 'stripe',
+            'payment_id' => $paymentId,
+            'stripe_status' => $st,
+            'source' => $source,
+            'raw' => $resp,
+        ];
+    }
+
+    public function estornarPagamentoStripePorPedido(int $pedidoId, string $motivo = ''): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'stripe') {
+            return ['success' => false, 'error' => 'Gateway não é Stripe'];
+        }
+
+        $storedPaymentId = (string) ($pedido['payment_id'] ?? '');
+        $storedPaymentId = trim($storedPaymentId);
+        if ($storedPaymentId === '') {
+            return ['success' => false, 'error' => 'Pedido sem payment_id'];
+        }
+
+        $norm = $this->normalizeStripePaymentIntentIdFromStoredId($storedPaymentId);
+        $paymentId = (string) ($norm['payment_intent_id'] ?? '');
+        $source = (string) ($norm['source'] ?? '');
+        $session = $norm['session'] ?? null;
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id'];
+        }
+        if ($source === 'checkout_session') {
+            $this->atualizarPedidoStripeComPaymentIntent($pedidoId, $paymentId, is_array($session) ? $session : null);
+        }
+
+        $body = [
+            'payment_intent' => $paymentId,
+        ];
+        if (trim($motivo) !== '') {
+            $body['metadata[motivo]'] = trim($motivo);
+        }
+
+        $refund = $this->stripeRequest('POST', '/v1/refunds', $body);
+        $st = strtolower(trim((string) ($refund['status'] ?? '')));
+        $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'refunded', strtoupper($st !== '' ? $st : 'REFUNDED'));
+
+        return [
+            'success' => true,
+            'gateway' => 'stripe',
+            'payment_id' => $paymentId,
+            'refund_id' => (string) ($refund['id'] ?? ''),
+            'refund_status' => $st,
+            'source' => $source,
+            'raw' => $refund,
+        ];
+    }
+
+    public function atualizarStatusPagamentoAppmaxPorPedido(int $pedidoId): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'appmax') {
+            return ['success' => false, 'error' => 'Gateway não é AppMax'];
+        }
+
+        $orderId = trim((string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? '')));
+        if ($orderId === '' || !ctype_digit($orderId)) {
+            return ['success' => false, 'error' => 'AppMax: pedido sem payment_id/order_id numérico'];
+        }
+
+        // Melhor esforço: consultar status do pedido na AppMax
+        $raw = $this->appmaxRequest('GET', 'order/' . $orderId, null);
+        $data = is_array($raw) ? ($raw['data'] ?? $raw) : [];
+        $status = '';
+        if (is_array($data)) {
+            $status = (string) ($data['status'] ?? ($data['order_status'] ?? ($data['order']['status'] ?? '')));
+        }
+        $statusNorm = strtoupper(trim($status));
+
+        $internal = 'pending';
+        if ($statusNorm !== '') {
+            if (str_contains($statusNorm, 'APROV') || str_contains($statusNorm, 'PAID') || str_contains($statusNorm, 'PAGO')) {
+                $internal = 'approved';
+            } elseif (str_contains($statusNorm, 'REFUND') || str_contains($statusNorm, 'ESTORN')) {
+                $internal = 'refunded';
+            } elseif (str_contains($statusNorm, 'CANCEL') || str_contains($statusNorm, 'RECUS') || str_contains($statusNorm, 'REJECT')) {
+                $internal = 'rejected';
+            }
+        }
+
+        $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', $internal, $statusNorm !== '' ? $statusNorm : $internal);
+
+        return [
+            'success' => true,
+            'gateway' => 'appmax',
+            'payment_id' => $orderId,
+            'payment_status' => $internal,
+            'appmax_status' => $statusNorm,
+            'raw' => $raw,
+        ];
+    }
+
+    public function estornarPagamentoAppmaxPorPedido(int $pedidoId, ?float $valor = null): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'appmax') {
+            return ['success' => false, 'error' => 'Gateway não é AppMax'];
+        }
+
+        $orderId = trim((string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? '')));
+        if ($orderId === '' || !ctype_digit($orderId)) {
+            return ['success' => false, 'error' => 'AppMax: pedido sem payment_id/order_id numérico'];
+        }
+
+        $payload = [
+            'order_id' => (int) $orderId,
+        ];
+        if ($valor !== null && $valor > 0) {
+            $payload['refund_type'] = 'partial';
+            $payload['refund_amount'] = (float) $valor;
+        } else {
+            $payload['refund_type'] = 'total';
+        }
+
+        $resp = $this->appmaxRequest('POST', 'refund', $payload);
+
+        $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', 'refunded', 'REFUND');
+
+        return [
+            'success' => true,
+            'gateway' => 'appmax',
+            'payment_id' => $orderId,
+            'refund_type' => (string) ($payload['refund_type'] ?? 'total'),
+            'refund_amount' => $payload['refund_amount'] ?? null,
+            'raw' => $resp,
+        ];
+    }
+
+    public function cancelarPagamentoAppmaxPorPedido(int $pedidoId): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'appmax') {
+            return ['success' => false, 'error' => 'Gateway não é AppMax'];
+        }
+
+        $orderId = trim((string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? '')));
+        if ($orderId === '' || !ctype_digit($orderId)) {
+            return ['success' => false, 'error' => 'AppMax: pedido sem payment_id/order_id numérico'];
+        }
+
+        $current = strtolower(trim((string) ($pedido['payment_status'] ?? ($pedido['pagamento_status'] ?? 'pending'))));
+        $isApproved = in_array($current, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true);
+
+        // A documentação pública expõe estorno via /refund. Não há endpoint oficial de "cancel".
+        // Melhor esforço:
+        // - Se já aprovado: solicitar estorno total (equivalente operacional ao cancelamento)
+        // - Se não aprovado: marcar como rejected internamente
+        if ($isApproved) {
+            $refund = $this->estornarPagamentoAppmaxPorPedido($pedidoId, null);
+            return [
+                'success' => (bool) ($refund['success'] ?? false),
+                'gateway' => 'appmax',
+                'payment_id' => $orderId,
+                'action' => 'refund_total',
+                'result' => $refund,
+            ];
+        }
+
+        $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', 'rejected', 'CANCELED');
+        return [
+            'success' => true,
+            'gateway' => 'appmax',
+            'payment_id' => $orderId,
+            'action' => 'mark_rejected',
+        ];
+    }
+
     private function stripeRequest(string $method, string $path, ?array $body): array {
         $url = 'https://api.stripe.com' . $path;
         $headers = [

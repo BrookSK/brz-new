@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\PaymentService;
 
 class AdminPagamentosController extends Controller {
     
@@ -15,29 +16,38 @@ class AdminPagamentosController extends Controller {
             $busca = $request->getParam('busca', '');
             $status = $request->getParam('status', '');
             $metodo = $request->getParam('metodo', '');
+            $gateway = $request->getParam('gateway', '');
             
             $sql = "
-                SELECT p.*, u.nome as cliente_nome, u.email as cliente_email,
-                       pg.metodo, pg.status as status_pagamento, pg.gateway,
-                       pg.codigo_transacao, pg.data_pagamento
-                FROM pedidos p 
+                SELECT
+                    p.*,
+                    u.nome as cliente_nome,
+                    u.email as cliente_email,
+                    COALESCE(p.payment_gateway, p.pagamento_gateway, '') as gateway_pagamento,
+                    COALESCE(p.payment_id, p.pagamento_transacao, '') as codigo_transacao,
+                    COALESCE(p.payment_status, p.pagamento_status, '') as status_pagamento,
+                    COALESCE(p.forma_pagamento, p.pagamento_metodo, '') as metodo_pagamento
+                FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
-                LEFT JOIN pagamentos pg ON p.id = pg.pedido_id
                 WHERE 1=1
             ";
             $params = [];
             
             if (!empty($busca)) {
-                $sql .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR pg.codigo_transacao LIKE :busca)";
+                $sql .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
                 $params[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sql .= " AND pg.status = :status";
+                $sql .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
                 $params[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sql .= " AND pg.metodo = :metodo";
+                $sql .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
                 $params[':metodo'] = $metodo;
+            }
+            if (!empty($gateway)) {
+                $sql .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $params[':gateway'] = strtolower((string) $gateway);
             }
             
             $sql .= " ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset";
@@ -49,19 +59,23 @@ class AdminPagamentosController extends Controller {
             $stmt->execute();
             $pagamentos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
-            $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id LEFT JOIN pagamentos pg ON p.id = pg.pedido_id WHERE 1=1";
+            $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
             if (!empty($busca)) {
-                $sqlTotal .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR pg.codigo_transacao LIKE :busca)";
+                $sqlTotal .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sqlTotal .= " AND pg.status = :status";
+                $sqlTotal .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
                 $paramsTotal[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sqlTotal .= " AND pg.metodo = :metodo";
+                $sqlTotal .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
                 $paramsTotal[':metodo'] = $metodo;
+            }
+            if (!empty($gateway)) {
+                $sqlTotal .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $paramsTotal[':gateway'] = strtolower((string) $gateway);
             }
             
             $stmtTotal = $pdo->prepare($sqlTotal);
@@ -75,11 +89,10 @@ class AdminPagamentosController extends Controller {
                 SELECT 
                     COUNT(*) as total_transacoes,
                     SUM(p.valor_total) as valor_total,
-                    SUM(CASE WHEN pg.status = 'aprovado' THEN p.valor_total ELSE 0 END) as valor_aprovado,
-                    SUM(CASE WHEN pg.status = 'pendente' THEN p.valor_total ELSE 0 END) as valor_pendente,
-                    SUM(CASE WHEN pg.status = 'recusado' THEN p.valor_total ELSE 0 END) as valor_recusado
+                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'approved' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'aprovado' THEN p.valor_total ELSE 0 END) as valor_aprovado,
+                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'pending' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'pendente' THEN p.valor_total ELSE 0 END) as valor_pendente,
+                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'rejected' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'recusado' THEN p.valor_total ELSE 0 END) as valor_recusado
                 FROM pedidos p
-                LEFT JOIN pagamentos pg ON p.id = pg.pedido_id
                 WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             ");
             $stats = $stmtStats->fetch(\PDO::FETCH_ASSOC);
@@ -197,18 +210,25 @@ class AdminPagamentosController extends Controller {
                     <div class="col-md-2">
                         <select class="form-select" name="status">
                             <option value="">Todos status</option>
-                            <option value="aprovado" ' . ($status === 'aprovado' ? 'selected' : '') . '>Aprovado</option>
-                            <option value="pendente" ' . ($status === 'pendente' ? 'selected' : '') . '>Pendente</option>
-                            <option value="recusado" ' . ($status === 'recusado' ? 'selected' : '') . '>Recusado</option>
-                            <option value="estornado" ' . ($status === 'estornado' ? 'selected' : '') . '>Estornado</option>
+                            <option value="approved" ' . ($status === 'approved' ? 'selected' : '') . '>Aprovado</option>
+                            <option value="pending" ' . ($status === 'pending' ? 'selected' : '') . '>Pendente</option>
+                            <option value="rejected" ' . ($status === 'rejected' ? 'selected' : '') . '>Recusado</option>
+                            <option value="refunded" ' . ($status === 'refunded' ? 'selected' : '') . '>Estornado</option>
                         </select>
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" name="metodo">
                             <option value="">Todos métodos</option>
-                            <option value="cartao" ' . ($metodo === 'cartao' ? 'selected' : '') . '>Cartão</option>
-                            <option value="boleto" ' . ($metodo === 'boleto' ? 'selected' : '') . '>Boleto</option>
-                            <option value="pix" ' . ($metodo === 'pix' ? 'selected' : '') . '>PIX</option>
+                            <option value="CREDIT_CARD" ' . ($metodo === 'CREDIT_CARD' ? 'selected' : '') . '>Cartão</option>
+                            <option value="BOLETO" ' . ($metodo === 'BOLETO' ? 'selected' : '') . '>Boleto</option>
+                            <option value="PIX" ' . ($metodo === 'PIX' ? 'selected' : '') . '>PIX</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="gateway">
+                            <option value="">Todos gateways</option>
+                            <option value="stripe" ' . ($gateway === 'stripe' ? 'selected' : '') . '>Stripe</option>
+                            <option value="appmax" ' . ($gateway === 'appmax' ? 'selected' : '') . '>AppMax</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -219,32 +239,55 @@ class AdminPagamentosController extends Controller {
                 <div class="row">';
                 
                 foreach ($pagamentos as $pagamento) {
-                    $statusClass = 'status-' . ($pagamento['status_pagamento'] ?? 'pendente');
+                    $pedidoIdRow = (int) ($pagamento['id'] ?? 0);
+                    $stRow = strtolower(trim((string) ($pagamento['status_pagamento'] ?? 'pending')));
+                    $gwRow = strtolower(trim((string) ($pagamento['gateway_pagamento'] ?? '')));
+
+                    $statusBadge = 'Pendente';
+                    $statusClass = 'status-pendente';
+                    if (in_array($stRow, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true)) {
+                        $statusBadge = 'Aprovado';
+                        $statusClass = 'status-aprovado';
+                    } elseif (in_array($stRow, ['rejected', 'recusado', 'failed', 'canceled', 'cancelled'], true)) {
+                        $statusBadge = 'Recusado';
+                        $statusClass = 'status-recusado';
+                    } elseif (in_array($stRow, ['refunded', 'estornado'], true)) {
+                        $statusBadge = 'Estornado';
+                        $statusClass = 'status-estornado';
+                    }
+
                     echo '<div class="col-md-6 col-lg-4 mb-4">
                         <div class="card payment-card h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <strong>#' . str_pad($pagamento['id'], 6, '0', STR_PAD_LEFT) . '</strong>
-                                <span class="badge ' . $statusClass . '">' . ucfirst($pagamento['status_pagamento'] ?? 'Pendente') . '</span>
+                                <strong>Pedido #' . str_pad((string) $pedidoIdRow, 6, '0', STR_PAD_LEFT) . '</strong>
+                                <span class="badge ' . $statusClass . '">' . $statusBadge . '</span>
                             </div>
                             <div class="card-body">
                                 <h6 class="card-title">' . htmlspecialchars($pagamento['cliente_nome'] ?? 'Visitante') . '</h6>
                                 <p class="card-text text-muted small">' . htmlspecialchars($pagamento['cliente_email'] ?? 'N/A') . '</p>
                                 <p class="card-text">
-                                    <small class="text-muted">Método: ' . ($pagamento['metodo'] ?? 'N/A') . '</small><br>
-                                    <small class="text-muted">Gateway: ' . ($pagamento['gateway'] ?? 'N/A') . '</small><br>
-                                    <small class="text-muted">Transação: ' . htmlspecialchars($pagamento['codigo_transacao'] ?? 'N/A') . '</small><br>
+                                    <small class="text-muted">Método: ' . htmlspecialchars((string) ($pagamento['metodo_pagamento'] ?? 'N/A')) . '</small><br>
+                                    <small class="text-muted">Gateway: ' . htmlspecialchars($gwRow !== '' ? strtoupper($gwRow) : 'N/A') . '</small><br>
+                                    <small class="text-muted">Transação: ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
                                     <strong>Valor: R$ ' . number_format($pagamento['valor_total'], 2, ',', '.') . '</strong>
                                 </p>
-                                <div class="d-flex justify-content-between">
-                                    <a href="/admin/pedidos/detalhes/' . $pagamento['id'] . '" class="btn btn-sm btn-outline-primary">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="/admin/pedidos/detalhes/' . $pedidoIdRow . '" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-eye"></i> Ver Pedido
-                                    </a>';
-                                    if ($pagamento['status_pagamento'] === 'pendente') {
-                                        echo '<button class="btn btn-sm btn-outline-success" onclick="confirmarPagamento(' . $pagamento['id'] . ')">
-                                            <i class="fas fa-check"></i> Confirmar
-                                        </button>';
-                                    }
-                                    echo '</div>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-info" onclick="refreshPagamento(' . $pedidoIdRow . ')">
+                                        <i class="fas fa-sync"></i> Atualizar status
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="cancelarPagamento(' . $pedidoIdRow . ')">
+                                        <i class="fas fa-ban"></i> Cancelar pag.
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="estornarPagamento(' . $pedidoIdRow . ')">
+                                        <i class="fas fa-undo"></i> Estornar
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelarPedido(' . $pedidoIdRow . ')">
+                                        <i class="fas fa-xmark"></i> Cancelar pedido
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>';
@@ -299,10 +342,290 @@ class AdminPagamentosController extends Controller {
                 });
             }
         }
+
+        function refreshPagamento(pedidoId) {
+            fetch("/admin/pagamentos/refresh/" + pedidoId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert("Erro ao atualizar status: " + (data.error || data.message || ""));
+                }
+            })
+            .catch(() => alert("Erro ao atualizar status"));
+        }
+
+        function cancelarPagamento(pedidoId) {
+            if (!confirm("Cancelar pagamento no gateway?")) return;
+            fetch("/admin/pagamentos/cancelar/" + pedidoId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert("Erro ao cancelar pagamento: " + (data.error || data.message || ""));
+                }
+            })
+            .catch(() => alert("Erro ao cancelar pagamento"));
+        }
+
+        function estornarPagamento(pedidoId) {
+            const motivo = prompt("Motivo do estorno (opcional):", "");
+            if (motivo === null) return;
+            if (!confirm("Confirmar estorno?")) return;
+
+            fetch("/admin/pagamentos/estornar/" + pedidoId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ motivo: motivo || "" })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert("Erro ao estornar: " + (data.error || data.message || ""));
+                }
+            })
+            .catch(() => alert("Erro ao estornar"));
+        }
+
+        function cancelarPedido(pedidoId) {
+            if (!confirm("Cancelar o pedido no sistema?")) return;
+            const estornar = confirm("Deseja estornar/cancelar o pagamento também?");
+            fetch("/admin/pagamentos/cancelar-pedido/" + pedidoId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ estornar: estornar ? 1 : 0 })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert("Erro ao cancelar pedido: " + (data.error || data.message || ""));
+                }
+            })
+            .catch(() => alert("Erro ao cancelar pedido"));
+        }
     </script>
 </body>
 </html>';
         exit;
+    }
+
+    public function refreshPagamento(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $pedidoId = (int) $request->getParam('id');
+        try {
+            $svc = new PaymentService();
+
+            $db = \Config\Database::getConnection();
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+
+            $gateway = '';
+            $paymentId = '';
+            if (!empty($colsP)) {
+                $st = $db->prepare('SELECT payment_gateway, payment_id, payment_status FROM pedidos WHERE id = ? LIMIT 1');
+                $st->execute([$pedidoId]);
+                $row = $st->fetch(\PDO::FETCH_ASSOC);
+                $gateway = strtolower(trim((string) ($row['payment_gateway'] ?? '')));
+                $paymentId = trim((string) ($row['payment_id'] ?? ''));
+            }
+
+            if ($gateway === 'stripe') {
+                $resp = $svc->atualizarStatusPagamentoStripePorPedido($pedidoId);
+                $this->json($resp);
+                return;
+            }
+
+            if ($gateway === 'appmax') {
+                $resp = $svc->atualizarStatusPagamentoAppmaxPorPedido($pedidoId);
+                $this->json($resp);
+                return;
+            }
+
+            $this->json(['success' => false, 'error' => 'Refresh automático ainda não implementado para este gateway']);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function cancelarPagamento(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $pedidoId = (int) $request->getParam('id');
+        try {
+            $svc = new PaymentService();
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT payment_gateway FROM pedidos WHERE id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $gateway = strtolower(trim((string) ($st->fetchColumn() ?: '')));
+
+            if ($gateway === 'stripe') {
+                $resp = $svc->cancelarPagamentoStripePorPedido($pedidoId);
+                $this->json($resp);
+                return;
+            }
+
+            if ($gateway === 'appmax') {
+                $resp = $svc->cancelarPagamentoAppmaxPorPedido($pedidoId);
+                $this->json($resp);
+                return;
+            }
+
+            $this->json(['success' => false, 'error' => 'Cancelamento ainda não implementado para este gateway']);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function estornarPagamento(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $pedidoId = (int) $request->getParam('id');
+        $payload = [];
+        try {
+            $raw = file_get_contents('php://input');
+            $decoded = json_decode((string) $raw, true);
+            $payload = is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            $payload = [];
+        }
+        $motivo = (string) ($payload['motivo'] ?? '');
+        $valor = null;
+        if (isset($payload['valor'])) {
+            $v = str_replace(',', '.', trim((string) $payload['valor']));
+            if (is_numeric($v)) {
+                $valor = (float) $v;
+            }
+        }
+
+        try {
+            $svc = new PaymentService();
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT payment_gateway FROM pedidos WHERE id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $gateway = strtolower(trim((string) ($st->fetchColumn() ?: '')));
+
+            if ($gateway === 'stripe') {
+                $resp = $svc->estornarPagamentoStripePorPedido($pedidoId, $motivo);
+                $this->json($resp);
+                return;
+            }
+
+            if ($gateway === 'appmax') {
+                $resp = $svc->estornarPagamentoAppmaxPorPedido($pedidoId, $valor);
+                $this->json($resp);
+                return;
+            }
+
+            $this->json(['success' => false, 'error' => 'Estorno ainda não implementado para este gateway']);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function cancelarPedido(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $pedidoId = (int) $request->getParam('id');
+        try {
+            $db = \Config\Database::getConnection();
+            $svc = new PaymentService();
+
+            $payload = [];
+            try {
+                $raw = file_get_contents('php://input');
+                $decoded = json_decode((string) $raw, true);
+                $payload = is_array($decoded) ? $decoded : [];
+            } catch (\Exception $e) {
+                $payload = [];
+            }
+            $estornar = !empty($payload['estornar']);
+
+            $stPedido = $db->prepare('SELECT id, payment_gateway, payment_id, payment_status, pagamento_gateway, pagamento_transacao, pagamento_status FROM pedidos WHERE id = ? LIMIT 1');
+            $stPedido->execute([$pedidoId]);
+            $pedido = $stPedido->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                $this->json(['success' => false, 'error' => 'Pedido não encontrado']);
+                return;
+            }
+
+            $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+            $paymentStatus = strtolower(trim((string) ($pedido['payment_status'] ?? ($pedido['pagamento_status'] ?? ''))));
+            $isPaid = in_array($paymentStatus, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true);
+            $hasPayment = trim((string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? ''))) !== '';
+
+            $gatewayResult = null;
+            if ($estornar && $hasPayment && $gateway !== '') {
+                if ($isPaid) {
+                    if ($gateway === 'stripe') {
+                        $gatewayResult = $svc->estornarPagamentoStripePorPedido($pedidoId, 'Cancelamento do pedido no sistema');
+                    } elseif ($gateway === 'appmax') {
+                        $gatewayResult = $svc->estornarPagamentoAppmaxPorPedido($pedidoId, null);
+                    }
+                } else {
+                    if ($gateway === 'stripe') {
+                        $gatewayResult = $svc->cancelarPagamentoStripePorPedido($pedidoId);
+                    } elseif ($gateway === 'appmax') {
+                        $gatewayResult = $svc->cancelarPagamentoAppmaxPorPedido($pedidoId);
+                    }
+                }
+            }
+
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+
+            $set = [];
+            $params = [':id' => $pedidoId];
+            if (in_array('status', $colsP, true)) {
+                $set[] = 'status = :status';
+                $params[':status'] = 'cancelado';
+            }
+            if (in_array('updated_at', $colsP, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            if (!empty($set)) {
+                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $st = $db->prepare($sql);
+                $st->execute($params);
+            }
+
+            $this->json([
+                'success' => true,
+                'gateway' => $gateway,
+                'payment_status' => $paymentStatus,
+                'gateway_action' => $estornar ? ($isPaid ? 'refund' : 'cancel') : 'none',
+                'gateway_result' => $gatewayResult,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     public function comissoesGerais(Request $request) {

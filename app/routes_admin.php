@@ -36,6 +36,10 @@ $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController'
 // Pagamentos
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');
 $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', 'confirmarPagamento');
+$router->post('/admin/pagamentos/refresh/{id}', 'AdminPagamentosController', 'refreshPagamento');
+$router->post('/admin/pagamentos/cancelar/{id}', 'AdminPagamentosController', 'cancelarPagamento');
+$router->post('/admin/pagamentos/estornar/{id}', 'AdminPagamentosController', 'estornarPagamento');
+$router->post('/admin/pagamentos/cancelar-pedido/{id}', 'AdminPagamentosController', 'cancelarPedido');
 $router->get('/admin/pagamentos/configuracoes', 'AdminPagamentosController', 'configuracoes');
 $router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosController', 'salvarConfiguracoes');
 

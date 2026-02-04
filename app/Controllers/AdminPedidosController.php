@@ -1036,7 +1036,11 @@ class AdminPedidosController extends Controller {
         function atualizarStatus() {
             const status = document.getElementById("novo_status").value;
             if (status) {
-                window.location.href = "/admin/pedidos/atualizar-status/' . $id . '/" + status;
+                let estornar = 0;
+                if (status === "cancelado") {
+                    estornar = confirm("Deseja estornar/cancelar o pagamento também?") ? 1 : 0;
+                }
+                window.location.href = "/admin/pedidos/atualizar-status/' . $id . '/" + status + "?estornar=" + estornar;
             }
         }
 
@@ -1596,6 +1600,7 @@ class AdminPedidosController extends Controller {
     public function atualizarStatus(Request $request) {
         $id = $request->getParam('id');
         $novoStatus = $request->getParam('status');
+        $estornar = (int) $request->getParam('estornar', 0) === 1;
         
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -1688,6 +1693,37 @@ class AdminPedidosController extends Controller {
             $params[] = $id;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
+
+            if ((string) $novoStatus === 'cancelado' && $estornar) {
+                try {
+                    $stmtP = $pdo->prepare('SELECT payment_gateway, payment_id, payment_status, pagamento_gateway, pagamento_transacao, pagamento_status FROM pedidos WHERE id = ? LIMIT 1');
+                    $stmtP->execute([(int) $id]);
+                    $pedido = $stmtP->fetch(\PDO::FETCH_ASSOC);
+
+                    $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+                    $pstatus = strtolower(trim((string) ($pedido['payment_status'] ?? ($pedido['pagamento_status'] ?? ''))));
+                    $isPaid = in_array($pstatus, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true);
+                    $hasPayment = trim((string) ($pedido['payment_id'] ?? ($pedido['pagamento_transacao'] ?? ''))) !== '';
+
+                    if ($hasPayment && $gateway !== '') {
+                        $paySvc = new PaymentService();
+                        if ($isPaid) {
+                            if ($gateway === 'stripe') {
+                                $paySvc->estornarPagamentoStripePorPedido((int) $id, 'Cancelamento do pedido no sistema');
+                            } elseif ($gateway === 'appmax') {
+                                $paySvc->estornarPagamentoAppmaxPorPedido((int) $id, null);
+                            }
+                        } else {
+                            if ($gateway === 'stripe') {
+                                $paySvc->cancelarPagamentoStripePorPedido((int) $id);
+                            } elseif ($gateway === 'appmax') {
+                                $paySvc->cancelarPagamentoAppmaxPorPedido((int) $id);
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
 
             if ($stmt->rowCount() <= 0) {
                 echo '<div class="alert alert-warning">Nenhuma linha foi atualizada. Verifique se o pedido existe e se a coluna de status está correta (coluna usada: <strong>' . htmlspecialchars($statusCol) . '</strong>).</div>';
@@ -1960,7 +1996,7 @@ class AdminPedidosController extends Controller {
             }
 
             if ((string) $novoStatus === 'cancelado') {
-                // Cancelamento: liberar reservas e remover pendancias do pedido
+                // Cancelamento: liberar reservas e remover pendncias do pedido
                 try {
                     $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
                     $stmtT->execute(['estoque_reservas']);
