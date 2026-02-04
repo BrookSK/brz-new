@@ -299,21 +299,18 @@ class AdminPedidosController extends Controller {
                         ? 'color:#14532d;font-weight:700;'
                         : 'color:#b91c1c;font-weight:700;';
 
-                    $origemTxt = '';
-                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
-                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
-                    }
-                    if ($origemTxt === '') {
-                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
-                    }
-
+                    $isManualBool = false;
                     $manualTxt = '';
                     if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
                         $v = $pedido[$colManual];
-                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
-                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -335,7 +332,6 @@ class AdminPedidosController extends Controller {
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
-                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -414,21 +410,18 @@ class AdminPedidosController extends Controller {
                         ? 'color:#14532d;font-weight:700;'
                         : 'color:#b91c1c;font-weight:700;';
 
-                    $origemTxt = '';
-                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
-                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
-                    }
-                    if ($origemTxt === '') {
-                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
-                    }
-
+                    $isManualBool = false;
                     $manualTxt = '';
                     if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
                         $v = $pedido[$colManual];
-                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
-                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -450,7 +443,6 @@ class AdminPedidosController extends Controller {
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
-                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -469,13 +461,16 @@ class AdminPedidosController extends Controller {
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
                                         </div>
                                     </div>
@@ -499,7 +494,6 @@ class AdminPedidosController extends Controller {
                             <div class="tab-pane fade" id="pedidos-real" role="tabpanel">
                                 <div class="row">';
                 
-                // Filtrar pedidos em BRL
                 $pedidosBRL = array_filter($pedidos, function($pedido) {
                     return $pedido['moeda'] === 'BRL';
                 });
@@ -526,21 +520,18 @@ class AdminPedidosController extends Controller {
                         ? 'color:#14532d;font-weight:700;'
                         : 'color:#b91c1c;font-weight:700;';
 
-                    $origemTxt = '';
-                    if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
-                        $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
-                    }
-                    if ($origemTxt === '') {
-                        $origemTxt = (!empty($pedido['usuario_id']) ? 'Direct' : 'Visitante');
-                    }
-
+                    $isManualBool = false;
                     $manualTxt = '';
                     if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
                         $v = $pedido[$colManual];
-                        $isManual = ($v === 1 || $v === '1' || $v === true || $v === 'true');
-                        $manualTxt = $isManual ? 'Sim' : 'Não';
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
                     }
-                    
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -562,7 +553,7 @@ class AdminPedidosController extends Controller {
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
-                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
+                                            <span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -581,13 +572,16 @@ class AdminPedidosController extends Controller {
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
                                         </div>
                                     </div>
