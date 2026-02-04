@@ -248,6 +248,35 @@ class AuthController extends Controller {
         $this->view('auth/loginadmin');
     }
 
+    public function recuperarSenha(Request $request) {
+        if ($this->authService->estaLogado()) {
+            $usuario = $this->authService->getUsuarioLogado();
+            if (($usuario['perfil'] ?? '') === 'admin') {
+                $this->redirect('/admin/dashboard');
+            }
+            $this->redirect('/minha-conta');
+            return;
+        }
+
+        if ($request->getMethod() === 'POST') {
+            $email = trim((string) ($request->getParam('email') ?? ''));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $_SESSION['message'] = 'Informe um e-mail válido.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/recuperar-senha');
+                return;
+            }
+
+            // Por compatibilidade: não vazar se email existe. Fluxo real de envio de email pode ser implementado depois.
+            $_SESSION['message'] = 'Se o e-mail estiver cadastrado, você receberá instruções para recuperar sua senha.';
+            $_SESSION['message_type'] = 'success';
+            $this->redirect('/login');
+            return;
+        }
+
+        $this->view('auth/recuperar-senha');
+    }
+
     public function logout(Request $request) {
         try {
             $this->authService->logout();

@@ -54,7 +54,26 @@ class Usuario extends Model {
     public function authenticate($email, $senha) {
         $usuario = $this->findByEmail($email);
 
-        $hash = $usuario['senha'] ?? $usuario['password'] ?? null;
+        $hash = null;
+        $senhaCol = null;
+        if (is_array($usuario)) {
+            $s1 = isset($usuario['senha']) ? trim((string) $usuario['senha']) : null;
+            $s2 = isset($usuario['password']) ? trim((string) $usuario['password']) : null;
+            if ($s1 !== null && $s1 !== '') {
+                $hash = $s1;
+                $senhaCol = 'senha';
+            } elseif ($s2 !== null && $s2 !== '') {
+                $hash = $s2;
+                $senhaCol = 'password';
+            } elseif (array_key_exists('senha', $usuario)) {
+                // fallback quando existe a coluna mas está vazia
+                $hash = is_string($usuario['senha'] ?? null) ? (string) $usuario['senha'] : null;
+                $senhaCol = 'senha';
+            } elseif (array_key_exists('password', $usuario)) {
+                $hash = is_string($usuario['password'] ?? null) ? (string) $usuario['password'] : null;
+                $senhaCol = 'password';
+            }
+        }
         $ok = false;
         if ($usuario && is_string($hash) && $hash !== '') {
             // Compatibilidade: aceita senha em texto plano antiga
@@ -62,7 +81,7 @@ class Usuario extends Model {
                 $ok = true;
                 // Migrar para hash
                 $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
-                $col = array_key_exists('senha', $usuario) ? 'senha' : 'password';
+                $col = $senhaCol ?: (array_key_exists('senha', $usuario) ? 'senha' : 'password');
                 try {
                     $stmtHash = $this->connection->prepare("UPDATE {$this->table} SET {$col} = :hash WHERE id = :id");
                     $stmtHash->bindParam(':hash', $newHash);
@@ -76,7 +95,7 @@ class Usuario extends Model {
                 // Rehash quando necessário
                 if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
                     $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
-                    $col = array_key_exists('senha', $usuario) ? 'senha' : 'password';
+                    $col = $senhaCol ?: (array_key_exists('senha', $usuario) ? 'senha' : 'password');
                     try {
                         $stmtHash = $this->connection->prepare("UPDATE {$this->table} SET {$col} = :hash WHERE id = :id");
                         $stmtHash->bindParam(':hash', $newHash);
