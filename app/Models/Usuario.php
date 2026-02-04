@@ -227,7 +227,15 @@ class Usuario extends Model {
             unset($usuario['password'], $usuario['senha']);
             
             // Adicionar campo 'perfil' para compatibilidade
-            $usuario['perfil'] = $usuario['role'] ?? 'cliente';
+            $perfil = '';
+            if (array_key_exists('perfil', $usuario) && $usuario['perfil'] !== null && trim((string) $usuario['perfil']) !== '') {
+                $perfil = (string) $usuario['perfil'];
+            } elseif (array_key_exists('role', $usuario) && $usuario['role'] !== null && trim((string) $usuario['role']) !== '') {
+                $perfil = (string) $usuario['role'];
+            } else {
+                $perfil = 'cliente';
+            }
+            $usuario['perfil'] = $perfil;
             $usuario['nome'] = $usuario['name'] ?? $usuario['nome'] ?? '';
             
             return $usuario;
