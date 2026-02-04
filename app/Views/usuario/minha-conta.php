@@ -2,65 +2,7 @@
 <div class="container py-5">
     <div class="row">
         <!-- Sidebar -->
-        <div class="col-lg-3 mb-4 account-sidebar">
-            <div class="card shadow-sm">
-                <div class="card-body text-center">
-                    <?php
-                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
-                        $avatarUrl = null;
-                        foreach ($avatarColumnCandidates as $c) {
-                            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
-                                $avatarUrl = $usuario[$c];
-                                break;
-                            }
-                        }
-                        if (empty($avatarUrl)) {
-                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
-                        }
-                    ?>
-                    <div class="user-avatar mx-auto mb-3">
-                        <?php if (!empty($avatarUrl) && is_string($avatarUrl)): ?>
-                            <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>">
-                        <?php else: ?>
-                            <?= strtoupper(substr($usuario['nome'], 0, 2)) ?>
-                        <?php endif; ?>
-                    </div>
-                    <h5 class="card-title"><?= htmlspecialchars($usuario['nome']) ?></h5>
-                    <p class="text-muted"><?= htmlspecialchars($usuario['email']) ?></p>
-                    <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: #0b1f3a;">
-                        <?= ucfirst($usuario['perfil']) ?>
-                    </span>
-                    <?php $suiteValue = $usuario['suite'] ?? ($usuario['switch'] ?? null); ?>
-                    <?php if (!empty($suiteValue)): ?>
-                        <div class="mt-2 small text-muted">Suite: <strong><?= (int) $suiteValue ?></strong></div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <div class="card shadow-sm mt-3">
-                <div class="card-body">
-                    <h6 class="card-title">Menu Rápido</h6>
-                    <nav class="nav flex-column">
-                        <a class="nav-link active" href="/minha-conta">
-                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                        </a>
-                        <a class="nav-link" href="/meus-dados">
-                            <i class="fas fa-user me-2"></i> Meus Dados
-                        </a>
-                        <a class="nav-link" href="/meus-pedidos">
-                            <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
-                        </a>
-                        <a class="nav-link" href="/carrinho">
-                            <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
-                        </a>
-                        <hr>
-                        <a class="nav-link text-danger" href="/logout">
-                            <i class="fas fa-sign-out-alt me-2"></i> Sair
-                        </a>
-                    </nav>
-                </div>
-            </div>
-        </div>
+        <?php $activePage = 'dashboard'; include __DIR__ . '/../partials/usuario_sidebar.php'; ?>
         
         <!-- Main Content -->
         <div class="col-lg-9">

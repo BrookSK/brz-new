@@ -66,75 +66,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
 
         <!-- Main Content -->
     <div class="row g-4">
-        <div class="col-lg-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center p-4">
-                    <?php
-                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
-                        $avatarUrl = null;
-                        foreach ($avatarColumnCandidates as $c) {
-                            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
-                                $avatarUrl = $usuario[$c];
-                                break;
-                            }
-                        }
-                        if (empty($avatarUrl)) {
-                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
-                        }
-                        if (empty($avatarUrl)) {
-                            $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=6366f1&color=fff&size=128';
-                        } else {
-                            $raw = trim((string) $avatarUrl);
-                            if (preg_match('#^https?://#i', $raw) || strpos($raw, '//') === 0) {
-                                $avatarUrl = (strpos($raw, '//') === 0) ? ('https:' . $raw) : $raw;
-                            } else {
-                                if ($raw !== '' && $raw[0] !== '/') {
-                                    $raw = '/' . $raw;
-                                }
-                                $avatarUrl = Url::absolute($raw);
-                            }
-                        }
-                    ?>
-                    <div class="user-avatar mx-auto mb-3">
-                        <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome'] ?? '') ?>" class="rounded-circle" width="80" height="80" style="object-fit: cover;">
-                    </div>
-                    <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome'] ?? '') ?></h5>
-                    <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email'] ?? '') ?></p>
-                    <span class="badge px-3 py-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
-                        <?= ucfirst((string) ($usuario['perfil'] ?? '')) ?>
-                    </span>
-                </div>
-            </div>
-
-            <div class="card border-0 shadow-sm mt-3">
-                <div class="card-body p-4">
-                    <h6 class="card-title mb-3">Menu Rápido</h6>
-                    <nav class="nav flex-column">
-                        <a class="nav-link mb-2" href="/minha-conta">
-                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                        </a>
-                        <a class="nav-link mb-2" href="/meus-dados">
-                            <i class="fas fa-user me-2"></i> Meus Dados
-                        </a>
-                        <a class="nav-link active mb-2" href="/meus-pedidos">
-                            <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
-                        </a>
-                        <a class="nav-link mb-2" href="/carrinho">
-                            <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
-                            <?php if (!empty($_SESSION['carrinho'])): ?>
-                                <span class="badge rounded-pill ms-auto" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                    <?= count($_SESSION['carrinho']) ?>
-                                </span>
-                            <?php endif; ?>
-                        </a>
-                        <hr class="my-3">
-                        <a class="nav-link text-danger mb-2" href="/logout">
-                            <i class="fas fa-sign-out-alt me-2"></i> Sair
-                        </a>
-                    </nav>
-                </div>
-            </div>
-        </div>
+        <?php $activePage = 'pedidos'; include __DIR__ . '/../partials/usuario_sidebar.php'; ?>
                 
                 <!-- Main Content -->
         <div class="col-lg-9">
@@ -201,16 +133,26 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                             if (preg_match('#^https?://#i', $imgRaw) || strpos($imgRaw, '//') === 0) {
                                                 $imgSrc = (strpos($imgRaw, '//') === 0) ? ('https:' . $imgRaw) : $imgRaw;
                                             } else {
-                                                $imgFile = $imgRaw;
-                                                if (strpos($imgFile, 'uploads/produtos/') !== false) {
-                                                    $imgFile = str_replace('uploads/produtos/', '', $imgFile);
+                                                $imgFile = trim($imgRaw);
+                                                if ($imgFile === '' || $imgFile === 'placeholder.jpg') {
+                                                    $imgSrc = Url::absolute('/uploads/produtos/placeholder.jpg');
+                                                } else {
+                                                    if (strpos($imgFile, '/uploads/') === 0) {
+                                                        $imgSrc = Url::absolute($imgFile);
+                                                    } else {
+                                                        $imgFile = ltrim($imgFile, '/');
+                                                        if (strpos($imgFile, 'uploads/') === 0) {
+                                                            $imgSrc = Url::absolute('/' . $imgFile);
+                                                        } else {
+                                                            $imgSrc = Url::absolute('/uploads/produtos/' . $imgFile);
+                                                        }
+                                                    }
                                                 }
-                                                $imgSrc = Url::absolute('/uploads/produtos/' . $imgFile);
                                             }
                                         ?>
                                         <img src="<?= htmlspecialchars($imgSrc) ?>" 
                                              alt="<?= htmlspecialchars($item['nome_produto'] ?? 'Produto') ?>" 
-                                             class="product-image">
+                                             class="product-image" onerror="this.onerror=null;this.src='<?= htmlspecialchars(Url::absolute('/uploads/produtos/placeholder.jpg')) ?>';">
                                         <div class="product-info flex-grow-1">
                                             <h6><?= htmlspecialchars($item['nome_produto'] ?? 'Produto sem nome') ?></h6>
                                             <small class="text-muted"><?= htmlspecialchars($item['referencia'] ?? '') ?></small>
@@ -399,6 +341,12 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
 </div>
 
 <style>
+.user-avatar img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+}
+
 .timeline {
     position: relative;
     padding-left: 2rem;

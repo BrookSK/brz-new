@@ -1097,6 +1097,50 @@ document.addEventListener('DOMContentLoaded', function(){
     const linkCard = document.getElementById('linkPagamentoCard');
     const linkInfo = document.getElementById('linkPagamentoInfo');
     const linkResult = document.getElementById('linkResult');
+    const clienteSel = document.getElementById('cliente_id');
+
+    function enderecoFormHasAnyValue(){
+        const ids = [
+            'endereco_entrega_cep',
+            'endereco_entrega_endereco',
+            'endereco_entrega_numero',
+            'endereco_entrega_complemento',
+            'endereco_entrega_bairro',
+            'endereco_entrega_cidade',
+            'endereco_entrega_estado'
+        ];
+        for (const id of ids) {
+            const el = document.getElementById(id);
+            if (el && String(el.value || '').trim() !== '') return true;
+        }
+        return false;
+    }
+
+    function setEnderecoValue(id, v){
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = String(v || '');
+    }
+
+    function fetchAndPrefillEndereco(clienteId, force){
+        const cid = Number(clienteId || 0);
+        if (!cid) return;
+        if (!force && enderecoFormHasAnyValue()) return;
+        fetch('/admin/pedidos/novo-manual/cliente-endereco/' + String(cid))
+            .then(r => r.json())
+            .then(resp => {
+                if (!resp || !resp.success || !resp.endereco) return;
+                const e = resp.endereco;
+                setEnderecoValue('endereco_entrega_cep', e.cep);
+                setEnderecoValue('endereco_entrega_endereco', e.endereco);
+                setEnderecoValue('endereco_entrega_numero', e.numero);
+                setEnderecoValue('endereco_entrega_complemento', e.complemento);
+                setEnderecoValue('endereco_entrega_bairro', e.bairro);
+                setEnderecoValue('endereco_entrega_cidade', e.cidade);
+                setEnderecoValue('endereco_entrega_estado', e.estado);
+            })
+            .catch(() => {});
+    }
 
     function convertAllItemValues(fromMoeda, toMoeda){
         const rows = document.querySelectorAll('#itensTable tbody tr');
@@ -1186,6 +1230,13 @@ document.addEventListener('DOMContentLoaded', function(){
         if (sel) {
             sel.value = String(EXISTING_PEDIDO.cliente_id);
         }
+        fetchAndPrefillEndereco(EXISTING_PEDIDO.cliente_id, false);
+    }
+
+    if (clienteSel) {
+        clienteSel.addEventListener('change', function(){
+            fetchAndPrefillEndereco(this.value, false);
+        });
     }
 
     const tbody = document.querySelector('#itensTable tbody');
@@ -1584,6 +1635,81 @@ JS;
                 'impostos' => round((float) $impostos, 2),
                 'frete' => round((float) $frete, 2),
                 'total' => round((float) $total, 2),
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function clienteEndereco(Request $request) {
+        try {
+            $clienteId = (int) $request->getParam('id', 0);
+            if ($clienteId <= 0) {
+                $this->json(['success' => false, 'error' => 'Cliente inválido']);
+            }
+
+            $pdo = \Config\Database::getConnection();
+            $cols = [];
+            try {
+                $st = $pdo->query('DESCRIBE enderecos');
+                $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            if (empty($cols)) {
+                $this->json(['success' => true, 'endereco' => null]);
+            }
+
+            $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+            if ($usuarioCol === '') {
+                $this->json(['success' => true, 'endereco' => null]);
+            }
+
+            $cepCol = in_array('cep', $cols, true) ? 'cep' : '';
+            $endCol = in_array('endereco', $cols, true) ? 'endereco' : (in_array('logradouro', $cols, true) ? 'logradouro' : '');
+            $numCol = in_array('numero', $cols, true) ? 'numero' : '';
+            $complCol = in_array('complemento', $cols, true) ? 'complemento' : '';
+            $bairroCol = in_array('bairro', $cols, true) ? 'bairro' : '';
+            $cidadeCol = in_array('cidade', $cols, true) ? 'cidade' : '';
+            $estadoCol = in_array('estado', $cols, true) ? 'estado' : (in_array('uf', $cols, true) ? 'uf' : '');
+            $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
+
+            $select = ['id'];
+            if ($cepCol !== '') $select[] = $cepCol . ' AS cep';
+            if ($endCol !== '') $select[] = $endCol . ' AS endereco';
+            if ($numCol !== '') $select[] = $numCol . ' AS numero';
+            if ($complCol !== '') $select[] = $complCol . ' AS complemento';
+            if ($bairroCol !== '') $select[] = $bairroCol . ' AS bairro';
+            if ($cidadeCol !== '') $select[] = $cidadeCol . ' AS cidade';
+            if ($estadoCol !== '') $select[] = $estadoCol . ' AS estado';
+
+            $order = ' ORDER BY id DESC';
+            if ($principalCol !== '') {
+                $order = ' ORDER BY ' . $principalCol . ' DESC, id DESC';
+            }
+
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM enderecos WHERE ' . $usuarioCol . ' = :uid' . $order . ' LIMIT 1';
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':uid', $clienteId, \PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+            if (!$row) {
+                $this->json(['success' => true, 'endereco' => null]);
+            }
+
+            $this->json([
+                'success' => true,
+                'endereco' => [
+                    'cep' => (string) ($row['cep'] ?? ''),
+                    'endereco' => (string) ($row['endereco'] ?? ''),
+                    'numero' => (string) ($row['numero'] ?? ''),
+                    'complemento' => (string) ($row['complemento'] ?? ''),
+                    'bairro' => (string) ($row['bairro'] ?? ''),
+                    'cidade' => (string) ($row['cidade'] ?? ''),
+                    'estado' => (string) ($row['estado'] ?? ''),
+                ],
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);

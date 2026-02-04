@@ -2,105 +2,7 @@
 <div class="container py-4">
     <div class="row g-4">
         <!-- Sidebar -->
-        <div class="col-lg-3">
-            <!-- Profile Card -->
-            <div class="card border-0 shadow-sm profile-card">
-                <div class="card-body text-center p-4">
-                    <?php
-                        $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
-                        $avatarUrl = null;
-                        foreach ($avatarColumnCandidates as $c) {
-                            if (!empty($usuario[$c])) {
-                                $avatarUrl = $usuario[$c];
-                                break;
-                            }
-                        }
-
-                        if (empty($avatarUrl)) {
-                            $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
-                        }
-
-                        if (empty($avatarUrl)) {
-                            $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($usuario['nome']) . '&background=1d4ed8&color=fff&size=128';
-                        }
-                    ?>
-
-                    <div class="user-avatar mx-auto mb-3 dropdown">
-                        <button type="button" class="btn p-0 border-0 bg-transparent" id="avatarDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="<?= htmlspecialchars($avatarUrl) ?>" 
-                                 alt="<?= htmlspecialchars($usuario['nome']) ?>" 
-                                 class="rounded-circle" width="80" height="80" style="object-fit: cover;">
-                            <span class="avatar-camera-indicator" aria-hidden="true">
-                                <i class="fas fa-camera"></i>
-                            </span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="avatarDropdown">
-                            <li>
-                                <button type="button" class="dropdown-item" id="btnAvatarView">
-                                    <i class="fas fa-eye me-2"></i> Ver foto
-                                </button>
-                            </li>
-                            <li>
-                                <button type="button" class="dropdown-item" id="btnAvatarChange">
-                                    <i class="fas fa-upload me-2"></i> Alterar foto
-                                </button>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <button type="button" class="dropdown-item text-danger" id="btnAvatarRemove">
-                                    <i class="fas fa-trash me-2"></i> Remover foto
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <form method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" id="avatarUploadForm">
-                        <input type="file" name="avatar" id="avatarFileInput" accept="image/png,image/jpeg,image/webp" class="avatar-file-input-hidden">
-                    </form>
-                    <form method="POST" action="/meus-dados/avatar/remover" id="avatarRemoveForm" class="d-none"></form>
-
-                    <h5 class="card-title mb-1"><?= htmlspecialchars($usuario['nome']) ?></h5>
-                    <p class="text-muted small mb-3"><?= htmlspecialchars($usuario['email']) ?></p>
-                    <span class="badge px-3 py-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
-                        <?= ucfirst($usuario['perfil']) ?>
-                    </span>
-                    <?php $suiteValue = $usuario['suite'] ?? ($usuario['switch'] ?? null); ?>
-                    <?php if (!empty($suiteValue)): ?>
-                        <div class="mt-2 small text-muted">Suite: <strong><?= (int) $suiteValue ?></strong></div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <!-- Quick Menu -->
-            <div class="card border-0 shadow-sm mt-3">
-                <div class="card-body p-4">
-                    <h6 class="card-title mb-3">Menu Rápido</h6>
-                    <nav class="nav flex-column">
-                        <a class="nav-link mb-2" href="/minha-conta">
-                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                        </a>
-                        <a class="nav-link active mb-2" href="/meus-dados">
-                            <i class="fas fa-user me-2"></i> Meus Dados
-                        </a>
-                        <a class="nav-link mb-2" href="/meus-pedidos">
-                            <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
-                        </a>
-                        <a class="nav-link mb-2" href="/carrinho">
-                            <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
-                            <?php if (!empty($_SESSION['carrinho'])): ?>
-                                <span class="badge rounded-pill ms-auto" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                    <?= count($_SESSION['carrinho']) ?>
-                                </span>
-                            <?php endif; ?>
-                        </a>
-                        <hr class="my-3">
-                        <a class="nav-link text-danger mb-2" href="/logout">
-                            <i class="fas fa-sign-out-alt me-2"></i> Sair
-                        </a>
-                    </nav>
-                </div>
-            </div>
-        </div>
+        <?php $activePage = 'dados'; include __DIR__ . '/../partials/usuario_sidebar.php'; ?>
         
         <!-- Main Content -->
         <div class="col-lg-9">
@@ -673,6 +575,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php
+    $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+    $avatarUrl = null;
+    foreach ($avatarColumnCandidates as $c) {
+        if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+            $avatarUrl = $usuario[$c];
+            break;
+        }
+    }
+    if (empty($avatarUrl)) {
+        $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+    }
+    if (empty($avatarUrl)) {
+        $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=0b1f3a&color=fff&size=512';
+    }
+?>
+
 <div class="modal fade" id="avatarViewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -681,7 +600,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center">
-                <img src="<?= htmlspecialchars($avatarUrl) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>" class="img-fluid rounded" style="max-height: 70vh; object-fit: contain;">
+                <img src="<?= htmlspecialchars((string) $avatarUrl) ?>" alt="<?= htmlspecialchars((string) ($usuario['nome'] ?? '')) ?>" class="img-fluid rounded" style="max-height: 70vh; object-fit: contain;">
             </div>
         </div>
     </div>

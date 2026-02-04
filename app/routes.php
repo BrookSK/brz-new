@@ -260,6 +260,7 @@ $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf'
 $router->post('/admin/pedidos/upload-comprovante/{id}', 'AdminPedidosController', 'uploadComprovante');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
 $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
+$router->get('/admin/pedidos/novo-manual/cliente-endereco/{id}', 'AdminPedidosManualController', 'clienteEndereco');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
