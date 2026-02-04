@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
     opacity: 0;
 }
 
-.nav-link {
+.col-lg-9 .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -443,13 +443,13 @@ document.addEventListener('DOMContentLoaded', function() {
     align-items: center;
 }
 
-.nav-link:hover {
+.col-lg-9 .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
     transform: none;
 }
 
-.nav-link.active {
+.col-lg-9 .nav-link.active {
     background: rgba(11, 31, 58, 0.08);
     border: 1px solid rgba(11, 31, 58, 0.14);
     color: rgba(11, 31, 58, 1) !important;
@@ -657,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
     height: 80px;
 }
 
-.nav-link {
+.col-lg-9 .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -668,13 +668,13 @@ document.addEventListener('DOMContentLoaded', function() {
     align-items: center;
 }
 
-.nav-link:hover {
+.col-lg-9 .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
     transform: none;
 }
 
-.nav-link.active {
+.col-lg-9 .nav-link.active {
     background: rgba(11, 31, 58, 0.08);
     border: 1px solid rgba(11, 31, 58, 0.14);
     color: rgba(11, 31, 58, 1) !important;

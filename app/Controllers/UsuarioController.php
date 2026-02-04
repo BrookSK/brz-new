@@ -697,7 +697,8 @@ class UsuarioController extends Controller {
     public function meusPedidos(Request $request) {
         $this->authService->requerAutenticacao();
         
-        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioSessao = $this->authService->getUsuarioLogado();
+        $usuario = $this->usuarioModel->find((int) ($usuarioSessao['id'] ?? 0));
         $pagina = (int) $request->getParam('pagina', 1);
         if ($pagina < 1) {
             $pagina = 1;
@@ -707,7 +708,7 @@ class UsuarioController extends Controller {
         
         // Obter pedidos reais do usuário
         try {
-            $pedidos = $this->pedidoModel->getPedidos($usuario['id'], $limite, $offset);
+            $pedidos = $this->pedidoModel->getPedidos((int) ($usuarioSessao['id'] ?? 0), $limite, $offset);
         } catch (\Exception $e) {
             // Se houver erro, usar array vazio e registrar log
             error_log('Erro ao obter pedidos do usuário: ' . $e->getMessage());
@@ -716,7 +717,7 @@ class UsuarioController extends Controller {
 
         $total = 0;
         try {
-            $total = $this->pedidoModel->getTotalPedidosUsuario((int) $usuario['id']);
+            $total = $this->pedidoModel->getTotalPedidosUsuario((int) ($usuarioSessao['id'] ?? 0));
         } catch (\Exception $e) {
             $total = is_array($pedidos) ? count($pedidos) : 0;
         }
@@ -738,22 +739,23 @@ class UsuarioController extends Controller {
         $this->authService->requerAutenticacao();
         
         $pedidoId = $request->getParam('id');
-        $usuario = $this->authService->getUsuarioLogado();
+        $usuarioSessao = $this->authService->getUsuarioLogado();
+        $usuario = $this->usuarioModel->find((int) ($usuarioSessao['id'] ?? 0));
         
         // Debug
-        error_log("Tentando acessar detalhes do pedido ID: {$pedidoId} para usuário: {$usuario['id']}");
+        error_log("Tentando acessar detalhes do pedido ID: {$pedidoId} para usuário: {$usuarioSessao['id']}");
         
         try {
             $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
             
             error_log("Pedido encontrado: " . ($pedido ? 'SIM' : 'NÃO'));
             if ($pedido) {
-                error_log("Dono do pedido: {$pedido['usuario_id']}, Usuário logado: {$usuario['id']}");
+                error_log("Dono do pedido: {$pedido['usuario_id']}, Usuário logado: {$usuarioSessao['id']}");
                 error_log("Itens do pedido: " . count($pedido['items']));
                 error_log("Valor total: " . ($pedido['valor_total'] ?? 0));
             }
             
-            if (!$pedido || $pedido['usuario_id'] != $usuario['id']) {
+            if (!$pedido || $pedido['usuario_id'] != ($usuarioSessao['id'] ?? null)) {
                 error_log("Acesso negado ao pedido {$pedidoId}");
                 $this->view('errors/404');
                 return;

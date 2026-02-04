@@ -1073,6 +1073,20 @@ class PedidoEcommerce {
             $stmtItens->execute([':id' => $pedidoId]);
             $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+            // Fallback de imagem via tabela produtos (quando não há produto_fotos)
+            $stmtProdImg = null;
+            try {
+                if ($this->tableExists('produtos')) {
+                    $colsProd = $this->getTableColumns('produtos');
+                    $colImgProd = $this->pickColumn($colsProd, ['foto_principal', 'capa', 'imagem', 'image']);
+                    if ($colImgProd) {
+                        $stmtProdImg = $this->connection->prepare('SELECT ' . $colImgProd . ' AS imagem FROM produtos WHERE id = ? LIMIT 1');
+                    }
+                }
+            } catch (\Exception $e) {
+                $stmtProdImg = null;
+            }
+
             // Descrições de variação
             $variacaoDescById = [];
             if (!empty($itens) && $colProdutoVariacaoId) {
@@ -1120,7 +1134,19 @@ class PedidoEcommerce {
 
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
-                $item['imagem'] = $item['imagem_principal'] ?? 'placeholder.jpg';
+                $img = '';
+                if (array_key_exists('imagem_principal', $item)) {
+                    $img = trim((string) ($item['imagem_principal'] ?? ''));
+                }
+                if ($img === '' && $stmtProdImg && !empty($item['produto_id'])) {
+                    try {
+                        $stmtProdImg->execute([(int) $item['produto_id']]);
+                        $img = trim((string) ($stmtProdImg->fetchColumn() ?: ''));
+                    } catch (\Exception $e) {
+                        $img = '';
+                    }
+                }
+                $item['imagem'] = ($img !== '') ? $img : 'placeholder.jpg';
                 if ((float) ($item['preco_unitario'] ?? 0) <= 0 && isset($item['valor_unitario_alt'])) {
                     $vuAlt = (float) ($item['valor_unitario_alt'] ?? 0);
                     if ($vuAlt > 0) {
