@@ -649,8 +649,8 @@ function updateLinkVisibility(){
     // Regras:
     // - Offline (PagDev): não gera link
     // - Online BRL: AppMax (gera link)
-    // - Online USD: Stripe (checkout normal; não gera link aqui)
-    const canShowLinkCard = (!isOffline && moeda === 'BRL');
+    // - Online USD: Stripe (gera link de checkout)
+    const canShowLinkCard = (!isOffline && (moeda === 'BRL' || moeda === 'USD'));
 
     if (linkCard) {
         linkCard.style.display = canShowLinkCard ? '' : 'none';
