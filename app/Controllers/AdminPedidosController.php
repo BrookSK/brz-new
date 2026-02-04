@@ -448,6 +448,41 @@ class AdminPedidosController extends Controller {
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h5 class="mb-0 text-success">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
+                                            <small class="text-muted">Total (USD)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                                <option value="">Status</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
+                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
+                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
+                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
                 }
                 
                 if (empty($pedidosUSD)) {
