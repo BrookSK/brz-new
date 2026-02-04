@@ -1459,7 +1459,10 @@ class AdminComprasController extends Controller {
                                         : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
 
                                     $lojaNome = '-';
-                                    $lojaIdRow = (int) ($item['loja_id'] ?? ($item['produto_loja_id'] ?? 0));
+                                    $lojaIdRow = (int) ($item['loja_id'] ?? 0);
+                                    if ($lojaIdRow <= 0) {
+                                        $lojaIdRow = (int) ($item['produto_loja_id'] ?? 0);
+                                    }
                                     if ($lojaIdRow > 0 && $this->tableExists('lojas')) {
                                         try {
                                             $stmtLn = $this->connection->prepare('SELECT nome FROM lojas WHERE id = :id LIMIT 1');
