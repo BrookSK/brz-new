@@ -328,6 +328,9 @@ class UsuarioController extends Controller {
                     
                     // Atualizar dados do usuário
                     $this->usuarioModel->update($usuarioId, $dadosAtualizacao);
+
+                    // Salvar Endereço de Entrega (único/principal) na tabela enderecos
+                    $this->salvarEnderecoEntrega((int) $usuarioId, $dados);
                     
                     // Registrar log (com tratamento de erro)
                     try {
@@ -359,11 +362,122 @@ class UsuarioController extends Controller {
         }
         
         // Obter dados completos do usuário
-        $usuario = $this->usuarioModel->find($this->authService->getUsuarioLogado()['id']);
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        $usuario = $this->usuarioModel->find($usuarioId);
+
+        $enderecoEntrega = null;
+        try {
+            $enderecos = $this->usuarioModel->getEnderecos($usuarioId);
+            if (is_array($enderecos) && !empty($enderecos)) {
+                $enderecoEntrega = $enderecos[0];
+            }
+        } catch (\Exception $e) {
+            $enderecoEntrega = null;
+        }
         
         $this->view('usuario/meus-dados', [
-            'usuario' => $usuario
+            'usuario' => $usuario,
+            'enderecoEntrega' => $enderecoEntrega
         ]);
+    }
+
+    private function salvarEnderecoEntrega(int $usuarioId, array $dados): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        $db = \Config\Database::getConnection();
+
+        $cols = [];
+        try {
+            $stmtCols = $db->query('DESCRIBE enderecos');
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        if (empty($cols)) {
+            return;
+        }
+
+        $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+        if ($usuarioCol === '') {
+            return;
+        }
+
+        $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
+
+        $map = [
+            'cep' => ['cep'],
+            'endereco' => ['endereco', 'logradouro'],
+            'numero' => ['numero'],
+            'complemento' => ['complemento'],
+            'bairro' => ['bairro'],
+            'cidade' => ['cidade'],
+            'estado' => ['estado', 'uf'],
+        ];
+
+        $payload = [];
+        foreach ($map as $inputKey => $colCandidates) {
+            $val = isset($dados[$inputKey]) ? (string) $dados[$inputKey] : '';
+            $val = trim($val);
+            $colFound = null;
+            foreach ($colCandidates as $c) {
+                if (in_array($c, $cols, true)) {
+                    $colFound = $c;
+                    break;
+                }
+            }
+            if ($colFound !== null) {
+                $payload[$colFound] = $val;
+            }
+        }
+
+        if ($principalCol !== '') {
+            $payload[$principalCol] = 1;
+        }
+
+        try {
+            $stmt = $db->prepare('SELECT id FROM enderecos WHERE ' . $usuarioCol . ' = :uid' . ($principalCol !== '' ? (' AND ' . $principalCol . ' = 1') : '') . ' ORDER BY id DESC LIMIT 1');
+            $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
+            $stmt->execute();
+            $existingId = (int) ($stmt->fetchColumn() ?: 0);
+
+            if ($existingId > 0) {
+                $set = [];
+                $params = [':id' => $existingId];
+                foreach ($payload as $col => $val) {
+                    $set[] = $col . ' = :' . $col;
+                    $params[':' . $col] = $val;
+                }
+                if (!empty($set)) {
+                    $sql = 'UPDATE enderecos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                    $stUp = $db->prepare($sql);
+                    $stUp->execute($params);
+                }
+            } else {
+                $colsIns = [$usuarioCol];
+                $valsIns = [':uid'];
+                $params = [':uid' => $usuarioId];
+                foreach ($payload as $col => $val) {
+                    $colsIns[] = $col;
+                    $valsIns[] = ':' . $col;
+                    $params[':' . $col] = $val;
+                }
+                $sql = 'INSERT INTO enderecos (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')';
+                $stIn = $db->prepare($sql);
+                $stIn->execute($params);
+                $existingId = (int) $db->lastInsertId();
+            }
+
+            // Garantir único principal
+            if ($principalCol !== '' && $existingId > 0) {
+                $st = $db->prepare('UPDATE enderecos SET ' . $principalCol . ' = 0 WHERE ' . $usuarioCol . ' = :uid AND id <> :id');
+                $st->execute([':uid' => $usuarioId, ':id' => $existingId]);
+            }
+        } catch (\Exception $e) {
+            // ignore
+        }
     }
 
     public function avatarUpload(Request $request) {

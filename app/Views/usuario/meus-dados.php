@@ -99,78 +99,81 @@
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-map-marker-alt me-2"></i> Endereço Principal
+                        <i class="fas fa-map-marker-alt me-2"></i> Endereço de Entrega
                     </h5>
                 </div>
                 <div class="card-body">
+                        <?php $enderecoEntrega = $enderecoEntrega ?? null; ?>
+                        <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="cep" class="form-label">CEP</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
-                                       value="<?= htmlspecialchars($usuario['cep'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
                                        placeholder="00000-000" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="endereco" class="form-label">Endereço</label>
                                 <input type="text" class="form-control" id="endereco" name="endereco" 
-                                       value="<?= htmlspecialchars($usuario['endereco'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['endereco'] ?? ($ee['logradouro'] ?? ($usuario['endereco'] ?? '')))) ?>" 
                                        placeholder="Rua, Avenida, etc." required>
                             </div>
                             <div class="col-md-3">
                                 <label for="numero" class="form-label">Número</label>
                                 <input type="text" class="form-control" id="numero" name="numero" 
-                                       value="<?= htmlspecialchars($usuario['numero'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['numero'] ?? ($usuario['numero'] ?? ''))) ?>" 
                                        placeholder="123" required>
                             </div>
                             <div class="col-md-3">
                                 <label for="complemento" class="form-label">Complemento</label>
                                 <input type="text" class="form-control" id="complemento" name="complemento" 
-                                       value="<?= htmlspecialchars($usuario['complemento'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['complemento'] ?? ($usuario['complemento'] ?? ''))) ?>" 
                                        placeholder="Apto, Casa, etc.">
                             </div>
                             <div class="col-md-4">
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
-                                       value="<?= htmlspecialchars($usuario['bairro'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['bairro'] ?? ($usuario['bairro'] ?? ''))) ?>" 
                                        placeholder="Centro" required>
                             </div>
                             <div class="col-md-4">
                                 <label for="cidade" class="form-label">Cidade</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
-                                       value="<?= htmlspecialchars($usuario['cidade'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars((string) ($ee['cidade'] ?? ($usuario['cidade'] ?? ''))) ?>" 
                                        placeholder="São Paulo" required>
                             </div>
                             <div class="col-md-4">
                                 <label for="estado" class="form-label">Estado</label>
                                 <select class="form-select" id="estado" name="estado" required>
                                     <option value="">Selecione...</option>
-                                    <option value="AC" <?= ($usuario['estado'] ?? '') === 'AC' ? 'selected' : '' ?>>Acre</option>
-                                    <option value="AL" <?= ($usuario['estado'] ?? '') === 'AL' ? 'selected' : '' ?>>Alagoas</option>
-                                    <option value="AP" <?= ($usuario['estado'] ?? '') === 'AP' ? 'selected' : '' ?>>Amapá</option>
-                                    <option value="AM" <?= ($usuario['estado'] ?? '') === 'AM' ? 'selected' : '' ?>>Amazonas</option>
-                                    <option value="BA" <?= ($usuario['estado'] ?? '') === 'BA' ? 'selected' : '' ?>>Bahia</option>
-                                    <option value="CE" <?= ($usuario['estado'] ?? '') === 'CE' ? 'selected' : '' ?>>Ceará</option>
-                                    <option value="DF" <?= ($usuario['estado'] ?? '') === 'DF' ? 'selected' : '' ?>>Distrito Federal</option>
-                                    <option value="ES" <?= ($usuario['estado'] ?? '') === 'ES' ? 'selected' : '' ?>>Espírito Santo</option>
-                                    <option value="GO" <?= ($usuario['estado'] ?? '') === 'GO' ? 'selected' : '' ?>>Goiás</option>
-                                    <option value="MA" <?= ($usuario['estado'] ?? '') === 'MA' ? 'selected' : '' ?>>Maranhão</option>
-                                    <option value="MT" <?= ($usuario['estado'] ?? '') === 'MT' ? 'selected' : '' ?>>Mato Grosso</option>
-                                    <option value="MS" <?= ($usuario['estado'] ?? '') === 'MS' ? 'selected' : '' ?>>Mato Grosso do Sul</option>
-                                    <option value="MG" <?= ($usuario['estado'] ?? '') === 'MG' ? 'selected' : '' ?>>Minas Gerais</option>
-                                    <option value="PA" <?= ($usuario['estado'] ?? '') === 'PA' ? 'selected' : '' ?>>Pará</option>
-                                    <option value="PB" <?= ($usuario['estado'] ?? '') === 'PB' ? 'selected' : '' ?>>Paraíba</option>
-                                    <option value="PR" <?= ($usuario['estado'] ?? '') === 'PR' ? 'selected' : '' ?>>Paraná</option>
-                                    <option value="PE" <?= ($usuario['estado'] ?? '') === 'PE' ? 'selected' : '' ?>>Pernambuco</option>
-                                    <option value="PI" <?= ($usuario['estado'] ?? '') === 'PI' ? 'selected' : '' ?>>Piauí</option>
-                                    <option value="RJ" <?= ($usuario['estado'] ?? '') === 'RJ' ? 'selected' : '' ?>>Rio de Janeiro</option>
-                                    <option value="RN" <?= ($usuario['estado'] ?? '') === 'RN' ? 'selected' : '' ?>>Rio Grande do Norte</option>
-                                    <option value="RS" <?= ($usuario['estado'] ?? '') === 'RS' ? 'selected' : '' ?>>Rio Grande do Sul</option>
-                                    <option value="RO" <?= ($usuario['estado'] ?? '') === 'RO' ? 'selected' : '' ?>>Rondônia</option>
-                                    <option value="RR" <?= ($usuario['estado'] ?? '') === 'RR' ? 'selected' : '' ?>>Roraima</option>
-                                    <option value="SC" <?= ($usuario['estado'] ?? '') === 'SC' ? 'selected' : '' ?>>Santa Catarina</option>
-                                    <option value="SP" <?= ($usuario['estado'] ?? '') === 'SP' ? 'selected' : '' ?>>São Paulo</option>
-                                    <option value="SE" <?= ($usuario['estado'] ?? '') === 'SE' ? 'selected' : '' ?>>Sergipe</option>
-                                    <option value="TO" <?= ($usuario['estado'] ?? '') === 'TO' ? 'selected' : '' ?>>Tocantins</option>
+                                    <?php $selectedUf = (string) ($ee['estado'] ?? ($ee['uf'] ?? ($usuario['estado'] ?? ''))); ?>
+                                    <option value="AC" <?= $selectedUf === 'AC' ? 'selected' : '' ?>>Acre</option>
+                                    <option value="AL" <?= $selectedUf === 'AL' ? 'selected' : '' ?>>Alagoas</option>
+                                    <option value="AP" <?= $selectedUf === 'AP' ? 'selected' : '' ?>>Amapá</option>
+                                    <option value="AM" <?= $selectedUf === 'AM' ? 'selected' : '' ?>>Amazonas</option>
+                                    <option value="BA" <?= $selectedUf === 'BA' ? 'selected' : '' ?>>Bahia</option>
+                                    <option value="CE" <?= $selectedUf === 'CE' ? 'selected' : '' ?>>Ceará</option>
+                                    <option value="DF" <?= $selectedUf === 'DF' ? 'selected' : '' ?>>Distrito Federal</option>
+                                    <option value="ES" <?= $selectedUf === 'ES' ? 'selected' : '' ?>>Espírito Santo</option>
+                                    <option value="GO" <?= $selectedUf === 'GO' ? 'selected' : '' ?>>Goiás</option>
+                                    <option value="MA" <?= $selectedUf === 'MA' ? 'selected' : '' ?>>Maranhão</option>
+                                    <option value="MT" <?= $selectedUf === 'MT' ? 'selected' : '' ?>>Mato Grosso</option>
+                                    <option value="MS" <?= $selectedUf === 'MS' ? 'selected' : '' ?>>Mato Grosso do Sul</option>
+                                    <option value="MG" <?= $selectedUf === 'MG' ? 'selected' : '' ?>>Minas Gerais</option>
+                                    <option value="PA" <?= $selectedUf === 'PA' ? 'selected' : '' ?>>Pará</option>
+                                    <option value="PB" <?= $selectedUf === 'PB' ? 'selected' : '' ?>>Paraíba</option>
+                                    <option value="PR" <?= $selectedUf === 'PR' ? 'selected' : '' ?>>Paraná</option>
+                                    <option value="PE" <?= $selectedUf === 'PE' ? 'selected' : '' ?>>Pernambuco</option>
+                                    <option value="PI" <?= $selectedUf === 'PI' ? 'selected' : '' ?>>Piauí</option>
+                                    <option value="RJ" <?= $selectedUf === 'RJ' ? 'selected' : '' ?>>Rio de Janeiro</option>
+                                    <option value="RN" <?= $selectedUf === 'RN' ? 'selected' : '' ?>>Rio Grande do Norte</option>
+                                    <option value="RS" <?= $selectedUf === 'RS' ? 'selected' : '' ?>>Rio Grande do Sul</option>
+                                    <option value="RO" <?= $selectedUf === 'RO' ? 'selected' : '' ?>>Rondônia</option>
+                                    <option value="RR" <?= $selectedUf === 'RR' ? 'selected' : '' ?>>Roraima</option>
+                                    <option value="SC" <?= $selectedUf === 'SC' ? 'selected' : '' ?>>Santa Catarina</option>
+                                    <option value="SP" <?= $selectedUf === 'SP' ? 'selected' : '' ?>>São Paulo</option>
+                                    <option value="SE" <?= $selectedUf === 'SE' ? 'selected' : '' ?>>Sergipe</option>
+                                    <option value="TO" <?= $selectedUf === 'TO' ? 'selected' : '' ?>>Tocantins</option>
                                 </select>
                             </div>
                         </div>
