@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminDashboardController extends Controller {
 
@@ -35,6 +36,8 @@ class AdminDashboardController extends Controller {
     }
     
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             

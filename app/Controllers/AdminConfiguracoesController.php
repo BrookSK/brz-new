@@ -2,11 +2,14 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 use Config\Database;
 
 class AdminConfiguracoesController extends Controller {
     
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
         try {
             $pdo = Database::getConnection();
             

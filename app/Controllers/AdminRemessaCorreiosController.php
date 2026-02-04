@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use Config\Database;
 use App\Models\PedidoEcommerce;
+use App\Services\AuthService;
 
 class AdminRemessaCorreiosController extends Controller {
     private $connection;
@@ -198,6 +199,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function index($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             // Buscar remessas prontas para etiqueta (status = remessa_gerada)
             $remessasProntas = $this->getRemessasProntas();
@@ -612,6 +615,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function gerarLoteEtiquetas($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $raw = file_get_contents('php://input');
             $payload = json_decode((string) $raw, true);
@@ -659,6 +664,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function imprimirTodasEtiquetas($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $stmt = $this->connection->prepare("SELECT * FROM correios_etiquetas WHERE status IN ('gerada','impressa') ORDER BY created_at DESC");
             $stmt->execute();
@@ -703,6 +710,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function rastrearEtiqueta($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $etiquetaId = (int) $request->getParam('id');
         try {
             $stmt = $this->connection->prepare('SELECT codigo_etiqueta FROM correios_etiquetas WHERE id = ? LIMIT 1');
@@ -950,6 +959,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function gerarEtiqueta($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $pedidoId = (int) $request->getParam('id');
         
         try {
@@ -1023,6 +1034,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function confirmarPostagem($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $etiquetaId = $request->getParam('id');
         
         try {
@@ -1053,6 +1066,8 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     public function imprimirEtiqueta($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $etiquetaId = $request->getParam('id');
         
         try {

@@ -12,12 +12,13 @@ class AdminUsuariosHelper {
     
     private function verificarCriarTabelaUsuarios() {
         try {
-            $this->pdo->exec("
+            $this->pdo->exec("\
                 CREATE TABLE IF NOT EXISTS `usuarios` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
                     `nome` varchar(255) NOT NULL,
                     `email` varchar(255) NOT NULL,
                     `senha` varchar(255) NOT NULL,
+                    `perfil` varchar(50) DEFAULT 'cliente',
                     `cpf` varchar(14) DEFAULT NULL,
                     `telefone` varchar(20) DEFAULT NULL,
                     `ativo` tinyint(1) DEFAULT 1,
@@ -28,6 +29,15 @@ class AdminUsuariosHelper {
                     KEY `idx_ativo` (`ativo`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
+
+            // Se a tabela já existia sem a coluna perfil, tenta adicioná-la.
+            try {
+                $cols = $this->getColunasUsuarios();
+                if (is_array($cols) && !in_array('perfil', $cols, true)) {
+                    $this->pdo->exec("ALTER TABLE `usuarios` ADD COLUMN `perfil` varchar(50) DEFAULT 'cliente'");
+                }
+            } catch (\Exception $e) {
+            }
         } catch (\Exception $e) {
             // Silenciar erros de criação de tabela
         }
@@ -162,6 +172,11 @@ class AdminUsuariosHelper {
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'suite', $dados['suite'] ?? null);
+            $perfil = strtolower(trim((string) ($dados['perfil'] ?? 'cliente')));
+            if ($perfil === '') {
+                $perfil = 'cliente';
+            }
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'perfil', $perfil);
 
             if (in_array('ativo', $colunas)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
@@ -228,6 +243,13 @@ class AdminUsuariosHelper {
 
             if (!empty($dados['senha']) && in_array('senha', $colunas)) {
                 $this->setIfColumnExists($setParts, $params, $colunas, 'senha', password_hash($dados['senha'], PASSWORD_DEFAULT));
+            }
+
+            if (in_array('perfil', $colunas, true) && array_key_exists('perfil', $dados)) {
+                $perfil = strtolower(trim((string) ($dados['perfil'] ?? '')));
+                if ($perfil !== '') {
+                    $this->setIfColumnExists($setParts, $params, $colunas, 'perfil', $perfil);
+                }
             }
 
             if (in_array('updated_at', $colunas)) {

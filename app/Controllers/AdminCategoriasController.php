@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminCategoriasController extends Controller {
 
@@ -82,6 +83,8 @@ class AdminCategoriasController extends Controller {
     }
 
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         $categorias = [];
@@ -101,11 +104,15 @@ class AdminCategoriasController extends Controller {
     }
 
     public function novo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         $this->renderPage([], ['id' => null]);
     }
 
     public function editar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         $id = (int) $request->getParam('id');
@@ -133,6 +140,8 @@ class AdminCategoriasController extends Controller {
     }
 
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = $this->getPdo();
             $this->ensureTable($pdo);
@@ -215,6 +224,8 @@ class AdminCategoriasController extends Controller {
     }
 
     public function excluir(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) $request->getParam('id');
 
         try {

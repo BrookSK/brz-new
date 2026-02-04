@@ -1,10 +1,14 @@
 <?php
 namespace App\Controllers;
 
+use App\Services\AuthService;
+
 class AdminPedidosEditController {
     private $connection;
 
     public function __construct() {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminVariacoesController extends Controller {
 
@@ -85,6 +86,8 @@ class AdminVariacoesController extends Controller {
     }
 
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         $tipos = [];
@@ -327,6 +330,8 @@ class AdminVariacoesController extends Controller {
     }
 
     public function salvarTipo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $nome = trim((string) $request->getParam('nome', ''));
         $slug = trim((string) $request->getParam('slug', ''));
 
@@ -360,6 +365,8 @@ class AdminVariacoesController extends Controller {
     }
 
     public function inativarTipo(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
 
         try {
@@ -380,6 +387,8 @@ class AdminVariacoesController extends Controller {
     }
 
     public function salvarOpcao(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $tipoId = (int) $request->getParam('tipo_id', 0);
         $valor = trim((string) $request->getParam('valor', ''));
         $nomeExibicao = trim((string) $request->getParam('nome_exibicao', ''));
@@ -446,6 +455,8 @@ class AdminVariacoesController extends Controller {
     }
 
     public function inativarOpcao(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
         $tipoId = (int) $request->getParam('tipo_id', 0);
 

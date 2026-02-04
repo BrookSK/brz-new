@@ -10,6 +10,8 @@ use App\Services\AuthService;
 class AdminPedidosController extends Controller {
     
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pagina = $request->getParam('pagina', 1);
@@ -499,6 +501,8 @@ class AdminPedidosController extends Controller {
     }
 
     public function pdf(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
         try {
             $pedidoModel = new PedidoEcommerce();
@@ -531,6 +535,8 @@ class AdminPedidosController extends Controller {
     }
     
     public function detalhes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
         
         try {
@@ -1185,6 +1191,8 @@ class AdminPedidosController extends Controller {
     }
 
     public function uploadComprovante(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $pedidoId = (int) $request->getParam('id');
         if ($pedidoId <= 0) {
             $this->redirect('/admin/pedidos?erro=' . urlencode('Pedido inválido'));
@@ -1439,8 +1447,9 @@ class AdminPedidosController extends Controller {
 
     public function comissoes(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfil('admin');
+        $auth->requerPerfis(['admin', 'vendedor']);
         $admin = $auth->getUsuarioLogado();
+        $perfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
 
         $pedidoModel = new PedidoEcommerce();
         $resumo = [
@@ -1453,7 +1462,11 @@ class AdminPedidosController extends Controller {
             'faixas' => [],
         ];
         try {
-            $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador((int) ($admin['id'] ?? 0));
+            if ($perfil === 'admin') {
+                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisTodos();
+            } else {
+                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador((int) ($admin['id'] ?? 0));
+            }
         } catch (\Exception $e) {
             $resumo = $resumo;
         }
@@ -1654,6 +1667,8 @@ class AdminPedidosController extends Controller {
     }
     
     public function atualizarStatus(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $id = $request->getParam('id');
         $novoStatus = $request->getParam('status');
         $estornar = (int) $request->getParam('estornar', 0) === 1;
@@ -2113,6 +2128,8 @@ class AdminPedidosController extends Controller {
     }
 
     public function excluir(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $id = $id ?? $request->getParam('id');
 
         if (empty($id)) {

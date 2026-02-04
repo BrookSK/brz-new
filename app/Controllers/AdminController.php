@@ -2,10 +2,13 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminController extends Controller {
     
     public function dashboard(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
         // Conexão com o banco
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -423,6 +426,8 @@ class AdminController extends Controller {
     }
     
     public function pedidos(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pagina = $request->getParam('pagina', 1);
@@ -448,10 +453,10 @@ class AdminController extends Controller {
             
             $stmt = $pdo->prepare($sql);
             foreach ($params as $key => $value) $stmt->bindValue($key, $value);
-            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             $stmt->execute();
-            $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
             // Total para paginação
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
@@ -468,10 +473,10 @@ class AdminController extends Controller {
             $stmtTotal = $pdo->prepare($sqlTotal);
             foreach ($paramsTotal as $key => $value) $stmtTotal->bindValue($key, $value);
             $stmtTotal->execute();
-            $total = $stmtTotal->fetch(PDO::FETCH_ASSOC)['total'];
+            $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
             $totalPaginas = ceil($total / $limite);
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $pedidos = [];
             $total = 0;
             $totalPaginas = 0;
@@ -618,6 +623,8 @@ class AdminController extends Controller {
     }
     
     public function novoProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         // Conexão com o banco
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
@@ -842,6 +849,8 @@ class AdminController extends Controller {
     }
     
     public function salvarProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
         try {
@@ -945,6 +954,8 @@ class AdminController extends Controller {
     }
     
     public function editarProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = $request->getParam('id');
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
@@ -969,6 +980,8 @@ class AdminController extends Controller {
     }
     
     public function atualizarProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = $request->getParam('id');
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         
@@ -985,6 +998,8 @@ class AdminController extends Controller {
     }
     
     public function excluirProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         error_log('🔍 [ADMIN-EXCLUIR] Método excluirProduto chamado com ID: ' . $request->getParam('id'));
         
         $produtoId = $request->getParam('id');

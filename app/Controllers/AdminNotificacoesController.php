@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminNotificacoesController extends Controller {
     private function getConfigTableInfo(\PDO $pdo): array {
@@ -571,26 +572,8 @@ class AdminNotificacoesController extends Controller {
     }
 
     private function requireAdmin(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $usuarioId = $_SESSION['usuario_id'] ?? ($_SESSION['user_id'] ?? null);
-        $logado = $_SESSION['logado'] ?? null;
-        $temSessao = ($logado === true) || (!empty($usuarioId));
-
-        if (!$temSessao) {
-            $this->json(['success' => false, 'error' => 'Não autenticado'], 401);
-            exit;
-        }
-
-        $perfil = $_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ($_SESSION['user_perfil'] ?? null));
-        $isAdmin = ($perfil === 'admin') || (!empty($_SESSION['is_admin']) && $_SESSION['is_admin']);
-
-        if (!$isAdmin) {
-            $this->json(['success' => false, 'error' => 'Acesso negado'], 403);
-            exit;
-        }
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
     }
 
     public function salvarNotificacao(Request $request) {

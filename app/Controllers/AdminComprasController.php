@@ -1,10 +1,14 @@
 <?php
 namespace App\Controllers;
 
+use App\Services\AuthService;
+
 class AdminComprasController extends Controller {
     private $connection;
 
     public function __construct() {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $this->connection = \Config\Database::getConnection();
     }
 

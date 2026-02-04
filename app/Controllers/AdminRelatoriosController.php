@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 use Config\Database;
 
 class AdminRelatoriosController extends Controller {
@@ -114,6 +115,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function movimentacao(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $usuarioId = (int) $request->getParam('usuario_id', 0);
         $dataInicio = (string) $request->getParam('data_inicio', '');
         $dataFim = (string) $request->getParam('data_fim', '');
@@ -423,6 +426,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function auditoriaLogs(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $usuarioId = (int) $request->getParam('usuario_id', 0);
         $dataInicio = (string) $request->getParam('data_inicio', '');
         $dataFim = (string) $request->getParam('data_fim', '');
@@ -687,6 +692,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function financeiro(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         // filtros
         $dataInicioCriacao = (string) $request->getParam('data_inicio_criacao', '');
         $dataFimCriacao = (string) $request->getParam('data_fim_criacao', '');
@@ -1090,6 +1097,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function exportFinanceiro(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $format = strtolower((string) $request->getParam('format', 'csv'));
         if (!in_array($format, ['csv', 'pdf'], true)) {
             $format = 'csv';
@@ -1313,6 +1322,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function index($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             // Buscar estatísticas gerais
             $stmt = $this->connection->prepare("
@@ -1713,6 +1724,8 @@ class AdminRelatoriosController extends Controller {
     }
 
     public function gerarPDF($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $tipo = $request->getParam('tipo', 'completo');
             $data_inicial = $request->getParam('data_inicial');

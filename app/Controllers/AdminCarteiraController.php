@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminCarteiraController extends Controller {
     
@@ -53,6 +54,8 @@ class AdminCarteiraController extends Controller {
     }
     
     public function adicionarCredito(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarioId = $data['usuario_id'] ?? 0;
         $valor = $data['valor'] ?? 0;
@@ -95,6 +98,8 @@ class AdminCarteiraController extends Controller {
     }
     
     public function converterParaBRL(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarioId = $data['usuario_id'] ?? 0;
         $valorUSD = $data['valor_usd'] ?? 0;
@@ -149,6 +154,8 @@ class AdminCarteiraController extends Controller {
     }
     
     public function getSaldo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $usuarioId = $request->getParam('usuario_id');
         
         try {
@@ -173,6 +180,8 @@ class AdminCarteiraController extends Controller {
     }
     
     public function getExtrato(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $usuarioId = $request->getParam('usuario_id');
         $pagina = $request->getParam('pagina', 1);
         $limite = 20;
@@ -255,6 +264,8 @@ class AdminCarteiraController extends Controller {
     }
     
     public function adicionarCreditosEmLote(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarios = $data['usuarios'] ?? [];
         $valor = $data['valor'] ?? 0;

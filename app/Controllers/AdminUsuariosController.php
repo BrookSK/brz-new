@@ -2,10 +2,13 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminUsuariosController extends Controller {
     
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
         try {
             $helper = new \App\Controllers\AdminUsuariosHelper();
             
@@ -142,6 +145,8 @@ class AdminUsuariosController extends Controller {
     }
 
     public function novo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
@@ -200,6 +205,16 @@ class AdminUsuariosController extends Controller {
                                     <option value="0">Inativo</option>
                                 </select>
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Perfil</label>
+                                <select class="form-select" name="perfil" required>
+                                    <option value="cliente" selected>Cliente</option>
+                                    <option value="admin">Administrador</option>
+                                    <option value="vendedor">Vendedor</option>
+                                    <option value="suporte">Suporte</option>
+                                    <option value="redirecionador">Redirecionador</option>
+                                </select>
+                            </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-1"></i>Salvar
@@ -219,6 +234,8 @@ class AdminUsuariosController extends Controller {
     }
 
     public function editar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
         $id = $id ?? $request->getParam('id');
 
         try {
@@ -295,6 +312,16 @@ class AdminUsuariosController extends Controller {
                                     <option value="0" ' . ((int)($usuario['ativo'] ?? 1) === 0 ? 'selected' : '') . '>Inativo</option>
                                 </select>
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Perfil</label>
+                                <select class="form-select" name="perfil" required>
+                                    <option value="cliente" ' . ((($usuario['perfil'] ?? 'cliente') === 'cliente') ? 'selected' : '') . '>Cliente</option>
+                                    <option value="admin" ' . ((($usuario['perfil'] ?? '') === 'admin') ? 'selected' : '') . '>Administrador</option>
+                                    <option value="vendedor" ' . ((($usuario['perfil'] ?? '') === 'vendedor') ? 'selected' : '') . '>Vendedor</option>
+                                    <option value="suporte" ' . ((($usuario['perfil'] ?? '') === 'suporte') ? 'selected' : '') . '>Suporte</option>
+                                    <option value="redirecionador" ' . ((($usuario['perfil'] ?? '') === 'redirecionador') ? 'selected' : '') . '>Redirecionador</option>
+                                </select>
+                            </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-1"></i>Salvar Alterações
@@ -314,6 +341,8 @@ class AdminUsuariosController extends Controller {
     }
 
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
         try {
             $helper = new \App\Controllers\AdminUsuariosHelper();
 
@@ -324,7 +353,8 @@ class AdminUsuariosController extends Controller {
                 'cpf' => $request->getParam('cpf'),
                 'telefone' => $request->getParam('telefone'),
                 'ativo' => $request->getParam('ativo', 1),
-                'senha' => $request->getParam('senha')
+                'senha' => $request->getParam('senha'),
+                'perfil' => $request->getParam('perfil', 'cliente')
             ];
 
             if (!empty($id)) {
@@ -344,6 +374,8 @@ class AdminUsuariosController extends Controller {
     }
 
     public function detalhes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
         $id = $request->getParam('id');
         
         try {

@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Core\Url;
+use App\Services\AuthService;
 
 class AdminProdutosController extends Controller {
 
@@ -245,6 +246,8 @@ class AdminProdutosController extends Controller {
     }
 
     public function cadastroRapido(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         if (!$this->ensureCadastroRapidoAccess($request)) {
             return;
         }
@@ -252,6 +255,8 @@ class AdminProdutosController extends Controller {
     }
 
     public function cadastroRapidoSalvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         if (!$this->ensureCadastroRapidoAccess($request)) {
             return;
         }
@@ -375,6 +380,8 @@ HTML;
     }
 
     public function uploadFotosVariacao(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $varId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -448,6 +455,8 @@ HTML;
     }
 
     public function removerFotoVariacao(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $fotoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -481,6 +490,8 @@ HTML;
     }
 
     public function salvarOrdemFotosVariacao(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $varId = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens_variacao', []);
         try {
@@ -777,6 +788,8 @@ HTML;
     }
 
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pagina = (int) $request->getParam('pagina', 1);
@@ -943,6 +956,8 @@ HTML;
     }
     
     public function novo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         // Buscar categorias
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -1187,6 +1202,8 @@ HTML;
     }
     
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
@@ -1352,6 +1369,8 @@ HTML;
     }
     
     public function editar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) $request->getParam('id');
 
         try {
@@ -2017,6 +2036,8 @@ HTMLSCRIPT;
     }
     
     public function atualizar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2178,6 +2199,8 @@ HTMLSCRIPT;
     }
 
     public function salvarAtributosVariacoes(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         if ($produtoId <= 0) {
             header('Location: /admin/produtos');
@@ -2244,6 +2267,8 @@ HTMLSCRIPT;
     }
 
     public function salvarVariacoes(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         if ($produtoId <= 0) {
             header('Location: /admin/produtos');
@@ -2318,6 +2343,8 @@ HTMLSCRIPT;
     }
 
     public function apagarVariacoes(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2357,6 +2384,8 @@ HTMLSCRIPT;
     }
 
     public function gerarVariacoes(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         $replace = (int) $request->getParam('replace', 0) === 1;
 
@@ -2452,6 +2481,8 @@ HTMLSCRIPT;
     }
 
     public function criarVariacaoIndividual(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2669,6 +2700,8 @@ HTMLSCRIPT;
     }
 
     public function uploadCapa(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2721,6 +2754,8 @@ HTMLSCRIPT;
     }
 
     public function uploadGaleria(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2792,6 +2827,8 @@ HTMLSCRIPT;
     }
     
     public function removerFoto(Request $request, $fotoId = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $fotoId = $fotoId ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2837,6 +2874,8 @@ HTMLSCRIPT;
     }
 
     public function removerCapa(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2863,6 +2902,8 @@ HTMLSCRIPT;
     }
 
     public function salvarOrdemGaleria(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens', []);
         try {
@@ -2894,6 +2935,8 @@ HTMLSCRIPT;
     }
     
     public function excluir(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');

@@ -826,7 +826,7 @@
                                 <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> Minha Conta</a></li>
                                 <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> Meus Pedidos</a></li>
                                 <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> Meus Dados</a></li>
-                                <?php if ($usuarioPerfil === 'admin'): ?>
+                                <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)): ?>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> Painel Admin</a></li>
                                 <?php endif; ?>

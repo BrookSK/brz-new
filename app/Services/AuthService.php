@@ -176,6 +176,41 @@ class AuthService {
             exit;
         }
     }
+
+    public function requerPerfis(array $perfis) {
+        $this->requerAutenticacao();
+
+        $usuario = $this->getUsuarioLogado();
+        $perfilAtual = (string) ($usuario['perfil'] ?? '');
+        $perfisNorm = array_values(array_filter(array_map(function ($p) {
+            return strtolower(trim((string) $p));
+        }, $perfis), function ($p) {
+            return $p !== '';
+        }));
+
+        if (empty($perfisNorm)) {
+            return;
+        }
+
+        if (!in_array(strtolower($perfilAtual), $perfisNorm, true)) {
+            $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /login');
+            exit;
+        }
+    }
+
+    public function podeAcessarPainelAdmin(): bool {
+        $usuario = $this->getUsuarioLogado();
+        if (!$usuario) {
+            return false;
+        }
+        $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+        if ($perfil === '') {
+            return false;
+        }
+        return $perfil !== 'cliente';
+    }
     
     public function requerPermissao($acao) {
         $this->requerAutenticacao();

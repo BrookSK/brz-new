@@ -9,6 +9,8 @@ use App\Models\Usuario;
 
 class AdminPedidosManualController extends Controller {
     public function novo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         $usuarioModel = new Usuario();
         $usuarios = [];
         try {
@@ -1388,6 +1390,8 @@ JS;
     }
 
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
@@ -1437,9 +1441,9 @@ JS;
 
             $adminId = null;
             try {
-                $auth = new AuthService();
                 $u = $auth->getUsuarioLogado();
-                if (is_array($u) && (($u['perfil'] ?? '') === 'admin')) {
+                $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+                if (is_array($u) && in_array($perfil, ['admin', 'vendedor'], true)) {
                     $adminId = (int) ($u['id'] ?? 0);
                 }
             } catch (\Exception $e) {
@@ -1458,6 +1462,8 @@ JS;
     }
 
     public function criar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
@@ -1507,9 +1513,9 @@ JS;
 
             $adminId = null;
             try {
-                $auth = new AuthService();
                 $u = $auth->getUsuarioLogado();
-                if (is_array($u) && (($u['perfil'] ?? '') === 'admin')) {
+                $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+                if (is_array($u) && in_array($perfil, ['admin', 'vendedor'], true)) {
                     $adminId = (int) ($u['id'] ?? 0);
                 }
             } catch (\Exception $e) {

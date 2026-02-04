@@ -4,6 +4,7 @@ namespace App\Controllers;
 use Config\Database;
 use App\Services\WExpressService;
 use App\Models\PedidoEcommerce;
+use App\Services\AuthService;
 
 class AdminRemessaInternacionalController extends Controller {
     private $connection;
@@ -13,25 +14,8 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function requireAdmin(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $usuarioId = $_SESSION['usuario_id'] ?? ($_SESSION['user_id'] ?? null);
-        $logado = $_SESSION['logado'] ?? null;
-        $temSessao = ($logado === true) || (!empty($usuarioId));
-
-        if (!$temSessao) {
-            header('Location: /loginadmin');
-            exit;
-        }
-
-        $perfil = $_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ($_SESSION['user_perfil'] ?? null));
-        $isAdmin = ($perfil === 'admin') || (!empty($_SESSION['is_admin']) && $_SESSION['is_admin']);
-        if (!$isAdmin) {
-            header('Location: /admin');
-            exit;
-        }
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
     }
 
     private function isPedidoPago(array $pedido): bool {

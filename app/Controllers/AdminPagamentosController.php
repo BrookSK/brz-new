@@ -8,6 +8,8 @@ use App\Services\PaymentService;
 class AdminPagamentosController extends Controller {
     
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pagina = $request->getParam('pagina', 1);
@@ -423,7 +425,7 @@ class AdminPagamentosController extends Controller {
 
     public function refreshPagamento(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfil('admin');
+        $auth->requerPerfis(['admin', 'vendedor']);
 
         $pedidoId = (int) $request->getParam('id');
         try {
@@ -1147,6 +1149,8 @@ class AdminPagamentosController extends Controller {
     }
     
     public function confirmarPagamento(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
         $pedidoId = $request->getParam('id');
         
         try {
@@ -1186,6 +1190,8 @@ class AdminPagamentosController extends Controller {
     }
     
     public function configuracoes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             

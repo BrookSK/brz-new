@@ -25,7 +25,7 @@ class AuthController extends Controller {
 
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
-            if ($usuario['perfil'] === 'admin') {
+            if ($this->authService->podeAcessarPainelAdmin()) {
                 $this->redirect('/admin/dashboard');
             } else {
                 $this->redirect($redirectTo !== '' ? $redirectTo : '/minha-conta');
@@ -48,7 +48,7 @@ class AuthController extends Controller {
                 
                 if ($usuario) {
                     // Verificar se é login admin
-                    if ($isAdmin && $usuario['perfil'] !== 'admin') {
+                    if ($isAdmin && !$this->authService->podeAcessarPainelAdmin()) {
                         $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
                         $_SESSION['message_type'] = 'danger';
                         $this->redirect('/login');
@@ -56,7 +56,7 @@ class AuthController extends Controller {
                     }
                     
                     // Redirecionar baseado no perfil
-                    if ($isAdmin || $usuario['perfil'] === 'admin') {
+                    if ($isAdmin || $this->authService->podeAcessarPainelAdmin()) {
                         $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
                         if ($isAjax) {
@@ -163,7 +163,7 @@ class AuthController extends Controller {
 
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
-            if ($usuario['perfil'] === 'admin') {
+            if ($this->authService->podeAcessarPainelAdmin()) {
                 if ($isAjax) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
@@ -195,7 +195,7 @@ class AuthController extends Controller {
                 
                 if ($usuario) {
                     // Verificar se é admin
-                    if ($usuario['perfil'] !== 'admin') {
+                    if (!$this->authService->podeAcessarPainelAdmin()) {
                         $_SESSION['message'] = 'Acesso administrativo negado. Usuário não tem permissão de administrador.';
                         $_SESSION['message_type'] = 'danger';
 

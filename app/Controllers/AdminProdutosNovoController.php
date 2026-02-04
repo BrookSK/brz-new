@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminProdutosNovoController extends Controller {
 
@@ -232,6 +233,8 @@ class AdminProdutosNovoController extends Controller {
     }
 
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $categorias = $this->getCategorias();
         $lojas = $this->getLojasSafe();
         $tipos = $this->getVariacaoTiposComOpcoes();
@@ -676,6 +679,8 @@ HTML;
     }
 
     public function salvarVariavel(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = $this->getPdo();
 

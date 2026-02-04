@@ -1,22 +1,36 @@
 <?php
 // Menu lateral padrão para todas as páginas do admin
 function renderAdminSidebar($activePage = '') {
+    $perfil = '';
+    try {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
+    } catch (\Exception $e) {
+        $perfil = '';
+    }
+    $perfil = strtolower(trim($perfil));
+    if ($perfil === '') {
+        $perfil = 'cliente';
+    }
+
     $menuItems = [
-        'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard'],
-        'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos'],
-        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => 'Variações', 'url' => '/admin/variacoes'],
-        'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas'],
-        'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias'],
-        'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos'],
-        'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes'],
-        'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque'],
-        'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras'],
-        'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios'],
-        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Remessa Internacional', 'url' => '/admin/remessa-internacional'],
-        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Remessa Correios', 'url' => '/admin/remessa-correios'],
-        'usuarios' => ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios'],
-        'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos'],
-        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes']
+        'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
+        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => 'Variações', 'url' => '/admin/variacoes', 'roles' => ['admin','vendedor','suporte']],
+        'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
+        'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
+        'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor']],
+        'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
+        'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
+        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Remessa Internacional', 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
+        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Remessa Correios', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
+        'usuarios' => ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
+        'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
+        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin','vendedor']]
     ];
 
     // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
@@ -33,6 +47,10 @@ function renderAdminSidebar($activePage = '') {
             <ul class="nav flex-column">';
             
             foreach ($menuItems as $key => $item) {
+                $roles = isset($item['roles']) && is_array($item['roles']) ? $item['roles'] : [];
+                if (!empty($roles) && !in_array($perfil, $roles, true)) {
+                    continue;
+                }
                 $activeClass = ($activePage === $key) ? 'active' : '';
                 echo '<li class="nav-item">
                     <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">

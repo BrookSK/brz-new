@@ -7,6 +7,8 @@ class AdminEstoqueController extends Controller {
     private $connection;
 
     public function __construct() {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $this->connection = \Config\Database::getConnection();
     }
 
@@ -479,6 +481,24 @@ class AdminEstoqueController extends Controller {
             . '</div>';
     }
 
+    private function requireWriteAccess(bool $json = false): bool {
+        $logged = $this->getLoggedUser();
+        $perfil = strtolower(trim((string) ($logged['perfil'] ?? '')));
+        $ok = in_array($perfil, ['admin', 'vendedor'], true);
+        if ($ok) {
+            return true;
+        }
+
+        if ($json) {
+            echo json_encode(['success' => false, 'message' => 'Acesso negado.']);
+            return false;
+        }
+
+        $this->setFlash('Acesso negado.', 'danger');
+        header('Location: /admin/estoque');
+        exit;
+    }
+
     private function tableExists(string $table): bool {
         try {
             $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
@@ -738,6 +758,7 @@ class AdminEstoqueController extends Controller {
     }
 
     public function entrada($request) {
+        $this->requireWriteAccess(false);
         $prefillProdutoId = (int) $request->getParam('produto_id', 0);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -1450,6 +1471,7 @@ class AdminEstoqueController extends Controller {
     }
 
     public function salvar($request) {
+        $this->requireWriteAccess(false);
         try {
             $produtoId = (int) $request->getParam('produto_id');
             $quantidade = (int) $request->getParam('quantidade');
@@ -1697,7 +1719,60 @@ class AdminEstoqueController extends Controller {
     }
 
     public function marcarComprado($request) {
-        echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (!$this->requireWriteAccess(true)) {
+            return;
+        }
+
+        try {
+            if (!$this->tableExists('lista_compras')) {
+                echo json_encode(['success' => false, 'message' => 'Tabela lista_compras não encontrada.']);
+                return;
+            }
+
+            $produtoId = (int) $request->getParam('produto_id', 0);
+            $itemId = (int) $request->getParam('item_id', 0);
+            $lojaId = (int) $request->getParam('loja_id', 0);
+            $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
+
+            if ($itemId <= 0 && $produtoId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
+                return;
+            }
+
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+            $params = [];
+
+            if ($itemId > 0) {
+                $sql .= ' AND lc.id = :id';
+                $params[':id'] = $itemId;
+            } else {
+                $sql .= ' AND lc.produto_id = :produto_id';
+                $params[':produto_id'] = $produtoId;
+            }
+
+            if ($temLojaIdEmLista) {
+                if ($semLoja) {
+                    $sql .= ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                } elseif ($lojaId > 0) {
+                    $sql .= ' AND lc.loja_id = :loja_id';
+                    $params[':loja_id'] = $lojaId;
+                }
+            }
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
+
+            echo json_encode(['success' => true, 'message' => 'Item(s) marcado(s) como comprado.']);
+            return;
+        } catch (\Exception $e) {
+            error_log('Erro ao marcar comprado (estoque): ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao marcar como comprado.']);
+            return;
+        }
     }
 
     public function editar($request) {
@@ -2125,6 +2200,7 @@ class AdminEstoqueController extends Controller {
     }
 
     public function salvarEdicao($request) {
+        $this->requireWriteAccess(false);
         try {
             $produtoId = (int) $request->getParam('produto_id');
             if ($produtoId <= 0) {
@@ -2369,6 +2445,7 @@ class AdminEstoqueController extends Controller {
     }
 
     public function excluirEntrada($request) {
+        $this->requireWriteAccess(false);
         try {
             $produtoId = (int) $request->getParam('produto_id');
             $estoqueId = (int) $request->getParam('estoque_id');

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\AuthService;
 
 class AdminLojasController extends Controller {
 
@@ -29,6 +30,8 @@ class AdminLojasController extends Controller {
     }
 
     public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         try {
@@ -45,11 +48,15 @@ class AdminLojasController extends Controller {
     }
 
     public function novo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         $this->renderPage([], ['id' => null, 'nome' => '', 'slug' => '', 'ativo' => 1]);
     }
 
     public function editar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         $id = (int) $request->getParam('id');
@@ -74,6 +81,8 @@ class AdminLojasController extends Controller {
     }
 
     public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
             $pdo = $this->getPdo();
             $this->ensureTable($pdo);
@@ -133,6 +142,8 @@ class AdminLojasController extends Controller {
     }
 
     public function excluir(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = (int) $request->getParam('id');
 
         try {
