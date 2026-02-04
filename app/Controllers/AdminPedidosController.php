@@ -28,6 +28,21 @@ class AdminPedidosController extends Controller {
                 $colsPedidos = [];
             }
 
+            $pickCol = function (array $cols, array $candidates): ?string {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        return $c;
+                    }
+                }
+                return null;
+            };
+
+            // Campos opcionais para enriquecer a listagem (sem depender de schema fixo)
+            $colPais = $pickCol($colsPedidos, ['pais', 'country', 'pais_entrega', 'country_entrega', 'shipping_country', 'pais_destino', 'pais_entrega_nome']);
+            $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
+            $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
+            $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
+
             // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
             $rateUSDBRL = 5.5;
             try {
@@ -131,6 +146,11 @@ class AdminPedidosController extends Controller {
                         if (!array_key_exists('total', $p) && $totalField !== '') {
                             $p['total'] = (float) ($p[$totalField] ?? 0);
                         }
+                    }
+
+                    // Normalizar/garantir alguns campos para exibição
+                    if (!array_key_exists('numero_pedido', $p) && $colNumero) {
+                        $p['numero_pedido'] = (string) ($p[$colNumero] ?? '');
                     }
                 }
                 unset($p);
@@ -264,6 +284,35 @@ class AdminPedidosController extends Controller {
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
                     
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
+                    $isManualBool = false;
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    }
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -280,7 +329,12 @@ class AdminPedidosController extends Controller {
                                     <div class="col-md-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
@@ -340,7 +394,36 @@ class AdminPedidosController extends Controller {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
-                    
+
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
+                    $isManualBool = false;
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    }
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -357,11 +440,16 @@ class AdminPedidosController extends Controller {
                                     <div class="col-md-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-success">$ ' . number_format($pedido['total'], 2, '.', ',') . '</h5>
+                                            <h5 class="mb-0 text-success">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
                                             <small class="text-muted">Total (USD)</small>
                                         </div>
                                     </div>
@@ -375,13 +463,16 @@ class AdminPedidosController extends Controller {
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
                                         </div>
                                     </div>
@@ -405,7 +496,6 @@ class AdminPedidosController extends Controller {
                             <div class="tab-pane fade" id="pedidos-real" role="tabpanel">
                                 <div class="row">';
                 
-                // Filtrar pedidos em BRL
                 $pedidosBRL = array_filter($pedidos, function($pedido) {
                     return $pedido['moeda'] === 'BRL';
                 });
@@ -414,7 +504,36 @@ class AdminPedidosController extends Controller {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
-                    
+
+                    $paisTxt = '';
+                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+                    }
+                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+                    }
+                    if ($paisTxt === '') {
+                        $paisTxt = 'Brazil';
+                    }
+
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
+                    $isManualBool = false;
+                    $manualTxt = '';
+                    if (!empty($colManual) && array_key_exists($colManual, $pedido)) {
+                        $v = $pedido[$colManual];
+                        $isManualBool = ($v === 1 || $v === '1' || $v === true || $v === 'true');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    } elseif (!empty($pedido['origem_pedido'])) {
+                        $isManualBool = (strtolower((string) $pedido['origem_pedido']) === 'manual');
+                        $manualTxt = $isManualBool ? 'Sim' : 'Não';
+                    }
+                    $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
+
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card">
                             <div class="card-body">
@@ -431,7 +550,12 @@ class AdminPedidosController extends Controller {
                                     <div class="col-md-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
-                                        <p class="text-muted small mb-0">' . htmlspecialchars($pedido['numero_pedido']) . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="text-center">
@@ -449,13 +573,16 @@ class AdminPedidosController extends Controller {
                                             </a>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
+                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
+                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
+                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
+                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
+                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
+                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
                                         </div>
                                     </div>

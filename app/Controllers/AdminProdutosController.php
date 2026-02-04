@@ -527,7 +527,7 @@ HTML;
         $cols = $this->getTableColumns($pdo, 'produtos');
 
         $name = (string) $request->getParam('name');
-        $price = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('price'));
+        $price = $this->parseMoneyToDb($request->getParam('price'));
         $weight = str_replace([','], ['.'], (string) $request->getParam('weight'));
         $stock = (int) $request->getParam('stock', 999);
         $featured = $request->getParam('featured') ? 1 : 0;

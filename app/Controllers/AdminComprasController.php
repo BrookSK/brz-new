@@ -1463,7 +1463,10 @@ class AdminComprasController extends Controller {
                                         : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
 
                                     $lojaNome = '-';
-                                    $lojaIdRow = (int) ($item['loja_id'] ?? ($item['produto_loja_id'] ?? 0));
+                                    $lojaIdRow = (int) ($item['loja_id'] ?? 0);
+                                    if ($lojaIdRow <= 0) {
+                                        $lojaIdRow = (int) ($item['produto_loja_id'] ?? 0);
+                                    }
                                     if ($lojaIdRow > 0 && $this->tableExists('lojas')) {
                                         try {
                                             $stmtLn = $this->connection->prepare('SELECT nome FROM lojas WHERE id = :id LIMIT 1');
@@ -1498,6 +1501,13 @@ class AdminComprasController extends Controller {
                                     $btnLoja = $missingLoja
                                         ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"><i class="fas fa-store"></i></button>'
                                         : '';
+                                    $btnConcluirItem = '<button type="button" class="btn btn-outline-success"'
+                                        . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
+                                        . ' data-produto-id="' . (int) $item['produto_id'] . '"'
+                                        . ' data-loja-id="' . (int) $lojaIdRow . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-quantidade="' . (int) $qf . '"'
+                                        . '><i class="fas fa-check"></i></button>';
 
                                     echo '<tr>'
                                         . '<td>'
@@ -1516,12 +1526,7 @@ class AdminComprasController extends Controller {
                                         . $btnVerPedidos
                                         . ($statusView === 'pendente' ? $btnLoja : '')
                                         . ($statusView === 'pendente'
-                                            ? ('<button type="button" class="btn btn-outline-success"'
-                                                . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
-                                                . ' data-produto-id="' . (int) $item['produto_id'] . '"'
-                                                . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                                . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
-                                                . '><i class="fas fa-check"></i></button>')
+                                            ? $btnConcluirItem
                                             : $btnReabrirItem)
                                         . ($statusView === 'pendente' ? $btnRemoverItem : '')
                                         . '</div>'
@@ -1883,7 +1888,7 @@ class AdminComprasController extends Controller {
                                         </div>
                                         <div class="mt-3">
                                             <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
-                                            <input type="number" class="form-control" name="quantidade_comprada" id="concluir_quantidade_comprada" min="0" value="0">
+                                            <input type="number" class="form-control" name="quantidade_comprada" id="concluir_quantidade_comprada" min="0" max="0" value="0">
                                             <div class="form-text">Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.</div>
                                         </div>
                                     </div>
@@ -1905,7 +1910,26 @@ class AdminComprasController extends Controller {
                             document.getElementById("concluir_produto_id").value = button.getAttribute("data-produto-id") || "";
                             document.getElementById("concluir_loja_id").value = button.getAttribute("data-loja-id") || "0";
                             document.getElementById("concluir_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                            var maxQ = parseInt(button.getAttribute("data-quantidade") || "0", 10);
+                            var inp = document.getElementById("concluir_quantidade_comprada");
+                            if (inp) {
+                                inp.max = String(Math.max(0, maxQ));
+                                inp.value = "0";
+                            }
                         });
+                        var form = modalConcluirItem.querySelector("form");
+                        if (form) {
+                            form.addEventListener("submit", function (e) {
+                                var inp = document.getElementById("concluir_quantidade_comprada");
+                                if (!inp) return;
+                                var max = parseInt(inp.max || "0", 10);
+                                var val = parseInt(inp.value || "0", 10);
+                                if (val > max) {
+                                    e.preventDefault();
+                                    alert("O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque ");
+                                }
+                            });
+                        }
                     }
                 </script>';
 
@@ -2305,6 +2329,20 @@ class AdminComprasController extends Controller {
                 );
                 $stmtSel->execute($params);
                 $rows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $totalNeed = 0;
+                foreach ($rows as $r) {
+                    $qf = (int) ($r['quantidade_faltante'] ?? 0);
+                    $qn = (int) ($r['quantidade_necessaria'] ?? 0);
+                    $need = $qf > 0 ? $qf : $qn;
+                    if ($need > 0) $totalNeed += $need;
+                }
+                if ($quantidadeComprada > $totalNeed) {
+                    $_SESSION['message'] = 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque';
+                    $_SESSION['message_type'] = 'warning';
+                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    exit;
+                }
 
                 $restante = $quantidadeComprada;
                 foreach ($rows as $r) {
