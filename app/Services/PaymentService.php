@@ -1,6 +1,8 @@
 <?php
 namespace App\Services;
 
+use App\Core\Url;
+
 use App\Models\PedidoEcommerce;
 
 class PaymentService {
@@ -25,6 +27,64 @@ class PaymentService {
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
         $this->loadConfigurations();
+    }
+
+    public function createStripeCheckoutSession(int $pedidoId, float $valorUsd, string $descricao, array $customer = [], ?string $successUrl = null, ?string $cancelUrl = null): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round($valorUsd * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para cobrança.'];
+        }
+
+        $base = Url::base();
+        if ($successUrl === null || trim((string) $successUrl) === '') {
+            $successUrl = rtrim($base, '/') . '/pedido/detalhes/' . $pedidoId . '?stripe=success';
+        }
+        if ($cancelUrl === null || trim((string) $cancelUrl) === '') {
+            $cancelUrl = rtrim($base, '/') . '/pedido/detalhes/' . $pedidoId . '?stripe=cancel';
+        }
+
+        $body = [
+            'mode' => 'payment',
+            'success_url' => (string) $successUrl,
+            'cancel_url' => (string) $cancelUrl,
+            'client_reference_id' => (string) $pedidoId,
+            'metadata[pedido_id]' => (string) $pedidoId,
+            'line_items[0][quantity]' => '1',
+            'line_items[0][price_data][currency]' => 'usd',
+            'line_items[0][price_data][unit_amount]' => (string) $amountCents,
+            'line_items[0][price_data][product_data][name]' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId),
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['customer_email'] = (string) $customer['email'];
+        }
+
+        try {
+            $session = $this->stripeRequest('POST', '/v1/checkout/sessions', $body);
+            $id = (string) ($session['id'] ?? '');
+            $url = (string) ($session['url'] ?? '');
+            $paymentIntentId = (string) ($session['payment_intent'] ?? '');
+            if ($id === '' || $url === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar Checkout Session.'];
+            }
+
+            return [
+                'success' => true,
+                'session_id' => $id,
+                'url' => $url,
+                'payment_intent_id' => $paymentIntentId,
+                'raw' => $session,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 
     private function isDebugEnabled(): bool {
@@ -974,6 +1034,17 @@ class PaymentService {
             return ['status' => 'ignored'];
         }
 
+        // Webhook via Checkout Session (link hospedado)
+        if ($eventType === 'checkout.session.completed') {
+            $pi = (string) ($obj['payment_intent'] ?? '');
+            if ($pi !== '') {
+                $this->atualizarPagamentoPedidoPorGateway($pi, 'stripe', 'approved', 'SUCCEEDED');
+                return ['status' => 'processed'];
+            }
+            return ['status' => 'ignored'];
+        }
+
+        // Webhook via PaymentIntent (Elements / API)
         $paymentId = (string) ($obj['id'] ?? '');
         if ($paymentId === '') {
             return ['status' => 'ignored'];

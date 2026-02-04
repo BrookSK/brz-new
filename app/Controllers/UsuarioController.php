@@ -909,6 +909,13 @@ class UsuarioController extends Controller {
                         ];
                     }
                 }
+            } elseif ($gatewayPedido === 'stripe') {
+                $invoiceUrl = (string) ($pedido['payment_invoice_url'] ?? ($pedido['invoice_url'] ?? ($pedido['invoiceUrl'] ?? '')));
+                $paymentDetails = [
+                    'billingType' => 'CREDIT_CARD',
+                    'invoiceUrl' => $invoiceUrl !== '' ? $invoiceUrl : null,
+                    'status' => (string) ($pedido['payment_status'] ?? ''),
+                ];
             } else {
                 try {
                     if (!empty($pedido['pagamento_gateway']) && $pedido['pagamento_gateway'] === 'asaas' && !empty($pedido['pagamento_transacao'])) {

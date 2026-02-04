@@ -170,9 +170,84 @@ class PedidoManualService {
     }
 
     private function gerarLinkPagamentoStripePedidoManual(int $pedidoId): array {
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+
+        $colsPedidos = $this->getCols('pedidos');
+        if (empty($colsPedidos)) {
+            return ['success' => false, 'error' => 'Tabela pedidos não encontrada'];
+        }
+
+        $colMoeda = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
+        $colTotal = $this->pickFirstExistingColumn($colsPedidos, ['total', 'valor_total', 'amount', 'valor']);
+        $colUsuarioId = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
+        $colNumeroPedido = $this->pickFirstExistingColumn($colsPedidos, ['numero_pedido', 'codigo', 'order_number']);
+
+        $select = ['id'];
+        if ($colMoeda !== '') $select[] = $colMoeda . ' AS moeda';
+        if ($colTotal !== '') $select[] = $colTotal . ' AS total';
+        if ($colUsuarioId !== '') $select[] = $colUsuarioId . ' AS usuario_id';
+        if ($colNumeroPedido !== '') $select[] = $colNumeroPedido . ' AS numero_pedido';
+
+        $stmt = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stmt->execute([$pedidoId]);
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($pedido)) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
+        if ($moeda === '') $moeda = 'USD';
+        if ($moeda === 'BRL') {
+            return ['success' => false, 'error' => 'Este pedido não é USD/Stripe'];
+        }
+
+        $totalUsd = (float) ($pedido['total'] ?? 0);
+        if ($totalUsd <= 0) {
+            return ['success' => false, 'error' => 'Total inválido para cobrança'];
+        }
+
+        $email = '';
+        try {
+            $uid = (int) ($pedido['usuario_id'] ?? 0);
+            if ($uid > 0 && $this->tableExists('usuarios')) {
+                $stmtU = $this->db->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
+                $stmtU->execute([$uid]);
+                $email = (string) ($stmtU->fetchColumn() ?: '');
+            }
+        } catch (\Exception $e) {
+            $email = '';
+        }
+
+        $descricao = 'Pedido #' . (string) (($pedido['numero_pedido'] ?? '') !== '' ? $pedido['numero_pedido'] : $pedidoId);
+
+        $paySvc = new PaymentService();
+        $session = $paySvc->createStripeCheckoutSession($pedidoId, $totalUsd, $descricao, ['email' => $email]);
+        if (empty($session['success'])) {
+            return ['success' => false, 'error' => (string) ($session['error'] ?? 'Falha ao criar link Stripe')];
+        }
+
+        $payResult = [
+            'billingType' => 'CREDIT_CARD',
+            'payment_id' => (string) ($session['payment_intent_id'] ?? ''),
+            'invoiceUrl' => (string) ($session['url'] ?? ''),
+        ];
+
+        // Se não veio payment_intent, usar session_id como fallback (ao menos para exibição do link)
+        if ($payResult['payment_id'] === '') {
+            $payResult['payment_id'] = (string) ($session['session_id'] ?? '');
+        }
+
+        $this->persistirPagamentoNoPedido($pedidoId, $payResult, 'stripe');
+
         return [
-            'success' => false,
-            'error' => 'Geração de link de pagamento em USD (Stripe) ainda está em desenvolvimento.',
+            'success' => true,
+            'pedido_id' => $pedidoId,
+            'payment_id' => $payResult['payment_id'],
+            'invoiceUrl' => (string) ($session['url'] ?? ''),
+            'billingType' => 'CREDIT_CARD',
+            'status' => 'pending',
         ];
     }
 
