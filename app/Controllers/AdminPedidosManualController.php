@@ -411,7 +411,7 @@ class AdminPedidosManualController extends Controller {
                 <div class="card-body">
                     <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-4" id="billingTypeWrap">
                             <label class="form-label">Billing Type</label>
                             <select id="billingType" class="form-select">
                                 <option value="BOLETO">BOLETO</option>
@@ -642,6 +642,7 @@ function updateLinkVisibility(){
     const linkCard = document.getElementById('linkPagamentoCard');
     const linkInfo = document.getElementById('linkPagamentoInfo');
     const linkResult = document.getElementById('linkResult');
+    const billingWrap = document.getElementById('billingTypeWrap');
 
     const v = fpSel ? String(fpSel.value || '') : '';
     const isOffline = (v === 'pagdev');
@@ -651,6 +652,11 @@ function updateLinkVisibility(){
     // - Online BRL: AppMax (gera link)
     // - Online USD: Stripe (gera link de checkout)
     const canShowLinkCard = (!isOffline && (moeda === 'BRL' || moeda === 'USD'));
+    const shouldShowBillingType = (!isOffline && moeda === 'BRL');
+
+    if (billingWrap) {
+        billingWrap.style.display = shouldShowBillingType ? '' : 'none';
+    }
 
     if (linkCard) {
         linkCard.style.display = canShowLinkCard ? '' : 'none';
@@ -1024,7 +1030,12 @@ function copiarLinkPagamento(){
 }
 
 function gerarLinkPagamento(){
-    const bt = document.getElementById('billingType').value;
+    const moeda = getSelectedMoeda();
+    let bt = 'CREDIT_CARD';
+    if (moeda === 'BRL') {
+        const sel = document.getElementById('billingType');
+        bt = sel ? String(sel.value || 'BOLETO') : 'BOLETO';
+    }
 
     // Garantir que os hidden inputs estejam atualizados
     try { calcTotal(); } catch (e) {}

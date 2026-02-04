@@ -862,6 +862,17 @@ class AdminPedidosController extends Controller {
                                         );
                                     }
 
+                                    $stripeInvoiceUrl = '';
+                                    if ($pgGateway2 === 'stripe' && $isPending2) {
+                                        $stripeInvoiceUrl = (string) (
+                                            $pedido['payment_invoice_url'] ??
+                                            $pedido['invoice_url'] ??
+                                            $pedido['invoiceUrl'] ??
+                                            ''
+                                        );
+                                        $stripeInvoiceUrl = trim($stripeInvoiceUrl);
+                                    }
+
                                     if ($pixPayload !== '') {
                                         $pixPayloadEsc = htmlspecialchars($pixPayload, ENT_QUOTES, 'UTF-8');
                                         echo '<div class="mt-3">'
@@ -869,6 +880,19 @@ class AdminPedidosController extends Controller {
                                             . '<textarea class="form-control" rows="3" readonly id="admin-pix-payload">' . $pixPayloadEsc . '</textarea>'
                                             . '<button type="button" class="btn btn-sm btn-outline-dark mt-2" id="admin-pix-copy-btn" onclick="copiarPixAdmin()">Copiar PIX</button>'
                                             . '<div id="admin-pix-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>'
+                                            . '</div>';
+                                    }
+
+                                    if ($stripeInvoiceUrl !== '') {
+                                        $stripeEsc = htmlspecialchars($stripeInvoiceUrl, ENT_QUOTES, 'UTF-8');
+                                        echo '<div class="mt-3">'
+                                            . '<div class="small text-muted mb-1">Stripe (link de pagamento)</div>'
+                                            . '<div class="d-flex gap-2 flex-wrap">'
+                                            . '<a class="btn btn-sm btn-outline-primary" href="' . $stripeEsc . '" target="_blank" rel="noopener">Abrir link</a>'
+                                            . '<button type="button" class="btn btn-sm btn-outline-dark" id="admin-stripe-copy-btn" onclick="copiarStripeAdmin()">Copiar link</button>'
+                                            . '</div>'
+                                            . '<textarea class="form-control mt-2" rows="2" readonly id="admin-stripe-link">' . $stripeEsc . '</textarea>'
+                                            . '<div id="admin-stripe-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>'
                                             . '</div>';
                                     }
 
@@ -1033,6 +1057,43 @@ class AdminPedidosController extends Controller {
                 if (btn) {
                     btn.innerText = "Copiado";
                     setTimeout(() => { btn.innerText = old || "Copiar PIX"; }, 1800);
+                }
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(txt).then(ok).catch(() => {
+                    el.focus();
+                    el.select();
+                    try { document.execCommand("copy"); ok(); } catch (e) {}
+                });
+                return;
+            }
+            el.focus();
+            el.select();
+            try {
+                document.execCommand("copy");
+                ok();
+            } catch (e) {
+            }
+        }
+
+        function copiarStripeAdmin() {
+            const el = document.getElementById("admin-stripe-link");
+            const msg = document.getElementById("admin-stripe-copied");
+            const btn = document.getElementById("admin-stripe-copy-btn");
+            if (!el) return;
+            const txt = el.value || el.textContent || "";
+            if (!txt) return;
+
+            const old = btn ? btn.innerText : "";
+            const ok = () => {
+                if (msg) {
+                    msg.style.display = "block";
+                    setTimeout(() => { msg.style.display = "none"; }, 1800);
+                }
+                if (btn) {
+                    btn.innerText = "Copiado";
+                    setTimeout(() => { btn.innerText = old || "Copiar link"; }, 1800);
                 }
             };
 

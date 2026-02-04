@@ -306,6 +306,20 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <input type="text" class="form-control" value="<?= htmlspecialchars($digitableLine) ?>" readonly onclick="this.select();" />
                                     </div>
                                 <?php endif; ?>
+                            <?php elseif (!$isPago && $billingType === 'CREDIT_CARD'): ?>
+                                <?php if (!empty($invoiceUrl)): ?>
+                                    <p class="mb-2">
+                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($invoiceUrl) ?>" target="_blank" rel="noopener">Pagar com cartão</a>
+                                    </p>
+                                    <div class="mb-2">
+                                        <strong>Link de pagamento:</strong>
+                                        <div class="input-group">
+                                            <input id="stripe-link" type="text" class="form-control" value="<?= htmlspecialchars($invoiceUrl) ?>" readonly onclick="this.select();" />
+                                            <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('stripe-link','stripe-copied', this)">Copiar</button>
+                                        </div>
+                                        <div id="stripe-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>
+                                    </div>
+                                <?php endif; ?>
                             <?php endif; ?>
 
                             <?php
