@@ -553,7 +553,6 @@ class AdminPedidosController extends Controller {
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
-                                            <span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
