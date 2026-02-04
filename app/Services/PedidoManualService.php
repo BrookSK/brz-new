@@ -787,6 +787,9 @@ class PedidoManualService {
         $paymentId = (string) ($result['payment_id'] ?? '');
         $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
         $statusGateway = (string) ($result['status'] ?? '');
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
 
         if ($paymentId === '') {
             throw new \Exception('AppMax: payment_id não retornado');
@@ -827,6 +830,9 @@ class PedidoManualService {
             'pedido_id' => $pedidoId,
             'payment_id' => $paymentId,
             'invoiceUrl' => $invoiceUrl,
+            'pix' => $pix,
+            'bankSlipUrl' => $bankSlipUrl,
+            'digitableLine' => $digitableLine,
             'billingType' => $billingType,
             'status' => $statusGateway,
         ];

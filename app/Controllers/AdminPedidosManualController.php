@@ -929,8 +929,8 @@ function copiarTextoOrcamento(){
 }
 
 function copiarLinkPagamento(){
-    const url = String(window.__PAGAMENTO_LINK__ || '').trim();
-    if (!url) return;
+    const txt = String(window.__PAGAMENTO_LINK__ || '').trim();
+    if (!txt) return;
 
     const ok = () => {
         const out = document.getElementById('linkResult');
@@ -951,7 +951,7 @@ function copiarLinkPagamento(){
     };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(ok).catch(() => {
+        navigator.clipboard.writeText(txt).then(ok).catch(() => {
             try {
                 const ta = document.getElementById('linkPagamentoTexto');
                 if (ta) {
@@ -1006,18 +1006,42 @@ function gerarLinkPagamento(){
         .then(r => r.json())
         .then(data => {
             if (data && data.success) {
-                const url = data.invoiceUrl || '';
-                window.__PAGAMENTO_LINK__ = url;
+                const url = String(data.invoiceUrl || '').trim();
+                const pixPayload = String((data.pix && data.pix.payload) ? data.pix.payload : '').trim();
+                const pixImg = String((data.pix && data.pix.encodedImage) ? data.pix.encodedImage : '').trim();
+                const bankSlipUrl = String(data.bankSlipUrl || '').trim();
+                const digitableLine = String(data.digitableLine || '').trim();
+
+                const textToCopy = (url || pixPayload || bankSlipUrl || digitableLine);
+                window.__PAGAMENTO_LINK__ = textToCopy;
+
+                let actions = '';
+                if (url) {
+                    actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                } else if (bankSlipUrl) {
+                    actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(bankSlipUrl)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                }
+                actions += `<button type="button" class="btn btn-sm btn-dark" onclick="copiarLinkPagamento()"><i class="fas fa-copy"></i> Copiar</button>`;
+
+                const headerMsg = url ? 'Link gerado.' : (pixPayload ? 'PIX gerado.' : (bankSlipUrl ? 'Boleto gerado.' : 'Pagamento gerado.'));
+
+                let extra = '';
+                if (pixImg) {
+                    extra += `<div class="mt-3"><img alt="QR Code PIX" style="max-width:220px;width:100%;height:auto" src="data:image/png;base64,${escapeHtml(pixImg)}" /></div>`;
+                }
+
+                const displayText = url || pixPayload || bankSlipUrl || digitableLine;
+
                 el.innerHTML = `<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <strong>Link gerado.</strong> Agora é só copiar e enviar para o cliente.
+                        <strong>${headerMsg}</strong> Agora é só copiar e enviar para o cliente.
                     </div>
                     <div class="d-flex gap-2">
-                        <a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>
-                        <button type="button" class="btn btn-sm btn-dark" onclick="copiarLinkPagamento()"><i class="fas fa-copy"></i> Copiar</button>
+                        ${actions}
                     </div>
                 </div>
-                <textarea class="form-control" id="linkPagamentoTexto" rows="2" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(url)}</textarea>
+                <textarea class="form-control" id="linkPagamentoTexto" rows="${pixPayload ? 4 : 2}" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(displayText)}</textarea>
+                ${extra}
                 <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar outro link.</div>`;
             } else {
                 el.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml((data && data.error) ? data.error : 'Falha ao gerar link')}</div>`;
