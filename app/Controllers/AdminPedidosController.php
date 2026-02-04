@@ -293,6 +293,12 @@ class AdminPedidosController extends Controller {
                         $paisTxt = 'Brazil';
                     }
 
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
                     $origemTxt = '';
                     if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
                         $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
@@ -326,7 +332,7 @@ class AdminPedidosController extends Controller {
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         <div class="text-muted small mt-1">
-                                            <span class="me-3"><strong>' . htmlspecialchars($paisTxt) . '</strong></span>
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
                                             ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
@@ -402,6 +408,12 @@ class AdminPedidosController extends Controller {
                         $paisTxt = 'Brazil';
                     }
 
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
                     $origemTxt = '';
                     if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
                         $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
@@ -435,42 +447,7 @@ class AdminPedidosController extends Controller {
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
                                         <div class="text-muted small mt-1">
-                                            <span class="me-3"><strong>' . htmlspecialchars($paisTxt) . '</strong></span>
-                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
-                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="text-center">
-                                            <h5 class="mb-0 text-success">$ ' . number_format($pedido['total'], 2, '.', ',') . '</h5>
-                                            <small class="text-muted">Total (USD)</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="d-flex justify-content-end gap-2">
-                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver
-                                            </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
-                                                <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>🟡 Pendente</option>
-                                                <option value="pagamento" ' . ($pedido['status'] == 'pagamento' ? 'selected' : '') . '>🔵 Pagamento</option>
-                                                <option value="aprovado" ' . ($pedido['status'] == 'aprovado' ? 'selected' : '') . '>🟢 Aprovado</option>
-                                                <option value="separacao" ' . ($pedido['status'] == 'separacao' ? 'selected' : '') . '>🟠 Separação</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>🔵 Enviado</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>✅ Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>❌ Cancelado</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                 }
                 
                 if (empty($pedidosUSD)) {
@@ -508,6 +485,12 @@ class AdminPedidosController extends Controller {
                         $paisTxt = 'Brazil';
                     }
 
+                    $paisLower = strtolower($paisTxt);
+                    $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
+                    $paisStyle = $paisIsBrazil
+                        ? 'color:#14532d;font-weight:700;'
+                        : 'color:#b91c1c;font-weight:700;';
+
                     $origemTxt = '';
                     if (!empty($colOrigem) && array_key_exists($colOrigem, $pedido)) {
                         $origemTxt = trim((string) ($pedido[$colOrigem] ?? ''));
@@ -532,6 +515,23 @@ class AdminPedidosController extends Controller {
                                             <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
                                                 <i class="' . $statusIcon . '"></i>
                                             </div>
+                                            <h6 class="mb-0">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</h6>
+                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                        <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
+                                        <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        <div class="text-muted small mt-1">
+                                            <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
+                                            <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            ' . ($manualTxt !== '' ? ('<span>Manual: <strong>' . htmlspecialchars($manualTxt) . '</strong></span>') : '') . '
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
                                             <h5 class="mb-0 text-info">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
                                             <small class="text-muted">Total (BRL)</small>
                                         </div>
