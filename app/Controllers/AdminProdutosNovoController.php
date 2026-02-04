@@ -729,7 +729,23 @@ HTML;
                 $data['loja_id'] = $lojaId;
             }
             if (in_array('loja', $cols, true)) {
-                $data['loja'] = $lojaParam;
+                $lojaValue = $lojaParam;
+                if ($lojaId > 0) {
+                    try {
+                        $st = $pdo->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['lojas']);
+                        if ($st->fetchColumn()) {
+                            $stmtL = $pdo->prepare('SELECT slug FROM lojas WHERE id = :id LIMIT 1');
+                            $stmtL->execute([':id' => $lojaId]);
+                            $tmpSlug = $stmtL->fetchColumn();
+                            if ($tmpSlug !== false && (string) $tmpSlug !== '') {
+                                $lojaValue = (string) $tmpSlug;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+                $data['loja'] = $lojaValue;
             }
             if (in_array('ncm', $cols, true)) $data['ncm'] = (string) $request->getParam('ncm', '');
             if (in_array('description', $cols, true)) $data['description'] = (string) $request->getParam('description', '');
