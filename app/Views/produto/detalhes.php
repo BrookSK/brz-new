@@ -135,9 +135,20 @@
                             <div class="text-muted"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></div>
                         </div>
 
+                        <?php
+                        $precoBase = (float) ($produto['preco'] ?? 0);
+                        $precoPromo = (float) ($produto['preco_promocao'] ?? 0);
+                        $temPromo = ($precoPromo > 0 && $precoPromo < $precoBase);
+                        ?>
+
                         <div class="d-flex align-items-baseline gap-2 mb-2">
+                            <?php if ($temPromo): ?>
+                                <div class="text-muted text-decoration-line-through" style="font-size: 1.1rem;">
+                                    <span class="original-amount" data-original-price="<?= $precoBase ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($precoBase, 2, ',', '.') ?></span>
+                                </div>
+                            <?php endif; ?>
                             <div class="fs-4 fw-bold">
-                                <span class="amount" data-original-price="<?= $produto['preco'] ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($produto['preco'], 2, ',', '.') ?></span>
+                                <span class="amount" data-original-price="<?= $temPromo ? $precoPromo : $precoBase ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($temPromo ? $precoPromo : $precoBase, 2, ',', '.') ?></span>
                             </div>
                         </div>
 
@@ -195,9 +206,22 @@
                         </h2>
                         <div id="collapseDesc" class="accordion-collapse collapse show" aria-labelledby="headingDesc" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
-                                <div class="text-muted"><?= nl2br(htmlspecialchars($produto['descricao_curta'] ?? $produto['descricao'] ?? '')) ?></div>
-                                <?php if (!empty($produto['descricao_completa'])): ?>
-                                    <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($produto['descricao_completa'])) ?></div>
+                                <?php
+                                $descCurta = trim((string) ($produto['descricao_curta'] ?? ''));
+                                $descCompleta = trim((string) ($produto['descricao'] ?? ''));
+                                $descExtra = trim((string) ($produto['descricao_completa'] ?? ''));
+                                ?>
+
+                                <?php if ($descCurta !== ''): ?>
+                                    <div class="text-muted"><?= nl2br(htmlspecialchars($descCurta)) ?></div>
+                                <?php endif; ?>
+
+                                <?php if ($descCompleta !== '' && $descCompleta !== $descCurta): ?>
+                                    <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($descCompleta)) ?></div>
+                                <?php endif; ?>
+
+                                <?php if ($descExtra !== '' && $descExtra !== $descCurta && $descExtra !== $descCompleta): ?>
+                                    <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($descExtra)) ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>

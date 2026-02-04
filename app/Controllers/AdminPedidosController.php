@@ -657,6 +657,62 @@ class AdminPedidosController extends Controller {
                         </div>
                     </div>';
             }
+
+            // Bloco: rastreio / etiqueta (Correios ou W-Express)
+            try {
+                $pdoTrack = null;
+                try {
+                    if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
+                        $pdoTrack = $pdoCols;
+                    } else {
+                        $pdoTrack = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    }
+                } catch (\Exception $e) {
+                    $pdoTrack = null;
+                }
+
+                $tracking = '';
+                $trackingFonte = '';
+
+                if ($pdoTrack instanceof \PDO) {
+                    // Correios
+                    try {
+                        $st = $pdoTrack->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                        $st->execute([(int) $id]);
+                        $c = (string) ($st->fetchColumn() ?: '');
+                        if ($c !== '') {
+                            $tracking = $c;
+                            $trackingFonte = 'Correios';
+                        }
+                    } catch (\Exception $e) {
+                    }
+
+                    // W-Express (internacional)
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT courier_tracking_number, wexpress_tracking_number, wexpress_status FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $courier = trim((string) ($row['courier_tracking_number'] ?? ''));
+                            $wx = trim((string) ($row['wexpress_tracking_number'] ?? ''));
+                            $wxStatus = trim((string) ($row['wexpress_status'] ?? ''));
+                            if ($courier !== '' || $wx !== '') {
+                                $tracking = $courier !== '' ? $courier : $wx;
+                                $trackingFonte = 'W-Express' . ($wxStatus !== '' ? (' (' . $wxStatus . ')') : '');
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($tracking !== '') {
+                    echo '<div class="alert alert-info mb-3">'
+                        . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($tracking) . '</div>'
+                        . ($trackingFonte !== '' ? ('<div class="small text-muted">Fonte: ' . htmlspecialchars($trackingFonte) . '</div>') : '')
+                        . '</div>';
+                }
+            } catch (\Exception $e) {
+            }
             
             // Conteúdo principal
             echo '<div class="row">

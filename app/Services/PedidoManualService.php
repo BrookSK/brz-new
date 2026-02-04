@@ -941,15 +941,9 @@ class PedidoManualService {
 
         $pg = new PaymentService();
 
-        // AppMax v3 valida o frete/shipping no payload do order.
-        // Para evitar HTTP 422 quando frete do pedido for 0 (e evitar truncamento), sempre enviamos shipping_value_cents >= 100 (R$ 1,00)
-        // mantendo o total inalterado (movendo R$ 1,00 do produto para o shipping).
         $totalCents = (int) round(((float) $total) * 100);
-        $shippingValueCents = 100;
+        $shippingValueCents = 0;
         $productsValueCents = $totalCents;
-        if ($totalCents > 100) {
-            $productsValueCents = $totalCents - 100;
-        }
 
         $products = [
             [

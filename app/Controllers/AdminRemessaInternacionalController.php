@@ -316,7 +316,7 @@ class AdminRemessaInternacionalController extends Controller {
             // Mantido por compatibilidade com blocos antigos no HTML (até remover/refatorar)
             $pedidosPendentes = [];
             $pedidosAtraso = [];
-            $remessasGeradas = [];
+            $remessasGeradas = $this->getRemessasGeradas();
 
             $stats = [
                 'abertas' => count($janelasAbertas),
@@ -742,12 +742,22 @@ class AdminRemessaInternacionalController extends Controller {
                                         
                                         foreach ($remessasGeradas as $remessa) {
                                             $webhookStatus = $remessa['webhook_enviado'] ? 'success' : 'warning';
+                                            $trk = '';
+                                            if (!empty($remessa['courier_tracking_number'])) {
+                                                $trk = (string) $remessa['courier_tracking_number'];
+                                            } elseif (!empty($remessa['wexpress_tracking_number'])) {
+                                                $trk = (string) $remessa['wexpress_tracking_number'];
+                                            }
+                                            $wxStatus = (string) ($remessa['wexpress_status'] ?? '');
                                             echo '<tr>
                                                 <td><strong>#' . str_pad($remessa['id'], 6, '0', STR_PAD_LEFT) . '</strong></td>
                                                 <td>#' . str_pad($remessa['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
-                                                <td><span class="badge bg-info">Remessa Gerada</span></td>
+                                                <td><span class="badge bg-info">Remessa Gerada</span>'
+                                                    . ($wxStatus !== '' ? ('<div class="small text-muted">W-Express: ' . htmlspecialchars($wxStatus) . '</div>') : '')
+                                                    . ($trk !== '' ? ('<div class="small text-muted">Tracking: ' . htmlspecialchars($trk) . '</div>') : '')
+                                                . '</td>
                                                 <td><span class="badge bg-' . $webhookStatus . '">' . ($remessa['webhook_enviado'] ? 'Enviado' : 'Pendente') . '</span></td>
                                                 <td>
                                                     <button class="btn btn-sm btn-outline-secondary" onclick="reenviarWebhook(' . $remessa['id'] . ')">
@@ -1625,7 +1635,13 @@ function gerarEtiqueta() {
             if ($etiquetaGerada) {
                 try {
                     $pedidoModel = new PedidoEcommerce();
-                    $pedidoModel->atualizarStatus((int) $pid, 'em_transporte', 'Etiqueta internacional gerada (W-Express)', $_SESSION['usuario_id'] ?? null);
+                    $obs = 'Etiqueta internacional gerada (W-Express)';
+                    if ($wxCourier !== '') {
+                        $obs .= ' - Rastreio: ' . $wxCourier;
+                    } elseif ($wxTrack !== '') {
+                        $obs .= ' - Rastreio: ' . $wxTrack;
+                    }
+                    $pedidoModel->atualizarStatus((int) $pid, 'em_transporte', $obs, $_SESSION['usuario_id'] ?? null);
                 } catch (\Exception $e) {
                 }
 
@@ -1839,14 +1855,14 @@ function gerarEtiqueta() {
             $st = $this->connection->query('DESCRIBE configuracoes_moeda');
             $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
             if (!is_array($cols) || empty($cols) || !in_array('taxa_conversao', $cols, true)) {
-                return 1.0;
+                return 5.5;
             }
             $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
             $stTx->execute();
             $tx = (float) ($stTx->fetchColumn() ?: 0);
-            return $tx > 0 ? $tx : 1.0;
+            return $tx > 1.01 ? $tx : 5.5;
         } catch (\Exception $e) {
-            return 1.0;
+            return 5.5;
         }
     }
 
@@ -1918,10 +1934,18 @@ function gerarEtiqueta() {
 
     private function getRemessasGeradas() {
         $stmt = $this->connection->prepare("
-            SELECT r.*, p.usuario_id, u.nome as cliente_nome 
+            SELECT 
+                r.*, 
+                p.usuario_id, 
+                u.nome as cliente_nome,
+                rjp.wexpress_shipping_id,
+                rjp.wexpress_tracking_number,
+                rjp.courier_tracking_number,
+                rjp.wexpress_status
             FROM remessas_internacionais r 
             LEFT JOIN pedidos p ON r.pedido_id = p.id 
             LEFT JOIN usuarios u ON p.usuario_id = u.id 
+            LEFT JOIN remessa_janela_pedidos rjp ON rjp.pedido_id = r.pedido_id
             WHERE r.status = 'remessa_gerada' 
             ORDER BY r.created_at DESC 
             LIMIT 50

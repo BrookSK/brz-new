@@ -115,13 +115,23 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                         </div>
                         <div class="card-body">
                             <?php if (!empty($pedido['items'])): ?>
-                                <?php $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL')); ?>
-                                <?php $simboloMoeda = ($moedaPedido === 'USD') ? 'US$' : 'R$'; ?>
-                                <?php if ($moedaPedido === 'BRL' && !empty($pedido['taxa_conversao']) && (float) $pedido['taxa_conversao'] > 1.01): ?>
-                                    <div class="alert alert-info small mb-3">
-                                        Taxa de conversão aplicada: 1 USD = R$ <?= number_format((float) $pedido['taxa_conversao'], 2, ',', '.') ?>
-                                    </div>
-                                <?php endif; ?>
+                                <?php
+                                $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+                                $simboloMoeda = 'US$';
+                                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
+                                if ($tx <= 1.01) {
+                                    try {
+                                        $svcTx = new \App\Services\PedidoManualService();
+                                        $tx = (float) $svcTx->getTaxaConversaoUSDBRL();
+                                    } catch (\Exception $e) {
+                                        $tx = 5.5;
+                                    }
+                                }
+                                $brlToUsd = $tx > 0 ? (1.0 / $tx) : 1.0;
+                                ?>
+                                <div class="alert alert-info small mb-3">
+                                    Valores exibidos em USD (US$). Taxa: 1 USD = R$ <?= number_format((float) $tx, 2, ',', '.') ?>
+                                </div>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
                                         <?php
@@ -163,10 +173,22 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="quantity-badge"><?= $item['quantidade'] ?? 1 ?></span>
                                             <span class="text-muted">x</span>
-                                            <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($item['preco_unitario'] ?? 0, 2, ',', '.') ?></span>
+                                            <?php
+                                            $pu = (float) ($item['preco_unitario'] ?? 0);
+                                            if ($moedaPedido === 'BRL') {
+                                                $pu = $pu * $brlToUsd;
+                                            }
+                                            ?>
+                                            <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($pu, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
-                                            <small class="text-muted">Subtotal: <?= $simboloMoeda ?> <?= number_format($item['subtotal'] ?? 0, 2, ',', '.') ?></small>
+                                            <?php
+                                            $st = (float) ($item['subtotal'] ?? 0);
+                                            if ($moedaPedido === 'BRL') {
+                                                $st = $st * $brlToUsd;
+                                            }
+                                            ?>
+                                            <small class="text-muted">Subtotal: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -210,12 +232,24 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                 <div class="card-body">
                                     <div class="price-row">
                                         <span>Subtotal:</span>
-                                        <span><?= $simboloMoeda ?> <?= number_format($pedido['subtotal_produtos'] ?? 0, 2, ',', '.') ?></span>
+                                        <?php
+                                        $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
+                                        if ($moedaPedido === 'BRL') {
+                                            $sub = $sub * $brlToUsd;
+                                        }
+                                        ?>
+                                        <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Frete:</span>
                                         <?php $freteVal = (float) ($pedido['valor_frete'] ?? 0); ?>
-                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
+                                        <?php
+                                        $freteUsd = $freteVal;
+                                        if ($moedaPedido === 'BRL') {
+                                            $freteUsd = $freteUsd * $brlToUsd;
+                                        }
+                                        ?>
+                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteUsd, 2, ',', '.'))) ?></span>
                                     </div>
                                     <div class="price-row">
                                         <span>Taxa de Serviço:</span>

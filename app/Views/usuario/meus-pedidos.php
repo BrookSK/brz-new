@@ -243,11 +243,23 @@
                                                     </span>
                                                 </td>
                                                 <td class="fw-semibold">
-                                                    <?php if ($moeda === 'USD'): ?>
-                                                        US$ <?= number_format($totalPedido, 2, ',', '.') ?>
-                                                    <?php else: ?>
-                                                        R$ <?= number_format($totalPedido, 2, ',', '.') ?>
-                                                    <?php endif; ?>
+                                                    <?php
+                                                    $moedaPedido = strtoupper((string) ($moeda ?? 'BRL'));
+                                                    $tx = (float) ($pedido['taxa_conversao'] ?? 0);
+                                                    if ($tx <= 1.01) {
+                                                        try {
+                                                            $svcTx = new \App\Services\PedidoManualService();
+                                                            $tx = (float) $svcTx->getTaxaConversaoUSDBRL();
+                                                        } catch (\Exception $e) {
+                                                            $tx = 5.5;
+                                                        }
+                                                    }
+                                                    $totalUsd = (float) $totalPedido;
+                                                    if ($moedaPedido === 'BRL') {
+                                                        $totalUsd = $tx > 0 ? ($totalUsd / $tx) : $totalUsd;
+                                                    }
+                                                    ?>
+                                                    US$ <?= number_format($totalUsd, 2, ',', '.') ?>
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center">

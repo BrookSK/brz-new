@@ -352,7 +352,7 @@ class AdminRemessaCorreiosController extends Controller {
                                         foreach ($remessasProntas as $remessa) {
                                             echo '<tr class="remessa-card">
                                                 <td><input type="checkbox" class="remessa-checkbox" value="' . (int) ($remessa['pedido_id'] ?? 0) . '"></td>
-                                                <td><strong>#' . str_pad((int) ($remessa['janela_id'] ?? 0), 6, '0', STR_PAD_LEFT) . '</strong></td>
+                                                <td><strong>' . (!empty($remessa['janela_id']) ? ('#' . str_pad((int) ($remessa['janela_id'] ?? 0), 6, '0', STR_PAD_LEFT)) : '-') . '</strong></td>
                                                 <td>#' . str_pad($remessa['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
@@ -362,7 +362,7 @@ class AdminRemessaCorreiosController extends Controller {
                                                     <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-tags"></i> Gerar Etiqueta
                                                     </button>
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesRemessa(' . (int) ($remessa['janela_id'] ?? 0) . ', ' . (int) ($remessa['pedido_id'] ?? 0) . ')">
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesRemessa(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </td>
@@ -602,8 +602,8 @@ class AdminRemessaCorreiosController extends Controller {
             }
         }
 
-        function verDetalhesRemessa(janelaId, pedidoId) {
-            window.open("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId, "_blank");
+        function verDetalhesRemessa(pedidoId) {
+            window.open("/admin/pedidos/detalhes/" + pedidoId, "_blank");
         }
     </script>
 </body>
@@ -833,7 +833,11 @@ class AdminRemessaCorreiosController extends Controller {
         $etiquetaId = (int) $this->connection->lastInsertId();
 
         try {
-            $pedidoModel->atualizarStatus((int) $pedidoId, 'enviado', 'Etiqueta Correios gerada (remessa Brasil)', $_SESSION['usuario_id'] ?? null);
+            $obs = 'Etiqueta Correios gerada (remessa Brasil)';
+            if (!empty($codigoEtiqueta)) {
+                $obs .= ' - Rastreio: ' . $codigoEtiqueta;
+            }
+            $pedidoModel->atualizarStatus((int) $pedidoId, 'enviado', $obs, $_SESSION['usuario_id'] ?? null);
         } catch (\Exception $e) {
         }
 
@@ -841,23 +845,47 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     private function getRemessasProntas() {
-        $stmt = $this->connection->prepare("
+        $colsPedidos = [];
+        try {
+            $stCols = $this->connection->query('DESCRIBE pedidos');
+            $colsPedidos = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsPedidos = [];
+        }
+
+        $statusWhere = "(LOWER(COALESCE(p.status,'')) IN ('pago','paid','approved','aprovado','confirmado','confirmed'))";
+        if (is_array($colsPedidos) && in_array('payment_status', $colsPedidos, true)) {
+            $statusWhere .= " OR (UPPER(COALESCE(p.payment_status,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS'))";
+        }
+        if (is_array($colsPedidos) && in_array('status_pagamento', $colsPedidos, true)) {
+            $statusWhere .= " OR (UPPER(COALESCE(p.status_pagamento,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS','PAGO','APROVADO'))";
+        }
+
+        $joinEndereco = '';
+        $wherePais = '1=1';
+        if (is_array($colsPedidos) && in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
+            $joinEndereco = " LEFT JOIN enderecos e ON e.id = p.endereco_entrega_id ";
+            $wherePais = "UPPER(COALESCE(e.pais,'BR')) = 'BR'";
+        }
+
+        $totalExpr = (is_array($colsPedidos) && in_array('total', $colsPedidos, true)) ? 'p.total' : (in_array('valor_total', $colsPedidos, true) ? 'p.valor_total' : '0');
+
+        $stmt = $this->connection->prepare(" 
             SELECT
-                rjp.pedido_id,
-                rjp.janela_id,
+                p.id AS pedido_id,
+                NULL AS janela_id,
                 u.nome as cliente_nome,
                 p.usuario_id,
                 p.created_at,
-                p.total as valor_total
-            FROM remessa_janela_pedidos rjp
-            INNER JOIN remessa_janelas j ON j.id = rjp.janela_id
-            INNER JOIN pedidos p ON p.id = rjp.pedido_id
+                {$totalExpr} as valor_total
+            FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
-            LEFT JOIN correios_etiquetas ce ON ce.pedido_id = rjp.pedido_id
-            WHERE j.status = 'remessa_gerada'
-              AND rjp.etiqueta_gerada = 1
+            {$joinEndereco}
+            LEFT JOIN correios_etiquetas ce ON ce.pedido_id = p.id
+            WHERE ({$statusWhere})
+              AND {$wherePais}
               AND ce.id IS NULL
-            ORDER BY rjp.etiqueta_gerada_em ASC
+            ORDER BY p.created_at ASC
         ");
         $stmt->execute();
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];

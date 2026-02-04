@@ -14,10 +14,34 @@ class PedidoEcommerce {
         try {
             $st = $this->connection->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
             $st->execute([$table]);
-            return ((int) $st->fetchColumn()) > 0;
+            return (int) $st->fetchColumn() > 0;
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    private function resolvePedidoStatusHistoryUsuarioColumn(): string {
+        try {
+            if (!$this->tableExists('pedido_status_history')) {
+                return 'usuario_id';
+            }
+
+            $stmtCols = $this->connection->query('DESCRIBE pedido_status_history');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols)) {
+                return 'usuario_id';
+            }
+
+            if (in_array('alterado_por', $cols, true)) {
+                return 'alterado_por';
+            }
+            if (in_array('usuario_id', $cols, true)) {
+                return 'usuario_id';
+            }
+        } catch (\Exception $e) {
+        }
+
+        return 'usuario_id';
     }
 
     private function getTableColumns(string $table): array {
@@ -1224,6 +1248,7 @@ class PedidoEcommerce {
         // Histórico (se existir)
         try {
             if ($this->tableExists('pedido_status_history')) {
+                $usuarioCol = $this->resolvePedidoStatusHistoryUsuarioColumn();
                 $userNomeCol = 'nome';
                 try {
                     $stmtUserCols = $this->connection->query('DESCRIBE usuarios');
@@ -1237,7 +1262,7 @@ class PedidoEcommerce {
                 $stmtHist = $this->connection->prepare("\
                     SELECT psh.*, u.{$userNomeCol} as usuario_alterou
                     FROM pedido_status_history psh
-                    LEFT JOIN usuarios u ON psh.usuario_id = u.id
+                    LEFT JOIN usuarios u ON psh.{$usuarioCol} = u.id
                     WHERE psh.pedido_id = :id
                     ORDER BY psh.created_at DESC
                 ");
@@ -1256,6 +1281,7 @@ class PedidoEcommerce {
         if ($pedidoId <= 0) return [];
 
         try {
+            $usuarioCol = $this->resolvePedidoStatusHistoryUsuarioColumn();
             $userNomeCol = 'nome';
             try {
                 $stmtUserCols = $this->connection->query('DESCRIBE usuarios');
@@ -1269,7 +1295,7 @@ class PedidoEcommerce {
             $stmt = $this->connection->prepare("\
                 SELECT psh.*, u.{$userNomeCol} as usuario_alterou
                 FROM pedido_status_history psh
-                LEFT JOIN usuarios u ON psh.usuario_id = u.id
+                LEFT JOIN usuarios u ON psh.{$usuarioCol} = u.id
                 WHERE psh.pedido_id = :id
                 ORDER BY psh.created_at DESC
             ");
@@ -1290,8 +1316,9 @@ class PedidoEcommerce {
 
             if ($this->tableExists('pedido_status_history')) {
                 try {
-                    $stH = $this->connection->prepare('INSERT INTO pedido_status_history (pedido_id, status_anterior, status_novo, observacao, usuario_id, created_at) VALUES (?, NULL, ?, ?, ?, NOW())');
+                    $usuarioCol = $this->resolvePedidoStatusHistoryUsuarioColumn();
                     $uid = $usuarioId !== null ? (int) $usuarioId : null;
+                    $stH = $this->connection->prepare('INSERT INTO pedido_status_history (pedido_id, status_anterior, status_novo, observacao, ' . $usuarioCol . ', created_at) VALUES (?, NULL, ?, ?, ?, NOW())');
                     $stH->execute([$pedidoId, $novoStatus, $observacao, $uid]);
                 } catch (\Exception $e) {
                 }

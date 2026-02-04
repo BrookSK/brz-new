@@ -387,21 +387,39 @@ class PaymentService {
         $shippingValueCents = (int) ($dados['shipping_value_cents'] ?? 0);
         $discountValueCents = (int) ($dados['discount_value_cents'] ?? 0);
 
-        // AppMax v3 pode rejeitar order com frete/shipping = 0 (e pode truncar valores pequenos).
-        // Para não alterar o total cobrado (products + shipping - discount), movemos R$1,00 (100 centavos) de products para shipping.
-        if ($shippingValueCents < 100) {
-            $need = 100 - max(0, $shippingValueCents);
-            if ($productsValueCents > $need) {
-                $productsValueCents -= $need;
-                $shippingValueCents += $need;
-            } else {
-                // Fallback: garante shipping mínimo mesmo que impacte 1.00 no total (casos extremos)
-                $shippingValueCents = 100;
-            }
-        }
-
         $customerId = $this->appmaxCreateCustomer($dados, $products);
-        $orderId = $this->appmaxCreateOrder($customerId, $productsValueCents, $discountValueCents, $shippingValueCents, $products);
+
+        // Tenta criar order sem alterar shipping (inclusive 0). Se AppMax rejeitar por shipping=0,
+        // faz retry com ajuste mínimo (movendo R$ 1,00 dos produtos para o frete, sem alterar o total).
+        $orderId = 0;
+        $origProductsValueCents = $productsValueCents;
+        $origShippingValueCents = $shippingValueCents;
+        try {
+            $orderId = $this->appmaxCreateOrder($customerId, $productsValueCents, $discountValueCents, $shippingValueCents, $products);
+        } catch (\Exception $e) {
+            $msg = strtolower((string) $e->getMessage());
+            $shouldRetry = ($origShippingValueCents <= 0) && (str_contains($msg, '422') || str_contains($msg, 'http 422') || str_contains($msg, 'unprocessable'));
+            $shouldRetry = $shouldRetry && (str_contains($msg, 'shipping') || str_contains($msg, 'frete'));
+
+            if (!$shouldRetry) {
+                throw $e;
+            }
+
+            $productsValueCents = $origProductsValueCents;
+            $shippingValueCents = $origShippingValueCents;
+
+            $need = 100 - max(0, $shippingValueCents);
+            if ($need > 0) {
+                if ($productsValueCents > $need) {
+                    $productsValueCents -= $need;
+                    $shippingValueCents += $need;
+                } else {
+                    $shippingValueCents = 100;
+                }
+            }
+
+            $orderId = $this->appmaxCreateOrder($customerId, $productsValueCents, $discountValueCents, $shippingValueCents, $products);
+        }
 
         $result = [
             'success' => true,

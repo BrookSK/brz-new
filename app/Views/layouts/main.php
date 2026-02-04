@@ -982,8 +982,11 @@
                 console.log('=== INICIANDO SISTEMA DE CONVERSÃO INLINE ===');
                 
                 // Recuperar moeda salva
-                this.currentCurrency = localStorage.getItem('selected_currency') || 'USD';
+                this.currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
                 console.log('Moeda inicial:', this.currentCurrency);
+
+                // Garantir que o header reflita a moeda inicial antes de atualizar preços
+                this.updateCurrencyDisplay();
                 
                 // Inicializar seletor
                 this.initSelector();
@@ -1016,10 +1019,16 @@
                 e.preventDefault();
                 e.stopPropagation();
                 
-                const newCurrency = e.target.getAttribute('data-currency');
+                const el = e.target && e.target.closest ? e.target.closest('.currency-selector') : null;
+                const newCurrency = el ? el.getAttribute('data-currency') : e.target.getAttribute('data-currency');
                 console.log('=== CLIQUE NO SELETOR ===');
                 console.log('Moeda selecionada:', newCurrency);
                 console.log('Moeda atual:', this.currentCurrency);
+
+                if (!newCurrency) {
+                    console.log('Moeda não encontrada no clique');
+                    return;
+                }
                 
                 if (newCurrency !== this.currentCurrency) {
                     this.currentCurrency = newCurrency;

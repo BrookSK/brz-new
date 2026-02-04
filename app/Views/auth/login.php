@@ -42,7 +42,7 @@
                         </div>
 
                         <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="consentimento_legal" name="consentimento_legal" required>
+                            <input type="checkbox" class="form-check-input" id="consentimento_legal" name="consentimento_legal">
                             <label class="form-check-label" for="consentimento_legal">
                                 Li e aceito os <a href="/termos-uso" class="text-decoration-none">Termos de Uso</a> e <a href="/politica-privacidade" class="text-decoration-none">Política de Privacidade</a>
                             </label>

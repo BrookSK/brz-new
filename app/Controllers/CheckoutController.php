@@ -2315,6 +2315,55 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
             }
 
+            // Garantir suite e aceite de termos para conta criada/associada no checkout
+            try {
+                $colsU = [];
+                try {
+                    $stmtColsU = $db->query('DESCRIBE usuarios');
+                    $colsU = $stmtColsU ? ($stmtColsU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsU = [];
+                }
+
+                if (!empty($usuarioId) && is_array($colsU) && !empty($colsU)) {
+                    // suite: quando vazio, usar o próprio id
+                    if (in_array('suite', $colsU, true)) {
+                        try {
+                            $stSuite = $db->prepare('UPDATE usuarios SET `suite` = ? WHERE id = ? AND (`suite` IS NULL OR `suite` = 0)');
+                            $stSuite->execute([(int) $usuarioId, (int) $usuarioId]);
+                        } catch (\Exception $e) {
+                        }
+                    }
+
+                    // termos aceitos: o checkout sempre exige consentimento_legal, então persistimos no usuário
+                    $hasConsent = !empty($dados['consentimento_legal']);
+                    if ($hasConsent) {
+                        $upd = [];
+                        if (in_array('termos_aceitos_em', $colsU, true)) {
+                            $upd['termos_aceitos_em'] = date('Y-m-d H:i:s');
+                        }
+                        if (in_array('termos_aceitos_ip', $colsU, true)) {
+                            $upd['termos_aceitos_ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+                        }
+                        if (in_array('termos_versao', $colsU, true)) {
+                            $upd['termos_versao'] = '1.0';
+                        }
+                        if (!empty($upd)) {
+                            $sets = [];
+                            $params = [':id' => (int) $usuarioId];
+                            foreach ($upd as $k => $v) {
+                                $sets[] = $k . ' = :' . $k;
+                                $params[':' . $k] = $v;
+                            }
+                            $sql = 'UPDATE usuarios SET ' . implode(', ', $sets) . ' WHERE id = :id';
+                            $stUpd = $db->prepare($sql);
+                            $stUpd->execute($params);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
             // Login automático quando não estava logado
             if (!$this->authService->estaLogado()) {
                 try {

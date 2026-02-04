@@ -98,12 +98,12 @@
                             <div class="price-section">
                                 <span class="h4 text-primary fw-bold mb-0 product-price" 
                                       data-original-price="<?= $produto['price'] ?>">
-                                    $<?= number_format($produto['price'], 2, '.', ',') ?>
+                                    <?= number_format($produto['price'], 2, ',', '.') ?>
                                 </span>
                                 <?php if ($produto['sale_price'] > 0): ?>
                                     <small class="text-decoration-line-through text-muted product-sale-price"
                                           data-original-sale-price="<?= $produto['sale_price'] ?>">
-                                        $<?= number_format($produto['sale_price'], 2, '.', ',') ?>
+                                        <?= number_format($produto['sale_price'], 2, ',', '.') ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
@@ -354,20 +354,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Verificar moeda atual e atualizar preços
-    const headerCurrency = document.getElementById('current-currency');
-    if (headerCurrency) {
-        const currentCurrency = headerCurrency.textContent;
-        updateProductPrices(currentCurrency);
-        
-        // Monitorar mudanças na moeda
-        setInterval(function() {
-            const newCurrency = headerCurrency.textContent;
-            if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
-                window.lastCurrency = newCurrency;
-                updateProductPrices(newCurrency);
-            }
-        }, 200);
-    }
+    const resolveCurrency = function() {
+        if (window.CurrencyConverter && window.CurrencyConverter.currentCurrency) {
+            return window.CurrencyConverter.currentCurrency;
+        }
+        return localStorage.getItem('selected_currency') || 'BRL';
+    };
+
+    updateProductPrices(resolveCurrency());
+    
+    // Monitorar mudanças na moeda
+    setInterval(function() {
+        const newCurrency = resolveCurrency();
+        if (typeof window.lastCurrency === 'undefined' || window.lastCurrency !== newCurrency) {
+            window.lastCurrency = newCurrency;
+            updateProductPrices(newCurrency);
+        }
+    }, 200);
 });
 
 // Função global para atualizar preços
