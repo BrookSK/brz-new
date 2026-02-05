@@ -6,6 +6,12 @@
     <title><?= $title ?? 'Painel Administrativo - Braziliana Shop' ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <?php
+    include_once __DIR__ . '/../partials/admin_sidebar.php';
+    if (function_exists('renderAdminSidebarStyles')) {
+        renderAdminSidebarStyles();
+    }
+    ?>
     <style>
         :root {
             --primary-color: #0b1f3a;
@@ -157,65 +163,11 @@
     <div class="container-fluid admin-shell">
         <div class="row">
             <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    
-                    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                        <div class="sidebar-brand-icon">
-                            <i class="fas fa-shipping-fast"></i>
-                        </div>
-                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
-                    </a>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/dashboard">
-                                <i class="fas fa-fw fa-tachometer-alt"></i>
-                                <span>Dashboard</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/pedidos">
-                                <i class="fas fa-fw fa-shopping-cart"></i>
-                                <span>Pedidos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/consolidar-pedidos">
-                                <i class="fas fa-fw fa-compress"></i>
-                                <span>Consolidar Pedidos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/produtos">
-                                <i class="fas fa-fw fa-box"></i>
-                                <span>Produtos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/usuarios">
-                                <i class="fas fa-fw fa-users"></i>
-                                <span>Usuários</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/configuracoes">
-                                <i class="fas fa-fw fa-cog"></i>
-                                <span>Configurações</span>
-                            </a>
-                        </li>
-                    </ul>
-                    
-                    <hr class="sidebar-divider">
-                    
-                    <div class="nav-item">
-                        <a class="nav-link" href="/logout">
-                            <i class="fas fa-fw fa-sign-out-alt"></i>
-                            <span>Sair</span>
-                        </a>
-                    </div>
-                </div>
-            </nav>
+            <?php
+            if (function_exists('renderAdminSidebar')) {
+                renderAdminSidebar($sidebarActive ?? '');
+            }
+            ?>
             
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 d-flex flex-column">

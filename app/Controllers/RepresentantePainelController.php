@@ -4,7 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 
-class RepresentanteComissoesController extends Controller {
+class RepresentantePainelController extends Controller {
 
     private function getPdo(): \PDO {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -53,7 +53,6 @@ class RepresentanteComissoesController extends Controller {
         if (!$pedidoStatusCol) {
             return '';
         }
-        // Considera pago quando status/payment_status indica aprovação
         return " WHERE LOWER(COALESCE(p.{$pedidoStatusCol},'')) IN ('pago','paid','approved','aprovado','confirmed','received','succeeded','success') ";
     }
 
@@ -100,29 +99,50 @@ class RepresentanteComissoesController extends Controller {
 
     public function index(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+        $auth->requerAutenticacao();
 
-        $perfil = '';
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        $repId = (int) ($_SESSION['usuario_id'] ?? 0);
-        $repEmail = (string) ($_SESSION['usuario_email'] ?? '');
+        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+        if ($perfil !== 'representante') {
+            $this->redirect('/minha-conta');
+        }
 
+        $repId = (int) ($_SESSION['usuario_id'] ?? 0);
+        $usuarioNome = (string) ($_SESSION['usuario_nome'] ?? '');
+
+        $lojaUrl = '';
         $resumo = [
             'percentual' => 0.0,
+            'rate' => 0.0,
             'totais' => [
-                'USD' => ['venda' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'comissao' => 0.0],
-                'BRL' => ['venda' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'comissao' => 0.0],
+                'USD' => ['venda' => 0.0, 'comissao' => 0.0],
+                'BRL' => ['venda' => 0.0, 'comissao' => 0.0],
             ],
-            'linhas' => [],
+            'vendas_qtd' => 0,
         ];
+        $erro = '';
 
         try {
             $pdo = $this->getPdo();
 
+            if ($this->tableExists($pdo, 'usuarios')) {
+                $uCols = $this->getColumns($pdo, 'usuarios');
+                $slugCol = $this->pickColumn($uCols, ['representante_slug']);
+                if ($slugCol) {
+                    $st = $pdo->prepare('SELECT ' . $slugCol . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $st->execute([$repId]);
+                    $slug = trim((string) ($st->fetchColumn() ?: ''));
+                    if ($slug !== '') {
+                        $lojaUrl = '/produtos/rep-' . $slug;
+                    }
+                }
+            }
+
             $resumo['percentual'] = $this->getPercentualRepresentante($pdo, $repId);
+            $resumo['rate'] = $this->getUsdBrlRate($pdo);
 
             $itensTable = $this->detectItensTable($pdo);
             if (!$itensTable || !$this->tableExists($pdo, 'pedidos') || !$this->tableExists($pdo, 'produtos')) {
@@ -139,38 +159,19 @@ class RepresentanteComissoesController extends Controller {
             $colPreco = $this->pickColumn($iCols, ['preco_unitario', 'price', 'valor_unitario']);
 
             $pedidoStatusCol = $this->pickColumn($pCols, ['payment_status', 'status', 'status_pagamento', 'pagamento_status']);
+            $moedaCol = $this->pickColumn($pCols, ['moeda', 'currency']);
 
             $repIdCol = $this->pickColumn($prCols, ['representante_id']);
-            $repEmailCol = $this->pickColumn($prCols, ['representante_email']);
             $costCol = $this->pickColumn($prCols, ['cost_price', 'preco_custo', 'valor_custo']);
 
-            $moedaCol = $this->pickColumn($pCols, ['moeda', 'currency']);
-            $codigoCol = $this->pickColumn($pCols, ['numero_pedido', 'codigo_pedido', 'codigo', 'code']);
-            $dataCol = $this->pickColumn($pCols, ['created_at', 'data_criacao', 'data_pedido', 'data']);
-
-            if (!$colPedidoId || !$colProdutoId || !$colQtd || !$colPreco || !$pedidoStatusCol || (!$repIdCol && !$repEmailCol) || !$costCol) {
+            if (!$colPedidoId || !$colProdutoId || !$colQtd || !$colPreco || !$pedidoStatusCol || !$repIdCol || !$costCol) {
                 throw new \Exception('Colunas necessárias não encontradas para calcular comissão.');
             }
 
             $wherePaid = $this->normalizePaidWhere($pedidoStatusCol);
-
-            $whereRep = '';
-            $params = [];
-            if ($repIdCol) {
-                $whereRep = " AND pr.{$repIdCol} = :repId";
-                $params[':repId'] = $repId;
-            } else {
-                $whereRep = " AND pr.{$repEmailCol} = :repEmail";
-                $params[':repEmail'] = $repEmail;
-            }
-
-            $selCodigo = $codigoCol ? ("p.{$codigoCol}") : 'p.id';
-            $selData = $dataCol ? ("p.{$dataCol}") : 'p.id';
             $selMoeda = $moedaCol ? ("p.{$moedaCol}") : "'USD'";
 
             $sql = "SELECT p.id AS pedido_id,\n"
-                . "       {$selCodigo} AS codigo,\n"
-                . "       {$selData} AS data,\n"
                 . "       {$selMoeda} AS moeda,\n"
                 . "       SUM(COALESCE(i.{$colQtd},0) * COALESCE(i.{$colPreco},0)) AS venda_total,\n"
                 . "       SUM(COALESCE(i.{$colQtd},0) * COALESCE(pr.{$costCol},0)) AS custo_total_usd\n"
@@ -178,20 +179,20 @@ class RepresentanteComissoesController extends Controller {
                 . "INNER JOIN pedidos p ON p.id = i.{$colPedidoId}\n"
                 . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
                 . $wherePaid
-                . $whereRep
-                . "\nGROUP BY p.id, codigo, data, moeda\n"
+                . " AND pr.{$repIdCol} = :repId\n"
+                . "GROUP BY p.id, moeda\n"
                 . "ORDER BY p.id DESC\n"
                 . "LIMIT 200";
 
             $stmt = $pdo->prepare($sql);
-            foreach ($params as $k => $v) {
-                $stmt->bindValue($k, $v);
-            }
+            $stmt->bindValue(':repId', $repId, \PDO::PARAM_INT);
             $stmt->execute();
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+            $resumo['vendas_qtd'] = count($rows);
+
             $percent = (float) ($resumo['percentual'] ?? 0);
-            $rate = $this->getUsdBrlRate($pdo);
+            $rate = (float) ($resumo['rate'] ?? 0);
             foreach ($rows as $r) {
                 $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'USD')));
                 if (!in_array($moeda, ['USD', 'BRL'], true)) {
@@ -201,89 +202,84 @@ class RepresentanteComissoesController extends Controller {
                 $venda = (float) ($r['venda_total'] ?? 0);
                 $custoUsd = (float) ($r['custo_total_usd'] ?? 0);
                 $custo = ($moeda === 'BRL') ? ($custoUsd * $rate) : $custoUsd;
-
                 $liq = $venda - $custo;
                 $com = $liq * ($percent / 100.0);
 
                 $resumo['totais'][$moeda]['venda'] += $venda;
-                $resumo['totais'][$moeda]['custo'] += $custo;
-                $resumo['totais'][$moeda]['liquido'] += $liq;
                 $resumo['totais'][$moeda]['comissao'] += $com;
-
-                $resumo['linhas'][] = [
-                    'pedido_id' => (int) ($r['pedido_id'] ?? 0),
-                    'codigo' => (string) ($r['codigo'] ?? ''),
-                    'data' => (string) ($r['data'] ?? ''),
-                    'moeda' => $moeda,
-                    'venda' => $venda,
-                    'custo' => $custo,
-                    'liquido' => $liq,
-                    'comissao' => $com,
-                ];
             }
+
         } catch (\Exception $e) {
             $erro = $e->getMessage();
         }
 
-        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
 
-        echo '<div class="pt-3">'
-            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Comissões</h1>'
+        echo '<div class="container py-4">'
+            . '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">'
+            . '<div>'
+            . '<div class="text-muted small">Meu Painel</div>'
+            . '<h1 class="h3 mb-0">' . htmlspecialchars($usuarioNome !== '' ? $usuarioNome : 'Representante', ENT_QUOTES, 'UTF-8') . '</h1>'
+            . '</div>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/representante/produtos" class="btn btn-outline-primary"><i class="fas fa-box"></i> Produtos</a>'
-            . '<a href="/admin/produtos/cadastro-representante" class="btn btn-primary"><i class="fas fa-plus"></i> Novo produto</a>'
+            . '<a class="btn btn-outline-primary" href="/admin/representante/comissoes"><i class="fas fa-percentage me-1"></i>Comissões</a>'
+            . '<a class="btn btn-primary" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Cadastrar produto</a>'
             . '</div>'
             . '</div>';
 
-        if (!empty($erro)) {
+        if ($erro !== '') {
             echo '<div class="alert alert-danger">' . htmlspecialchars($erro, ENT_QUOTES, 'UTF-8') . '</div>';
         }
 
-        $totUsd = $resumo['totais']['USD'] ?? ['venda' => 0, 'custo' => 0, 'liquido' => 0, 'comissao' => 0];
-        $totBrl = $resumo['totais']['BRL'] ?? ['venda' => 0, 'custo' => 0, 'liquido' => 0, 'comissao' => 0];
+        echo '<div class="row g-3">'
+            . '<div class="col-lg-4">'
+            . '<div class="card h-100"><div class="card-body">'
+            . '<div class="text-muted small mb-1">Minha Loja</div>';
 
-        echo '<div class="row g-3 mb-3">'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Percentual</div><div class="h4 mb-0">' . number_format((float) ($resumo['percentual'] ?? 0), 2, ',', '.') . '%</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Comissão (USD)</div><div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totUsd['comissao'] ?? 0), 'USD'), ENT_QUOTES, 'UTF-8') . '</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Comissão (BRL)</div><div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totBrl['comissao'] ?? 0), 'BRL'), ENT_QUOTES, 'UTF-8') . '</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Taxa USD→BRL</div><div class="h4 mb-0">' . number_format((float) ($rate ?? 0), 4, ',', '.') . '</div></div></div></div>'
-            . '</div>';
-
-        if (empty($resumo['linhas'])) {
-            echo '<div class="alert alert-info">Nenhuma venda paga encontrada para seus produtos (ou percentual ainda não configurado).</div>';
+        if ($lojaUrl !== '') {
+            echo '<div class="fw-semibold mb-2">Página pública</div>'
+                . '<a href="' . htmlspecialchars($lojaUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">' . htmlspecialchars($lojaUrl, ENT_QUOTES, 'UTF-8') . '</a>'
+                . '<div class="text-muted small mt-2">Compartilhe esse link para divulgar seus produtos.</div>';
         } else {
-            echo '<div class="card"><div class="card-body">'
-                . '<div class="table-responsive"><table class="table table-sm table-striped align-middle mb-0">'
-                . '<thead><tr><th>Pedido</th><th>Data</th><th>Moeda</th><th>Venda</th><th>Custo</th><th>Líquido</th><th>Comissão</th></tr></thead><tbody>';
-            foreach ($resumo['linhas'] as $l) {
-                $m = (string) ($l['moeda'] ?? 'USD');
-                $codigoPedido = htmlspecialchars((string) ($l['codigo'] ?? ''), ENT_QUOTES, 'UTF-8');
-                $pedidoId = (int) ($l['pedido_id'] ?? 0);
-                $pedidoCell = $perfil === 'representante'
-                    ? $codigoPedido
-                    : ('<a href="/admin/pedidos/detalhes/' . $pedidoId . '" target="_blank">' . $codigoPedido . '</a>');
-                echo '<tr>'
-                    . '<td>' . $pedidoCell . '</td>'
-                    . '<td>' . htmlspecialchars((string) ($l['data'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td>' . htmlspecialchars($m, ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['venda'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['custo'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['liquido'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td class="fw-semibold">' . htmlspecialchars($this->formatMoney((float) ($l['comissao'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '</tr>';
-            }
-            echo '</tbody></table></div></div></div>';
+            echo '<div class="text-muted">Link da loja indisponível.</div>';
         }
 
-        echo '<div class="small text-muted mt-3">Regra: comissão = (venda - custo) * percentual. Considera apenas pedidos pagos.</div>';
+        echo '</div></div>'
+            . '</div>';
+
+        $totUsd = $resumo['totais']['USD'] ?? ['venda' => 0, 'comissao' => 0];
+        $totBrl = $resumo['totais']['BRL'] ?? ['venda' => 0, 'comissao' => 0];
+
+        echo '<div class="col-lg-8">'
+            . '<div class="row g-3">'
+            . '<div class="col-md-4"><div class="card h-100"><div class="card-body">'
+            . '<div class="text-muted small">Vendas (pagas)</div>'
+            . '<div class="h4 mb-0">' . (int) ($resumo['vendas_qtd'] ?? 0) . '</div>'
+            . '</div></div></div>'
+            . '<div class="col-md-4"><div class="card h-100"><div class="card-body">'
+            . '<div class="text-muted small">Comissão (USD)</div>'
+            . '<div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totUsd['comissao'] ?? 0), 'USD'), ENT_QUOTES, 'UTF-8') . '</div>'
+            . '</div></div></div>'
+            . '<div class="col-md-4"><div class="card h-100"><div class="card-body">'
+            . '<div class="text-muted small">Comissão (BRL)</div>'
+            . '<div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totBrl['comissao'] ?? 0), 'BRL'), ENT_QUOTES, 'UTF-8') . '</div>'
+            . '</div></div></div>'
+            . '<div class="col-12"><div class="card"><div class="card-body">'
+            . '<div class="row g-2">'
+            . '<div class="col-md-6"><div class="text-muted small">Vendas (USD)</div><div class="fw-semibold">' . htmlspecialchars($this->formatMoney((float) ($totUsd['venda'] ?? 0), 'USD'), ENT_QUOTES, 'UTF-8') . '</div></div>'
+            . '<div class="col-md-6"><div class="text-muted small">Vendas (BRL)</div><div class="fw-semibold">' . htmlspecialchars($this->formatMoney((float) ($totBrl['venda'] ?? 0), 'BRL'), ENT_QUOTES, 'UTF-8') . '</div></div>'
+            . '</div>'
+            . '<div class="text-muted small mt-3">Comissão é calculada por pedido pago, respeitando a moeda do pagamento.</div>'
+            . '</div></div></div>'
+            . '</div>'
+            . '</div>'
+            . '</div>';
+
         echo '</div>';
 
         $content = ob_get_clean();
-        $sidebarActive = ($perfil === 'representante') ? 'rep_comissoes' : '';
-        $title = 'Comissões - Representante';
-        include __DIR__ . '/../Views/layouts/admin.php';
+        $title = 'Meu Painel';
+        include __DIR__ . '/../Views/layouts/main.php';
         exit;
     }
 }

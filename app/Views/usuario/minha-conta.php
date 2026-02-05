@@ -12,6 +12,24 @@
                     Bem-vindo, <strong><?= htmlspecialchars($usuario['nome']) ?></strong>!
                 </span>
             </div>
+
+            <?php
+            $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($usuario['perfil'] ?? ''))));
+            ?>
+            <?php if ($perfil === 'representante'): ?>
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="btn btn-outline-primary" href="/admin/representante/produtos">
+                                <i class="fas fa-box me-1"></i> Produtos
+                            </a>
+                            <a class="btn btn-primary" href="/admin/representante/comissoes">
+                                <i class="fas fa-percentage me-1"></i> Comissões
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
             
             <!-- Stats Cards -->
             <div class="row mb-4">

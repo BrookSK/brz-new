@@ -25,16 +25,14 @@ class AuthController extends Controller {
 
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
-            if ($this->authService->podeAcessarPainelAdmin()) {
-                $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
-                if ($perfil === 'representante') {
-                    $this->redirect('/admin/representante/produtos');
-                } else {
-                    $this->redirect('/admin/dashboard');
-                }
-            } else {
-                $this->redirect($redirectTo !== '' ? $redirectTo : '/minha-conta');
+            $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+            if ($perfil === 'representante') {
+                $this->redirect('/meu-painel');
             }
+            if ($this->authService->podeAcessarPainelAdmin()) {
+                $this->redirect('/admin/dashboard');
+            }
+            $this->redirect($redirectTo !== '' ? $redirectTo : '/minha-conta');
             return;
         }
         
@@ -64,8 +62,7 @@ class AuthController extends Controller {
                     if ($isAdmin || $this->authService->podeAcessarPainelAdmin()) {
                         $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
-                        $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
-                        $adminTarget = ($perfil === 'representante') ? '/admin/representante/produtos' : '/admin/dashboard';
+                        $adminTarget = '/admin/dashboard';
                         if ($isAjax) {
                             header('Content-Type: application/json; charset=utf-8');
                             echo json_encode(['success' => true, 'redirect' => $adminTarget]);
@@ -73,6 +70,15 @@ class AuthController extends Controller {
                         }
                         $this->redirect($adminTarget);
                     } else {
+                        $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+                        if ($perfil === 'representante') {
+                            if ($isAjax) {
+                                header('Content-Type: application/json; charset=utf-8');
+                                echo json_encode(['success' => true, 'redirect' => '/meu-painel']);
+                                return;
+                            }
+                            $this->redirect('/meu-painel');
+                        }
                         $usuarioCompleto = null;
                         try {
                             $usuarioCompleto = $this->usuarioModel->find((int) ($usuario['id'] ?? 0));

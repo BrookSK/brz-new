@@ -211,7 +211,7 @@ class AuthService {
         if ($perfil === '') {
             return false;
         }
-        return $perfil !== 'cliente';
+        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true);
     }
     
     public function requerPermissao($acao) {

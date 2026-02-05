@@ -878,6 +878,9 @@ HTML;
         $perfil = $this->getSessionPerfil();
         $repId = $this->getSessionUserId();
 
+        $isRepresentante = ($perfil === 'representante');
+        $sidebarActive = $isRepresentante ? 'rep_produtos' : 'produtos';
+
         $pagina = (int) $request->getParam('pagina', 1);
         if ($pagina <= 0) $pagina = 1;
         $limite = 20;
@@ -954,12 +957,16 @@ HTML;
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         ob_start();
+
+        $urlNovo = $isRepresentante ? '/admin/produtos/cadastro-representante' : '/admin/produtos/novo';
+        $urlCadastroRapido = $isRepresentante ? '/admin/produtos/cadastro-representante' : '/admin/produtos/cadastro-rapido';
+
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
             . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos/cadastro-rapido" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
-            . '<a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
             . '</div>'
             . '</div>';
 
@@ -974,6 +981,7 @@ HTML;
 
         echo '<div class="row">';
         foreach ($produtos as $produto) {
+            $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             echo '<div class="col-md-6 col-lg-4 mb-4">'
                 . '<div class="card product-card h-100">'
                 . '<img src="' . htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8') . '" class="card-img-top product-image" alt="' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '">' 
@@ -985,7 +993,7 @@ HTML;
                 . '<span class="badge ' . ((int) $produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ((int) $produto['active'] ? 'Ativo' : 'Inativo') . '</span>'
                 . '</div>'
                 . '<div class="d-flex justify-content-between">'
-                . '<a href="/admin/produtos/editar/' . (int) $produto['id'] . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
                 . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display: inline;">'
                 . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>'
                 . '</form>'
@@ -999,7 +1007,8 @@ HTML;
         if ($totalPaginas > 1) {
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
             for ($i = 1; $i <= $totalPaginas; $i++) {
-                $url = "/admin/produtos?pagina={$i}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+                $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
+                $url = $base . "?pagina={$i}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
                 echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">' 
                     . '<a class="page-link" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
                     . '</li>';
