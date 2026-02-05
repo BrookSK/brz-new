@@ -241,9 +241,7 @@ $router->get('/admin/produtos/novo-simples', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
-$router->get('/admin/produtos/cadastro-representante', 'RepresentanteProdutosController', 'cadastroRapido');
-$router->post('/admin/produtos/cadastro-representante', 'RepresentanteProdutosController', 'cadastroRapido');
-$router->post('/admin/produtos/cadastro-representante/salvar', 'RepresentanteProdutosController', 'cadastroRapidoSalvar');
+$router->get('/admin/produtos/cadastro-representante', 'AdminProdutosNovoController', 'index');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
@@ -434,7 +432,7 @@ $router->get('/admin/usuarios/novo', 'AdminUsuariosController', 'novo');
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
 
 // Área do Representante
-$router->get('/admin/representante/produtos', 'RepresentanteProdutosController', 'index');
-$router->get('/admin/representante/produtos/editar/{id}', 'RepresentanteProdutosController', 'editar');
-$router->post('/admin/representante/produtos/atualizar/{id}', 'RepresentanteProdutosController', 'atualizar');
+$router->get('/admin/representante/produtos', 'AdminProdutosController', 'index');
+$router->get('/admin/representante/produtos/editar/{id}', 'AdminProdutosController', 'editar');
+$router->post('/admin/representante/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
 $router->get('/admin/representante/comissoes', 'RepresentanteComissoesController', 'index');

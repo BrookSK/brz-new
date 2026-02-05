@@ -69,6 +69,35 @@ class RepresentanteComissoesController extends Controller {
         }
     }
 
+    private function getUsdBrlRate(\PDO $pdo): float {
+        try {
+            if (!$this->tableExists($pdo, 'configuracoes_sistema')) {
+                return 5.5;
+            }
+            $stmt = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                try {
+                    $stmt->execute([$k]);
+                    $val = $stmt->fetchColumn();
+                    if ($val !== false && $val !== null && trim((string) $val) !== '') {
+                        $r = (float) str_replace(',', '.', trim((string) $val));
+                        if ($r > 0) {
+                            return $r;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+        return 5.5;
+    }
+
+    private function formatMoney(float $v, string $moeda): string {
+        $sym = ($moeda === 'BRL') ? 'R$' : '$';
+        return $sym . ' ' . number_format($v, 2, ',', '.');
+    }
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['representante']);
@@ -82,10 +111,10 @@ class RepresentanteComissoesController extends Controller {
 
         $resumo = [
             'percentual' => 0.0,
-            'total_venda' => 0.0,
-            'total_custo' => 0.0,
-            'total_liquido' => 0.0,
-            'total_comissao' => 0.0,
+            'totais' => [
+                'USD' => ['venda' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'comissao' => 0.0],
+                'BRL' => ['venda' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'comissao' => 0.0],
+            ],
             'linhas' => [],
         ];
 
@@ -114,6 +143,10 @@ class RepresentanteComissoesController extends Controller {
             $repEmailCol = $this->pickColumn($prCols, ['representante_email']);
             $costCol = $this->pickColumn($prCols, ['cost_price', 'preco_custo', 'valor_custo']);
 
+            $moedaCol = $this->pickColumn($pCols, ['moeda', 'currency']);
+            $codigoCol = $this->pickColumn($pCols, ['numero_pedido', 'codigo_pedido', 'codigo', 'code']);
+            $dataCol = $this->pickColumn($pCols, ['created_at', 'data_criacao', 'data_pedido', 'data']);
+
             if (!$colPedidoId || !$colProdutoId || !$colQtd || !$colPreco || !$pedidoStatusCol || (!$repIdCol && !$repEmailCol) || !$costCol) {
                 throw new \Exception('Colunas necessárias não encontradas para calcular comissão.');
             }
@@ -130,18 +163,22 @@ class RepresentanteComissoesController extends Controller {
                 $params[':repEmail'] = $repEmail;
             }
 
-            // soma por pedido/produto
+            $selCodigo = $codigoCol ? ("p.{$codigoCol}") : 'p.id';
+            $selData = $dataCol ? ("p.{$dataCol}") : 'p.id';
+            $selMoeda = $moedaCol ? ("p.{$moedaCol}") : "'USD'";
+
             $sql = "SELECT p.id AS pedido_id,\n"
-                . "       COALESCE(p.numero_pedido, p.codigo_pedido, p.id) AS codigo,\n"
-                . "       COALESCE(p.created_at, p.data_criacao, p.data_pedido) AS data,\n"
+                . "       {$selCodigo} AS codigo,\n"
+                . "       {$selData} AS data,\n"
+                . "       {$selMoeda} AS moeda,\n"
                 . "       SUM(COALESCE(i.{$colQtd},0) * COALESCE(i.{$colPreco},0)) AS venda_total,\n"
-                . "       SUM(COALESCE(i.{$colQtd},0) * COALESCE(pr.{$costCol},0)) AS custo_total\n"
+                . "       SUM(COALESCE(i.{$colQtd},0) * COALESCE(pr.{$costCol},0)) AS custo_total_usd\n"
                 . "FROM {$itensTable} i\n"
                 . "INNER JOIN pedidos p ON p.id = i.{$colPedidoId}\n"
                 . "INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}\n"
                 . $wherePaid
                 . $whereRep
-                . "\nGROUP BY p.id, codigo, data\n"
+                . "\nGROUP BY p.id, codigo, data, moeda\n"
                 . "ORDER BY p.id DESC\n"
                 . "LIMIT 200";
 
@@ -153,21 +190,30 @@ class RepresentanteComissoesController extends Controller {
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             $percent = (float) ($resumo['percentual'] ?? 0);
+            $rate = $this->getUsdBrlRate($pdo);
             foreach ($rows as $r) {
+                $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'USD')));
+                if (!in_array($moeda, ['USD', 'BRL'], true)) {
+                    $moeda = 'USD';
+                }
+
                 $venda = (float) ($r['venda_total'] ?? 0);
-                $custo = (float) ($r['custo_total'] ?? 0);
+                $custoUsd = (float) ($r['custo_total_usd'] ?? 0);
+                $custo = ($moeda === 'BRL') ? ($custoUsd * $rate) : $custoUsd;
+
                 $liq = $venda - $custo;
                 $com = $liq * ($percent / 100.0);
 
-                $resumo['total_venda'] += $venda;
-                $resumo['total_custo'] += $custo;
-                $resumo['total_liquido'] += $liq;
-                $resumo['total_comissao'] += $com;
+                $resumo['totais'][$moeda]['venda'] += $venda;
+                $resumo['totais'][$moeda]['custo'] += $custo;
+                $resumo['totais'][$moeda]['liquido'] += $liq;
+                $resumo['totais'][$moeda]['comissao'] += $com;
 
                 $resumo['linhas'][] = [
                     'pedido_id' => (int) ($r['pedido_id'] ?? 0),
                     'codigo' => (string) ($r['codigo'] ?? ''),
                     'data' => (string) ($r['data'] ?? ''),
+                    'moeda' => $moeda,
                     'venda' => $venda,
                     'custo' => $custo,
                     'liquido' => $liq,
@@ -178,60 +224,59 @@ class RepresentanteComissoesController extends Controller {
             $erro = $e->getMessage();
         }
 
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comissões - Representante</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-<div class="container py-4" style="max-width: 1100px;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0"><i class="fas fa-percentage me-2"></i>Comissões</h3>
-        <div class="d-flex gap-2">
-            <a href="/admin/representante/produtos" class="btn btn-outline-primary"><i class="fas fa-box me-1"></i>Produtos</a>
-            <a href="/admin/produtos/cadastro-representante" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Novo produto</a>
-        </div>
-    </div>';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+
+        echo '<div class="pt-3">'
+            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
+            . '<h1 class="h2">Comissões</h1>'
+            . '<div class="d-flex gap-2">'
+            . '<a href="/admin/representante/produtos" class="btn btn-outline-primary"><i class="fas fa-box"></i> Produtos</a>'
+            . '<a href="/admin/produtos/cadastro-representante" class="btn btn-primary"><i class="fas fa-plus"></i> Novo produto</a>'
+            . '</div>'
+            . '</div>';
 
         if (!empty($erro)) {
             echo '<div class="alert alert-danger">' . htmlspecialchars($erro, ENT_QUOTES, 'UTF-8') . '</div>';
         }
 
+        $totUsd = $resumo['totais']['USD'] ?? ['venda' => 0, 'custo' => 0, 'liquido' => 0, 'comissao' => 0];
+        $totBrl = $resumo['totais']['BRL'] ?? ['venda' => 0, 'custo' => 0, 'liquido' => 0, 'comissao' => 0];
+
         echo '<div class="row g-3 mb-3">'
             . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Percentual</div><div class="h4 mb-0">' . number_format((float) ($resumo['percentual'] ?? 0), 2, ',', '.') . '%</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Total venda</div><div class="h4 mb-0">$ ' . number_format((float) ($resumo['total_venda'] ?? 0), 2, ',', '.') . '</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Total custo</div><div class="h4 mb-0">$ ' . number_format((float) ($resumo['total_custo'] ?? 0), 2, ',', '.') . '</div></div></div></div>'
-            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Comissão estimada</div><div class="h4 mb-0">$ ' . number_format((float) ($resumo['total_comissao'] ?? 0), 2, ',', '.') . '</div></div></div></div>'
+            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Comissão (USD)</div><div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totUsd['comissao'] ?? 0), 'USD'), ENT_QUOTES, 'UTF-8') . '</div></div></div></div>'
+            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Comissão (BRL)</div><div class="h4 mb-0">' . htmlspecialchars($this->formatMoney((float) ($totBrl['comissao'] ?? 0), 'BRL'), ENT_QUOTES, 'UTF-8') . '</div></div></div></div>'
+            . '<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Taxa USD→BRL</div><div class="h4 mb-0">' . number_format((float) ($rate ?? 0), 4, ',', '.') . '</div></div></div></div>'
             . '</div>';
 
         if (empty($resumo['linhas'])) {
             echo '<div class="alert alert-info">Nenhuma venda paga encontrada para seus produtos (ou percentual ainda não configurado).</div>';
         } else {
-            echo '<div class="table-responsive"><table class="table table-sm table-striped align-middle">'
-                . '<thead><tr><th>Pedido</th><th>Data</th><th>Venda</th><th>Custo</th><th>Líquido</th><th>Comissão</th></tr></thead><tbody>';
+            echo '<div class="card"><div class="card-body">'
+                . '<div class="table-responsive"><table class="table table-sm table-striped align-middle mb-0">'
+                . '<thead><tr><th>Pedido</th><th>Data</th><th>Moeda</th><th>Venda</th><th>Custo</th><th>Líquido</th><th>Comissão</th></tr></thead><tbody>';
             foreach ($resumo['linhas'] as $l) {
+                $m = (string) ($l['moeda'] ?? 'USD');
                 echo '<tr>'
                     . '<td><a href="/admin/pedidos/detalhes/' . (int) ($l['pedido_id'] ?? 0) . '" target="_blank">' . htmlspecialchars((string) ($l['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') . '</a></td>'
                     . '<td>' . htmlspecialchars((string) ($l['data'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>'
-                    . '<td>$ ' . number_format((float) ($l['venda'] ?? 0), 2, ',', '.') . '</td>'
-                    . '<td>$ ' . number_format((float) ($l['custo'] ?? 0), 2, ',', '.') . '</td>'
-                    . '<td>$ ' . number_format((float) ($l['liquido'] ?? 0), 2, ',', '.') . '</td>'
-                    . '<td class="fw-semibold">$ ' . number_format((float) ($l['comissao'] ?? 0), 2, ',', '.') . '</td>'
+                    . '<td>' . htmlspecialchars($m, ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['venda'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['custo'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td>' . htmlspecialchars($this->formatMoney((float) ($l['liquido'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td class="fw-semibold">' . htmlspecialchars($this->formatMoney((float) ($l['comissao'] ?? 0), $m), ENT_QUOTES, 'UTF-8') . '</td>'
                     . '</tr>';
             }
-            echo '</tbody></table></div>';
+            echo '</tbody></table></div></div></div>';
         }
 
         echo '<div class="small text-muted mt-3">Regra: comissão = (venda - custo) * percentual. Considera apenas pedidos pagos.</div>';
+        echo '</div>';
 
-        echo '</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>';
+        $content = ob_get_clean();
+        $title = 'Comissões - Representante';
+        include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
 }

@@ -234,7 +234,7 @@ class AdminProdutosNovoController extends Controller {
 
     public function index(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $categorias = $this->getCategorias();
         $lojas = $this->getLojasSafe();
         $tipos = $this->getVariacaoTiposComOpcoes();
@@ -680,7 +680,7 @@ HTML;
 
     public function salvarVariavel(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         try {
             $pdo = $this->getPdo();
 
@@ -699,12 +699,35 @@ HTML;
 
             $cols = $this->getTableColumns($pdo, 'produtos');
 
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $perfilSessao = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+            $repId = (int) ($_SESSION['usuario_id'] ?? 0);
+            $repEmail = (string) ($_SESSION['usuario_email'] ?? '');
+
+            $price = $this->parseMoneyToDb($request->getParam('price'));
+            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
+            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
+            $stock = (int) $request->getParam('stock', 0);
+            $minStock = (int) $request->getParam('min_stock', 0);
+            $weight = $this->parseMoneyToDb($request->getParam('weight'));
+
             $name = trim((string) $request->getParam('name', ''));
             if ($name === '') {
                 $_SESSION['message'] = 'Informe o nome do produto.';
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/produtos/novo');
                 exit;
+            }
+
+            if ($perfilSessao === 'representante') {
+                if (trim((string) $costPrice) === '') {
+                    $_SESSION['message'] = 'Preço de custo (USD) é obrigatório para representante.';
+                    $_SESSION['message_type'] = 'danger';
+                    header('Location: /admin/produtos/novo');
+                    exit;
+                }
             }
 
             $skuInput = trim((string) $request->getParam('sku', ''));
@@ -716,13 +739,6 @@ HTML;
             }
 
             $pdo->beginTransaction();
-
-            $price = $this->parseMoneyToDb($request->getParam('price'));
-            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
-            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
-            $stock = (int) $request->getParam('stock', 0);
-            $minStock = (int) $request->getParam('min_stock', 0);
-            $weight = $this->parseMoneyToDb($request->getParam('weight'));
 
             $data = [];
             if (in_array('name', $cols, true)) $data['name'] = $name;
@@ -775,6 +791,18 @@ HTML;
             if (in_array('peso', $cols, true)) $data['peso'] = $weight;
             if (in_array('moeda', $cols, true)) {
                 $data['moeda'] = 'USD';
+            }
+            if (in_array('currency', $cols, true)) {
+                $data['currency'] = 'USD';
+            }
+
+            if ($perfilSessao === 'representante') {
+                if (in_array('representante_id', $cols, true)) {
+                    $data['representante_id'] = ($repId > 0 ? $repId : null);
+                }
+                if (in_array('representante_email', $cols, true)) {
+                    $data['representante_email'] = ($repEmail !== '' ? $repEmail : null);
+                }
             }
             if (in_array('status', $cols, true)) $data['status'] = (string) $request->getParam('status', 'published');
             if (in_array('active', $cols, true)) $data['active'] = (int) $request->getParam('active', 1);
