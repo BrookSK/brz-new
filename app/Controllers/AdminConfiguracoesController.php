@@ -2907,7 +2907,7 @@ HTML;
         $auth->requerPerfil('admin');
 
         $headers = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
         ];
 
         header('Content-Type: text/csv; charset=UTF-8');
@@ -2971,6 +2971,7 @@ HTML;
             'csv' => $csvPath,
             'delimiter' => (string) ($scan['delimiter'] ?? ','),
             'hasHeader' => (bool) ($scan['hasHeader'] ?? true),
+            'headerMap' => (is_array($scan['headerMap'] ?? null) ? ($scan['headerMap'] ?? null) : null),
             'total' => (int) ($scan['total'] ?? 0),
             'offset' => 0,
             'okCount' => 0,
@@ -3050,10 +3051,11 @@ HTML;
 
         $delimiter = (string) ($state['delimiter'] ?? ',');
         $hasHeader = (bool) ($state['hasHeader'] ?? true);
+        $headerMap = (is_array($state['headerMap'] ?? null) ? ($state['headerMap'] ?? null) : null);
         $offset = (int) ($state['offset'] ?? 0);
         if ($offset < 0) $offset = 0;
 
-        $res = $this->processUsuariosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $offset, $batchSize);
+        $res = $this->processUsuariosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $headerMap, $offset, $batchSize);
 
         $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
         $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
@@ -3083,7 +3085,7 @@ HTML;
 
     private function scanUsuariosCsv(string $csvPath): array {
         $expected = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
         ];
 
         $fh = @fopen($csvPath, 'r');
@@ -3106,13 +3108,25 @@ HTML;
         };
 
         $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
-        $isHeader = (count($header) === count($expected));
-        if ($isHeader) {
-            for ($i = 0; $i < count($expected); $i++) {
-                if (($header[$i] ?? '') !== $expected[$i]) {
-                    $isHeader = false;
+        $headerMap = null;
+        $isHeader = false;
+        if (!empty($header)) {
+            $map = [];
+            foreach ($header as $idx => $name) {
+                $key = (string) $name;
+                if ($key === '') continue;
+                $map[$key] = (int) $idx;
+            }
+            $ok = true;
+            foreach ($expected as $col) {
+                if (!array_key_exists($col, $map)) {
+                    $ok = false;
                     break;
                 }
+            }
+            if ($ok) {
+                $isHeader = true;
+                $headerMap = $map;
             }
         }
         if (!$isHeader) {
@@ -3127,12 +3141,12 @@ HTML;
             $total++;
         }
         fclose($fh);
-        return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => $isHeader, 'total' => $total];
+        return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => $isHeader, 'headerMap' => $headerMap, 'total' => $total];
     }
 
-    private function processUsuariosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, int $offset, int $limit): array {
+    private function processUsuariosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $headerMap, int $offset, int $limit): array {
         $expected = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
         ];
 
         $fh = @fopen($csvPath, 'r');
@@ -3141,7 +3155,22 @@ HTML;
         }
 
         if ($hasHeader) {
-            fgetcsv($fh, 0, $delimiter);
+            $hdrRow = fgetcsv($fh, 0, $delimiter);
+            if ($headerMap === null && is_array($hdrRow)) {
+                $normalizeHeader = function($v) {
+                    $s = trim((string) $v);
+                    $s = preg_replace('/\s+/', ' ', $s);
+                    return $s;
+                };
+                $hdr = array_map($normalizeHeader, $hdrRow);
+                $tmpMap = [];
+                foreach ($hdr as $idx => $name) {
+                    $key = (string) $name;
+                    if ($key === '') continue;
+                    $tmpMap[$key] = (int) $idx;
+                }
+                $headerMap = $tmpMap;
+            }
         }
 
         $skipped = 0;
@@ -3157,6 +3186,14 @@ HTML;
         while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
             if (!is_array($row) || count($row) < 5) {
                 continue;
+            }
+            if ($hasHeader && is_array($headerMap)) {
+                $ordered = [];
+                foreach ($expected as $col) {
+                    $idx = $headerMap[$col] ?? null;
+                    $ordered[] = ($idx !== null && array_key_exists($idx, $row)) ? (string) $row[$idx] : '';
+                }
+                $row = $ordered;
             }
             $row = array_pad($row, count($expected), '');
             try {
@@ -3189,8 +3226,9 @@ HTML;
         $billingCell = $get(25);
         $shippingSuite = $get(28);
         $billingCnpj = $get(29);
-        $role = $get(30);
-        $pass = $get(31);
+        $wooWalletBalance = $get(30);
+        $role = $get(31);
+        $pass = $get(32);
 
         if ($email === '' && $login === '' && $idExt === '') {
             throw new \RuntimeException('Linha vazia');
@@ -3247,6 +3285,32 @@ HTML;
             $usuarioId = (int) $helper->criarUsuario($dadosUsuario);
         }
 
+        if ($usuarioId > 0 && $wooWalletBalance !== '') {
+            $raw = (string) $wooWalletBalance;
+            $raw = preg_replace('/\s+/', '', $raw);
+            $raw = str_replace(['R$', 'USD', 'BRL'], '', $raw);
+            $raw = trim($raw);
+            if ($raw !== '') {
+                $num = $raw;
+                if (strpos($num, ',') !== false && strpos($num, '.') !== false) {
+                    $num = str_replace('.', '', $num);
+                    $num = str_replace(',', '.', $num);
+                } elseif (strpos($num, ',') !== false) {
+                    $num = str_replace(',', '.', $num);
+                }
+                $balance = is_numeric($num) ? (float) $num : null;
+                if ($balance !== null) {
+                    try {
+                        $stIns = $pdo->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
+                        $stIns->execute([(int) $usuarioId]);
+                        $stUp = $pdo->prepare('UPDATE carteiras SET saldo_usd = ?, updated_at = NOW() WHERE usuario_id = ?');
+                        $stUp->execute([$balance, (int) $usuarioId]);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        }
+
         $addr = $this->pickEnderecoFromRow($row);
         if ($usuarioId > 0 && !empty($addr)) {
             $this->salvarEnderecoPrincipal($pdo, $usuarioId, $addr);
@@ -3275,7 +3339,7 @@ HTML;
         }
 
         $expected = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
         ];
 
         $first = fgetcsv($fh, 0, ',');
@@ -3293,13 +3357,25 @@ HTML;
         };
 
         $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
-        $isHeader = (count($header) === count($expected));
-        if ($isHeader) {
-            for ($i = 0; $i < count($expected); $i++) {
-                if (($header[$i] ?? '') !== $expected[$i]) {
-                    $isHeader = false;
+        $headerMap = null;
+        $isHeader = false;
+        if (!empty($header)) {
+            $map = [];
+            foreach ($header as $idx => $name) {
+                $key = (string) $name;
+                if ($key === '') continue;
+                $map[$key] = (int) $idx;
+            }
+            $okHeader = true;
+            foreach ($expected as $col) {
+                if (!array_key_exists($col, $map)) {
+                    $okHeader = false;
                     break;
                 }
+            }
+            if ($okHeader) {
+                $isHeader = true;
+                $headerMap = $map;
             }
         }
         if (!$isHeader) {
@@ -3313,88 +3389,17 @@ HTML;
                 continue;
             }
 
+            if ($isHeader && is_array($headerMap)) {
+                $ordered = [];
+                foreach ($expected as $col) {
+                    $idx = $headerMap[$col] ?? null;
+                    $ordered[] = ($idx !== null && array_key_exists($idx, $row)) ? (string) $row[$idx] : '';
+                }
+                $row = $ordered;
+            }
             $row = array_pad($row, count($expected), '');
-            $get = function(int $idx) use ($row) {
-                return trim((string) ($row[$idx] ?? ''));
-            };
-
-            $idExt = $get(0);
-            $email = $get(1);
-            $login = $get(2);
-            $firstName = $get(3);
-            $lastName = $get(4);
-
-            $suite = $get(20);
-            $billingCpf = $get(21);
-            $billingBirth = $get(22);
-            $billingCell = $get(25);
-            $shippingSuite = $get(28);
-            $billingCnpj = $get(29);
-            $role = $get(30);
-            $pass = $get(31);
-
-            if ($email === '' && $login === '' && $idExt === '') {
-                continue;
-            }
-
-            $nome = trim($firstName . ' ' . $lastName);
-            if ($nome === '') {
-                $nome = $login !== '' ? $login : $email;
-            }
-
-            $perfil = strtolower(trim($role));
-            if ($perfil === '') {
-                $perfil = 'cliente';
-            }
-
-            $telefone = $billingCell !== '' ? $billingCell : '';
-            if ($telefone === '') {
-                $telefone = $get(12);
-            }
-
-            $doc = $billingCpf !== '' ? $billingCpf : '';
-            if ($doc === '' && $billingCnpj !== '') {
-                $doc = $billingCnpj;
-            }
-
-            $usuarioId = 0;
             try {
-                if ($idExt !== '' && ctype_digit($idExt)) {
-                    $usuarioId = $this->findUsuarioIdById($pdo, (int) $idExt);
-                }
-                if ($usuarioId <= 0 && $email !== '') {
-                    $usuarioId = $this->findUsuarioIdByEmail($pdo, $email);
-                }
-            } catch (\Exception $e) {
-                $usuarioId = 0;
-            }
-
-            $dadosUsuario = [
-                'nome' => $nome,
-                'email' => $email !== '' ? $email : ($login . '@local'),
-                'telefone' => $telefone,
-                'cpf' => $billingCpf,
-                'documento' => $doc,
-                'suite' => ($suite !== '' ? $suite : ($shippingSuite !== '' ? $shippingSuite : null)),
-                'perfil' => $perfil,
-            ];
-            if ($pass !== '') {
-                $dadosUsuario['senha'] = $pass;
-            }
-
-            try {
-                if ($usuarioId > 0) {
-                    $helper->atualizarUsuario($usuarioId, $dadosUsuario);
-                } else {
-                    $usuarioId = (int) $helper->criarUsuario($dadosUsuario);
-                }
-
-                $addr = $this->pickEnderecoFromRow($row);
-                if ($usuarioId > 0 && !empty($addr)) {
-                    $this->salvarEnderecoPrincipal($pdo, $usuarioId, $addr);
-                }
-
-                $this->atualizarCamposUsuarioEnderecoSeExistir($pdo, $usuarioId, $addr ?? [], $billingBirth);
+                $this->processUsuarioRow($pdo, $helper, $row);
                 $ok++;
             } catch (\Exception $e) {
                 $fail++;
