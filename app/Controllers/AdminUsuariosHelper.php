@@ -246,7 +246,14 @@ class AdminUsuariosHelper {
             if ($perfil === '') {
                 $perfil = 'cliente';
             }
-            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'perfil', $perfil);
+            // Compatibilidade: schemas podem ter `perfil`, `role` ou ambos.
+            // Quando existir ambos, gravar ambos para evitar inconsistência.
+            if (in_array('perfil', $colunas, true)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'perfil', $perfil);
+            }
+            if (in_array('role', $colunas, true)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'role', $perfil);
+            }
 
             if ($perfil === 'representante') {
                 $slug = $this->slugify((string) ($dados['nome'] ?? ''));
@@ -320,10 +327,15 @@ class AdminUsuariosHelper {
                 $this->setIfColumnExists($setParts, $params, $colunas, 'senha', password_hash($dados['senha'], PASSWORD_DEFAULT));
             }
 
-            if (in_array('perfil', $colunas, true) && array_key_exists('perfil', $dados)) {
+            if (array_key_exists('perfil', $dados)) {
                 $perfil = strtolower(trim((string) ($dados['perfil'] ?? '')));
                 if ($perfil !== '') {
-                    $this->setIfColumnExists($setParts, $params, $colunas, 'perfil', $perfil);
+                    if (in_array('perfil', $colunas, true)) {
+                        $this->setIfColumnExists($setParts, $params, $colunas, 'perfil', $perfil);
+                    }
+                    if (in_array('role', $colunas, true)) {
+                        $this->setIfColumnExists($setParts, $params, $colunas, 'role', $perfil);
+                    }
                 }
             }
 
