@@ -188,10 +188,12 @@ class AdminUsuariosHelper {
             if ($perfil === '') {
                 $perfil = 'cliente';
             }
-            // Compatibilidade: alguns schemas usam `role` em vez de `perfil`
+            // Compatibilidade: schemas podem ter `perfil`, `role` ou ambos.
+            // Quando existir ambos, gravar ambos para evitar inconsistência.
             if (in_array('perfil', $colunas, true)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'perfil', $perfil);
-            } else {
+            }
+            if (in_array('role', $colunas, true)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'role', $perfil);
             }
 
@@ -272,7 +274,8 @@ class AdminUsuariosHelper {
                 if ($perfil !== '') {
                     if (in_array('perfil', $colunas, true)) {
                         $this->setIfColumnExists($setParts, $params, $colunas, 'perfil', $perfil);
-                    } else {
+                    }
+                    if (in_array('role', $colunas, true)) {
                         $this->setIfColumnExists($setParts, $params, $colunas, 'role', $perfil);
                     }
                 }
