@@ -1322,6 +1322,9 @@ function updatePaymentMethodsForCurrency(currency) {
     select.innerHTML = '';
     select.appendChild(new Option('Selecione...', ''));
 
+    // Carteira deve aparecer sempre (independente da moeda)
+    select.appendChild(new Option('Carteira', 'carteira'));
+
     if (isBRL) {
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Boleto Bancário', 'boleto'));

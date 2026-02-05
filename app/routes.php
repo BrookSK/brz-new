@@ -400,7 +400,7 @@ $router->get('/admin/remessa-stamps', 'AdminRemessaStampsController', 'index');
 $router->post('/admin/remessa-stamps/gerar-etiqueta', 'AdminRemessaStampsController', 'gerarEtiqueta');
 
 // Rotas de Carteira
-$router->post('/admin/usuarios/adicionar-credito', 'AdminUsuariosController', 'adicionarCredito');
+$router->post('/admin/usuarios/adicionar-credito', 'AdminCarteiraController', 'adicionarCredito');
 $router->post('/admin/carteira/converter-para-brl', 'AdminCarteiraController', 'converterParaBRL');
 $router->post('/admin/carteira/adicionar-creditos-em-lote', 'AdminCarteiraController', 'adicionarCreditosEmLote');
 $router->get('/admin/carteira/saldo/{usuario_id}', 'AdminCarteiraController', 'getSaldo');
