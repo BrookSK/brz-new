@@ -99,6 +99,17 @@
                                     <?php if (!empty($item['variacao_descricao'])): ?>
                                         <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                     <?php endif; ?>
+                                    <?php if (isset($item['peso_unit'])): ?>
+                                        <div class="small text-muted">
+                                            Peso: <?= number_format((float) ($item['peso_unit'] ?? 0), 3, ',', '.') ?> kg (x<?= (int) ($item['quantidade'] ?? 0) ?>)
+                                            = <?= number_format((float) ($item['peso_item'] ?? 0), 3, ',', '.') ?> kg
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['ativo'])): ?>
+                                        <div class="small text-success">Ativo</div>
+                                    <?php else: ?>
+                                        <div class="small text-danger">Desativado</div>
+                                    <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
                                         <button class="btn btn-outline-secondary" onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
@@ -128,9 +139,14 @@
                                     </small>
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
-                                    <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-secondary" onclick='toggleAtivo(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= !empty($item['ativo']) ? 0 : 1 ?>)'>
+                                            <i class="fas <?= !empty($item['ativo']) ? 'fa-eye-slash' : 'fa-eye' ?>"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -213,6 +229,11 @@
                         <h5 class="mb-0">Resumo do Pedido</h5>
                     </div>
                     <div class="card-body">
+                        <?php if (!empty($excede_peso)): ?>
+                            <div class="alert alert-warning">
+                                Peso máximo é <?= number_format((float) ($peso_max_kg ?? 30), 0, ',', '.') ?>kg. Desative itens para continuar.
+                            </div>
+                        <?php endif; ?>
                         <hr>
                         
                         <div class="d-flex justify-content-between mb-2">
@@ -243,7 +264,7 @@
                     </div>
                     
                     <div class="d-grid">
-                        <a href="/checkout" class="btn btn-primary btn-lg">
+                        <a href="/carrinho/checkout" class="btn btn-primary btn-lg <?= !empty($excede_peso) ? 'disabled' : '' ?>" <?= !empty($excede_peso) ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
                             <i class="fas fa-lock"></i> Finalizar Compra
                         </a>
                     </div>
@@ -320,6 +341,28 @@ function removerItem(itemKey, produtoId) {
             }
         });
     }
+
+}
+
+function toggleAtivo(itemKey, ativo) {
+    $.ajax({
+        url: '/carrinho/toggle-ativo',
+        method: 'POST',
+        data: {
+            id: itemKey,
+            ativo: ativo
+        },
+        success: function(response) {
+            if (response && response.success) {
+                location.reload();
+            } else {
+                alert((response && response.error) ? response.error : 'Erro ao atualizar item');
+            }
+        },
+        error: function() {
+            alert('Erro ao atualizar item');
+        }
+    });
 }
 
 function limparCarrinho() {
