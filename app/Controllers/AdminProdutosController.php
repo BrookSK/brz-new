@@ -7,6 +7,84 @@ use App\Services\AuthService;
 
 class AdminProdutosController extends Controller {
 
+    private function getSessionPerfil(): string {
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+        } catch (\Throwable $e) {
+        }
+        return strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+    }
+
+    private function getSessionUserId(): int {
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+        } catch (\Throwable $e) {
+        }
+        return (int) ($_SESSION['usuario_id'] ?? 0);
+    }
+
+    private function getSessionUserEmail(): string {
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+        } catch (\Throwable $e) {
+        }
+        return (string) ($_SESSION['usuario_email'] ?? '');
+    }
+
+    private function requireProdutoOwnerIfRepresentante(\PDO $pdo, int $produtoId): void {
+        $perfil = $this->getSessionPerfil();
+        if ($perfil !== 'representante') {
+            return;
+        }
+        $uid = $this->getSessionUserId();
+        if ($uid <= 0) {
+            throw new \Exception('Sessão inválida.');
+        }
+
+        $cols = $this->getTableColumns($pdo, 'produtos');
+        if (!in_array('representante_id', $cols, true)) {
+            throw new \Exception('Schema não possui representante_id em produtos (rodar migration 071).');
+        }
+
+        $st = $pdo->prepare('SELECT id FROM produtos WHERE id = ? AND representante_id = ? LIMIT 1');
+        $st->execute([(int) $produtoId, (int) $uid]);
+        if (!$st->fetch()) {
+            throw new \Exception('Acesso negado: produto não pertence ao representante.');
+        }
+    }
+
+    private function requireVariacaoOwnerIfRepresentante(\PDO $pdo, int $variacaoId): void {
+        $perfil = $this->getSessionPerfil();
+        if ($perfil !== 'representante') {
+            return;
+        }
+        $uid = $this->getSessionUserId();
+        if ($uid <= 0) {
+            throw new \Exception('Sessão inválida.');
+        }
+
+        if (!$this->tableExists($pdo, 'produto_variacoes')) {
+            throw new \Exception('Schema de variações não encontrado.');
+        }
+
+        $colsProd = $this->getTableColumns($pdo, 'produtos');
+        if (!in_array('representante_id', $colsProd, true)) {
+            throw new \Exception('Schema não possui representante_id em produtos (rodar migration 071).');
+        }
+
+        $st = $pdo->prepare('SELECT pr.id FROM produto_variacoes pv INNER JOIN produtos pr ON pr.id = pv.produto_id WHERE pv.id = ? AND pr.representante_id = ? LIMIT 1');
+        $st->execute([(int) $variacaoId, (int) $uid]);
+        if (!$st->fetch()) {
+            throw new \Exception('Acesso negado: variação não pertence ao representante.');
+        }
+    }
+
     private function fetchLojasSafe(): array {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -381,10 +459,11 @@ HTML;
 
     public function uploadFotosVariacao(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $varId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireVariacaoOwnerIfRepresentante($pdo, (int) $varId);
             $pdo->beginTransaction();
 
             if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
@@ -456,7 +535,7 @@ HTML;
 
     public function removerFotoVariacao(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $fotoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -471,6 +550,8 @@ HTML;
                 header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/produtos'));
                 exit;
             }
+
+            $this->requireVariacaoOwnerIfRepresentante($pdo, (int) ($foto['produto_variacao_id'] ?? 0));
 
             $path = (string) ($foto['nome_arquivo'] ?? '');
             $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($path, '/');
@@ -491,11 +572,12 @@ HTML;
 
     public function salvarOrdemFotosVariacao(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $varId = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens_variacao', []);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireVariacaoOwnerIfRepresentante($pdo, (int) $varId);
             if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
                 throw new \Exception('Tabela produto_variacao_fotos não encontrada');
             }
@@ -784,88 +866,7 @@ HTML;
 </html>
 HTML;
 
-        exit;
-    }
-
-    public function index(Request $request) {
-        $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
-        try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            $pagina = (int) $request->getParam('pagina', 1);
-            $limite = 12;
-            $offset = ($pagina - 1) * $limite;
-            $busca = $request->getParam('busca', '');
-
-            $sql = "SELECT p.*, c.name as categoria FROM produtos p LEFT JOIN categorias c ON p.category_id = c.id WHERE 1=1";
-            $params = [];
-
-            if (!empty($busca)) {
-                $sql .= " AND (p.name LIKE :busca OR p.sku LIKE :busca)";
-                $params[':busca'] = "%{$busca}%";
-            }
-
-            $sql .= " ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset";
-
-            $stmt = $pdo->prepare($sql);
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':limite', $limite, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-            $stmt->execute();
-            $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            // Buscar imagens (priorizar capa do produto)
-            foreach ($produtos as &$produto) {
-                $produto['imagem'] = Url::absolute('/uploads/produtos/placeholder.jpg');
-
-                $fotoCapa = $produto['foto_principal'] ?? null;
-                if (!empty($fotoCapa)) {
-                    // Se for URL externa, usar diretamente
-                    if (is_string($fotoCapa) && preg_match('#^https?://#i', $fotoCapa)) {
-                        $produto['imagem'] = $fotoCapa;
-                        continue;
-                    }
-                    $filePath = $this->resolveUploadsPublicPath((string) $fotoCapa);
-                    if ($filePath) {
-                        $produto['imagem'] = Url::absolute((string) $fotoCapa);
-                        continue;
-                    }
-                }
-
-                // fallback: primeira foto da galeria (se existir)
-                $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = :produto_id ORDER BY ordem ASC, id ASC LIMIT 1");
-                $stmtFotos->bindParam(':produto_id', $produto['id']);
-                $stmtFotos->execute();
-                $foto = $stmtFotos->fetch(\PDO::FETCH_ASSOC);
-
-                if ($foto && !empty($foto['nome_arquivo'])) {
-                    // Se for URL externa, usar diretamente
-                    if (is_string($foto['nome_arquivo']) && preg_match('#^https?://#i', (string) $foto['nome_arquivo'])) {
-                        $produto['imagem'] = (string) $foto['nome_arquivo'];
-                        continue;
-                    }
-                    $filePath = $this->resolveUploadsPublicPath($foto['nome_arquivo']);
-                    if ($filePath) {
-                        $produto['imagem'] = Url::absolute($foto['nome_arquivo']);
-                    }
-                }
-            }
-
-            unset($produto);
-
-            $stmtTotal = $pdo->prepare("SELECT COUNT(*) as total FROM produtos WHERE 1=1" . (!empty($busca) ? " AND (name LIKE :busca OR sku LIKE :busca)" : ""));
-            if (!empty($busca)) {
-                $stmtTotal->bindValue(':busca', "%{$busca}%");
-            }
-            $stmtTotal->execute();
-            $total = (int) ($stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
-            $totalPaginas = (int) ceil($total / $limite);
-        } catch (\Exception $e) {
-            $produtos = [];
-            $total = 0;
-            $totalPaginas = 0;
+            exit;
             $pagina = 1;
             $busca = '';
         }
@@ -957,7 +958,7 @@ HTML;
     
     public function novo(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         // Buscar categorias
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -1210,16 +1211,24 @@ HTML;
     
     public function salvar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             $cols = $this->getTableColumns($pdo, 'produtos');
 
+            $perfil = $this->getSessionPerfil();
+            $repId = $this->getSessionUserId();
+            $repEmail = $this->getSessionUserEmail();
+
             $price = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('price'));
             $costPrice = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('cost_price'));
             $salePrice = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('sale_price'));
+
+            if ($perfil === 'representante' && trim((string) $costPrice) === '') {
+                throw new \Exception('Preço de custo (USD) é obrigatório para representante.');
+            }
             
             // Validar categoria se fornecida
             $categoryParam = $request->getParam('category_id');
@@ -1280,6 +1289,13 @@ HTML;
             if (in_array('price', $cols, true)) $data['price'] = $price;
             if (in_array('cost_price', $cols, true) && $costPrice !== '') $data['cost_price'] = $costPrice;
             if (in_array('sale_price', $cols, true) && $salePrice !== '') $data['sale_price'] = $salePrice;
+
+            if ($perfil === 'representante') {
+                if (in_array('moeda', $cols, true)) $data['moeda'] = 'USD';
+                if (in_array('currency', $cols, true)) $data['currency'] = 'USD';
+                if (in_array('representante_id', $cols, true)) $data['representante_id'] = ($repId > 0 ? $repId : null);
+                if (in_array('representante_email', $cols, true)) $data['representante_email'] = ($repEmail !== '' ? $repEmail : null);
+            }
 
             if (in_array('weight', $cols, true)) $data['weight'] = $request->getParam('weight') ?: 0;
             if (in_array('stock', $cols, true)) $data['stock'] = $request->getParam('stock') ?: 0;
@@ -1366,7 +1382,11 @@ HTML;
             }
             
             $pdo->commit();
-            header('Location: /admin/produtos?success=1');
+            if ($perfil === 'representante') {
+                header('Location: /admin/representante/produtos?success=1');
+            } else {
+                header('Location: /admin/produtos?success=1');
+            }
             exit;
             
         } catch (\Exception $e) {
@@ -1378,11 +1398,13 @@ HTML;
     
     public function editar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) $request->getParam('id');
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
 
             $stmtProduto = $pdo->prepare('SELECT * FROM produtos WHERE id = ?');
             $stmtProduto->execute([$id]);
@@ -2052,16 +2074,26 @@ HTMLSCRIPT;
     
     public function atualizar(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             $cols = $this->getTableColumns($pdo, 'produtos');
+
+            $perfil = $this->getSessionPerfil();
+            $repId = $this->getSessionUserId();
+            $repEmail = $this->getSessionUserEmail();
+
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             
             $price = $this->parseMoneyToDb($request->getParam('price'));
             $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
             $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
+
+            if ($perfil === 'representante' && trim((string) $costPrice) === '') {
+                throw new \Exception('Preço de custo (USD) é obrigatório para representante.');
+            }
             
             // Validar categoria se fornecida
             $categoryId = $request->getParam('category_id');
@@ -2129,6 +2161,21 @@ HTMLSCRIPT;
             if (in_array('clube_ativo', $cols, true)) {
                 $stmtClube = $pdo->prepare('UPDATE produtos SET clube_ativo = ? WHERE id = ?');
                 $stmtClube->execute([(int) ($request->getParam('clube_ativo') ?: 0), (int) $id]);
+            }
+
+            if ($perfil === 'representante') {
+                if (in_array('moeda', $cols, true)) {
+                    $pdo->prepare('UPDATE produtos SET moeda = ? WHERE id = ?')->execute(['USD', (int) $id]);
+                }
+                if (in_array('currency', $cols, true)) {
+                    $pdo->prepare('UPDATE produtos SET currency = ? WHERE id = ?')->execute(['USD', (int) $id]);
+                }
+                if (in_array('representante_id', $cols, true)) {
+                    $pdo->prepare('UPDATE produtos SET representante_id = ? WHERE id = ?')->execute([(int) $repId, (int) $id]);
+                }
+                if (in_array('representante_email', $cols, true)) {
+                    $pdo->prepare('UPDATE produtos SET representante_email = ? WHERE id = ?')->execute([(string) $repEmail, (int) $id]);
+                }
             }
 
             $rowsUpdated = $stmt->rowCount();
@@ -2208,7 +2255,11 @@ HTMLSCRIPT;
                 exit;
             }
 
-            header('Location: /admin/produtos?success=2');
+            if ($perfil === 'representante') {
+                header('Location: /admin/representante/produtos?success=2');
+            } else {
+                header('Location: /admin/produtos?success=2');
+            }
             exit;
             
         } catch (\Exception $e) {
@@ -2220,7 +2271,7 @@ HTMLSCRIPT;
 
     public function salvarAtributosVariacoes(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         if ($produtoId <= 0) {
             header('Location: /admin/produtos');
@@ -2236,6 +2287,8 @@ HTMLSCRIPT;
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_atributos')) {
                 $_SESSION['message'] = 'Tabelas de variações não encontradas. Rode a migration 061.';
                 $_SESSION['message_type'] = 'warning';
@@ -2288,7 +2341,7 @@ HTMLSCRIPT;
 
     public function salvarVariacoes(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         if ($produtoId <= 0) {
             header('Location: /admin/produtos');
@@ -2306,6 +2359,7 @@ HTMLSCRIPT;
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
                 throw new \Exception('Tabelas de variações não encontradas');
             }
@@ -2364,10 +2418,11 @@ HTMLSCRIPT;
 
     public function apagarVariacoes(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             $pdo->beginTransaction();
 
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
@@ -2405,12 +2460,13 @@ HTMLSCRIPT;
 
     public function gerarVariacoes(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         $replace = (int) $request->getParam('replace', 0) === 1;
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes') || !$this->tableExists($pdo, 'produto_variacao_itens')) {
                 throw new \Exception('Tabelas de variações não encontradas');
             }
@@ -2502,10 +2558,11 @@ HTMLSCRIPT;
 
     public function criarVariacaoIndividual(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
                 throw new \Exception('Tabelas de variações não encontradas');
             }
@@ -2721,10 +2778,11 @@ HTMLSCRIPT;
 
     public function uploadCapa(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
             if (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
@@ -2775,10 +2833,11 @@ HTMLSCRIPT;
 
     public function uploadGaleria(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
             $inserted = [];
@@ -2848,16 +2907,17 @@ HTMLSCRIPT;
     
     public function removerFoto(Request $request, $fotoId = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $fotoId = $fotoId ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             
-            $stmt = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT id, produto_id, nome_arquivo FROM produto_fotos WHERE id = ? LIMIT 1");
             $stmt->execute([$fotoId]);
             $foto = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($foto) {
+                $this->requireProdutoOwnerIfRepresentante($pdo, (int) ($foto['produto_id'] ?? 0));
                 // Remover arquivo físico
                 $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($foto['nome_arquivo'], '/');
                 if (file_exists($filePath)) {
@@ -2895,10 +2955,11 @@ HTMLSCRIPT;
 
     public function removerCapa(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $stmt = $pdo->prepare('SELECT foto_principal FROM produtos WHERE id = ?');
             $stmt->execute([$id]);
             $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -2923,11 +2984,12 @@ HTMLSCRIPT;
 
     public function salvarOrdemGaleria(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens', []);
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
             if (is_array($ordens)) {
@@ -2956,10 +3018,11 @@ HTMLSCRIPT;
     
     public function excluir(Request $request, $id = null) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = $id ?? $request->getParam('id');
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
             
             // Buscar produto para obter imagens

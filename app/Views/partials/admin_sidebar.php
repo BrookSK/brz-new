@@ -15,6 +15,54 @@ function renderAdminSidebar($activePage = '') {
         $perfil = 'cliente';
     }
 
+    if ($perfil === 'representante') {
+        $menuItems = [
+            'rep_produtos' => ['icon' => 'fa-box', 'label' => 'Produtos', 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
+            'rep_comissoes' => ['icon' => 'fa-percentage', 'label' => 'Comissões', 'url' => '/admin/representante/comissoes', 'roles' => ['representante']],
+        ];
+
+        echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">
+                <i class="fas fa-bars"></i>
+              </button>';
+
+        echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <div class="position-sticky pt-3">
+                <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/representante/produtos">
+                    <div class="sidebar-brand-icon"><i class="fas fa-user-tie"></i></div>
+                    <div class="sidebar-brand-text mx-3">Representante</div>
+                </a>
+                <ul class="nav flex-column">';
+
+        foreach ($menuItems as $key => $item) {
+            $activeClass = ($activePage === $key) ? 'active' : '';
+            echo '<li class="nav-item">
+                <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
+                    <i class="fas fa-fw ' . $item['icon'] . '"></i>
+                    <span>' . $item['label'] . '</span>
+                </a>
+            </li>';
+        }
+
+        echo '</ul>
+                <hr class="sidebar-divider">
+                <div class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-fw fa-home"></i>
+                        <span>Voltar ao Site</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link" href="/logout">
+                        <i class="fas fa-fw fa-sign-out-alt"></i>
+                        <span>Sair</span>
+                    </a>
+                </div>
+            </div>
+        </nav>';
+
+        return;
+    }
+
     $menuItems = [
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
