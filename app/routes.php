@@ -52,6 +52,7 @@ $router->post('/perfil', 'AuthController', 'perfil');
 
 // Área do Usuário
 $router->get('/minha-conta', 'UsuarioController', 'minhaConta');
+$router->get('/meu-painel', 'RepresentantePainelController', 'index');
 $router->get('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
@@ -102,6 +103,11 @@ $router->get('/admin', function() {
         $perfil = 'cliente';
     }
 
+    if ($perfil === 'representante') {
+        header('Location: /meu-painel');
+        exit;
+    }
+
     $menuItems = [
         ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
@@ -114,13 +120,6 @@ $router->get('/admin', function() {
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
     ];
-
-    if ($perfil === 'representante') {
-        $menuItems = [
-            ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
-            ['icon' => 'fas fa-percentage', 'label' => 'Comissões', 'url' => '/admin/representante/comissoes', 'roles' => ['representante']],
-        ];
-    }
 
     $renderItems = $menuItems;
     if ($perfil !== 'cliente') {

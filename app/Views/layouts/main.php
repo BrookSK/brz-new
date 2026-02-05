@@ -824,6 +824,9 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> Minha Conta</a></li>
+                                <?php if ($usuarioPerfil === 'representante'): ?>
+                                    <li><a class="dropdown-item" href="/meu-painel"><i class="fas fa-chart-line"></i> Meu Painel</a></li>
+                                <?php endif; ?>
                                 <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> Meus Pedidos</a></li>
                                 <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> Meus Dados</a></li>
                                 <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)): ?>
