@@ -317,6 +317,51 @@ class UsuarioController extends Controller {
         } catch (\Exception $e) {
             $orcamentosAssessoria = [];
         }
+
+        $carteiraTransacoes = [];
+        $carteiraRendimentoResumo = [
+            'credito_usd' => 0.0,
+            'credito_brl' => 0.0,
+            'debito_usd' => 0.0,
+            'debito_brl' => 0.0,
+        ];
+        try {
+            $db = \Config\Database::getConnection();
+
+            $temTabela = false;
+            try {
+                $stmtT = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+                $stmtT->execute(['transacoes_carteira']);
+                $temTabela = (bool) $stmtT->fetchColumn();
+            } catch (\Exception $e) {
+                $temTabela = false;
+            }
+
+            if ($temTabela) {
+                $stmtTx = $db->prepare('SELECT id, tipo, valor_usd, valor_brl, descricao, created_at FROM transacoes_carteira WHERE usuario_id = ? ORDER BY created_at DESC, id DESC LIMIT 50');
+                $stmtTx->execute([(int) $usuario['id']]);
+                $carteiraTransacoes = $stmtTx->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                foreach ($carteiraTransacoes as $t) {
+                    $desc = (string) ($t['descricao'] ?? '');
+                    if (stripos($desc, 'Rendimento Clube') === false) {
+                        continue;
+                    }
+                    $tipo = strtolower(trim((string) ($t['tipo'] ?? '')));
+                    $vUsd = (float) ($t['valor_usd'] ?? 0);
+                    $vBrl = (float) ($t['valor_brl'] ?? 0);
+                    if ($tipo === 'credito') {
+                        $carteiraRendimentoResumo['credito_usd'] += $vUsd;
+                        $carteiraRendimentoResumo['credito_brl'] += $vBrl;
+                    } elseif ($tipo === 'debito') {
+                        $carteiraRendimentoResumo['debito_usd'] += $vUsd;
+                        $carteiraRendimentoResumo['debito_brl'] += $vBrl;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $carteiraTransacoes = [];
+        }
         
         $this->view('usuario/minha-conta', [
             'usuario' => $usuario,
@@ -332,6 +377,8 @@ class UsuarioController extends Controller {
             'carteira_saldo_usd' => (float) $carteiraSaldoUsd,
             'carteira_usd_brl_rate' => (float) $usdBrlRate,
             'carteira_saldo_brl_equiv' => (float) $carteiraSaldoBrlEquiv,
+            'carteira_transacoes' => $carteiraTransacoes,
+            'carteira_rendimento_resumo' => $carteiraRendimentoResumo,
             'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
             'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey()
         ]);

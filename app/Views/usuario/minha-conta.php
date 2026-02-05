@@ -132,6 +132,99 @@
                 </div>
             </div>
 
+            <div class="card shadow-sm mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Rendimentos da Carteira (Clube)</h5>
+                </div>
+                <div class="card-body">
+                    <?php $rr = $carteira_rendimento_resumo ?? ['credito_usd' => 0, 'credito_brl' => 0, 'debito_usd' => 0, 'debito_brl' => 0]; ?>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
+                                <div class="small text-muted">Total creditado</div>
+                                <div class="fw-bold">
+                                    <?php
+                                        $cUsd = (float) ($rr['credito_usd'] ?? 0);
+                                        $cBrl = (float) ($rr['credito_brl'] ?? 0);
+                                        $parts = [];
+                                        if ($cBrl > 0) $parts[] = 'R$ ' . number_format($cBrl, 2, ',', '.');
+                                        if ($cUsd > 0) $parts[] = 'US$ ' . number_format($cUsd, 2, ',', '.');
+                                        echo !empty($parts) ? implode(' / ', $parts) : 'R$ 0,00';
+                                    ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3" style="background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.18) !important;">
+                                <div class="small text-muted">Total estornado</div>
+                                <div class="fw-bold">
+                                    <?php
+                                        $dUsd = (float) ($rr['debito_usd'] ?? 0);
+                                        $dBrl = (float) ($rr['debito_brl'] ?? 0);
+                                        $parts = [];
+                                        if ($dBrl > 0) $parts[] = 'R$ ' . number_format($dBrl, 2, ',', '.');
+                                        if ($dUsd > 0) $parts[] = 'US$ ' . number_format($dUsd, 2, ',', '.');
+                                        echo !empty($parts) ? implode(' / ', $parts) : 'R$ 0,00';
+                                    ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mt-3">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php $txs = $carteira_transacoes ?? []; ?>
+                                <?php if (empty($txs)): ?>
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">Nenhuma movimentação encontrada.</td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($txs as $t): ?>
+                                        <?php
+                                            $desc = (string) ($t['descricao'] ?? '');
+                                            $tipo = strtolower(trim((string) ($t['tipo'] ?? '')));
+                                            $isRend = (stripos($desc, 'Rendimento Clube') !== false);
+                                            $vUsd = (float) ($t['valor_usd'] ?? 0);
+                                            $vBrl = (float) ($t['valor_brl'] ?? 0);
+                                            $valorStr = '-';
+                                            if (abs($vBrl) > 0.00001) {
+                                                $valorStr = 'R$ ' . number_format(abs($vBrl), 2, ',', '.');
+                                            } elseif (abs($vUsd) > 0.00001) {
+                                                $valorStr = 'US$ ' . number_format(abs($vUsd), 2, ',', '.');
+                                            }
+                                            $valorClass = ($tipo === 'debito') ? 'text-danger' : 'text-success';
+                                        ?>
+                                        <tr class="<?= $isRend ? '' : 'text-muted' ?>">
+                                            <td style="white-space: nowrap;">
+                                                <?= !empty($t['created_at']) ? date('d/m/Y H:i', strtotime((string) $t['created_at'])) : '-' ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($isRend): ?>
+                                                    <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">Clube</span>
+                                                <?php endif; ?>
+                                                <?= htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') ?>
+                                            </td>
+                                            <td class="text-end <?= $valorClass ?>" style="white-space: nowrap;">
+                                                <?= ($tipo === 'debito' ? '-' : '+') . ' ' . $valorStr ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                        <div class="small text-muted">Mostrando as últimas 50 movimentações.</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="modal fade" id="modalRecargaCarteira" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered">
                     <div class="modal-content">

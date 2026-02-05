@@ -1212,6 +1212,10 @@ class AdminConfiguracoesController extends Controller {
                                                                 <div class="col-12">
                                                                     <div class="border rounded p-3 bg-light">
                                                                         <div class="fw-semibold mb-2">Faixas de desconto progressivo (peso total de produtos com Clube Ativo)</div>
+                                                                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                                                            <div class="text-muted small">Para cadastrar uma nova faixa: preencha a linha <strong>Nova</strong> abaixo e clique em <strong>Salvar Configurações</strong>.</div>
+                                                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="try{var els=document.getElementsByName(\'clube_faixa_nova[peso_min_kg]\'); if(els&&els[0]) els[0].focus();}catch(e){}">Nova faixa</button>
+                                                                        </div>
                                                                         <div class="table-responsive">
                                                                             <table class="table table-sm align-middle mb-0">
                                                                                 <thead>
