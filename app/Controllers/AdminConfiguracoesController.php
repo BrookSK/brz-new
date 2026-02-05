@@ -2511,15 +2511,24 @@ HTML;
             $auth->requerPerfil('admin');
 
             $pdo = Database::getConnection();
-            $pdo->beginTransaction();
-
             $acao = (string) ($request->getParam('acao') ?? '');
             if ($acao === 'importar_usuarios') {
+                @ini_set('max_execution_time', '0');
+                @set_time_limit(0);
+                @ini_set('memory_limit', '-1');
+                if (function_exists('ignore_user_abort')) {
+                    @ignore_user_abort(true);
+                }
+                if (function_exists('session_write_close')) {
+                    @session_write_close();
+                }
+
                 $resultado = $this->importarUsuariosCsv($pdo);
-                $pdo->commit();
                 header('Location: /admin/configuracoes?import_users=1&ok=' . (int) ($resultado['ok'] ?? 0) . '&fail=' . (int) ($resultado['fail'] ?? 0));
                 exit;
             }
+
+            $pdo->beginTransaction();
 
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
@@ -2807,6 +2816,9 @@ HTML;
         $ok = 0;
         $fail = 0;
 
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+
         if (!isset($_FILES['usuarios_import_csv']) || empty($_FILES['usuarios_import_csv']['tmp_name'])) {
             return ['ok' => 0, 'fail' => 1];
         }
@@ -2945,6 +2957,10 @@ HTML;
             } catch (\Exception $e) {
                 $fail++;
             }
+
+            if ((($ok + $fail) % 200) === 0) {
+                @set_time_limit(0);
+            }
         }
 
         fclose($fh);
@@ -2999,6 +3015,8 @@ HTML;
         }
         $src = $hasBilling ? $billing : $shipping;
 
+        $src['tipo'] = $hasBilling ? 'cobranca' : 'entrega';
+
         foreach ($src as $k => $v) {
             if ($v === '') {
                 unset($src[$k]);
@@ -3031,6 +3049,7 @@ HTML;
 
         $payload = [];
         $map = [
+            'tipo' => ['tipo'],
             'cep' => ['cep'],
             'endereco' => ['endereco', 'logradouro'],
             'numero' => ['numero'],
@@ -3132,12 +3151,18 @@ HTML;
         if ($birth !== '') {
             $colBirth = in_array('data_nascimento', $cols, true) ? 'data_nascimento' : (in_array('birthdate', $cols, true) ? 'birthdate' : '');
             if ($colBirth !== '') {
-                $norm = preg_replace('/[^0-9\-\/]/', '', $birth);
+                $norm = trim((string) $birth);
+                $norm = preg_replace('/\s+/', '', $norm);
+
                 $dt = null;
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $norm)) {
                     $dt = $norm;
                 } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $norm, $m)) {
                     $dt = $m[3] . '-' . $m[2] . '-' . $m[1];
+                } elseif (preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $norm, $m)) {
+                    $dt = $m[3] . '-' . $m[2] . '-' . $m[1];
+                } elseif (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $norm, $m)) {
+                    $dt = $m[1] . '-' . $m[2] . '-' . $m[3];
                 }
                 if ($dt !== null) {
                     $set[] = $colBirth . ' = ?';
