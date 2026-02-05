@@ -499,7 +499,12 @@
                         return;
                     }
 
-                    setRecargaResultado('<div class="alert alert-success mb-0">Pagamento confirmado. A recarga será creditada após confirmação automática (webhook).</div>');
+                    if (recargaModalInstance) {
+                        recargaModalInstance.hide();
+                    }
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 300);
                     return;
                 }
 
