@@ -18,7 +18,6 @@ function renderAdminSidebar($activePage = '') {
     if ($perfil === 'representante') {
         $menuItems = [
             'rep_produtos' => ['icon' => 'fa-box', 'label' => 'Produtos', 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
-            'rep_comissoes' => ['icon' => 'fa-percentage', 'label' => 'Comissões', 'url' => '/admin/representante/comissoes', 'roles' => ['representante']],
         ];
 
         echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">

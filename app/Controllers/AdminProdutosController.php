@@ -59,6 +59,43 @@ class AdminProdutosController extends Controller {
         }
     }
 
+    public function togglePublicacao(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+        $id = (int) ($id ?? $request->getParam('id'));
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
+
+            $cols = $this->getTableColumns($pdo, 'produtos');
+            $colActive = null;
+            if (in_array('active', $cols, true)) {
+                $colActive = 'active';
+            } elseif (in_array('ativo', $cols, true)) {
+                $colActive = 'ativo';
+            }
+            if ($colActive === null) {
+                throw new \Exception('Campo de publicação não encontrado no schema de produtos.');
+            }
+
+            $st = $pdo->prepare('SELECT ' . $colActive . ' FROM produtos WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $curr = $st->fetchColumn();
+            $currInt = (int) ($curr ?? 0);
+            $novo = $currInt ? 0 : 1;
+
+            $stUp = $pdo->prepare('UPDATE produtos SET ' . $colActive . ' = ? WHERE id = ?');
+            $stUp->execute([$novo, $id]);
+
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/admin/representante/produtos'));
+            exit;
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+    }
+
     private function requireVariacaoOwnerIfRepresentante(\PDO $pdo, int $variacaoId): void {
         $perfil = $this->getSessionPerfil();
         if ($perfil !== 'representante') {
@@ -3090,6 +3127,11 @@ HTMLSCRIPT;
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
+
+            if ($this->produtoTemVendas($pdo, (int) $id)) {
+                throw new \Exception('Não é possível excluir este produto porque ele já possui vendas. Você pode despublicar o produto.');
+            }
+
             $pdo->beginTransaction();
             
             // Buscar produto para obter imagens
@@ -3122,7 +3164,8 @@ HTMLSCRIPT;
             $stmt->execute([$id]);
             
             $pdo->commit();
-            header('Location: /admin/produtos?success=3');
+            $perfil = $this->getSessionPerfil();
+            header('Location: ' . ($perfil === 'representante' ? '/admin/representante/produtos?success=3' : '/admin/produtos?success=3'));
             exit;
             
         } catch (\Exception $e) {
@@ -3159,5 +3202,48 @@ HTMLSCRIPT;
         }
 
         return $s;
+    }
+
+    private function detectPedidoItensTable(\PDO $pdo): ?string {
+        foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+            if ($this->tableExists($pdo, $t)) {
+                return $t;
+            }
+        }
+        return null;
+    }
+
+    private function getFirstExistingColumn(array $cols, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    private function produtoTemVendas(\PDO $pdo, int $produtoId): bool {
+        if ($produtoId <= 0) {
+            return false;
+        }
+
+        $itensTable = $this->detectPedidoItensTable($pdo);
+        if (!$itensTable) {
+            return false;
+        }
+
+        $colsItens = $this->getTableColumns($pdo, $itensTable);
+        $colProdutoId = $this->getFirstExistingColumn($colsItens, ['produto_id', 'product_id']);
+        if (!$colProdutoId) {
+            return false;
+        }
+
+        try {
+            $st = $pdo->prepare('SELECT 1 FROM ' . $itensTable . ' WHERE ' . $colProdutoId . ' = ? LIMIT 1');
+            $st->execute([$produtoId]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }

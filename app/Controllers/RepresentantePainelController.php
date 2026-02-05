@@ -97,6 +97,34 @@ class RepresentantePainelController extends Controller {
         return $sym . ' ' . number_format($v, 2, ',', '.');
     }
 
+    private function getProdutosDoRepresentante(\PDO $pdo, int $repId): array {
+        if ($repId <= 0) {
+            return [];
+        }
+        if (!$this->tableExists($pdo, 'produtos')) {
+            return [];
+        }
+
+        $cols = $this->getColumns($pdo, 'produtos');
+        if (!in_array('representante_id', $cols, true)) {
+            return [];
+        }
+
+        $colActive = in_array('active', $cols, true) ? 'active' : (in_array('ativo', $cols, true) ? 'ativo' : null);
+        $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'id');
+        $colSku = in_array('sku', $cols, true) ? 'sku' : null;
+        $colFoto = in_array('foto_principal', $cols, true) ? 'foto_principal' : null;
+
+        $select = 'id, ' . $colNome . ' AS nome';
+        if ($colSku) $select .= ', ' . $colSku . ' AS sku';
+        if ($colActive) $select .= ', ' . $colActive . ' AS active';
+        if ($colFoto) $select .= ', ' . $colFoto . ' AS foto_principal';
+
+        $st = $pdo->prepare('SELECT ' . $select . ' FROM produtos WHERE representante_id = ? ORDER BY id DESC LIMIT 50');
+        $st->execute([$repId]);
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerAutenticacao();
@@ -124,6 +152,7 @@ class RepresentantePainelController extends Controller {
             'vendas_qtd' => 0,
         ];
         $erro = '';
+        $produtos = [];
 
         try {
             $pdo = $this->getPdo();
@@ -209,6 +238,8 @@ class RepresentantePainelController extends Controller {
                 $resumo['totais'][$moeda]['comissao'] += $com;
             }
 
+            $produtos = $this->getProdutosDoRepresentante($pdo, $repId);
+
         } catch (\Exception $e) {
             $erro = $e->getMessage();
         }
@@ -222,7 +253,6 @@ class RepresentantePainelController extends Controller {
             . '<h1 class="h3 mb-0">' . htmlspecialchars($usuarioNome !== '' ? $usuarioNome : 'Representante', ENT_QUOTES, 'UTF-8') . '</h1>'
             . '</div>'
             . '<div class="d-flex gap-2">'
-            . '<a class="btn btn-outline-primary" href="/admin/representante/comissoes"><i class="fas fa-percentage me-1"></i>Comissões</a>'
             . '<a class="btn btn-primary" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Cadastrar produto</a>'
             . '</div>'
             . '</div>';
@@ -274,6 +304,57 @@ class RepresentantePainelController extends Controller {
             . '</div>'
             . '</div>'
             . '</div>';
+
+        echo '</div>';
+
+        echo '<div class="container pb-4">'
+            . '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-2">'
+            . '<h2 class="h5 mb-0">Meus Produtos</h2>'
+            . '<div class="d-flex gap-2">'
+            . '<a class="btn btn-outline-primary btn-sm" href="/admin/representante/produtos"><i class="fas fa-box me-1"></i>Gerenciar produtos</a>'
+            . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Adicionar produto</a>'
+            . '</div>'
+            . '</div>';
+
+        if (empty($produtos)) {
+            echo '<div class="card"><div class="card-body text-muted">Nenhum produto cadastrado ainda.</div></div>';
+        } else {
+            echo '<div class="card"><div class="card-body">'
+                . '<div class="table-responsive">'
+                . '<table class="table table-sm align-middle mb-0">'
+                . '<thead><tr><th>Produto</th><th>Status</th><th class="text-end">Ações</th></tr></thead><tbody>';
+            foreach ($produtos as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $nome = (string) ($p['nome'] ?? '');
+                $sku = (string) ($p['sku'] ?? '');
+                $ativo = (int) ($p['active'] ?? 0);
+                $status = $ativo ? 'Publicado' : 'Despublicado';
+                $badge = $ativo ? 'bg-success' : 'bg-secondary';
+
+                $nomeEsc = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+                $skuEsc = htmlspecialchars($sku, ENT_QUOTES, 'UTF-8');
+                $urlEditar = '/admin/representante/produtos/editar/' . $pid;
+
+                echo '<tr>'
+                    . '<td>'
+                    . '<div class="fw-semibold">' . $nomeEsc . '</div>'
+                    . ($skuEsc !== '' ? ('<div class="text-muted small">SKU: ' . $skuEsc . '</div>') : '')
+                    . '</td>'
+                    . '<td><span class="badge ' . $badge . '">' . $status . '</span></td>'
+                    . '<td class="text-end">'
+                    . '<div class="d-inline-flex gap-2">'
+                    . '<a class="btn btn-sm btn-outline-warning" href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-edit"></i></a>'
+                    . '<form method="POST" action="/admin/representante/produtos/toggle-publicacao/' . $pid . '">' 
+                    . '<button type="submit" class="btn btn-sm ' . ($ativo ? 'btn-outline-secondary' : 'btn-outline-success') . '">' 
+                    . ($ativo ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>')
+                    . '</button>'
+                    . '</form>'
+                    . '</div>'
+                    . '</td>'
+                    . '</tr>';
+            }
+            echo '</tbody></table></div></div></div>';
+        }
 
         echo '</div>';
 

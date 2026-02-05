@@ -437,4 +437,5 @@ $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController'
 $router->get('/admin/representante/produtos', 'AdminProdutosController', 'index');
 $router->get('/admin/representante/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/representante/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
+$router->post('/admin/representante/produtos/toggle-publicacao/{id}', 'AdminProdutosController', 'togglePublicacao');
 $router->get('/admin/representante/comissoes', 'RepresentanteComissoesController', 'index');
