@@ -868,8 +868,7 @@ HTML;
 
             exit;
 
-            return;
-        }
+        exit;
     }
 
     public function index(Request $request) {
