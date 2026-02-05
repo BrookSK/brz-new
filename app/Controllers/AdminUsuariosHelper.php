@@ -56,6 +56,15 @@ class AdminUsuariosHelper {
     }
     
     public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0) {
+        $colunasUsuarios = $this->getColunasUsuarios();
+        $buscaCols = ['u.nome', 'u.email'];
+        if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
+            $buscaCols[] = 'u.cpf';
+        }
+        if (is_array($colunasUsuarios) && in_array('documento', $colunasUsuarios, true)) {
+            $buscaCols[] = 'u.documento';
+        }
+
         $sql = "SELECT u.*, 
                        COALESCE(w.saldo_usd, 0) as carteira_usd,
                        COALESCE(w.saldo_brl, 0) as carteira_brl
@@ -65,7 +74,11 @@ class AdminUsuariosHelper {
         $params = [];
         
         if (!empty($busca)) {
-            $sql .= " AND (u.nome LIKE :busca OR u.email LIKE :busca OR u.cpf LIKE :busca)";
+            $conds = [];
+            foreach ($buscaCols as $c) {
+                $conds[] = $c . ' LIKE :busca';
+            }
+            $sql .= " AND (" . implode(' OR ', $conds) . ")";
             $params[':busca'] = "%{$busca}%";
         }
         
@@ -96,11 +109,24 @@ class AdminUsuariosHelper {
     }
     
     public function getTotalUsuarios($busca = '') {
+        $colunasUsuarios = $this->getColunasUsuarios();
+        $buscaCols = ['nome', 'email'];
+        if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
+            $buscaCols[] = 'cpf';
+        }
+        if (is_array($colunasUsuarios) && in_array('documento', $colunasUsuarios, true)) {
+            $buscaCols[] = 'documento';
+        }
+
         $sql = "SELECT COUNT(*) as total FROM usuarios u";
         $params = [];
         
         if (!empty($busca)) {
-            $sql .= " WHERE (u.nome LIKE :busca OR u.email LIKE :busca OR u.cpf LIKE :busca)";
+            $conds = [];
+            foreach ($buscaCols as $c) {
+                $conds[] = 'u.' . $c . ' LIKE :busca';
+            }
+            $sql .= " WHERE (" . implode(' OR ', $conds) . ")";
             $params[':busca'] = "%{$busca}%";
         }
         

@@ -111,13 +111,60 @@ class AdminUsuariosController extends Controller {
                 
                 // Paginação
                 if ($totalPaginas > 1) {
-                    echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
-                    for ($i = 1; $i <= $totalPaginas; $i++) {
-                        $url = "/admin/usuarios?pagina={$i}" . (!empty($busca) ? "&busca=" . urlencode($busca) : "");
-                        echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">
-                            <a class="page-link" href="' . $url . '">' . $i . '</a>
-                        </li>';
+                    $paginaAtual = (int) $pagina;
+                    if ($paginaAtual < 1) $paginaAtual = 1;
+                    if ($paginaAtual > (int) $totalPaginas) $paginaAtual = (int) $totalPaginas;
+                    $mkUrl = function(int $p) use ($busca): string {
+                        return "/admin/usuarios?pagina={$p}" . (!empty($busca) ? "&busca=" . urlencode($busca) : "");
+                    };
+
+                    $start = max(1, $paginaAtual - 1);
+                    $end = min((int) $totalPaginas, $paginaAtual + 1);
+                    if (($end - $start + 1) < 3) {
+                        if ($start === 1) {
+                            $end = min((int) $totalPaginas, $start + 2);
+                        } elseif ($end === (int) $totalPaginas) {
+                            $start = max(1, $end - 2);
+                        }
                     }
+
+                    echo '<nav class="mt-4"><ul class="pagination justify-content-center flex-wrap">';
+
+                    // Anterior
+                    $prev = max(1, $paginaAtual - 1);
+                    echo '<li class="page-item ' . ($paginaAtual <= 1 ? 'disabled' : '') . '">'
+                        . '<a class="page-link" href="' . ($paginaAtual <= 1 ? '#' : $mkUrl($prev)) . '" tabindex="-1">Anterior</a>'
+                        . '</li>';
+
+                    // Primeira + reticências
+                    if ($start > 1) {
+                        echo '<li class="page-item"><a class="page-link" href="' . $mkUrl(1) . '">1</a></li>';
+                        if ($start > 2) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                    }
+
+                    // Janela (máx 3)
+                    for ($i = $start; $i <= $end; $i++) {
+                        echo '<li class="page-item ' . ($i === $paginaAtual ? 'active' : '') . '">'
+                            . '<a class="page-link" href="' . $mkUrl($i) . '">' . $i . '</a>'
+                            . '</li>';
+                    }
+
+                    // Reticências + última
+                    if ($end < (int) $totalPaginas) {
+                        if ($end < ((int) $totalPaginas - 1)) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                        echo '<li class="page-item"><a class="page-link" href="' . $mkUrl((int) $totalPaginas) . '">' . (int) $totalPaginas . '</a></li>';
+                    }
+
+                    // Próxima
+                    $next = min((int) $totalPaginas, $paginaAtual + 1);
+                    echo '<li class="page-item ' . ($paginaAtual >= (int) $totalPaginas ? 'disabled' : '') . '">'
+                        . '<a class="page-link" href="' . ($paginaAtual >= (int) $totalPaginas ? '#' : $mkUrl($next)) . '">Próxima</a>'
+                        . '</li>';
+
                     echo '</ul></nav>';
                 }
                 
