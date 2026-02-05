@@ -174,8 +174,15 @@ class CarrinhoController extends Controller {
         session_start();
 
         $uid = $this->getLoggedUserId();
+        $cartId = 0;
         $carrinho = [];
         if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+            } catch (\Throwable $e) {
+                $cartId = 0;
+            }
             $carrinho = $this->getCarrinhoFromDb($uid);
         }
         if (empty($carrinho)) {
@@ -192,6 +199,11 @@ class CarrinhoController extends Controller {
         $subtotal = 0;
         $pesoTotal = 0;
         $totalItensAtivos = 0;
+
+        $pesoClubeTotal = 0.0;
+        $subtotalClube = 0.0;
+        $descontoClube = 0.0;
+        $cashbackClubeEstimado = 0.0;
 
         $removedExpired = false;
         
@@ -311,6 +323,7 @@ class CarrinhoController extends Controller {
         $excedePeso = ((float) $pesoTotal) > $pesoMaxKg + 0.00001;
 
         $pesoArredondado = ceil($pesoTotal); // Arredondar para cima
+
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
 
         // Mesma regra do checkout (Model Carrinho): taxa por kg configurada + impostos (Receita Federal)
@@ -318,11 +331,59 @@ class CarrinhoController extends Controller {
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
+
+        // Se o carrinho estiver no DB, usar os totais persistidos (inclui desconto/cashback do Clube)
+        if ($uid > 0 && $cartId > 0) {
+            try {
+                $db = $this->carrinhoModel->getConnection();
+                $cols = [];
+                try {
+                    $stCols = $db->query('DESCRIBE carrinhos');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Throwable $e) {
+                    $cols = [];
+                }
+
+                $st = $db->prepare('SELECT * FROM carrinhos WHERE id = ? LIMIT 1');
+                $st->execute([$cartId]);
+                $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                if (!empty($row)) {
+                    if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
+                    if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
+                    if (array_key_exists('taxa_servico', $row)) $taxaServico = (float) ($row['taxa_servico'] ?? $taxaServico);
+                    if (array_key_exists('valor_impostos', $row)) $impostos = (float) ($row['valor_impostos'] ?? $impostos);
+                    if (array_key_exists('valor_total', $row)) $total = (float) ($row['valor_total'] ?? $total);
+
+                    if (array_key_exists('frete_manual', $row) && $row['frete_manual'] !== null && $row['frete_manual'] !== '') {
+                        $frete = (float) $row['frete_manual'];
+                    }
+
+                    if (is_array($cols) && in_array('peso_clube_total', $cols, true)) {
+                        $pesoClubeTotal = (float) ($row['peso_clube_total'] ?? 0);
+                    }
+                    if (is_array($cols) && in_array('subtotal_clube', $cols, true)) {
+                        $subtotalClube = (float) ($row['subtotal_clube'] ?? 0);
+                    }
+                    if (is_array($cols) && in_array('desconto_clube', $cols, true)) {
+                        $descontoClube = (float) ($row['desconto_clube'] ?? 0);
+                    }
+                    if (is_array($cols) && in_array('cashback_clube_estimado', $cols, true)) {
+                        $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
         
         $this->view('carrinho/index', [
             'carrinho' => $carrinho,
             'produtosDetalhados' => $produtosDetalhados,
             'subtotal' => $subtotal,
+            'peso_clube_total' => $pesoClubeTotal,
+            'subtotal_clube' => $subtotalClube,
+            'desconto_clube' => $descontoClube,
+            'cashback_clube_estimado' => $cashbackClubeEstimado,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'frete' => $frete,

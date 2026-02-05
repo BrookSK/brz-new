@@ -52,6 +52,70 @@ class Carrinho extends Model {
         return 'COALESCE(' . implode(', ', $parts) . ', 0)';
     }
 
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getTableColumns(string $table): array {
+        try {
+            $st = $this->connection->query('DESCRIBE ' . $table);
+            return $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getConfigValue(string $key, $default = null) {
+        try {
+            if (!$this->tableExists('configuracoes_sistema')) {
+                return $default;
+            }
+            $stmt = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([(string) $key]);
+            $v = $stmt->fetchColumn();
+            if ($v === false || $v === null) {
+                return $default;
+            }
+            return $v;
+        } catch (\Exception $e) {
+            return $default;
+        }
+    }
+
+    private function getClubeFaixaPercentual(float $pesoClubeTotal): float {
+        $pesoClubeTotal = (float) $pesoClubeTotal;
+        if ($pesoClubeTotal <= 0) {
+            return 0.0;
+        }
+        if (!$this->tableExists('clube_descontos_faixas')) {
+            return 0.0;
+        }
+        try {
+            $sql = "SELECT percentual_desconto\n"
+                . "FROM clube_descontos_faixas\n"
+                . "WHERE ativo = 1\n"
+                . "  AND peso_min_kg <= :peso\n"
+                . "  AND (peso_max_kg <= 0 OR :peso <= peso_max_kg)\n"
+                . "ORDER BY ordem ASC, peso_min_kg DESC, id ASC\n"
+                . "LIMIT 1";
+            $st = $this->connection->prepare($sql);
+            $st->bindValue(':peso', $pesoClubeTotal);
+            $st->execute();
+            $pct = $st->fetchColumn();
+            $pct = (float) str_replace(',', '.', (string) ($pct ?? 0));
+            if ($pct < 0) $pct = 0.0;
+            return $pct;
+        } catch (\Exception $e) {
+            return 0.0;
+        }
+    }
+
     public function getOrCreateCarrinho($usuarioId = null, $sessionId = null, $moeda = 'USD') {
         $where = [];
         $params = [];
@@ -194,8 +258,13 @@ class Carrinho extends Model {
     public function atualizarTotais($carrinhoId) {
         // Obter itens do carrinho
         $pesoExpr = $this->getPesoExpressionForProdutos('p');
+
+        $prodCols = $this->getTableColumns('produtos');
+        $hasClubeAtivo = is_array($prodCols) && in_array('clube_ativo', $prodCols, true);
+        $clubeSelect = $hasClubeAtivo ? ', COALESCE(p.clube_ativo,0) AS clube_ativo' : ', 0 AS clube_ativo';
+
         $stmt = $this->connection->prepare("
-            SELECT ci.*, {$pesoExpr} AS peso 
+            SELECT ci.*, {$pesoExpr} AS peso {$clubeSelect}
             FROM carrinho_items ci 
             JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id
@@ -206,10 +275,19 @@ class Carrinho extends Model {
         
         $subtotalProdutos = 0;
         $pesoTotal = 0;
+
+        $pesoClubeTotal = 0.0;
+        $subtotalClube = 0.0;
         
         foreach ($items as $item) {
             $subtotalProdutos += $item['subtotal'];
             $pesoTotal += $item['peso'] * $item['quantidade'];
+
+            $isClube = ((int) ($item['clube_ativo'] ?? 0)) === 1;
+            if ($isClube) {
+                $subtotalClube += (float) ($item['subtotal'] ?? 0);
+                $pesoClubeTotal += ((float) ($item['peso'] ?? 0)) * ((int) ($item['quantidade'] ?? 0));
+            }
         }
         
         // Obter dados do carrinho
@@ -220,27 +298,83 @@ class Carrinho extends Model {
         
         // Calcular taxas
         $taxaServico = $this->calcularTaxaServico($pesoTotal, $carrinho['moeda'], $carrinho['taxa_conversao']);
-        $valorImpostos = $this->calcularImpostos($subtotalProdutos, $carrinho['frete_manual']);
+
+        $pctDesconto = $this->getClubeFaixaPercentual((float) $pesoClubeTotal);
+        $descontoClube = 0.0;
+        if ($pctDesconto > 0 && $subtotalClube > 0) {
+            $descontoClube = ((float) $subtotalClube) * ($pctDesconto / 100.0);
+            if ($descontoClube < 0) {
+                $descontoClube = 0.0;
+            }
+        }
+
+        $subtotalLiquido = (float) $subtotalProdutos - (float) $descontoClube;
+        if ($subtotalLiquido < 0) {
+            $subtotalLiquido = 0.0;
+        }
+
+        $valorImpostos = $this->calcularImpostos($subtotalLiquido, $carrinho['frete_manual']);
         
-        $valorTotal = $subtotalProdutos + $carrinho['frete_manual'] + $taxaServico + $valorImpostos;
+        $valorTotal = $subtotalLiquido + $carrinho['frete_manual'] + $taxaServico + $valorImpostos;
+
+        $cashbackPct = (float) str_replace(',', '.', (string) $this->getConfigValue('clube_cashback_percent', '0'));
+        if ($cashbackPct < 0) $cashbackPct = 0.0;
+        $cashbackBase = (float) $subtotalClube - (float) $descontoClube;
+        if ($cashbackBase < 0) {
+            $cashbackBase = 0.0;
+        }
+        $cashbackEstimado = 0.0;
+        if ($cashbackPct > 0 && $cashbackBase > 0) {
+            $cashbackEstimado = $cashbackBase * ($cashbackPct / 100.0);
+            if ($cashbackEstimado < 0) {
+                $cashbackEstimado = 0.0;
+            }
+        }
         
         // Atualizar carrinho
+        $cartCols = $this->getTableColumns($this->table);
+        $setExtra = '';
+        if (is_array($cartCols) && in_array('peso_clube_total', $cartCols, true)) {
+            $setExtra .= ', peso_clube_total = :peso_clube_total';
+        }
+        if (is_array($cartCols) && in_array('subtotal_clube', $cartCols, true)) {
+            $setExtra .= ', subtotal_clube = :subtotal_clube';
+        }
+        if (is_array($cartCols) && in_array('desconto_clube', $cartCols, true)) {
+            $setExtra .= ', desconto_clube = :desconto_clube';
+        }
+        if (is_array($cartCols) && in_array('cashback_clube_estimado', $cartCols, true)) {
+            $setExtra .= ', cashback_clube_estimado = :cashback_clube_estimado';
+        }
+
         $stmt = $this->connection->prepare("
             UPDATE {$this->table} 
             SET subtotal_produtos = :subtotal, 
                 peso_total = :peso, 
                 taxa_servico = :taxa_servico, 
                 valor_impostos = :impostos, 
-                valor_total = :total,
+                valor_total = :total{$setExtra},
                 updated_at = NOW()
             WHERE id = :id
         ");
-        $stmt->bindParam(':subtotal', $subtotalProdutos);
-        $stmt->bindParam(':peso', $pesoTotal);
-        $stmt->bindParam(':taxa_servico', $taxaServico);
-        $stmt->bindParam(':impostos', $valorImpostos);
-        $stmt->bindParam(':total', $valorTotal);
-        $stmt->bindParam(':id', $carrinhoId);
+        $stmt->bindValue(':subtotal', (float) $subtotalProdutos);
+        $stmt->bindValue(':peso', (float) $pesoTotal);
+        $stmt->bindValue(':taxa_servico', (float) $taxaServico);
+        $stmt->bindValue(':impostos', (float) $valorImpostos);
+        $stmt->bindValue(':total', (float) $valorTotal);
+        if (strpos($setExtra, ':peso_clube_total') !== false) {
+            $stmt->bindValue(':peso_clube_total', (float) $pesoClubeTotal);
+        }
+        if (strpos($setExtra, ':subtotal_clube') !== false) {
+            $stmt->bindValue(':subtotal_clube', (float) $subtotalClube);
+        }
+        if (strpos($setExtra, ':desconto_clube') !== false) {
+            $stmt->bindValue(':desconto_clube', (float) $descontoClube);
+        }
+        if (strpos($setExtra, ':cashback_clube_estimado') !== false) {
+            $stmt->bindValue(':cashback_clube_estimado', (float) $cashbackEstimado);
+        }
+        $stmt->bindValue(':id', (int) $carrinhoId);
         $stmt->execute();
     }
 
@@ -348,8 +482,11 @@ class Carrinho extends Model {
 
     public function getItems($carrinhoId) {
         $pesoExpr = $this->getPesoExpressionForProdutos('p');
+        $prodCols = $this->getTableColumns('produtos');
+        $hasClubeAtivo = is_array($prodCols) && in_array('clube_ativo', $prodCols, true);
+        $clubeSelect = $hasClubeAtivo ? ', COALESCE(p.clube_ativo,0) AS clube_ativo' : ', 0 AS clube_ativo';
         $stmt = $this->connection->prepare("
-            SELECT ci.*, p.nome, p.sku, p.descricao, {$pesoExpr} AS peso, p.moeda as moeda_produto
+            SELECT ci.*, p.nome, p.sku, p.descricao, {$pesoExpr} AS peso, p.moeda as moeda_produto {$clubeSelect}
             FROM carrinho_items ci 
             JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id

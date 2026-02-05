@@ -11,6 +11,8 @@ $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
 $router->post('/produtos/carrinho', 'ProdutoController', 'adicionarAoCarrinho');
+$router->get('/clube-brasiliana', 'ClubeController', 'comoFunciona');
+$router->get('/produtos-clube', 'ClubeController', 'produtosClube');
 $router->get('/carrinho', 'CarrinhoController', 'index');
 $router->post('/carrinho/adicionar', 'CarrinhoController', 'adicionar');
 $router->post('/carrinho/remover', 'CarrinhoController', 'remover');
@@ -82,6 +84,7 @@ $router->post('/assessoria/aceitar-disclaimer', 'AssessoriaController', 'aceitar
 
 // Cron / Manutenção
 $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cronLimparTemporarios');
+$router->get('/cron/clube/rendimento', 'ClubeController', 'cronRendimento');
 
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function() {
