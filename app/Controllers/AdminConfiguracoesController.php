@@ -82,6 +82,24 @@ class AdminConfiguracoesController extends Controller {
                     $config[$categoria][$chave] = $valor;
                 }
             }
+
+            // Comissão específica por representante (tabela dedicada)
+            try {
+                $repData = $request->getParam('representante_comissoes', null);
+                if (is_array($repData) && $this->tableExists($pdo, 'representante_comissoes')) {
+                    foreach ($repData as $rid => $percent) {
+                        $rid = (int) $rid;
+                        if ($rid <= 0) continue;
+                        $p = is_numeric($percent) ? (float) $percent : null;
+                        if ($p === null) continue;
+                        if ($p < 0) $p = 0;
+                        if ($p > 100) $p = 100;
+                        $stmtUp = $pdo->prepare('INSERT INTO representante_comissoes (representante_id, percentual, ativo, created_at, updated_at) VALUES (?, ?, 1, NOW(), NOW()) ON DUPLICATE KEY UPDATE percentual = VALUES(percentual), ativo = 1, updated_at = NOW()');
+                        $stmtUp->execute([$rid, $p]);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
             
         } catch (\Exception $e) {
             $config = [];
@@ -99,6 +117,13 @@ class AdminConfiguracoesController extends Controller {
             $mapaCalorTabHtml = $this->renderMapaCalorTabHtml($mapaCalor);
         } catch (\Exception $e) {
             $mapaCalorTabHtml = $this->renderMapaCalorTabHtml([]);
+        }
+
+        $repComissoesHtml = '';
+        try {
+            $repComissoesHtml = $this->renderRepresentantesComissoesHtml($pdo ?? null);
+        } catch (\Exception $e) {
+            $repComissoesHtml = '';
         }
         
         // Incluir o partial do menu lateral
@@ -1218,6 +1243,8 @@ class AdminConfiguracoesController extends Controller {
                                                 </button>
                                                 <small class="text-muted d-block mt-2">O faturamento usado é a soma do total faturado de pedidos manuais pagos.</small>
                                             </div>
+
+                                            ' . $repComissoesHtml . '
                                         </div>
                                     </div>
                                 </div>
@@ -1392,6 +1419,81 @@ JS;
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    private function renderRepresentantesComissoesHtml(?\PDO $pdo): string {
+        if (!$pdo || !$this->tableExists($pdo, 'usuarios') || !$this->tableExists($pdo, 'representante_comissoes')) {
+            return '';
+        }
+
+        $uCols = $this->getColumns($pdo, 'usuarios');
+        $nomeCol = $this->pickColumn($uCols, ['nome', 'name']);
+        if (!$nomeCol) {
+            return '';
+        }
+        if (!in_array('perfil', $uCols, true)) {
+            return '';
+        }
+
+        $reps = [];
+        try {
+            $st = $pdo->prepare('SELECT id, ' . $nomeCol . ' AS nome, email FROM usuarios WHERE LOWER(COALESCE(perfil,\'\')) = \'representante\' ORDER BY ' . $nomeCol . ' ASC');
+            $st->execute();
+            $reps = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $reps = [];
+        }
+
+        if (empty($reps)) {
+            return '<div class="alert alert-info">Nenhum usuário com perfil Representante encontrado.</div>';
+        }
+
+        $map = [];
+        try {
+            $ids = array_values(array_filter(array_map(function ($r) {
+                return (int) ($r['id'] ?? 0);
+            }, $reps)));
+            $ids = array_values(array_unique($ids));
+            if (!empty($ids)) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $st2 = $pdo->prepare('SELECT representante_id, percentual, ativo FROM representante_comissoes WHERE representante_id IN (' . $in . ')');
+                $st2->execute($ids);
+                foreach (($st2->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $row) {
+                    $rid = (int) ($row['representante_id'] ?? 0);
+                    if ($rid > 0) {
+                        $map[$rid] = [
+                            'percentual' => (float) ($row['percentual'] ?? 0),
+                            'ativo' => (int) ($row['ativo'] ?? 1),
+                        ];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $map = [];
+        }
+
+        $html = '<hr>'
+            . '<h6 class="mb-2">Comissões por Representante</h6>'
+            . '<div class="text-muted small mb-2">Configure o percentual (%) de comissão para cada representante. Usado no painel do representante e no cálculo: (venda - custo) * %.</div>'
+            . '<div class="table-responsive">'
+            . '<table class="table table-sm table-bordered align-middle">'
+            . '<thead><tr><th style="width:45%">Representante</th><th style="width:35%">E-mail</th><th style="width:20%">Comissão (%)</th></tr></thead><tbody>';
+
+        foreach ($reps as $r) {
+            $rid = (int) ($r['id'] ?? 0);
+            $nome = htmlspecialchars((string) ($r['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $email = htmlspecialchars((string) ($r['email'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $pct = isset($map[$rid]) ? (float) ($map[$rid]['percentual'] ?? 0) : 0.0;
+            $pctEsc = htmlspecialchars((string) $pct, ENT_QUOTES, 'UTF-8');
+            $html .= '<tr>'
+                . '<td>' . $nome . ' <span class="text-muted">(#' . $rid . ')</span></td>'
+                . '<td>' . $email . '</td>'
+                . '<td><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="representante_comissoes[' . $rid . ']" value="' . $pctEsc . '"></td>'
+                . '</tr>';
+        }
+
+        $html .= '</tbody></table></div>';
+        return $html;
     }
 
     private function getColumns(\PDO $pdo, string $table): array {
