@@ -1509,13 +1509,24 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="row g-2 align-items-end">
                                                     <div class="col-md-8">
                                                         <label class="form-label mb-1">Arquivo CSV</label>
-                                                        <input type="file" class="form-control" name="usuarios_import_csv" accept=".csv,text/csv">
+                                                        <input type="file" class="form-control" name="usuarios_import_csv" id="usuarios_import_csv" accept=".csv,text/csv">
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <button type="submit" class="btn btn-primary w-100" name="acao" value="importar_usuarios">
+                                                        <button type="button" class="btn btn-primary w-100" id="btnImportarUsuariosCsv">
                                                             <i class="fas fa-upload me-1"></i>Importar Usuários
                                                         </button>
                                                     </div>
+                                                </div>
+
+                                                <div class="mt-3" id="usuariosImportProgressWrap" style="display:none;">
+                                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                                        <span id="usuariosImportProgressLabel">Preparando...</span>
+                                                        <span id="usuariosImportProgressPercent">0%</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 18px;">
+                                                        <div class="progress-bar" role="progressbar" style="width:0%" id="usuariosImportProgressBar">0%</div>
+                                                    </div>
+                                                    <div class="small text-muted mt-2" id="usuariosImportProgressStats"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1539,10 +1550,106 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . $this->getUsuariosImportJS() . '
 </body>
 </html>';
         exit;
+    }
+
+    private function getUsuariosImportJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnImportarUsuariosCsv');
+    const fileInput = document.getElementById('usuarios_import_csv');
+    const wrap = document.getElementById('usuariosImportProgressWrap');
+    const bar = document.getElementById('usuariosImportProgressBar');
+    const percentEl = document.getElementById('usuariosImportProgressPercent');
+    const labelEl = document.getElementById('usuariosImportProgressLabel');
+    const statsEl = document.getElementById('usuariosImportProgressStats');
+
+    if (!btn || !fileInput || !wrap || !bar || !percentEl || !labelEl || !statsEl) return;
+
+    let running = false;
+
+    function setProgress(processed, total, okCount, failCount, label){
+        const t = (typeof total === 'number' && total > 0) ? total : 0;
+        const p = (typeof processed === 'number' && processed > 0) ? processed : 0;
+        let pct = (t > 0) ? Math.floor((p / t) * 100) : 0;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        percentEl.textContent = pct + '%';
+        labelEl.textContent = label || 'Processando...';
+        statsEl.textContent = 'Processados: ' + p + ' / ' + t + ' | OK: ' + (okCount||0) + ' | Falhas: ' + (failCount||0);
+    }
+
+    async function iniciarImportacao(file){
+        const fd = new FormData();
+        fd.append('usuarios_import_csv', file);
+        const resp = await fetch('/admin/configuracoes/importar-usuarios/iniciar', { method: 'POST', body: fd });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao iniciar a importação.');
+        }
+        return json;
+    }
+
+    async function processarLote(token, batchSize){
+        const fd = new URLSearchParams();
+        fd.set('token', token);
+        fd.set('batch', String(batchSize || 300));
+        const resp = await fetch('/admin/configuracoes/importar-usuarios/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString()
+        });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao processar lote.');
+        }
+        return json;
+    }
+
+    btn.addEventListener('click', async function(){
+        if (running) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert('Selecione um arquivo CSV primeiro.');
+            return;
+        }
+
+        running = true;
+        btn.disabled = true;
+        wrap.style.display = '';
+        setProgress(0, 0, 0, 0, 'Enviando arquivo...');
+
+        try {
+            const init = await iniciarImportacao(file);
+            const token = init.token;
+            const total = init.total || 0;
+            let last = init;
+
+            setProgress(0, total, 0, 0, 'Importação iniciada...');
+
+            while (!last.done) {
+                last = await processarLote(token, 300);
+                setProgress(last.processed || 0, last.total || total, last.okCount || 0, last.failCount || 0, 'Processando em lotes de 300...');
+            }
+
+            setProgress(last.processed || total, last.total || total, last.okCount || 0, last.failCount || 0, 'Finalizado');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Erro na importação.');
+            labelEl.textContent = 'Erro';
+        } finally {
+            running = false;
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+JS;
     }
 
     private function getComissoesJS(): string {
@@ -2810,6 +2917,341 @@ HTML;
         fputcsv($out, $headers);
         fclose($out);
         exit;
+    }
+
+    public function importarUsuariosIniciar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+        @ini_set('memory_limit', '-1');
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+        if (function_exists('session_write_close')) {
+            @session_write_close();
+        }
+
+        if (!isset($_FILES['usuarios_import_csv']) || empty($_FILES['usuarios_import_csv']['tmp_name'])) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não enviado.']);
+            exit;
+        }
+        if (!empty($_FILES['usuarios_import_csv']['error']) && $_FILES['usuarios_import_csv']['error'] !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Falha no upload do CSV.']);
+            exit;
+        }
+
+        $tmpUpload = (string) $_FILES['usuarios_import_csv']['tmp_name'];
+        $token = bin2hex(random_bytes(16));
+        $csvPath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'usuarios_import_' . $token . '.csv';
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'usuarios_import_' . $token . '.json';
+
+        if (!@move_uploaded_file($tmpUpload, $csvPath)) {
+            if (!@copy($tmpUpload, $csvPath)) {
+                http_response_code(500);
+                echo json_encode(['ok' => false, 'error' => 'Não foi possível salvar o arquivo no servidor.']);
+                exit;
+            }
+        }
+
+        $scan = $this->scanUsuariosCsv($csvPath);
+        if (!($scan['ok'] ?? false)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => (string) ($scan['error'] ?? 'CSV inválido')]);
+            exit;
+        }
+
+        $state = [
+            'token' => $token,
+            'csv' => $csvPath,
+            'delimiter' => (string) ($scan['delimiter'] ?? ','),
+            'hasHeader' => (bool) ($scan['hasHeader'] ?? true),
+            'total' => (int) ($scan['total'] ?? 0),
+            'offset' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+            'createdAt' => date('c'),
+        ];
+        @file_put_contents($statePath, json_encode($state));
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $state['total'],
+            'processed' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+        ]);
+        exit;
+    }
+
+    public function importarUsuariosProcessar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+
+        $pdo = Database::getConnection();
+        $token = trim((string) ($request->getParam('token') ?? ''));
+        $batchSize = (int) ($request->getParam('batch') ?? 300);
+        if ($batchSize <= 0) $batchSize = 300;
+        if ($batchSize > 1000) $batchSize = 1000;
+
+        if ($token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Token inválido.']);
+            exit;
+        }
+
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'usuarios_import_' . $token . '.json';
+        if (!is_file($statePath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Importação não encontrada (expirada).']);
+            exit;
+        }
+
+        $stateRaw = @file_get_contents($statePath);
+        $state = is_string($stateRaw) ? json_decode($stateRaw, true) : null;
+        if (!is_array($state)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Estado da importação corrompido.']);
+            exit;
+        }
+
+        if (!empty($state['done'])) {
+            echo json_encode([
+                'ok' => true,
+                'token' => $token,
+                'total' => (int) ($state['total'] ?? 0),
+                'processed' => (int) ($state['offset'] ?? 0),
+                'okCount' => (int) ($state['okCount'] ?? 0),
+                'failCount' => (int) ($state['failCount'] ?? 0),
+                'done' => true,
+            ]);
+            exit;
+        }
+
+        $csvPath = (string) ($state['csv'] ?? '');
+        if ($csvPath === '' || !is_file($csvPath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não encontrado no servidor.']);
+            exit;
+        }
+
+        $delimiter = (string) ($state['delimiter'] ?? ',');
+        $hasHeader = (bool) ($state['hasHeader'] ?? true);
+        $offset = (int) ($state['offset'] ?? 0);
+        if ($offset < 0) $offset = 0;
+
+        $res = $this->processUsuariosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $offset, $batchSize);
+
+        $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
+        $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
+        $state['failCount'] = (int) ($state['failCount'] ?? 0) + (int) ($res['failNow'] ?? 0);
+        $total = (int) ($state['total'] ?? 0);
+        $processed = (int) ($state['offset'] ?? 0);
+        $state['done'] = ($total > 0 && $processed >= $total) || (int) ($res['processedNow'] ?? 0) === 0;
+
+        @file_put_contents($statePath, json_encode($state));
+
+        if (!empty($state['done'])) {
+            try { @unlink($csvPath); } catch (\Exception $e) {}
+            try { @unlink($statePath); } catch (\Exception $e) {}
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $total,
+            'processed' => $processed,
+            'okCount' => (int) ($state['okCount'] ?? 0),
+            'failCount' => (int) ($state['failCount'] ?? 0),
+            'done' => (bool) ($state['done'] ?? false),
+        ]);
+        exit;
+    }
+
+    private function scanUsuariosCsv(string $csvPath): array {
+        $expected = [
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+        ];
+
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
+        }
+
+        $first = fgetcsv($fh, 0, ',');
+        $delimiter = ',';
+        if (is_array($first) && count($first) === 1) {
+            rewind($fh);
+            $first = fgetcsv($fh, 0, ';');
+            $delimiter = ';';
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
+        $isHeader = (count($header) === count($expected));
+        if ($isHeader) {
+            for ($i = 0; $i < count($expected); $i++) {
+                if (($header[$i] ?? '') !== $expected[$i]) {
+                    $isHeader = false;
+                    break;
+                }
+            }
+        }
+        if (!$isHeader) {
+            rewind($fh);
+        }
+
+        $total = 0;
+        while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 2) {
+                continue;
+            }
+            $total++;
+        }
+        fclose($fh);
+        return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => $isHeader, 'total' => $total];
+    }
+
+    private function processUsuariosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, int $offset, int $limit): array {
+        $expected = [
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+        ];
+
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['processedNow' => 0, 'okNow' => 0, 'failNow' => 0];
+        }
+
+        if ($hasHeader) {
+            fgetcsv($fh, 0, $delimiter);
+        }
+
+        $skipped = 0;
+        while ($skipped < $offset && ($rowSkip = fgetcsv($fh, 0, $delimiter)) !== false) {
+            $skipped++;
+        }
+
+        $helper = new \App\Controllers\AdminUsuariosHelper();
+        $processedNow = 0;
+        $okNow = 0;
+        $failNow = 0;
+
+        while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 5) {
+                continue;
+            }
+            $row = array_pad($row, count($expected), '');
+            try {
+                $this->processUsuarioRow($pdo, $helper, $row);
+                $okNow++;
+            } catch (\Exception $e) {
+                $failNow++;
+            }
+            $processedNow++;
+        }
+
+        fclose($fh);
+        return ['processedNow' => $processedNow, 'okNow' => $okNow, 'failNow' => $failNow];
+    }
+
+    private function processUsuarioRow(\PDO $pdo, \App\Controllers\AdminUsuariosHelper $helper, array $row): void {
+        $get = function(int $idx) use ($row) {
+            return trim((string) ($row[$idx] ?? ''));
+        };
+
+        $idExt = $get(0);
+        $email = $get(1);
+        $login = $get(2);
+        $firstName = $get(3);
+        $lastName = $get(4);
+
+        $suite = $get(20);
+        $billingCpf = $get(21);
+        $billingBirth = $get(22);
+        $billingCell = $get(25);
+        $shippingSuite = $get(28);
+        $billingCnpj = $get(29);
+        $role = $get(30);
+        $pass = $get(31);
+
+        if ($email === '' && $login === '' && $idExt === '') {
+            throw new \RuntimeException('Linha vazia');
+        }
+
+        $nome = trim($firstName . ' ' . $lastName);
+        if ($nome === '') {
+            $nome = $login !== '' ? $login : $email;
+        }
+
+        $perfil = strtolower(trim($role));
+        if ($perfil === '') {
+            $perfil = 'cliente';
+        }
+
+        $telefone = $billingCell !== '' ? $billingCell : '';
+        if ($telefone === '') {
+            $telefone = $get(12);
+        }
+
+        $doc = $billingCpf !== '' ? $billingCpf : '';
+        if ($doc === '' && $billingCnpj !== '') {
+            $doc = $billingCnpj;
+        }
+
+        $usuarioId = 0;
+        try {
+            if ($idExt !== '' && ctype_digit($idExt)) {
+                $usuarioId = $this->findUsuarioIdById($pdo, (int) $idExt);
+            }
+            if ($usuarioId <= 0 && $email !== '') {
+                $usuarioId = $this->findUsuarioIdByEmail($pdo, $email);
+            }
+        } catch (\Exception $e) {
+            $usuarioId = 0;
+        }
+
+        $dadosUsuario = [
+            'nome' => $nome,
+            'email' => $email !== '' ? $email : ($login . '@local'),
+            'telefone' => $telefone,
+            'cpf' => $billingCpf,
+            'documento' => $doc,
+            'suite' => ($suite !== '' ? $suite : ($shippingSuite !== '' ? $shippingSuite : null)),
+            'perfil' => $perfil,
+        ];
+        if ($pass !== '') {
+            $dadosUsuario['senha'] = $pass;
+        }
+
+        if ($usuarioId > 0) {
+            $helper->atualizarUsuario($usuarioId, $dadosUsuario);
+        } else {
+            $usuarioId = (int) $helper->criarUsuario($dadosUsuario);
+        }
+
+        $addr = $this->pickEnderecoFromRow($row);
+        if ($usuarioId > 0 && !empty($addr)) {
+            $this->salvarEnderecoPrincipal($pdo, $usuarioId, $addr);
+        }
+        $this->atualizarCamposUsuarioEnderecoSeExistir($pdo, $usuarioId, $addr ?? [], $billingBirth);
     }
 
     private function importarUsuariosCsv(\PDO $pdo): array {
