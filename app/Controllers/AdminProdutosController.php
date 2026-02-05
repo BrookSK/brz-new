@@ -867,95 +867,154 @@ HTML;
 HTML;
 
             exit;
-            $pagina = 1;
-            $busca = '';
+
+            return;
+        }
+    }
+
+    public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $perfil = $this->getSessionPerfil();
+        $repId = $this->getSessionUserId();
+
+        $pagina = (int) $request->getParam('pagina', 1);
+        if ($pagina <= 0) $pagina = 1;
+        $limite = 20;
+        $offset = ($pagina - 1) * $limite;
+        $busca = (string) $request->getParam('busca', '');
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $params = [];
+            $where = ' WHERE 1=1 ';
+            if ($perfil === 'representante') {
+                if ($repId <= 0) {
+                    header('Location: /login');
+                    exit;
+                }
+                $where .= ' AND p.representante_id = :rep_id ';
+                $params[':rep_id'] = $repId;
+            }
+            if (trim($busca) !== '') {
+                $where .= ' AND (p.name LIKE :busca OR p.sku LIKE :busca) ';
+                $params[':busca'] = '%' . $busca . '%';
+            }
+
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.id DESC LIMIT :limite OFFSET :offset';
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                if ($k === ':rep_id') {
+                    $stmt->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                } else {
+                    $stmt->bindValue($k, (string) $v);
+                }
+            }
+            $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $sqlTotal = 'SELECT COUNT(*) FROM produtos p' . $where;
+            $stmtT = $pdo->prepare($sqlTotal);
+            foreach ($params as $k => $v) {
+                if ($k === ':rep_id') {
+                    $stmtT->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                } else {
+                    $stmtT->bindValue($k, (string) $v);
+                }
+            }
+            $stmtT->execute();
+            $total = (int) ($stmtT->fetchColumn() ?: 0);
+            $totalPaginas = (int) ceil($total / $limite);
+
+            $produtos = [];
+            foreach ($rows as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $img = (string) ($r['foto_principal'] ?? '');
+                if ($img === '') {
+                    $img = '/uploads/produtos/placeholder.jpg';
+                }
+                $produtos[] = [
+                    'id' => $id,
+                    'name' => (string) ($r['name'] ?? ($r['nome'] ?? '')),
+                    'sku' => (string) ($r['sku'] ?? ''),
+                    'price' => (float) ($r['price'] ?? ($r['preco'] ?? ($r['valor'] ?? 0))),
+                    'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
+                    'imagem' => $img,
+                ];
+            }
+
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
         }
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Produtos - Braziliana Shop Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        ob_start();
+        echo '<div class="pt-3">'
+            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
+            . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
+            . '<div class="d-flex gap-2">'
+            . '<a href="/admin/produtos/cadastro-rapido" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
+            . '<a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '</div>'
+            . '</div>';
 
-        renderAdminSidebarStyles();
-
-        echo '<style>
-        .product-card { transition: none; }
-        .product-image { height: 200px; object-fit: cover; }
-    </style>
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">';
-
-        renderAdminSidebar('produtos');
-
-        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Produtos (' . $total . ')</h1>
-                    <div class="d-flex gap-2">
-                        <a href="/admin/produtos/cadastro-rapido" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>
-                        <a href="/admin/produtos/novo" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
-                    </div>
-                </div>';
-
-        echo '<form method="GET" class="row g-3 mb-4">
-                <div class="col-md-8">
-                    <input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca) . '">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>
-                </div>
-            </form>';
+        echo '<form method="GET" class="row g-3 mb-4">'
+            . '<div class="col-md-8">'
+            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '</div>'
+            . '<div class="col-md-4">'
+            . '<button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>'
+            . '</div>'
+            . '</form>';
 
         echo '<div class="row">';
         foreach ($produtos as $produto) {
-            echo '<div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card product-card h-100">
-                        <img src="' . $produto['imagem'] . '" class="card-img-top product-image" alt="' . htmlspecialchars($produto['name']) . '">
-                        <div class="card-body">
-                            <h5 class="card-title">' . htmlspecialchars($produto['name']) . '</h5>
-                            <p class="text-muted small">SKU: ' . htmlspecialchars($produto['sku']) . '</p>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="fw-bold text-primary">$' . number_format($produto['price'], 2, '.', ',') . '</span>
-                                <span class="badge ' . ($produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ($produto['active'] ? 'Ativo' : 'Inativo') . '</span>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <a href="/admin/produtos/editar/' . $produto['id'] . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
-                                <form method="POST" action="/admin/produtos/excluir/' . $produto['id'] . '" style="display: inline;">
-                                    <button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>';
+            echo '<div class="col-md-6 col-lg-4 mb-4">'
+                . '<div class="card product-card h-100">'
+                . '<img src="' . htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8') . '" class="card-img-top product-image" alt="' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '">' 
+                . '<div class="card-body">'
+                . '<h5 class="card-title">' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '</h5>'
+                . '<p class="text-muted small">SKU: ' . htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8') . '</p>'
+                . '<div class="d-flex justify-content-between align-items-center mb-2">'
+                . '<span class="fw-bold text-primary">$' . number_format((float) $produto['price'], 2, '.', ',') . '</span>'
+                . '<span class="badge ' . ((int) $produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ((int) $produto['active'] ? 'Ativo' : 'Inativo') . '</span>'
+                . '</div>'
+                . '<div class="d-flex justify-content-between">'
+                . '<a href="/admin/produtos/editar/' . (int) $produto['id'] . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
+                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display: inline;">'
+                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>'
+                . '</form>'
+                . '</div>'
+                . '</div>'
+                . '</div>'
+                . '</div>';
         }
         echo '</div>';
 
         if ($totalPaginas > 1) {
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
             for ($i = 1; $i <= $totalPaginas; $i++) {
-                $url = "/admin/produtos?pagina={$i}" . (!empty($busca) ? "&busca=" . urlencode($busca) : "");
-                echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">
-                        <a class="page-link" href="' . $url . '">' . $i . '</a>
-                      </li>';
+                $url = "/admin/produtos?pagina={$i}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+                echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">' 
+                    . '<a class="page-link" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
+                    . '</li>';
             }
             echo '</ul></nav>';
         }
 
-        echo '</main></div></div>';
+        echo '</div>';
 
-        renderAdminScripts();
-
-        echo '</body></html>';
+        $content = ob_get_clean();
+        $title = 'Produtos - Braziliana Shop Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
-    
     public function novo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
