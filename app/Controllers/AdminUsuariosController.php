@@ -392,6 +392,20 @@ class AdminUsuariosController extends Controller {
             
             $pedidos = $helper->getPedidosUsuario($id);
 
+            $carteiraTransacoes = [];
+            $carteiraRendimentoResumo = [
+                'credito_usd' => 0.0,
+                'credito_brl' => 0.0,
+                'debito_usd' => 0.0,
+                'debito_brl' => 0.0,
+            ];
+            try {
+                $carteiraTransacoes = $helper->getTransacoesCarteiraUsuario((int) $usuario['id'], 50);
+                $carteiraRendimentoResumo = $helper->getResumoRendimentoClubeCarteira((int) $usuario['id'], 200);
+            } catch (\Exception $e) {
+                $carteiraTransacoes = [];
+            }
+
             $totalPedidos = is_array($pedidos) ? count($pedidos) : 0;
             $totalGasto = 0;
             if (!empty($pedidos) && is_array($pedidos)) {
@@ -510,6 +524,78 @@ class AdminUsuariosController extends Controller {
                                             <i class="fas fa-' . ($usuario['ativo'] ? 'ban' : 'check') . '"></i> ' . ($usuario['ativo'] ? 'Desativar' : 'Ativar') . '
                                         </button>
                                     </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Rendimentos da Carteira (Clube)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
+                                            <div class="small text-muted">Total creditado</div>
+                                            <div class="fw-bold">'
+                                            . ((float) ($carteiraRendimentoResumo['credito_brl'] ?? 0) > 0 ? ('R$ ' . number_format((float) ($carteiraRendimentoResumo['credito_brl'] ?? 0), 2, ',', '.') ) : 'R$ 0,00')
+                                            . (((float) ($carteiraRendimentoResumo['credito_usd'] ?? 0) > 0) ? ('<br><span class="text-muted">US$ ' . number_format((float) ($carteiraRendimentoResumo['credito_usd'] ?? 0), 2, ',', '.') . '</span>') : '')
+                                            . '</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3" style="background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.18) !important;">
+                                            <div class="small text-muted">Total estornado</div>
+                                            <div class="fw-bold">'
+                                            . ((float) ($carteiraRendimentoResumo['debito_brl'] ?? 0) > 0 ? ('R$ ' . number_format((float) ($carteiraRendimentoResumo['debito_brl'] ?? 0), 2, ',', '.') ) : 'R$ 0,00')
+                                            . (((float) ($carteiraRendimentoResumo['debito_usd'] ?? 0) > 0) ? ('<br><span class="text-muted">US$ ' . number_format((float) ($carteiraRendimentoResumo['debito_usd'] ?? 0), 2, ',', '.') . '</span>') : '')
+                                            . '</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive mt-3">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Data</th>
+                                                <th>Descrição</th>
+                                                <th class="text-end">Valor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>';
+
+        if (empty($carteiraTransacoes)) {
+            echo '<tr><td colspan="3" class="text-center text-muted py-3">Nenhuma movimentação encontrada.</td></tr>';
+        } else {
+            foreach ($carteiraTransacoes as $t) {
+                $desc = (string) ($t['descricao'] ?? '');
+                $tipo = strtolower(trim((string) ($t['tipo'] ?? '')));
+                $isRend = (stripos($desc, 'Rendimento Clube') !== false);
+                $vUsd = (float) ($t['valor_usd'] ?? 0);
+                $vBrl = (float) ($t['valor_brl'] ?? 0);
+
+                $valorStr = '-';
+                if (abs($vBrl) > 0.00001) {
+                    $valorStr = 'R$ ' . number_format(abs($vBrl), 2, ',', '.');
+                } elseif (abs($vUsd) > 0.00001) {
+                    $valorStr = 'US$ ' . number_format(abs($vUsd), 2, ',', '.');
+                }
+                $valorClass = ($tipo === 'debito') ? 'text-danger' : 'text-success';
+                $rowClass = $isRend ? '' : 'text-muted';
+                $dt = !empty($t['created_at']) ? date('d/m/Y H:i', strtotime((string) $t['created_at'])) : '-';
+
+                echo '<tr class="' . $rowClass . '">' .
+                    '<td style="white-space:nowrap;">' . $dt . '</td>' .
+                    '<td>' . ($isRend ? '<span class="badge bg-light text-dark me-1">Clube</span>' : '') . htmlspecialchars($desc) . '</td>' .
+                    '<td class="text-end ' . $valorClass . '" style="white-space:nowrap;">' . ($tipo === 'debito' ? '-' : '+') . ' ' . $valorStr . '</td>' .
+                '</tr>';
+            }
+        }
+
+        echo '                        </tbody>
+                                    </table>
+                                    <div class="small text-muted">Mostrando as últimas 50 movimentações.</div>
                                 </div>
                             </div>
                         </div>

@@ -129,6 +129,64 @@ class AdminUsuariosHelper {
         
         return $usuario;
     }
+
+    public function getTransacoesCarteiraUsuario(int $usuarioId, int $limite = 50): array {
+        $usuarioId = (int) $usuarioId;
+        if ($usuarioId <= 0) {
+            return [];
+        }
+        $limite = (int) $limite;
+        if ($limite <= 0) {
+            $limite = 50;
+        }
+        if ($limite > 200) {
+            $limite = 200;
+        }
+
+        try {
+            $stmtT = $this->pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $stmtT->execute(['transacoes_carteira']);
+            $temTabela = (bool) $stmtT->fetchColumn();
+            if (!$temTabela) {
+                return [];
+            }
+
+            $stmt = $this->pdo->prepare('SELECT id, tipo, valor_usd, valor_brl, descricao, created_at FROM transacoes_carteira WHERE usuario_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . $limite);
+            $stmt->execute([$usuarioId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function getResumoRendimentoClubeCarteira(int $usuarioId, int $limiteAnalise = 200): array {
+        $txs = $this->getTransacoesCarteiraUsuario($usuarioId, $limiteAnalise);
+        $resumo = [
+            'credito_usd' => 0.0,
+            'credito_brl' => 0.0,
+            'debito_usd' => 0.0,
+            'debito_brl' => 0.0,
+        ];
+
+        foreach ($txs as $t) {
+            $desc = (string) ($t['descricao'] ?? '');
+            if (stripos($desc, 'Rendimento Clube') === false) {
+                continue;
+            }
+            $tipo = strtolower(trim((string) ($t['tipo'] ?? '')));
+            $vUsd = (float) ($t['valor_usd'] ?? 0);
+            $vBrl = (float) ($t['valor_brl'] ?? 0);
+            if ($tipo === 'credito') {
+                $resumo['credito_usd'] += $vUsd;
+                $resumo['credito_brl'] += $vBrl;
+            } elseif ($tipo === 'debito') {
+                $resumo['debito_usd'] += $vUsd;
+                $resumo['debito_brl'] += $vBrl;
+            }
+        }
+
+        return $resumo;
+    }
     
     public function getStatsUsuarios() {
         $stats = [];

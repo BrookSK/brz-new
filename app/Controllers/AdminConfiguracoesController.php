@@ -1212,6 +1212,11 @@ class AdminConfiguracoesController extends Controller {
                                                                 <div class="col-12">
                                                                     <div class="border rounded p-3 bg-light">
                                                                         <div class="fw-semibold mb-2">Faixas de desconto progressivo (peso total de produtos com Clube Ativo)</div>
+                                                                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                                                            <div class="text-muted small">Para cadastrar uma nova faixa: preencha a linha <strong>Nova</strong> abaixo (o <strong>Peso mín</strong> pode ser <strong>0</strong>) e clique em <strong>Salvar Configurações</strong>.</div>
+                                                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="try{var els=document.getElementsByName(\'clube_faixa_nova[percentual_desconto]\'); if(els&&els[0]) els[0].focus();}catch(e){}">Nova faixa</button>
+                                                                            <button type="button" class="btn btn-sm btn-primary" onclick="try{addClubeFaixaNova();}catch(e){}">Adicionar faixa</button>
+                                                                        </div>
                                                                         <div class="table-responsive">
                                                                             <table class="table table-sm align-middle mb-0">
                                                                                 <thead>
@@ -1268,6 +1273,70 @@ class AdminConfiguracoesController extends Controller {
                                                                             </table>
                                                                         </div>
                                                                         <div class="text-muted small mt-2">O desconto progressivo será calculado somente com base no peso total dos produtos com Clube Ativo.</div>
+                                                                        <script>
+                                                                        (function(){
+                                                                            function getFirstByName(n){
+                                                                                try{var els=document.getElementsByName(n); return (els&&els[0])?els[0]:null;}catch(e){return null;}
+                                                                            }
+                                                                            window.addClubeFaixaNova = function(){
+                                                                                var ativoEl = getFirstByName("clube_faixa_nova[ativo]");
+                                                                                var ordemEl = getFirstByName("clube_faixa_nova[ordem]");
+                                                                                var minEl = getFirstByName("clube_faixa_nova[peso_min_kg]");
+                                                                                var maxEl = getFirstByName("clube_faixa_nova[peso_max_kg]");
+                                                                                var pctEl = getFirstByName("clube_faixa_nova[percentual_desconto]");
+                                                                                if(!ordemEl||!minEl||!maxEl||!pctEl){return;}
+
+                                                                                var ativo = (ativoEl && ativoEl.checked) ? 1 : 0;
+                                                                                var ordem = parseInt((ordemEl.value||"0"),10); if(isNaN(ordem)) ordem = 0;
+                                                                                var min = parseFloat((minEl.value||"0").toString().replace(",",".")); if(isNaN(min)) min = 0;
+                                                                                var max = parseFloat((maxEl.value||"0").toString().replace(",",".")); if(isNaN(max)) max = 0;
+                                                                                var pct = parseFloat((pctEl.value||"0").toString().replace(",",".")); if(isNaN(pct)) pct = 0;
+
+                                                                                if(!(min>0 || max>0 || pct>0)){
+                                                                                    pctEl.focus();
+                                                                                    return;
+                                                                                }
+
+                                                                                var table = pctEl.closest("table");
+                                                                                if(!table){return;}
+                                                                                var tbody = table.querySelector("tbody");
+                                                                                if(!tbody){return;}
+
+                                                                                var idx = String(Date.now()) + String(Math.floor(Math.random()*1000));
+                                                                                var tr = document.createElement("tr");
+                                                                                tr.setAttribute("data-clube-nova", idx);
+                                                                                tr.innerHTML = `
+                                                                                    <td>
+                                                                                        <input type="hidden" name="clube_faixas_novas[${idx}][ativo]" value="0">
+                                                                                        <input class="form-check-input" type="checkbox" name="clube_faixas_novas[${idx}][ativo]" value="1" ${ativo ? "checked" : ""}>
+                                                                                    </td>
+                                                                                    <td><input type="number" class="form-control form-control-sm" name="clube_faixas_novas[${idx}][ordem]" value="${ordem}" step="1"></td>
+                                                                                    <td><input type="number" class="form-control form-control-sm" name="clube_faixas_novas[${idx}][peso_min_kg]" value="${min}" step="0.001" min="0"></td>
+                                                                                    <td><input type="number" class="form-control form-control-sm" name="clube_faixas_novas[${idx}][peso_max_kg]" value="${max}" step="0.001" min="0"></td>
+                                                                                    <td><input type="number" class="form-control form-control-sm" name="clube_faixas_novas[${idx}][percentual_desconto]" value="${pct}" step="0.01" min="0"></td>
+                                                                                    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="try{this.closest(\"tr\").remove();}catch(e){}">Remover</button></td>
+                                                                                `;
+
+                                                                                var novaRow = getFirstByName("clube_faixa_nova[peso_min_kg]");
+                                                                                var trNova = null;
+                                                                                if(novaRow){
+                                                                                    trNova = novaRow.closest("tr");
+                                                                                }
+                                                                                if(trNova && trNova.parentNode === tbody){
+                                                                                    tbody.insertBefore(tr, trNova);
+                                                                                } else {
+                                                                                    tbody.appendChild(tr);
+                                                                                }
+
+                                                                                if(ativoEl){ativoEl.checked = true;}
+                                                                                ordemEl.value = "0";
+                                                                                minEl.value = "0";
+                                                                                maxEl.value = "0";
+                                                                                pctEl.value = "0";
+                                                                                pctEl.focus();
+                                                                            };
+                                                                        })();
+                                                                        </script>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2620,19 +2689,36 @@ HTML;
                         $stUp->execute([$min, $max, $pct, $ativo, $ordem, $idFx]);
                     }
 
+                    $toInsert = [];
+
                     $nova = $request->getParam('clube_faixa_nova', []);
                     if (is_array($nova)) {
-                        $minN = (float) str_replace(',', '.', (string) ($nova['peso_min_kg'] ?? 0));
-                        $maxN = (float) str_replace(',', '.', (string) ($nova['peso_max_kg'] ?? 0));
-                        $pctN = (float) str_replace(',', '.', (string) ($nova['percentual_desconto'] ?? 0));
-                        $ativoN = (int) (($nova['ativo'] ?? 0) ? 1 : 0);
-                        $ordN = (int) ($nova['ordem'] ?? 0);
-                        if ($minN < 0) $minN = 0.0;
-                        if ($maxN < 0) $maxN = 0.0;
-                        if ($pctN < 0) $pctN = 0.0;
-                        if ($minN > 0 || $maxN > 0 || $pctN > 0) {
-                            $stIns = $pdo->prepare('INSERT INTO clube_descontos_faixas (peso_min_kg, peso_max_kg, percentual_desconto, ativo, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
-                            $stIns->execute([$minN, $maxN, $pctN, $ativoN, $ordN]);
+                        $toInsert[] = $nova;
+                    }
+
+                    $novas = $request->getParam('clube_faixas_novas', []);
+                    if (is_array($novas)) {
+                        foreach ($novas as $rowN) {
+                            if (is_array($rowN)) {
+                                $toInsert[] = $rowN;
+                            }
+                        }
+                    }
+
+                    if (!empty($toInsert)) {
+                        $stIns = $pdo->prepare('INSERT INTO clube_descontos_faixas (peso_min_kg, peso_max_kg, percentual_desconto, ativo, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                        foreach ($toInsert as $rowN) {
+                            $minN = (float) str_replace(',', '.', (string) ($rowN['peso_min_kg'] ?? 0));
+                            $maxN = (float) str_replace(',', '.', (string) ($rowN['peso_max_kg'] ?? 0));
+                            $pctN = (float) str_replace(',', '.', (string) ($rowN['percentual_desconto'] ?? 0));
+                            $ativoN = (int) (($rowN['ativo'] ?? 0) ? 1 : 0);
+                            $ordN = (int) ($rowN['ordem'] ?? 0);
+                            if ($minN < 0) $minN = 0.0;
+                            if ($maxN < 0) $maxN = 0.0;
+                            if ($pctN < 0) $pctN = 0.0;
+                            if ($minN > 0 || $maxN > 0 || $pctN > 0) {
+                                $stIns->execute([$minN, $maxN, $pctN, $ativoN, $ordN]);
+                            }
                         }
                     }
                 }
