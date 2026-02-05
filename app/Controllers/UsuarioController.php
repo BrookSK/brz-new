@@ -256,6 +256,7 @@ class UsuarioController extends Controller {
 
         $carteiraSaldoBrl = 0.0;
         $carteiraSaldoUsd = 0.0;
+        $usdBrlRate = 5.5;
         try {
             $db = \Config\Database::getConnection();
             $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? LIMIT 1');
@@ -263,9 +264,50 @@ class UsuarioController extends Controller {
             $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
             $carteiraSaldoUsd = (float) ($row['saldo_usd'] ?? 0);
             $carteiraSaldoBrl = (float) ($row['saldo_brl'] ?? 0);
+
+            try {
+                $stmtRate = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                    try {
+                        $stmtRate->execute([$k]);
+                        $val = $stmtRate->fetchColumn();
+                        $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                        if ($v > 0) {
+                            $usdBrlRate = $v;
+                            break;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
+            if ($usdBrlRate <= 0) {
+                $usdBrlRate = 5.5;
+            }
+
+            if ($usdBrlRate <= 0 || $usdBrlRate === 5.5) {
+                try {
+                    $stmtTx = $db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                    $r = $stmtTx ? $stmtTx->fetch(\PDO::FETCH_ASSOC) : null;
+                    if (is_array($r) && isset($r['taxa_conversao'])) {
+                        $v = (float) $r['taxa_conversao'];
+                        if ($v > 0) {
+                            $usdBrlRate = $v;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
         } catch (\Exception $e) {
             $carteiraSaldoBrl = 0.0;
             $carteiraSaldoUsd = 0.0;
+            $usdBrlRate = 5.5;
+        }
+
+        $carteiraSaldoBrlEquiv = (float) $carteiraSaldoBrl;
+        if ($carteiraSaldoUsd > 0 && $usdBrlRate > 0) {
+            $carteiraSaldoBrlEquiv = (float) ($carteiraSaldoBrl + ($carteiraSaldoUsd * $usdBrlRate));
         }
 
         $orcamentosAssessoria = [];
@@ -287,8 +329,244 @@ class UsuarioController extends Controller {
             'pedidos_ativos' => (int) ($stats['pedidos_ativos'] ?? 0),
             'orcamentos_assessoria' => $orcamentosAssessoria,
             'carteira_saldo_brl' => (float) $carteiraSaldoBrl,
-            'carteira_saldo_usd' => (float) $carteiraSaldoUsd
+            'carteira_saldo_usd' => (float) $carteiraSaldoUsd,
+            'carteira_usd_brl_rate' => (float) $usdBrlRate,
+            'carteira_saldo_brl_equiv' => (float) $carteiraSaldoBrlEquiv,
+            'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
+            'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey()
         ]);
+    }
+
+    private function garantirTabelaCarteiraRecargas(\PDO $db): void {
+        try {
+            $db->exec("CREATE TABLE IF NOT EXISTS `carteira_recargas` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `usuario_id` int(11) NOT NULL,
+                `moeda` varchar(3) NOT NULL DEFAULT 'USD',
+                `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                `gateway` varchar(20) DEFAULT NULL,
+                `payment_id` varchar(191) DEFAULT NULL,
+                `invoice_url` text,
+                `status` varchar(30) NOT NULL DEFAULT 'pending',
+                `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                `paid_at` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `idx_usuario_id` (`usuario_id`),
+                KEY `idx_gateway_payment` (`gateway`, `payment_id`),
+                KEY `idx_status` (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function carteiraRecargaCriar(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioSessao = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuarioSessao['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'Usuário inválido'], 400);
+            return;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode((string) $raw, true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $moeda = strtoupper(trim((string) ($data['moeda'] ?? 'BRL')));
+        $valor = (float) str_replace(',', '.', (string) ($data['valor'] ?? '0'));
+        $metodo = strtolower(trim((string) ($data['metodo'] ?? 'pix')));
+
+        $cardHolderName = (string) ($data['card_holder_name'] ?? '');
+        $cardNumber = (string) ($data['card_number'] ?? '');
+        $cardExpiryMonth = (string) ($data['card_expiry_month'] ?? '');
+        $cardExpiryYear = (string) ($data['card_expiry_year'] ?? '');
+        $cardCvv = (string) ($data['card_cvv'] ?? '');
+        $installments = (int) ($data['installments'] ?? 1);
+        if ($installments <= 0) {
+            $installments = 1;
+        }
+
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            $this->json(['success' => false, 'error' => 'Moeda inválida'], 400);
+            return;
+        }
+        if ($valor <= 0) {
+            $this->json(['success' => false, 'error' => 'Valor inválido'], 400);
+            return;
+        }
+
+        if ($moeda === 'BRL' && !in_array($metodo, ['pix', 'boleto', 'cartao_credito'], true)) {
+            $metodo = 'pix';
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $this->garantirTabelaCarteiraRecargas($db);
+
+            $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, status, created_at, updated_at) VALUES (:uid, :moeda, :valor, 'pending', NOW(), NOW())");
+            $stmtIns->execute([
+                ':uid' => $usuarioId,
+                ':moeda' => $moeda,
+                ':valor' => $valor,
+            ]);
+            $recargaId = (int) $db->lastInsertId();
+            if ($recargaId <= 0) {
+                $this->json(['success' => false, 'error' => 'Não foi possível criar recarga'], 500);
+                return;
+            }
+
+            $usuario = $this->usuarioModel->find($usuarioId);
+            $nome = (string) ($usuario['nome'] ?? ($usuarioSessao['nome'] ?? 'Cliente'));
+            $email = (string) ($usuario['email'] ?? ($usuarioSessao['email'] ?? ''));
+            $documento = (string) ($usuario['cpf_cnpj'] ?? ($usuario['documento'] ?? ($usuario['cpf'] ?? '')));
+            $telefone = (string) ($usuario['celular'] ?? ($usuario['telefone'] ?? ''));
+
+            $descricao = 'Recarga Carteira #' . $recargaId;
+
+            if ($moeda === 'USD') {
+                $pi = $this->paymentService->createStripePaymentIntentCarteiraRecarga($recargaId, $valor, $descricao, ['email' => $email]);
+                if (empty($pi['success'])) {
+                    $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao iniciar pagamento Stripe')], 500);
+                    return;
+                }
+
+                $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
+                if ($paymentIntentId !== '') {
+                    $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'stripe', payment_id = :pid, status = 'pending', updated_at = NOW() WHERE id = :id");
+                    $stmtUp->execute([':pid' => $paymentIntentId, ':id' => $recargaId]);
+                }
+
+                $this->json([
+                    'success' => true,
+                    'recarga_id' => $recargaId,
+                    'moeda' => 'USD',
+                    'valor' => $valor,
+                    'stripe_required' => true,
+                    'payment_intent_id' => $paymentIntentId,
+                    'client_secret' => (string) ($pi['client_secret'] ?? ''),
+                ]);
+                return;
+            }
+
+            $billingType = 'PIX';
+            if ($metodo === 'boleto') {
+                $billingType = 'BOLETO';
+            } elseif ($metodo === 'cartao_credito') {
+                $billingType = 'CREDIT_CARD';
+            }
+
+            $payload = [
+                'billingType' => $billingType,
+                'customer_name' => $nome,
+                'customer_email' => $email,
+                'customer_phone' => $telefone,
+                'customer_document' => $documento,
+                'externalReference' => 'wallet_topup_' . $recargaId,
+                'products' => [
+                    [
+                        'sku' => 'RECARGA_' . $recargaId,
+                        'name' => $descricao,
+                        'quantity' => 1,
+                        'unit_value' => (int) round($valor * 100),
+                        'type' => 'service',
+                    ]
+                ],
+                'products_value_cents' => (int) round($valor * 100),
+                'shipping_value_cents' => 0,
+                'discount_value_cents' => 0,
+            ];
+
+            if ($billingType === 'CREDIT_CARD') {
+                $payload['card_holder_name'] = $cardHolderName;
+                $payload['card_number'] = $cardNumber;
+                $payload['card_expiry_month'] = $cardExpiryMonth;
+                $payload['card_expiry_year'] = $cardExpiryYear;
+                $payload['card_cvv'] = $cardCvv;
+                $payload['installments'] = $installments;
+            }
+
+            $res = $this->paymentService->processarPagamento($payload, $valor, 'BRL', $descricao);
+            if (empty($res['success'])) {
+                $this->json(['success' => false, 'error' => (string) ($res['error'] ?? 'Falha ao iniciar pagamento')], 500);
+                return;
+            }
+
+            $paymentId = (string) ($res['payment_id'] ?? '');
+            $invUrl = (string) ($res['invoiceUrl'] ?? '');
+            $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'appmax', payment_id = :pid, invoice_url = :inv, status = 'pending', updated_at = NOW() WHERE id = :id");
+            $stmtUp->execute([
+                ':pid' => $paymentId,
+                ':inv' => $invUrl,
+                ':id' => $recargaId,
+            ]);
+
+            $this->json([
+                'success' => true,
+                'recarga_id' => $recargaId,
+                'moeda' => 'BRL',
+                'valor' => $valor,
+                'gateway' => 'appmax',
+                'payment_id' => $paymentId,
+                'status' => (string) ($res['status'] ?? 'pending'),
+                'invoiceUrl' => $invUrl,
+                'bankSlipUrl' => (string) ($res['bankSlipUrl'] ?? ''),
+                'digitableLine' => (string) ($res['digitableLine'] ?? ''),
+                'pix' => (isset($res['pix']) && is_array($res['pix'])) ? $res['pix'] : null,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function carteiraRecargaStripeFinalizar(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioSessao = $this->authService->getUsuarioLogado();
+        $usuarioId = (int) ($usuarioSessao['id'] ?? 0);
+
+        $recargaId = (int) ($request->getParam('recarga_id') ?? 0);
+        $paymentIntentId = trim((string) ($request->getParam('payment_intent_id') ?? ''));
+        if ($usuarioId <= 0 || $recargaId <= 0 || $paymentIntentId === '') {
+            $this->json(['success' => false, 'error' => 'Parâmetros inválidos'], 400);
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $this->garantirTabelaCarteiraRecargas($db);
+
+            $stmt = $db->prepare('SELECT id, usuario_id FROM carteira_recargas WHERE id = ? LIMIT 1');
+            $stmt->execute([$recargaId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row) || (int) ($row['usuario_id'] ?? 0) !== $usuarioId) {
+                $this->json(['success' => false, 'error' => 'Recarga não encontrada'], 404);
+                return;
+            }
+
+            $pi = $this->paymentService->retrieveStripePaymentIntent($paymentIntentId);
+            $status = strtoupper((string) ($pi['status'] ?? ''));
+            if ($status !== 'SUCCEEDED') {
+                $this->json(['success' => false, 'error' => 'Pagamento não confirmado', 'status' => $status], 400);
+                return;
+            }
+
+            $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'stripe', payment_id = :pid, status = 'confirmed', paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id");
+            $stmtUp->execute([':pid' => $paymentIntentId, ':id' => $recargaId]);
+
+            $this->json([
+                'success' => true,
+                'recarga_id' => $recargaId,
+                'payment_intent_id' => $paymentIntentId,
+                'status' => $status,
+                'message' => 'Pagamento confirmado. A recarga será creditada na carteira em instantes.'
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function meusDados(Request $request) {

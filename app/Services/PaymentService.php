@@ -252,6 +252,164 @@ class PaymentService {
         return $this->estornarPagamentoCarteiraPorPedido($pedidoId, null, 'Cancelamento do pedido');
     }
 
+    private function garantirTabelaCarteiraRecargas(\PDO $db): void {
+        try {
+            $db->exec("CREATE TABLE IF NOT EXISTS `carteira_recargas` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `usuario_id` int(11) NOT NULL,
+                `moeda` varchar(3) NOT NULL DEFAULT 'USD',
+                `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                `gateway` varchar(20) DEFAULT NULL,
+                `payment_id` varchar(191) DEFAULT NULL,
+                `invoice_url` text,
+                `status` varchar(30) NOT NULL DEFAULT 'pending',
+                `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                `paid_at` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `idx_usuario_id` (`usuario_id`),
+                KEY `idx_gateway_payment` (`gateway`, `payment_id`),
+                KEY `idx_status` (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function createStripePaymentIntentCarteiraRecarga(int $recargaId, float $valorUsd, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round($valorUsd * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para recarga.'];
+        }
+
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'usd',
+            'description' => $descricao,
+            'metadata[carteira_recarga_id]' => (string) $recargaId,
+            'automatic_payment_methods[enabled]' => 'true',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '' || $clientSecret === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar PaymentIntent.'];
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function tentarCreditarCarteiraPorRecarga(string $gateway, string $paymentId, string $paymentStatusInterno, string $gatewayStatus = ''): void {
+        $gateway = strtolower(trim($gateway));
+        $paymentId = trim($paymentId);
+        if ($gateway === '' || $paymentId === '') {
+            return;
+        }
+
+        $aprovado = in_array($paymentStatusInterno, ['approved', 'paid', 'succeeded'], true);
+        if (!$aprovado) {
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $this->garantirTabelaCarteiraRecargas($db);
+            $this->garantirTabelaTransacoesCarteira($db);
+
+            $stmt = $db->prepare('SELECT * FROM carteira_recargas WHERE gateway = :g AND payment_id = :pid ORDER BY id DESC LIMIT 1');
+            $stmt->execute([':g' => $gateway, ':pid' => $paymentId]);
+            $recarga = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($recarga) || empty($recarga['id'])) {
+                return;
+            }
+
+            $recargaId = (int) ($recarga['id'] ?? 0);
+            $usuarioId = (int) ($recarga['usuario_id'] ?? 0);
+            $moeda = strtoupper(trim((string) ($recarga['moeda'] ?? 'USD')));
+            $valor = (float) ($recarga['valor'] ?? 0);
+            $statusAtual = strtolower(trim((string) ($recarga['status'] ?? 'pending')));
+
+            if ($recargaId <= 0 || $usuarioId <= 0 || $valor <= 0) {
+                return;
+            }
+            if (in_array($statusAtual, ['paid', 'approved', 'credited'], true)) {
+                return;
+            }
+            if (!in_array($moeda, ['BRL', 'USD'], true)) {
+                $moeda = 'USD';
+            }
+
+            $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+            $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+            $db->beginTransaction();
+            try {
+                $this->garantirCarteiraUsuario($db, $usuarioId);
+
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
+                $stmtChk->execute([
+                    ':uid' => $usuarioId,
+                    ':desc' => '%Recarga Carteira #' . $recargaId . '%',
+                ]);
+                $ja = (int) ($stmtChk->fetchColumn() ?: 0);
+                if ($ja > 0) {
+                    $stUp = $db->prepare("UPDATE carteira_recargas SET status = 'paid', paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id");
+                    $stUp->execute([':id' => $recargaId]);
+                    $db->commit();
+                    return;
+                }
+
+                $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                $stmtLock->execute([$usuarioId]);
+
+                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
+
+                try {
+                    $desc = 'Recarga Carteira #' . $recargaId;
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $valor,
+                        ':desc' => $desc,
+                    ]);
+                } catch (\Exception $e) {
+                }
+
+                $stUp = $db->prepare("UPDATE carteira_recargas SET status = 'paid', paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id");
+                $stUp->execute([':id' => $recargaId]);
+
+                $db->commit();
+            } catch (\Exception $e) {
+                $db->rollBack();
+                return;
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
     public function createStripeCheckoutSession(int $pedidoId, float $valorUsd, string $descricao, array $customer = [], ?string $successUrl = null, ?string $cancelUrl = null): array {
         if (!$this->isStripeEnabled()) {
             return ['success' => false, 'error' => 'Stripe está desabilitado.'];
@@ -1347,6 +1505,7 @@ class PaymentService {
         if ($eventType === 'checkout.session.completed') {
             $pi = (string) ($obj['payment_intent'] ?? '');
             if ($pi !== '') {
+                $this->tentarCreditarCarteiraPorRecarga('stripe', $pi, 'approved', 'SUCCEEDED');
                 $this->atualizarPagamentoPedidoPorGateway($pi, 'stripe', 'approved', 'SUCCEEDED');
                 return ['status' => 'processed'];
             }
@@ -1362,6 +1521,7 @@ class PaymentService {
         $gatewayStatus = strtoupper((string) ($obj['status'] ?? ''));
 
         if ($eventType === 'payment_intent.succeeded') {
+            $this->tentarCreditarCarteiraPorRecarga('stripe', $paymentId, 'approved', $gatewayStatus !== '' ? $gatewayStatus : 'SUCCEEDED');
             $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'approved', $gatewayStatus !== '' ? $gatewayStatus : 'SUCCEEDED');
             return ['status' => 'processed'];
         }
@@ -1417,6 +1577,7 @@ class PaymentService {
 
         // Para AppMax, normalmente atualizamos pelo order_id.
         if ($paymentId !== '' && ctype_digit($paymentId)) {
+            $this->tentarCreditarCarteiraPorRecarga('appmax', $paymentId, $internal, $eventNorm !== '' ? $eventNorm : $internal);
             $this->atualizarPagamentoPedidoPorGateway($paymentId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
             return ['status' => 'processed', 'match' => 'payment_id'];
         }
@@ -1438,6 +1599,7 @@ class PaymentService {
             }
         }
         if ($orderId !== '' && ctype_digit($orderId)) {
+            $this->tentarCreditarCarteiraPorRecarga('appmax', $orderId, $internal, $eventNorm !== '' ? $eventNorm : $internal);
             $this->atualizarPagamentoPedidoPorGateway($orderId, 'appmax', $internal, $eventNorm !== '' ? $eventNorm : $internal);
             return ['status' => 'processed', 'match' => 'order_id'];
         }

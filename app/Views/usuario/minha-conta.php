@@ -105,20 +105,103 @@
                                         <?php
                                         $cb = floatval($carteira_saldo_brl ?? 0);
                                         $cu = floatval($carteira_saldo_usd ?? 0);
-                                        if ($cu > 0 && $cb > 0) {
-                                            echo 'R$ ' . number_format($cb, 2, ',', '.') . '<br><span class="text-muted" style="font-size: 0.85rem;">US$ ' . number_format($cu, 2, ',', '.') . '</span>';
+                                        $rate = floatval($carteira_usd_brl_rate ?? 0);
+                                        $equiv = floatval($carteira_saldo_brl_equiv ?? $cb);
+
+                                        if ($equiv > 0) {
+                                            $label = ($cu > 0 && $rate > 0 && $cb <= 0.00001) ? ' (equiv.)' : '';
+                                            echo 'R$ ' . number_format($equiv, 2, ',', '.') . $label;
+                                            if ($cu > 0) {
+                                                echo '<br><span class="text-muted" style="font-size: 0.85rem;">US$ ' . number_format($cu, 2, ',', '.') . '</span>';
+                                            }
                                         } elseif ($cu > 0) {
                                             echo 'US$ ' . number_format($cu, 2, ',', '.');
                                         } else {
-                                            echo 'R$ ' . number_format($cb, 2, ',', '.');
+                                            echo 'R$ 0,00';
                                         }
                                         ?>
                                     </h6>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="abrirModalRecargaCarteira()">Adicionar saldo</button>
                                 </div>
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.18); color: rgba(49, 46, 129, 1);">
                                     <i class="fas fa-wallet"></i>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="modalRecargaCarteira" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Adicionar saldo na carteira</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Moeda</label>
+                                    <select class="form-select" id="recargaMoeda" onchange="onRecargaMoedaChange()">
+                                        <option value="BRL" selected>BRL (Real)</option>
+                                        <option value="USD">USD (Dólar)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Valor</label>
+                                    <input type="number" min="0.01" step="0.01" class="form-control" id="recargaValor" placeholder="0,00">
+                                </div>
+                                <div class="col-md-4" id="recargaMetodoWrap">
+                                    <label class="form-label">Método (BRL)</label>
+                                    <select class="form-select" id="recargaMetodo">
+                                        <option value="pix" selected>PIX</option>
+                                        <option value="boleto">Boleto</option>
+                                        <option value="cartao_credito">Cartão de crédito</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mt-2" id="recargaCartaoWrap" style="display:none;">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nome no cartão</label>
+                                    <input type="text" class="form-control" id="recargaCardHolder" placeholder="Nome como está no cartão">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Número do cartão</label>
+                                    <input type="text" class="form-control" id="recargaCardNumber" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Validade (MM)</label>
+                                    <input type="text" class="form-control" id="recargaCardExpMonth" placeholder="MM" maxlength="2" inputmode="numeric">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Validade (AAAA)</label>
+                                    <input type="text" class="form-control" id="recargaCardExpYear" placeholder="AAAA" maxlength="4" inputmode="numeric">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">CVV</label>
+                                    <input type="text" class="form-control" id="recargaCardCvv" placeholder="123" maxlength="4" inputmode="numeric">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Parcelas</label>
+                                    <input type="number" class="form-control" id="recargaInstallments" value="1" min="1" max="12">
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info mt-3 mb-0" id="recargaInfo" style="display:none;"></div>
+
+                            <div class="mt-3" id="recargaStripeWrap" style="display:none;">
+                                <div class="mb-2"><strong>Pagamento (Stripe)</strong></div>
+                                <div id="recargaStripeCard" class="form-control" style="padding: 12px; background: #fff;"></div>
+                                <div id="recargaStripeErrors" class="text-danger small mt-2" style="display:none;"></div>
+                            </div>
+
+                            <div class="mt-3" id="recargaResultado" style="display:none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            <button type="button" class="btn btn-primary" id="btnConfirmarRecarga" onclick="confirmarRecargaCarteira()">Gerar pagamento</button>
                         </div>
                     </div>
                 </div>
@@ -244,6 +327,230 @@
 
                 setInterval(tick, 1000);
             })();
+            </script>
+
+            <script src="https://js.stripe.com/v3/"></script>
+
+            <script>
+            let recargaModalInstance = null;
+            let recargaStripeClient = null;
+            let recargaStripeElements = null;
+            let recargaStripeCard = null;
+            let recargaStripeCardMounted = false;
+
+            function abrirModalRecargaCarteira() {
+                const el = document.getElementById('modalRecargaCarteira');
+                if (!el) return;
+                if (!recargaModalInstance) {
+                    recargaModalInstance = new bootstrap.Modal(el);
+                }
+                document.getElementById('recargaValor').value = '';
+                document.getElementById('recargaMoeda').value = 'BRL';
+                document.getElementById('recargaMetodo').value = 'pix';
+                const info = document.getElementById('recargaInfo');
+                const res = document.getElementById('recargaResultado');
+                const err = document.getElementById('recargaStripeErrors');
+                if (info) { info.style.display = 'none'; info.innerHTML = ''; }
+                if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+                if (err) { err.style.display = 'none'; err.textContent = ''; }
+                onRecargaMoedaChange();
+                recargaModalInstance.show();
+            }
+
+            function onRecargaMoedaChange() {
+                const moeda = (document.getElementById('recargaMoeda')?.value || 'BRL').toString().toUpperCase();
+                const metodoWrap = document.getElementById('recargaMetodoWrap');
+                const stripeWrap = document.getElementById('recargaStripeWrap');
+                const cartaoWrap = document.getElementById('recargaCartaoWrap');
+                const btn = document.getElementById('btnConfirmarRecarga');
+
+                if (moeda === 'USD') {
+                    if (metodoWrap) metodoWrap.style.display = 'none';
+                    if (cartaoWrap) cartaoWrap.style.display = 'none';
+                    if (stripeWrap) stripeWrap.style.display = 'block';
+                    if (btn) btn.textContent = 'Pagar com Stripe';
+                    ensureRecargaStripeInit();
+                    mountRecargaStripeCard();
+                    return;
+                }
+
+                if (metodoWrap) metodoWrap.style.display = '';
+                if (stripeWrap) stripeWrap.style.display = 'none';
+                if (btn) btn.textContent = 'Gerar pagamento';
+
+                const metodo = (document.getElementById('recargaMetodo')?.value || 'pix').toString();
+                if (cartaoWrap) {
+                    cartaoWrap.style.display = (metodo === 'cartao_credito') ? '' : 'none';
+                }
+            }
+
+            document.getElementById('recargaMetodo')?.addEventListener('change', function() {
+                onRecargaMoedaChange();
+            });
+
+            function ensureRecargaStripeInit() {
+                const stripeEnabled = <?php echo json_encode((bool) ($stripe_enabled ?? false)); ?>;
+                const publishableKey = <?php echo json_encode((string) ($stripe_publishable_key ?? '')); ?>;
+                if (!stripeEnabled || !publishableKey) {
+                    return false;
+                }
+                if (typeof Stripe !== 'function') {
+                    return false;
+                }
+                if (!recargaStripeClient) {
+                    recargaStripeClient = Stripe(publishableKey);
+                    recargaStripeElements = recargaStripeClient.elements();
+                    recargaStripeCard = recargaStripeElements.create('card');
+                    recargaStripeCardMounted = false;
+                }
+                return true;
+            }
+
+            function mountRecargaStripeCard() {
+                const wrap = document.getElementById('recargaStripeWrap');
+                const target = document.getElementById('recargaStripeCard');
+                if (!wrap || wrap.style.display === 'none' || !target) {
+                    return;
+                }
+                if (!ensureRecargaStripeInit()) {
+                    return;
+                }
+                if (recargaStripeCard && !recargaStripeCardMounted) {
+                    recargaStripeCard.mount('#recargaStripeCard');
+                    recargaStripeCardMounted = true;
+                }
+            }
+
+            function setRecargaInfo(html) {
+                const info = document.getElementById('recargaInfo');
+                if (!info) return;
+                info.innerHTML = html;
+                info.style.display = html ? '' : 'none';
+            }
+
+            function setRecargaResultado(html) {
+                const res = document.getElementById('recargaResultado');
+                if (!res) return;
+                res.innerHTML = html;
+                res.style.display = html ? '' : 'none';
+            }
+
+            function setRecargaStripeError(msg) {
+                const el = document.getElementById('recargaStripeErrors');
+                if (!el) return;
+                el.textContent = msg || '';
+                el.style.display = msg ? '' : 'none';
+            }
+
+            async function confirmarRecargaCarteira() {
+                setRecargaInfo('');
+                setRecargaResultado('');
+                setRecargaStripeError('');
+
+                const moeda = (document.getElementById('recargaMoeda')?.value || 'BRL').toString().toUpperCase();
+                const valor = parseFloat((document.getElementById('recargaValor')?.value || '0').toString().replace(',', '.'));
+                if (!valor || valor <= 0) {
+                    setRecargaInfo('Informe um valor válido.');
+                    return;
+                }
+
+                if (moeda === 'USD') {
+                    if (!ensureRecargaStripeInit()) {
+                        setRecargaInfo('Stripe não está configurado.');
+                        return;
+                    }
+
+                    const r = await fetch('/carteira/recarga/criar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ moeda: 'USD', valor: valor })
+                    });
+                    const data = await r.json();
+                    if (!data || !data.success || !data.client_secret) {
+                        setRecargaInfo('Falha ao iniciar recarga: ' + (data && (data.error || data.message) ? (data.error || data.message) : 'erro')); 
+                        return;
+                    }
+
+                    mountRecargaStripeCard();
+                    const confirmRes = await recargaStripeClient.confirmCardPayment(data.client_secret, {
+                        payment_method: { card: recargaStripeCard }
+                    });
+                    if (confirmRes.error) {
+                        setRecargaStripeError(confirmRes.error.message || 'Pagamento não autorizado');
+                        return;
+                    }
+
+                    const pi = confirmRes.paymentIntent;
+                    const piId = (pi && pi.id) ? pi.id : (data.payment_intent_id || '');
+                    if (!piId) {
+                        setRecargaStripeError('PaymentIntent inválido');
+                        return;
+                    }
+
+                    const f = new URLSearchParams({ recarga_id: String(data.recarga_id || ''), payment_intent_id: String(piId) }).toString();
+                    const respFin = await fetch('/carteira/recarga/stripe/finalizar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: f
+                    });
+                    const fin = await respFin.json();
+                    if (!fin || !fin.success) {
+                        setRecargaStripeError(fin && (fin.error || fin.message) ? (fin.error || fin.message) : 'Falha ao finalizar');
+                        return;
+                    }
+
+                    setRecargaResultado('<div class="alert alert-success mb-0">Pagamento confirmado. A recarga será creditada após confirmação automática (webhook).</div>');
+                    return;
+                }
+
+                const metodo = (document.getElementById('recargaMetodo')?.value || 'pix').toString();
+                const payload = { moeda: 'BRL', valor: valor, metodo: metodo };
+
+                if (metodo === 'cartao_credito') {
+                    payload.card_holder_name = (document.getElementById('recargaCardHolder')?.value || '').toString();
+                    payload.card_number = (document.getElementById('recargaCardNumber')?.value || '').toString();
+                    payload.card_expiry_month = (document.getElementById('recargaCardExpMonth')?.value || '').toString();
+                    payload.card_expiry_year = (document.getElementById('recargaCardExpYear')?.value || '').toString();
+                    payload.card_cvv = (document.getElementById('recargaCardCvv')?.value || '').toString();
+                    payload.installments = parseInt((document.getElementById('recargaInstallments')?.value || '1').toString(), 10) || 1;
+                }
+
+                const r = await fetch('/carteira/recarga/criar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await r.json();
+                if (!data || !data.success) {
+                    setRecargaInfo('Falha ao gerar pagamento: ' + (data && (data.error || data.message) ? (data.error || data.message) : 'erro'));
+                    return;
+                }
+
+                let html = '';
+                if (data.pix && (data.pix.encodedImage || data.pix.payload)) {
+                    if (data.pix.encodedImage) {
+                        html += '<div class="mb-2"><strong>PIX QR Code</strong></div>';
+                        html += '<img alt="PIX" style="max-width:220px" class="img-fluid border rounded" src="data:image/png;base64,' + String(data.pix.encodedImage) + '">';
+                    }
+                    if (data.pix.payload) {
+                        html += '<div class="mt-2"><small class="text-muted">Copia e cola:</small><div class="border rounded p-2" style="word-break:break-all;">' + String(data.pix.payload) + '</div></div>';
+                    }
+                }
+                if (data.bankSlipUrl) {
+                    html += '<div class="mt-2"><a class="btn btn-sm btn-outline-secondary" target="_blank" href="' + String(data.bankSlipUrl) + '">Abrir boleto</a></div>';
+                }
+                if (data.invoiceUrl) {
+                    html += '<div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' + String(data.invoiceUrl) + '">Abrir link de pagamento</a></div>';
+                }
+                if (data.digitableLine) {
+                    html += '<div class="mt-2"><small class="text-muted">Linha digitável:</small><div class="border rounded p-2" style="word-break:break-all;">' + String(data.digitableLine) + '</div></div>';
+                }
+
+                if (!html) {
+                    html = '<div class="alert alert-success mb-0">Pagamento gerado. Aguarde a confirmação para crédito automático na carteira.</div>';
+                }
+                setRecargaResultado(html);
+            }
             </script>
         </div>
         </div>

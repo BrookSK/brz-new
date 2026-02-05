@@ -51,6 +51,8 @@ $router->get('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
 $router->post('/meus-dados/avatar/remover', 'UsuarioController', 'avatarRemover');
+$router->post('/carteira/recarga/criar', 'UsuarioController', 'carteiraRecargaCriar');
+$router->post('/carteira/recarga/stripe/finalizar', 'UsuarioController', 'carteiraRecargaStripeFinalizar');
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
 $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 $router->get('/pedido/detalhes/{id}/pdf', 'UsuarioController', 'pedidoPdf');
