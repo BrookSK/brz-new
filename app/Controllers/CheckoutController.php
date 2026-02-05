@@ -1089,10 +1089,18 @@ class CheckoutController extends Controller {
         $subtotal = 0;
         $pesoTotal = 0;
 
+        $pesoClubeTotal = 0.0;
+        $subtotalClube = 0.0;
+        $descontoClube = 0.0;
+        $cashbackClubeEstimado = 0.0;
+
         // Fallback de peso via tabela produtos (quando o item do carrinho não trouxer)
         $pesoCol = null;
         $pesoCache = [];
         $stPeso = null;
+        $hasClubeAtivo = false;
+        $clubeCache = [];
+        $stClube = null;
         try {
             $dbPeso = \Config\Database::getConnection();
             $stmtColsProd = $dbPeso->query('DESCRIBE produtos');
@@ -1106,9 +1114,16 @@ class CheckoutController extends Controller {
             if ($pesoCol) {
                 $stPeso = $dbPeso->prepare('SELECT ' . $pesoCol . ' AS peso FROM produtos WHERE id = ? LIMIT 1');
             }
+
+            $hasClubeAtivo = (is_array($colsProd) && in_array('clube_ativo', $colsProd, true));
+            if ($hasClubeAtivo) {
+                $stClube = $dbPeso->prepare('SELECT COALESCE(clube_ativo,0) AS clube_ativo FROM produtos WHERE id = ? LIMIT 1');
+            }
         } catch (\Exception $e) {
             $pesoCol = null;
             $stPeso = null;
+            $hasClubeAtivo = false;
+            $stClube = null;
         }
         
         foreach ($carrinho as $produtoId => $item) {
@@ -1147,6 +1162,25 @@ class CheckoutController extends Controller {
                 $pesoUnit = 0.5;
             }
             $pesoItem = $pesoUnit * (int) $quantidade;
+
+            $isClubeAtivo = false;
+            if ($hasClubeAtivo) {
+                $pid = (int) ($item['produto_id'] ?? 0);
+                if ($pid > 0) {
+                    if (array_key_exists($pid, $clubeCache)) {
+                        $isClubeAtivo = (bool) $clubeCache[$pid];
+                    } elseif ($stClube) {
+                        try {
+                            $stClube->execute([$pid]);
+                            $cv = (int) ($stClube->fetchColumn() ?: 0);
+                            $isClubeAtivo = ($cv === 1);
+                            $clubeCache[$pid] = $isClubeAtivo;
+                        } catch (\Exception $e) {
+                            $clubeCache[$pid] = false;
+                        }
+                    }
+                }
+            }
             
             // Buscar detalhes do produto (simulado por enquanto)
             $produto = [
@@ -1159,6 +1193,7 @@ class CheckoutController extends Controller {
                 'foto_principal' => $item['foto_principal'] ?? null,
                 'produto_variacao_id' => $item['produto_variacao_id'] ?? null,
                 'variacao_descricao' => $item['variacao_descricao'] ?? null,
+                'clube_ativo' => $isClubeAtivo ? 1 : 0,
             ];
             
             $items[] = $produto;
@@ -1169,12 +1204,76 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT_INDEX] Produto processado: ' . json_encode($produto));
         }
 
+        // Se o carrinho estiver no DB, usar os totais persistidos (inclui desconto/cashback do Clube)
+        $uid = (int) ($usuario['id'] ?? 0);
+        if ($uid > 0) {
+            try {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId > 0) {
+                    $db = $this->carrinhoModel->getConnection();
+                    $cols = [];
+                    try {
+                        $stCols = $db->query('DESCRIBE carrinhos');
+                        $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Throwable $e) {
+                        $cols = [];
+                    }
+
+                    $st = $db->prepare('SELECT * FROM carrinhos WHERE id = ? LIMIT 1');
+                    $st->execute([$cartId]);
+                    $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                    if (!empty($row)) {
+                        if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
+                        if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
+
+                        if (array_key_exists('taxa_servico', $row)) $taxaServicoFromDb = (float) ($row['taxa_servico'] ?? 0);
+                        if (array_key_exists('valor_impostos', $row)) $impostosFromDb = (float) ($row['valor_impostos'] ?? 0);
+                        if (array_key_exists('valor_total', $row)) $totalFromDb = (float) ($row['valor_total'] ?? 0);
+                        if (array_key_exists('frete_manual', $row) && $row['frete_manual'] !== null && $row['frete_manual'] !== '') {
+                            $freteFromDb = (float) $row['frete_manual'];
+                        }
+
+                        if (is_array($cols) && in_array('peso_clube_total', $cols, true)) {
+                            $pesoClubeTotal = (float) ($row['peso_clube_total'] ?? 0);
+                        }
+                        if (is_array($cols) && in_array('subtotal_clube', $cols, true)) {
+                            $subtotalClube = (float) ($row['subtotal_clube'] ?? 0);
+                        }
+                        if (is_array($cols) && in_array('desconto_clube', $cols, true)) {
+                            $descontoClube = (float) ($row['desconto_clube'] ?? 0);
+                        }
+                        if (is_array($cols) && in_array('cashback_clube_estimado', $cols, true)) {
+                            $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
         // Calcular valores no backend sempre em USD (moeda base), para evitar mistura de moedas.
         // A conversão para BRL é feita no JS da view (assim como no carrinho).
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
         $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
+
+        if (isset($taxaServicoFromDb)) {
+            $taxaServico = (float) $taxaServicoFromDb;
+        }
+        if (isset($impostosFromDb)) {
+            $impostos = (float) $impostosFromDb;
+        }
+        if (isset($freteFromDb)) {
+            $frete = (float) $freteFromDb;
+        }
+        if (isset($totalFromDb) && (float) $totalFromDb > 0) {
+            $total = (float) $totalFromDb;
+        } else {
+            $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
+        }
         
         $enderecos = $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [];
         $enderecoPrincipal = null;
@@ -1220,6 +1319,10 @@ class CheckoutController extends Controller {
             'carrinho' => $carrinho,
             'items' => $items,
             'subtotal' => $subtotal,
+            'peso_clube_total' => $pesoClubeTotal,
+            'subtotal_clube' => $subtotalClube,
+            'desconto_clube' => $descontoClube,
+            'cashback_clube_estimado' => $cashbackClubeEstimado,
             'peso_total' => $pesoTotal,
             'usuario' => $usuario,
             'perfil_ok' => $perfilOk,
@@ -1519,6 +1622,13 @@ class CheckoutController extends Controller {
                     $gateway = 'carteira';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                     $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+
+                    try {
+                        if (strtoupper((string) ($payResult['status'] ?? '')) === 'PAID') {
+                            $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
+                        }
+                    } catch (\Exception $e) {
+                    }
                 }
 
                 if (!$reused && $formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
@@ -1657,6 +1767,10 @@ class CheckoutController extends Controller {
             $this->atualizarPagamentoNaTabelaPagamentos($pedidoId, ['payment_id' => $paymentIntentId, 'status' => $internalStatus, 'paid_at' => ($status === 'SUCCEEDED' ? date('Y-m-d H:i:s') : null)], 'stripe');
 
             if ($status === 'SUCCEEDED') {
+                try {
+                    $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
+                } catch (\Exception $e) {
+                }
                 unset($_SESSION['carrinho']);
             }
 

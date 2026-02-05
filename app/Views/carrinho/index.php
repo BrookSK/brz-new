@@ -16,11 +16,16 @@
                                     <?php 
                                     $fotoUrl = null;
                                     $capaArquivo = null;
+                                    $isClubeAtivo = false;
                                     try {
                                         $produtoModel = new \App\Models\Produto();
                                         $produtoCarrinho = $produtoModel->find($item['produto_id']);
                                         if (!empty($produtoCarrinho) && is_array($produtoCarrinho) && !empty($produtoCarrinho['foto_principal'])) {
                                             $capaArquivo = (string) $produtoCarrinho['foto_principal'];
+                                        }
+
+                                        if (!empty($produtoCarrinho) && is_array($produtoCarrinho) && !empty($produtoCarrinho['clube_ativo'])) {
+                                            $isClubeAtivo = ((int) ($produtoCarrinho['clube_ativo'] ?? 0)) === 1;
                                         }
                                     } catch (\Exception $e) {
                                     }
@@ -95,7 +100,12 @@
                                          class="img-fluid rounded">
                                 </div>
                                 <div class="col-8 col-md-5">
-                                    <h6 class="mb-1"><?= htmlspecialchars($item['nome']) ?></h6>
+                                    <h6 class="mb-1">
+                                        <?= htmlspecialchars($item['nome']) ?>
+                                        <?php if (!empty($isClubeAtivo)): ?>
+                                            <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i>Clube Ativo</span>
+                                        <?php endif; ?>
+                                    </h6>
                                     <?php if (!empty($item['variacao_descricao'])): ?>
                                         <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                     <?php endif; ?>
@@ -219,6 +229,32 @@
                             <span>Subtotal (<?= $total_itens ?> itens)</span>
                             <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
                         </div>
+
+                        <?php if (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube)): ?>
+                            <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
+                                <div class="fw-semibold mb-1" style="color:#0b1f3a;">Clube Brasiliana</div>
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Peso Clube</span>
+                                    <span><?= number_format((float) ($peso_clube_total ?? 0), 3, ',', '.') ?> kg</span>
+                                </div>
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Subtotal Clube</span>
+                                    <span class="cart-currency" data-original-value="<?= (float) ($subtotal_clube ?? 0) ?>"><?= number_format((float) ($subtotal_clube ?? 0), 2, ',', '.') ?></span>
+                                </div>
+                                <?php if (!empty($desconto_clube)): ?>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Desconto Clube</span>
+                                        <span class="cart-currency" data-original-value="<?= (float) ($desconto_clube ?? 0) ?>">-<?= number_format((float) ($desconto_clube ?? 0), 2, ',', '.') ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($cashback_clube_estimado)): ?>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Cashback estimado</span>
+                                        <span class="cart-currency" data-original-value="<?= (float) ($cashback_clube_estimado ?? 0) ?>"><?= number_format((float) ($cashback_clube_estimado ?? 0), 2, ',', '.') ?></span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>

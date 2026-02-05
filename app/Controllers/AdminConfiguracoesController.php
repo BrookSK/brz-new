@@ -104,6 +104,16 @@ class AdminConfiguracoesController extends Controller {
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $clubeFaixas = [];
+        try {
+            if (isset($pdo) && $pdo instanceof \PDO && $this->tableExists($pdo, 'clube_descontos_faixas')) {
+                $st = $pdo->query('SELECT id, peso_min_kg, peso_max_kg, percentual_desconto, ativo, ordem FROM clube_descontos_faixas ORDER BY ativo DESC, ordem ASC, peso_min_kg ASC, id ASC');
+                $clubeFaixas = $st ? ($st->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Exception $e) {
+            $clubeFaixas = [];
+        }
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1122,6 +1132,121 @@ class AdminConfiguracoesController extends Controller {
                                                         <label class="form-label">Webhook - Link de Pagamento do Pedido Manual (URL)</label>
                                                         <input type="url" class="form-control" name="pagamentos_webhook_link_pagamento_pedido_manual_url" value="' . $this->getConfigValue($config, 'pagamentos', 'webhook_link_pagamento_pedido_manual_url', '') . '" placeholder="https://seu-webhook.com/pedidos/manual/link-pagamento">
                                                         <small class="text-muted">O sistema enviará POST em JSON com dados do pedido, cliente e link de pagamento assim que o link for gerado.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            <h6 class="mb-0">👑 Clube Brasiliana</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-4">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Cashback (%)</label>
+                                                                        <input type="number" step="0.01" min="0" class="form-control" name="clube_cashback_percent" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'cashback_percent', '0'), ENT_QUOTES, 'UTF-8') . '">
+                                                                        <small class="text-muted">Percentual de cashback em créditos internos (apenas produtos com Clube Ativo).</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-4">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Rendimento (%)</label>
+                                                                        <input type="number" step="0.01" min="0" class="form-control" name="clube_rendimento_percent" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'rendimento_percent', '0'), ENT_QUOTES, 'UTF-8') . '">
+                                                                        <small class="text-muted">Percentual de créditos internos gerados periodicamente (saldo mínimo necessário).</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-4">
+                                                                    <label class="form-label">Intervalo do rendimento</label>
+                                                                    <div class="input-group mb-3">
+                                                                        <input type="number" min="1" step="1" class="form-control" name="clube_rendimento_intervalo_valor" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'rendimento_intervalo_valor', '30'), ENT_QUOTES, 'UTF-8') . '">
+                                                                        <select class="form-select" name="clube_rendimento_intervalo_unidade">
+                                                                            ';
+
+        $unit = (string) $this->getConfigValue($config, 'clube', 'rendimento_intervalo_unidade', 'dia');
+        $unit = strtolower(trim($unit));
+        if (!in_array($unit, ['minuto', 'hora', 'dia', 'mes'], true)) {
+            $unit = 'dia';
+        }
+
+        echo '                                                                <option value="minuto" ' . ($unit === 'minuto' ? 'selected' : '') . '>Minuto(s)</option>
+                                                                            <option value="hora" ' . ($unit === 'hora' ? 'selected' : '') . '>Hora(s)</option>
+                                                                            <option value="dia" ' . ($unit === 'dia' ? 'selected' : '') . '>Dia(s)</option>
+                                                                            <option value="mes" ' . ($unit === 'mes' ? 'selected' : '') . '>Mês(es)</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <small class="text-muted">Configura a periodicidade do crédito por permanência.</small>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row mt-2">
+                                                                <div class="col-12">
+                                                                    <div class="border rounded p-3 bg-light">
+                                                                        <div class="fw-semibold mb-2">Faixas de desconto progressivo (peso total de produtos com Clube Ativo)</div>
+                                                                        <div class="table-responsive">
+                                                                            <table class="table table-sm align-middle mb-0">
+                                                                                <thead>
+                                                                                    <tr>
+                                                                                        <th style="width:80px;">Ativo</th>
+                                                                                        <th style="width:120px;">Ordem</th>
+                                                                                        <th style="width:180px;">Peso mín (kg)</th>
+                                                                                        <th style="width:180px;">Peso máx (kg)</th>
+                                                                                        <th style="width:180px;">Desconto (%)</th>
+                                                                                        <th style="width:120px;">Remover</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody>';
+
+        if (empty($clubeFaixas)) {
+            echo '<tr><td colspan="6" class="text-center text-muted">Nenhuma faixa cadastrada</td></tr>';
+        } else {
+            foreach ($clubeFaixas as $fx) {
+                $idFx = (int) ($fx['id'] ?? 0);
+                $ativoFx = (int) ($fx['ativo'] ?? 0);
+                $ordFx = (int) ($fx['ordem'] ?? 0);
+                $minFx = (string) ($fx['peso_min_kg'] ?? '0');
+                $maxFx = (string) ($fx['peso_max_kg'] ?? '0');
+                $pctFx = (string) ($fx['percentual_desconto'] ?? '0');
+
+                echo '<tr>'
+                    . '<td>'
+                    . '<input type="hidden" name="clube_faixas[' . $idFx . '][id]" value="' . $idFx . '">'
+                    . '<input type="hidden" name="clube_faixas[' . $idFx . '][ativo]" value="0">'
+                    . '<input class="form-check-input" type="checkbox" name="clube_faixas[' . $idFx . '][ativo]" value="1" ' . ($ativoFx ? 'checked' : '') . '>'
+                    . '</td>'
+                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixas[' . $idFx . '][ordem]" value="' . htmlspecialchars((string) $ordFx, ENT_QUOTES, 'UTF-8') . '" step="1"></td>'
+                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixas[' . $idFx . '][peso_min_kg]" value="' . htmlspecialchars((string) $minFx, ENT_QUOTES, 'UTF-8') . '" step="0.001" min="0"></td>'
+                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixas[' . $idFx . '][peso_max_kg]" value="' . htmlspecialchars((string) $maxFx, ENT_QUOTES, 'UTF-8') . '" step="0.001" min="0"></td>'
+                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixas[' . $idFx . '][percentual_desconto]" value="' . htmlspecialchars((string) $pctFx, ENT_QUOTES, 'UTF-8') . '" step="0.01" min="0"></td>'
+                    . '<td class="text-center"><input class="form-check-input" type="checkbox" name="clube_faixas_remover[]" value="' . $idFx . '"></td>'
+                    . '</tr>';
+            }
+        }
+
+        echo '                                                                <tr>'
+                                                                                    . '<td>'
+                                                                                    . '<input type="hidden" name="clube_faixa_nova[ativo]" value="0">'
+                                                                                    . '<input class="form-check-input" type="checkbox" name="clube_faixa_nova[ativo]" value="1" checked>'
+                                                                                    . '</td>'
+                                                                                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[ordem]" value="0" step="1"></td>'
+                                                                                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[peso_min_kg]" value="0" step="0.001" min="0"></td>'
+                                                                                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[peso_max_kg]" value="0" step="0.001" min="0"></td>'
+                                                                                    . '<td><input type="number" class="form-control form-control-sm" name="clube_faixa_nova[percentual_desconto]" value="0" step="0.01" min="0"></td>'
+                                                                                    . '<td class="text-muted small">Nova</td>'
+                                                                                    . '</tr>';
+
+        echo '                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                        <div class="text-muted small mt-2">O desconto progressivo será calculado somente com base no peso total dos produtos com Clube Ativo.</div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2219,6 +2344,7 @@ HTML;
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
+                'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
@@ -2358,7 +2484,59 @@ HTML;
                     }
                 }
             }
-            
+
+            try {
+                if ($this->tableExists($pdo, 'clube_descontos_faixas')) {
+                    $rem = $request->getParam('clube_faixas_remover', []);
+                    if (!is_array($rem)) $rem = [];
+                    $remIds = array_values(array_unique(array_map('intval', $rem)));
+                    if (!empty($remIds)) {
+                        $in = implode(',', array_fill(0, count($remIds), '?'));
+                        $stDel = $pdo->prepare('DELETE FROM clube_descontos_faixas WHERE id IN (' . $in . ')');
+                        $stDel->execute($remIds);
+                    }
+
+                    $faixas = $request->getParam('clube_faixas', []);
+                    if (!is_array($faixas)) $faixas = [];
+
+                    foreach ($faixas as $row) {
+                        if (!is_array($row)) continue;
+                        $idFx = (int) ($row['id'] ?? 0);
+                        if ($idFx <= 0) continue;
+                        if (in_array($idFx, $remIds, true)) continue;
+
+                        $ativo = (int) (($row['ativo'] ?? 0) ? 1 : 0);
+                        $ordem = (int) ($row['ordem'] ?? 0);
+                        $min = (float) str_replace(',', '.', (string) ($row['peso_min_kg'] ?? 0));
+                        $max = (float) str_replace(',', '.', (string) ($row['peso_max_kg'] ?? 0));
+                        $pct = (float) str_replace(',', '.', (string) ($row['percentual_desconto'] ?? 0));
+                        if ($min < 0) $min = 0.0;
+                        if ($max < 0) $max = 0.0;
+                        if ($pct < 0) $pct = 0.0;
+
+                        $stUp = $pdo->prepare('UPDATE clube_descontos_faixas SET peso_min_kg = ?, peso_max_kg = ?, percentual_desconto = ?, ativo = ?, ordem = ?, updated_at = NOW() WHERE id = ?');
+                        $stUp->execute([$min, $max, $pct, $ativo, $ordem, $idFx]);
+                    }
+
+                    $nova = $request->getParam('clube_faixa_nova', []);
+                    if (is_array($nova)) {
+                        $minN = (float) str_replace(',', '.', (string) ($nova['peso_min_kg'] ?? 0));
+                        $maxN = (float) str_replace(',', '.', (string) ($nova['peso_max_kg'] ?? 0));
+                        $pctN = (float) str_replace(',', '.', (string) ($nova['percentual_desconto'] ?? 0));
+                        $ativoN = (int) (($nova['ativo'] ?? 0) ? 1 : 0);
+                        $ordN = (int) ($nova['ordem'] ?? 0);
+                        if ($minN < 0) $minN = 0.0;
+                        if ($maxN < 0) $maxN = 0.0;
+                        if ($pctN < 0) $pctN = 0.0;
+                        if ($minN > 0 || $maxN > 0 || $pctN > 0) {
+                            $stIns = $pdo->prepare('INSERT INTO clube_descontos_faixas (peso_min_kg, peso_max_kg, percentual_desconto, ativo, ordem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
+                            $stIns->execute([$minN, $maxN, $pctN, $ativoN, $ordN]);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
             $pdo->commit();
             
             header('Location: /admin/configuracoes?success=1');
@@ -2546,8 +2724,10 @@ HTML;
         }
         
         function testarAsaasAPI() {
-            const apiKey = document.querySelector('input[name="asaas_api_key"]').value;
-            const ambiente = document.querySelector('select[name="asaas_ambiente"]').value;
+            const apiKeyEl = document.querySelector('input[name="pagamentos_asaas_api_key"]');
+            const ambEl = document.querySelector('select[name="pagamentos_asaas_ambiente"]');
+            const apiKey = apiKeyEl ? apiKeyEl.value : '';
+            const ambiente = ambEl ? ambEl.value : 'sandbox';
             
             if (!apiKey) {
                 alert('Digite a API Key do Asaas primeiro');
@@ -2577,9 +2757,12 @@ HTML;
         }
         
         function testarStripeAPI() {
-            const publishableKey = document.querySelector('input[name="stripe_publishable_key"]').value;
-            const secretKey = document.querySelector('input[name="stripe_secret_key"]').value;
-            const ambiente = document.querySelector('select[name="stripe_ambiente"]').value;
+            const pkEl = document.querySelector('input[name="pagamentos_stripe_publishable_key"]');
+            const skEl = document.querySelector('input[name="pagamentos_stripe_secret_key"]');
+            const ambEl = document.querySelector('select[name="pagamentos_stripe_ambiente"]');
+            const publishableKey = pkEl ? pkEl.value : '';
+            const secretKey = skEl ? skEl.value : '';
+            const ambiente = ambEl ? ambEl.value : 'test';
             
             if (!publishableKey || !secretKey) {
                 alert('Digite as chaves do Stripe primeiro');

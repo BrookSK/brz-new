@@ -1124,6 +1124,13 @@ HTML;
                                             <option value="1">Sim</option>
                                         </select>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Clube Ativo</label>
+                                        <select class="form-select" name="clube_ativo">
+                                            <option value="0" selected>Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
                             </div>
@@ -1281,6 +1288,7 @@ HTML;
             if (in_array('status', $cols, true)) $data['status'] = $request->getParam('status') ?: 'published';
             if (in_array('active', $cols, true)) $data['active'] = $request->getParam('active') ?: 1;
             if (in_array('featured', $cols, true)) $data['featured'] = $request->getParam('featured') ?: 0;
+            if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
 
             if (in_array('created_at', $cols, true) && empty($data['created_at'])) {
                 $data['created_at'] = date('Y-m-d H:i:s');
@@ -1871,7 +1879,14 @@ HTML;
                                             <option value="0" ' . (empty($produto['featured']) ? 'selected' : '') . '>Não</option>
                                         </select>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Atualizar</button>
+                                    <div class="mb-3">
+                                        <label class="form-label">Clube Ativo</label>
+                                        <select class="form-select" name="clube_ativo">
+                                            <option value="1" ' . (!empty($produto['clube_ativo']) ? 'selected' : '') . '>Sim</option>
+                                            <option value="0" ' . (empty($produto['clube_ativo']) ? 'selected' : '') . '>Não</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar Alterações</button>
                                 </div>
                             </div>
                         </div>
@@ -2109,6 +2124,11 @@ HTMLSCRIPT;
             if (in_array('loja_id', $cols, true) && $lojaId > 0) {
                 $stmtLojaId = $pdo->prepare('UPDATE produtos SET loja_id = ? WHERE id = ?');
                 $stmtLojaId->execute([$lojaId, $id]);
+            }
+
+            if (in_array('clube_ativo', $cols, true)) {
+                $stmtClube = $pdo->prepare('UPDATE produtos SET clube_ativo = ? WHERE id = ?');
+                $stmtClube->execute([(int) ($request->getParam('clube_ativo') ?: 0), (int) $id]);
             }
 
             $rowsUpdated = $stmt->rowCount();

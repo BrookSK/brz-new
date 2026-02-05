@@ -57,6 +57,770 @@ class PaymentService {
         }
     }
 
+    private function debitarCashbackClubePorPedidoEstornado(\PDO $db, int $pedidoId): void {
+        try {
+            $pedidoId = (int) $pedidoId;
+            if ($pedidoId <= 0) {
+                return;
+            }
+
+            $colsP = [];
+            try {
+                $stColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $usuarioCol = null;
+            foreach (['usuario_id', 'user_id'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $usuarioCol = $c;
+                    break;
+                }
+            }
+            if ($usuarioCol === null) {
+                return;
+            }
+
+            $select = ['id', $usuarioCol];
+            foreach (['moeda', 'currency'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $select[] = $c;
+                    break;
+                }
+            }
+
+            $stP = $db->prepare('SELECT ' . implode(', ', array_unique($select)) . ' FROM pedidos WHERE id = ? LIMIT 1');
+            $stP->execute([$pedidoId]);
+            $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $usuarioId = (int) ($pedido[$usuarioCol] ?? 0);
+            if ($usuarioId <= 0) {
+                return;
+            }
+
+            $moeda = 'BRL';
+            foreach (['moeda', 'currency'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $moeda = strtoupper(trim((string) ($pedido[$c] ?? 'BRL')));
+                    break;
+                }
+            }
+            if (!in_array($moeda, ['BRL', 'USD'], true)) {
+                $moeda = 'BRL';
+            }
+
+            $this->garantirCarteiraUsuario($db, $usuarioId);
+            $this->garantirTabelaTransacoesCarteira($db);
+
+            $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+            $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+
+            $startedTx = false;
+            try {
+                if (!$db->inTransaction()) {
+                    $db->beginTransaction();
+                    $startedTx = true;
+                }
+
+                // Idempotência: se já debitou o cashback desse pedido, não repetir
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'debito' AND descricao LIKE :desc LIMIT 1");
+                $stmtChk->execute([
+                    ':uid' => $usuarioId,
+                    ':desc' => '%Estorno Cashback Clube - Pedido #' . (int) $pedidoId . '%',
+                ]);
+                $ja = (int) ($stmtChk->fetchColumn() ?: 0);
+                if ($ja > 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                // Buscar quanto foi creditado de cashback no passado (pela transação de crédito)
+                $stmtCred = $db->prepare(
+                    'SELECT COALESCE(' . $valorCol . ',0) AS v ' .
+                    'FROM transacoes_carteira ' .
+                    "WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc " .
+                    'ORDER BY id ASC LIMIT 1'
+                );
+                $stmtCred->execute([
+                    ':uid' => $usuarioId,
+                    ':desc' => '%Cashback Clube - Pedido #' . (int) $pedidoId . '%',
+                ]);
+                $valorCred = (float) ($stmtCred->fetchColumn() ?: 0);
+                if ($valorCred <= 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                // Lock carteira
+                $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                $stmtLock->execute([$usuarioId]);
+                $rowW = $stmtLock->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $saldoAtual = (float) ($rowW[$saldoCol] ?? 0);
+                if ($saldoAtual < 0) {
+                    $saldoAtual = 0.0;
+                }
+
+                $debito = $valorCred;
+                if ($debito > $saldoAtual) {
+                    $debito = $saldoAtual;
+                }
+                if ($debito <= 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $debito, ':uid' => $usuarioId]);
+
+                try {
+                    $desc = 'Estorno Cashback Clube - Pedido #' . $pedidoId;
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $debito,
+                        ':desc' => $desc,
+                    ]);
+                } catch (\Exception $e) {
+                }
+
+                if ($startedTx) {
+                    $db->commit();
+                }
+            } catch (\Exception $e) {
+                if ($startedTx && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+                return;
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    private function debitarRendimentoClubePorPedidoEstornado(\PDO $db, int $pedidoId): void {
+        try {
+            $pedidoId = (int) $pedidoId;
+            if ($pedidoId <= 0) {
+                return;
+            }
+
+            // Resolver usuario do pedido
+            $colsP = [];
+            try {
+                $stColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $usuarioCol = null;
+            foreach (['usuario_id', 'user_id'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $usuarioCol = $c;
+                    break;
+                }
+            }
+            if ($usuarioCol === null) {
+                return;
+            }
+
+            $stP = $db->prepare('SELECT id, ' . $usuarioCol . ' AS usuario_id FROM pedidos WHERE id = ? LIMIT 1');
+            $stP->execute([$pedidoId]);
+            $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $usuarioId = (int) ($pedido['usuario_id'] ?? 0);
+            if ($usuarioId <= 0) {
+                return;
+            }
+
+            // Ler configuração para descobrir a chave do período
+            $intervaloValorRaw = $this->getConfig('clube', 'rendimento_intervalo_valor', '30');
+            $intervaloValor = (int) str_replace(',', '.', trim((string) ($intervaloValorRaw ?? '30')));
+            if ($intervaloValor <= 0) {
+                $intervaloValor = 30;
+            }
+            $intervaloUnidade = (string) $this->getConfig('clube', 'rendimento_intervalo_unidade', 'dia');
+            $periodKey = $this->computeRendimentoPeriodoKey($intervaloValor, $intervaloUnidade);
+
+            $this->garantirCarteiraUsuario($db, $usuarioId);
+            $this->garantirTabelaTransacoesCarteira($db);
+
+            $startedTx = false;
+            try {
+                if (!$db->inTransaction()) {
+                    $db->beginTransaction();
+                    $startedTx = true;
+                }
+
+                $descCredito = 'Rendimento Clube - ' . $periodKey;
+                $descDebito = 'Estorno Rendimento Clube - ' . $periodKey . ' - Pedido #' . $pedidoId;
+
+                // Idempotência por pedido/período
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'debito' AND descricao = :desc LIMIT 1");
+                $stmtChk->execute([':uid' => $usuarioId, ':desc' => $descDebito]);
+                $ja = (int) ($stmtChk->fetchColumn() ?: 0);
+                if ($ja > 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                // Buscar o rendimento creditado no período (se existir)
+                $stmtCred = $db->prepare(
+                    "SELECT COALESCE(valor_usd,0) AS valor_usd, COALESCE(valor_brl,0) AS valor_brl " .
+                    "FROM transacoes_carteira " .
+                    "WHERE usuario_id = :uid AND tipo = 'credito' AND descricao = :desc " .
+                    "ORDER BY id ASC LIMIT 1"
+                );
+                $stmtCred->execute([':uid' => $usuarioId, ':desc' => $descCredito]);
+                $rowCred = $stmtCred->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $valorUsd = (float) ($rowCred['valor_usd'] ?? 0);
+                $valorBrl = (float) ($rowCred['valor_brl'] ?? 0);
+
+                $moeda = null;
+                $valor = 0.0;
+                if ($valorUsd > 0) {
+                    $moeda = 'USD';
+                    $valor = $valorUsd;
+                } elseif ($valorBrl > 0) {
+                    $moeda = 'BRL';
+                    $valor = $valorBrl;
+                }
+
+                if ($moeda === null || $valor <= 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+                $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+                // Lock carteira
+                $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                $stmtLock->execute([$usuarioId]);
+                $rowW = $stmtLock->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $saldoAtual = (float) ($rowW[$saldoCol] ?? 0);
+                if ($saldoAtual < 0) {
+                    $saldoAtual = 0.0;
+                }
+
+                $debito = $valor;
+                if ($debito > $saldoAtual) {
+                    $debito = $saldoAtual;
+                }
+                if ($debito <= 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $debito, ':uid' => $usuarioId]);
+
+                try {
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $debito,
+                        ':desc' => $descDebito,
+                    ]);
+                } catch (\Exception $e) {
+                }
+
+                if ($startedTx) {
+                    $db->commit();
+                }
+            } catch (\Exception $e) {
+                if ($startedTx && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+                return;
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
+        $temPedidoItens = false;
+        $temPedidoItems = false;
+
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_itens']);
+            $temPedidoItens = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItens = false;
+        }
+
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_items']);
+            $temPedidoItems = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItems = false;
+        }
+
+        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
+        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+
+        if ($pedidoId > 0) {
+            $c1 = 0;
+            $c2 = 0;
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
+                $st->execute([(int) $pedidoId]);
+                $c1 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c1 = 0;
+            }
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
+                $st->execute([(int) $pedidoId]);
+                $c2 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c2 = 0;
+            }
+            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+        }
+
+        return 'pedido_itens';
+    }
+
+    private function creditarCashbackClubePorPedidoAprovado(\PDO $db, int $pedidoId): void {
+        try {
+            $pedidoId = (int) $pedidoId;
+            if ($pedidoId <= 0) {
+                return;
+            }
+
+            $cashbackPctRaw = $this->getConfig('clube', 'cashback_percent', null);
+            if ($cashbackPctRaw === null) {
+                $cashbackPctRaw = $this->getConfig('clube', 'clube_cashback_percent', null);
+            }
+            $cashbackPct = (float) str_replace(',', '.', trim((string) ($cashbackPctRaw ?? '0')));
+            if ($cashbackPct <= 0) {
+                return;
+            }
+
+            $colsP = [];
+            try {
+                $stColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $select = ['id'];
+            $usuarioCol = null;
+            foreach (['usuario_id', 'user_id'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $usuarioCol = $c;
+                    $select[] = $c;
+                    break;
+                }
+            }
+            foreach (['moeda', 'currency'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $select[] = $c;
+                    break;
+                }
+            }
+            foreach (['desconto', 'discount'] as $c) {
+                if (in_array($c, $colsP, true)) {
+                    $select[] = $c;
+                    break;
+                }
+            }
+
+            if ($usuarioCol === null) {
+                return;
+            }
+
+            $stP = $db->prepare('SELECT ' . implode(', ', array_unique($select)) . ' FROM pedidos WHERE id = ? LIMIT 1');
+            $stP->execute([$pedidoId]);
+            $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $usuarioId = (int) ($pedido[$usuarioCol] ?? 0);
+            if ($usuarioId <= 0) {
+                return;
+            }
+
+            $moeda = 'BRL';
+            foreach (['moeda', 'currency'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $moeda = strtoupper(trim((string) ($pedido[$c] ?? 'BRL')));
+                    break;
+                }
+            }
+            if (!in_array($moeda, ['BRL', 'USD'], true)) {
+                $moeda = 'BRL';
+            }
+
+            $descontoTotal = 0.0;
+            foreach (['desconto', 'discount'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $descontoTotal = (float) ($pedido[$c] ?? 0);
+                    break;
+                }
+            }
+            if ($descontoTotal < 0) {
+                $descontoTotal = 0.0;
+            }
+
+            $itensTable = $this->pickPedidoItensTable($db, $pedidoId);
+            $colsItens = [];
+            try {
+                $stColsI = $db->query('DESCRIBE ' . $itensTable);
+                $colsItens = $stColsI ? ($stColsI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsItens = [];
+            }
+
+            $colPedidoId = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : null;
+            $colProdutoId = in_array('produto_id', $colsItens, true) ? 'produto_id' : null;
+            $colSubtotal = null;
+            foreach (['subtotal', 'valor_total', 'total', 'amount'] as $c) {
+                if (is_array($colsItens) && in_array($c, $colsItens, true)) {
+                    $colSubtotal = $c;
+                    break;
+                }
+            }
+            if ($colPedidoId === null || $colProdutoId === null || $colSubtotal === null) {
+                return;
+            }
+
+            $prodCols = [];
+            try {
+                $stColsProd = $db->query('DESCRIBE produtos');
+                $prodCols = $stColsProd ? ($stColsProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $prodCols = [];
+            }
+            if (!is_array($prodCols) || !in_array('clube_ativo', $prodCols, true)) {
+                return;
+            }
+
+            $stSum = $db->prepare(
+                'SELECT SUM(COALESCE(i.' . $colSubtotal . ',0)) AS subtotal_clube ' .
+                'FROM ' . $itensTable . ' i ' .
+                'INNER JOIN produtos p ON p.id = i.' . $colProdutoId . ' ' .
+                'WHERE i.' . $colPedidoId . ' = :pid AND COALESCE(p.clube_ativo,0) = 1'
+            );
+            $stSum->execute([':pid' => $pedidoId]);
+            $subtotalClube = (float) ($stSum->fetchColumn() ?: 0);
+            if ($subtotalClube <= 0) {
+                return;
+            }
+
+            $descontoAplicado = $descontoTotal;
+            if ($descontoAplicado > $subtotalClube) {
+                $descontoAplicado = $subtotalClube;
+            }
+            if ($descontoAplicado < 0) {
+                $descontoAplicado = 0.0;
+            }
+
+            $cashbackBase = $subtotalClube - $descontoAplicado;
+            if ($cashbackBase <= 0) {
+                return;
+            }
+
+            $cashback = $cashbackBase * ($cashbackPct / 100.0);
+            if ($cashback <= 0) {
+                return;
+            }
+
+            $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+            $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+            $this->garantirCarteiraUsuario($db, $usuarioId);
+            $this->garantirTabelaTransacoesCarteira($db);
+
+            $startedTx = false;
+            try {
+                if (!$db->inTransaction()) {
+                    $db->beginTransaction();
+                    $startedTx = true;
+                }
+
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
+                $stmtChk->execute([
+                    ':uid' => $usuarioId,
+                    ':desc' => '%Cashback Clube - Pedido #' . (int) $pedidoId . '%',
+                ]);
+                $ja = (int) ($stmtChk->fetchColumn() ?: 0);
+                if ($ja > 0) {
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+                    return;
+                }
+
+                $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                $stmtLock->execute([$usuarioId]);
+
+                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $cashback, ':uid' => $usuarioId]);
+
+                try {
+                    $desc = 'Cashback Clube - Pedido #' . $pedidoId;
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $cashback,
+                        ':desc' => $desc,
+                    ]);
+                } catch (\Exception $e) {
+                }
+
+                if ($startedTx) {
+                    $db->commit();
+                }
+            } catch (\Exception $e) {
+                if ($startedTx && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+                return;
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    public function creditarCashbackClubePorPedidoPago(int $pedidoId): void {
+        try {
+            $db = \Config\Database::getConnection();
+            $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function getUsdBrlRate(): float {
+        $rate = 5.5;
+        try {
+            $v = $this->getConfig('sistema', 'usd_brl_rate', null);
+            if ($v === null) {
+                $v = $this->getConfig('sistema', 'sistema_usd_brl_rate', null);
+            }
+            $r = (float) str_replace(',', '.', trim((string) ($v ?? '')));
+            if ($r > 0) {
+                $rate = $r;
+            }
+        } catch (\Exception $e) {
+        }
+
+        if ($rate <= 0) {
+            $rate = 5.5;
+        }
+        return (float) $rate;
+    }
+
+    private function computeRendimentoPeriodoKey(int $intervaloValor, string $intervaloUnidade): string {
+        $intervaloValor = (int) $intervaloValor;
+        if ($intervaloValor <= 0) {
+            $intervaloValor = 30;
+        }
+        $u = strtolower(trim((string) $intervaloUnidade));
+        if (!in_array($u, ['minuto', 'hora', 'dia', 'mes'], true)) {
+            $u = 'dia';
+        }
+
+        $now = new \DateTime('now');
+
+        if ($u === 'mes') {
+            $year = (int) $now->format('Y');
+            $month = (int) $now->format('n');
+            $idx = (int) floor(($month - 1) / $intervaloValor);
+            $bucketMonth = ($idx * $intervaloValor) + 1;
+            if ($bucketMonth < 1) $bucketMonth = 1;
+            if ($bucketMonth > 12) $bucketMonth = 12;
+            return sprintf('%04d-%02d', $year, $bucketMonth);
+        }
+
+        if ($u === 'dia') {
+            $year = (int) $now->format('Y');
+            $dayOfYear = (int) $now->format('z'); // 0-based
+            $idx = (int) floor($dayOfYear / $intervaloValor);
+            $bucketDay = ($idx * $intervaloValor);
+            $d = new \DateTime($year . '-01-01 00:00:00');
+            $d->modify('+' . $bucketDay . ' days');
+            return $d->format('Y-m-d');
+        }
+
+        if ($u === 'hora') {
+            $ts = (int) $now->format('U');
+            $bucketSeconds = $intervaloValor * 3600;
+            $bucketStart = (int) (floor($ts / $bucketSeconds) * $bucketSeconds);
+            $d = new \DateTime('@' . $bucketStart);
+            $d->setTimezone($now->getTimezone());
+            return $d->format('Y-m-d H:00');
+        }
+
+        // minuto
+        $ts = (int) $now->format('U');
+        $bucketSeconds = $intervaloValor * 60;
+        $bucketStart = (int) (floor($ts / $bucketSeconds) * $bucketSeconds);
+        $d = new \DateTime('@' . $bucketStart);
+        $d->setTimezone($now->getTimezone());
+        return $d->format('Y-m-d H:i');
+    }
+
+    public function processarRendimentoClube(): array {
+        $out = [
+            'success' => true,
+            'processed' => 0,
+            'eligible' => 0,
+            'credited' => 0,
+            'skipped_idempotent' => 0,
+            'skipped_invalid' => 0,
+            'errors' => 0,
+        ];
+
+        try {
+            $db = \Config\Database::getConnection();
+
+            $pctRaw = $this->getConfig('clube', 'rendimento_percent', null);
+            $pct = (float) str_replace(',', '.', trim((string) ($pctRaw ?? '0')));
+            if ($pct <= 0) {
+                return $out;
+            }
+
+            $intervaloValorRaw = $this->getConfig('clube', 'rendimento_intervalo_valor', '30');
+            $intervaloValor = (int) str_replace(',', '.', trim((string) ($intervaloValorRaw ?? '30')));
+            if ($intervaloValor <= 0) {
+                $intervaloValor = 30;
+            }
+
+            $intervaloUnidade = (string) $this->getConfig('clube', 'rendimento_intervalo_unidade', 'dia');
+            $periodKey = $this->computeRendimentoPeriodoKey($intervaloValor, $intervaloUnidade);
+
+            $minUsd = 39.0;
+            $rate = $this->getUsdBrlRate();
+            if ($rate <= 0) {
+                $rate = 5.5;
+            }
+
+            $this->garantirTabelaTransacoesCarteira($db);
+
+            $stmtWallets = $db->query('SELECT usuario_id, saldo_usd, saldo_brl FROM carteiras');
+            $wallets = $stmtWallets ? ($stmtWallets->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+
+            foreach ($wallets as $w) {
+                $out['processed']++;
+                $usuarioId = (int) ($w['usuario_id'] ?? 0);
+                if ($usuarioId <= 0) {
+                    $out['skipped_invalid']++;
+                    continue;
+                }
+
+                $saldoUsd = (float) ($w['saldo_usd'] ?? 0);
+                $saldoBrl = (float) ($w['saldo_brl'] ?? 0);
+                $equivUsd = (float) $saldoUsd;
+                if ($saldoBrl > 0 && $rate > 0) {
+                    $equivUsd = (float) ($saldoUsd + ($saldoBrl / $rate));
+                }
+
+                if ($equivUsd + 0.00001 < $minUsd) {
+                    continue;
+                }
+                $out['eligible']++;
+
+                $creditoUsd = $equivUsd * ($pct / 100.0);
+                if ($creditoUsd <= 0) {
+                    continue;
+                }
+
+                $creditMoeda = ($saldoUsd >= ($saldoBrl > 0 && $rate > 0 ? ($saldoBrl / $rate) : 0.0)) ? 'USD' : 'BRL';
+                $valorCredito = $creditoUsd;
+                if ($creditMoeda === 'BRL') {
+                    $valorCredito = $creditoUsd * $rate;
+                }
+
+                if ($valorCredito <= 0) {
+                    continue;
+                }
+
+                $saldoCol = ($creditMoeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+                $valorCol = ($creditMoeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+                $startedTx = false;
+                try {
+                    if (!$db->inTransaction()) {
+                        $db->beginTransaction();
+                        $startedTx = true;
+                    }
+
+                    $desc = 'Rendimento Clube - ' . $periodKey;
+                    $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao = :desc LIMIT 1");
+                    $stmtChk->execute([':uid' => $usuarioId, ':desc' => $desc]);
+                    $exists = (int) ($stmtChk->fetchColumn() ?: 0);
+                    if ($exists > 0) {
+                        if ($startedTx) {
+                            $db->commit();
+                        }
+                        $out['skipped_idempotent']++;
+                        continue;
+                    }
+
+                    $this->garantirCarteiraUsuario($db, $usuarioId);
+
+                    $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                    $stmtLock->execute([$usuarioId]);
+
+                    $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                    $stmtUpd->execute([':valor' => $valorCredito, ':uid' => $usuarioId]);
+
+                    try {
+                        $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
+                        $stmtTx->execute([
+                            ':uid' => $usuarioId,
+                            ':valor' => $valorCredito,
+                            ':desc' => $desc,
+                        ]);
+                    } catch (\Exception $e) {
+                    }
+
+                    if ($startedTx) {
+                        $db->commit();
+                    }
+
+                    $out['credited']++;
+                } catch (\Exception $e) {
+                    if ($startedTx && $db->inTransaction()) {
+                        $db->rollBack();
+                    }
+                    $out['errors']++;
+                }
+            }
+
+            return $out;
+        } catch (\Exception $e) {
+            $out['success'] = false;
+            $out['errors']++;
+            return $out;
+        }
+    }
+
     private function garantirTabelaTransacoesCarteira(\PDO $db): void {
         try {
             $db->exec("
@@ -76,80 +840,6 @@ class PaymentService {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
         } catch (\Exception $e) {
-        }
-    }
-
-    private function atualizarPedidoPaymentStatusPorPedidoId(\PDO $db, int $pedidoId, string $paymentStatusInterno, string $gateway = 'carteira'): void {
-        try {
-            if ($pedidoId <= 0) {
-                return;
-            }
-
-            $colsP = [];
-            try {
-                $stmtColsP = $db->query('DESCRIBE pedidos');
-                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            } catch (\Exception $e) {
-                $colsP = [];
-            }
-            if (!is_array($colsP) || empty($colsP)) {
-                return;
-            }
-
-            $set = [];
-            $params = [':id' => $pedidoId];
-
-            if (in_array('payment_gateway', $colsP, true)) {
-                $set[] = 'payment_gateway = :pg';
-                $params[':pg'] = $gateway;
-            }
-            if (in_array('payment_status', $colsP, true)) {
-                $set[] = 'payment_status = :ps';
-                $params[':ps'] = $paymentStatusInterno;
-            }
-            if (in_array('updated_at', $colsP, true)) {
-                $set[] = 'updated_at = NOW()';
-            }
-
-            if (!empty($set)) {
-                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
-                $st = $db->prepare($sql);
-                $st->execute($params);
-            }
-
-            // Melhor esforço: manter tabela pagamentos coerente
-            try {
-                $stmtColsPg = $db->query('DESCRIBE pagamentos');
-                $colsPg = $stmtColsPg ? ($stmtColsPg->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
-                    $updates = [];
-                    $paramsPg = [':pedido_id' => $pedidoId];
-
-                    foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
-                        if (in_array($c, $colsPg, true)) {
-                            $updates[] = "$c = :pg_status";
-                            $paramsPg[':pg_status'] = $paymentStatusInterno;
-                            break;
-                        }
-                    }
-                    foreach (['gateway', 'provedor', 'provider'] as $c) {
-                        if (in_array($c, $colsPg, true)) {
-                            $updates[] = "$c = :pg_gateway";
-                            $paramsPg[':pg_gateway'] = $gateway;
-                            break;
-                        }
-                    }
-
-                    if (!empty($updates)) {
-                        $sqlPg = 'UPDATE pagamentos SET ' . implode(', ', $updates) . ' WHERE pedido_id = :pedido_id';
-                        $stmtUpPg = $db->prepare($sqlPg);
-                        $stmtUpPg->execute($paramsPg);
-                    }
-                }
-            } catch (\Exception $e) {
-            }
-        } catch (\Exception $e) {
-            return;
         }
     }
 
@@ -228,7 +918,17 @@ class PaymentService {
                 }
             }
 
-            $this->atualizarPedidoPaymentStatusPorPedidoId($db, (int) $pedidoId, 'refunded', 'carteira');
+            try {
+                $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+            } catch (\Exception $e) {
+            }
+
+            $this->atualizarPagamentoPedidoPorPedidoId((int) $pedidoId, 'carteira', 'refunded', 'refunded');
 
             $db->commit();
             return [
@@ -1650,6 +2350,15 @@ class PaymentService {
                 $stmtUp->execute($params);
             }
 
+            if ($aprovado) {
+                $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+            }
+
+            if ($paymentStatusInterno === 'refunded') {
+                $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+            }
+
             try {
                 $stmtColsPg = $db->query('DESCRIBE pagamentos');
                 $colsPg = $stmtColsPg->fetchAll(\PDO::FETCH_COLUMN);
@@ -1949,6 +2658,7 @@ class PaymentService {
             }
 
             if ($aprovado) {
+                $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', $pedidoId);
                 $pagoEm = null;
                 if (!empty($params['pago_em'])) {
@@ -1962,6 +2672,11 @@ class PaymentService {
                     $pagoEm = new \DateTime('now');
                 }
                 $this->inserirPedidoNaJanelaRemessa($db, (int) $pedidoId, $pagoEm);
+            }
+
+            if ($paymentStatusInterno === 'refunded') {
+                $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
