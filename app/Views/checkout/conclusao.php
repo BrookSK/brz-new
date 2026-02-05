@@ -40,7 +40,27 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <strong>Status:</strong>
-                            <span class="badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">Pendente</span>
+                            <?php
+                            $statusPagamentoResumo = $pedido['payment_status'] ?? ($paymentDetails['status'] ?? null);
+                            if (is_string($statusPagamentoResumo)) {
+                                $statusPagamentoResumo = strtoupper($statusPagamentoResumo);
+                            }
+                            $statusPedidoBadgeText = 'Aguardando pagamento';
+                            $statusPedidoBadgeStyle = 'background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);';
+                            if (!empty($statusPagamentoResumo)) {
+                                if (in_array($statusPagamentoResumo, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                                    $statusPedidoBadgeText = 'Confirmado';
+                                    $statusPedidoBadgeStyle = 'background: rgba(34, 197, 94, 0.14); border: 1px solid rgba(34, 197, 94, 0.35); color: rgba(20, 83, 45, 1);';
+                                } elseif (in_array($statusPagamentoResumo, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
+                                    $statusPedidoBadgeText = 'Cancelado';
+                                    $statusPedidoBadgeStyle = 'background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.35); color: rgba(127, 29, 29, 1);';
+                                } elseif (in_array($statusPagamentoResumo, ['REFUNDED'], true)) {
+                                    $statusPedidoBadgeText = 'Estornado';
+                                    $statusPedidoBadgeStyle = 'background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);';
+                                }
+                            }
+                            ?>
+                            <span class="badge" style="<?= $statusPedidoBadgeStyle ?>"><?= htmlspecialchars($statusPedidoBadgeText) ?></span>
                         </div>
                         <div class="col-md-6">
                             <strong>Moeda:</strong>
@@ -230,44 +250,111 @@
             <h5 class="mb-0"><i class="fas fa-clock"></i> Próximas Etapas</h5>
         </div>
         <div class="card-body">
+            <?php
+            $billingTypeEtapas = strtoupper((string) ($paymentDetails['billingType'] ?? ($pedido['forma_pagamento'] ?? '')));
+            if ($billingTypeEtapas === 'CARTAO_CREDITO') {
+                $billingTypeEtapas = 'CREDIT_CARD';
+            }
+
+            $hasInvoiceLink = !empty($paymentDetails['invoiceUrl']) || !empty($paymentDetails['bankSlipUrl']);
+            $rotuloCobranca = 'cobrança';
+            if ($billingTypeEtapas === 'PIX') {
+                $rotuloCobranca = 'código PIX';
+            } elseif ($billingTypeEtapas === 'BOLETO') {
+                $rotuloCobranca = 'boleto';
+            } elseif ($billingTypeEtapas === 'CREDIT_CARD') {
+                $rotuloCobranca = 'link de pagamento';
+            }
+
+            $stepDoneClass = 'text-success';
+            $stepPendingClass = 'text-warning';
+            $stepCurrentClass = 'text-primary';
+
+            $steps = [];
+            if ($isPago) {
+                $steps[] = [
+                    'icon' => 'fa-check-circle',
+                    'iconClass' => $stepDoneClass,
+                    'title' => 'Pagamento confirmado',
+                    'desc' => 'Recebemos a confirmação do pagamento e seu pedido entrou em fila de processamento.',
+                ];
+                $steps[] = [
+                    'icon' => 'fa-box',
+                    'iconClass' => $stepCurrentClass,
+                    'title' => 'Preparação',
+                    'desc' => 'Sua compra está sendo separada e preparada para envio.',
+                ];
+                $steps[] = [
+                    'icon' => 'fa-shipping-fast',
+                    'iconClass' => $stepPendingClass,
+                    'title' => 'Envio',
+                    'desc' => 'Assim que o pedido for postado, você receberá atualizações.',
+                ];
+                $steps[] = [
+                    'icon' => 'fa-home',
+                    'iconClass' => $stepPendingClass,
+                    'title' => 'Entrega',
+                    'desc' => 'Entrega no endereço informado no checkout.',
+                ];
+            } else {
+                $steps[] = [
+                    'icon' => 'fa-check-circle',
+                    'iconClass' => $stepDoneClass,
+                    'title' => 'Pedido criado',
+                    'desc' => 'Seu pedido foi registrado. O próximo passo é finalizar o pagamento para confirmar.',
+                ];
+
+                $descPagamento = 'Finalize o pagamento para confirmar o pedido.';
+                if ($hasInvoiceLink) {
+                    $descPagamento = 'Aguarde a geração da ' . $rotuloCobranca . ' e finalize o pagamento para confirmar o pedido.';
+                } elseif ($billingTypeEtapas !== '') {
+                    $descPagamento = 'Finalize o pagamento via ' . $rotuloCobranca . ' para confirmar o pedido.';
+                }
+
+                $steps[] = [
+                    'icon' => 'fa-file-invoice-dollar',
+                    'iconClass' => $stepCurrentClass,
+                    'title' => 'Aguardando pagamento',
+                    'desc' => $descPagamento,
+                ];
+                $steps[] = [
+                    'icon' => 'fa-box',
+                    'iconClass' => $stepPendingClass,
+                    'title' => 'Preparação',
+                    'desc' => 'Após a confirmação do pagamento, iniciamos a preparação do seu pedido.',
+                ];
+                $steps[] = [
+                    'icon' => 'fa-shipping-fast',
+                    'iconClass' => $stepPendingClass,
+                    'title' => 'Envio',
+                    'desc' => 'Após a preparação, o pedido é enviado e você recebe atualizações.',
+                ];
+                $steps[] = [
+                    'icon' => 'fa-home',
+                    'iconClass' => $stepPendingClass,
+                    'title' => 'Entrega',
+                    'desc' => 'Entrega no endereço informado no checkout.',
+                ];
+            }
+
+            $stepsChunks = array_chunk($steps, 4);
+            ?>
+
+            <?php foreach ($stepsChunks as $chunk): ?>
             <div class="row">
+                <?php foreach ($chunk as $step): ?>
                 <div class="col-md-3">
                     <div class="text-center">
-                        <div class="step-icon completed mb-2">
-                            <i class="fas fa-check-circle text-success"></i>
+                        <div class="step-icon mb-2">
+                            <i class="fas <?= htmlspecialchars($step['icon']) ?> <?= htmlspecialchars($step['iconClass']) ?>"></i>
                         </div>
-                        <h6>Pedido Confirmado</h6>
-                        <p class="small text-muted">Seu pedido foi recebido e está sendo processado.</p>
+                        <h6><?= htmlspecialchars($step['title']) ?></h6>
+                        <p class="small text-muted"><?= htmlspecialchars($step['desc']) ?></p>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <div class="step-icon pending mb-2">
-                            <i class="fas fa-box text-warning"></i>
-                        </div>
-                        <h6>Preparação</h6>
-                        <p class="small text-muted">Seus produtos estão sendo preparados para envio.</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <div class="step-icon pending mb-2">
-                            <i class="fas fa-shipping-fast text-warning"></i>
-                        </div>
-                        <h6>Envio</h6>
-                        <p class="small text-muted">Seu pedido será enviado em até 30 dias.</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <div class="step-icon pending mb-2">
-                            <i class="fas fa-home text-warning"></i>
-                        </div>
-                        <h6>Entrega</h6>
-                        <p class="small text-muted">Receba seu produto no endereço informado.</p>
-                    </div>
-                </div>
+                <?php endforeach; ?>
             </div>
+            <?php endforeach; ?>
         </div>
     </div>
 
@@ -290,14 +377,6 @@
 .step-icon {
     font-size: 2rem;
     margin-bottom: 0.5rem;
-}
-
-.step-icon.completed {
-    color: #28a745;
-}
-
-.step-icon.pending {
-    color: #ffc107;
 }
 
 .card {

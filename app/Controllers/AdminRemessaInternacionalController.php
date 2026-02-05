@@ -1946,23 +1946,64 @@ function gerarEtiqueta() {
     }
 
     private function getRemessasGeradas() {
-        $stmt = $this->connection->prepare("
-            SELECT 
-                r.*, 
-                p.usuario_id, 
+        $hasRemessasInternacionais = $this->tableExists('remessas_internacionais');
+
+        // Observação: a geração de etiqueta (W-Express) salva em remessa_janela_pedidos.
+        // A tabela remessas_internacionais só é preenchida pelo botão/endpoint de "Gerar remessa".
+        // Para o admin enxergar o que acabou de gerar, listamos também as etiquetas geradas.
+        $sqlEtiquetaGerada = "
+            SELECT
+                rjp.id as id,
+                rjp.pedido_id,
+                rjp.etiqueta_gerada_em as created_at,
+                'etiqueta_gerada' as status,
+                0 as webhook_enviado,
+                p.usuario_id,
                 u.nome as cliente_nome,
                 rjp.wexpress_shipping_id,
                 rjp.wexpress_tracking_number,
                 rjp.courier_tracking_number,
                 rjp.wexpress_status
-            FROM remessas_internacionais r 
-            LEFT JOIN pedidos p ON r.pedido_id = p.id 
-            LEFT JOIN usuarios u ON p.usuario_id = u.id 
-            LEFT JOIN remessa_janela_pedidos rjp ON rjp.pedido_id = r.pedido_id
-            WHERE r.status = 'remessa_gerada' 
-            ORDER BY r.created_at DESC 
-            LIMIT 50
-        ");
+            FROM remessa_janela_pedidos rjp
+            LEFT JOIN pedidos p ON p.id = rjp.pedido_id
+            LEFT JOIN usuarios u ON u.id = p.usuario_id
+            WHERE rjp.etiqueta_gerada = 1
+        ";
+
+        if ($hasRemessasInternacionais) {
+            $sql = "
+                (
+                    SELECT
+                        r.id as id,
+                        r.pedido_id,
+                        r.created_at as created_at,
+                        r.status as status,
+                        r.webhook_enviado as webhook_enviado,
+                        p.usuario_id,
+                        u.nome as cliente_nome,
+                        rjp.wexpress_shipping_id,
+                        rjp.wexpress_tracking_number,
+                        rjp.courier_tracking_number,
+                        rjp.wexpress_status
+                    FROM remessas_internacionais r
+                    LEFT JOIN pedidos p ON r.pedido_id = p.id
+                    LEFT JOIN usuarios u ON p.usuario_id = u.id
+                    LEFT JOIN remessa_janela_pedidos rjp ON rjp.pedido_id = r.pedido_id
+                    WHERE r.status = 'remessa_gerada'
+                )
+                UNION ALL
+                (
+                    {$sqlEtiquetaGerada}
+                    AND rjp.pedido_id NOT IN (SELECT pedido_id FROM remessas_internacionais WHERE status = 'remessa_gerada')
+                )
+                ORDER BY created_at DESC
+                LIMIT 50
+            ";
+        } else {
+            $sql = $sqlEtiquetaGerada . " ORDER BY rjp.etiqueta_gerada_em DESC LIMIT 50";
+        }
+
+        $stmt = $this->connection->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

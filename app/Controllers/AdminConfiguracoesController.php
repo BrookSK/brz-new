@@ -699,6 +699,13 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
 
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button type="button" class="btn btn-outline-primary" onclick="testarSigepAPI()">
+                                                    <i class="fas fa-plug"></i> Testar SIGEP
+                                                </button>
+                                                <small class="text-muted align-self-center">Executa um teste de solicita\u00E7\u00E3o de etiqueta via SIGEP e mostra o retorno.</small>
+                                            </div>
+
                                             <hr>
 
                                             <h6 class="mb-3">Correios (Rastreamento)</h6>

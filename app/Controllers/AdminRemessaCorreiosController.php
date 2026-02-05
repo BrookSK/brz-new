@@ -765,35 +765,41 @@ class AdminRemessaCorreiosController extends Controller {
         $sigepSemDv = null;
         $sigepDv = null;
 
+        if (empty($cfg['enabled'])) {
+            throw new \Exception('SIGEP está desabilitado. Habilite e configure em /admin/configuracoes > Entrega > Correios (SIGEP Web).');
+        }
+
+        $hasMin = !empty($cfg['usuario']) && !empty($cfg['senha']) && !empty($cfg['contrato']) && !empty($cfg['cartao']) && !empty($cfg['servico_codigo']);
+        if (!$hasMin) {
+            throw new \Exception('SIGEP: configuração incompleta. Preencha usuário, senha, contrato, cartão de postagem e código do serviço.');
+        }
+
+        $sigepUsed = 1;
+        $sigepReq = [
+            'ambiente' => $sigepAmb,
+            'usuario' => (string) ($cfg['usuario'] ?? ''),
+            'contrato' => (string) ($cfg['contrato'] ?? ''),
+            'cartao' => (string) ($cfg['cartao'] ?? ''),
+            'cnpj' => (string) ($cfg['cnpj'] ?? ''),
+            'servico_codigo' => (string) ($cfg['servico_codigo'] ?? ''),
+        ];
+
         $codigoEtiqueta = '';
-        if (!empty($cfg['enabled'])) {
-            $hasMin = !empty($cfg['usuario']) && !empty($cfg['senha']) && !empty($cfg['contrato']) && !empty($cfg['cartao']) && !empty($cfg['servico_codigo']);
-            if ($hasMin) {
-                $sigepUsed = 1;
-                $sigepReq = [
-                    'ambiente' => $sigepAmb,
-                    'usuario' => (string) ($cfg['usuario'] ?? ''),
-                    'contrato' => (string) ($cfg['contrato'] ?? ''),
-                    'cartao' => (string) ($cfg['cartao'] ?? ''),
-                    'cnpj' => (string) ($cfg['cnpj'] ?? ''),
-                    'servico_codigo' => (string) ($cfg['servico_codigo'] ?? ''),
-                ];
-                try {
-                    $raw = $this->solicitarEtiquetaSigep($cfg);
-                    $sigepResp = ['raw' => $raw];
-                    $packed = $this->completarEtiquetaComDv($raw);
-                    $codigoEtiqueta = (string) ($packed['etiqueta'] ?? $raw);
-                    $sigepSemDv = $packed['sem_dv'] ?? null;
-                    $sigepDv = $packed['dv'] ?? null;
-                } catch (\Exception $e) {
-                    $sigepErr = $e->getMessage();
-                    throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
-                }
-            } else {
-                $codigoEtiqueta = $this->gerarCodigoEtiqueta();
-            }
-        } else {
-            $codigoEtiqueta = $this->gerarCodigoEtiqueta();
+        try {
+            $raw = $this->solicitarEtiquetaSigep($cfg);
+            $sigepResp = ['raw' => $raw];
+            $packed = $this->completarEtiquetaComDv($raw);
+            $codigoEtiqueta = (string) ($packed['etiqueta'] ?? $raw);
+            $sigepSemDv = $packed['sem_dv'] ?? null;
+            $sigepDv = $packed['dv'] ?? null;
+        } catch (\Exception $e) {
+            $sigepErr = $e->getMessage();
+            throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
+        }
+
+        $codigoEtiqueta = $this->normalizarEtiquetaCorreios($codigoEtiqueta);
+        if (!preg_match('/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/', $codigoEtiqueta)) {
+            throw new \Exception('SIGEP retornou uma etiqueta em formato inválido: ' . $codigoEtiqueta);
         }
 
         $cols = ['pedido_id', 'codigo_etiqueta', 'dados_remetente', 'dados_destinatario', 'status', 'created_at'];
@@ -986,11 +992,6 @@ class AdminRemessaCorreiosController extends Controller {
         exit;
     }
 
-    private function gerarCodigoEtiqueta() {
-        // Simular geração de código de etiqueta dos Correios
-        return 'BR' . date('Ymd') . strtoupper(substr(md5(uniqid()), 0, 10));
-    }
-
     private function getDadosRemetente() {
         return [
             'nome' => 'Braziliana Shop',
@@ -1094,57 +1095,86 @@ class AdminRemessaCorreiosController extends Controller {
             $dadosRemetente = json_decode($etiqueta['dados_remetente'], true);
             $dadosDestinatario = json_decode($etiqueta['dados_destinatario'], true);
             
-            echo '<!DOCTYPE html>
+            $codigo = (string) ($etiqueta['codigo_etiqueta'] ?? '');
+            $codigoHtml = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
+            $codigoJs = json_encode($codigo);
+
+            $remNome = htmlspecialchars((string) ($dadosRemetente['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $remEnd = htmlspecialchars((string) ($dadosRemetente['endereco'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $remCidadeUf = htmlspecialchars((string) (($dadosRemetente['cidade'] ?? '') . '/' . ($dadosRemetente['estado'] ?? '')), ENT_QUOTES, 'UTF-8');
+            $remCep = htmlspecialchars((string) ($dadosRemetente['cep'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+            $destNome = htmlspecialchars((string) ($dadosDestinatario['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $destEnd = htmlspecialchars((string) ($dadosDestinatario['endereco'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $destCidadeUf = htmlspecialchars((string) (($dadosDestinatario['cidade'] ?? '') . '/' . ($dadosDestinatario['estado'] ?? '')), ENT_QUOTES, 'UTF-8');
+            $destCep = htmlspecialchars((string) ($dadosDestinatario['cep'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+            $html = <<<HTML
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Etiqueta Correios #' . $etiqueta['codigo_etiqueta'] . '</title>
+    <title>Etiqueta Correios #{$codigoHtml}</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .etiqueta { 
-            border: 2px solid #000; 
-            padding: 20px; 
-            width: 400px; 
+        .etiqueta {
+            border: 2px solid #000;
+            padding: 16px;
+            width: 420px;
             margin: 0 auto;
         }
-        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-        .codigo { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-        .section { margin-bottom: 15px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
+        .codigo { font-size: 16px; font-weight: bold; text-align: center; margin: 10px 0; letter-spacing: 1px; }
+        .barcode { display: flex; justify-content: center; margin: 6px 0 12px; }
+        .section { margin-bottom: 10px; }
         .label { font-weight: bold; }
+        .small { font-size: 12px; }
         @media print { body { margin: 0; } }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
     <div class="etiqueta">
         <div class="header">
-            <h3>CORREIOS - ETIQUETA DE POSTAGEM</h3>
+            <h3 style="margin:0">CORREIOS</h3>
+            <div class="small">Etiqueta de postagem</div>
         </div>
-        <div class="codigo">
-            CÓDIGO: ' . $etiqueta['codigo_etiqueta'] . '
-        </div>
+
+        <div class="barcode"><svg id="barcode"></svg></div>
+        <div class="codigo">{$codigoHtml}</div>
+
         <div class="section">
-            <div class="label">REMETENTE:</div>
-            <div>' . htmlspecialchars($dadosRemetente['nome']) . '</div>
-            <div>' . htmlspecialchars($dadosRemetente['endereco']) . '</div>
-            <div>' . htmlspecialchars($dadosRemetente['cidade'] . '/' . $dadosRemetente['estado']) . ' - CEP: ' . htmlspecialchars($dadosRemetente['cep']) . '</div>
+            <div class="label">REMETENTE</div>
+            <div>{$remNome}</div>
+            <div class="small">{$remEnd}</div>
+            <div class="small">{$remCidadeUf} - CEP: {$remCep}</div>
         </div>
+
         <div class="section">
-            <div class="label">DESTINATÁRIO:</div>
-            <div>' . htmlspecialchars($dadosDestinatario['nome']) . '</div>
-            <div>' . htmlspecialchars($dadosDestinatario['endereco']) . '</div>
-            <div>' . htmlspecialchars($dadosDestinatario['cidade'] . '/' . $dadosDestinatario['estado']) . ' - CEP: ' . htmlspecialchars($dadosDestinatario['cep']) . '</div>
-        </div>
-        <div class="section">
-            <div class="label">DATA POSTAGEM:</div>
-            <div>' . date('d/m/Y H:i') . '</div>
+            <div class="label">DESTINATÁRIO</div>
+            <div>{$destNome}</div>
+            <div class="small">{$destEnd}</div>
+            <div class="small">{$destCidadeUf} - CEP: {$destCep}</div>
         </div>
     </div>
     <script>
-        window.onload = function() {
-            window.print();
-        }
+        (function(){
+            var code = {$codigoJs};
+            try {
+                JsBarcode('#barcode', code, {
+                    format: 'CODE128',
+                    displayValue: false,
+                    margin: 0,
+                    height: 56
+                });
+            } catch (e) {}
+            window.onload = function(){ window.print(); };
+        })();
     </script>
 </body>
-</html>';
+</html>
+HTML;
+
+            echo $html;
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
