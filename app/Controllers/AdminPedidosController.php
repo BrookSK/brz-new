@@ -806,8 +806,27 @@ class AdminPedidosController extends Controller {
 
                 $tracking = '';
                 $trackingFonte = '';
+                $trackingUrl = '';
 
                 if ($pdoTrack instanceof \PDO) {
+                    // Stamps (UPS - exterior)
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT tracking_number, label_url, carrier FROM stamps_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $trk = trim((string) ($row['tracking_number'] ?? ''));
+                            $url = trim((string) ($row['label_url'] ?? ''));
+                            $car = trim((string) ($row['carrier'] ?? ''));
+                            if ($trk !== '') {
+                                $tracking = $trk;
+                                $trackingFonte = 'Stamps' . ($car !== '' ? (' (' . $car . ')') : '');
+                                $trackingUrl = $url;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     // Correios
                     try {
                         $st = $pdoTrack->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
@@ -842,6 +861,7 @@ class AdminPedidosController extends Controller {
                     echo '<div class="alert alert-info mb-3">'
                         . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($tracking) . '</div>'
                         . ($trackingFonte !== '' ? ('<div class="small text-muted">Fonte: ' . htmlspecialchars($trackingFonte) . '</div>') : '')
+                        . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">Ver etiqueta</a></div>') : '')
                         . '</div>';
                 }
             } catch (\Exception $e) {

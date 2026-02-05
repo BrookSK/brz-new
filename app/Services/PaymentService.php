@@ -87,6 +87,74 @@ class PaymentService {
         }
     }
 
+    private function isPedidoEntregaBrasil(\PDO $db, int $pedidoId): bool {
+        try {
+            if ($pedidoId <= 0) {
+                return true;
+            }
+
+            $colsPed = [];
+            try {
+                $stCols = $db->query('DESCRIBE pedidos');
+                $colsPed = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPed = [];
+            }
+
+            $pais = '';
+
+            if (is_array($colsPed) && in_array('endereco_entrega_id', $colsPed, true)) {
+                $hasEnderecos = false;
+                try {
+                    $st = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+                    $st->execute(['enderecos']);
+                    $hasEnderecos = ((int) $st->fetchColumn()) > 0;
+                } catch (\Exception $e) {
+                    $hasEnderecos = false;
+                }
+
+                if ($hasEnderecos) {
+                    $colsEnd = [];
+                    try {
+                        $stColsE = $db->query('DESCRIBE enderecos');
+                        $colsEnd = $stColsE ? ($stColsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsEnd = [];
+                    }
+                    if (is_array($colsEnd) && in_array('pais', $colsEnd, true)) {
+                        $stP = $db->prepare("SELECT UPPER(TRIM(COALESCE(e.pais,''))) AS pais FROM pedidos p LEFT JOIN enderecos e ON e.id = p.endereco_entrega_id WHERE p.id = ? LIMIT 1");
+                        $stP->execute([(int) $pedidoId]);
+                        $pais = (string) ($stP->fetchColumn() ?: '');
+                    }
+                }
+            }
+
+            if ($pais === '' && is_array($colsPed)) {
+                foreach (['pais', 'country', 'shipping_country', 'pais_entrega', 'country_entrega', 'pais_destino'] as $c) {
+                    if (in_array($c, $colsPed, true)) {
+                        try {
+                            $stP = $db->prepare('SELECT UPPER(TRIM(COALESCE(' . $c . ",''))) AS pais FROM pedidos WHERE id = ? LIMIT 1");
+                            $stP->execute([(int) $pedidoId]);
+                            $pais = (string) ($stP->fetchColumn() ?: '');
+                        } catch (\Exception $e) {
+                            $pais = '';
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if ($pais === '') {
+                return true;
+            }
+
+            $pais = strtoupper(trim($pais));
+            return in_array($pais, ['BR', 'BRA', 'BRASIL', 'BRAZIL'], true);
+        } catch (\Exception $e) {
+            return true;
+        }
+    }
+
     private function isDebugEnabled(): bool {
         $v = '';
         if (isset($_ENV['APP_DEBUG'])) {
@@ -1572,6 +1640,10 @@ class PaymentService {
 
     private function inserirPedidoNaJanelaRemessa(\PDO $db, int $pedidoId, \DateTime $pagoEm): void {
         try {
+            if (!$this->isPedidoEntregaBrasil($db, (int) $pedidoId)) {
+                return;
+            }
+
             $janelaId = $this->ensureRemessaJanelaForDate($db, $pagoEm);
             if (empty($janelaId)) {
                 return;

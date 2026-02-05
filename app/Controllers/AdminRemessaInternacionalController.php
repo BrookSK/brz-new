@@ -13,6 +13,16 @@ class AdminRemessaInternacionalController extends Controller {
         $this->connection = Database::getConnection();
     }
 
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $stmt->execute([$table]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     private function requireAdmin(): void {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
@@ -248,7 +258,26 @@ class AdminRemessaInternacionalController extends Controller {
         $dateCol = (is_array($cols) && in_array('pago_em', $cols, true)) ? 'pago_em' : ((is_array($cols) && in_array('created_at', $cols, true)) ? 'created_at' : 'id');
         $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
 
-        $sql = "SELECT id FROM pedidos WHERE ({$paidStatusWhere}) AND {$dateWhere}";
+        $joinEndereco = '';
+        $wherePais = '1=1';
+        if (is_array($cols) && in_array('endereco_entrega_id', $cols, true) && $this->tableExists('enderecos')) {
+            try {
+                $colsEnd = [];
+                try {
+                    $stColsE = $this->connection->query('DESCRIBE enderecos');
+                    $colsEnd = $stColsE ? ($stColsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsEnd = [];
+                }
+                if (is_array($colsEnd) && in_array('pais', $colsEnd, true)) {
+                    $joinEndereco = ' LEFT JOIN enderecos e ON e.id = p.endereco_entrega_id ';
+                    $wherePais = "UPPER(COALESCE(e.pais,'BR')) = 'BR'";
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $sql = "SELECT p.id FROM pedidos p {$joinEndereco} WHERE ({$paidStatusWhere}) AND {$dateWhere} AND {$wherePais}";
         $stP = $this->connection->prepare($sql);
         if ($dateCol === 'id') {
             $stP->execute();

@@ -727,6 +727,82 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                                 <small class="text-muted">O sistema usa automaticamente o endpoint do Packet Service conforme o ambiente selecionado em SIGEP (Homologação/Produção).</small>
                                             </div>
+
+                                            <hr>
+
+                                            <h6 class="mb-3">Stamps (UPS) - Exterior</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ativo</label>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="stamps_enabled" name="entrega_stamps_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'stamps_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="stamps_enabled">Habilitar Stamps (UPS)</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente</label>
+                                                        <select class="form-select" name="entrega_stamps_ambiente">
+                                                            <option value="staging" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', 'staging') === 'staging' ? 'selected' : '') . '>Staging</option>
+                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Client ID</label>
+                                                        <input type="text" class="form-control" name="entrega_stamps_client_id" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_id', '') . '" placeholder="Client ID">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Client Secret</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_stamps_client_secret" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_secret', '') . '" placeholder="Client Secret">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Refresh Token</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" name="entrega_stamps_refresh_token" value="' . $this->getConfigValue($config, 'entrega', 'stamps_refresh_token', '') . '" placeholder="Refresh Token">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">From Address (JSON)</label>
+                                                <textarea class="form-control" name="entrega_stamps_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'stamps_from_address_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela API da Stamps.</small>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Service Type</label>
+                                                        <input type="text" class="form-control" name="entrega_stamps_service_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_service_type', '') . '" placeholder="Ex.: ups_ground / ups_worldwide_saver">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Packaging Type</label>
+                                                        <input type="text" class="form-control" name="entrega_stamps_packaging_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_packaging_type', 'package') . '" placeholder="package">
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2137,7 +2213,7 @@ HTML;
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'scrapingbee' => ['api_key'],
@@ -2145,7 +2221,7 @@ HTML;
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'stamps_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {

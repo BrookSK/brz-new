@@ -101,6 +101,7 @@ $router->get('/admin', function() {
         ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
+        ['icon' => 'fas fa-plane', 'label' => 'Remessa Stamps (UPS)', 'url' => '/admin/remessa-stamps', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
@@ -393,6 +394,10 @@ $router->get('/admin/remessa-correios/imprimir-etiqueta/{id}', 'AdminRemessaCorr
 $router->get('/admin/remessa-correios/imprimir-todas-etiquetas', 'AdminRemessaCorreiosController', 'imprimirTodasEtiquetas');
 $router->post('/admin/remessa-correios/confirmar-postagem/{id}', 'AdminRemessaCorreiosController', 'confirmarPostagem');
 $router->get('/admin/remessa-correios/rastrear/{id}', 'AdminRemessaCorreiosController', 'rastrearEtiqueta');
+
+// Rotas de Remessa Stamps (UPS) - pedidos exterior
+$router->get('/admin/remessa-stamps', 'AdminRemessaStampsController', 'index');
+$router->post('/admin/remessa-stamps/gerar-etiqueta', 'AdminRemessaStampsController', 'gerarEtiqueta');
 
 // Rotas de Carteira
 $router->post('/admin/usuarios/adicionar-credito', 'AdminUsuariosController', 'adicionarCredito');
