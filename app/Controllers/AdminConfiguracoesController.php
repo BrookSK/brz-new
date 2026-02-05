@@ -212,7 +212,7 @@ class AdminConfiguracoesController extends Controller {
                     </div>
                     
                     <div class="col-md-9">
-                        <form method="POST" action="/admin/configuracoes/salvar" novalidate>
+                        <form method="POST" action="/admin/configuracoes/salvar" enctype="multipart/form-data" novalidate>
                             <div class="tab-content" id="v-pills-tabContent">
                                 <!-- Configurações da Loja -->
                                 <div class="tab-pane fade show active" id="v-pills-loja" role="tabpanel">
@@ -1214,7 +1214,6 @@ class AdminConfiguracoesController extends Controller {
                                                                         <div class="fw-semibold mb-2">Faixas de desconto progressivo (peso total de produtos com Clube Ativo)</div>
                                                                         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                                                                             <div class="text-muted small">Para cadastrar uma nova faixa: preencha a linha <strong>Nova</strong> abaixo (o <strong>Peso mín</strong> pode ser <strong>0</strong>) e clique em <strong>Salvar Configurações</strong>.</div>
-                                                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="try{var els=document.getElementsByName(\'clube_faixa_nova[percentual_desconto]\'); if(els&&els[0]) els[0].focus();}catch(e){}">Nova faixa</button>
                                                                             <button type="button" class="btn btn-sm btn-primary" onclick="try{addClubeFaixaNova();}catch(e){}">Adicionar faixa</button>
                                                                         </div>
                                                                         <div class="table-responsive">
@@ -1493,6 +1492,31 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="cache_ativado" ' . ($this->getConfigValue($config, 'sistema', 'cache_ativado', '1') === '1' ? 'checked' : '') . '>
                                                 <label class="form-check-label">Cache Ativado</label>
+                                            </div>
+
+                                            <hr class="my-4">
+
+                                            <div class="border rounded p-3 bg-light">
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Usuários (CSV)</div>
+                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. O endereço usa prioridade <strong>Billing</strong> e, se não houver, usa <strong>Shipping</strong>.</div>
+
+                                                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                                    <a class="btn btn-outline-primary btn-sm" href="/admin/configuracoes/importar-usuarios/modelo" target="_blank">
+                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                    </a>
+                                                </div>
+
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-md-8">
+                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <input type="file" class="form-control" name="usuarios_import_csv" accept=".csv,text/csv">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <button type="submit" class="btn btn-primary w-100" name="acao" value="importar_usuarios">
+                                                            <i class="fas fa-upload me-1"></i>Importar Usuários
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2483,8 +2507,19 @@ HTML;
     
     public function salvar(Request $request) {
         try {
+            $auth = new AuthService();
+            $auth->requerPerfil('admin');
+
             $pdo = Database::getConnection();
             $pdo->beginTransaction();
+
+            $acao = (string) ($request->getParam('acao') ?? '');
+            if ($acao === 'importar_usuarios') {
+                $resultado = $this->importarUsuariosCsv($pdo);
+                $pdo->commit();
+                header('Location: /admin/configuracoes?import_users=1&ok=' . (int) ($resultado['ok'] ?? 0) . '&fail=' . (int) ($resultado['fail'] ?? 0));
+                exit;
+            }
 
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
@@ -2748,6 +2783,375 @@ HTML;
             echo '<div class="alert alert-danger">Erro ao salvar configurações: ' . $e->getMessage() . $schemaInfo . '</div>';
             echo '<a href="/admin/configuracoes" class="btn btn-secondary">Voltar</a>';
             exit;
+        }
+    }
+
+    public function importarUsuariosModelo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $headers = [
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+        ];
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="import_usuarios_modelo.csv"');
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers);
+        fclose($out);
+        exit;
+    }
+
+    private function importarUsuariosCsv(\PDO $pdo): array {
+        $ok = 0;
+        $fail = 0;
+
+        if (!isset($_FILES['usuarios_import_csv']) || empty($_FILES['usuarios_import_csv']['tmp_name'])) {
+            return ['ok' => 0, 'fail' => 1];
+        }
+        if (!empty($_FILES['usuarios_import_csv']['error']) && $_FILES['usuarios_import_csv']['error'] !== UPLOAD_ERR_OK) {
+            return ['ok' => 0, 'fail' => 1];
+        }
+
+        $tmp = (string) $_FILES['usuarios_import_csv']['tmp_name'];
+        $fh = @fopen($tmp, 'r');
+        if (!$fh) {
+            return ['ok' => 0, 'fail' => 1];
+        }
+
+        $expected = [
+            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','User Role','User Pass'
+        ];
+
+        $first = fgetcsv($fh, 0, ',');
+        $delimiter = ',';
+        if (is_array($first) && count($first) === 1) {
+            rewind($fh);
+            $first = fgetcsv($fh, 0, ';');
+            $delimiter = ';';
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
+        $isHeader = (count($header) === count($expected));
+        if ($isHeader) {
+            for ($i = 0; $i < count($expected); $i++) {
+                if (($header[$i] ?? '') !== $expected[$i]) {
+                    $isHeader = false;
+                    break;
+                }
+            }
+        }
+        if (!$isHeader) {
+            rewind($fh);
+        }
+
+        $helper = new \App\Controllers\AdminUsuariosHelper();
+
+        while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 5) {
+                continue;
+            }
+
+            $row = array_pad($row, count($expected), '');
+            $get = function(int $idx) use ($row) {
+                return trim((string) ($row[$idx] ?? ''));
+            };
+
+            $idExt = $get(0);
+            $email = $get(1);
+            $login = $get(2);
+            $firstName = $get(3);
+            $lastName = $get(4);
+
+            $suite = $get(20);
+            $billingCpf = $get(21);
+            $billingBirth = $get(22);
+            $billingCell = $get(25);
+            $shippingSuite = $get(28);
+            $billingCnpj = $get(29);
+            $role = $get(30);
+            $pass = $get(31);
+
+            if ($email === '' && $login === '' && $idExt === '') {
+                continue;
+            }
+
+            $nome = trim($firstName . ' ' . $lastName);
+            if ($nome === '') {
+                $nome = $login !== '' ? $login : $email;
+            }
+
+            $perfil = strtolower(trim($role));
+            if ($perfil === '') {
+                $perfil = 'cliente';
+            }
+
+            $telefone = $billingCell !== '' ? $billingCell : '';
+            if ($telefone === '') {
+                $telefone = $get(12);
+            }
+
+            $doc = $billingCpf !== '' ? $billingCpf : '';
+            if ($doc === '' && $billingCnpj !== '') {
+                $doc = $billingCnpj;
+            }
+
+            $usuarioId = 0;
+            try {
+                if ($idExt !== '' && ctype_digit($idExt)) {
+                    $usuarioId = $this->findUsuarioIdById($pdo, (int) $idExt);
+                }
+                if ($usuarioId <= 0 && $email !== '') {
+                    $usuarioId = $this->findUsuarioIdByEmail($pdo, $email);
+                }
+            } catch (\Exception $e) {
+                $usuarioId = 0;
+            }
+
+            $dadosUsuario = [
+                'nome' => $nome,
+                'email' => $email !== '' ? $email : ($login . '@local'),
+                'telefone' => $telefone,
+                'cpf' => $billingCpf,
+                'documento' => $doc,
+                'suite' => ($suite !== '' ? $suite : ($shippingSuite !== '' ? $shippingSuite : null)),
+                'perfil' => $perfil,
+            ];
+            if ($pass !== '') {
+                $dadosUsuario['senha'] = $pass;
+            }
+
+            try {
+                if ($usuarioId > 0) {
+                    $helper->atualizarUsuario($usuarioId, $dadosUsuario);
+                } else {
+                    $usuarioId = (int) $helper->criarUsuario($dadosUsuario);
+                }
+
+                $addr = $this->pickEnderecoFromRow($row);
+                if ($usuarioId > 0 && !empty($addr)) {
+                    $this->salvarEnderecoPrincipal($pdo, $usuarioId, $addr);
+                }
+
+                $this->atualizarCamposUsuarioEnderecoSeExistir($pdo, $usuarioId, $addr ?? [], $billingBirth);
+                $ok++;
+            } catch (\Exception $e) {
+                $fail++;
+            }
+        }
+
+        fclose($fh);
+        return ['ok' => $ok, 'fail' => $fail];
+    }
+
+    private function findUsuarioIdById(\PDO $pdo, int $id): int {
+        if ($id <= 0) return 0;
+        $st = $pdo->prepare('SELECT id FROM usuarios WHERE id = ? LIMIT 1');
+        $st->execute([$id]);
+        return (int) ($st->fetchColumn() ?: 0);
+    }
+
+    private function findUsuarioIdByEmail(\PDO $pdo, string $email): int {
+        $email = trim($email);
+        if ($email === '') return 0;
+        $st = $pdo->prepare('SELECT id FROM usuarios WHERE LOWER(email) = LOWER(?) LIMIT 1');
+        $st->execute([$email]);
+        return (int) ($st->fetchColumn() ?: 0);
+    }
+
+    private function pickEnderecoFromRow(array $row): array {
+        $get = function(int $idx) use ($row) {
+            return trim((string) ($row[$idx] ?? ''));
+        };
+
+        $billing = [
+            'endereco' => $get(6),
+            'complemento' => $get(7),
+            'cidade' => $get(8),
+            'cep' => $get(9),
+            'pais' => $get(10),
+            'estado' => $get(11),
+            'numero' => $get(23),
+            'bairro' => $get(24),
+        ];
+
+        $shipping = [
+            'endereco' => $get(14),
+            'complemento' => $get(15),
+            'cidade' => $get(16),
+            'cep' => $get(17),
+            'pais' => $get(18),
+            'estado' => $get(19),
+            'numero' => $get(26),
+            'bairro' => $get(27),
+        ];
+
+        $hasBilling = false;
+        foreach (['endereco','cidade','cep'] as $k) {
+            if (!empty($billing[$k])) { $hasBilling = true; break; }
+        }
+        $src = $hasBilling ? $billing : $shipping;
+
+        foreach ($src as $k => $v) {
+            if ($v === '') {
+                unset($src[$k]);
+            }
+        }
+        return $src;
+    }
+
+    private function salvarEnderecoPrincipal(\PDO $pdo, int $usuarioId, array $dados): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        $cols = [];
+        try {
+            $st = $pdo->query('DESCRIBE enderecos');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+        if (empty($cols)) {
+            return;
+        }
+
+        $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+        if ($usuarioCol === '') {
+            return;
+        }
+        $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
+
+        $payload = [];
+        $map = [
+            'cep' => ['cep'],
+            'endereco' => ['endereco', 'logradouro'],
+            'numero' => ['numero'],
+            'complemento' => ['complemento'],
+            'bairro' => ['bairro'],
+            'cidade' => ['cidade'],
+            'estado' => ['estado', 'uf'],
+            'pais' => ['pais'],
+        ];
+        foreach ($map as $inputKey => $cands) {
+            $val = isset($dados[$inputKey]) ? trim((string) $dados[$inputKey]) : '';
+            if ($val === '') continue;
+            foreach ($cands as $col) {
+                if (in_array($col, $cols, true)) {
+                    $payload[$col] = $val;
+                    break;
+                }
+            }
+        }
+        if ($principalCol !== '') {
+            $payload[$principalCol] = 1;
+        }
+        if (empty($payload)) {
+            return;
+        }
+
+        try {
+            $sqlSel = 'SELECT id FROM enderecos WHERE ' . $usuarioCol . ' = :uid' . ($principalCol !== '' ? (' AND ' . $principalCol . ' = 1') : '') . ' ORDER BY id DESC LIMIT 1';
+            $stSel = $pdo->prepare($sqlSel);
+            $stSel->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
+            $stSel->execute();
+            $existingId = (int) ($stSel->fetchColumn() ?: 0);
+
+            if ($existingId > 0) {
+                $set = [];
+                $params = [':id' => $existingId];
+                foreach ($payload as $col => $val) {
+                    $set[] = $col . ' = :' . $col;
+                    $params[':' . $col] = $val;
+                }
+                if (!empty($set)) {
+                    $sqlUp = 'UPDATE enderecos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                    $stUp = $pdo->prepare($sqlUp);
+                    $stUp->execute($params);
+                }
+            } else {
+                $colsIns = [$usuarioCol];
+                $valsIns = [':uid'];
+                $params = [':uid' => $usuarioId];
+                foreach ($payload as $col => $val) {
+                    $colsIns[] = $col;
+                    $valsIns[] = ':' . $col;
+                    $params[':' . $col] = $val;
+                }
+                $sqlIn = 'INSERT INTO enderecos (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')';
+                $stIn = $pdo->prepare($sqlIn);
+                $stIn->execute($params);
+                $existingId = (int) $pdo->lastInsertId();
+            }
+
+            if ($principalCol !== '' && $existingId > 0) {
+                $st = $pdo->prepare('UPDATE enderecos SET ' . $principalCol . ' = 0 WHERE ' . $usuarioCol . ' = :uid AND id <> :id');
+                $st->execute([':uid' => $usuarioId, ':id' => $existingId]);
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function atualizarCamposUsuarioEnderecoSeExistir(\PDO $pdo, int $usuarioId, array $endereco, string $birthdate): void {
+        if ($usuarioId <= 0) return;
+        $cols = [];
+        try {
+            $st = $pdo->query('DESCRIBE usuarios');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+        if (empty($cols)) return;
+
+        $set = [];
+        $params = [];
+
+        $map = [
+            'cep' => 'cep',
+            'endereco' => 'endereco',
+            'numero' => 'numero',
+            'bairro' => 'bairro',
+            'cidade' => 'cidade',
+            'estado' => 'estado',
+        ];
+        foreach ($map as $k => $col) {
+            if (!empty($endereco[$k]) && in_array($col, $cols, true)) {
+                $set[] = $col . ' = ?';
+                $params[] = (string) $endereco[$k];
+            }
+        }
+
+        $birth = trim((string) $birthdate);
+        if ($birth !== '') {
+            $colBirth = in_array('data_nascimento', $cols, true) ? 'data_nascimento' : (in_array('birthdate', $cols, true) ? 'birthdate' : '');
+            if ($colBirth !== '') {
+                $norm = preg_replace('/[^0-9\-\/]/', '', $birth);
+                $dt = null;
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $norm)) {
+                    $dt = $norm;
+                } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $norm, $m)) {
+                    $dt = $m[3] . '-' . $m[2] . '-' . $m[1];
+                }
+                if ($dt !== null) {
+                    $set[] = $colBirth . ' = ?';
+                    $params[] = $dt;
+                }
+            }
+        }
+
+        if (empty($set)) return;
+        try {
+            $params[] = $usuarioId;
+            $stUp = $pdo->prepare('UPDATE usuarios SET ' . implode(', ', $set) . ' WHERE id = ?');
+            $stUp->execute($params);
+        } catch (\Exception $e) {
         }
     }
     

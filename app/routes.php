@@ -320,6 +320,7 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
+$router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoesController', 'importarUsuariosModelo');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
 
 // Mapa de calor (segmentação)

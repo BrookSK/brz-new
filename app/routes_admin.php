@@ -54,6 +54,9 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// Importação de usuários (CSV)
+$router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoesController', 'importarUsuariosModelo');
+
 // Mapa de calor (segmentação)
 $router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
 $router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
