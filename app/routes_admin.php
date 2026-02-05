@@ -56,6 +56,8 @@ $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'sa
 
 // Importação de usuários (CSV)
 $router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoesController', 'importarUsuariosModelo');
+$router->post('/admin/configuracoes/importar-usuarios/iniciar', 'AdminConfiguracoesController', 'importarUsuariosIniciar');
+$router->post('/admin/configuracoes/importar-usuarios/processar', 'AdminConfiguracoesController', 'importarUsuariosProcessar');
 
 // Mapa de calor (segmentação)
 $router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
