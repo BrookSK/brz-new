@@ -6,6 +6,7 @@ $router = new Router();
 // Rotas Públicas
 $router->get('/', 'HomeController', 'index');
 $router->get('/produtos', 'ProdutoController', 'index');
+$router->get('/produtos/rep-{slug}', 'ProdutoController', 'representante');
 $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
@@ -16,7 +17,9 @@ $router->get('/carrinho', 'CarrinhoController', 'index');
 $router->post('/carrinho/adicionar', 'CarrinhoController', 'adicionar');
 $router->post('/carrinho/remover', 'CarrinhoController', 'remover');
 $router->post('/carrinho/atualizar', 'CarrinhoController', 'atualizar');
+$router->post('/carrinho/toggle-ativo', 'CarrinhoController', 'toggleAtivo');
 $router->post('/carrinho/limpar', 'CarrinhoController', 'limpar');
+$router->get('/carrinho/checkout', 'CarrinhoController', 'checkout');
 $router->get('/cobranca', 'CobrancaController', 'index');
 $router->post('/cobranca/calcular', 'CobrancaController', 'calcular');
 $router->get('/rastreamento', 'RastreamentoController', 'index');
@@ -111,6 +114,13 @@ $router->get('/admin', function() {
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
     ];
+
+    if ($perfil === 'representante') {
+        $menuItems = [
+            ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
+            ['icon' => 'fas fa-percentage', 'label' => 'Comissões', 'url' => '/admin/representante/comissoes', 'roles' => ['representante']],
+        ];
+    }
 
     $renderItems = $menuItems;
     if ($perfil !== 'cliente') {
@@ -231,6 +241,9 @@ $router->get('/admin/produtos/novo-simples', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
+$router->get('/admin/produtos/cadastro-representante', 'RepresentanteProdutosController', 'cadastroRapido');
+$router->post('/admin/produtos/cadastro-representante', 'RepresentanteProdutosController', 'cadastroRapido');
+$router->post('/admin/produtos/cadastro-representante/salvar', 'RepresentanteProdutosController', 'cadastroRapidoSalvar');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
@@ -419,3 +432,9 @@ $router->get('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir
 $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
 $router->get('/admin/usuarios/novo', 'AdminUsuariosController', 'novo');
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
+
+// Área do Representante
+$router->get('/admin/representante/produtos', 'RepresentanteProdutosController', 'index');
+$router->get('/admin/representante/produtos/editar/{id}', 'RepresentanteProdutosController', 'editar');
+$router->post('/admin/representante/produtos/atualizar/{id}', 'RepresentanteProdutosController', 'atualizar');
+$router->get('/admin/representante/comissoes', 'RepresentanteComissoesController', 'index');

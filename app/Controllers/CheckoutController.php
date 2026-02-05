@@ -999,6 +999,65 @@ class CheckoutController extends Controller {
         $this->pedidoModel = new PedidoEcommerce();
     }
 
+    private function requireFromCartOrRedirect(bool $asJson = false): bool {
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $fromCartAt = (int) ($_SESSION['checkout_from_cart_at'] ?? 0);
+        if ($fromCartAt <= 0 || (time() - $fromCartAt) > 900) {
+            if ($asJson) {
+                $this->json(['success' => false, 'error' => 'Acesso ao checkout inválido. Volte ao carrinho para continuar.'], 403);
+                return false;
+            }
+            $this->redirect('/carrinho');
+            return false;
+        }
+
+        return true;
+    }
+
+    private function validatePesoMaximoCarrinhoAtivoOrFail(bool $asJson = false): bool {
+        // Revalidar peso ativo no backend (evita bypass via request manual)
+        $usuario = $this->authService->getUsuarioLogado();
+        $carrinho = $this->getCarrinhoForCheckout(is_array($usuario) ? $usuario : null);
+        if (empty($carrinho)) {
+            if ($asJson) {
+                $this->json(['success' => false, 'error' => 'Carrinho vazio'], 400);
+                return false;
+            }
+            $this->redirect('/carrinho');
+            return false;
+        }
+
+        $pesoTotal = 0.0;
+        foreach ($carrinho as $item) {
+            $qtd = (int) ($item['quantidade'] ?? 0);
+            if ($qtd <= 0) continue;
+            $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));
+            if ($pesoUnit <= 0) {
+                $pesoUnit = 0.5;
+            }
+            $pesoTotal += ($pesoUnit * $qtd);
+        }
+
+        if ($pesoTotal > 30.0 + 0.00001) {
+            if ($asJson) {
+                $this->json(['success' => false, 'error' => 'Peso máximo do carrinho é 30kg. Desative itens no carrinho para continuar.'], 400);
+                return false;
+            }
+            $_SESSION['message'] = 'Peso máximo do carrinho é 30kg. Desative itens no carrinho para continuar.';
+            $_SESSION['message_type'] = 'warning';
+            $this->redirect('/carrinho');
+            return false;
+        }
+
+        return true;
+    }
+
     private function getCarrinhoForCheckout(?array $usuario): array {
         $uid = (int) (($usuario['id'] ?? 0));
         if ($uid > 0) {
@@ -1030,6 +1089,20 @@ class CheckoutController extends Controller {
                         ];
                     }
                     if (!empty($out)) {
+                        // Filtrar itens desativados (persistidos em sessão)
+                        try {
+                            if (session_status() === PHP_SESSION_NONE) {
+                                session_start();
+                            }
+                        } catch (\Throwable $e) {
+                        }
+                        $ativosMap = (isset($_SESSION['carrinho_itens_ativos']) && is_array($_SESSION['carrinho_itens_ativos'])) ? $_SESSION['carrinho_itens_ativos'] : [];
+                        $out = array_filter($out, function ($v, $k) use ($ativosMap) {
+                            if (is_array($ativosMap) && array_key_exists((string) $k, $ativosMap)) {
+                                return (bool) $ativosMap[(string) $k];
+                            }
+                            return true;
+                        }, ARRAY_FILTER_USE_BOTH);
                         return $out;
                     }
                 }
@@ -1037,10 +1110,34 @@ class CheckoutController extends Controller {
             }
         }
 
-        return $_SESSION['carrinho'] ?? [];
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $sessCart = $_SESSION['carrinho'] ?? [];
+        $ativosMap = (isset($_SESSION['carrinho_itens_ativos']) && is_array($_SESSION['carrinho_itens_ativos'])) ? $_SESSION['carrinho_itens_ativos'] : [];
+        if (!empty($sessCart) && is_array($sessCart)) {
+            $sessCart = array_filter($sessCart, function ($v, $k) use ($ativosMap) {
+                if (is_array($ativosMap) && array_key_exists((string) $k, $ativosMap)) {
+                    return (bool) $ativosMap[(string) $k];
+                }
+                return true;
+            }, ARRAY_FILTER_USE_BOTH);
+        }
+        return $sessCart;
     }
     
     public function index(Request $request) {
+        if (!$this->requireFromCartOrRedirect(false)) {
+            return;
+        }
+        if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(false)) {
+            return;
+        }
+
         // Obter usuário logado
         $usuario = $this->authService->getUsuarioLogado();
 
@@ -1414,6 +1511,13 @@ class CheckoutController extends Controller {
     }
     
     public function processar(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+        if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(true)) {
+            return;
+        }
+
         // Obter usuário logado
         $usuario = $this->authService->getUsuarioLogado();
 
@@ -1678,6 +1782,14 @@ class CheckoutController extends Controller {
                 
                 $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
                 $this->json($response);
+                // Consumir a janela de checkout (obriga passar novamente pelo carrinho em nova tentativa)
+                try {
+                    if (session_status() === PHP_SESSION_NONE) {
+                        session_start();
+                    }
+                    unset($_SESSION['checkout_from_cart_at']);
+                } catch (\Throwable $e) {
+                }
             } else {
                 $this->debugLog('[CHECKOUT] Erro ao criar pedido - ID retornado: ' . $pedidoId);
                 $this->json(['error' => 'Erro ao criar pedido'], 500);
@@ -1693,6 +1805,13 @@ class CheckoutController extends Controller {
     }
 
     public function stripePaymentIntent(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+        if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(true)) {
+            return;
+        }
+
         $pedidoId = (int) ($request->getParam('pedido_id') ?? 0);
         if ($pedidoId <= 0) {
             $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
@@ -1745,6 +1864,13 @@ class CheckoutController extends Controller {
     }
 
     public function stripeFinalizar(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+        if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(true)) {
+            return;
+        }
+
         $pedidoId = (int) ($request->getParam('pedido_id') ?? 0);
         $paymentIntentId = trim((string) ($request->getParam('payment_intent_id') ?? ''));
         if ($pedidoId <= 0 || $paymentIntentId === '') {
@@ -2479,6 +2605,13 @@ class CheckoutController extends Controller {
     }
     
     public function calcular(Request $request) {
+        if (!$this->requireFromCartOrRedirect(true)) {
+            return;
+        }
+        if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(true)) {
+            return;
+        }
+
         $dados = $request->getParams();
         
         try {

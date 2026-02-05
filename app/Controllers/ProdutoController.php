@@ -107,6 +107,131 @@ class ProdutoController extends Controller {
         ]);
     }
 
+    public function representante(Request $request) {
+        $slug = (string) ($request->getParam('slug') ?? '');
+        $slug = strtolower(trim($slug));
+        if ($slug === '') {
+            $this->redirect('/produtos');
+            return;
+        }
+
+        $produtos = [];
+        $categorias = [];
+        try {
+            $pdo = $this->produtoModel->getConnection();
+
+            // Resolver representante pelo slug
+            $hasUsers = false;
+            try {
+                $st = $pdo->query("SHOW TABLES LIKE 'usuarios'");
+                $hasUsers = (bool) ($st && $st->fetch());
+            } catch (\Throwable $e) {
+                $hasUsers = false;
+            }
+
+            if (!$hasUsers) {
+                $this->view('errors/404');
+                return;
+            }
+
+            $uCols = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE usuarios');
+                $uCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $uCols = [];
+            }
+
+            if (!in_array('representante_slug', $uCols, true)) {
+                $this->view('errors/404');
+                return;
+            }
+
+            $stRep = $pdo->prepare('SELECT id, nome, name FROM usuarios WHERE representante_slug = ? LIMIT 1');
+            $stRep->execute([$slug]);
+            $rep = $stRep->fetch(\PDO::FETCH_ASSOC);
+            if (!$rep || empty($rep['id'])) {
+                $this->view('errors/404');
+                return;
+            }
+            $repId = (int) ($rep['id'] ?? 0);
+            if ($repId <= 0) {
+                $this->view('errors/404');
+                return;
+            }
+
+            // Listar produtos do representante (publicados/ativos)
+            $pCols = [];
+            try {
+                $stColsP = $pdo->query('DESCRIBE produtos');
+                $pCols = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $pCols = [];
+            }
+
+            if (!in_array('representante_id', $pCols, true)) {
+                $this->view('errors/404');
+                return;
+            }
+
+            $where = ['p.representante_id = :rid'];
+            if (in_array('active', $pCols, true)) {
+                $where[] = 'p.active = 1';
+            } elseif (in_array('ativo', $pCols, true)) {
+                $where[] = 'p.ativo = 1';
+            }
+            if (in_array('status', $pCols, true)) {
+                $where[] = "LOWER(COALESCE(p.status,'')) IN ('published','ativo','active')";
+            }
+            // Excluir assessoria
+            $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+            if (in_array('attributes', $pCols, true)) {
+                $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+            }
+
+            $sql = "SELECT p.*, c.name as categoria
+                    FROM produtos p
+                    LEFT JOIN categorias c ON p.category_id = c.id
+                    WHERE " . implode(' AND ', $where) . "
+                    ORDER BY p.featured DESC, p.name ASC";
+
+            $st = $pdo->prepare($sql);
+            $st->bindValue(':rid', $repId, \PDO::PARAM_INT);
+            $st->execute();
+            $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Adicionar foto de capa (produtos.foto_principal) com fallback para galeria
+            foreach ($produtos as &$produto) {
+                $capa = $this->normalizeProdutoImagemPath($produto['foto_principal'] ?? null);
+                if (!empty($capa) && $this->produtoImagemExiste($capa)) {
+                    $produto['foto_principal'] = Url::absolute($capa);
+                    continue;
+                }
+
+                $fotoGaleria = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
+                if ($fotoGaleria && !empty($fotoGaleria['nome_arquivo'])) {
+                    $fotoUrl = $this->normalizeProdutoImagemPath($fotoGaleria['nome_arquivo']);
+                    $produto['foto_principal'] = ($fotoUrl && $this->produtoImagemExiste($fotoUrl)) ? Url::absolute($fotoUrl) : null;
+                } else {
+                    $produto['foto_principal'] = null;
+                }
+            }
+            unset($produto);
+
+            $categorias = $this->produtoModel->getCategorias();
+        } catch (\Throwable $e) {
+            $produtos = [];
+            $categorias = [];
+        }
+
+        $this->view('produto/index_moderno', [
+            'produtos' => $produtos,
+            'categorias' => $categorias,
+            'search' => null,
+            'categoriaSelecionada' => null
+        ]);
+    }
+
     public function detalhes(Request $request) {
         $produtoId = $request->getParam('id');
         

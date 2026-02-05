@@ -212,6 +212,7 @@ class AdminUsuariosController extends Controller {
                                     <option value="admin">Administrador</option>
                                     <option value="vendedor">Vendedor</option>
                                     <option value="suporte">Suporte</option>
+                                    <option value="representante">Representante</option>
                                     <option value="redirecionador">Redirecionador</option>
                                 </select>
                             </div>
@@ -319,6 +320,7 @@ class AdminUsuariosController extends Controller {
                                     <option value="admin" ' . ((($usuario['perfil'] ?? '') === 'admin') ? 'selected' : '') . '>Administrador</option>
                                     <option value="vendedor" ' . ((($usuario['perfil'] ?? '') === 'vendedor') ? 'selected' : '') . '>Vendedor</option>
                                     <option value="suporte" ' . ((($usuario['perfil'] ?? '') === 'suporte') ? 'selected' : '') . '>Suporte</option>
+                                    <option value="representante" ' . ((($usuario['perfil'] ?? '') === 'representante') ? 'selected' : '') . '>Representante</option>
                                     <option value="redirecionador" ' . ((($usuario['perfil'] ?? '') === 'redirecionador') ? 'selected' : '') . '>Redirecionador</option>
                                 </select>
                             </div>

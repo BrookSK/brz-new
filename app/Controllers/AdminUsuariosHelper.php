@@ -42,6 +42,18 @@ class AdminUsuariosHelper {
             // Silenciar erros de criação de tabela
         }
     }
+
+    private function slugify(string $text): string {
+        $text = trim((string) $text);
+        $text = iconv('UTF-8', 'ASCII//TRANSLIT', $text);
+        $text = strtolower((string) $text);
+        $text = preg_replace('/[^a-z0-9]+/', '-', $text);
+        $text = trim((string) $text, '-');
+        if ($text === '') {
+            $text = 'rep';
+        }
+        return substr($text, 0, 120);
+    }
     
     public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0) {
         $sql = "SELECT u.*, 
@@ -178,6 +190,11 @@ class AdminUsuariosHelper {
             }
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'perfil', $perfil);
 
+            if ($perfil === 'representante') {
+                $slug = $this->slugify((string) ($dados['nome'] ?? ''));
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'representante_slug', $slug);
+            }
+
             if (in_array('ativo', $colunas)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'ativo', (int)($dados['ativo'] ?? 1));
             } elseif (in_array('status', $colunas)) {
@@ -250,6 +267,13 @@ class AdminUsuariosHelper {
                 if ($perfil !== '') {
                     $this->setIfColumnExists($setParts, $params, $colunas, 'perfil', $perfil);
                 }
+            }
+
+            // Representante: manter slug em sincronia com o nome (quando disponível)
+            $perfilEfetivo = strtolower(trim((string) ($dados['perfil'] ?? '')));
+            if ($perfilEfetivo === 'representante') {
+                $slug = $this->slugify((string) ($dados['nome'] ?? ''));
+                $this->setIfColumnExists($setParts, $params, $colunas, 'representante_slug', $slug);
             }
 
             if (in_array('updated_at', $colunas)) {

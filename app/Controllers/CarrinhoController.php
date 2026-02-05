@@ -25,6 +25,29 @@ class CarrinhoController extends Controller {
         }
     }
 
+    private function getItemAtivoFromSession(string $itemKey): bool {
+        try {
+            if (!isset($_SESSION['carrinho_itens_ativos']) || !is_array($_SESSION['carrinho_itens_ativos'])) {
+                $_SESSION['carrinho_itens_ativos'] = [];
+            }
+            if (array_key_exists($itemKey, $_SESSION['carrinho_itens_ativos'])) {
+                return (bool) $_SESSION['carrinho_itens_ativos'][$itemKey];
+            }
+        } catch (\Throwable $e) {
+        }
+        return true;
+    }
+
+    private function setItemAtivoInSession(string $itemKey, bool $ativo): void {
+        try {
+            if (!isset($_SESSION['carrinho_itens_ativos']) || !is_array($_SESSION['carrinho_itens_ativos'])) {
+                $_SESSION['carrinho_itens_ativos'] = [];
+            }
+            $_SESSION['carrinho_itens_ativos'][$itemKey] = $ativo ? 1 : 0;
+        } catch (\Throwable $e) {
+        }
+    }
+
     private function getVariacaoInfo(int $produtoVariacaoId): ?array {
         if ($produtoVariacaoId <= 0) return null;
         if (!$this->tableExists('produto_variacoes')) return null;
@@ -175,6 +198,7 @@ class CarrinhoController extends Controller {
         $produtosDetalhados = [];
         $subtotal = 0;
         $pesoTotal = 0;
+        $totalItensAtivos = 0;
 
         $pesoClubeTotal = 0.0;
         $subtotalClube = 0.0;
@@ -221,11 +245,24 @@ class CarrinhoController extends Controller {
 
                 $itemSubtotal = ((int) ($item['quantidade'] ?? 0)) * $itemPrice;
 
+                $pesoUnit = (float) ($produto['peso'] ?? 0.5);
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoItem = ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
+
+                $ativo = $this->getItemAtivoFromSession((string) $k);
+                // Se não existir flag ainda, inicializar como ativo
+                $this->setItemAtivoInSession((string) $k, (bool) $ativo);
+
                 // Normalizar sessão para refletir os valores corretos na view/resumo
                 if (isset($_SESSION['carrinho'][$k]) && is_array($_SESSION['carrinho'][$k])) {
                     $_SESSION['carrinho'][$k]['price'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['preco_unitario'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['subtotal'] = $itemSubtotal;
+                    $_SESSION['carrinho'][$k]['peso_unit'] = $pesoUnit;
+                    $_SESSION['carrinho'][$k]['peso_item'] = $pesoItem;
+                    $_SESSION['carrinho'][$k]['ativo'] = $ativo ? 1 : 0;
                 }
 
                 // Normalizar o carrinho local usado pela view
@@ -233,6 +270,9 @@ class CarrinhoController extends Controller {
                     $carrinho[$k]['price'] = $itemPrice;
                     $carrinho[$k]['preco_unitario'] = $itemPrice;
                     $carrinho[$k]['subtotal'] = $itemSubtotal;
+                    $carrinho[$k]['peso_unit'] = $pesoUnit;
+                    $carrinho[$k]['peso_item'] = $pesoItem;
+                    $carrinho[$k]['ativo'] = $ativo ? 1 : 0;
                 }
                 
                 $this->debugLog('[CARRINHO] Preco: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
@@ -243,15 +283,19 @@ class CarrinhoController extends Controller {
                     'name' => $produto['nome'],
                     'description' => $produto['descricao'],
                     'price' => $itemPrice,
-                    'weight' => $produto['peso'],
+                    'weight' => $pesoUnit,
                     'quantidade' => $item['quantidade'],
                     'subtotal' => $itemSubtotal,
                     'foto_principal' => $fotoUrl,
-                    'stock' => $itemStock
+                    'stock' => $itemStock,
+                    'ativo' => $ativo ? 1 : 0,
                 ];
-                
-                $subtotal += $itemSubtotal;
-                $pesoTotal += $item['quantidade'] * floatval($produto['peso'] ?? 0.5);
+
+                if ($ativo) {
+                    $subtotal += $itemSubtotal;
+                    $pesoTotal += $pesoItem;
+                    $totalItensAtivos += (int) ($item['quantidade'] ?? 0);
+                }
             } else {
                 $this->debugLog('[CARRINHO] Produto nao encontrado: ' . $item['produto_id']);
 
@@ -274,7 +318,10 @@ class CarrinhoController extends Controller {
             }
         }
         
-        // Calcular taxas e impostos com arredondamento
+        // Calcular taxas e impostos com arredondamento (somente itens ativos)
+        $pesoMaxKg = 30.0;
+        $excedePeso = ((float) $pesoTotal) > $pesoMaxKg + 0.00001;
+
         $pesoArredondado = ceil($pesoTotal); // Arredondar para cima
 
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
@@ -342,8 +389,71 @@ class CarrinhoController extends Controller {
             'frete' => $frete,
             'peso_total' => $pesoTotal,
             'total' => $total,
-            'total_itens' => array_sum(array_column($carrinho, 'quantidade'))
+            'total_itens' => $totalItensAtivos,
+            'peso_max_kg' => $pesoMaxKg,
+            'excede_peso' => $excedePeso,
         ]);
+    }
+
+    public function toggleAtivo(Request $request) {
+        session_start();
+
+        $itemKey = trim((string) ($request->getParam('id') ?? ''));
+        $ativo = $request->getParam('ativo', null);
+        if ($itemKey === '' || $ativo === null) {
+            $this->json(['success' => false, 'error' => 'Parâmetros inválidos'], 400);
+            return;
+        }
+
+        $ativoBool = ((string) $ativo === '1' || (string) $ativo === 'true' || (int) $ativo === 1);
+        $this->setItemAtivoInSession($itemKey, $ativoBool);
+        $this->json(['success' => true, 'id' => $itemKey, 'ativo' => $ativoBool ? 1 : 0]);
+    }
+
+    public function checkout(Request $request) {
+        session_start();
+
+        $pesoTotal = 0.0;
+        $uid = $this->getLoggedUserId();
+        $carrinho = [];
+        if ($uid > 0) {
+            $carrinho = $this->getCarrinhoFromDb($uid);
+        }
+        if (empty($carrinho)) {
+            $carrinho = $_SESSION['carrinho'] ?? [];
+        }
+
+        if (empty($carrinho)) {
+            header('Location: /carrinho');
+            exit;
+        }
+
+        foreach ($carrinho as $k => $item) {
+            $ativo = $this->getItemAtivoFromSession((string) $k);
+            if (!$ativo) {
+                continue;
+            }
+            try {
+                $produto = $this->produtoModel->find((int) ($item['produto_id'] ?? 0));
+                $pesoUnit = (float) ($produto['peso'] ?? 0.5);
+                if ($pesoUnit <= 0) {
+                    $pesoUnit = 0.5;
+                }
+                $pesoTotal += ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if ($pesoTotal > 30.0 + 0.00001) {
+            $_SESSION['message'] = 'Peso máximo do carrinho é 30kg. Desative alguns itens para continuar.';
+            $_SESSION['message_type'] = 'warning';
+            header('Location: /carrinho');
+            exit;
+        }
+
+        $_SESSION['checkout_from_cart_at'] = time();
+        header('Location: /checkout');
+        exit;
     }
 
     public function adicionar(Request $request) {
