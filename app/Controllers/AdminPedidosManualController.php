@@ -297,6 +297,7 @@ class AdminPedidosManualController extends Controller {
                                 <label class="form-label">Método de Pagamento</label>
                                 <select class="form-select" name="forma_pagamento" id="forma_pagamento">
                                     <option value="" selected>Online</option>
+                                    <option value="carteira">Carteira</option>
                                     <option value="pagdev">PagDev (offline)</option>
                                 </select>
                                 <div class="form-text">Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
@@ -1211,14 +1212,16 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     function updateManualPaymentMethodsForCurrency(){
-        if (!fpSel) return;
-        const prev = String(fpSel.value || '');
-        const moeda = getSelectedMoeda();
-        fpSel.innerHTML = '';
-        fpSel.appendChild(new Option(moeda === 'BRL' ? 'Online (AppMax)' : 'Online (Stripe)', ''));
-        fpSel.appendChild(new Option('PagDev (offline)', 'pagdev'));
-        const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
-        fpSel.value = stillValid ? prev : '';
+        if (moedaSel && fpSel) {
+            const prev = String(fpSel.value || '');
+            const moeda = getSelectedMoeda();
+            fpSel.innerHTML = '';
+            fpSel.appendChild(new Option(moeda === 'BRL' ? 'Online (AppMax)' : 'Online (Stripe)', ''));
+            fpSel.appendChild(new Option('Carteira', 'carteira'));
+            fpSel.appendChild(new Option('PagDev (offline)', 'pagdev'));
+            const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
+            fpSel.value = stillValid ? prev : '';
+        }
     }
 
     if (moedaSel) {
@@ -1346,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     PEDIDO_ID = Number(resp.pedidoId || resp.pedido_id || resp.id || 0);
 
                     const fp = String(fd.get('forma_pagamento') || (fpSel ? String(fpSel.value || '') : ''));
-                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix') {
+                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix' || fp === 'carteira') {
                         if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
                             window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
                             return;

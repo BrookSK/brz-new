@@ -6,7 +6,7 @@
             <i class="fas fa-check-circle" style="font-size: 4rem; color: var(--primary-color);"></i>
         </div>
         <?php
-        $statusPagamentoHeader = $pedido['payment_status'] ?? ($paymentDetails['status'] ?? null);
+        $statusPagamentoHeader = $pedido['payment_status'] ?? ((is_array($paymentDetails) ? ($paymentDetails['status'] ?? null) : null));
         if (is_string($statusPagamentoHeader)) {
             $statusPagamentoHeader = strtoupper($statusPagamentoHeader);
         }
@@ -41,7 +41,7 @@
                         <div class="col-md-6">
                             <strong>Status:</strong>
                             <?php
-                            $statusPagamentoResumo = $pedido['payment_status'] ?? ($paymentDetails['status'] ?? null);
+                            $statusPagamentoResumo = $pedido['payment_status'] ?? ((is_array($paymentDetails) ? ($paymentDetails['status'] ?? null) : null));
                             if (is_string($statusPagamentoResumo)) {
                                 $statusPagamentoResumo = strtoupper($statusPagamentoResumo);
                             }
@@ -164,6 +164,7 @@
                         <strong>Forma:</strong> 
                         <?php
                         $formas = [
+                            'carteira' => 'Carteira',
                             'cartao_credito' => 'Cartão de Crédito',
                             'boleto' => 'Boleto Bancário',
                             'pix' => 'PIX',
@@ -174,7 +175,7 @@
                     </p>
 
                     <?php
-                    $statusPagamento = $pedido['payment_status'] ?? ($paymentDetails['status'] ?? null);
+                    $statusPagamento = $pedido['payment_status'] ?? ((is_array($paymentDetails) ? ($paymentDetails['status'] ?? null) : null));
                     if (is_string($statusPagamento)) {
                         $statusPagamento = strtoupper($statusPagamento);
                     }
@@ -202,10 +203,10 @@
                     </p>
 
                     <?php
-                    $billingType = strtoupper((string) ($paymentDetails['billingType'] ?? ''));
-                    $invoiceUrl = $paymentDetails['invoiceUrl'] ?? null;
-                    $bankSlipUrl = $paymentDetails['bankSlipUrl'] ?? null;
-                    $digitableLine = $paymentDetails['digitableLine'] ?? null;
+                    $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '')));
+                    $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
+                    $bankSlipUrl = (is_array($paymentDetails) ? ($paymentDetails['bankSlipUrl'] ?? null) : null);
+                    $digitableLine = (is_array($paymentDetails) ? ($paymentDetails['digitableLine'] ?? null) : null);
                     ?>
 
                     <?php if (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
@@ -251,12 +252,12 @@
         </div>
         <div class="card-body">
             <?php
-            $billingTypeEtapas = strtoupper((string) ($paymentDetails['billingType'] ?? ($pedido['forma_pagamento'] ?? '')));
+            $billingTypeEtapas = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '') ?: ($pedido['forma_pagamento'] ?? '')));
             if ($billingTypeEtapas === 'CARTAO_CREDITO') {
                 $billingTypeEtapas = 'CREDIT_CARD';
             }
 
-            $hasInvoiceLink = !empty($paymentDetails['invoiceUrl']) || !empty($paymentDetails['bankSlipUrl']);
+            $hasInvoiceLink = (is_array($paymentDetails) && (!empty($paymentDetails['invoiceUrl']) || !empty($paymentDetails['bankSlipUrl'])));
             $rotuloCobranca = 'cobrança';
             if ($billingTypeEtapas === 'PIX') {
                 $rotuloCobranca = 'código PIX';
@@ -264,6 +265,8 @@
                 $rotuloCobranca = 'boleto';
             } elseif ($billingTypeEtapas === 'CREDIT_CARD') {
                 $rotuloCobranca = 'link de pagamento';
+            } elseif ($billingTypeEtapas === 'CARTEIRA' || $billingTypeEtapas === 'WALLET') {
+                $rotuloCobranca = 'carteira';
             }
 
             $stepDoneClass = 'text-success';

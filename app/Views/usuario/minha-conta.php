@@ -94,6 +94,34 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="col-md-3 mb-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between">
+                                <div>
+                                    <small class="text-muted d-block mb-1">Carteira</small>
+                                    <h6 class="mb-0 text-dark" style="line-height: 1.2;">
+                                        <?php
+                                        $cb = floatval($carteira_saldo_brl ?? 0);
+                                        $cu = floatval($carteira_saldo_usd ?? 0);
+                                        if ($cu > 0 && $cb > 0) {
+                                            echo 'R$ ' . number_format($cb, 2, ',', '.') . '<br><span class="text-muted" style="font-size: 0.85rem;">US$ ' . number_format($cu, 2, ',', '.') . '</span>';
+                                        } elseif ($cu > 0) {
+                                            echo 'US$ ' . number_format($cu, 2, ',', '.');
+                                        } else {
+                                            echo 'R$ ' . number_format($cb, 2, ',', '.');
+                                        }
+                                        ?>
+                                    </h6>
+                                </div>
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.18); color: rgba(49, 46, 129, 1);">
+                                    <i class="fas fa-wallet"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Orçamentos da Assessoria -->

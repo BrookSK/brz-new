@@ -8,6 +8,103 @@ class PedidoManualService {
         $this->db = $db ?? \Config\Database::getConnection();
     }
 
+    private function garantirCarteiraUsuario(int $usuarioId): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS `carteiras` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `saldo_usd` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `uk_usuario_id` (`usuario_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $this->db->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
+            $stmt->execute([(int) $usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function garantirTabelaTransacoesCarteira(): void {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS `transacoes_carteira` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `tipo` enum('credito','debito','conversao') NOT NULL,
+                    `valor_usd` decimal(10,2) DEFAULT 0.00,
+                    `valor_brl` decimal(10,2) DEFAULT 0.00,
+                    `taxa_conversao` decimal(10,6) DEFAULT 1.000000,
+                    `descricao` text,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_usuario_id` (`usuario_id`),
+                    KEY `idx_tipo` (`tipo`),
+                    KEY `idx_created_at` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function debitarCarteiraParaPedidoManual(int $usuarioId, int $pedidoId, float $valor, string $moeda): void {
+        $usuarioId = (int) $usuarioId;
+        $pedidoId = (int) $pedidoId;
+        $valor = (float) $valor;
+        $moeda = strtoupper(trim((string) $moeda));
+
+        if ($usuarioId <= 0) {
+            throw new \Exception('Usuário inválido para pagamento via carteira');
+        }
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido para pagamento via carteira');
+        }
+        if ($valor <= 0) {
+            throw new \Exception('Valor inválido para pagamento via carteira');
+        }
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            throw new \Exception('Moeda inválida para carteira');
+        }
+
+        $this->garantirCarteiraUsuario($usuarioId);
+        $this->garantirTabelaTransacoesCarteira();
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        $stmt = $this->db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+        $stmt->execute([$usuarioId]);
+        $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
+        if ($saldoAtual + 0.00001 < $valor) {
+            throw new \Exception('Saldo insuficiente na carteira');
+        }
+
+        $stmtUpd = $this->db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+        $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
+
+        try {
+            $stmtTx = $this->db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+            $stmtTx->execute([
+                ':uid' => $usuarioId,
+                ':valor' => $valor,
+                ':desc' => 'Pagamento do Pedido #' . $pedidoId,
+            ]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function criarEnderecoEntregaParaCliente(int $clienteId, ?array $enderecoEntrega): int {
         if ($clienteId <= 0) {
             return 0;
@@ -580,7 +677,7 @@ class PedidoManualService {
 
         if ($formaPagamento !== null) {
             $fpNorm = trim((string) $formaPagamento);
-            if ($fpNorm !== '' && $fpNorm !== 'pagdev') {
+            if ($fpNorm !== '' && $fpNorm !== 'pagdev' && $fpNorm !== 'carteira') {
                 throw new \Exception('Forma de pagamento inválida');
             }
         }
@@ -748,6 +845,51 @@ class PedidoManualService {
             }
 
             $this->salvarItensPedido($pedidoId, $itens, $moeda);
+
+            if ($formaPagamento !== null) {
+                $fp = strtolower(trim((string) $formaPagamento));
+                if ($fp === 'carteira') {
+                    $this->debitarCarteiraParaPedidoManual($clienteId, $pedidoId, (float) $total, (string) $moeda);
+
+                    $colsPedidosUpd = $this->getCols('pedidos');
+                    $set = [];
+                    $upd = [':id' => (int) $pedidoId];
+
+                    if (is_array($colsPedidosUpd) && in_array('payment_gateway', $colsPedidosUpd, true)) {
+                        $set[] = 'payment_gateway = :pg';
+                        $upd[':pg'] = 'carteira';
+                    }
+                    if (is_array($colsPedidosUpd) && in_array('payment_id', $colsPedidosUpd, true)) {
+                        $set[] = 'payment_id = :pid';
+                        $upd[':pid'] = 'WALLET_' . (int) $pedidoId;
+                    }
+                    if (is_array($colsPedidosUpd) && in_array('payment_status', $colsPedidosUpd, true)) {
+                        $set[] = 'payment_status = :pst';
+                        $upd[':pst'] = 'PAID';
+                    }
+                    if (is_array($colsPedidosUpd) && in_array('forma_pagamento', $colsPedidosUpd, true)) {
+                        $set[] = 'forma_pagamento = :fp';
+                        $upd[':fp'] = 'carteira';
+                    }
+                    if (is_array($colsPedidosUpd) && in_array('status', $colsPedidosUpd, true)) {
+                        $set[] = 'status = :st';
+                        $upd[':st'] = 'processando';
+                    }
+
+                    foreach (['paid_at', 'data_pagamento', 'data_confirmacao', 'updated_at'] as $c) {
+                        if (is_array($colsPedidosUpd) && in_array($c, $colsPedidosUpd, true)) {
+                            $set[] = $c . ' = :paid_at';
+                            $upd[':paid_at'] = date('Y-m-d H:i:s');
+                            break;
+                        }
+                    }
+
+                    if (!empty($set)) {
+                        $st = $this->db->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                        $st->execute($upd);
+                    }
+                }
+            }
 
             // Se for pagamento offline (PagDev), cria pendência de comprovante quando a tabela existir
             if ($formaPagamento !== null) {

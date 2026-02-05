@@ -1930,12 +1930,16 @@ class AdminPedidosController extends Controller {
                                 $paySvc->estornarPagamentoStripePorPedido((int) $id, 'Cancelamento do pedido no sistema');
                             } elseif ($gateway === 'appmax') {
                                 $paySvc->estornarPagamentoAppmaxPorPedido((int) $id, null);
+                            } elseif ($gateway === 'carteira') {
+                                $paySvc->estornarPagamentoCarteiraPorPedido((int) $id, null, 'Cancelamento do pedido no sistema');
                             }
                         } else {
                             if ($gateway === 'stripe') {
                                 $paySvc->cancelarPagamentoStripePorPedido((int) $id);
                             } elseif ($gateway === 'appmax') {
                                 $paySvc->cancelarPagamentoAppmaxPorPedido((int) $id);
+                            } elseif ($gateway === 'carteira') {
+                                $paySvc->cancelarPagamentoCarteiraPorPedido((int) $id);
                             }
                         }
                     }

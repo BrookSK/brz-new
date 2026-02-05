@@ -29,6 +29,229 @@ class PaymentService {
         $this->loadConfigurations();
     }
 
+    private function garantirCarteiraUsuario(\PDO $db, int $usuarioId): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `carteiras` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `saldo_usd` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `uk_usuario_id` (`usuario_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $db->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
+            $stmt->execute([(int) $usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function garantirTabelaTransacoesCarteira(\PDO $db): void {
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `transacoes_carteira` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `tipo` enum('credito','debito','conversao') NOT NULL,
+                    `valor_usd` decimal(10,2) DEFAULT 0.00,
+                    `valor_brl` decimal(10,2) DEFAULT 0.00,
+                    `taxa_conversao` decimal(10,6) DEFAULT 1.000000,
+                    `descricao` text,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_usuario_id` (`usuario_id`),
+                    KEY `idx_tipo` (`tipo`),
+                    KEY `idx_created_at` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function atualizarPedidoPaymentStatusPorPedidoId(\PDO $db, int $pedidoId, string $paymentStatusInterno, string $gateway = 'carteira'): void {
+        try {
+            if ($pedidoId <= 0) {
+                return;
+            }
+
+            $colsP = [];
+            try {
+                $stmtColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+            if (!is_array($colsP) || empty($colsP)) {
+                return;
+            }
+
+            $set = [];
+            $params = [':id' => $pedidoId];
+
+            if (in_array('payment_gateway', $colsP, true)) {
+                $set[] = 'payment_gateway = :pg';
+                $params[':pg'] = $gateway;
+            }
+            if (in_array('payment_status', $colsP, true)) {
+                $set[] = 'payment_status = :ps';
+                $params[':ps'] = $paymentStatusInterno;
+            }
+            if (in_array('updated_at', $colsP, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            if (!empty($set)) {
+                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $st = $db->prepare($sql);
+                $st->execute($params);
+            }
+
+            // Melhor esforço: manter tabela pagamentos coerente
+            try {
+                $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                $colsPg = $stmtColsPg ? ($stmtColsPg->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                    $updates = [];
+                    $paramsPg = [':pedido_id' => $pedidoId];
+
+                    foreach (['status', 'status_pagamento', 'payment_status'] as $c) {
+                        if (in_array($c, $colsPg, true)) {
+                            $updates[] = "$c = :pg_status";
+                            $paramsPg[':pg_status'] = $paymentStatusInterno;
+                            break;
+                        }
+                    }
+                    foreach (['gateway', 'provedor', 'provider'] as $c) {
+                        if (in_array($c, $colsPg, true)) {
+                            $updates[] = "$c = :pg_gateway";
+                            $paramsPg[':pg_gateway'] = $gateway;
+                            break;
+                        }
+                    }
+
+                    if (!empty($updates)) {
+                        $sqlPg = 'UPDATE pagamentos SET ' . implode(', ', $updates) . ' WHERE pedido_id = :pedido_id';
+                        $stmtUpPg = $db->prepare($sqlPg);
+                        $stmtUpPg->execute($paramsPg);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    public function estornarPagamentoCarteiraPorPedido(int $pedidoId, ?float $valor = null, string $motivo = ''): array {
+        $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+        if (!$pedido) {
+            return ['success' => false, 'error' => 'Pedido não encontrado'];
+        }
+
+        $gateway = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
+        if ($gateway !== 'carteira') {
+            return ['success' => false, 'error' => 'Gateway não é Carteira'];
+        }
+
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            $moeda = 'BRL';
+        }
+
+        $usuarioId = (int) ($pedido['usuario_id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $usuarioId = (int) ($pedido['cliente_id'] ?? 0);
+        }
+        if ($usuarioId <= 0) {
+            return ['success' => false, 'error' => 'Pedido sem usuário vinculado para estorno'];
+        }
+
+        $totalPedido = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+        $valorEstorno = $valor !== null ? (float) $valor : $totalPedido;
+        if ($valorEstorno <= 0) {
+            return ['success' => false, 'error' => 'Valor de estorno inválido'];
+        }
+
+        $db = \Config\Database::getConnection();
+        $this->garantirCarteiraUsuario($db, $usuarioId);
+        $this->garantirTabelaTransacoesCarteira($db);
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        $db->beginTransaction();
+        try {
+            // Idempotência: se já houver um crédito de estorno para este pedido, não repetir.
+            $alreadyRefunded = false;
+            try {
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
+                $stmtChk->execute([
+                    ':uid' => $usuarioId,
+                    ':desc' => '%Estorno do Pedido #' . (int) $pedidoId . '%',
+                ]);
+                $alreadyRefunded = ((int) ($stmtChk->fetchColumn() ?: 0)) > 0;
+            } catch (\Exception $e) {
+                $alreadyRefunded = false;
+            }
+
+            if (!$alreadyRefunded) {
+                $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                $stmt->execute([$usuarioId]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $valorEstorno, ':uid' => $usuarioId]);
+
+                try {
+                    $desc = 'Estorno do Pedido #' . $pedidoId;
+                    if (trim($motivo) !== '') {
+                        $desc .= ' - ' . trim($motivo);
+                    }
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $valorEstorno,
+                        ':desc' => $desc,
+                    ]);
+                } catch (\Exception $e) {
+                }
+            }
+
+            $this->atualizarPedidoPaymentStatusPorPedidoId($db, (int) $pedidoId, 'refunded', 'carteira');
+
+            $db->commit();
+            return [
+                'success' => true,
+                'gateway' => 'carteira',
+                'pedido_id' => (int) $pedidoId,
+                'usuario_id' => (int) $usuarioId,
+                'moeda' => $moeda,
+                'valor' => $valorEstorno,
+                'idempotent' => $alreadyRefunded,
+                'status' => 'refunded',
+            ];
+        } catch (\Exception $e) {
+            $db->rollBack();
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function cancelarPagamentoCarteiraPorPedido(int $pedidoId): array {
+        // Para carteira, "cancelar" no gateway não existe: tratamos como estorno total.
+        return $this->estornarPagamentoCarteiraPorPedido($pedidoId, null, 'Cancelamento do pedido');
+    }
+
     public function createStripeCheckoutSession(int $pedidoId, float $valorUsd, string $descricao, array $customer = [], ?string $successUrl = null, ?string $cancelUrl = null): array {
         if (!$this->isStripeEnabled()) {
             return ['success' => false, 'error' => 'Stripe está desabilitado.'];

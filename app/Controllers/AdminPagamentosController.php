@@ -492,6 +492,12 @@ class AdminPagamentosController extends Controller {
                 return;
             }
 
+            if ($gateway === 'carteira') {
+                $resp = $svc->cancelarPagamentoCarteiraPorPedido($pedidoId);
+                $this->json($resp);
+                return;
+            }
+
             $this->json(['success' => false, 'error' => 'Cancelamento ainda não implementado para este gateway']);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
@@ -535,6 +541,12 @@ class AdminPagamentosController extends Controller {
 
             if ($gateway === 'appmax') {
                 $resp = $svc->estornarPagamentoAppmaxPorPedido($pedidoId, $valor);
+                $this->json($resp);
+                return;
+            }
+
+            if ($gateway === 'carteira') {
+                $resp = $svc->estornarPagamentoCarteiraPorPedido($pedidoId, $valor, $motivo);
                 $this->json($resp);
                 return;
             }
@@ -584,12 +596,16 @@ class AdminPagamentosController extends Controller {
                         $gatewayResult = $svc->estornarPagamentoStripePorPedido($pedidoId, 'Cancelamento do pedido no sistema');
                     } elseif ($gateway === 'appmax') {
                         $gatewayResult = $svc->estornarPagamentoAppmaxPorPedido($pedidoId, null);
+                    } elseif ($gateway === 'carteira') {
+                        $gatewayResult = $svc->estornarPagamentoCarteiraPorPedido($pedidoId, null, 'Cancelamento do pedido no sistema');
                     }
                 } else {
                     if ($gateway === 'stripe') {
                         $gatewayResult = $svc->cancelarPagamentoStripePorPedido($pedidoId);
                     } elseif ($gateway === 'appmax') {
                         $gatewayResult = $svc->cancelarPagamentoAppmaxPorPedido($pedidoId);
+                    } elseif ($gateway === 'carteira') {
+                        $gatewayResult = $svc->cancelarPagamentoCarteiraPorPedido($pedidoId);
                     }
                 }
             }

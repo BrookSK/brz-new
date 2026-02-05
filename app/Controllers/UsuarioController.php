@@ -254,6 +254,20 @@ class UsuarioController extends Controller {
         } catch (\Exception $e) {
         }
 
+        $carteiraSaldoBrl = 0.0;
+        $carteiraSaldoUsd = 0.0;
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? LIMIT 1');
+            $stmt->execute([(int) $usuario['id']]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $carteiraSaldoUsd = (float) ($row['saldo_usd'] ?? 0);
+            $carteiraSaldoBrl = (float) ($row['saldo_brl'] ?? 0);
+        } catch (\Exception $e) {
+            $carteiraSaldoBrl = 0.0;
+            $carteiraSaldoUsd = 0.0;
+        }
+
         $orcamentosAssessoria = [];
         try {
             $orcModel = new AssessoriaOrcamento();
@@ -271,7 +285,9 @@ class UsuarioController extends Controller {
             'total_gasto_brl' => (float) ($stats['total_gasto_brl'] ?? 0),
             'total_gasto_usd' => (float) ($stats['total_gasto_usd'] ?? 0),
             'pedidos_ativos' => (int) ($stats['pedidos_ativos'] ?? 0),
-            'orcamentos_assessoria' => $orcamentosAssessoria
+            'orcamentos_assessoria' => $orcamentosAssessoria,
+            'carteira_saldo_brl' => (float) $carteiraSaldoBrl,
+            'carteira_saldo_usd' => (float) $carteiraSaldoUsd
         ]);
     }
 

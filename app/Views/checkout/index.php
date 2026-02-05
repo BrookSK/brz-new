@@ -260,6 +260,7 @@
                                             <label class="form-label">Forma de Pagamento</label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
                                                 <option value="">Selecione...</option>
+                                                <option value="carteira">Carteira</option>
                                                 <option value="cartao_credito">Cartão de Crédito</option>
                                                 <option value="boleto">Boleto Bancário</option>
                                                 <option value="pix">PIX</option>
@@ -969,6 +970,9 @@ function atualizarFormaPagamento() {
     
     // Mostrar campos específicos conforme a forma de pagamento
     switch(formaPagamento) {
+        case 'carteira':
+            console.log('🔍 [PAGAMENTO] Pagamento via carteira selecionado');
+            break;
         case 'cartao_credito':
             if (camposCartao) {
                 camposCartao.style.display = 'block';
@@ -1045,6 +1049,10 @@ function atualizarFormaPagamento() {
     
     if (botaoFinalizar) {
         switch(formaPagamento) {
+            case 'carteira':
+                botaoFinalizar.innerHTML = '<i class="fas fa-wallet"></i> Pagar com Carteira';
+                console.log('🔍 [BOTÃO] Texto atualizado para carteira');
+                break;
             case 'cartao_credito':
                 botaoFinalizar.innerHTML = '<i class="fas fa-credit-card"></i> Finalizar com Cartão de Crédito';
                 console.log('🔍 [BOTÃO] Texto atualizado para cartão de crédito');

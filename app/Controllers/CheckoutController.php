@@ -26,6 +26,130 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function garantirCarteiraUsuario(
+        \PDO $db,
+        int $usuarioId
+    ): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `carteiras` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `saldo_usd` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `uk_usuario_id` (`usuario_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $db->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
+            $stmt->execute([(int) $usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function garantirTabelaTransacoesCarteira(\PDO $db): void {
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `transacoes_carteira` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `tipo` enum('credito','debito','conversao') NOT NULL,
+                    `valor_usd` decimal(10,2) DEFAULT 0.00,
+                    `valor_brl` decimal(10,2) DEFAULT 0.00,
+                    `taxa_conversao` decimal(10,6) DEFAULT 1.000000,
+                    `descricao` text,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_usuario_id` (`usuario_id`),
+                    KEY `idx_tipo` (`tipo`),
+                    KEY `idx_created_at` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function debitarCarteiraParaPedido(
+        int $usuarioId,
+        int $pedidoId,
+        float $valor,
+        string $moeda
+    ): array {
+        $usuarioId = (int) $usuarioId;
+        $pedidoId = (int) $pedidoId;
+        $valor = (float) $valor;
+        $moeda = strtoupper(trim((string) $moeda));
+
+        if ($usuarioId <= 0) {
+            throw new \Exception('Usuário inválido para pagamento via carteira');
+        }
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido para pagamento via carteira');
+        }
+        if ($valor <= 0) {
+            throw new \Exception('Valor inválido para pagamento via carteira');
+        }
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            throw new \Exception('Moeda inválida para carteira');
+        }
+
+        $db = \Config\Database::getConnection();
+
+        $this->garantirCarteiraUsuario($db, $usuarioId);
+        $this->garantirTabelaTransacoesCarteira($db);
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+            $stmt->execute([$usuarioId]);
+            $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
+            if ($saldoAtual + 0.00001 < $valor) {
+                throw new \Exception('Saldo insuficiente na carteira');
+            }
+
+            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+            $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
+
+            try {
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor' => $valor,
+                    ':desc' => 'Pagamento do Pedido #' . $pedidoId,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            $db->commit();
+
+            return [
+                'success' => true,
+                'status' => 'PAID',
+                'paid_at' => date('Y-m-d H:i:s'),
+                'billingType' => 'WALLET',
+                'payment_id' => 'WALLET_' . $pedidoId,
+            ];
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
     private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
         if (empty($missing)) {
             return $missing;
@@ -1386,8 +1510,18 @@ class CheckoutController extends Controller {
                     $pedidoRowPay = [];
                 }
 
-                $moedaPedido = (string) ($pedidoRowPay['moeda'] ?? 'BRL');
-                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                $formaSelecionada = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+
+                if (!$reused && $formaSelecionada === 'carteira') {
+                    $valorPedido = (float) ($pedidoRowPay['total'] ?? 0);
+                    $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                    $payResult = $this->debitarCarteiraParaPedido((int) ($usuario['id'] ?? 0), (int) $pedidoId, $valorPedido, $moedaPedidoWallet);
+                    $gateway = 'carteira';
+                    $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                    $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                }
+
+                if (!$reused && $formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     try {
                         $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                         $gateway = 'appmax';
@@ -1419,7 +1553,7 @@ class CheckoutController extends Controller {
                 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
                 // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
-                if (!$reused && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                if (!$reused && ($formaSelecionada === 'carteira' || strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL')) {
                     unset($_SESSION['carrinho']);
                     $this->debugLog('[CHECKOUT] Carrinho limpo');
                 }
@@ -1429,7 +1563,7 @@ class CheckoutController extends Controller {
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
-                    'stripe_required' => (strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
+                    'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
                 ];
                 
                 $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
