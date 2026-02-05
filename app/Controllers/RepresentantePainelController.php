@@ -253,7 +253,8 @@ class RepresentantePainelController extends Controller {
             . '<h1 class="h3 mb-0">' . htmlspecialchars($usuarioNome !== '' ? $usuarioNome : 'Representante', ENT_QUOTES, 'UTF-8') . '</h1>'
             . '</div>'
             . '<div class="d-flex gap-2">'
-            . '<a class="btn btn-primary" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Cadastrar produto</a>'
+            . '<a class="btn btn-outline-primary" href="/admin/representante/produtos"><i class="fas fa-box me-1"></i>Gerenciar produtos</a>'
+            . '<a class="btn btn-primary" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Adicionar produto</a>'
             . '</div>'
             . '</div>';
 
@@ -305,15 +306,8 @@ class RepresentantePainelController extends Controller {
             . '</div>'
             . '</div>';
 
-        echo '</div>';
-
-        echo '<div class="container pb-4">'
-            . '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-2">'
+        echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-2">'
             . '<h2 class="h5 mb-0">Meus Produtos</h2>'
-            . '<div class="d-flex gap-2">'
-            . '<a class="btn btn-outline-primary btn-sm" href="/admin/representante/produtos"><i class="fas fa-box me-1"></i>Gerenciar produtos</a>'
-            . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-representante"><i class="fas fa-plus me-1"></i>Adicionar produto</a>'
-            . '</div>'
             . '</div>';
 
         if (empty($produtos)) {
