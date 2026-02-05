@@ -172,7 +172,8 @@ class AuthService {
         if ($usuario['perfil'] !== $perfil) {
             $_SESSION['message'] = 'Acesso negado. Permissão de ' . $perfil . ' necessária.';
             $_SESSION['message_type'] = 'danger';
-            header('Location: /login');
+            $target = $this->estaLogado() ? '/admin' : '/login';
+            header('Location: ' . $target);
             exit;
         }
     }
@@ -195,7 +196,8 @@ class AuthService {
         if (!in_array(strtolower($perfilAtual), $perfisNorm, true)) {
             $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
             $_SESSION['message_type'] = 'danger';
-            header('Location: /login');
+            $target = $this->estaLogado() ? '/admin' : '/login';
+            header('Location: ' . $target);
             exit;
         }
     }
