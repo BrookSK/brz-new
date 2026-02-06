@@ -104,8 +104,8 @@ class AdminTicketsController extends Controller {
             exit;
         }
 
-        $stIns = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, \"admin\", ?, ?)');
-        $stIns->execute([$id, $adminUid, $msg]);
+        $stIns = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+        $stIns->execute([$id, 'admin', $adminUid, $msg]);
 
         $pdo->prepare('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?')->execute([$id]);
 
