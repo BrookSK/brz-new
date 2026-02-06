@@ -763,6 +763,20 @@ class AdminProdutosController extends Controller {
                 $parentProdutoId = (int) ($stP->fetchColumn() ?: 0);
             }
 
+            if ($parentProdutoId <= 0 && $parentIdExt !== '' && ctype_digit($parentIdExt)) {
+                // Parent Product ID do Woo não é o mesmo ID interno do nosso banco.
+                // Resolver via produto_meta (onde salvamos o CSV inteiro, incluindo coluna ID).
+                if ($this->tableExists($pdo, 'produto_meta')) {
+                    try {
+                        $stPM = $pdo->prepare("SELECT produto_id FROM produto_meta WHERE meta_key IN ('ID','Id','id','product_id','produto_id','woo_id','external_id') AND meta_value = :v ORDER BY produto_id DESC LIMIT 1");
+                        $stPM->execute([':v' => (string) $parentIdExt]);
+                        $parentProdutoId = (int) ($stPM->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $parentProdutoId = 0;
+                    }
+                }
+            }
+
             if ($parentProdutoId <= 0) {
                 $findParents = function(string $sql, array $params) use ($pdo): array {
                     $st = $pdo->prepare($sql);
