@@ -437,16 +437,20 @@ class AdminProdutosController extends Controller {
         };
 
         $idExt = $getAny(['ID', 'Id', 'id', 'product_id', 'produto_id']);
-        $typeRaw = strtolower(trim((string) $getAny(['Type', 'type', 'Product Type', 'product_type', 'tipo'])));
-        $sku = $getAny(['SKU', 'Sku', 'sku']);
-        $title = $getAny(['Name', 'name', 'Title', 'title', 'nome', 'product_name']);
-        $publishedRaw = strtolower(trim((string) $getAny(['Published', 'published', 'Status', 'status'])));
-        $excerpt = $getAny(['Short description', 'short_description', 'Descricao curta', 'descricao_curta', 'Excerpt', 'excerpt']);
-        $content = $getAny(['Description', 'description', 'Descricao', 'descricao', 'Content', 'content']);
+        $typeRaw = strtolower(trim((string) $getAny(['Product Type', 'product_type', 'Type', 'type', 'tipo'])));
+        $sku = $getAny(['Sku', 'SKU', 'sku']);
+        $title = $getAny(['Title', 'title', 'Name', 'name', 'nome', 'product_name']);
+        $publishedRaw = strtolower(trim((string) $getAny(['Published', 'published'])));
+        $statusFromCsv = strtolower(trim((string) $getAny(['Status', 'status'])));
+        $manageStockRaw = strtolower(trim((string) $getAny(['Manage Stock', 'manage_stock', 'controla_estoque'])));
+        $dateRaw = trim((string) $getAny(['Date', 'date', 'created_at', 'published_at']));
+        $excerpt = $getAny(['Excerpt', 'excerpt', 'Short description', 'short_description', 'Descricao curta', 'descricao_curta']);
+        $content = $getAny(['Content', 'content', 'Description', 'description', 'Descricao', 'descricao']);
         $slug = $getAny(['Slug', 'slug', 'post_name']);
-        $regularPrice = $this->parseMoneyCsv($getAny(['Regular price', 'Regular Price', 'regular_price', 'preco_regular', 'Price', 'price', 'preco', 'valor']));
-        $salePrice = $this->parseMoneyCsv($getAny(['Sale price', 'Sale Price', 'sale_price', 'preco_promocao']));
-        $price = ($salePrice > 0 ? $salePrice : $regularPrice);
+
+        $regularPrice = $this->parseMoneyCsv($getAny(['Regular Price', 'Regular price', 'regular_price', 'preco_regular', 'Price', 'price', 'preco', 'valor']));
+        $salePrice = $this->parseMoneyCsv($getAny(['Sale Price', 'Sale price', 'sale_price', 'preco_promocao']));
+        $price = ($regularPrice > 0 ? $regularPrice : ($salePrice > 0 ? $salePrice : 0));
 
         $stockRaw = $getAny(['Stock', 'stock', 'Estoque', 'estoque']);
         $stock = (int) ($stockRaw !== '' ? $stockRaw : 0);
@@ -456,11 +460,11 @@ class AdminProdutosController extends Controller {
         $length = (float) str_replace(',', '.', $getAny(['Length (cm)', 'Length', 'length', 'comprimento']));
         $width = (float) str_replace(',', '.', $getAny(['Width (cm)', 'Width', 'width', 'largura']));
         $height = (float) str_replace(',', '.', $getAny(['Height (cm)', 'Height', 'height', 'altura']));
-        $statusRaw = $publishedRaw;
+        $statusRaw = ($statusFromCsv !== '' ? $statusFromCsv : $publishedRaw);
 
-        $imagesRaw = $getAny(['Images', 'images', 'Product Image Gallery', 'product_image_gallery', 'Product Image', 'product_image']);
+        $imagesRaw = $getAny(['Product Image Gallery', 'product_image_gallery', 'Images', 'images', 'Product Image', 'product_image']);
         $tagsRaw = $getAny(['Product Tags', 'product_tags', 'Tags', 'tags']);
-        $catsRaw = $getAny(['Categories', 'categories', 'Product Categories', 'product_categories', 'Categoria', 'categoria']);
+        $catsRaw = $getAny(['Product Categories', 'product_categories', 'Categories', 'categories', 'Categoria', 'categoria']);
         $attrsRaw = $getAny(['Product Attributes', 'product_attributes', 'Attributes', 'attributes', 'Default Attributes', 'default_attributes']);
         $childrenRaw = $getAny(['Children', 'children', 'Variations', 'variations', 'Variation Description', 'variation_description']);
 
@@ -501,6 +505,27 @@ class AdminProdutosController extends Controller {
         $colVariations = $pickCol(['variations']);
         $colStatus = $pickCol(['status']);
         $colType = $pickCol(['type', 'tipo']);
+
+        $colControlaEstoque = $pickCol(['controla_estoque', 'manage_stock']);
+        $colCreatedAt = $pickCol(['created_at']);
+        $colPublishedAt = $pickCol(['published_at']);
+
+        $manageStock = null;
+        if ($colControlaEstoque !== '' && $manageStockRaw !== '') {
+            if ($manageStockRaw === '1' || $manageStockRaw === 'yes' || $manageStockRaw === 'true' || $manageStockRaw === 'sim') {
+                $manageStock = 1;
+            } elseif ($manageStockRaw === '0' || $manageStockRaw === 'no' || $manageStockRaw === 'false' || $manageStockRaw === 'nao' || $manageStockRaw === 'não') {
+                $manageStock = 0;
+            }
+        }
+
+        $dateSql = '';
+        if ($dateRaw !== '') {
+            $ts = strtotime($dateRaw);
+            if ($ts !== false) {
+                $dateSql = date('Y-m-d H:i:s', $ts);
+            }
+        }
 
         $colCategoriaId = $pickCol(['categoria_id', 'category_id']);
         $colCategoria = $pickCol(['categoria', 'category']);
@@ -574,13 +599,11 @@ class AdminProdutosController extends Controller {
             }
         }
 
-        $statusRaw = $publishedRaw;
-        if ($publishedRaw === '1' || $publishedRaw === '0' || $publishedRaw === 'yes' || $publishedRaw === 'no' || $publishedRaw === 'true' || $publishedRaw === 'false') {
-            if ($active === 1) {
-                $statusRaw = 'publish';
-            } elseif ($active === 0) {
-                $statusRaw = 'draft';
-            }
+        if ($statusRaw === '') {
+            $statusRaw = $publishedRaw;
+        }
+        if (($statusRaw === '1' || $statusRaw === '0' || $statusRaw === 'yes' || $statusRaw === 'no' || $statusRaw === 'true' || $statusRaw === 'false') && $active !== null) {
+            $statusRaw = ($active === 1) ? 'publish' : 'draft';
         }
 
         if ($stockStatus === 'outofstock' && $stock <= 0) {
@@ -803,6 +826,18 @@ class AdminProdutosController extends Controller {
                 $firstImg = trim((string) preg_split('/[,|]/', (string) $imagesRaw)[0]);
                 if ($firstImg !== '') { $set[] = $colFoto . ' = :foto'; $params[':foto'] = $firstImg; }
             }
+            if ($colControlaEstoque !== '' && $manageStock !== null && (!array_key_exists($colControlaEstoque, $existing) || $isEmpty($existing[$colControlaEstoque] ?? null) || $isZeroish($existing[$colControlaEstoque] ?? null))) {
+                $set[] = $colControlaEstoque . ' = :mstock';
+                $params[':mstock'] = (int) $manageStock;
+            }
+            if ($colCreatedAt !== '' && $dateSql !== '' && (!array_key_exists($colCreatedAt, $existing) || $isEmpty($existing[$colCreatedAt] ?? null))) {
+                $set[] = $colCreatedAt . ' = :cat';
+                $params[':cat'] = $dateSql;
+            }
+            if ($colPublishedAt !== '' && $dateSql !== '' && (!array_key_exists($colPublishedAt, $existing) || $isEmpty($existing[$colPublishedAt] ?? null))) {
+                $set[] = $colPublishedAt . ' = :pat';
+                $params[':pat'] = $dateSql;
+            }
             if ($colType !== '') {
                 $type = $typeRaw;
                 if ($type !== '' && (!array_key_exists($colType, $existing) || $isEmpty($existing[$colType] ?? null))) { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
@@ -850,6 +885,10 @@ class AdminProdutosController extends Controller {
             }
 
             if ($colType !== '' && $typeRaw !== '') { $colsIns[] = $colType; $valsIns[] = ':tp'; $params[':tp'] = $typeRaw; }
+
+            if ($colControlaEstoque !== '' && $manageStock !== null) { $colsIns[] = $colControlaEstoque; $valsIns[] = ':mstock'; $params[':mstock'] = (int) $manageStock; }
+            if ($colCreatedAt !== '' && $dateSql !== '') { $colsIns[] = $colCreatedAt; $valsIns[] = ':cat'; $params[':cat'] = $dateSql; }
+            if ($colPublishedAt !== '' && $dateSql !== '') { $colsIns[] = $colPublishedAt; $valsIns[] = ':pat'; $params[':pat'] = $dateSql; }
 
             if (empty($colsIns)) {
                 throw new \RuntimeException('Nenhuma coluna compatível para inserir produto');
