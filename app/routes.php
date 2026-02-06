@@ -304,6 +304,8 @@ $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes
 $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
 $router->post('/admin/pedidos/upload-comprovante/{id}', 'AdminPedidosController', 'uploadComprovante');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
+$router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
+$router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
 $router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'importarPedidosModelo');
 $router->post('/admin/pedidos/importar/iniciar', 'AdminPedidosController', 'importarPedidosIniciar');
 $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'importarPedidosProcessar');
