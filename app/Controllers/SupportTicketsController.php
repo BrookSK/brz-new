@@ -172,8 +172,8 @@ class SupportTicketsController extends Controller {
             exit;
         }
 
-        $stIns = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, \"cliente\", ?, ?)');
-        $stIns->execute([(int) $id, $uid, $msg]);
+        $stIns = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+        $stIns->execute([(int) $id, 'cliente', $uid, $msg]);
 
         $pdo->prepare('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?')->execute([(int) $id]);
 
