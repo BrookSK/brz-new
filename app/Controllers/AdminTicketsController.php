@@ -12,6 +12,31 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function getUploadsDirTicketFiles(): array {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $absCandidates = [
+            $docRoot . '/public/uploads/tickets/files/',
+            $docRoot . '/uploads/tickets/files/',
+            __DIR__ . '/../../public/uploads/tickets/files/',
+        ];
+
+        $abs = '';
+        foreach ($absCandidates as $c) {
+            if (is_string($c) && $c !== '' && (is_dir($c) || @mkdir($c, 0775, true))) {
+                $abs = rtrim($c, '/\\') . DIRECTORY_SEPARATOR;
+                break;
+            }
+        }
+        if ($abs === '') {
+            $abs = rtrim((string) $absCandidates[0], '/\\') . DIRECTORY_SEPARATOR;
+        }
+
+        return [
+            'abs' => $abs,
+            'web' => '/uploads/tickets/files/',
+        ];
+    }
+
     private function columnExists(\PDO $pdo, string $table, string $column): bool {
         try {
             $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?');
@@ -290,6 +315,17 @@ class AdminTicketsController extends Controller {
         $stM->execute([$id]);
         $messages = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+        $ticketFiles = [];
+        try {
+            if ($this->tableExists($pdo, 'support_ticket_files')) {
+                $stF = $pdo->prepare('SELECT * FROM support_ticket_files WHERE ticket_id = ? ORDER BY id DESC');
+                $stF->execute([(int) $id]);
+                $ticketFiles = $stF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $ticketFiles = [];
+        }
+
         $attachmentsByMessage = $this->loadAttachmentsByTicket($pdo, (int) $id);
         foreach ($messages as &$m) {
             $mid = (int) ($m['id'] ?? 0);
@@ -311,6 +347,91 @@ class AdminTicketsController extends Controller {
         $content = ob_get_clean();
         $title = 'Ticket #' . $id;
         include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    public function uploadArquivoTicket(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $adminUid = $this->getLoggedUserId();
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/tickets');
+            exit;
+        }
+
+        $pdo = $this->getPdo();
+        if (!$this->tableExists($pdo, 'support_ticket_files')) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        if (!isset($_FILES['arquivo']) || !is_array($_FILES['arquivo'])) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        if (($_FILES['arquivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $tmp = (string) ($_FILES['arquivo']['tmp_name'] ?? '');
+        $origName = (string) ($_FILES['arquivo']['name'] ?? '');
+        $size = (int) ($_FILES['arquivo']['size'] ?? 0);
+        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        // 20MB
+        if ($size > (20 * 1024 * 1024)) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = (string) $finfo->file($tmp);
+
+        // bloquear uploads perigosos por extensão
+        $clean = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $origName);
+        $ext = strtolower(pathinfo($clean, PATHINFO_EXTENSION));
+        $blockedExt = ['php', 'phtml', 'phar', 'exe', 'bat', 'cmd', 'sh', 'js', 'html', 'htm'];
+        if ($ext !== '' && in_array($ext, $blockedExt, true)) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $dirs = $this->getUploadsDirTicketFiles();
+        $absDir = (string) ($dirs['abs'] ?? '');
+        $webDir = (string) ($dirs['web'] ?? '/uploads/tickets/files/');
+        if ($absDir === '') {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $fname = 't' . (int) $id . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '_' . $clean;
+        if ($fname === '' || $fname === null) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $abs = rtrim($absDir, '/\\') . DIRECTORY_SEPARATOR . $fname;
+        $rel = rtrim($webDir, '/') . '/' . $fname;
+
+        if (!@move_uploaded_file($tmp, $abs)) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        try {
+            $st = $pdo->prepare('INSERT INTO support_ticket_files (ticket_id, uploader_type, uploader_user_id, file_path, original_name, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?, ?)');
+            $st->execute([(int) $id, 'admin', (int) $adminUid, $rel, $origName, $mime, $size]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/tickets/' . $id);
         exit;
     }
 

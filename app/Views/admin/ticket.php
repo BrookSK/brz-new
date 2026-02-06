@@ -19,109 +19,126 @@
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-body">
+<?php $st = (string) ($ticket['status'] ?? 'open'); ?>
+<div class="card border-0 shadow-sm brz-chat">
+    <div class="card-body p-0">
         <style>
-            .ticket-chat-box {
+            .brz-chat { overflow: hidden; }
+            .brz-chat, .brz-chat * { box-sizing: border-box; }
+            .brz-chat .brz-chat-header {
+                padding: 14px 16px;
+                border-bottom: 1px solid rgba(148,163,184,.25);
                 background: #fff;
-                max-height: 520px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
+            .brz-chat .brz-chat-header .brz-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+            }
+            .brz-chat .brz-chat-header .brz-sub {
+                color: #64748b;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+            .brz-chat .brz-chat-body {
+                background: #fff;
+                height: min(62vh, 560px);
                 overflow: auto;
+                padding: 16px;
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
             }
-            .ticket-msg-row {
-                display: flex;
-                margin-bottom: 12px;
-                width: 100%;
-            }
-            .ticket-msg-row.is-admin {
-                justify-content: flex-end;
-            }
-            .ticket-msg-row.is-client {
-                justify-content: flex-start;
-            }
-            .ticket-bubble {
+            .brz-chat .brz-row { width: 100%; display: flex; }
+            .brz-chat .brz-row.me { justify-content: flex-end; }
+            .brz-chat .brz-row.other { justify-content: flex-start; }
+            .brz-chat .brz-bubble {
                 width: fit-content;
-                max-width: min(85%, 760px);
+                max-width: min(82%, 760px);
                 padding: 12px 14px;
-                border-radius: 12px;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: flex-start !important;
+                border-radius: 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
                 text-align: left !important;
+            }
+            .brz-chat .brz-bubble * { text-align: left !important; }
+            .brz-chat .brz-bubble.me { background: #0b1f3a; color: #fff; border-top-right-radius: 8px; }
+            .brz-chat .brz-bubble.other { background: #f1f5f9; color: #0f172a; border-top-left-radius: 8px; }
+            .brz-chat .brz-meta {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+                opacity: .85;
+            }
+            .brz-chat .brz-text {
+                width: 100%;
                 white-space: pre-wrap;
                 word-break: break-word;
                 overflow-wrap: anywhere;
+                line-height: 1.35;
             }
-            .ticket-bubble * {
-                text-align: left !important;
-            }
-            .ticket-bubble.is-admin {
-                background: #0b1f3a;
-                color: #fff;
-                border-top-right-radius: 6px;
-            }
-            .ticket-bubble.is-client {
-                background: #f3f4f6;
-                color: #111;
-                border-top-left-radius: 6px;
-            }
-            .ticket-meta {
-                font-size: 12px;
-                opacity: .85;
-                margin-bottom: 6px;
-                display: block !important;
-                text-align: left !important;
-                width: 100% !important;
-                display: flex !important;
-                align-items: center !important;
-                gap: 8px !important;
-            }
-            .ticket-text {
-                display: block !important;
-                text-align: left !important;
-                width: 100% !important;
-            }
-            .ticket-attachments {
+            .brz-chat .brz-attachments {
+                width: 100%;
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: 10px;
-                margin-top: 10px;
-                width: 100%;
             }
-            .ticket-attachments a {
-                display: inline-block;
-                border: 1px solid rgba(0,0,0,.08);
-                border-radius: 10px;
+            .brz-chat .brz-attachments a {
+                display: block;
+                border-radius: 12px;
                 overflow: hidden;
+                border: 1px solid rgba(148,163,184,.35);
                 background: #fff;
-                width: 100%;
             }
-            .ticket-attachments img {
-                height: 100px;
+            .brz-chat .brz-attachments img {
+                width: 100%;
+                height: 110px;
                 object-fit: cover;
                 display: block;
-                width: 100%;
+            }
+            .brz-chat .brz-chat-footer {
+                background: #fff;
+                border-top: 1px solid rgba(148,163,184,.25);
+                padding: 14px 16px;
+            }
+            .brz-chat .brz-composer { display: grid; grid-template-columns: 1fr 160px; gap: 10px; }
+            .brz-chat .brz-composer textarea { min-height: 90px; resize: vertical; }
+            .brz-chat .brz-actions { display: flex; flex-direction: column; gap: 10px; }
+            .brz-chat .brz-actions .btn { height: 44px; }
+            @media (max-width: 768px) {
+                .brz-chat .brz-chat-body { height: min(66vh, 560px); }
+                .brz-chat .brz-composer { grid-template-columns: 1fr; }
+                .brz-chat .brz-actions { flex-direction: row; }
+                .brz-chat .brz-actions .btn { width: 100%; }
             }
         </style>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <span class="badge <?= ($st === 'open' ? 'bg-success' : 'bg-secondary') ?>"><?= $st === 'open' ? 'Aberto' : 'Fechado' ?></span>
-            <?php if (!empty($ticket['pedido_id'])): ?>
-                <div class="text-muted small">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
-            <?php endif; ?>
+        <div class="brz-chat-header">
+            <div class="brz-title">
+                <span class="badge <?= ($st === 'open' ? 'bg-success' : 'bg-secondary') ?>"><?= $st === 'open' ? 'Aberto' : 'Fechado' ?></span>
+                <?php if (!empty($ticket['pedido_id'])): ?>
+                    <div class="brz-sub">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                <?php endif; ?>
+            </div>
         </div>
 
-        <div class="border rounded p-3 ticket-chat-box">
+        <div class="brz-chat-body">
             <?php if (empty($messages)): ?>
                 <div class="text-muted">Sem mensagens ainda.</div>
             <?php else: ?>
                 <?php foreach ($messages as $m): ?>
                     <?php $isAdmin = ((string) ($m['autor_tipo'] ?? '')) === 'admin'; ?>
-                    <div class="ticket-msg-row <?= $isAdmin ? 'is-admin' : 'is-client' ?>">
-                        <div class="ticket-bubble <?= $isAdmin ? 'is-admin' : 'is-client' ?>">
-                            <div class="ticket-meta">
+                    <div class="brz-row <?= $isAdmin ? 'me' : 'other' ?>">
+                        <div class="brz-bubble <?= $isAdmin ? 'me' : 'other' ?>">
+                            <div class="brz-meta">
                                 <?php if ($isAdmin): ?>
                                     <?= htmlspecialchars((string) (($m['autor_nome'] ?? '') !== '' ? $m['autor_nome'] : 'Admin/Suporte'), ENT_QUOTES, 'UTF-8') ?>
                                 <?php else: ?>
@@ -130,12 +147,10 @@
                                 <span class="opacity-75">•</span>
                                 <span class="opacity-75"><?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
-                            <div class="ticket-text">
-                                <?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                            </div>
+                            <div class="brz-text"><?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
 
                             <?php if (!empty($m['attachments']) && is_array($m['attachments'])): ?>
-                                <div class="ticket-attachments">
+                                <div class="brz-attachments">
                                     <?php foreach ($m['attachments'] as $a): ?>
                                         <?php $p = (string) ($a['file_path'] ?? ''); ?>
                                         <?php if ($p !== ''): ?>
@@ -152,25 +167,27 @@
             <?php endif; ?>
         </div>
 
-        <?php if ($st === 'open'): ?>
-            <form class="mt-3" method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/mensagem" enctype="multipart/form-data">
-                <div class="row g-2">
-                    <div class="col-md-10">
-                        <label class="form-label mb-1">Mensagem</label>
-                        <textarea class="form-control" name="mensagem" rows="3" required></textarea>
+        <div class="brz-chat-footer">
+            <?php if ($st === 'open'): ?>
+                <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/mensagem" enctype="multipart/form-data">
+                    <div class="brz-composer">
+                        <div>
+                            <label class="form-label mb-1">Mensagem</label>
+                            <textarea class="form-control" name="mensagem" required></textarea>
+                            <div class="mt-2">
+                                <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
+                                <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
+                            </div>
+                        </div>
+                        <div class="brz-actions">
+                            <button type="submit" class="btn btn-primary w-100">Enviar</button>
+                        </div>
                     </div>
-                    <div class="col-md-2 d-flex align-items-stretch">
-                        <button type="submit" class="btn btn-primary w-100">Enviar</button>
-                    </div>
-                    <div class="col-12">
-                        <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
-                        <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
-                    </div>
-                </div>
-            </form>
-        <?php else: ?>
-            <div class="alert alert-secondary mt-3 mb-0">Ticket fechado.</div>
-        <?php endif; ?>
+                </form>
+            <?php else: ?>
+                <div class="alert alert-secondary mb-0">Ticket fechado.</div>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 
@@ -192,60 +209,87 @@
 
             <div class="row g-3">
                 <div class="col-lg-4">
-                    <div class="small text-muted">Código do pedido</div>
-                    <div class="mb-2"><?= htmlspecialchars((string) ($pd['codigo_pedido'] ?? ($pd['numero_pedido'] ?? $pd['id'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
-
-                    <?php if (!empty($pd['moeda'])): ?>
-                        <div class="small text-muted">Moeda processada</div>
-                        <div class="mb-2"><?= htmlspecialchars((string) $pd['moeda'], ENT_QUOTES, 'UTF-8') ?></div>
-                    <?php endif; ?>
+                    <style>
+                        .pedido-kv td { vertical-align: middle; }
+                        .pedido-kv .k { color: #64748b; font-size: 12px; }
+                        .pedido-kv .v { text-align: right; font-weight: 600; color: #0f172a; }
+                        .pedido-kv .v.muted { font-weight: 500; color: #334155; }
+                        .pedido-totais { background: rgba(148,163,184,.10); border: 1px solid rgba(148,163,184,.22); border-radius: 12px; padding: 12px; }
+                        .pedido-totais .rowline { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+                        .pedido-totais .rowline .l { color: #475569; font-size: 12px; }
+                        .pedido-totais .rowline .r { font-weight: 700; }
+                        .pedido-totais .rowline.total { border-top: 1px solid rgba(148,163,184,.28); margin-top: 6px; padding-top: 10px; }
+                    </style>
 
                     <?php
+                        $codigoPedido = (string) ($pd['codigo_pedido'] ?? ($pd['numero_pedido'] ?? ($pd['id'] ?? '')));
+                        $moedaProc = (string) ($pd['moeda'] ?? '');
                         $moedaOrig = '';
                         foreach (['moeda_original', 'currency_original', 'original_currency'] as $k) {
                             if (!empty($pd[$k])) { $moedaOrig = (string) $pd[$k]; break; }
                         }
+
+                        // Priorizar campos normalizados pelo PedidoEcommerce
+                        $subtotal = $pd['subtotal_produtos'] ?? ($pd['subtotal'] ?? null);
+                        $frete = $pd['valor_frete'] ?? ($pd['frete'] ?? null);
+                        $servico = $pd['taxa_servico'] ?? ($pd['servicos'] ?? null);
+                        $impostos = $pd['valor_impostos'] ?? ($pd['impostos'] ?? null);
+                        $total = $pd['total'] ?? ($pd['valor_total'] ?? null);
+                        $taxaConv = $pd['taxa_conversao'] ?? null;
                     ?>
-                    <?php if ($moedaOrig !== ''): ?>
-                        <div class="small text-muted">Moeda original</div>
-                        <div class="mb-2"><?= htmlspecialchars($moedaOrig, ENT_QUOTES, 'UTF-8') ?></div>
-                    <?php endif; ?>
 
-                    <div class="small text-muted">Status</div>
-                    <div class="mb-2"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-3 pedido-kv">
+                            <tbody>
+                                <tr>
+                                    <td class="k">Código</td>
+                                    <td class="v muted"><?= htmlspecialchars($codigoPedido, ENT_QUOTES, 'UTF-8') ?></td>
+                                </tr>
+                                <?php if ($moedaProc !== ''): ?>
+                                    <tr>
+                                        <td class="k">Moeda processada</td>
+                                        <td class="v muted"><?= htmlspecialchars($moedaProc, ENT_QUOTES, 'UTF-8') ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php if ($moedaOrig !== ''): ?>
+                                    <tr>
+                                        <td class="k">Moeda original</td>
+                                        <td class="v muted"><?= htmlspecialchars($moedaOrig, ENT_QUOTES, 'UTF-8') ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php if (!empty($pd['status'])): ?>
+                                    <tr>
+                                        <td class="k">Status</td>
+                                        <td class="v muted"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php if ($taxaConv !== null && $taxaConv !== '' && (float) $taxaConv != 0.0): ?>
+                                    <tr>
+                                        <td class="k">Taxa conversão</td>
+                                        <td class="v muted"><?= htmlspecialchars((string) $taxaConv, ENT_QUOTES, 'UTF-8') ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
 
-                    <div class="small text-muted">Total</div>
-                    <div><?= htmlspecialchars((string) ($pd['total'] ?? ($pd['valor_total'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
-
-                    <?php
-                        $valList = [
-                            'subtotal_produtos' => 'Subtotal produtos',
-                            'valor_frete' => 'Frete',
-                            'taxa_servico' => 'Taxa serviço',
-                            'valor_impostos' => 'Impostos',
-                            'taxa_conversao' => 'Taxa conversão',
-                            'subtotal_produtos_brl' => 'Subtotal (BRL)',
-                            'valor_frete_brl' => 'Frete (BRL)',
-                            'taxa_servico_brl' => 'Taxa serviço (BRL)',
-                            'valor_impostos_brl' => 'Impostos (BRL)',
-                            'valor_total_brl' => 'Total (BRL)',
-                            'total_brl' => 'Total (BRL)',
-                            'frete' => 'Frete',
-                            'impostos' => 'Impostos',
-                            'servicos' => 'Taxa serviço',
-                            'subtotal' => 'Subtotal',
-                            'total' => 'Total',
-                        ];
-                        $shown = [];
-                        foreach ($valList as $k => $label) {
-                            if (isset($shown[$k])) continue;
-                            if (array_key_exists($k, $pd) && $pd[$k] !== null && $pd[$k] !== '' && (float) $pd[$k] != 0.0) {
-                                $shown[$k] = true;
-                                echo '<div class="small text-muted mt-2">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>';
-                                echo '<div>' . htmlspecialchars((string) $pd[$k], ENT_QUOTES, 'UTF-8') . '</div>';
-                            }
-                        }
-                    ?>
+                    <div class="pedido-totais">
+                        <?php if ($subtotal !== null && $subtotal !== '' && (float) $subtotal != 0.0): ?>
+                            <div class="rowline"><div class="l">Subtotal</div><div class="r"><?= htmlspecialchars((string) $subtotal, ENT_QUOTES, 'UTF-8') ?></div></div>
+                        <?php endif; ?>
+                        <?php if ($frete !== null && $frete !== '' && (float) $frete != 0.0): ?>
+                            <div class="rowline"><div class="l">Frete</div><div class="r"><?= htmlspecialchars((string) $frete, ENT_QUOTES, 'UTF-8') ?></div></div>
+                        <?php endif; ?>
+                        <?php if ($servico !== null && $servico !== '' && (float) $servico != 0.0): ?>
+                            <div class="rowline"><div class="l">Taxas</div><div class="r"><?= htmlspecialchars((string) $servico, ENT_QUOTES, 'UTF-8') ?></div></div>
+                        <?php endif; ?>
+                        <?php if ($impostos !== null && $impostos !== '' && (float) $impostos != 0.0): ?>
+                            <div class="rowline"><div class="l">Impostos</div><div class="r"><?= htmlspecialchars((string) $impostos, ENT_QUOTES, 'UTF-8') ?></div></div>
+                        <?php endif; ?>
+                        <?php if ($total !== null && $total !== '' && (float) $total != 0.0): ?>
+                            <div class="rowline total"><div class="l">Total</div><div class="r"><?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?></div></div>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <div class="col-lg-8">
@@ -301,6 +345,71 @@
 ?>
 
 <?php if (in_array($perfil, ['admin', 'suporte'], true)): ?>
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <div class="fw-semibold">Arquivos do ticket</div>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/arquivos" enctype="multipart/form-data" class="mb-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-9">
+                        <label class="form-label mb-1">Enviar arquivo</label>
+                        <input class="form-control" type="file" name="arquivo" required>
+                        <div class="form-text">Até 20MB. Alguns tipos perigosos são bloqueados.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-upload me-1"></i>Enviar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <?php if (empty($ticketFiles)): ?>
+                <div class="text-muted">Nenhum arquivo anexado ao ticket.</div>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>Tipo</th>
+                                <th>Tamanho</th>
+                                <th>Data</th>
+                                <th class="text-end"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($ticketFiles as $f): ?>
+                                <?php
+                                    $path = (string) ($f['file_path'] ?? '');
+                                    $name = (string) ($f['original_name'] ?? '');
+                                    $mime = (string) ($f['mime_type'] ?? '');
+                                    $size = (int) ($f['file_size'] ?? 0);
+                                    $created = (string) ($f['created_at'] ?? '');
+                                    $sizeKb = $size > 0 ? round($size / 1024, 1) . ' KB' : '';
+                                ?>
+                                <tr>
+                                    <td class="fw-semibold"><?= htmlspecialchars($name !== '' ? $name : $path, ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-muted small"><?= htmlspecialchars($mime, ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-muted small"><?= htmlspecialchars($sizeKb, ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-muted small"><?= htmlspecialchars($created, ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-end">
+                                        <?php if ($path !== ''): ?>
+                                            <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars($path, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white">
             <div class="fw-semibold">Anotações internas (somente admin)</div>
