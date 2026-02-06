@@ -68,6 +68,7 @@ $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirP
 $router->get('/meus-tickets', 'SupportTicketsController', 'index');
 $router->get('/meu-ticket/{id}', 'SupportTicketsController', 'ver');
 $router->post('/meu-ticket/{id}/mensagem', 'SupportTicketsController', 'enviarMensagem');
+$router->post('/meu-ticket/{id}/fechar', 'SupportTicketsController', 'fechar');
 $router->get('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
 
 // Checkout
