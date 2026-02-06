@@ -192,13 +192,22 @@ class AdminProdutosController extends Controller {
             return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
         }
 
-        $first = fgetcsv($fh, 0, ',');
-        $delimiter = ',';
-        if (is_array($first) && count($first) === 1) {
+        $candidates = [',', ';', "\t"];
+        $best = null;
+        $bestDelim = ',';
+        $bestCount = 0;
+        foreach ($candidates as $d) {
             rewind($fh);
-            $first = fgetcsv($fh, 0, ';');
-            $delimiter = ';';
+            $row = fgetcsv($fh, 0, $d);
+            $cnt = is_array($row) ? count($row) : 0;
+            if ($cnt > $bestCount) {
+                $bestCount = $cnt;
+                $best = $row;
+                $bestDelim = $d;
+            }
         }
+        $first = is_array($best) ? $best : [];
+        $delimiter = $bestDelim;
 
         $normalizeHeader = function($v) {
             $s = trim((string) $v);
@@ -275,6 +284,19 @@ class AdminProdutosController extends Controller {
                 foreach ($row as $i => $v) {
                     $assoc[(string) $i] = (string) $v;
                 }
+            }
+
+            $isRowEmpty = true;
+            foreach ($assoc as $v) {
+                if (trim((string) $v) !== '') {
+                    $isRowEmpty = false;
+                    break;
+                }
+            }
+            if ($isRowEmpty) {
+                // Linha vazia no CSV: não é erro, apenas pular
+                $processedNow++;
+                continue;
             }
 
             $rowKey = $this->getProdutoImportRowKey($assoc);
