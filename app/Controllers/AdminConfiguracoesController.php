@@ -1529,6 +1529,74 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="small text-muted mt-2" id="usuariosImportProgressStats"></div>
                                                 </div>
                                             </div>
+
+                                            <div class="border rounded p-3 bg-light mt-3">
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Pedidos (CSV)</div>
+                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
+
+                                                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                                    <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/importar/modelo" target="_blank">
+                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                    </a>
+                                                </div>
+
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-md-8">
+                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <input type="file" class="form-control" name="pedidos_import_csv" id="pedidos_import_csv" accept=".csv,text/csv">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <button type="button" class="btn btn-primary w-100" id="btnImportarPedidosCsv">
+                                                            <i class="fas fa-upload me-1"></i>Importar Pedidos
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-3" id="pedidosImportProgressWrap" style="display:none;">
+                                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                                        <span id="pedidosImportProgressLabel">Preparando...</span>
+                                                        <span id="pedidosImportProgressPercent">0%</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 18px;">
+                                                        <div class="progress-bar" role="progressbar" style="width:0%" id="pedidosImportProgressBar">0%</div>
+                                                    </div>
+                                                    <div class="small text-muted mt-2" id="pedidosImportProgressStats"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3 bg-light mt-3">
+                                                <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Produtos (CSV)</div>
+                                                <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
+
+                                                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                                    <a class="btn btn-outline-primary btn-sm" href="/admin/produtos/importar/modelo" target="_blank">
+                                                        <i class="fas fa-download me-1"></i>Baixar modelo CSV
+                                                    </a>
+                                                </div>
+
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-md-8">
+                                                        <label class="form-label mb-1">Arquivo CSV</label>
+                                                        <input type="file" class="form-control" name="produtos_import_csv" id="produtos_import_csv" accept=".csv,text/csv">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <button type="button" class="btn btn-primary w-100" id="btnImportarProdutosCsv">
+                                                            <i class="fas fa-upload me-1"></i>Importar Produtos
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-3" id="produtosImportProgressWrap" style="display:none;">
+                                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                                        <span id="produtosImportProgressLabel">Preparando...</span>
+                                                        <span id="produtosImportProgressPercent">0%</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 18px;">
+                                                        <div class="progress-bar" role="progressbar" style="width:0%" id="produtosImportProgressBar">0%</div>
+                                                    </div>
+                                                    <div class="small text-muted mt-2" id="produtosImportProgressStats"></div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1550,10 +1618,202 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . $this->getUsuariosImportJS() . '
+    ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . $this->getUsuariosImportJS() . $this->getPedidosImportJS() . $this->getProdutosImportJS() . '
 </body>
 </html>';
         exit;
+    }
+
+    private function getPedidosImportJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnImportarPedidosCsv');
+    const fileInput = document.getElementById('pedidos_import_csv');
+    const wrap = document.getElementById('pedidosImportProgressWrap');
+    const bar = document.getElementById('pedidosImportProgressBar');
+    const percentEl = document.getElementById('pedidosImportProgressPercent');
+    const labelEl = document.getElementById('pedidosImportProgressLabel');
+    const statsEl = document.getElementById('pedidosImportProgressStats');
+
+    if (!btn || !fileInput || !wrap || !bar || !percentEl || !labelEl || !statsEl) return;
+
+    let running = false;
+
+    function setProgress(processed, total, okCount, failCount, label){
+        const t = (typeof total === 'number' && total > 0) ? total : 0;
+        const p = (typeof processed === 'number' && processed > 0) ? processed : 0;
+        let pct = (t > 0) ? Math.floor((p / t) * 100) : 0;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        percentEl.textContent = pct + '%';
+        labelEl.textContent = label || 'Processando...';
+        statsEl.textContent = 'Processados: ' + p + ' / ' + t + ' | OK: ' + (okCount||0) + ' | Falhas: ' + (failCount||0);
+    }
+
+    async function iniciarImportacao(file){
+        const fd = new FormData();
+        fd.append('pedidos_import_csv', file);
+        const resp = await fetch('/admin/pedidos/importar/iniciar', { method: 'POST', body: fd });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao iniciar a importação.');
+        }
+        return json;
+    }
+
+    async function processarLote(token, batchSize){
+        const fd = new URLSearchParams();
+        fd.set('token', token);
+        fd.set('batch', String(batchSize || 200));
+        const resp = await fetch('/admin/pedidos/importar/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString()
+        });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao processar lote.');
+        }
+        return json;
+    }
+
+    btn.addEventListener('click', async function(){
+        if (running) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert('Selecione um arquivo CSV primeiro.');
+            return;
+        }
+
+        running = true;
+        btn.disabled = true;
+        wrap.style.display = '';
+        setProgress(0, 0, 0, 0, 'Enviando arquivo...');
+
+        try {
+            const init = await iniciarImportacao(file);
+            const token = init.token;
+            const total = init.total || 0;
+            let last = init;
+
+            setProgress(0, total, 0, 0, 'Importação iniciada...');
+
+            while (!last.done) {
+                last = await processarLote(token, 200);
+                setProgress(last.processed || 0, last.total || total, last.okCount || 0, last.failCount || 0, 'Processando em lotes...');
+            }
+
+            setProgress(last.processed || total, last.total || total, last.okCount || 0, last.failCount || 0, 'Finalizado');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Erro na importação.');
+            labelEl.textContent = 'Erro';
+        } finally {
+            running = false;
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+JS;
+    }
+
+    private function getProdutosImportJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnImportarProdutosCsv');
+    const fileInput = document.getElementById('produtos_import_csv');
+    const wrap = document.getElementById('produtosImportProgressWrap');
+    const bar = document.getElementById('produtosImportProgressBar');
+    const percentEl = document.getElementById('produtosImportProgressPercent');
+    const labelEl = document.getElementById('produtosImportProgressLabel');
+    const statsEl = document.getElementById('produtosImportProgressStats');
+
+    if (!btn || !fileInput || !wrap || !bar || !percentEl || !labelEl || !statsEl) return;
+
+    let running = false;
+
+    function setProgress(processed, total, okCount, failCount, label){
+        const t = (typeof total === 'number' && total > 0) ? total : 0;
+        const p = (typeof processed === 'number' && processed > 0) ? processed : 0;
+        let pct = (t > 0) ? Math.floor((p / t) * 100) : 0;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        percentEl.textContent = pct + '%';
+        labelEl.textContent = label || 'Processando...';
+        statsEl.textContent = 'Processados: ' + p + ' / ' + t + ' | OK: ' + (okCount||0) + ' | Falhas: ' + (failCount||0);
+    }
+
+    async function iniciarImportacao(file){
+        const fd = new FormData();
+        fd.append('produtos_import_csv', file);
+        const resp = await fetch('/admin/produtos/importar/iniciar', { method: 'POST', body: fd });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao iniciar a importação.');
+        }
+        return json;
+    }
+
+    async function processarLote(token, batchSize){
+        const fd = new URLSearchParams();
+        fd.set('token', token);
+        fd.set('batch', String(batchSize || 200));
+        const resp = await fetch('/admin/produtos/importar/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString()
+        });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao processar lote.');
+        }
+        return json;
+    }
+
+    btn.addEventListener('click', async function(){
+        if (running) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert('Selecione um arquivo CSV primeiro.');
+            return;
+        }
+
+        running = true;
+        btn.disabled = true;
+        wrap.style.display = '';
+        setProgress(0, 0, 0, 0, 'Enviando arquivo...');
+
+        try {
+            const init = await iniciarImportacao(file);
+            const token = init.token;
+            const total = init.total || 0;
+            let last = init;
+
+            setProgress(0, total, 0, 0, 'Importação iniciada...');
+
+            while (!last.done) {
+                last = await processarLote(token, 200);
+                setProgress(last.processed || 0, last.total || total, last.okCount || 0, last.failCount || 0, 'Processando em lotes...');
+            }
+
+            setProgress(last.processed || total, last.total || total, last.okCount || 0, last.failCount || 0, 'Finalizado');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Erro na importação.');
+            labelEl.textContent = 'Erro';
+        } finally {
+            running = false;
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+JS;
     }
 
     private function getUsuariosImportJS(): string {

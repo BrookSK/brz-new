@@ -1505,33 +1505,8 @@ HTML;
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
             . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
-            . '<a href="/admin/produtos/importar/modelo" target="_blank" class="btn btn-outline-secondary"><i class="fas fa-download"></i> Modelo CSV</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
             . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
-            . '</div>'
-            . '</div>';
-
-        echo '<div class="border rounded p-3 bg-light mb-4">'
-            . '<div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Produtos (CSV)</div>'
-            . '<div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>'
-            . '<div class="row g-2 align-items-end">'
-            . '<div class="col-md-8">'
-            . '<label class="form-label mb-1">Arquivo CSV</label>'
-            . '<input type="file" class="form-control" name="produtos_import_csv" id="produtos_import_csv" accept=".csv,text/csv">'
-            . '</div>'
-            . '<div class="col-md-4">'
-            . '<button type="button" class="btn btn-primary w-100" id="btnImportarProdutosCsv"><i class="fas fa-upload me-1"></i>Importar Produtos</button>'
-            . '</div>'
-            . '</div>'
-            . '<div class="mt-3" id="produtosImportProgressWrap" style="display:none;">'
-            . '<div class="d-flex justify-content-between small text-muted mb-1">'
-            . '<span id="produtosImportProgressLabel">Preparando...</span>'
-            . '<span id="produtosImportProgressPercent">0%</span>'
-            . '</div>'
-            . '<div class="progress" style="height: 18px;">'
-            . '<div class="progress-bar" role="progressbar" style="width:0%" id="produtosImportProgressBar">0%</div>'
-            . '</div>'
-            . '<div class="small text-muted mt-2" id="produtosImportProgressStats"></div>'
             . '</div>'
             . '</div>';
 
@@ -1568,8 +1543,6 @@ HTML;
                 . '</div>';
         }
         echo '</div>';
-
-        echo $this->getProdutosImportJS();
 
         if ($totalPaginas > 1) {
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';

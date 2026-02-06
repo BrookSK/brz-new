@@ -915,43 +915,12 @@ JS;
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
-                        <a class="btn btn-outline-secondary me-2" href="/admin/pedidos/importar/modelo" target="_blank">
-                            <i class="fas fa-download me-1"></i>Modelo CSV
-                        </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
                         </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
-                    </div>
-                </div>
-
-                <div class="border rounded p-3 bg-light mb-4">
-                    <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Pedidos (CSV)</div>
-                    <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
-
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-8">
-                            <label class="form-label mb-1">Arquivo CSV</label>
-                            <input type="file" class="form-control" name="pedidos_import_csv" id="pedidos_import_csv" accept=".csv,text/csv">
-                        </div>
-                        <div class="col-md-4">
-                            <button type="button" class="btn btn-primary w-100" id="btnImportarPedidosCsv">
-                                <i class="fas fa-upload me-1"></i>Importar Pedidos
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mt-3" id="pedidosImportProgressWrap" style="display:none;">
-                        <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span id="pedidosImportProgressLabel">Preparando...</span>
-                            <span id="pedidosImportProgressPercent">0%</span>
-                        </div>
-                        <div class="progress" style="height: 18px;">
-                            <div class="progress-bar" role="progressbar" style="width:0%" id="pedidosImportProgressBar">0%</div>
-                        </div>
-                        <div class="small text-muted mt-2" id="pedidosImportProgressStats"></div>
                     </div>
                 </div>
                 
@@ -1346,7 +1315,6 @@ JS;
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    ' . $this->getPedidosImportJS() . '
 </body>
 </html>';
         exit;
