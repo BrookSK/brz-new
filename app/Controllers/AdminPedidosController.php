@@ -109,9 +109,9 @@ class AdminPedidosController extends Controller {
 
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
         $token = trim((string) ($request->getParam('token') ?? ''));
-        $batchSize = (int) ($request->getParam('batch') ?? 300);
-        if ($batchSize <= 0) $batchSize = 300;
-        if ($batchSize > 1000) $batchSize = 1000;
+        $batchSize = (int) ($request->getParam('batch') ?? 150);
+        if ($batchSize <= 0) $batchSize = 150;
+        if ($batchSize > 500) $batchSize = 500;
 
         if ($token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
             http_response_code(400);
@@ -309,7 +309,20 @@ class AdminPedidosController extends Controller {
         $orderKey = trim((string) ($assoc['_order_key'] ?? ''));
         $oldOrderId = trim((string) ($assoc['_old_order_id'] ?? ''));
 
-        if ($postId !== '') return 'post_id:' . $postId;
+        // Quando o CSV vier "um item por linha", precisamos diferenciar itens do mesmo pedido.
+        $produtoIdExt = trim((string) ($assoc['Produto ID'] ?? $assoc['produto_id'] ?? ''));
+        $ref = trim((string) ($assoc['Referência'] ?? $assoc['Referencia'] ?? $assoc['SKU'] ?? $assoc['Sku'] ?? $assoc['sku'] ?? ''));
+        $nome = trim((string) ($assoc['Produto'] ?? $assoc['produto'] ?? ''));
+        $qtd = trim((string) ($assoc['Quantidade'] ?? $assoc['quantidade'] ?? $assoc['qty'] ?? ''));
+        $sub = trim((string) ($assoc['Subtotal'] ?? $assoc['subtotal'] ?? ''));
+        $hasItem = ($produtoIdExt !== '' || $ref !== '' || $nome !== '');
+
+        if ($postId !== '') {
+            if ($hasItem) {
+                return 'post_id:' . $postId . '|item:' . strtolower($produtoIdExt . '|' . $ref . '|' . $nome . '|' . $qtd . '|' . $sub);
+            }
+            return 'post_id:' . $postId;
+        }
         if ($orderKey !== '') return 'order_key:' . $orderKey;
         if ($oldOrderId !== '') return 'old_order_id:' . $oldOrderId;
         return '';
@@ -379,6 +392,16 @@ class AdminPedidosController extends Controller {
             return trim((string) ($row[$key] ?? ''));
         };
 
+        $getAny = function(array $keys) use ($row) {
+            foreach ($keys as $k) {
+                if (array_key_exists($k, $row)) {
+                    $v = trim((string) ($row[$k] ?? ''));
+                    if ($v !== '') return $v;
+                }
+            }
+            return '';
+        };
+
         $postId = $get('post_id');
         $orderKey = $get('_order_key');
         $oldOrderId = $get('_old_order_id');
@@ -405,13 +428,17 @@ class AdminPedidosController extends Controller {
             throw new \RuntimeException('Usuário não encontrado para o pedido');
         }
 
-        $colsPedidos = [];
-        try {
-            $stmtColsP = $pdo->query('DESCRIBE pedidos');
-            $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-        } catch (\Exception $e) {
-            $colsPedidos = [];
+        static $colsPedidosCache = null;
+        if (!is_array($colsPedidosCache)) {
+            $colsPedidosCache = [];
+            try {
+                $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                $colsPedidosCache = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidosCache = [];
+            }
         }
+        $colsPedidos = $colsPedidosCache;
         if (empty($colsPedidos)) {
             throw new \RuntimeException('Tabela pedidos não encontrada');
         }
@@ -498,42 +525,57 @@ class AdminPedidosController extends Controller {
         }
 
         if ($pedidoId > 0) {
+            $existing = [];
+            try {
+                $stCur = $pdo->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
+                $stCur->execute([':id' => (int) $pedidoId]);
+                $existing = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $existing = [];
+            }
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
             $set = [];
             $params = [];
 
-            if ($colUsuario !== '') {
+            if ($colUsuario !== '' && (!array_key_exists($colUsuario, $existing) || $isEmpty($existing[$colUsuario] ?? null))) {
                 $set[] = $colUsuario . ' = :uid';
                 $params[':uid'] = (int) $usuarioId;
             }
-            if ($colTotal !== '') {
+            if ($colTotal !== '' && (!array_key_exists($colTotal, $existing) || $isEmpty($existing[$colTotal] ?? null))) {
                 $set[] = $colTotal . ' = :tot';
                 $params[':tot'] = $total;
             }
-            if ($colMoeda !== '') {
+            if ($colMoeda !== '' && (!array_key_exists($colMoeda, $existing) || $isEmpty($existing[$colMoeda] ?? null))) {
                 $set[] = $colMoeda . ' = :mo';
                 $params[':mo'] = $moeda;
             }
-            if ($colStatus !== '') {
+            if ($colStatus !== '' && (!array_key_exists($colStatus, $existing) || $isEmpty($existing[$colStatus] ?? null))) {
                 $set[] = $colStatus . ' = :st';
                 $params[':st'] = $status;
             }
-            if ($colPaymentGateway !== '' && $paymentMethod !== '') {
+            if ($colPaymentGateway !== '' && $paymentMethod !== '' && (!array_key_exists($colPaymentGateway, $existing) || $isEmpty($existing[$colPaymentGateway] ?? null))) {
                 $set[] = $colPaymentGateway . ' = :pg';
                 $params[':pg'] = $paymentMethod;
             }
-            if ($colPaymentId !== '' && $paymentId !== '') {
+            if ($colPaymentId !== '' && $paymentId !== '' && (!array_key_exists($colPaymentId, $existing) || $isEmpty($existing[$colPaymentId] ?? null))) {
                 $set[] = $colPaymentId . ' = :pid';
                 $params[':pid'] = $paymentId;
             }
-            if ($colPaymentStatus !== '') {
+            if ($colPaymentStatus !== '' && (!array_key_exists($colPaymentStatus, $existing) || $isEmpty($existing[$colPaymentStatus] ?? null))) {
                 $set[] = $colPaymentStatus . ' = :pst';
                 $params[':pst'] = $status;
             }
-            if ($colTracking !== '' && $tracking !== '') {
+            if ($colTracking !== '' && $tracking !== '' && (!array_key_exists($colTracking, $existing) || $isEmpty($existing[$colTracking] ?? null))) {
                 $set[] = $colTracking . ' = :trk';
                 $params[':trk'] = $tracking;
             }
-            if ($colCodigoPedido !== '' && $codigoPedido !== '') {
+            if ($colCodigoPedido !== '' && $codigoPedido !== '' && (!array_key_exists($colCodigoPedido, $existing) || $isEmpty($existing[$colCodigoPedido] ?? null))) {
                 $set[] = $colCodigoPedido . ' = :cod';
                 $params[':cod'] = $codigoPedido;
             }
@@ -620,10 +662,238 @@ class AdminPedidosController extends Controller {
             $this->upsertPedidoMeta($pdo, $pedidoId, $mk, $mv);
         }
 
-        foreach ($row as $k => $v) {
-            $k = trim((string) $k);
-            if ($k === '') continue;
-            $this->upsertPedidoMeta($pdo, $pedidoId, $k, (string) $v);
+        // CSV de pedidos vem 1 linha por item (repete dados do pedido). Para evitar milhares de UPSERTs
+        // de meta por pedido, importar os metadados completos do pedido apenas 1x por pedido_id.
+        static $pedidoMetaFullImported = [];
+        if (!isset($pedidoMetaFullImported[$pedidoId])) {
+            foreach ($row as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                $vv = trim((string) $v);
+                if ($vv === '') continue;
+                $this->upsertPedidoMeta($pdo, $pedidoId, $k, $vv);
+            }
+            $pedidoMetaFullImported[$pedidoId] = true;
+        }
+
+        // Itens do pedido (quando o CSV trouxer colunas de produto)
+        $produtoIdExt = $getAny(['Produto ID', 'produto_id', 'product_id']);
+        $produtoNome = $getAny(['Produto', 'produto', 'nome_produto', 'produto_nome']);
+        $produtoNcm = $getAny(['NCM', 'ncm']);
+        $produtoRef = $getAny(['Referência', 'Referencia', 'Ref', 'SKU', 'Sku', 'sku']);
+        $produtoImg = $getAny(['Imagem', 'imagem', 'Image', 'image']);
+        $qtdRaw = $getAny(['Quantidade', 'quantidade', 'qty']);
+        $vuRaw = $getAny(['Preço Unitário', 'Preco Unitario', 'preco_unitario', 'valor_unitario', 'price']);
+        $subRaw = $getAny(['Subtotal', 'subtotal']);
+
+        $hasItem = ($produtoIdExt !== '' || $produtoNome !== '' || $produtoRef !== '');
+        if ($hasItem) {
+            $qtd = 0;
+            if ($qtdRaw !== '') {
+                $qtdNum = preg_replace('/[^0-9]/', '', (string) $qtdRaw);
+                if ($qtdNum !== '' && ctype_digit($qtdNum)) {
+                    $qtd = (int) $qtdNum;
+                }
+            }
+
+            $parseMoney = function(string $s): float {
+                $s = trim($s);
+                if ($s === '') return 0.0;
+                $num = str_replace(['R$', 'USD', 'BRL'], '', $s);
+                $num = preg_replace('/\s+/', '', (string) $num);
+                if (strpos($num, ',') !== false && strpos($num, '.') !== false) {
+                    $num = str_replace('.', '', $num);
+                    $num = str_replace(',', '.', $num);
+                } elseif (strpos($num, ',') !== false) {
+                    $num = str_replace(',', '.', $num);
+                }
+                return is_numeric($num) ? (float) $num : 0.0;
+            };
+
+            $valorUnit = $parseMoney($vuRaw);
+            $subtotal = $parseMoney($subRaw);
+            if ($subtotal <= 0 && $qtd > 0 && $valorUnit >= 0) {
+                $subtotal = round($valorUnit * $qtd, 2);
+            }
+
+            $produtoIdInt = $this->resolveProdutoIdForPedidoItem($pdo, $produtoIdExt, $produtoRef);
+            if ($produtoIdInt > 0 && $qtd > 0) {
+                $this->upsertPedidoItem($pdo, $pedidoId, $produtoIdInt, [
+                    'sku' => $produtoRef,
+                    'nome_produto' => $produtoNome,
+                    'ncm' => $produtoNcm,
+                    'imagem' => $produtoImg,
+                    'quantidade' => $qtd,
+                    'valor_unitario' => $valorUnit,
+                    'subtotal' => $subtotal,
+                ]);
+            }
+        }
+    }
+
+    private function resolveProdutoIdForPedidoItem(\PDO $pdo, string $produtoIdExt, string $skuOrRef): int {
+        $produtoIdExt = trim($produtoIdExt);
+        $skuOrRef = trim($skuOrRef);
+
+        if ($skuOrRef !== '') {
+            try {
+                $st = $pdo->prepare('SELECT id FROM produtos WHERE LOWER(sku) = LOWER(?) LIMIT 1');
+                $st->execute([$skuOrRef]);
+                $id = (int) ($st->fetchColumn() ?: 0);
+                if ($id > 0) return $id;
+            } catch (\Exception $e) {
+            }
+        }
+
+        if ($produtoIdExt !== '' && ctype_digit($produtoIdExt)) {
+            $wooId = (int) $produtoIdExt;
+            if ($wooId > 0) {
+                // Tentativa via produto_meta (import de produtos costuma salvar woo_id)
+                try {
+                    $st = $pdo->prepare('SELECT produto_id FROM produto_meta WHERE meta_key = :k AND meta_value = :v ORDER BY produto_id DESC LIMIT 1');
+                    $st->execute([':k' => 'woo_id', ':v' => (string) $wooId]);
+                    $id = (int) ($st->fetchColumn() ?: 0);
+                    if ($id > 0) return $id;
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private function upsertPedidoItem(\PDO $pdo, int $pedidoId, int $produtoId, array $data): void {
+        static $itensTableCache = null;
+        static $colsItensCache = null;
+
+        if (!is_string($itensTableCache) || $itensTableCache === '') {
+            $itensTableCache = 'pedido_itens';
+            try {
+                $st = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+                $st->execute(['pedido_itens']);
+                $ok = (bool) $st->fetchColumn();
+                if (!$ok) {
+                    $itensTableCache = 'pedido_items';
+                }
+            } catch (\Exception $e) {
+                $itensTableCache = 'pedido_items';
+            }
+        }
+        $table = $itensTableCache;
+
+        if (!is_array($colsItensCache)) {
+            $colsItensCache = [];
+            try {
+                $stmt = $pdo->query('DESCRIBE ' . $table);
+                $colsItensCache = $stmt ? ($stmt->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsItensCache = [];
+            }
+        }
+        $colsItens = $colsItensCache;
+        if (empty($colsItens)) return;
+
+        // Se já existir item com pedido_id+produto_id, somar quantidade/subtotal.
+        try {
+            $stSel = $pdo->prepare('SELECT id FROM ' . $table . ' WHERE pedido_id = ? AND produto_id = ? LIMIT 1');
+            $stSel->execute([(int) $pedidoId, (int) $produtoId]);
+            $exists = (int) ($stSel->fetchColumn() ?: 0);
+            if ($exists > 0) {
+                $qtdAdd = (int) ($data['quantidade'] ?? 0);
+                $subAdd = (float) ($data['subtotal'] ?? 0.0);
+                $vu = (float) ($data['valor_unitario'] ?? 0.0);
+
+                $set = [];
+                $params = [':id' => (int) $exists];
+
+                $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
+                if ($colQtd !== '' && $qtdAdd > 0) {
+                    $set[] = $colQtd . ' = ' . $colQtd . ' + :qtd_add';
+                    $params[':qtd_add'] = $qtdAdd;
+                }
+
+                if (in_array('subtotal', $colsItens, true) && $subAdd > 0) {
+                    $set[] = 'subtotal = subtotal + :sub_add';
+                    $params[':sub_add'] = $subAdd;
+                }
+
+                $colUnit = in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : '')));
+                if ($colUnit !== '' && $vu > 0) {
+                    // Só preencher se estiver vazio/0
+                    $set[] = $colUnit . " = IF(" . $colUnit . " IS NULL OR " . $colUnit . " = 0, :vu, " . $colUnit . ")";
+                    $params[':vu'] = $vu;
+                }
+
+                if (!empty($set)) {
+                    $stUp = $pdo->prepare('UPDATE ' . $table . ' SET ' . implode(', ', $set) . ' WHERE id = :id');
+                    $stUp->execute($params);
+                }
+                return;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $colPedido = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : '';
+        $colProduto = in_array('produto_id', $colsItens, true) ? 'produto_id' : '';
+        if ($colPedido === '' || $colProduto === '') return;
+
+        $cols = [$colPedido, $colProduto];
+        $vals = [':pedido_id', ':produto_id'];
+        $params = [':pedido_id' => (int) $pedidoId, ':produto_id' => (int) $produtoId];
+
+        $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
+        if ($colQtd !== '') {
+            $cols[] = $colQtd;
+            $vals[] = ':qtd';
+            $params[':qtd'] = (int) ($data['quantidade'] ?? 0);
+        }
+
+        $colNome = in_array('nome_produto', $colsItens, true) ? 'nome_produto' : (in_array('produto_nome', $colsItens, true) ? 'produto_nome' : (in_array('nome', $colsItens, true) ? 'nome' : ''));
+        if ($colNome !== '') {
+            $cols[] = $colNome;
+            $vals[] = ':nome';
+            $params[':nome'] = (string) ($data['nome_produto'] ?? '');
+        }
+
+        $colSku = in_array('sku', $colsItens, true) ? 'sku' : '';
+        if ($colSku !== '') {
+            $cols[] = $colSku;
+            $vals[] = ':sku';
+            $params[':sku'] = (string) ($data['sku'] ?? '');
+        }
+
+        $colUnit = in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('valor_unitario', $colsItens, true) ? 'valor_unitario' : (in_array('price', $colsItens, true) ? 'price' : (in_array('preco', $colsItens, true) ? 'preco' : (in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : ''))));
+        if ($colUnit !== '') {
+            $cols[] = $colUnit;
+            $vals[] = ':vu';
+            $params[':vu'] = (float) ($data['valor_unitario'] ?? 0.0);
+        }
+
+        $colSub = in_array('subtotal', $colsItens, true) ? 'subtotal' : '';
+        if ($colSub !== '') {
+            $cols[] = $colSub;
+            $vals[] = ':sub';
+            $params[':sub'] = (float) ($data['subtotal'] ?? 0.0);
+        }
+
+        // Campos extras quando existirem
+        if (in_array('ncm', $colsItens, true) && isset($data['ncm'])) {
+            $cols[] = 'ncm';
+            $vals[] = ':ncm';
+            $params[':ncm'] = (string) $data['ncm'];
+        }
+        if (in_array('imagem', $colsItens, true) && isset($data['imagem'])) {
+            $cols[] = 'imagem';
+            $vals[] = ':img';
+            $params[':img'] = (string) $data['imagem'];
+        }
+
+        try {
+            $sql = 'INSERT INTO ' . $table . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+        } catch (\Exception $e) {
+            // Não derrubar a importação do pedido por causa de um item
         }
     }
 
@@ -655,8 +925,26 @@ class AdminPedidosController extends Controller {
         $key = trim($key);
         if ($key === '') return;
         try {
-            $st = $pdo->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
-            $st->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+            $stSel = $pdo->prepare('SELECT meta_value FROM pedido_meta WHERE pedido_id = :pid AND meta_key = :k LIMIT 1');
+            $stSel->execute([':pid' => (int) $pedidoId, ':k' => $key]);
+            $curr = $stSel->fetchColumn();
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            if ($curr === false) {
+                $st = $pdo->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (:pid, :k, :v)');
+                $st->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+                return;
+            }
+
+            if ($isEmpty($curr) && trim((string) $value) !== '') {
+                $stUp = $pdo->prepare('UPDATE pedido_meta SET meta_value = :v, updated_at = NOW() WHERE pedido_id = :pid AND meta_key = :k');
+                $stUp->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+            }
         } catch (\Exception $e) {
         }
     }

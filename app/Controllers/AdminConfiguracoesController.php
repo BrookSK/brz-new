@@ -3690,6 +3690,13 @@ HTML;
             $doc = $billingCnpj;
         }
 
+        $emailFinal = '';
+        if ($email !== '') {
+            $emailFinal = $email;
+        } elseif ($login !== '') {
+            $emailFinal = $login . '@local';
+        }
+
         $usuarioId = 0;
         try {
             if ($idExt !== '' && ctype_digit($idExt)) {
@@ -3705,15 +3712,30 @@ HTML;
             $usuarioId = 0;
         }
 
+        if ($emailFinal === '') {
+            $seed = '';
+            if ($idExt !== '') {
+                $seed = 'id' . $idExt;
+            } elseif (trim((string) $doc) !== '') {
+                $seed = 'doc' . preg_replace('/[^0-9]/', '', (string) $doc);
+            } else {
+                $seed = substr(sha1($nome . '|' . $telefone), 0, 12);
+            }
+            $emailFinal = 'import_' . $seed . '@local';
+        }
+
         $dadosUsuario = [
             'nome' => $nome,
-            'email' => $email !== '' ? $email : ($login . '@local'),
+            'email' => $emailFinal,
             'telefone' => $telefone,
             'cpf' => $billingCpf,
             'documento' => $doc,
             'suite' => ($suite !== '' ? $suite : ($shippingSuite !== '' ? $shippingSuite : null)),
             'perfil' => $perfil,
         ];
+        if (trim((string) $doc) === '') {
+            $dadosUsuario['_allow_missing_documento'] = 1;
+        }
         if ($pass !== '') {
             $dadosUsuario['senha'] = $pass;
         }
