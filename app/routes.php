@@ -64,6 +64,12 @@ $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 $router->get('/pedido/detalhes/{id}/pdf', 'UsuarioController', 'pedidoPdf');
 $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirPagamento');
 
+// Tickets (Cliente)
+$router->get('/meus-tickets', 'SupportTicketsController', 'index');
+$router->get('/meu-ticket/{id}', 'SupportTicketsController', 'ver');
+$router->post('/meu-ticket/{id}/mensagem', 'SupportTicketsController', 'enviarMensagem');
+$router->get('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
+
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
 $router->post('/checkout/processar', 'CheckoutController', 'processar');
@@ -88,7 +94,7 @@ $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cro
 $router->get('/cron/clube/rendimento', 'ClubeController', 'cronRendimento');
 
 // Área Administrativa - Novos Controllers
-$router->get('/admin', function() {
+$router->get('/admin', function($request) {
     $perfil = '';
     try {
         if (session_status() === PHP_SESSION_NONE) {
@@ -229,6 +235,13 @@ $router->get('/admin', function() {
 </body>
 </html>';
 });
+
+// Tickets (Admin)
+$router->get('/admin/tickets', 'AdminTicketsController', 'index');
+$router->get('/admin/tickets/{id}', 'AdminTicketsController', 'ver');
+$router->post('/admin/tickets/{id}/mensagem', 'AdminTicketsController', 'enviarMensagem');
+$router->post('/admin/tickets/{id}/fechar', 'AdminTicketsController', 'fechar');
+$router->post('/admin/tickets/{id}/reabrir', 'AdminTicketsController', 'reabrir');
 
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');

@@ -61,6 +61,9 @@ if (empty($avatarUrl)) {
                 <a class="nav-link <?= $activePage === 'pedidos' ? 'active' : '' ?>" href="/meus-pedidos">
                     <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
                 </a>
+                <a class="nav-link <?= $activePage === 'tickets' ? 'active' : '' ?>" href="/meus-tickets">
+                    <i class="fas fa-life-ring me-2"></i> Meus Tickets
+                </a>
                 <a class="nav-link <?= $activePage === 'carrinho' ? 'active' : '' ?>" href="/carrinho">
                     <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
                 </a>
