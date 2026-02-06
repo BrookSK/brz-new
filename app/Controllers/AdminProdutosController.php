@@ -455,18 +455,85 @@ class AdminProdutosController extends Controller {
         $stockRaw = $getAny(['Stock', 'stock', 'Estoque', 'estoque']);
         $stock = (int) ($stockRaw !== '' ? $stockRaw : 0);
         $stockStatus = strtolower($getAny(['Stock Status', 'stock_status']));
-        $featuredRaw = strtolower($getAny(['Featured', 'featured', 'destaque']));
         $weight = (float) str_replace(',', '.', $getAny(['Weight (kg)', 'Weight', 'weight', 'peso']));
         $length = (float) str_replace(',', '.', $getAny(['Length (cm)', 'Length', 'length', 'comprimento']));
         $width = (float) str_replace(',', '.', $getAny(['Width (cm)', 'Width', 'width', 'largura']));
         $height = (float) str_replace(',', '.', $getAny(['Height (cm)', 'Height', 'height', 'altura']));
         $statusRaw = ($statusFromCsv !== '' ? $statusFromCsv : $publishedRaw);
 
-        $imagesRaw = $getAny(['Product Image Gallery', 'product_image_gallery', 'Images', 'images', 'Product Image', 'product_image']);
+        $imagesRaw = $getAny(['URL', 'url', 'Product Image Gallery', 'product_image_gallery', 'Images', 'images', 'Product Image', 'product_image']);
         $tagsRaw = $getAny(['Product Tags', 'product_tags', 'Tags', 'tags']);
         $catsRaw = $getAny(['Product Categories', 'product_categories', 'Categories', 'categories', 'Categoria', 'categoria']);
         $attrsRaw = $getAny(['Product Attributes', 'product_attributes', 'Attributes', 'attributes', 'Default Attributes', 'default_attributes']);
         $childrenRaw = $getAny(['Children', 'children', 'Variations', 'variations', 'Variation Description', 'variation_description']);
+
+        if (trim((string) $attrsRaw) === '') {
+            $attrs = [];
+            foreach ($row as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                if (!preg_match('/^Attribute Name\s*\((.+)\)$/i', $k, $m)) {
+                    continue;
+                }
+                $code = trim((string) ($m[1] ?? ''));
+                if ($code === '') continue;
+
+                $name = trim((string) $v);
+                if ($name === '') {
+                    $name = $code;
+                }
+
+                $value = (string) $this->assocGetAny($row, [
+                    'Attribute Value (' . $code . ')',
+                    'Attribute value (' . $code . ')',
+                ]);
+                $value = trim($value);
+
+                $inVar = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute In Variations (' . $code . ')',
+                    'Attribute in variations (' . $code . ')',
+                ])));
+                $isVisible = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute Is Visible (' . $code . ')',
+                    'Attribute is visible (' . $code . ')',
+                ])));
+                $isTax = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute Is Taxonomy (' . $code . ')',
+                    'Attribute is taxonomy (' . $code . ')',
+                ])));
+
+                $attrs[] = [
+                    'code' => $code,
+                    'name' => $name,
+                    'value' => $value,
+                    'in_variations' => ($inVar === '1' || $inVar === 'yes' || $inVar === 'true'),
+                    'visible' => ($isVisible === '1' || $isVisible === 'yes' || $isVisible === 'true'),
+                    'taxonomy' => ($isTax === '1' || $isTax === 'yes' || $isTax === 'true'),
+                ];
+            }
+
+            if (!empty($attrs)) {
+                $attrsRaw = json_encode($attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+        }
+
+        $catsRaw = trim((string) $catsRaw);
+        if ($catsRaw !== '') {
+            $parts = preg_split('/\|/', $catsRaw);
+            $normalized = [];
+            foreach (($parts ?: []) as $p) {
+                $p = trim((string) $p);
+                if ($p === '') continue;
+                $levels = preg_split('/\s*>\s*/', $p);
+                $last = trim((string) ($levels ? end($levels) : $p));
+                if ($last !== '') {
+                    $normalized[] = $last;
+                }
+            }
+            if (!empty($normalized)) {
+                $catsRaw = implode('|', $normalized);
+            }
+        }
 
         if ($sku === '' && $title === '' && $idExt === '') {
             throw new \RuntimeException('Linha vazia');
@@ -494,7 +561,7 @@ class AdminProdutosController extends Controller {
         $colSale = $pickCol(['sale_price', 'preco_promocao']);
         $colStock = $pickCol(['stock', 'estoque']);
         $colActive = $pickCol(['active', 'ativo']);
-        $colFeatured = $pickCol(['featured', 'destaque']);
+        $colFeatured = '';
         $colWeight = $pickCol(['weight', 'peso']);
         $colLength = $pickCol(['length', 'comprimento']);
         $colWidth = $pickCol(['width', 'largura']);
@@ -550,8 +617,8 @@ class AdminProdutosController extends Controller {
 
         $categoriaId = 0;
         if ($colCategoriaId !== '' && $catsRaw !== '') {
-            // Woo costuma exportar categorias como: "Cat A, Cat B" ou "Cat A > Cat B"
-            $firstCat = trim((string) preg_split('/[,|]/', (string) $catsRaw)[0]);
+            // Categorias podem vir como lista (|) e/ou hierarquia (>)
+            $firstCat = trim((string) preg_split('/[\|,]/', (string) $catsRaw)[0]);
             if ($firstCat !== '') {
                 try {
                     $st = $pdo->query('SHOW TABLES LIKE "categorias"');
@@ -611,9 +678,6 @@ class AdminProdutosController extends Controller {
         }
 
         $featured = null;
-        if ($colFeatured !== '') {
-            $featured = ($featuredRaw === '1' || $featuredRaw === 'yes' || $featuredRaw === 'true') ? 1 : 0;
-        }
 
         if ($typeRaw === 'variation' || $typeRaw === 'variacao' || $typeRaw === 'variação') {
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
@@ -810,7 +874,7 @@ class AdminProdutosController extends Controller {
                 if ($stockRaw !== '' && (!array_key_exists($colStock, $existing) || $isEmpty($curr) || $isZeroish($curr))) { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
             }
             if ($colActive !== '' && $active !== null && (!array_key_exists($colActive, $existing) || $isEmpty($existing[$colActive] ?? null))) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
-            if ($colFeatured !== '' && $featured !== null && (!array_key_exists($colFeatured, $existing) || $isEmpty($existing[$colFeatured] ?? null))) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
+            
             if ($colWeight !== '' && $weight > 0) { $curr = $existing[$colWeight] ?? null; if (!array_key_exists($colWeight, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; } }
             if ($colLength !== '' && $length > 0) { $curr = $existing[$colLength] ?? null; if (!array_key_exists($colLength, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; } }
             if ($colWidth !== '' && $width > 0) { $curr = $existing[$colWidth] ?? null; if (!array_key_exists($colWidth, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; } }
@@ -823,7 +887,10 @@ class AdminProdutosController extends Controller {
             if ($colCategoriaId !== '' && $categoriaId > 0 && (!array_key_exists($colCategoriaId, $existing) || $isEmpty($existing[$colCategoriaId] ?? null))) { $set[] = $colCategoriaId . ' = :cid'; $params[':cid'] = (int) $categoriaId; }
             if ($colCategoria !== '' && trim((string) $catsRaw) !== '' && (!array_key_exists($colCategoria, $existing) || $isEmpty($existing[$colCategoria] ?? null))) { $set[] = $colCategoria . ' = :cat'; $params[':cat'] = $catsRaw; }
             if ($colFoto !== '' && trim((string) $imagesRaw) !== '' && (!array_key_exists($colFoto, $existing) || $isEmpty($existing[$colFoto] ?? null))) {
-                $firstImg = trim((string) preg_split('/[,|]/', (string) $imagesRaw)[0]);
+                $firstImg = trim((string) preg_split('/\|/', (string) $imagesRaw)[0]);
+                if ($firstImg === '' && strpos((string) $imagesRaw, ',') !== false) {
+                    $firstImg = trim((string) preg_split('/,/', (string) $imagesRaw)[0]);
+                }
                 if ($firstImg !== '') { $set[] = $colFoto . ' = :foto'; $params[':foto'] = $firstImg; }
             }
             if ($colControlaEstoque !== '' && $manageStock !== null && (!array_key_exists($colControlaEstoque, $existing) || $isEmpty($existing[$colControlaEstoque] ?? null) || $isZeroish($existing[$colControlaEstoque] ?? null))) {
@@ -867,7 +934,7 @@ class AdminProdutosController extends Controller {
             if ($colSale !== '' && $salePrice > 0) { $colsIns[] = $colSale; $valsIns[] = ':sp'; $params[':sp'] = $salePrice; }
             if ($colStock !== '') { $colsIns[] = $colStock; $valsIns[] = ':st'; $params[':st'] = (int) $stock; }
             if ($colActive !== '' && $active !== null) { $colsIns[] = $colActive; $valsIns[] = ':ac'; $params[':ac'] = (int) $active; }
-            if ($colFeatured !== '' && $featured !== null) { $colsIns[] = $colFeatured; $valsIns[] = ':ft'; $params[':ft'] = (int) $featured; }
+            
             if ($colWeight !== '' && $weight > 0) { $colsIns[] = $colWeight; $valsIns[] = ':w'; $params[':w'] = $weight; }
             if ($colLength !== '' && $length > 0) { $colsIns[] = $colLength; $valsIns[] = ':l'; $params[':l'] = $length; }
             if ($colWidth !== '' && $width > 0) { $colsIns[] = $colWidth; $valsIns[] = ':wd'; $params[':wd'] = $width; }
@@ -880,7 +947,10 @@ class AdminProdutosController extends Controller {
             if ($colCategoriaId !== '' && $categoriaId > 0) { $colsIns[] = $colCategoriaId; $valsIns[] = ':cid'; $params[':cid'] = (int) $categoriaId; }
             if ($colCategoria !== '' && trim((string) $catsRaw) !== '') { $colsIns[] = $colCategoria; $valsIns[] = ':cat'; $params[':cat'] = $catsRaw; }
             if ($colFoto !== '' && trim((string) $imagesRaw) !== '') {
-                $firstImg = trim((string) preg_split('/[,|]/', (string) $imagesRaw)[0]);
+                $firstImg = trim((string) preg_split('/\|/', (string) $imagesRaw)[0]);
+                if ($firstImg === '' && strpos((string) $imagesRaw, ',') !== false) {
+                    $firstImg = trim((string) preg_split('/,/', (string) $imagesRaw)[0]);
+                }
                 if ($firstImg !== '') { $colsIns[] = $colFoto; $valsIns[] = ':foto'; $params[':foto'] = $firstImg; }
             }
 
