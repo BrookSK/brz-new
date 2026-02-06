@@ -36,7 +36,9 @@
                             max-width: 85%;
                             padding: 12px 14px;
                             border-radius: 12px;
-                            display: block !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: flex-start !important;
                             text-align: left !important;
                             white-space: pre-wrap;
                             word-break: break-word;
@@ -61,10 +63,12 @@
                             margin-bottom: 6px;
                             display: block !important;
                             text-align: left !important;
+                            width: 100% !important;
                         }
                         .ticket-text {
                             display: block !important;
                             text-align: left !important;
+                            width: 100% !important;
                         }
                         .ticket-attachments {
                             display: flex;
@@ -146,17 +150,17 @@
                         </div>
 
                         <form class="mt-3" method="POST" action="/meu-ticket/<?= (int) ($ticket['id'] ?? 0) ?>/mensagem" enctype="multipart/form-data">
-                            <div class="row g-2 align-items-end">
+                            <div class="row g-2">
                                 <div class="col-md-10">
                                     <label class="form-label mb-1">Mensagem</label>
                                     <textarea class="form-control" name="mensagem" rows="3" required></textarea>
-                                    <div class="mt-2">
-                                        <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
-                                        <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
-                                    </div>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-2 d-flex align-items-stretch">
                                     <button type="submit" class="btn btn-primary w-100">Enviar</button>
+                                </div>
+                                <div class="col-12">
+                                    <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
+                                    <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
                                 </div>
                             </div>
                         </form>

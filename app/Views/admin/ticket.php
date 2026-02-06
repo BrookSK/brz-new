@@ -41,7 +41,9 @@
                 max-width: 85%;
                 padding: 12px 14px;
                 border-radius: 12px;
-                display: block !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
                 text-align: left !important;
                 white-space: pre-wrap;
                 word-break: break-word;
@@ -66,10 +68,12 @@
                 margin-bottom: 6px;
                 display: block !important;
                 text-align: left !important;
+                width: 100% !important;
             }
             .ticket-text {
                 display: block !important;
                 text-align: left !important;
+                width: 100% !important;
             }
             .ticket-attachments {
                 display: flex;
@@ -164,7 +168,12 @@
         <div class="card-header bg-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="fw-semibold">Detalhes do pedido do ticket</div>
-                <div class="text-muted small">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <div class="text-muted small">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/detalhes/<?= (int) ($ticket['pedido_id'] ?? 0) ?>" target="_blank" rel="noopener">
+                        <i class="fas fa-external-link-alt me-1"></i>Abrir pedido
+                    </a>
+                </div>
             </div>
         </div>
         <div class="card-body">
@@ -180,6 +189,28 @@
 
                     <div class="small text-muted">Total</div>
                     <div><?= htmlspecialchars((string) ($pd['total'] ?? ($pd['valor_total'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
+
+                    <?php
+                        $valList = [
+                            'subtotal_produtos' => 'Subtotal produtos',
+                            'valor_frete' => 'Frete',
+                            'taxa_servico' => 'Taxa serviço',
+                            'valor_impostos' => 'Impostos',
+                            'taxa_conversao' => 'Taxa conversão',
+                            'subtotal_produtos_brl' => 'Subtotal (BRL)',
+                            'valor_frete_brl' => 'Frete (BRL)',
+                            'taxa_servico_brl' => 'Taxa serviço (BRL)',
+                            'valor_impostos_brl' => 'Impostos (BRL)',
+                            'valor_total_brl' => 'Total (BRL)',
+                            'total_brl' => 'Total (BRL)',
+                        ];
+                        foreach ($valList as $k => $label) {
+                            if (array_key_exists($k, $pd) && $pd[$k] !== null && $pd[$k] !== '' && (float) $pd[$k] != 0.0) {
+                                echo '<div class="small text-muted mt-2">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>';
+                                echo '<div>' . htmlspecialchars((string) $pd[$k], ENT_QUOTES, 'UTF-8') . '</div>';
+                            }
+                        }
+                    ?>
                 </div>
 
                 <div class="col-lg-8">
