@@ -668,7 +668,22 @@ class AdminProdutosController extends Controller {
                 throw new \RuntimeException('Variação sem vínculo do produto pai (faltando coluna Parent SKU/Parent product ID no CSV)');
             }
 
-            if (trim((string) $sku) === '') {
+            $skuTrimVar = trim((string) $sku);
+            $skuLooksInvalid = false;
+            if ($skuTrimVar === '') {
+                $skuLooksInvalid = true;
+            } elseif (preg_match('/\s/', $skuTrimVar)) {
+                // SKU com espaço costuma ser atributo/nome, não um SKU real
+                $skuLooksInvalid = true;
+            } elseif (preg_match('/^\d+$/', $skuTrimVar) && strlen($skuTrimVar) <= 3) {
+                // Valores muito curtos só numéricos (ex: "9") tendem a ser coluna deslocada
+                $skuLooksInvalid = true;
+            } elseif (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{1,}$/', $skuTrimVar)) {
+                // Regras mínimas de SKU: sem espaços e com chars comuns
+                $skuLooksInvalid = true;
+            }
+
+            if ($skuLooksInvalid) {
                 $seed = (string) $parentProdutoId
                     . '|' . trim((string) $idExt)
                     . '|' . trim((string) $title)
@@ -732,6 +747,20 @@ class AdminProdutosController extends Controller {
                 return false;
             };
 
+            $isZeroish = function($v): bool {
+                if ($v === null) return false;
+                if (is_string($v)) {
+                    $vv = trim($v);
+                    if ($vv === '') return false;
+                    if (!is_numeric($vv)) return false;
+                    return ((float) $vv) == 0.0;
+                }
+                if (is_int($v) || is_float($v)) {
+                    return ((float) $v) == 0.0;
+                }
+                return false;
+            };
+
             $set = [];
             $params = [':id' => (int) $produtoId];
 
@@ -740,16 +769,29 @@ class AdminProdutosController extends Controller {
             if ($colSlug !== '' && $slug !== '' && (!array_key_exists($colSlug, $existing) || $isEmpty($existing[$colSlug] ?? null))) { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
             if ($colDesc !== '' && $content !== '' && (!array_key_exists($colDesc, $existing) || $isEmpty($existing[$colDesc] ?? null))) { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
             if ($colShort !== '' && $excerpt !== '' && (!array_key_exists($colShort, $existing) || $isEmpty($existing[$colShort] ?? null))) { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
-            if ($colPrice !== '' && (!array_key_exists($colPrice, $existing) || $isEmpty($existing[$colPrice] ?? null))) { $set[] = $colPrice . ' = :price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
-            if ($colRegular !== '' && $regularPrice > 0 && (!array_key_exists($colRegular, $existing) || $isEmpty($existing[$colRegular] ?? null))) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
-            if ($colSale !== '' && $salePrice > 0 && (!array_key_exists($colSale, $existing) || $isEmpty($existing[$colSale] ?? null))) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
-            if ($colStock !== '' && (!array_key_exists($colStock, $existing) || $isEmpty($existing[$colStock] ?? null))) { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
+            if ($colPrice !== '') {
+                $newPrice = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0));
+                $curr = $existing[$colPrice] ?? null;
+                if ($newPrice > 0 && (!array_key_exists($colPrice, $existing) || $isEmpty($curr) || $isZeroish($curr))) { $set[] = $colPrice . ' = :price'; $params[':price'] = $newPrice; }
+            }
+            if ($colRegular !== '' && $regularPrice > 0) {
+                $curr = $existing[$colRegular] ?? null;
+                if (!array_key_exists($colRegular, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
+            }
+            if ($colSale !== '' && $salePrice > 0) {
+                $curr = $existing[$colSale] ?? null;
+                if (!array_key_exists($colSale, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
+            }
+            if ($colStock !== '') {
+                $curr = $existing[$colStock] ?? null;
+                if ($stockRaw !== '' && (!array_key_exists($colStock, $existing) || $isEmpty($curr) || $isZeroish($curr))) { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
+            }
             if ($colActive !== '' && $active !== null && (!array_key_exists($colActive, $existing) || $isEmpty($existing[$colActive] ?? null))) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
             if ($colFeatured !== '' && $featured !== null && (!array_key_exists($colFeatured, $existing) || $isEmpty($existing[$colFeatured] ?? null))) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
-            if ($colWeight !== '' && $weight > 0 && (!array_key_exists($colWeight, $existing) || $isEmpty($existing[$colWeight] ?? null))) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; }
-            if ($colLength !== '' && $length > 0 && (!array_key_exists($colLength, $existing) || $isEmpty($existing[$colLength] ?? null))) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; }
-            if ($colWidth !== '' && $width > 0 && (!array_key_exists($colWidth, $existing) || $isEmpty($existing[$colWidth] ?? null))) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; }
-            if ($colHeight !== '' && $height > 0 && (!array_key_exists($colHeight, $existing) || $isEmpty($existing[$colHeight] ?? null))) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; }
+            if ($colWeight !== '' && $weight > 0) { $curr = $existing[$colWeight] ?? null; if (!array_key_exists($colWeight, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; } }
+            if ($colLength !== '' && $length > 0) { $curr = $existing[$colLength] ?? null; if (!array_key_exists($colLength, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; } }
+            if ($colWidth !== '' && $width > 0) { $curr = $existing[$colWidth] ?? null; if (!array_key_exists($colWidth, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; } }
+            if ($colHeight !== '' && $height > 0) { $curr = $existing[$colHeight] ?? null; if (!array_key_exists($colHeight, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; } }
             if ($colStatus !== '' && $statusRaw !== '' && (!array_key_exists($colStatus, $existing) || $isEmpty($existing[$colStatus] ?? null))) { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
             if ($colImages !== '' && trim((string) $imagesRaw) !== '' && (!array_key_exists($colImages, $existing) || $isEmpty($existing[$colImages] ?? null))) { $set[] = $colImages . ' = :imgs'; $params[':imgs'] = $imagesRaw; }
             if ($colTags !== '' && trim((string) $tagsRaw) !== '' && (!array_key_exists($colTags, $existing) || $isEmpty($existing[$colTags] ?? null))) { $set[] = $colTags . ' = :tags'; $params[':tags'] = $tagsRaw; }
