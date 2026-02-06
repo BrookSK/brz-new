@@ -41,10 +41,14 @@
                 max-width: 85%;
                 padding: 12px 14px;
                 border-radius: 12px;
-                text-align: left;
+                display: block !important;
+                text-align: left !important;
                 white-space: pre-wrap;
                 word-break: break-word;
                 overflow-wrap: anywhere;
+            }
+            .ticket-bubble * {
+                text-align: left !important;
             }
             .ticket-bubble.is-admin {
                 background: #0b1f3a;
@@ -60,6 +64,12 @@
                 font-size: 12px;
                 opacity: .85;
                 margin-bottom: 6px;
+                display: block !important;
+                text-align: left !important;
+            }
+            .ticket-text {
+                display: block !important;
+                text-align: left !important;
             }
             .ticket-attachments {
                 display: flex;
@@ -105,7 +115,7 @@
                                 <?php endif; ?>
                                 • <?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                             </div>
-                            <div>
+                            <div class="ticket-text">
                                 <?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                             </div>
 
@@ -148,6 +158,69 @@
         <?php endif; ?>
     </div>
 </div>
+
+<?php if (!empty($pedidoDetalhes) && is_array($pedidoDetalhes) && !empty($ticket['pedido_id'])): ?>
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="fw-semibold">Detalhes do pedido do ticket</div>
+                <div class="text-muted small">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+            </div>
+        </div>
+        <div class="card-body">
+            <?php $pd = $pedidoDetalhes; ?>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="small text-muted">Código do pedido</div>
+                    <div class="mb-2"><?= htmlspecialchars((string) ($pd['codigo_pedido'] ?? ($pd['numero_pedido'] ?? $pd['id'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
+
+                    <div class="small text-muted">Status</div>
+                    <div class="mb-2"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+
+                    <div class="small text-muted">Total</div>
+                    <div><?= htmlspecialchars((string) ($pd['total'] ?? ($pd['valor_total'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="small text-muted">Itens</div>
+                    <?php $itens = $pd['itens'] ?? ($pd['items'] ?? []); ?>
+                    <?php if (empty($itens) || !is_array($itens)): ?>
+                        <div class="text-muted">Não foi possível carregar os itens.</div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th class="text-end">Qtd</th>
+                                        <th class="text-end">Unit</th>
+                                        <th class="text-end">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($itens as $it): ?>
+                                        <tr>
+                                            <td>
+                                                <?= htmlspecialchars((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Produto')), ENT_QUOTES, 'UTF-8') ?>
+                                                <?php if (!empty($it['variacao_descricao'])): ?>
+                                                    <div class="text-muted small"><?= htmlspecialchars((string) $it['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-end"><?= (int) ($it['quantidade'] ?? 0) ?></td>
+                                            <td class="text-end"><?= htmlspecialchars((string) ($it['preco_unitario'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-end"><?= htmlspecialchars((string) ($it['subtotal'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <div class="card border-0 shadow-sm mt-4">
     <div class="card-header bg-white">
@@ -243,61 +316,5 @@
                 </div>
             </div>
         </div>
-
-        <?php if (!empty($pedidoDetalhes) && is_array($pedidoDetalhes) && !empty($ticket['pedido_id'])): ?>
-            <div class="border rounded p-3 mt-3">
-                <div class="fw-semibold mb-2">Detalhes do pedido do ticket</div>
-                <?php $pd = $pedidoDetalhes; ?>
-
-                <div class="row g-3">
-                    <div class="col-lg-4">
-                        <div class="small text-muted">Código do pedido</div>
-                        <div class="mb-2"><?= htmlspecialchars((string) ($pd['codigo_pedido'] ?? ($pd['numero_pedido'] ?? $pd['id'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
-
-                        <div class="small text-muted">Status</div>
-                        <div class="mb-2"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-
-                        <div class="small text-muted">Total</div>
-                        <div><?= htmlspecialchars((string) ($pd['total'] ?? ($pd['valor_total'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
-                    </div>
-
-                    <div class="col-lg-8">
-                        <div class="small text-muted">Itens</div>
-                        <?php $itens = $pd['itens'] ?? ($pd['items'] ?? []); ?>
-                        <?php if (empty($itens) || !is_array($itens)): ?>
-                            <div class="text-muted">Não foi possível carregar os itens.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Produto</th>
-                                            <th class="text-end">Qtd</th>
-                                            <th class="text-end">Unit</th>
-                                            <th class="text-end">Subtotal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($itens as $it): ?>
-                                            <tr>
-                                                <td>
-                                                    <?= htmlspecialchars((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Produto')), ENT_QUOTES, 'UTF-8') ?>
-                                                    <?php if (!empty($it['variacao_descricao'])): ?>
-                                                        <div class="text-muted small"><?= htmlspecialchars((string) $it['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="text-end"><?= (int) ($it['quantidade'] ?? 0) ?></td>
-                                                <td class="text-end"><?= htmlspecialchars((string) ($it['preco_unitario'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                                <td class="text-end"><?= htmlspecialchars((string) ($it['subtotal'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
     </div>
 </div>

@@ -12,6 +12,29 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function tableExists(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+            $st->execute([$table]);
+            return (int) $st->fetchColumn() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function markAdminSeen(\PDO $pdo, int $ticketId, int $adminUid): void {
+        if ($ticketId <= 0 || $adminUid <= 0) return;
+        if (!$this->tableExists($pdo, 'support_ticket_views')) return;
+        try {
+            $pdo->prepare(
+                'INSERT INTO support_ticket_views (ticket_id, viewer_type, viewer_user_id, last_seen_at, updated_at) '
+                . 'VALUES (?, ?, ?, NOW(), NOW()) '
+                . 'ON DUPLICATE KEY UPDATE last_seen_at = NOW(), updated_at = NOW()'
+            )->execute([(int) $ticketId, 'admin', (int) $adminUid]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function pickColumn(array $cols, array $candidates): ?string {
         foreach ($candidates as $c) {
             if (in_array($c, $cols, true)) {
@@ -92,22 +115,45 @@ class AdminTicketsController extends Controller {
             $status = 'open';
         }
 
-        $where = '';
+        $dateFrom = trim((string) ($request->getParam('date_from') ?? ''));
+        $dateTo = trim((string) ($request->getParam('date_to') ?? ''));
+
+        $whereParts = [];
         $params = [];
         if ($status !== 'all') {
-            $where = ' WHERE t.status = ? ';
+            $whereParts[] = 't.status = ?';
             $params[] = $status;
+        }
+        if ($dateFrom !== '') {
+            $whereParts[] = 'DATE(COALESCE(t.updated_at, t.created_at)) >= ?';
+            $params[] = $dateFrom;
+        }
+        if ($dateTo !== '') {
+            $whereParts[] = 'DATE(COALESCE(t.updated_at, t.created_at)) <= ?';
+            $params[] = $dateTo;
+        }
+        $where = '';
+        if (!empty($whereParts)) {
+            $where = ' WHERE ' . implode(' AND ', $whereParts) . ' ';
         }
 
         $sql = 'SELECT t.*, u.nome AS usuario_nome, u.email AS usuario_email '
             . 'FROM support_tickets t '
             . 'INNER JOIN usuarios u ON u.id = t.usuario_id '
             . $where
-            . 'ORDER BY t.updated_at DESC, t.created_at DESC';
+            . 'ORDER BY COALESCE(t.updated_at, t.created_at) ASC, t.created_at ASC';
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $tickets = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Ao abrir a aba/lista, some a bolha de notificação (marca como visto para o admin)
+        $adminUid = $this->getLoggedUserId();
+        if ($adminUid > 0) {
+            foreach ($tickets as $t) {
+                $this->markAdminSeen($pdo, (int) ($t['id'] ?? 0), $adminUid);
+            }
+        }
 
         $sidebarActive = 'tickets';
         ob_start();
@@ -124,6 +170,11 @@ class AdminTicketsController extends Controller {
 
         $id = (int) ($id ?? $request->getParam('id'));
         $pdo = $this->getPdo();
+
+        $adminUid = $this->getLoggedUserId();
+        if ($adminUid > 0 && $id > 0) {
+            $this->markAdminSeen($pdo, $id, $adminUid);
+        }
 
         $st = $pdo->prepare('SELECT t.*, u.nome AS usuario_nome, u.email AS usuario_email FROM support_tickets t INNER JOIN usuarios u ON u.id = t.usuario_id WHERE t.id = ? LIMIT 1');
         $st->execute([$id]);

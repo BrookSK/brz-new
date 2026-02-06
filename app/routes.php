@@ -70,6 +70,7 @@ $router->get('/meu-ticket/{id}', 'SupportTicketsController', 'ver');
 $router->post('/meu-ticket/{id}/mensagem', 'SupportTicketsController', 'enviarMensagem');
 $router->post('/meu-ticket/{id}/fechar', 'SupportTicketsController', 'fechar');
 $router->get('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
+$router->post('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
 
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');

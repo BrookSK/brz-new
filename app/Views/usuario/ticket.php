@@ -36,10 +36,14 @@
                             max-width: 85%;
                             padding: 12px 14px;
                             border-radius: 12px;
-                            text-align: left;
+                            display: block !important;
+                            text-align: left !important;
                             white-space: pre-wrap;
                             word-break: break-word;
                             overflow-wrap: anywhere;
+                        }
+                        .ticket-bubble * {
+                            text-align: left !important;
                         }
                         .ticket-bubble.is-me {
                             background: #0b1f3a;
@@ -55,6 +59,12 @@
                             font-size: 12px;
                             opacity: .85;
                             margin-bottom: 6px;
+                            display: block !important;
+                            text-align: left !important;
+                        }
+                        .ticket-text {
+                            display: block !important;
+                            text-align: left !important;
                         }
                         .ticket-attachments {
                             display: flex;
@@ -104,7 +114,7 @@
                                             • <?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                                         </div>
 
-                                        <div>
+                                        <div class="ticket-text">
                                             <?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                                         </div>
 

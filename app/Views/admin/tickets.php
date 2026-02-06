@@ -3,6 +3,8 @@ $status = strtolower(trim((string) ($_GET['status'] ?? 'open')));
 if (!in_array($status, ['open', 'closed', 'all'], true)) {
     $status = 'open';
 }
+$dateFrom = trim((string) ($_GET['date_from'] ?? ''));
+$dateTo = trim((string) ($_GET['date_to'] ?? ''));
 ?>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
@@ -13,6 +15,33 @@ if (!in_array($status, ['open', 'closed', 'all'], true)) {
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets?status=open">Abertos</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets?status=closed">Fechados</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets?status=all">Todos</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <form class="row g-2 align-items-end" method="GET" action="/admin/tickets">
+            <div class="col-md-3">
+                <label class="form-label mb-1">Status</label>
+                <select class="form-select" name="status">
+                    <option value="open" <?= $status === 'open' ? 'selected' : '' ?>>Abertos</option>
+                    <option value="closed" <?= $status === 'closed' ? 'selected' : '' ?>>Fechados</option>
+                    <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todos</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1">De</label>
+                <input type="date" class="form-control" name="date_from" value="<?= htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1">Até</label>
+                <input type="date" class="form-control" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn btn-primary w-100" type="submit"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                <a class="btn btn-outline-secondary w-100" href="/admin/tickets"><i class="fas fa-eraser me-1"></i>Limpar</a>
+            </div>
+        </form>
     </div>
 </div>
 

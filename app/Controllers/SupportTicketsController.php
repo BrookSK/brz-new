@@ -11,6 +11,29 @@ class SupportTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function tableExists(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+            $st->execute([$table]);
+            return (int) $st->fetchColumn() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function markClienteSeen(\PDO $pdo, int $ticketId, int $uid): void {
+        if ($ticketId <= 0 || $uid <= 0) return;
+        if (!$this->tableExists($pdo, 'support_ticket_views')) return;
+        try {
+            $pdo->prepare(
+                'INSERT INTO support_ticket_views (ticket_id, viewer_type, viewer_user_id, last_seen_at, updated_at) '
+                . 'VALUES (?, ?, ?, NOW(), NOW()) '
+                . 'ON DUPLICATE KEY UPDATE last_seen_at = NOW(), updated_at = NOW()'
+            )->execute([(int) $ticketId, 'cliente', (int) $uid]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getUploadsDirTickets(): string {
         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
         $candidates = [
@@ -116,9 +139,15 @@ class SupportTicketsController extends Controller {
         $pdo = $this->getPdo();
         $usuario = $this->getUsuarioLogadoRow($pdo, $uid);
 
-        $st = $pdo->prepare('SELECT * FROM support_tickets WHERE usuario_id = ? ORDER BY updated_at DESC, created_at DESC');
+        $sql = 'SELECT * FROM support_tickets WHERE usuario_id = ? ORDER BY COALESCE(updated_at, created_at) ASC, created_at ASC';
+        $st = $pdo->prepare($sql);
         $st->execute([$uid]);
         $tickets = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Ao abrir a aba/lista, some a bolha de notificação (marca como visto para o cliente)
+        foreach ($tickets as $t) {
+            $this->markClienteSeen($pdo, (int) ($t['id'] ?? 0), $uid);
+        }
 
         $this->view('usuario/meus-tickets', [
             'usuario' => $usuario,
@@ -289,6 +318,10 @@ class SupportTicketsController extends Controller {
         $id = (int) ($id ?? $request->getParam('id'));
         $pdo = $this->getPdo();
         $usuario = $this->getUsuarioLogadoRow($pdo, $uid);
+
+        if ($id > 0) {
+            $this->markClienteSeen($pdo, $id, $uid);
+        }
 
         $st = $pdo->prepare('SELECT * FROM support_tickets WHERE id = ? AND usuario_id = ? LIMIT 1');
         $st->execute([$id, $uid]);
