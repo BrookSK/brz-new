@@ -467,6 +467,34 @@ class AdminProdutosController extends Controller {
         $attrsRaw = $getAny(['Product Attributes', 'product_attributes', 'Attributes', 'attributes', 'Default Attributes', 'default_attributes']);
         $childrenRaw = $getAny(['Children', 'children', 'Variations', 'variations', 'Variation Description', 'variation_description']);
 
+        $toJsonList = function($raw): string {
+            $raw = trim((string) $raw);
+            if ($raw === '') return '';
+            if ($raw[0] === '[' || $raw[0] === '{') {
+                return $raw;
+            }
+            $parts = preg_split('/[\|,]/', $raw);
+            $items = [];
+            foreach (($parts ?: []) as $p) {
+                $p = trim((string) $p);
+                if ($p === '') continue;
+                $items[] = $p;
+            }
+            if (empty($items)) return '';
+            $items = array_values(array_unique($items));
+            return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        };
+
+        if (trim((string) $tagsRaw) !== '') {
+            $tagsRaw = $toJsonList($tagsRaw);
+        }
+        if (trim((string) $imagesRaw) !== '') {
+            $imagesRaw = $toJsonList($imagesRaw);
+        }
+        if (trim((string) $childrenRaw) !== '') {
+            $childrenRaw = $toJsonList($childrenRaw);
+        }
+
         if (trim((string) $attrsRaw) === '') {
             $attrs = [];
             foreach ($row as $k => $v) {
