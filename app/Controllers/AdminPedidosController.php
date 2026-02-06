@@ -498,42 +498,57 @@ class AdminPedidosController extends Controller {
         }
 
         if ($pedidoId > 0) {
+            $existing = [];
+            try {
+                $stCur = $pdo->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
+                $stCur->execute([':id' => (int) $pedidoId]);
+                $existing = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $existing = [];
+            }
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
             $set = [];
             $params = [];
 
-            if ($colUsuario !== '') {
+            if ($colUsuario !== '' && (!array_key_exists($colUsuario, $existing) || $isEmpty($existing[$colUsuario] ?? null))) {
                 $set[] = $colUsuario . ' = :uid';
                 $params[':uid'] = (int) $usuarioId;
             }
-            if ($colTotal !== '') {
+            if ($colTotal !== '' && (!array_key_exists($colTotal, $existing) || $isEmpty($existing[$colTotal] ?? null))) {
                 $set[] = $colTotal . ' = :tot';
                 $params[':tot'] = $total;
             }
-            if ($colMoeda !== '') {
+            if ($colMoeda !== '' && (!array_key_exists($colMoeda, $existing) || $isEmpty($existing[$colMoeda] ?? null))) {
                 $set[] = $colMoeda . ' = :mo';
                 $params[':mo'] = $moeda;
             }
-            if ($colStatus !== '') {
+            if ($colStatus !== '' && (!array_key_exists($colStatus, $existing) || $isEmpty($existing[$colStatus] ?? null))) {
                 $set[] = $colStatus . ' = :st';
                 $params[':st'] = $status;
             }
-            if ($colPaymentGateway !== '' && $paymentMethod !== '') {
+            if ($colPaymentGateway !== '' && $paymentMethod !== '' && (!array_key_exists($colPaymentGateway, $existing) || $isEmpty($existing[$colPaymentGateway] ?? null))) {
                 $set[] = $colPaymentGateway . ' = :pg';
                 $params[':pg'] = $paymentMethod;
             }
-            if ($colPaymentId !== '' && $paymentId !== '') {
+            if ($colPaymentId !== '' && $paymentId !== '' && (!array_key_exists($colPaymentId, $existing) || $isEmpty($existing[$colPaymentId] ?? null))) {
                 $set[] = $colPaymentId . ' = :pid';
                 $params[':pid'] = $paymentId;
             }
-            if ($colPaymentStatus !== '') {
+            if ($colPaymentStatus !== '' && (!array_key_exists($colPaymentStatus, $existing) || $isEmpty($existing[$colPaymentStatus] ?? null))) {
                 $set[] = $colPaymentStatus . ' = :pst';
                 $params[':pst'] = $status;
             }
-            if ($colTracking !== '' && $tracking !== '') {
+            if ($colTracking !== '' && $tracking !== '' && (!array_key_exists($colTracking, $existing) || $isEmpty($existing[$colTracking] ?? null))) {
                 $set[] = $colTracking . ' = :trk';
                 $params[':trk'] = $tracking;
             }
-            if ($colCodigoPedido !== '' && $codigoPedido !== '') {
+            if ($colCodigoPedido !== '' && $codigoPedido !== '' && (!array_key_exists($colCodigoPedido, $existing) || $isEmpty($existing[$colCodigoPedido] ?? null))) {
                 $set[] = $colCodigoPedido . ' = :cod';
                 $params[':cod'] = $codigoPedido;
             }
@@ -655,8 +670,26 @@ class AdminPedidosController extends Controller {
         $key = trim($key);
         if ($key === '') return;
         try {
-            $st = $pdo->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
-            $st->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+            $stSel = $pdo->prepare('SELECT meta_value FROM pedido_meta WHERE pedido_id = :pid AND meta_key = :k LIMIT 1');
+            $stSel->execute([':pid' => (int) $pedidoId, ':k' => $key]);
+            $curr = $stSel->fetchColumn();
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            if ($curr === false) {
+                $st = $pdo->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (:pid, :k, :v)');
+                $st->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+                return;
+            }
+
+            if ($isEmpty($curr) && trim((string) $value) !== '') {
+                $stUp = $pdo->prepare('UPDATE pedido_meta SET meta_value = :v, updated_at = NOW() WHERE pedido_id = :pid AND meta_key = :k');
+                $stUp->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+            }
         } catch (\Exception $e) {
         }
     }

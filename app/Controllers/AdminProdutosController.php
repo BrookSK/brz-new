@@ -482,28 +482,43 @@ class AdminProdutosController extends Controller {
         }
 
         if ($produtoId > 0) {
+            $existing = [];
+            try {
+                $stCur = $pdo->prepare('SELECT * FROM produtos WHERE id = :id LIMIT 1');
+                $stCur->execute([':id' => (int) $produtoId]);
+                $existing = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $existing = [];
+            }
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
             $set = [];
             $params = [':id' => (int) $produtoId];
 
-            if ($colName !== '' && $title !== '') { $set[] = $colName . ' = :name'; $params[':name'] = $title; }
-            if ($colSku !== '' && $sku !== '') { $set[] = $colSku . ' = :sku'; $params[':sku'] = $sku; }
-            if ($colSlug !== '' && $slug !== '') { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
-            if ($colDesc !== '' && $content !== '') { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
-            if ($colShort !== '' && $excerpt !== '') { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
-            if ($colPrice !== '') { $set[] = $colPrice . ' = :price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
-            if ($colRegular !== '' && $regularPrice > 0) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
-            if ($colSale !== '' && $salePrice > 0) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
-            if ($colStock !== '') { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
-            if ($colActive !== '' && $active !== null) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
-            if ($colFeatured !== '' && $featured !== null) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
-            if ($colWeight !== '' && $weight > 0) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; }
-            if ($colLength !== '' && $length > 0) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; }
-            if ($colWidth !== '' && $width > 0) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; }
-            if ($colHeight !== '' && $height > 0) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; }
-            if ($colStatus !== '' && $statusRaw !== '') { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
+            if ($colName !== '' && $title !== '' && (!array_key_exists($colName, $existing) || $isEmpty($existing[$colName] ?? null))) { $set[] = $colName . ' = :name'; $params[':name'] = $title; }
+            if ($colSku !== '' && $sku !== '' && (!array_key_exists($colSku, $existing) || $isEmpty($existing[$colSku] ?? null))) { $set[] = $colSku . ' = :sku'; $params[':sku'] = $sku; }
+            if ($colSlug !== '' && $slug !== '' && (!array_key_exists($colSlug, $existing) || $isEmpty($existing[$colSlug] ?? null))) { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
+            if ($colDesc !== '' && $content !== '' && (!array_key_exists($colDesc, $existing) || $isEmpty($existing[$colDesc] ?? null))) { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
+            if ($colShort !== '' && $excerpt !== '' && (!array_key_exists($colShort, $existing) || $isEmpty($existing[$colShort] ?? null))) { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
+            if ($colPrice !== '' && (!array_key_exists($colPrice, $existing) || $isEmpty($existing[$colPrice] ?? null))) { $set[] = $colPrice . ' = :price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
+            if ($colRegular !== '' && $regularPrice > 0 && (!array_key_exists($colRegular, $existing) || $isEmpty($existing[$colRegular] ?? null))) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
+            if ($colSale !== '' && $salePrice > 0 && (!array_key_exists($colSale, $existing) || $isEmpty($existing[$colSale] ?? null))) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
+            if ($colStock !== '' && (!array_key_exists($colStock, $existing) || $isEmpty($existing[$colStock] ?? null))) { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
+            if ($colActive !== '' && $active !== null && (!array_key_exists($colActive, $existing) || $isEmpty($existing[$colActive] ?? null))) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
+            if ($colFeatured !== '' && $featured !== null && (!array_key_exists($colFeatured, $existing) || $isEmpty($existing[$colFeatured] ?? null))) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
+            if ($colWeight !== '' && $weight > 0 && (!array_key_exists($colWeight, $existing) || $isEmpty($existing[$colWeight] ?? null))) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; }
+            if ($colLength !== '' && $length > 0 && (!array_key_exists($colLength, $existing) || $isEmpty($existing[$colLength] ?? null))) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; }
+            if ($colWidth !== '' && $width > 0 && (!array_key_exists($colWidth, $existing) || $isEmpty($existing[$colWidth] ?? null))) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; }
+            if ($colHeight !== '' && $height > 0 && (!array_key_exists($colHeight, $existing) || $isEmpty($existing[$colHeight] ?? null))) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; }
+            if ($colStatus !== '' && $statusRaw !== '' && (!array_key_exists($colStatus, $existing) || $isEmpty($existing[$colStatus] ?? null))) { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
             if ($colType !== '') {
                 $type = strtolower(trim($get('Product Type')));
-                if ($type !== '') { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
+                if ($type !== '' && (!array_key_exists($colType, $existing) || $isEmpty($existing[$colType] ?? null))) { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
             }
 
             if (in_array('updated_at', $cols, true)) {
@@ -588,8 +603,26 @@ class AdminProdutosController extends Controller {
         $key = trim($key);
         if ($key === '') return;
         try {
-            $st = $pdo->prepare('INSERT INTO produto_meta (produto_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
-            $st->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+            $stSel = $pdo->prepare('SELECT meta_value FROM produto_meta WHERE produto_id = :pid AND meta_key = :k LIMIT 1');
+            $stSel->execute([':pid' => (int) $produtoId, ':k' => $key]);
+            $curr = $stSel->fetchColumn();
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            if ($curr === false) {
+                $st = $pdo->prepare('INSERT INTO produto_meta (produto_id, meta_key, meta_value) VALUES (:pid, :k, :v)');
+                $st->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+                return;
+            }
+
+            if ($isEmpty($curr) && trim((string) $value) !== '') {
+                $stUp = $pdo->prepare('UPDATE produto_meta SET meta_value = :v, updated_at = NOW() WHERE produto_id = :pid AND meta_key = :k');
+                $stUp->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+            }
         } catch (\Exception $e) {
         }
     }
