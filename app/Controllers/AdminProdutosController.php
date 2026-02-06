@@ -470,6 +470,13 @@ class AdminProdutosController extends Controller {
         $parentSku = trim((string) $getAny(['Parent SKU', 'parent_sku', 'Parent', 'parent', 'Parent product SKU', 'parent_product_sku']));
         $parentIdExt = trim((string) $getAny(['Parent product ID', 'parent_product_id', 'Parent ID', 'parent_id', 'Parent Product ID']));
 
+        if ($parentSku === '0') {
+            $parentSku = '';
+        }
+        if ($parentIdExt !== '' && ctype_digit($parentIdExt) && (int) $parentIdExt === 0) {
+            $parentIdExt = '';
+        }
+
         $toJsonList = function($raw): string {
             $raw = trim((string) $raw);
             if ($raw === '') return '';
