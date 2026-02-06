@@ -21,10 +21,14 @@
                             background: #fff;
                             max-height: 460px;
                             overflow: auto;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 12px;
                         }
                         .ticket-msg-row {
                             display: flex;
                             margin-bottom: 12px;
+                            width: 100%;
                         }
                         .ticket-msg-row.is-me {
                             justify-content: flex-end;
@@ -33,7 +37,8 @@
                             justify-content: flex-start;
                         }
                         .ticket-bubble {
-                            max-width: 85%;
+                            width: fit-content;
+                            max-width: min(85%, 760px);
                             padding: 12px 14px;
                             border-radius: 12px;
                             display: flex !important;
@@ -64,6 +69,9 @@
                             display: block !important;
                             text-align: left !important;
                             width: 100% !important;
+                            display: flex !important;
+                            align-items: center !important;
+                            gap: 8px !important;
                         }
                         .ticket-text {
                             display: block !important;
@@ -71,10 +79,11 @@
                             width: 100% !important;
                         }
                         .ticket-attachments {
-                            display: flex;
-                            flex-wrap: wrap;
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                             gap: 10px;
                             margin-top: 10px;
+                            width: 100%;
                         }
                         .ticket-attachments a {
                             display: inline-block;
@@ -82,12 +91,13 @@
                             border-radius: 10px;
                             overflow: hidden;
                             background: #fff;
+                            width: 100%;
                         }
                         .ticket-attachments img {
-                            width: 140px;
                             height: 100px;
                             object-fit: cover;
                             display: block;
+                            width: 100%;
                         }
                     </style>
 
@@ -115,7 +125,8 @@
                                             <?php else: ?>
                                                 <?= htmlspecialchars((string) (($m['autor_nome'] ?? '') !== '' ? $m['autor_nome'] : 'Admin/Suporte'), ENT_QUOTES, 'UTF-8') ?>
                                             <?php endif; ?>
-                                            • <?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                            <span class="opacity-75">•</span>
+                                            <span class="opacity-75"><?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                                         </div>
 
                                         <div class="ticket-text">

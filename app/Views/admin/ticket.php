@@ -26,10 +26,14 @@
                 background: #fff;
                 max-height: 520px;
                 overflow: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
             }
             .ticket-msg-row {
                 display: flex;
                 margin-bottom: 12px;
+                width: 100%;
             }
             .ticket-msg-row.is-admin {
                 justify-content: flex-end;
@@ -38,7 +42,8 @@
                 justify-content: flex-start;
             }
             .ticket-bubble {
-                max-width: 85%;
+                width: fit-content;
+                max-width: min(85%, 760px);
                 padding: 12px 14px;
                 border-radius: 12px;
                 display: flex !important;
@@ -69,6 +74,9 @@
                 display: block !important;
                 text-align: left !important;
                 width: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
             }
             .ticket-text {
                 display: block !important;
@@ -76,10 +84,11 @@
                 width: 100% !important;
             }
             .ticket-attachments {
-                display: flex;
-                flex-wrap: wrap;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: 10px;
                 margin-top: 10px;
+                width: 100%;
             }
             .ticket-attachments a {
                 display: inline-block;
@@ -87,12 +96,13 @@
                 border-radius: 10px;
                 overflow: hidden;
                 background: #fff;
+                width: 100%;
             }
             .ticket-attachments img {
-                width: 140px;
                 height: 100px;
                 object-fit: cover;
                 display: block;
+                width: 100%;
             }
         </style>
 
@@ -117,7 +127,8 @@
                                 <?php else: ?>
                                     Cliente
                                 <?php endif; ?>
-                                • <?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                <span class="opacity-75">•</span>
+                                <span class="opacity-75"><?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                             </div>
                             <div class="ticket-text">
                                 <?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
@@ -143,17 +154,17 @@
 
         <?php if ($st === 'open'): ?>
             <form class="mt-3" method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/mensagem" enctype="multipart/form-data">
-                <div class="row g-2 align-items-end">
+                <div class="row g-2">
                     <div class="col-md-10">
                         <label class="form-label mb-1">Mensagem</label>
                         <textarea class="form-control" name="mensagem" rows="3" required></textarea>
-                        <div class="mt-2">
-                            <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
-                            <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
-                        </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-2 d-flex align-items-stretch">
                         <button type="submit" class="btn btn-primary w-100">Enviar</button>
+                    </div>
+                    <div class="col-12">
+                        <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
+                        <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
                     </div>
                 </div>
             </form>
@@ -184,6 +195,22 @@
                     <div class="small text-muted">Código do pedido</div>
                     <div class="mb-2"><?= htmlspecialchars((string) ($pd['codigo_pedido'] ?? ($pd['numero_pedido'] ?? $pd['id'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
 
+                    <?php if (!empty($pd['moeda'])): ?>
+                        <div class="small text-muted">Moeda processada</div>
+                        <div class="mb-2"><?= htmlspecialchars((string) $pd['moeda'], ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php endif; ?>
+
+                    <?php
+                        $moedaOrig = '';
+                        foreach (['moeda_original', 'currency_original', 'original_currency'] as $k) {
+                            if (!empty($pd[$k])) { $moedaOrig = (string) $pd[$k]; break; }
+                        }
+                    ?>
+                    <?php if ($moedaOrig !== ''): ?>
+                        <div class="small text-muted">Moeda original</div>
+                        <div class="mb-2"><?= htmlspecialchars($moedaOrig, ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php endif; ?>
+
                     <div class="small text-muted">Status</div>
                     <div class="mb-2"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
 
@@ -203,9 +230,17 @@
                             'valor_impostos_brl' => 'Impostos (BRL)',
                             'valor_total_brl' => 'Total (BRL)',
                             'total_brl' => 'Total (BRL)',
+                            'frete' => 'Frete',
+                            'impostos' => 'Impostos',
+                            'servicos' => 'Taxa serviço',
+                            'subtotal' => 'Subtotal',
+                            'total' => 'Total',
                         ];
+                        $shown = [];
                         foreach ($valList as $k => $label) {
+                            if (isset($shown[$k])) continue;
                             if (array_key_exists($k, $pd) && $pd[$k] !== null && $pd[$k] !== '' && (float) $pd[$k] != 0.0) {
+                                $shown[$k] = true;
                                 echo '<div class="small text-muted mt-2">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>';
                                 echo '<div>' . htmlspecialchars((string) $pd[$k], ENT_QUOTES, 'UTF-8') . '</div>';
                             }
@@ -249,6 +284,38 @@
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php
+    $perfil = '';
+    try {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+    } catch (\Exception $e) {
+        $perfil = '';
+    }
+?>
+
+<?php if (in_array($perfil, ['admin', 'suporte'], true)): ?>
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <div class="fw-semibold">Anotações internas (somente admin)</div>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/notas-internas">
+                <div class="mb-2">
+                    <textarea class="form-control" name="internal_notes" rows="4" placeholder="Detalhes internos sobre o pedido / tratativa / observações..." style="white-space: pre-wrap;" ><?= htmlspecialchars((string) ($ticket['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-save me-1"></i>Salvar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 <?php endif; ?>

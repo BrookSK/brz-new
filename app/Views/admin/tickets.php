@@ -56,6 +56,7 @@ $dateTo = trim((string) ($_GET['date_to'] ?? ''));
                         <tr>
                             <th>#</th>
                             <th>Cliente</th>
+                            <th>Motivo</th>
                             <th>Assunto</th>
                             <th>Status</th>
                             <th>Atualizado</th>
@@ -73,6 +74,9 @@ $dateTo = trim((string) ($_GET['date_to'] ?? ''));
                                 <td>
                                     <div class="fw-semibold"><?= htmlspecialchars((string) ($t['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                     <div class="text-muted small"><?= htmlspecialchars((string) ($t['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                </td>
+                                <td>
+                                    <div><?= htmlspecialchars((string) ($t['motivo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 </td>
                                 <td><?= htmlspecialchars((string) ($t['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><span class="badge <?= $badge ?>"><?= $st === 'open' ? 'Aberto' : 'Fechado' ?></span></td>

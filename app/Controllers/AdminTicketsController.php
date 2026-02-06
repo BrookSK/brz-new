@@ -12,6 +12,16 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function columnExists(\PDO $pdo, string $table, string $column): bool {
+        try {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?');
+            $st->execute([$table, $column]);
+            return (int) $st->fetchColumn() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     private function tableExists(\PDO $pdo, string $table): bool {
         try {
             $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
@@ -417,6 +427,34 @@ class AdminTicketsController extends Controller {
         $id = (int) ($id ?? $request->getParam('id'));
         $pdo = $this->getPdo();
         $pdo->prepare("UPDATE support_tickets SET status = 'open', closed_at = NULL, updated_at = NOW() WHERE id = ?")->execute([$id]);
+        header('Location: /admin/tickets/' . $id);
+        exit;
+    }
+
+    public function salvarNotasInternas(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/tickets');
+            exit;
+        }
+
+        $notas = trim((string) ($request->getParam('internal_notes') ?? $request->getParam('notas') ?? ''));
+        $pdo = $this->getPdo();
+
+        if (!$this->columnExists($pdo, 'support_tickets', 'internal_notes')) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        try {
+            $st = $pdo->prepare('UPDATE support_tickets SET internal_notes = ?, updated_at = NOW() WHERE id = ? LIMIT 1');
+            $st->execute([$notas, $id]);
+        } catch (\Exception $e) {
+        }
+
         header('Location: /admin/tickets/' . $id);
         exit;
     }

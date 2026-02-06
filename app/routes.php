@@ -244,6 +244,7 @@ $router->get('/admin/tickets/{id}', 'AdminTicketsController', 'ver');
 $router->post('/admin/tickets/{id}/mensagem', 'AdminTicketsController', 'enviarMensagem');
 $router->post('/admin/tickets/{id}/fechar', 'AdminTicketsController', 'fechar');
 $router->post('/admin/tickets/{id}/reabrir', 'AdminTicketsController', 'reabrir');
+$router->post('/admin/tickets/{id}/notas-internas', 'AdminTicketsController', 'salvarNotasInternas');
 
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
