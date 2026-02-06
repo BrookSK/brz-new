@@ -260,6 +260,8 @@ class AdminPedidosController extends Controller {
         $okNow = 0;
         $failNow = 0;
 
+        $this->ensureImportRowStatusTable($pdo);
+
         while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
             if (!is_array($row) || count($row) < 2) {
                 continue;
@@ -277,10 +279,22 @@ class AdminPedidosController extends Controller {
                 }
             }
 
+            $rowKey = $this->getPedidoImportRowKey($assoc);
+            if ($rowKey !== '' && $this->isImportRowOk($pdo, 'pedidos', $rowKey)) {
+                $okNow++;
+                $processedNow++;
+                continue;
+            }
             try {
                 $this->processPedidoAssocRow($pdo, $assoc);
+                if ($rowKey !== '') {
+                    $this->markImportRowOk($pdo, 'pedidos', $rowKey);
+                }
                 $okNow++;
             } catch (\Exception $e) {
+                if ($rowKey !== '') {
+                    $this->markImportRowFail($pdo, 'pedidos', $rowKey, $e->getMessage());
+                }
                 $failNow++;
             }
             $processedNow++;
@@ -288,6 +302,76 @@ class AdminPedidosController extends Controller {
 
         fclose($fh);
         return ['processedNow' => $processedNow, 'okNow' => $okNow, 'failNow' => $failNow];
+    }
+
+    private function getPedidoImportRowKey(array $assoc): string {
+        $postId = trim((string) ($assoc['post_id'] ?? ''));
+        $orderKey = trim((string) ($assoc['_order_key'] ?? ''));
+        $oldOrderId = trim((string) ($assoc['_old_order_id'] ?? ''));
+
+        if ($postId !== '') return 'post_id:' . $postId;
+        if ($orderKey !== '') return 'order_key:' . $orderKey;
+        if ($oldOrderId !== '') return 'old_order_id:' . $oldOrderId;
+        return '';
+    }
+
+    private function ensureImportRowStatusTable(\PDO $pdo): void {
+        try {
+            $st = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['import_row_status']);
+            $ok = (bool) $st->fetchColumn();
+            if ($ok) return;
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS import_row_status (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                import_type VARCHAR(40) NOT NULL,
+                row_key VARCHAR(191) NOT NULL,
+                status VARCHAR(10) NOT NULL,
+                attempts INT NOT NULL DEFAULT 0,
+                last_error TEXT NULL,
+                ok_at DATETIME NULL,
+                fail_at DATETIME NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_import_row (import_type, row_key),
+                KEY idx_import_type_status (import_type, status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function isImportRowOk(\PDO $pdo, string $type, string $rowKey): bool {
+        try {
+            $st = $pdo->prepare('SELECT status FROM import_row_status WHERE import_type = :t AND row_key = :k LIMIT 1');
+            $st->execute([':t' => $type, ':k' => $rowKey]);
+            $s = strtolower((string) ($st->fetchColumn() ?: ''));
+            return $s === 'ok';
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function markImportRowOk(\PDO $pdo, string $type, string $rowKey): void {
+        try {
+            $st = $pdo->prepare('INSERT INTO import_row_status (import_type, row_key, status, attempts, ok_at) VALUES (:t,:k,\'ok\',1,NOW()) ON DUPLICATE KEY UPDATE status=\'ok\', attempts=attempts+1, last_error=NULL, ok_at=NOW(), updated_at=NOW()');
+            $st->execute([':t' => $type, ':k' => $rowKey]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function markImportRowFail(\PDO $pdo, string $type, string $rowKey, string $error): void {
+        $error = trim((string) $error);
+        if (strlen($error) > 2000) {
+            $error = substr($error, 0, 2000);
+        }
+        try {
+            $st = $pdo->prepare('INSERT INTO import_row_status (import_type, row_key, status, attempts, last_error, fail_at) VALUES (:t,:k,\'fail\',1,:e,NOW()) ON DUPLICATE KEY UPDATE status=\'fail\', attempts=attempts+1, last_error=:e, fail_at=NOW(), updated_at=NOW()');
+            $st->execute([':t' => $type, ':k' => $rowKey, ':e' => $error]);
+        } catch (\Exception $e) {
+        }
     }
 
     private function processPedidoAssocRow(\PDO $pdo, array $row): void {
