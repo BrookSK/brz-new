@@ -437,27 +437,30 @@ class AdminProdutosController extends Controller {
         };
 
         $idExt = $getAny(['ID', 'Id', 'id', 'product_id', 'produto_id']);
-        $sku = $getAny(['Sku', 'SKU', 'sku']);
-        $title = $getAny(['Title', 'title', 'name', 'nome', 'product_name']);
-        $content = $getAny(['Content', 'content', 'Description', 'description', 'descricao']);
-        $excerpt = $getAny(['Excerpt', 'excerpt', 'Short description', 'short_description', 'descricao_curta']);
+        $typeRaw = strtolower(trim((string) $getAny(['Type', 'type', 'Product Type', 'product_type', 'tipo'])));
+        $sku = $getAny(['SKU', 'Sku', 'sku']);
+        $title = $getAny(['Name', 'name', 'Title', 'title', 'nome', 'product_name']);
+        $publishedRaw = strtolower(trim((string) $getAny(['Published', 'published', 'Status', 'status'])));
+        $excerpt = $getAny(['Short description', 'short_description', 'Descricao curta', 'descricao_curta', 'Excerpt', 'excerpt']);
+        $content = $getAny(['Description', 'description', 'Descricao', 'descricao', 'Content', 'content']);
         $slug = $getAny(['Slug', 'slug', 'post_name']);
-        $price = $this->parseMoneyCsv($getAny(['Price', 'price', 'preco', 'valor']));
-        $regularPrice = $this->parseMoneyCsv($getAny(['Regular Price', 'regular_price', 'preco_regular']));
-        $salePrice = $this->parseMoneyCsv($getAny(['Sale Price', 'sale_price', 'preco_promocao']));
-        $stockRaw = $getAny(['Stock', 'stock', 'estoque']);
+        $regularPrice = $this->parseMoneyCsv($getAny(['Regular price', 'Regular Price', 'regular_price', 'preco_regular', 'Price', 'price', 'preco', 'valor']));
+        $salePrice = $this->parseMoneyCsv($getAny(['Sale price', 'Sale Price', 'sale_price', 'preco_promocao']));
+        $price = ($salePrice > 0 ? $salePrice : $regularPrice);
+
+        $stockRaw = $getAny(['Stock', 'stock', 'Estoque', 'estoque']);
         $stock = (int) ($stockRaw !== '' ? $stockRaw : 0);
         $stockStatus = strtolower($getAny(['Stock Status', 'stock_status']));
         $featuredRaw = strtolower($getAny(['Featured', 'featured', 'destaque']));
-        $weight = (float) str_replace(',', '.', $getAny(['Weight', 'weight', 'peso']));
-        $length = (float) str_replace(',', '.', $getAny(['Length', 'length', 'comprimento']));
-        $width = (float) str_replace(',', '.', $getAny(['Width', 'width', 'largura']));
-        $height = (float) str_replace(',', '.', $getAny(['Height', 'height', 'altura']));
-        $statusRaw = strtolower($getAny(['Status', 'status']));
+        $weight = (float) str_replace(',', '.', $getAny(['Weight (kg)', 'Weight', 'weight', 'peso']));
+        $length = (float) str_replace(',', '.', $getAny(['Length (cm)', 'Length', 'length', 'comprimento']));
+        $width = (float) str_replace(',', '.', $getAny(['Width (cm)', 'Width', 'width', 'largura']));
+        $height = (float) str_replace(',', '.', $getAny(['Height (cm)', 'Height', 'height', 'altura']));
+        $statusRaw = $publishedRaw;
 
-        $imagesRaw = $getAny(['Product Image Gallery', 'product_image_gallery', 'Images', 'images', 'Product Image', 'product_image']);
+        $imagesRaw = $getAny(['Images', 'images', 'Product Image Gallery', 'product_image_gallery', 'Product Image', 'product_image']);
         $tagsRaw = $getAny(['Product Tags', 'product_tags', 'Tags', 'tags']);
-        $catsRaw = $getAny(['Product Categories', 'product_categories', 'Categories', 'categories', 'Categoria', 'categoria']);
+        $catsRaw = $getAny(['Categories', 'categories', 'Product Categories', 'product_categories', 'Categoria', 'categoria']);
         $attrsRaw = $getAny(['Product Attributes', 'product_attributes', 'Attributes', 'attributes', 'Default Attributes', 'default_attributes']);
         $childrenRaw = $getAny(['Children', 'children', 'Variations', 'variations', 'Variation Description', 'variation_description']);
 
@@ -503,6 +506,23 @@ class AdminProdutosController extends Controller {
         $colCategoria = $pickCol(['categoria', 'category']);
         $colFoto = $pickCol(['foto_principal', 'image', 'imagem', 'featured_image']);
 
+        if ($slug === '' && $title !== '') {
+            $slug = strtolower(trim((string) $title));
+            $slug = preg_replace('/\s+/', '-', $slug);
+            $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+        }
+
+        if (trim((string) $sku) === '') {
+            if (trim((string) $idExt) !== '') {
+                $sku = 'imp-' . preg_replace('/\s+/', '', (string) $idExt);
+            } elseif (trim((string) $slug) !== '') {
+                $sku = 'imp-' . (string) $slug;
+            } elseif (trim((string) $title) !== '') {
+                $sku = 'imp-' . substr(md5((string) $title), 0, 12);
+            }
+            $sku = substr((string) $sku, 0, 100);
+        }
+
         $categoriaId = 0;
         if ($colCategoriaId !== '' && $catsRaw !== '') {
             // Woo costuma exportar categorias como: "Cat A, Cat B" ou "Cat A > Cat B"
@@ -515,12 +535,12 @@ class AdminProdutosController extends Controller {
                     $hasCatTable = false;
                 }
                 if (!empty($hasCatTable)) {
-                    $slug = strtolower(trim((string) $firstCat));
-                    $slug = preg_replace('/\s+/', '-', $slug);
-                    $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+                    $catSlug = strtolower(trim((string) $firstCat));
+                    $catSlug = preg_replace('/\s+/', '-', $catSlug);
+                    $catSlug = preg_replace('/[^a-z0-9\-]/', '', $catSlug);
                     try {
                         $stFind = $pdo->prepare('SELECT id FROM categorias WHERE LOWER(slug) = LOWER(?) OR LOWER(nome) = LOWER(?) ORDER BY id DESC LIMIT 1');
-                        $stFind->execute([(string) $slug, (string) $firstCat]);
+                        $stFind->execute([(string) $catSlug, (string) $firstCat]);
                         $categoriaId = (int) ($stFind->fetchColumn() ?: 0);
                     } catch (\Exception $e) {
                         $categoriaId = 0;
@@ -547,10 +567,19 @@ class AdminProdutosController extends Controller {
 
         $active = null;
         if ($colActive !== '') {
-            if ($statusRaw === 'publish' || $statusRaw === 'published' || $statusRaw === 'ativo' || $statusRaw === 'active') {
+            if ($publishedRaw === '1' || $publishedRaw === 'yes' || $publishedRaw === 'true' || $publishedRaw === 'publish' || $publishedRaw === 'published' || $publishedRaw === 'ativo' || $publishedRaw === 'active') {
                 $active = 1;
-            } elseif ($statusRaw === 'draft' || $statusRaw === 'rascunho' || $statusRaw === 'inativo' || $statusRaw === 'inactive') {
+            } elseif ($publishedRaw === '0' || $publishedRaw === 'no' || $publishedRaw === 'false' || $publishedRaw === 'draft' || $publishedRaw === 'rascunho' || $publishedRaw === 'inativo' || $publishedRaw === 'inactive') {
                 $active = 0;
+            }
+        }
+
+        $statusRaw = $publishedRaw;
+        if ($publishedRaw === '1' || $publishedRaw === '0' || $publishedRaw === 'yes' || $publishedRaw === 'no' || $publishedRaw === 'true' || $publishedRaw === 'false') {
+            if ($active === 1) {
+                $statusRaw = 'publish';
+            } elseif ($active === 0) {
+                $statusRaw = 'draft';
             }
         }
 
@@ -561,6 +590,130 @@ class AdminProdutosController extends Controller {
         $featured = null;
         if ($colFeatured !== '') {
             $featured = ($featuredRaw === '1' || $featuredRaw === 'yes' || $featuredRaw === 'true') ? 1 : 0;
+        }
+
+        if ($typeRaw === 'variation' || $typeRaw === 'variacao' || $typeRaw === 'variação') {
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \RuntimeException('CSV possui Type=variation, mas schema de variações (produto_variacoes) não existe');
+            }
+
+            $parentSku = trim((string) $getAny(['Parent SKU', 'parent_sku', 'Parent', 'parent', 'Parent product SKU', 'parent_product_sku']));
+            $parentIdExt = trim((string) $getAny(['Parent product ID', 'parent_product_id', 'Parent ID', 'parent_id', 'Parent Product ID']));
+            $parentProdutoId = 0;
+            if ($parentSku !== '') {
+                $stP = $pdo->prepare('SELECT id FROM produtos WHERE sku = :sku LIMIT 1');
+                $stP->execute([':sku' => $parentSku]);
+                $parentProdutoId = (int) ($stP->fetchColumn() ?: 0);
+            }
+            if ($parentProdutoId <= 0 && $parentIdExt !== '' && ctype_digit($parentIdExt)) {
+                $stP = $pdo->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
+                $stP->execute([':id' => (int) $parentIdExt]);
+                $parentProdutoId = (int) ($stP->fetchColumn() ?: 0);
+            }
+
+            if ($parentProdutoId <= 0) {
+                $findParents = function(string $sql, array $params) use ($pdo): array {
+                    $st = $pdo->prepare($sql);
+                    $st->execute($params);
+                    return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                };
+
+                $typeCol = $colType;
+                $typeWhere = ($typeCol !== '' ? (' AND LOWER(COALESCE(p.' . $typeCol . ", '')) = 'variable' ") : '');
+
+                $skuPrefix = '';
+                $skuTrim = trim((string) $sku);
+                if ($skuTrim !== '') {
+                    $parts = preg_split('/[-_\s]+/', $skuTrim);
+                    $skuPrefix = trim((string) ($parts[0] ?? ''));
+                }
+
+                $namePrefix = '';
+                $t = trim((string) $title);
+                if ($t !== '') {
+                    $namePrefix = (string) preg_split('/\s[-–—]\s|\s:\s/', $t)[0];
+                    $namePrefix = trim($namePrefix);
+                }
+
+                $cands = [];
+                if ($skuPrefix !== '') {
+                    $sql = 'SELECT p.id, p.sku, ' . ($colName !== '' ? ('p.' . $colName . ' AS nome') : "'' AS nome")
+                        . ' FROM produtos p WHERE 1=1'
+                        . $typeWhere
+                        . ' AND p.sku LIKE :pref ORDER BY LENGTH(p.sku) DESC, p.id DESC LIMIT 5';
+                    $cands = $findParents($sql, [':pref' => $skuPrefix . '%']);
+                }
+
+                if (count($cands) !== 1 && $namePrefix !== '') {
+                    $sql = 'SELECT p.id, p.sku, ' . ($colName !== '' ? ('p.' . $colName . ' AS nome') : "'' AS nome")
+                        . ' FROM produtos p WHERE 1=1'
+                        . $typeWhere
+                        . ($colName !== '' ? (' AND p.' . $colName . ' LIKE :nm ') : ' AND 1=0 ')
+                        . ' ORDER BY p.id DESC LIMIT 5';
+                    $cands = $findParents($sql, [':nm' => $namePrefix . '%']);
+                }
+
+                if (count($cands) === 1) {
+                    $parentProdutoId = (int) ($cands[0]['id'] ?? 0);
+                } elseif (count($cands) > 1) {
+                    $hint = [];
+                    foreach ($cands as $c) {
+                        $hint[] = 'id=' . (int) ($c['id'] ?? 0) . ' sku=' . (string) ($c['sku'] ?? '') . ' nome=' . (string) ($c['nome'] ?? '');
+                    }
+                    throw new \RuntimeException('Variação ambígua: não foi possível identificar produto pai. Candidatos: ' . implode(' | ', $hint));
+                }
+            }
+
+            if ($parentProdutoId <= 0) {
+                throw new \RuntimeException('Variação sem vínculo do produto pai (faltando coluna Parent SKU/Parent product ID no CSV)');
+            }
+
+            if (trim((string) $sku) === '') {
+                $seed = (string) $parentProdutoId
+                    . '|' . trim((string) $idExt)
+                    . '|' . trim((string) $title)
+                    . '|' . (string) $regularPrice
+                    . '|' . (string) $salePrice
+                    . '|' . (string) $stock
+                    . '|' . trim((string) $imagesRaw);
+                $sku = 'var-' . (int) $parentProdutoId . '-' . substr(md5($seed), 0, 12);
+                $sku = substr((string) $sku, 0, 120);
+            }
+
+            $stV = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid AND sku = :sku LIMIT 1');
+            $stV->execute([':pid' => (int) $parentProdutoId, ':sku' => (string) $sku]);
+            $varId = (int) ($stV->fetchColumn() ?: 0);
+
+            $sqlCols = $this->getTableColumns($pdo, 'produto_variacoes');
+            $set = [];
+            $paramsV = [':pid' => (int) $parentProdutoId, ':sku' => (string) $sku];
+            if (in_array('price_override', $sqlCols, true)) { $set[] = 'price_override = :po'; $paramsV[':po'] = ($price > 0 ? $price : null); }
+            if (in_array('stock', $sqlCols, true)) { $set[] = 'stock = :st'; $paramsV[':st'] = (int) $stock; }
+            if (in_array('ativo', $sqlCols, true)) { $set[] = 'ativo = :at'; $paramsV[':at'] = ($active !== null ? (int) $active : 1); }
+            if (in_array('updated_at', $sqlCols, true)) { $set[] = 'updated_at = NOW()'; }
+
+            if ($varId > 0) {
+                if (!empty($set)) {
+                    $stUpV = $pdo->prepare('UPDATE produto_variacoes SET ' . implode(', ', $set) . ' WHERE id = :id');
+                    $paramsV[':id'] = (int) $varId;
+                    $stUpV->execute($paramsV);
+                }
+            } else {
+                $colsInsV = ['produto_id', 'sku'];
+                $valsInsV = [':pid', ':sku'];
+                if (in_array('price_override', $sqlCols, true)) { $colsInsV[] = 'price_override'; $valsInsV[] = ':po'; }
+                if (in_array('stock', $sqlCols, true)) { $colsInsV[] = 'stock'; $valsInsV[] = ':st'; }
+                if (in_array('ativo', $sqlCols, true)) { $colsInsV[] = 'ativo'; $valsInsV[] = ':at'; }
+                if (in_array('created_at', $sqlCols, true)) { $colsInsV[] = 'created_at'; $valsInsV[] = 'NOW()'; }
+                if (in_array('updated_at', $sqlCols, true)) { $colsInsV[] = 'updated_at'; $valsInsV[] = 'NOW()'; }
+
+                $stInV = $pdo->prepare('INSERT INTO produto_variacoes (' . implode(', ', $colsInsV) . ') VALUES (' . implode(', ', $valsInsV) . ')');
+                $paramsV[':po'] = ($price > 0 ? $price : null);
+                $paramsV[':st'] = (int) $stock;
+                $paramsV[':at'] = ($active !== null ? (int) $active : 1);
+                $stInV->execute($paramsV);
+            }
+            return;
         }
 
         if ($produtoId > 0) {
@@ -609,7 +762,7 @@ class AdminProdutosController extends Controller {
                 if ($firstImg !== '') { $set[] = $colFoto . ' = :foto'; $params[':foto'] = $firstImg; }
             }
             if ($colType !== '') {
-                $type = strtolower(trim($getAny(['Product Type', 'product_type', 'type', 'tipo'])));
+                $type = $typeRaw;
                 if ($type !== '' && (!array_key_exists($colType, $existing) || $isEmpty($existing[$colType] ?? null))) { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
             }
 
@@ -653,6 +806,8 @@ class AdminProdutosController extends Controller {
                 $firstImg = trim((string) preg_split('/[,|]/', (string) $imagesRaw)[0]);
                 if ($firstImg !== '') { $colsIns[] = $colFoto; $valsIns[] = ':foto'; $params[':foto'] = $firstImg; }
             }
+
+            if ($colType !== '' && $typeRaw !== '') { $colsIns[] = $colType; $valsIns[] = ':tp'; $params[':tp'] = $typeRaw; }
 
             if (empty($colsIns)) {
                 throw new \RuntimeException('Nenhuma coluna compatível para inserir produto');
@@ -1764,14 +1919,41 @@ HTML;
         echo '</div>';
 
         if ($totalPaginas > 1) {
+            $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
+            $mkUrl = function(int $p) use ($base, $busca): string {
+                return $base . "?pagina={$p}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+            };
+
+            $start = max(1, $pagina - 1);
+            $end = min($totalPaginas, $pagina + 1);
+            if (($end - $start + 1) < 3) {
+                if ($start === 1) {
+                    $end = min($totalPaginas, $start + 2);
+                } elseif ($end === $totalPaginas) {
+                    $start = max(1, $end - 2);
+                }
+            }
+
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
-            for ($i = 1; $i <= $totalPaginas; $i++) {
-                $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
-                $url = $base . "?pagina={$i}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+
+            $prev = max(1, $pagina - 1);
+            $prevDisabled = ($pagina <= 1);
+            echo '<li class="page-item ' . ($prevDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">Anterior</a>'
+                . '</li>';
+
+            for ($i = $start; $i <= $end; $i++) {
                 echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">' 
-                    . '<a class="page-link" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
+                    . '<a class="page-link" href="' . htmlspecialchars($mkUrl($i), ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
                     . '</li>';
             }
+
+            $next = min($totalPaginas, $pagina + 1);
+            $nextDisabled = ($pagina >= $totalPaginas);
+            echo '<li class="page-item ' . ($nextDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">Próximo</a>'
+                . '</li>';
+
             echo '</ul></nav>';
         }
 
