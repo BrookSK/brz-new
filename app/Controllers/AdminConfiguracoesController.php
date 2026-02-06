@@ -208,6 +208,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
                                 <i class="fas fa-cogs"></i> Sistema
                             </button>
+                            <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
+                                <i class="fab fa-wordpress"></i> WordPress
+                            </button>
                         </div>
                     </div>
                     
@@ -244,6 +247,59 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-wordpress" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Integração WordPress (Somente leitura)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Host</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_host" value="' . $this->getConfigValue($config, 'wordpress', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Database (nome)</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_name" value="' . $this->getConfigValue($config, 'wordpress', 'db_name', '') . '" placeholder="wp_database">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Usuário</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_user" value="' . $this->getConfigValue($config, 'wordpress', 'db_user', '') . '" placeholder="wp_user">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Senha</label>
+                                                        <input type="password" class="form-control" name="wordpress_db_pass" value="' . $this->getConfigValue($config, 'wordpress', 'db_pass', '') . '" placeholder="********">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Prefixo das tabelas</label>
+                                                        <input type="text" class="form-control" name="wordpress_table_prefix" value="' . $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        <small class="text-muted">Normalmente <code>wp_</code>. Se o site antigo tiver outro prefixo, ajuste aqui.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-info mb-0">
+                                                Essa integração é <strong>somente leitura</strong>. O sistema usará essas credenciais para exibir pedidos do site antigo.
                                             </div>
                                         </div>
                                     </div>
@@ -2931,6 +2987,7 @@ HTML;
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
+                'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']

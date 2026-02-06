@@ -69,6 +69,7 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Pedidos (WordPress)', 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => 'Tickets', 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
