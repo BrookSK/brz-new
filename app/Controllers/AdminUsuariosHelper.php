@@ -253,7 +253,8 @@ class AdminUsuariosHelper {
             $colunas = $this->getColunasUsuarios();
 
             $documento = $dados['documento'] ?? ($dados['cpf'] ?? null);
-            if (in_array('documento', $colunas) && empty($documento)) {
+            $allowMissingDocumento = !empty($dados['_allow_missing_documento']);
+            if (in_array('documento', $colunas) && empty($documento) && !$allowMissingDocumento) {
                 throw new \Exception('Documento é obrigatório');
             }
 
@@ -266,7 +267,11 @@ class AdminUsuariosHelper {
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'senha', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
-            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
+            if (!empty($documento)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
+            } elseif ($allowMissingDocumento) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', null);
+            }
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'suite', $dados['suite'] ?? null);
             $perfil = strtolower(trim((string) ($dados['perfil'] ?? 'cliente')));
             if ($perfil === '') {
