@@ -7,6 +7,509 @@ use App\Services\AuthService;
 
 class AdminProdutosController extends Controller {
 
+    public function importarProdutosModelo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $headers = explode("\t", trim("ID\tTitle\tContent\tExcerpt\tDate\tPost Type\tPermalink\tParent Product ID\tSku\tPrice\tRegular Price\tSale Price\tStock Status\tStock\tExternal Product URL\tTotal Sales\tAttribute Name (pa_cores)\tAttribute Value (pa_cores)\tAttribute In Variations (pa_cores)\tAttribute Is Visible (pa_cores)\tAttribute Is Taxonomy (pa_cores)\tAttribute Name (pa_fragrancia)\tAttribute Value (pa_fragrancia)\tAttribute In Variations (pa_fragrancia)\tAttribute Is Visible (pa_fragrancia)\tAttribute Is Taxonomy (pa_fragrancia)\tAttribute Name (pa_modelo)\tAttribute Value (pa_modelo)\tAttribute In Variations (pa_modelo)\tAttribute Is Visible (pa_modelo)\tAttribute Is Taxonomy (pa_modelo)\tAttribute Name (pa_sabor)\tAttribute Value (pa_sabor)\tAttribute In Variations (pa_sabor)\tAttribute Is Visible (pa_sabor)\tAttribute Is Taxonomy (pa_sabor)\tAttribute Name (pa_tamanho)\tAttribute Value (pa_tamanho)\tAttribute In Variations (pa_tamanho)\tAttribute Is Visible (pa_tamanho)\tAttribute Is Taxonomy (pa_tamanho)\tAttribute Name (Cor)\tAttribute Value (Cor)\tAttribute In Variations (Cor)\tAttribute Is Visible (Cor)\tAttribute Is Taxonomy (Cor)\tAttribute Name (Cores)\tAttribute Value (Cores)\tAttribute In Variations (Cores)\tAttribute Is Visible (Cores)\tAttribute Is Taxonomy (Cores)\tAttribute Name (Estampa)\tAttribute Value (Estampa)\tAttribute In Variations (Estampa)\tAttribute Is Visible (Estampa)\tAttribute Is Taxonomy (Estampa)\tAttribute Name (Fragance)\tAttribute Value (Fragance)\tAttribute In Variations (Fragance)\tAttribute Is Visible (Fragance)\tAttribute Is Taxonomy (Fragance)\tAttribute Name (Fragrance)\tAttribute Value (Fragrance)\tAttribute In Variations (Fragrance)\tAttribute Is Visible (Fragrance)\tAttribute Is Taxonomy (Fragrance)\tAttribute Name (Fragrancia)\tAttribute Value (Fragrancia)\tAttribute In Variations (Fragrancia)\tAttribute Is Visible (Fragrancia)\tAttribute Is Taxonomy (Fragrancia)\tAttribute Name (Funcionalidade)\tAttribute Value (Funcionalidade)\tAttribute In Variations (Funcionalidade)\tAttribute Is Visible (Funcionalidade)\tAttribute Is Taxonomy (Funcionalidade)\tAttribute Name (Modelo)\tAttribute Value (Modelo)\tAttribute In Variations (Modelo)\tAttribute Is Visible (Modelo)\tAttribute Is Taxonomy (Modelo)\tAttribute Name (Quantidade)\tAttribute Value (Quantidade)\tAttribute In Variations (Quantidade)\tAttribute Is Visible (Quantidade)\tAttribute Is Taxonomy (Quantidade)\tAttribute Name (Sabor)\tAttribute Value (Sabor)\tAttribute In Variations (Sabor)\tAttribute Is Visible (Sabor)\tAttribute Is Taxonomy (Sabor)\tAttribute Name (Sabores)\tAttribute Value (Sabores)\tAttribute In Variations (Sabores)\tAttribute Is Visible (Sabores)\tAttribute Is Taxonomy (Sabores)\tAttribute Name (Tamanho)\tAttribute Value (Tamanho)\tAttribute In Variations (Tamanho)\tAttribute Is Visible (Tamanho)\tAttribute Is Taxonomy (Tamanho)\tAttribute Name (Tipo-de-manchas)\tAttribute Value (Tipo-de-manchas)\tAttribute In Variations (Tipo-de-manchas)\tAttribute Is Visible (Tipo-de-manchas)\tAttribute Is Taxonomy (Tipo-de-manchas)\tAttribute Name (Tipos)\tAttribute Value (Tipos)\tAttribute In Variations (Tipos)\tAttribute Is Visible (Tipos)\tAttribute Is Taxonomy (Tipos)\tAttribute Name (Unidades)\tAttribute Value (Unidades)\tAttribute In Variations (Unidades)\tAttribute Is Visible (Unidades)\tAttribute Is Taxonomy (Unidades)\tAttribute Name (Versao)\tAttribute Value (Versao)\tAttribute In Variations (Versao)\tAttribute Is Visible (Versao)\tAttribute Is Taxonomy (Versao)\tShipping Class\tURL\tTitle\tDescription\tFeatured\tURL\tProduct Type\tProduct visibility\tProduct Categories\tProduct Tags\tProduct Visibility\tStatus\tSlug\tTemplate\tParent Slug\tOrder\tWeight\tLength\tWidth\tHeight\tManage Stock\tButton Text\tBackorders\tTax Status\tTax Class\tProduct Image Gallery\tDefault Attributes\tProduct Attributes\tProduct Version\tVariation Description\tChildren"));
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="import_produtos_modelo.csv"');
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers);
+        fclose($out);
+        exit;
+    }
+
+    public function importarProdutosIniciar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+        @ini_set('memory_limit', '-1');
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+        if (function_exists('session_write_close')) {
+            @session_write_close();
+        }
+
+        if (!isset($_FILES['produtos_import_csv']) || empty($_FILES['produtos_import_csv']['tmp_name'])) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não enviado.']);
+            exit;
+        }
+        if (!empty($_FILES['produtos_import_csv']['error']) && $_FILES['produtos_import_csv']['error'] !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Falha no upload do CSV.']);
+            exit;
+        }
+
+        $tmpUpload = (string) $_FILES['produtos_import_csv']['tmp_name'];
+        $token = bin2hex(random_bytes(16));
+        $csvPath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'produtos_import_' . $token . '.csv';
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'produtos_import_' . $token . '.json';
+
+        if (!@move_uploaded_file($tmpUpload, $csvPath)) {
+            if (!@copy($tmpUpload, $csvPath)) {
+                http_response_code(500);
+                echo json_encode(['ok' => false, 'error' => 'Não foi possível salvar o arquivo no servidor.']);
+                exit;
+            }
+        }
+
+        $scan = $this->scanProdutosCsv($csvPath);
+        if (!($scan['ok'] ?? false)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => (string) ($scan['error'] ?? 'CSV inválido')]);
+            exit;
+        }
+
+        $state = [
+            'token' => $token,
+            'csv' => $csvPath,
+            'delimiter' => (string) ($scan['delimiter'] ?? ','),
+            'hasHeader' => (bool) ($scan['hasHeader'] ?? true),
+            'header' => (is_array($scan['header'] ?? null) ? ($scan['header'] ?? null) : null),
+            'total' => (int) ($scan['total'] ?? 0),
+            'offset' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+            'createdAt' => date('c'),
+        ];
+        @file_put_contents($statePath, json_encode($state));
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $state['total'],
+            'processed' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+        ]);
+        exit;
+    }
+
+    public function importarProdutosProcessar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $token = trim((string) ($request->getParam('token') ?? ''));
+        $batchSize = (int) ($request->getParam('batch') ?? 300);
+        if ($batchSize <= 0) $batchSize = 300;
+        if ($batchSize > 1000) $batchSize = 1000;
+
+        if ($token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Token inválido.']);
+            exit;
+        }
+
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'produtos_import_' . $token . '.json';
+        if (!is_file($statePath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Importação não encontrada (expirada).']);
+            exit;
+        }
+
+        $stateRaw = @file_get_contents($statePath);
+        $state = is_string($stateRaw) ? json_decode($stateRaw, true) : null;
+        if (!is_array($state)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Estado da importação corrompido.']);
+            exit;
+        }
+
+        if (!empty($state['done'])) {
+            echo json_encode([
+                'ok' => true,
+                'token' => $token,
+                'total' => (int) ($state['total'] ?? 0),
+                'processed' => (int) ($state['offset'] ?? 0),
+                'okCount' => (int) ($state['okCount'] ?? 0),
+                'failCount' => (int) ($state['failCount'] ?? 0),
+                'done' => true,
+            ]);
+            exit;
+        }
+
+        $csvPath = (string) ($state['csv'] ?? '');
+        if ($csvPath === '' || !is_file($csvPath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não encontrado no servidor.']);
+            exit;
+        }
+
+        $delimiter = (string) ($state['delimiter'] ?? ',');
+        $hasHeader = (bool) ($state['hasHeader'] ?? true);
+        $header = (is_array($state['header'] ?? null) ? ($state['header'] ?? null) : null);
+        $offset = (int) ($state['offset'] ?? 0);
+        if ($offset < 0) $offset = 0;
+
+        $res = $this->processProdutosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
+
+        $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
+        $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
+        $state['failCount'] = (int) ($state['failCount'] ?? 0) + (int) ($res['failNow'] ?? 0);
+        $total = (int) ($state['total'] ?? 0);
+        $processed = (int) ($state['offset'] ?? 0);
+        $state['done'] = ($total > 0 && $processed >= $total) || (int) ($res['processedNow'] ?? 0) === 0;
+
+        @file_put_contents($statePath, json_encode($state));
+
+        if (!empty($state['done'])) {
+            try { @unlink($csvPath); } catch (\Exception $e) {}
+            try { @unlink($statePath); } catch (\Exception $e) {}
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $total,
+            'processed' => $processed,
+            'okCount' => (int) ($state['okCount'] ?? 0),
+            'failCount' => (int) ($state['failCount'] ?? 0),
+            'done' => (bool) ($state['done'] ?? false),
+        ]);
+        exit;
+    }
+
+    private function scanProdutosCsv(string $csvPath): array {
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
+        }
+
+        $first = fgetcsv($fh, 0, ',');
+        $delimiter = ',';
+        if (is_array($first) && count($first) === 1) {
+            rewind($fh);
+            $first = fgetcsv($fh, 0, ';');
+            $delimiter = ';';
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
+        $hasHeader = !empty($header);
+        if ($hasHeader) {
+            $joined = strtolower(implode('|', $header));
+            if (strpos($joined, 'sku') === false || strpos($joined, 'title') === false) {
+                $hasHeader = false;
+                $header = null;
+                rewind($fh);
+            }
+        } else {
+            rewind($fh);
+        }
+
+        $total = 0;
+        while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 2) {
+                continue;
+            }
+            $total++;
+        }
+        fclose($fh);
+        return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => (bool) $hasHeader, 'header' => $header, 'total' => $total];
+    }
+
+    private function processProdutosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['processedNow' => 0, 'okNow' => 0, 'failNow' => 0];
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        if ($hasHeader) {
+            $hdrRow = fgetcsv($fh, 0, $delimiter);
+            if ($header === null && is_array($hdrRow)) {
+                $header = array_map($normalizeHeader, $hdrRow);
+            }
+        }
+
+        $skipped = 0;
+        while ($skipped < $offset && ($rowSkip = fgetcsv($fh, 0, $delimiter)) !== false) {
+            $skipped++;
+        }
+
+        $processedNow = 0;
+        $okNow = 0;
+        $failNow = 0;
+
+        while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 2) {
+                continue;
+            }
+
+            $assoc = [];
+            if ($hasHeader && is_array($header)) {
+                foreach ($header as $i => $k) {
+                    if ($k === '') continue;
+                    $assoc[$k] = array_key_exists($i, $row) ? (string) $row[$i] : '';
+                }
+            } else {
+                foreach ($row as $i => $v) {
+                    $assoc[(string) $i] = (string) $v;
+                }
+            }
+
+            try {
+                $this->processProdutoAssocRow($pdo, $assoc);
+                $okNow++;
+            } catch (\Exception $e) {
+                $failNow++;
+            }
+            $processedNow++;
+        }
+
+        fclose($fh);
+        return ['processedNow' => $processedNow, 'okNow' => $okNow, 'failNow' => $failNow];
+    }
+
+    private function parseMoneyCsv(string $raw): float {
+        $raw = trim((string) $raw);
+        if ($raw === '') return 0.0;
+        $num = str_replace(['R$', 'USD', 'BRL', '$'], '', $raw);
+        $num = preg_replace('/\s+/', '', (string) $num);
+        if (strpos($num, ',') !== false && strpos($num, '.') !== false) {
+            $num = str_replace('.', '', $num);
+            $num = str_replace(',', '.', $num);
+        } elseif (strpos($num, ',') !== false) {
+            $num = str_replace(',', '.', $num);
+        }
+        return is_numeric($num) ? (float) $num : 0.0;
+    }
+
+    private function processProdutoAssocRow(\PDO $pdo, array $row): void {
+        $get = function(string $key) use ($row) {
+            return trim((string) ($row[$key] ?? ''));
+        };
+
+        $idExt = $get('ID');
+        $sku = $get('Sku');
+        $title = $get('Title');
+        $content = $get('Content');
+        $excerpt = $get('Excerpt');
+        $slug = $get('Slug');
+        $price = $this->parseMoneyCsv($get('Price'));
+        $regularPrice = $this->parseMoneyCsv($get('Regular Price'));
+        $salePrice = $this->parseMoneyCsv($get('Sale Price'));
+        $stock = (int) ($get('Stock') !== '' ? $get('Stock') : 0);
+        $stockStatus = strtolower($get('Stock Status'));
+        $featuredRaw = strtolower($get('Featured'));
+        $weight = (float) str_replace(',', '.', $get('Weight'));
+        $length = (float) str_replace(',', '.', $get('Length'));
+        $width = (float) str_replace(',', '.', $get('Width'));
+        $height = (float) str_replace(',', '.', $get('Height'));
+        $statusRaw = strtolower($get('Status'));
+
+        if ($sku === '' && $title === '' && $idExt === '') {
+            throw new \RuntimeException('Linha vazia');
+        }
+
+        $cols = $this->getTableColumns($pdo, 'produtos');
+        if (empty($cols)) {
+            throw new \RuntimeException('Tabela produtos não encontrada');
+        }
+
+        $pickCol = function(array $cands) use ($cols): string {
+            foreach ($cands as $c) {
+                if (in_array($c, $cols, true)) return $c;
+            }
+            return '';
+        };
+
+        $colName = $pickCol(['name', 'nome', 'titulo']);
+        $colSku = $pickCol(['sku']);
+        $colSlug = $pickCol(['slug']);
+        $colDesc = $pickCol(['description', 'descricao', 'content']);
+        $colShort = $pickCol(['short_description', 'descricao_curta', 'excerpt']);
+        $colPrice = $pickCol(['price', 'preco', 'valor']);
+        $colRegular = $pickCol(['regular_price']);
+        $colSale = $pickCol(['sale_price', 'preco_promocao']);
+        $colStock = $pickCol(['stock', 'estoque']);
+        $colActive = $pickCol(['active', 'ativo']);
+        $colFeatured = $pickCol(['featured', 'destaque']);
+        $colWeight = $pickCol(['weight', 'peso']);
+        $colLength = $pickCol(['length', 'comprimento']);
+        $colWidth = $pickCol(['width', 'largura']);
+        $colHeight = $pickCol(['height', 'altura']);
+        $colImages = $pickCol(['images']);
+        $colTags = $pickCol(['tags']);
+        $colAttributes = $pickCol(['attributes']);
+        $colVariations = $pickCol(['variations']);
+        $colStatus = $pickCol(['status']);
+        $colType = $pickCol(['type', 'tipo']);
+
+        $produtoId = 0;
+        try {
+            if ($sku !== '' && $colSku !== '') {
+                $st = $pdo->prepare('SELECT id FROM produtos WHERE ' . $colSku . ' = :sku LIMIT 1');
+                $st->execute([':sku' => $sku]);
+                $produtoId = (int) ($st->fetchColumn() ?: 0);
+            }
+            if ($produtoId <= 0 && $idExt !== '' && ctype_digit($idExt)) {
+                $st = $pdo->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
+                $st->execute([':id' => (int) $idExt]);
+                $produtoId = (int) ($st->fetchColumn() ?: 0);
+            }
+        } catch (\Exception $e) {
+            $produtoId = 0;
+        }
+
+        $active = null;
+        if ($colActive !== '') {
+            if ($statusRaw === 'publish' || $statusRaw === 'published' || $statusRaw === 'ativo' || $statusRaw === 'active') {
+                $active = 1;
+            } elseif ($statusRaw === 'draft' || $statusRaw === 'rascunho' || $statusRaw === 'inativo' || $statusRaw === 'inactive') {
+                $active = 0;
+            }
+        }
+
+        if ($stockStatus === 'outofstock' && $stock <= 0) {
+            $stock = 0;
+        }
+
+        $featured = null;
+        if ($colFeatured !== '') {
+            $featured = ($featuredRaw === '1' || $featuredRaw === 'yes' || $featuredRaw === 'true') ? 1 : 0;
+        }
+
+        if ($produtoId > 0) {
+            $set = [];
+            $params = [':id' => (int) $produtoId];
+
+            if ($colName !== '' && $title !== '') { $set[] = $colName . ' = :name'; $params[':name'] = $title; }
+            if ($colSku !== '' && $sku !== '') { $set[] = $colSku . ' = :sku'; $params[':sku'] = $sku; }
+            if ($colSlug !== '' && $slug !== '') { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
+            if ($colDesc !== '' && $content !== '') { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
+            if ($colShort !== '' && $excerpt !== '') { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
+            if ($colPrice !== '') { $set[] = $colPrice . ' = :price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
+            if ($colRegular !== '' && $regularPrice > 0) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
+            if ($colSale !== '' && $salePrice > 0) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
+            if ($colStock !== '') { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
+            if ($colActive !== '' && $active !== null) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
+            if ($colFeatured !== '' && $featured !== null) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
+            if ($colWeight !== '' && $weight > 0) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; }
+            if ($colLength !== '' && $length > 0) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; }
+            if ($colWidth !== '' && $width > 0) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; }
+            if ($colHeight !== '' && $height > 0) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; }
+            if ($colStatus !== '' && $statusRaw !== '') { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
+            if ($colType !== '') {
+                $type = strtolower(trim($get('Product Type')));
+                if ($type !== '') { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
+            }
+
+            if (in_array('updated_at', $cols, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            if (!empty($set)) {
+                $sqlUp = 'UPDATE produtos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $st = $pdo->prepare($sqlUp);
+                $st->execute($params);
+            }
+        } else {
+            $colsIns = [];
+            $valsIns = [];
+            $params = [];
+
+            if ($colName !== '') { $colsIns[] = $colName; $valsIns[] = ':name'; $params[':name'] = ($title !== '' ? $title : ($sku !== '' ? $sku : 'Produto')); }
+            if ($colSku !== '' && $sku !== '') { $colsIns[] = $colSku; $valsIns[] = ':sku'; $params[':sku'] = $sku; }
+            if ($colSlug !== '' && $slug !== '') { $colsIns[] = $colSlug; $valsIns[] = ':slug'; $params[':slug'] = $slug; }
+            if ($colDesc !== '' && $content !== '') { $colsIns[] = $colDesc; $valsIns[] = ':desc'; $params[':desc'] = $content; }
+            if ($colShort !== '' && $excerpt !== '') { $colsIns[] = $colShort; $valsIns[] = ':short'; $params[':short'] = $excerpt; }
+            if ($colPrice !== '') { $colsIns[] = $colPrice; $valsIns[] = ':price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
+            if ($colRegular !== '' && $regularPrice > 0) { $colsIns[] = $colRegular; $valsIns[] = ':rp'; $params[':rp'] = $regularPrice; }
+            if ($colSale !== '' && $salePrice > 0) { $colsIns[] = $colSale; $valsIns[] = ':sp'; $params[':sp'] = $salePrice; }
+            if ($colStock !== '') { $colsIns[] = $colStock; $valsIns[] = ':st'; $params[':st'] = (int) $stock; }
+            if ($colActive !== '' && $active !== null) { $colsIns[] = $colActive; $valsIns[] = ':ac'; $params[':ac'] = (int) $active; }
+            if ($colFeatured !== '' && $featured !== null) { $colsIns[] = $colFeatured; $valsIns[] = ':ft'; $params[':ft'] = (int) $featured; }
+            if ($colWeight !== '' && $weight > 0) { $colsIns[] = $colWeight; $valsIns[] = ':w'; $params[':w'] = $weight; }
+            if ($colLength !== '' && $length > 0) { $colsIns[] = $colLength; $valsIns[] = ':l'; $params[':l'] = $length; }
+            if ($colWidth !== '' && $width > 0) { $colsIns[] = $colWidth; $valsIns[] = ':wd'; $params[':wd'] = $width; }
+            if ($colHeight !== '' && $height > 0) { $colsIns[] = $colHeight; $valsIns[] = ':h'; $params[':h'] = $height; }
+            if ($colStatus !== '' && $statusRaw !== '') { $colsIns[] = $colStatus; $valsIns[] = ':sts'; $params[':sts'] = $statusRaw; }
+
+            if (empty($colsIns)) {
+                throw new \RuntimeException('Nenhuma coluna compatível para inserir produto');
+            }
+
+            $sqlIn = 'INSERT INTO produtos (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')';
+            $st = $pdo->prepare($sqlIn);
+            $st->execute($params);
+            $produtoId = (int) $pdo->lastInsertId();
+        }
+
+        if ($produtoId <= 0) {
+            throw new \RuntimeException('Falha ao persistir produto');
+        }
+
+        $this->ensureProdutoMetaTable($pdo);
+
+        foreach ($row as $k => $v) {
+            $k = trim((string) $k);
+            if ($k === '') continue;
+            $this->upsertProdutoMeta($pdo, $produtoId, $k, (string) $v);
+        }
+    }
+
+    private function ensureProdutoMetaTable(\PDO $pdo): void {
+        try {
+            $st = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['produto_meta']);
+            $ok = (bool) $st->fetchColumn();
+            if ($ok) {
+                return;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS produto_meta (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            produto_id INT NOT NULL,
+            meta_key VARCHAR(191) NOT NULL,
+            meta_value LONGTEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_produto_meta (produto_id, meta_key),
+            KEY idx_meta_key (meta_key),
+            KEY idx_produto_id (produto_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+
+    private function upsertProdutoMeta(\PDO $pdo, int $produtoId, string $key, string $value): void {
+        $key = trim($key);
+        if ($key === '') return;
+        try {
+            $st = $pdo->prepare('INSERT INTO produto_meta (produto_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
+            $st->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getSessionPerfil(): string {
         try {
             if (session_status() === PHP_SESSION_NONE) {
@@ -1002,8 +1505,33 @@ HTML;
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
             . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
+            . '<a href="/admin/produtos/importar/modelo" target="_blank" class="btn btn-outline-secondary"><i class="fas fa-download"></i> Modelo CSV</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
             . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '</div>'
+            . '</div>';
+
+        echo '<div class="border rounded p-3 bg-light mb-4">'
+            . '<div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Produtos (CSV)</div>'
+            . '<div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>'
+            . '<div class="row g-2 align-items-end">'
+            . '<div class="col-md-8">'
+            . '<label class="form-label mb-1">Arquivo CSV</label>'
+            . '<input type="file" class="form-control" name="produtos_import_csv" id="produtos_import_csv" accept=".csv,text/csv">'
+            . '</div>'
+            . '<div class="col-md-4">'
+            . '<button type="button" class="btn btn-primary w-100" id="btnImportarProdutosCsv"><i class="fas fa-upload me-1"></i>Importar Produtos</button>'
+            . '</div>'
+            . '</div>'
+            . '<div class="mt-3" id="produtosImportProgressWrap" style="display:none;">'
+            . '<div class="d-flex justify-content-between small text-muted mb-1">'
+            . '<span id="produtosImportProgressLabel">Preparando...</span>'
+            . '<span id="produtosImportProgressPercent">0%</span>'
+            . '</div>'
+            . '<div class="progress" style="height: 18px;">'
+            . '<div class="progress-bar" role="progressbar" style="width:0%" id="produtosImportProgressBar">0%</div>'
+            . '</div>'
+            . '<div class="small text-muted mt-2" id="produtosImportProgressStats"></div>'
             . '</div>'
             . '</div>';
 
@@ -1041,6 +1569,8 @@ HTML;
         }
         echo '</div>';
 
+        echo $this->getProdutosImportJS();
+
         if ($totalPaginas > 1) {
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
             for ($i = 1; $i <= $totalPaginas; $i++) {
@@ -1059,6 +1589,102 @@ HTML;
         $title = 'Produtos - Braziliana Shop Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
+    }
+
+    private function getProdutosImportJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnImportarProdutosCsv');
+    const fileInput = document.getElementById('produtos_import_csv');
+    const wrap = document.getElementById('produtosImportProgressWrap');
+    const bar = document.getElementById('produtosImportProgressBar');
+    const percentEl = document.getElementById('produtosImportProgressPercent');
+    const labelEl = document.getElementById('produtosImportProgressLabel');
+    const statsEl = document.getElementById('produtosImportProgressStats');
+
+    if (!btn || !fileInput || !wrap || !bar || !percentEl || !labelEl || !statsEl) return;
+
+    let running = false;
+
+    function setProgress(processed, total, okCount, failCount, label){
+        const t = (typeof total === 'number' && total > 0) ? total : 0;
+        const p = (typeof processed === 'number' && processed > 0) ? processed : 0;
+        let pct = (t > 0) ? Math.floor((p / t) * 100) : 0;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        percentEl.textContent = pct + '%';
+        labelEl.textContent = label || 'Processando...';
+        statsEl.textContent = 'Processados: ' + p + ' / ' + t + ' | OK: ' + (okCount||0) + ' | Falhas: ' + (failCount||0);
+    }
+
+    async function iniciarImportacao(file){
+        const fd = new FormData();
+        fd.append('produtos_import_csv', file);
+        const resp = await fetch('/admin/produtos/importar/iniciar', { method: 'POST', body: fd });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao iniciar a importação.');
+        }
+        return json;
+    }
+
+    async function processarLote(token, batchSize){
+        const fd = new URLSearchParams();
+        fd.set('token', token);
+        fd.set('batch', String(batchSize || 200));
+        const resp = await fetch('/admin/produtos/importar/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString()
+        });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao processar lote.');
+        }
+        return json;
+    }
+
+    btn.addEventListener('click', async function(){
+        if (running) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert('Selecione um arquivo CSV primeiro.');
+            return;
+        }
+
+        running = true;
+        btn.disabled = true;
+        wrap.style.display = '';
+        setProgress(0, 0, 0, 0, 'Enviando arquivo...');
+
+        try {
+            const init = await iniciarImportacao(file);
+            const token = init.token;
+            const total = init.total || 0;
+            let last = init;
+
+            setProgress(0, total, 0, 0, 'Importação iniciada...');
+
+            while (!last.done) {
+                last = await processarLote(token, 200);
+                setProgress(last.processed || 0, last.total || total, last.okCount || 0, last.failCount || 0, 'Processando em lotes...');
+            }
+
+            setProgress(last.processed || total, last.total || total, last.okCount || 0, last.failCount || 0, 'Finalizado');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Erro na importação.');
+            labelEl.textContent = 'Erro';
+        } finally {
+            running = false;
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+JS;
     }
     public function novo(Request $request) {
         $auth = new AuthService();

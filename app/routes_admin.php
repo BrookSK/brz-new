@@ -18,12 +18,22 @@ $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'r
 $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
+// Importação de produtos (CSV)
+$router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
+$router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
+$router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
+
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
+
+// Importação de pedidos (CSV)
+$router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'importarPedidosModelo');
+$router->post('/admin/pedidos/importar/iniciar', 'AdminPedidosController', 'importarPedidosIniciar');
+$router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'importarPedidosProcessar');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');

@@ -8,6 +8,699 @@ use App\Services\PaymentService;
 use App\Services\AuthService;
 
 class AdminPedidosController extends Controller {
+
+    public function importarPedidosModelo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $headers = explode("\t", trim("post_id\tpost_date\tpost_type\tstatus\ttitle\tpost_name\tcreator\tpubDate\tlink\tguid\tMercado Pago - 139132911483 - card_last_four_digits\tMercado Pago - 139132911483 - installment_amount\tMercado Pago - 139132911483 - installments\tMercado Pago - 139132911483 - total_paid_amount\tMercado Pago - 139132911483 - transaction_amount\tMercado Pago - 139779301638 - card_last_four_digits\tMercado Pago - 139779301638 - installment_amount\tMercado Pago - 139779301638 - installments\tMercado Pago - 139779301638 - total_paid_amount\tMercado Pago - 139779301638 - transaction_amount\tMercado Pago - 141615422750 - card_last_four_digits\tMercado Pago - 141615422750 - installment_amount\tMercado Pago - 141615422750 - installments\tMercado Pago - 141615422750 - total_paid_amount\tMercado Pago - 141615422750 - transaction_amount\tMercado Pago - Payment 1325685362\tMercado Pago - Payment 137809090869\tMercado Pago - Payment 137828409527\tMercado Pago - Payment 137858461491\tMercado Pago - Payment 137970692673\tMercado Pago - Payment 138114864009\tMercado Pago - Payment 138160150449\tMercado Pago - Payment 138398316403\tMercado Pago - Payment 138408239279\tMercado Pago - Payment 138413245495\tMercado Pago - Payment 138442534612\tMercado Pago - Payment 138760913710\tMercado Pago - Payment 138763253086\tMercado Pago - Payment 138764416918\tMercado Pago - Payment 138934313819\tMercado Pago - Payment 139042864960\tMercado Pago - Payment 139043969606\tMercado Pago - Payment 139052696496\tMercado Pago - Payment 139128027471\tMercado Pago - Payment 139132911483\tMercado Pago - Payment 139173227978\tMercado Pago - Payment 139198918624\tMercado Pago - Payment 139588728906\tMercado Pago - Payment 139779301638\tMercado Pago - Payment 139780223608\tMercado Pago - Payment 140081615335\tMercado Pago - Payment 140394624492\tMercado Pago - Payment 140396137678\tMercado Pago - Payment 140655178553\tMercado Pago - Payment 140690315291\tMercado Pago - Payment 140724181308\tMercado Pago - Payment 140726199884\tMercado Pago - Payment 140791142853\tMercado Pago - Payment 141051085759\tMercado Pago - Payment 141095168033\tMercado Pago - Payment 141096070263\tMercado Pago - Payment 141253845215\tMercado Pago - Payment 141316218448\tMercado Pago - Payment 141319526220\tMercado Pago - Payment 141379310532\tMercado Pago - Payment 141415435559\tMercado Pago - Payment 141419174231\tMercado Pago - Payment 141499022953\tMercado Pago - Payment 141516626021\tMercado Pago - Payment 141615422750\tMercado Pago - Payment 141632778467\tMercado Pago - Payment 141750566566\tMercado Pago - Payment 141778613377\tMercado Pago - Payment 141783462809\tMercado Pago - Payment 141796904623\tMercado Pago - Payment 141903960476\tMercado Pago - Payment 142025716099\tMercado Pago - Payment 142028713787\tMercado Pago - Payment 142033041219\tMercado Pago - Payment 142034557529\tMercado Pago - Payment 142041162737\tMercado Pago - Payment 142080429274\tMercado Pago - Payment 142081528756\tMercado Pago - Payment 142082337636\tMercado Pago - Payment 142082663422\tMercado Pago - Payment 142114637341\tMercado Pago - Payment 142153416700\tMercado Pago - Payment 142165932226\tMercado Pago - Payment 142176757379\tMercado Pago - Payment 142178111735\tMercado Pago - Payment 142192276797\tMercado Pago - Payment 142194403667\tMercado Pago - Payment 142274860093\tMercado Pago - Payment 142307478387\tMercado Pago - Payment 142312798137\tMercado Pago - Payment 142386523179\tMercado Pago - Payment 142451359954\tMercado Pago - Payment 142483850170\tMercado Pago - Payment 142555055507\tMercado Pago - Payment 142678683181\tMercado Pago - Payment 142682522683\tMercado Pago - Payment 142688680069\tMercado Pago - Payment 142691431903\tMercado Pago - Payment 142692373637\tMercado Pago - Payment 142697311030\tMercado Pago - Payment 142700806678\tMercado Pago - Payment 142704403095\tMercado Pago - Payment 142704795873\tMercado Pago - Payment 142705935932\tMercado Pago - Payment 142709320442\tMercado Pago - Payment 142712043364\tMercado Pago - Payment 142825837080\tMercado Pago - Payment 142859787740\tMercado Pago - Payment 142866705548\tMercado Pago - Payment 142896987737\tMercado Pago - Payment 142940409911\tMercado Pago - Payment 142950908656\tMercado Pago - Payment 142951415728\tMercado Pago - Payment 142974036426\tMercado Pago - Payment 143022121065\tMercado Pago - Payment 143023335535\tMercado Pago - Payment 143067529734\tMercado Pago - Payment 143079256825\tMercado Pago - Payment 143090773899\tMercado Pago - Payment 143097800305\tMercado Pago - Payment 143245509584\tMercado Pago - Payment 143246887252\tMercado Pago - Payment 143250607572\tMercado Pago - Payment 143304958565\tMercado Pago - Payment 143306952223\tMercado Pago - Payment 143341561562\tMercado Pago - Payment 143343032634\tMercado Pago - Payment 143345712370\tMercado Pago - Payment 143348927958\tMercado Pago - Payment 143351513522\tMercado Pago - Payment 143380329616\tMercado Pago - Payment 143402346344\tMercado Pago - Payment 143561517558\tMercado Pago - Payment 143562623296\tMercado Pago - Payment 143567340914\tMercado Pago - Payment 143579138548\tMercado Pago - Payment 143589505152\tMercado Pago - Payment 143600501202\tMercado Pago - Payment 143601485018\tMercado Pago - Payment 143619430202\tMercado Pago - Payment 143625396619\tMercado Pago - Payment 143638326927\tMercado Pago - Payment 143711213020\tMercado Pago - Payment 143723982988\tMercado Pago - Payment 143734184860\tMercado Pago - Payment 143739623532\tMercado Pago - Payment 143753944480\tMercado Pago - Payment 143769558176\tMercado Pago - Payment 143839218211\tMercado Pago - Payment 143841539339\tMercado Pago - Payment 143854187652\tMercado Pago - Payment 143854234695\tMercado Pago - Payment 143860509576\tMercado Pago - Payment 143862559906\tMercado Pago - Payment 143864548398\tMercado Pago - Payment 143866655046\tMercado Pago - Payment 143942487951\tMercado Pago - Payment 143971750698\tMercado Pago - Payment 143973303890\tMercado Pago - Payment 143988939043\tMercado Pago - Payment 144008338271\tMercado Pago - Payment 144149932835\tMercado Pago - Payment 144169130116\tMercado Pago - Payment 144271989049\tMercado Pago - Payment 144302223279\tMercado Pago - Payment 144533638384\tMercado Pago - Payment 144666973580\tMercado Pago - Payment 144689517098\tMercado Pago - Payment 144759718338\tMercado Pago - Payment 144761854066\tMercado Pago - Payment 144795992064\tMercado Pago - Payment 144950180220\tMercado Pago - Payment 144951847650\tPAYMENT_ID: DATE\t_Mercado_Pago_Payment_IDs\t_accept_product_replacement\t_billing_address_1\t_billing_address_2\t_billing_address_index\t_billing_birthdate\t_billing_cellphone\t_billing_city\t_billing_company\t_billing_country\t_billing_cpf\t_billing_email\t_billing_first_name\t_billing_last_name\t_billing_neighborhood\t_billing_number\t_billing_phone\t_billing_postcode\t_billing_state\t_cart_discount\t_cart_discount_tax\t_cart_hash\t_completed_date\t_created_via\t_currency_ratio\t_customer_ip_address\t_customer_user\t_customer_user_agent\t_date_completed\t_date_paid\t_download_permissions_granted\t_edit_last\t_invoice_contest\t_invoice_images\t_last_printed_by\t_migrated_at\t_migration_batch\t_new_order_email_sent\t_old_order_id\t_order_currency\t_order_key\t_order_shipping\t_order_shipping_tax\t_order_stock_reduced\t_order_tax\t_order_total\t_order_version\t_pagamentos_para_woocommerce_com_appmax_label\t_pagamentos_para_woocommerce_com_appmax_media\t_pagamentos_para_woocommerce_com_appmax_payment_code\t_pagamentos_para_woocommerce_com_appmax_paymentid\t_paid_date\t_payment_method\t_payment_method_title\t_pdf_generated\t_prices_include_tax\t_print_count\t_recipient_document_number\t_recorded_coupon_usage_counts\t_recorded_sales\t_shipping_address_1\t_shipping_address_2\t_shipping_address_index\t_shipping_city\t_shipping_company\t_shipping_country\t_shipping_first_name\t_shipping_last_name\t_shipping_neighborhood\t_shipping_number\t_shipping_phone\t_shipping_postcode\t_shipping_state\t_shipping_suite\t_stripe_charge_captured\t_stripe_currency\t_stripe_customer_id\t_stripe_fee\t_stripe_intent_id\t_stripe_net\t_stripe_source_id\t_stripe_upe_payment_type\t_stripe_upe_redirect_processed\t_stripe_upe_waiting_for_redirect\t_stripe_upe_waiting_for_redirect\t_suite\t_tracking_code\t_transaction_id\t_used_gateway\t_wallet_rechargeable_order\t_wc_order_attribution_device_type\t_wc_order_attribution_referrer\t_wc_order_attribution_session_count\t_wc_order_attribution_session_entry\t_wc_order_attribution_session_pages\t_wc_order_attribution_session_start_time\t_wc_order_attribution_source_type\t_wc_order_attribution_user_agent\t_wc_order_attribution_utm_content\t_wc_order_attribution_utm_medium\t_wc_order_attribution_utm_source\t_wccs_base_currency\t_wccs_currency_rate\t_wccs_shop_currency\t_wccs_total_in_base_currency\t_wp_desired_post_slug\t_wp_trash_meta_comments_status\t_wp_trash_meta_status\t_wp_trash_meta_time\t_wpam_id\tblocks_payment\tcheckout_pix_date_expiration\tfinancing_fee\tis_production_mode\tis_vat_exempt\tjupiterx_reading_time\tlogic_results_storage\tmercadopago_fee\tmp_installments\tmp_pix_qr_base64\tmp_pix_qr_code\tmp_total_paid_amount\tmp_transaction_amount\tmp_transaction_details\tpix_on\tshopping_list_id\ttpul_visitor_id\ttrp_language"));
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="import_pedidos_modelo.csv"');
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers);
+        fclose($out);
+        exit;
+    }
+
+    public function importarPedidosIniciar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+        @ini_set('memory_limit', '-1');
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+        if (function_exists('session_write_close')) {
+            @session_write_close();
+        }
+
+        if (!isset($_FILES['pedidos_import_csv']) || empty($_FILES['pedidos_import_csv']['tmp_name'])) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não enviado.']);
+            exit;
+        }
+        if (!empty($_FILES['pedidos_import_csv']['error']) && $_FILES['pedidos_import_csv']['error'] !== UPLOAD_ERR_OK) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Falha no upload do CSV.']);
+            exit;
+        }
+
+        $tmpUpload = (string) $_FILES['pedidos_import_csv']['tmp_name'];
+        $token = bin2hex(random_bytes(16));
+        $csvPath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pedidos_import_' . $token . '.csv';
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pedidos_import_' . $token . '.json';
+
+        if (!@move_uploaded_file($tmpUpload, $csvPath)) {
+            if (!@copy($tmpUpload, $csvPath)) {
+                http_response_code(500);
+                echo json_encode(['ok' => false, 'error' => 'Não foi possível salvar o arquivo no servidor.']);
+                exit;
+            }
+        }
+
+        $scan = $this->scanPedidosCsv($csvPath);
+        if (!($scan['ok'] ?? false)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => (string) ($scan['error'] ?? 'CSV inválido')]);
+            exit;
+        }
+
+        $state = [
+            'token' => $token,
+            'csv' => $csvPath,
+            'delimiter' => (string) ($scan['delimiter'] ?? ','),
+            'hasHeader' => (bool) ($scan['hasHeader'] ?? true),
+            'header' => (is_array($scan['header'] ?? null) ? ($scan['header'] ?? null) : null),
+            'total' => (int) ($scan['total'] ?? 0),
+            'offset' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+            'createdAt' => date('c'),
+        ];
+        @file_put_contents($statePath, json_encode($state));
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $state['total'],
+            'processed' => 0,
+            'okCount' => 0,
+            'failCount' => 0,
+            'done' => false,
+        ]);
+        exit;
+    }
+
+    public function importarPedidosProcessar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
+
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $token = trim((string) ($request->getParam('token') ?? ''));
+        $batchSize = (int) ($request->getParam('batch') ?? 300);
+        if ($batchSize <= 0) $batchSize = 300;
+        if ($batchSize > 1000) $batchSize = 1000;
+
+        if ($token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Token inválido.']);
+            exit;
+        }
+
+        $statePath = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pedidos_import_' . $token . '.json';
+        if (!is_file($statePath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Importação não encontrada (expirada).']);
+            exit;
+        }
+
+        $stateRaw = @file_get_contents($statePath);
+        $state = is_string($stateRaw) ? json_decode($stateRaw, true) : null;
+        if (!is_array($state)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Estado da importação corrompido.']);
+            exit;
+        }
+
+        if (!empty($state['done'])) {
+            echo json_encode([
+                'ok' => true,
+                'token' => $token,
+                'total' => (int) ($state['total'] ?? 0),
+                'processed' => (int) ($state['offset'] ?? 0),
+                'okCount' => (int) ($state['okCount'] ?? 0),
+                'failCount' => (int) ($state['failCount'] ?? 0),
+                'done' => true,
+            ]);
+            exit;
+        }
+
+        $csvPath = (string) ($state['csv'] ?? '');
+        if ($csvPath === '' || !is_file($csvPath)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Arquivo CSV não encontrado no servidor.']);
+            exit;
+        }
+
+        $delimiter = (string) ($state['delimiter'] ?? ',');
+        $hasHeader = (bool) ($state['hasHeader'] ?? true);
+        $header = (is_array($state['header'] ?? null) ? ($state['header'] ?? null) : null);
+        $offset = (int) ($state['offset'] ?? 0);
+        if ($offset < 0) $offset = 0;
+
+        $res = $this->processPedidosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
+
+        $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
+        $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
+        $state['failCount'] = (int) ($state['failCount'] ?? 0) + (int) ($res['failNow'] ?? 0);
+        $total = (int) ($state['total'] ?? 0);
+        $processed = (int) ($state['offset'] ?? 0);
+        $state['done'] = ($total > 0 && $processed >= $total) || (int) ($res['processedNow'] ?? 0) === 0;
+
+        @file_put_contents($statePath, json_encode($state));
+
+        if (!empty($state['done'])) {
+            try { @unlink($csvPath); } catch (\Exception $e) {}
+            try { @unlink($statePath); } catch (\Exception $e) {}
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'token' => $token,
+            'total' => $total,
+            'processed' => $processed,
+            'okCount' => (int) ($state['okCount'] ?? 0),
+            'failCount' => (int) ($state['failCount'] ?? 0),
+            'done' => (bool) ($state['done'] ?? false),
+        ]);
+        exit;
+    }
+
+    private function scanPedidosCsv(string $csvPath): array {
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
+        }
+
+        $first = fgetcsv($fh, 0, ',');
+        $delimiter = ',';
+        if (is_array($first) && count($first) === 1) {
+            rewind($fh);
+            $first = fgetcsv($fh, 0, ';');
+            $delimiter = ';';
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
+        $hasHeader = !empty($header);
+        if ($hasHeader) {
+            $joined = strtolower(implode('|', $header));
+            if (strpos($joined, 'post_id') === false || strpos($joined, '_order_total') === false) {
+                $hasHeader = false;
+                $header = null;
+                rewind($fh);
+            }
+        } else {
+            rewind($fh);
+        }
+
+        $total = 0;
+        while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 2) {
+                continue;
+            }
+            $total++;
+        }
+        fclose($fh);
+        return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => (bool) $hasHeader, 'header' => $header, 'total' => $total];
+    }
+
+    private function processPedidosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
+        $fh = @fopen($csvPath, 'r');
+        if (!$fh) {
+            return ['processedNow' => 0, 'okNow' => 0, 'failNow' => 0];
+        }
+
+        $normalizeHeader = function($v) {
+            $s = trim((string) $v);
+            $s = preg_replace('/\s+/', ' ', $s);
+            return $s;
+        };
+
+        if ($hasHeader) {
+            $hdrRow = fgetcsv($fh, 0, $delimiter);
+            if ($header === null && is_array($hdrRow)) {
+                $header = array_map($normalizeHeader, $hdrRow);
+            }
+        }
+
+        $skipped = 0;
+        while ($skipped < $offset && ($rowSkip = fgetcsv($fh, 0, $delimiter)) !== false) {
+            $skipped++;
+        }
+
+        $processedNow = 0;
+        $okNow = 0;
+        $failNow = 0;
+
+        while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
+            if (!is_array($row) || count($row) < 2) {
+                continue;
+            }
+
+            $assoc = [];
+            if ($hasHeader && is_array($header)) {
+                foreach ($header as $i => $k) {
+                    if ($k === '') continue;
+                    $assoc[$k] = array_key_exists($i, $row) ? (string) $row[$i] : '';
+                }
+            } else {
+                foreach ($row as $i => $v) {
+                    $assoc[(string) $i] = (string) $v;
+                }
+            }
+
+            try {
+                $this->processPedidoAssocRow($pdo, $assoc);
+                $okNow++;
+            } catch (\Exception $e) {
+                $failNow++;
+            }
+            $processedNow++;
+        }
+
+        fclose($fh);
+        return ['processedNow' => $processedNow, 'okNow' => $okNow, 'failNow' => $failNow];
+    }
+
+    private function processPedidoAssocRow(\PDO $pdo, array $row): void {
+        $get = function(string $key) use ($row) {
+            return trim((string) ($row[$key] ?? ''));
+        };
+
+        $postId = $get('post_id');
+        $orderKey = $get('_order_key');
+        $oldOrderId = $get('_old_order_id');
+        $billingEmail = $get('_billing_email');
+        $customerUser = $get('_customer_user');
+
+        if ($postId === '' && $orderKey === '' && $oldOrderId === '') {
+            throw new \RuntimeException('Pedido sem identificador');
+        }
+
+        $usuarioId = 0;
+        try {
+            if ($customerUser !== '' && ctype_digit($customerUser)) {
+                $usuarioId = $this->findUsuarioIdById($pdo, (int) $customerUser);
+            }
+            if ($usuarioId <= 0 && $billingEmail !== '') {
+                $usuarioId = $this->findUsuarioIdByEmail($pdo, $billingEmail);
+            }
+        } catch (\Exception $e) {
+            $usuarioId = 0;
+        }
+
+        if ($usuarioId <= 0) {
+            throw new \RuntimeException('Usuário não encontrado para o pedido');
+        }
+
+        $colsPedidos = [];
+        try {
+            $stmtColsP = $pdo->query('DESCRIBE pedidos');
+            $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsPedidos = [];
+        }
+        if (empty($colsPedidos)) {
+            throw new \RuntimeException('Tabela pedidos não encontrada');
+        }
+
+        $pickCol = function(array $cols, array $cands): string {
+            foreach ($cands as $c) {
+                if (in_array($c, $cols, true)) return $c;
+            }
+            return '';
+        };
+
+        $colUsuario = $pickCol($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
+        $colTotal = $pickCol($colsPedidos, ['valor_total', 'total', 'amount', 'valor']);
+        $colMoeda = $pickCol($colsPedidos, ['moeda', 'currency', 'order_currency']);
+        $colStatus = $pickCol($colsPedidos, ['status', 'status_pedido', 'pedido_status']);
+        $colPaymentGateway = $pickCol($colsPedidos, ['payment_gateway', 'gateway']);
+        $colPaymentId = $pickCol($colsPedidos, ['payment_id', 'transaction_id', 'codigo_transacao']);
+        $colPaymentStatus = $pickCol($colsPedidos, ['payment_status', 'status_pagamento']);
+        $colTracking = $pickCol($colsPedidos, ['tracking_code', 'codigo_rastreio', 'rastreamento']);
+        $colCodigoPedido = $pickCol($colsPedidos, ['codigo_pedido', 'numero_pedido', 'codigo', 'order_number']);
+
+        if ($colUsuario === '' || $colTotal === '') {
+            throw new \RuntimeException('Schema de pedidos não compatível (faltando usuario/total)');
+        }
+
+        $orderTotalRaw = $get('_order_total');
+        $total = 0.0;
+        if ($orderTotalRaw !== '') {
+            $num = str_replace(['R$', 'USD', 'BRL'], '', $orderTotalRaw);
+            $num = preg_replace('/\s+/', '', (string) $num);
+            if (strpos($num, ',') !== false && strpos($num, '.') !== false) {
+                $num = str_replace('.', '', $num);
+                $num = str_replace(',', '.', $num);
+            } elseif (strpos($num, ',') !== false) {
+                $num = str_replace(',', '.', $num);
+            }
+            if (is_numeric($num)) {
+                $total = (float) $num;
+            }
+        }
+
+        $moeda = strtoupper(trim($get('_order_currency')));
+        if ($moeda === '') {
+            $moeda = strtoupper(trim($get('_order_currency')));
+        }
+        if ($moeda === '') {
+            $moeda = 'BRL';
+        }
+
+        $status = strtolower(trim($get('status')));
+        if ($status === '') {
+            $status = strtolower(trim($get('_payment_method')));
+        }
+        if ($status === '') {
+            $status = 'pendente';
+        }
+
+        $paymentMethod = trim($get('_payment_method'));
+        if ($paymentMethod === '') {
+            $paymentMethod = trim($get('_used_gateway'));
+        }
+        $paymentId = trim($get('_transaction_id'));
+        if ($paymentId === '') {
+            $paymentId = trim($get('Mercado Pago - Payment 139132911483'));
+        }
+
+        $tracking = trim($get('_tracking_code'));
+        if ($tracking === '') {
+            $tracking = trim($get('_tracking_code'));
+        }
+
+        $codigoPedido = $postId !== '' ? $postId : ($oldOrderId !== '' ? $oldOrderId : $orderKey);
+
+        $pedidoId = 0;
+        $lookupKey = $orderKey !== '' ? $orderKey : ($oldOrderId !== '' ? $oldOrderId : $postId);
+        if ($lookupKey !== '') {
+            $pedidoId = $this->findPedidoIdByMeta($pdo, '_order_key', $orderKey);
+            if ($pedidoId <= 0 && $oldOrderId !== '') {
+                $pedidoId = $this->findPedidoIdByMeta($pdo, '_old_order_id', $oldOrderId);
+            }
+            if ($pedidoId <= 0 && $postId !== '') {
+                $pedidoId = $this->findPedidoIdByMeta($pdo, 'post_id', $postId);
+            }
+        }
+
+        if ($pedidoId > 0) {
+            $set = [];
+            $params = [];
+
+            if ($colUsuario !== '') {
+                $set[] = $colUsuario . ' = :uid';
+                $params[':uid'] = (int) $usuarioId;
+            }
+            if ($colTotal !== '') {
+                $set[] = $colTotal . ' = :tot';
+                $params[':tot'] = $total;
+            }
+            if ($colMoeda !== '') {
+                $set[] = $colMoeda . ' = :mo';
+                $params[':mo'] = $moeda;
+            }
+            if ($colStatus !== '') {
+                $set[] = $colStatus . ' = :st';
+                $params[':st'] = $status;
+            }
+            if ($colPaymentGateway !== '' && $paymentMethod !== '') {
+                $set[] = $colPaymentGateway . ' = :pg';
+                $params[':pg'] = $paymentMethod;
+            }
+            if ($colPaymentId !== '' && $paymentId !== '') {
+                $set[] = $colPaymentId . ' = :pid';
+                $params[':pid'] = $paymentId;
+            }
+            if ($colPaymentStatus !== '') {
+                $set[] = $colPaymentStatus . ' = :pst';
+                $params[':pst'] = $status;
+            }
+            if ($colTracking !== '' && $tracking !== '') {
+                $set[] = $colTracking . ' = :trk';
+                $params[':trk'] = $tracking;
+            }
+            if ($colCodigoPedido !== '' && $codigoPedido !== '') {
+                $set[] = $colCodigoPedido . ' = :cod';
+                $params[':cod'] = $codigoPedido;
+            }
+
+            if (in_array('updated_at', $colsPedidos, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            if (!empty($set)) {
+                $sqlUp = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $params[':id'] = (int) $pedidoId;
+                $st = $pdo->prepare($sqlUp);
+                $st->execute($params);
+            }
+        } else {
+            $cols = [];
+            $vals = [];
+            $params = [];
+
+            $cols[] = $colUsuario;
+            $vals[] = ':uid';
+            $params[':uid'] = (int) $usuarioId;
+
+            $cols[] = $colTotal;
+            $vals[] = ':tot';
+            $params[':tot'] = $total;
+
+            if ($colMoeda !== '') {
+                $cols[] = $colMoeda;
+                $vals[] = ':mo';
+                $params[':mo'] = $moeda;
+            }
+            if ($colStatus !== '') {
+                $cols[] = $colStatus;
+                $vals[] = ':st';
+                $params[':st'] = $status;
+            }
+            if ($colPaymentGateway !== '' && $paymentMethod !== '') {
+                $cols[] = $colPaymentGateway;
+                $vals[] = ':pg';
+                $params[':pg'] = $paymentMethod;
+            }
+            if ($colPaymentId !== '' && $paymentId !== '') {
+                $cols[] = $colPaymentId;
+                $vals[] = ':pid';
+                $params[':pid'] = $paymentId;
+            }
+            if ($colPaymentStatus !== '') {
+                $cols[] = $colPaymentStatus;
+                $vals[] = ':pst';
+                $params[':pst'] = $status;
+            }
+            if ($colTracking !== '' && $tracking !== '') {
+                $cols[] = $colTracking;
+                $vals[] = ':trk';
+                $params[':trk'] = $tracking;
+            }
+            if ($colCodigoPedido !== '' && $codigoPedido !== '') {
+                $cols[] = $colCodigoPedido;
+                $vals[] = ':cod';
+                $params[':cod'] = $codigoPedido;
+            }
+
+            $sqlIn = 'INSERT INTO pedidos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $st = $pdo->prepare($sqlIn);
+            $st->execute($params);
+            $pedidoId = (int) $pdo->lastInsertId();
+        }
+
+        if ($pedidoId <= 0) {
+            throw new \RuntimeException('Falha ao persistir pedido');
+        }
+
+        $this->ensurePedidoMetaTable($pdo);
+
+        $metaPairs = [
+            'post_id' => $postId,
+            '_order_key' => $orderKey,
+            '_old_order_id' => $oldOrderId,
+        ];
+
+        foreach ($metaPairs as $mk => $mv) {
+            if ($mv === '') continue;
+            $this->upsertPedidoMeta($pdo, $pedidoId, $mk, $mv);
+        }
+
+        foreach ($row as $k => $v) {
+            $k = trim((string) $k);
+            if ($k === '') continue;
+            $this->upsertPedidoMeta($pdo, $pedidoId, $k, (string) $v);
+        }
+    }
+
+    private function ensurePedidoMetaTable(\PDO $pdo): void {
+        try {
+            $st = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_meta']);
+            $ok = (bool) $st->fetchColumn();
+            if ($ok) {
+                return;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pedido_meta (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            pedido_id INT NOT NULL,
+            meta_key VARCHAR(191) NOT NULL,
+            meta_value LONGTEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_pedido_meta (pedido_id, meta_key),
+            KEY idx_meta_key (meta_key),
+            KEY idx_pedido_id (pedido_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+
+    private function upsertPedidoMeta(\PDO $pdo, int $pedidoId, string $key, string $value): void {
+        $key = trim($key);
+        if ($key === '') return;
+        try {
+            $st = $pdo->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
+            $st->execute([':pid' => (int) $pedidoId, ':k' => $key, ':v' => $value]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function findPedidoIdByMeta(\PDO $pdo, string $metaKey, string $metaValue): int {
+        $metaKey = trim($metaKey);
+        $metaValue = trim($metaValue);
+        if ($metaKey === '' || $metaValue === '') return 0;
+        try {
+            $this->ensurePedidoMetaTable($pdo);
+            $st = $pdo->prepare('SELECT pedido_id FROM pedido_meta WHERE meta_key = :k AND meta_value = :v ORDER BY pedido_id DESC LIMIT 1');
+            $st->execute([':k' => $metaKey, ':v' => $metaValue]);
+            return (int) ($st->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    private function findUsuarioIdById(\PDO $pdo, int $id): int {
+        if ($id <= 0) return 0;
+        $st = $pdo->prepare('SELECT id FROM usuarios WHERE id = ? LIMIT 1');
+        $st->execute([(int) $id]);
+        return (int) ($st->fetchColumn() ?: 0);
+    }
+
+    private function findUsuarioIdByEmail(\PDO $pdo, string $email): int {
+        $email = trim($email);
+        if ($email === '') return 0;
+        $st = $pdo->prepare('SELECT id FROM usuarios WHERE LOWER(email) = LOWER(?) LIMIT 1');
+        $st->execute([$email]);
+        return (int) ($st->fetchColumn() ?: 0);
+    }
+
+    private function getPedidosImportJS(): string {
+        return <<<'JS'
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnImportarPedidosCsv');
+    const fileInput = document.getElementById('pedidos_import_csv');
+    const wrap = document.getElementById('pedidosImportProgressWrap');
+    const bar = document.getElementById('pedidosImportProgressBar');
+    const percentEl = document.getElementById('pedidosImportProgressPercent');
+    const labelEl = document.getElementById('pedidosImportProgressLabel');
+    const statsEl = document.getElementById('pedidosImportProgressStats');
+
+    if (!btn || !fileInput || !wrap || !bar || !percentEl || !labelEl || !statsEl) return;
+
+    let running = false;
+
+    function setProgress(processed, total, okCount, failCount, label){
+        const t = (typeof total === 'number' && total > 0) ? total : 0;
+        const p = (typeof processed === 'number' && processed > 0) ? processed : 0;
+        let pct = (t > 0) ? Math.floor((p / t) * 100) : 0;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        percentEl.textContent = pct + '%';
+        labelEl.textContent = label || 'Processando...';
+        statsEl.textContent = 'Processados: ' + p + ' / ' + t + ' | OK: ' + (okCount||0) + ' | Falhas: ' + (failCount||0);
+    }
+
+    async function iniciarImportacao(file){
+        const fd = new FormData();
+        fd.append('pedidos_import_csv', file);
+        const resp = await fetch('/admin/pedidos/importar/iniciar', { method: 'POST', body: fd });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao iniciar a importação.');
+        }
+        return json;
+    }
+
+    async function processarLote(token, batchSize){
+        const fd = new URLSearchParams();
+        fd.set('token', token);
+        fd.set('batch', String(batchSize || 200));
+        const resp = await fetch('/admin/pedidos/importar/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString()
+        });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || !json.ok) {
+            throw new Error((json && json.error) ? json.error : 'Falha ao processar lote.');
+        }
+        return json;
+    }
+
+    btn.addEventListener('click', async function(){
+        if (running) return;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert('Selecione um arquivo CSV primeiro.');
+            return;
+        }
+
+        running = true;
+        btn.disabled = true;
+        wrap.style.display = '';
+        setProgress(0, 0, 0, 0, 'Enviando arquivo...');
+
+        try {
+            const init = await iniciarImportacao(file);
+            const token = init.token;
+            const total = init.total || 0;
+            let last = init;
+
+            setProgress(0, total, 0, 0, 'Importação iniciada...');
+
+            while (!last.done) {
+                last = await processarLote(token, 200);
+                setProgress(last.processed || 0, last.total || total, last.okCount || 0, last.failCount || 0, 'Processando em lotes...');
+            }
+
+            setProgress(last.processed || total, last.total || total, last.okCount || 0, last.failCount || 0, 'Finalizado');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Erro na importação.');
+            labelEl.textContent = 'Erro';
+        } finally {
+            running = false;
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+JS;
+    }
     
     public function index(Request $request) {
         $auth = new AuthService();
@@ -222,12 +915,43 @@ class AdminPedidosController extends Controller {
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
+                        <a class="btn btn-outline-secondary me-2" href="/admin/pedidos/importar/modelo" target="_blank">
+                            <i class="fas fa-download me-1"></i>Modelo CSV
+                        </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
                         </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
+                    </div>
+                </div>
+
+                <div class="border rounded p-3 bg-light mb-4">
+                    <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Pedidos (CSV)</div>
+                    <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. As colunas podem estar em qualquer ordem (com header).</div>
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label mb-1">Arquivo CSV</label>
+                            <input type="file" class="form-control" name="pedidos_import_csv" id="pedidos_import_csv" accept=".csv,text/csv">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-primary w-100" id="btnImportarPedidosCsv">
+                                <i class="fas fa-upload me-1"></i>Importar Pedidos
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-3" id="pedidosImportProgressWrap" style="display:none;">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span id="pedidosImportProgressLabel">Preparando...</span>
+                            <span id="pedidosImportProgressPercent">0%</span>
+                        </div>
+                        <div class="progress" style="height: 18px;">
+                            <div class="progress-bar" role="progressbar" style="width:0%" id="pedidosImportProgressBar">0%</div>
+                        </div>
+                        <div class="small text-muted mt-2" id="pedidosImportProgressStats"></div>
                     </div>
                 </div>
                 
@@ -622,6 +1346,7 @@ class AdminPedidosController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    ' . $this->getPedidosImportJS() . '
 </body>
 </html>';
         exit;
