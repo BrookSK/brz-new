@@ -178,7 +178,7 @@ class AdminProdutosController extends Controller {
         $offset = (int) ($state['offset'] ?? 0);
         if ($offset < 0) $offset = 0;
 
-        $res = $this->processProdutosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
+        $res = $this->processProdutosCsvBatch($pdo, $state, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
 
         $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
         $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
@@ -262,7 +262,7 @@ class AdminProdutosController extends Controller {
         return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => (bool) $hasHeader, 'header' => $header, 'total' => $total];
     }
 
-    private function processProdutosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
+    private function processProdutosCsvBatch(\PDO $pdo, array &$state, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
         $fh = @fopen($csvPath, 'r');
         if (!$fh) {
             return ['processedNow' => 0, 'okNow' => 0, 'failNow' => 0];
@@ -291,6 +291,27 @@ class AdminProdutosController extends Controller {
         $failNow = 0;
 
         $this->ensureImportRowStatusTable($pdo);
+
+        // Tentar reprocessar variações pendentes de batches anteriores
+        if (isset($state['pendingVariations']) && is_array($state['pendingVariations']) && !empty($state['pendingVariations'])) {
+            $pending = $state['pendingVariations'];
+            $state['pendingVariations'] = [];
+            foreach ($pending as $rowKey => $assoc) {
+                if (!is_array($assoc)) continue;
+                try {
+                    $this->processProdutoAssocRow($pdo, $assoc);
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowOk($pdo, 'produtos', $rowKey);
+                    }
+                    $okNow++;
+                } catch (\Exception $e) {
+                    // Continua pendente
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $state['pendingVariations'][$rowKey] = $assoc;
+                    }
+                }
+            }
+        }
 
         while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
             if (!is_array($row) || count($row) < 2) {
@@ -335,12 +356,47 @@ class AdminProdutosController extends Controller {
                 }
                 $okNow++;
             } catch (\Exception $e) {
-                if ($rowKey !== '') {
-                    $this->markImportRowFail($pdo, 'produtos', $rowKey, $e->getMessage());
+                $msg = $e->getMessage();
+                $isPendingParent = (strpos($msg, 'Variação sem vínculo do produto pai') !== false);
+
+                if ($isPendingParent && $rowKey !== '') {
+                    // Guardar para tentar novamente em próximos batches (pai pode vir depois)
+                    if (!isset($state['pendingVariations']) || !is_array($state['pendingVariations'])) {
+                        $state['pendingVariations'] = [];
+                    }
+                    $state['pendingVariations'][$rowKey] = $assoc;
+                } else {
+                    if ($rowKey !== '') {
+                        $this->markImportRowFail($pdo, 'produtos', $rowKey, $msg);
+                    }
+                    $failNow++;
                 }
-                $failNow++;
             }
             $processedNow++;
+        }
+
+        // Se acabou o arquivo (último batch), tentar reprocessar pendências uma última vez.
+        // NOTA: aqui não sabemos com certeza se é o último batch, mas se processou menos que o limite,
+        // geralmente significa EOF.
+        if ($processedNow < $limit && isset($state['pendingVariations']) && is_array($state['pendingVariations']) && !empty($state['pendingVariations'])) {
+            $pending = $state['pendingVariations'];
+            $state['pendingVariations'] = [];
+            foreach ($pending as $rowKey => $assoc) {
+                if (!is_array($assoc)) continue;
+                try {
+                    $this->processProdutoAssocRow($pdo, $assoc);
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowOk($pdo, 'produtos', $rowKey);
+                    }
+                    $okNow++;
+                } catch (\Exception $e) {
+                    // Agora sim: marca como falha definitiva
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowFail($pdo, 'produtos', $rowKey, $e->getMessage());
+                    }
+                    $failNow++;
+                }
+            }
         }
 
         fclose($fh);
@@ -528,7 +584,11 @@ class AdminProdutosController extends Controller {
             return $first;
         };
 
-        if (trim((string) $attrsRaw) === '') {
+        // Campo Product Attributes do Woo pode vir como PHP serialized (a:...), que NÃO é JSON.
+        // Para evitar erro 4025 em colunas JSON, sempre preferir gerar JSON válido a partir das colunas Attribute Name/Value.
+        $attrsRawTrim = trim((string) $attrsRaw);
+        $attrsRawIsJsonish = ($attrsRawTrim !== '' && ($attrsRawTrim[0] === '[' || $attrsRawTrim[0] === '{'));
+        if ($attrsRawTrim === '' || !$attrsRawIsJsonish) {
             $attrs = [];
             foreach ($row as $k => $v) {
                 $k = trim((string) $k);
@@ -575,6 +635,8 @@ class AdminProdutosController extends Controller {
 
             if (!empty($attrs)) {
                 $attrsRaw = json_encode($attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            } else {
+                $attrsRaw = '';
             }
         }
 
