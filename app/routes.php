@@ -68,7 +68,9 @@ $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirP
 $router->get('/meus-tickets', 'SupportTicketsController', 'index');
 $router->get('/meu-ticket/{id}', 'SupportTicketsController', 'ver');
 $router->post('/meu-ticket/{id}/mensagem', 'SupportTicketsController', 'enviarMensagem');
+$router->post('/meu-ticket/{id}/fechar', 'SupportTicketsController', 'fechar');
 $router->get('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
+$router->post('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
 
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
@@ -242,6 +244,10 @@ $router->get('/admin/tickets/{id}', 'AdminTicketsController', 'ver');
 $router->post('/admin/tickets/{id}/mensagem', 'AdminTicketsController', 'enviarMensagem');
 $router->post('/admin/tickets/{id}/fechar', 'AdminTicketsController', 'fechar');
 $router->post('/admin/tickets/{id}/reabrir', 'AdminTicketsController', 'reabrir');
+$router->post('/admin/tickets/{id}/notas-internas', 'AdminTicketsController', 'salvarNotasInternas');
+$router->post('/admin/tickets/{id}/arquivos', 'AdminTicketsController', 'uploadArquivoTicket');
+$router->post('/admin/tickets/{id}/contatar-vendedor', 'AdminTicketsController', 'contatarVendedor');
+$router->post('/admin/tickets/{id}/vendor-chat/seen', 'AdminTicketsController', 'marcarVendorChatVisto');
 
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
