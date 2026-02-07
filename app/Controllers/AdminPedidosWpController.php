@@ -216,13 +216,23 @@ class AdminPedidosWpController extends Controller {
         $user = trim($user);
         $prefix = trim($prefix);
 
+        $port = null;
+        if ($host !== '' && strpos($host, ':') !== false) {
+            $parts = explode(':', $host, 2);
+            $host = trim((string) ($parts[0] ?? ''));
+            $portPart = trim((string) ($parts[1] ?? ''));
+            if ($portPart !== '' && ctype_digit($portPart)) {
+                $port = (int) $portPart;
+            }
+        }
+
         if ($prefix === '') $prefix = 'wp_';
 
         if ($host === '' || $dbname === '' || $user === '') {
             throw new \RuntimeException('Configure o banco WordPress em Admin > Configurações > WordPress');
         }
 
-        $dsn = 'mysql:host=' . $host . ';dbname=' . $dbname . ';charset=utf8mb4';
+        $dsn = 'mysql:host=' . $host . ';' . ($port ? ('port=' . $port . ';') : '') . 'dbname=' . $dbname . ';charset=utf8mb4';
         $pdo = new \PDO($dsn, $user, $pass, [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
