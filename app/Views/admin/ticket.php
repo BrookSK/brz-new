@@ -109,7 +109,7 @@
                 border-top: 1px solid rgba(148,163,184,.25);
                 padding: 14px 16px;
             }
-            .brz-chat .brz-composer { display: grid; grid-template-columns: 1fr 160px; gap: 10px; }
+            .brz-chat .brz-composer { display: grid; grid-template-columns: 1fr 56px; gap: 10px; }
             .brz-chat .brz-composer textarea { min-height: 90px; resize: vertical; }
             .brz-chat .brz-actions { display: flex; flex-direction: column; gap: 10px; }
             .brz-chat .brz-actions .btn { height: 44px; }
@@ -180,7 +180,9 @@
                             </div>
                         </div>
                         <div class="brz-actions">
-                            <button type="submit" class="btn btn-primary w-100">Enviar</button>
+                            <button type="submit" class="btn btn-primary w-100" title="Enviar">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -338,7 +340,7 @@
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
     } catch (\Exception $e) {
         $perfil = '';
     }
@@ -357,9 +359,9 @@
                         <input class="form-control" type="file" name="arquivo" required>
                         <div class="form-text">Até 20MB. Alguns tipos perigosos são bloqueados.</div>
                     </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="fas fa-upload me-1"></i>Enviar
+                    <div class="col-md-3 d-flex align-items-stretch">
+                        <button type="submit" class="btn btn-primary w-100" title="Enviar arquivo" style="height: 38px; align-self: end;">
+                            <i class="fas fa-upload"></i>
                         </button>
                     </div>
                 </div>

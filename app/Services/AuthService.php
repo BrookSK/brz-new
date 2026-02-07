@@ -104,7 +104,10 @@ class AuthService {
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
         $_SESSION['usuario_email'] = $usuario['email'];
-        $_SESSION['usuario_perfil'] = $usuario['perfil'];
+        $perfil = (string) ($usuario['perfil'] ?? '');
+        $role = (string) ($usuario['role'] ?? '');
+        $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
+        $_SESSION['usuario_role'] = $role !== '' ? $role : $perfil;
         $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
         $avatarUrl = null;
         foreach ($avatarCandidates as $c) {
@@ -143,6 +146,7 @@ class AuthService {
             'nome' => $_SESSION['usuario_nome'],
             'email' => $_SESSION['usuario_email'],
             'perfil' => $_SESSION['usuario_perfil'],
+            'role' => $_SESSION['usuario_role'] ?? $_SESSION['usuario_perfil'],
             'avatar' => $_SESSION['usuario_avatar'] ?? null
         ];
     }
@@ -168,8 +172,11 @@ class AuthService {
         $this->requerAutenticacao();
         
         $usuario = $this->getUsuarioLogado();
-        
-        if ($usuario['perfil'] !== $perfil) {
+
+        $perfilAtual = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+        $roleAtual = strtolower(trim((string) ($usuario['role'] ?? '')));
+        $perfilNeed = strtolower(trim((string) $perfil));
+        if ($perfilNeed === '' || ($perfilAtual !== $perfilNeed && $roleAtual !== $perfilNeed)) {
             $_SESSION['message'] = 'Acesso negado. Permissão de ' . $perfil . ' necessária.';
             $_SESSION['message_type'] = 'danger';
             $target = $this->estaLogado() ? '/admin' : '/login';
@@ -182,7 +189,8 @@ class AuthService {
         $this->requerAutenticacao();
 
         $usuario = $this->getUsuarioLogado();
-        $perfilAtual = (string) ($usuario['perfil'] ?? '');
+        $perfilAtual = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+        $roleAtual = strtolower(trim((string) ($usuario['role'] ?? '')));
         $perfisNorm = array_values(array_filter(array_map(function ($p) {
             return strtolower(trim((string) $p));
         }, $perfis), function ($p) {
@@ -193,7 +201,7 @@ class AuthService {
             return;
         }
 
-        if (!in_array(strtolower($perfilAtual), $perfisNorm, true)) {
+        if (!in_array($perfilAtual, $perfisNorm, true) && !in_array($roleAtual, $perfisNorm, true)) {
             $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
             $_SESSION['message_type'] = 'danger';
             $target = $this->estaLogado() ? '/admin' : '/login';
@@ -208,10 +216,12 @@ class AuthService {
             return false;
         }
         $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
-        if ($perfil === '') {
+        $role = strtolower(trim((string) ($usuario['role'] ?? '')));
+        if ($perfil === '' && $role === '') {
             return false;
         }
-        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true);
+        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)
+            || in_array($role, ['admin', 'vendedor', 'suporte', 'redirecionador'], true);
     }
     
     public function requerPermissao($acao) {
