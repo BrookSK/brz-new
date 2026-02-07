@@ -12,6 +12,19 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function getUserRoleOrPerfil(): string {
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $p = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+            $r = strtolower(trim((string) ($_SESSION['usuario_role'] ?? '')));
+            return $p !== '' ? $p : $r;
+        } catch (\Exception $e) {
+            return '';
+        }
+    }
+
     private function getUploadsDirTicketFiles(): array {
         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
         $absCandidates = [
@@ -299,16 +312,30 @@ class AdminTicketsController extends Controller {
         // Detalhes do pedido relacionado ao ticket
         $pedidoDetalhes = [];
         try {
-            $pedidoId = (int) ($ticket['pedido_id'] ?? 0);
-            if ($pedidoId > 0) {
+            if (!empty($ticket['pedido_id'])) {
                 $pedidoModel = new PedidoEcommerce();
-                $pedidoDetalhes = $pedidoModel->getComDetalhes($pedidoId);
-                if (!is_array($pedidoDetalhes)) {
-                    $pedidoDetalhes = [];
-                }
+                $pedidoDetalhes = $pedidoModel->getComDetalhes((int) $ticket['pedido_id']) ?: [];
             }
         } catch (\Exception $e) {
             $pedidoDetalhes = [];
+        }
+
+        $pedidoManual = false;
+        try {
+            $pedidoManual = is_array($pedidoDetalhes) && strtolower(trim((string) ($pedidoDetalhes['origem_pedido'] ?? ''))) === 'manual';
+        } catch (\Exception $e) {
+            $pedidoManual = false;
+        }
+
+        $vendedores = [];
+        if ($pedidoManual) {
+            try {
+                $stV = $pdo->prepare("SELECT id, COALESCE(nome, name) AS nome, email FROM usuarios WHERE (LOWER(COALESCE(role,'')) = 'vendedor' OR LOWER(COALESCE(perfil,'')) = 'vendedor') AND COALESCE(ativo, active, 1) = 1 ORDER BY COALESCE(nome, name) ASC");
+                $stV->execute();
+                $vendedores = $stV->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $vendedores = [];
+            }
         }
 
         $stM = $pdo->prepare('SELECT * FROM support_ticket_messages WHERE ticket_id = ? ORDER BY id ASC');
@@ -347,6 +374,94 @@ class AdminTicketsController extends Controller {
         $content = ob_get_clean();
         $title = 'Ticket #' . $id;
         include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    public function contatarVendedor(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/tickets');
+            exit;
+        }
+
+        $vendedorId = (int) ($request->getParam('vendedor_id') ?? 0);
+        $msg = trim((string) ($request->getParam('mensagem') ?? ''));
+        if ($vendedorId <= 0 || $msg === '') {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        $pdo = $this->getPdo();
+
+        // buscar ticket + pedido
+        $ticket = null;
+        try {
+            $stT = $pdo->prepare('SELECT * FROM support_tickets WHERE id = ? LIMIT 1');
+            $stT->execute([$id]);
+            $ticket = $stT->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $ticket = null;
+        }
+        if (!$ticket) {
+            header('Location: /admin/tickets');
+            exit;
+        }
+
+        $pedidoId = (int) ($ticket['pedido_id'] ?? 0);
+        if ($pedidoId <= 0) {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        // garantir que é pedido manual
+        $origem = '';
+        try {
+            $stP = $pdo->prepare('SELECT origem_pedido FROM pedidos WHERE id = ? LIMIT 1');
+            $stP->execute([$pedidoId]);
+            $origem = strtolower(trim((string) ($stP->fetchColumn() ?: '')));
+        } catch (\Exception $e) {
+            $origem = '';
+        }
+        if ($origem !== 'manual') {
+            header('Location: /admin/tickets/' . $id);
+            exit;
+        }
+
+        // pegar vendedor
+        $vendNome = '';
+        $vendEmail = '';
+        try {
+            $stU = $pdo->prepare("SELECT COALESCE(nome, name) AS nome, email FROM usuarios WHERE id = ? LIMIT 1");
+            $stU->execute([$vendedorId]);
+            $u = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $vendNome = (string) ($u['nome'] ?? '');
+            $vendEmail = (string) ($u['email'] ?? '');
+        } catch (\Exception $e) {
+        }
+
+        // registrar em internal_notes (sem novas migrations)
+        $adminUid = $this->getLoggedUserId();
+        $adminNome = '';
+        try {
+            $adminNome = (string) ($_SESSION['usuario_nome'] ?? '');
+        } catch (\Exception $e) {
+            $adminNome = '';
+        }
+        $stamp = date('Y-m-d H:i:s');
+        $log = "[CONTATO VENDEDOR] {$stamp} | por: {$adminNome} (#{$adminUid}) | para: {$vendNome} (#{$vendedorId}) {$vendEmail}\n{$msg}\n";
+
+        try {
+            if ($this->columnExists($pdo, 'support_tickets', 'internal_notes')) {
+                $st = $pdo->prepare('UPDATE support_tickets SET internal_notes = CONCAT(COALESCE(internal_notes, \'\'), ?, "\n\n"), updated_at = NOW() WHERE id = ? LIMIT 1');
+                $st->execute([$log, $id]);
+            }
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/tickets/' . $id);
         exit;
     }
 
