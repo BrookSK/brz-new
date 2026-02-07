@@ -567,10 +567,7 @@ class AdminTicketsController extends Controller {
         }
 
         try {
-            if ($this->columnExists($pdo, 'support_tickets', 'internal_notes')) {
-                $st = $pdo->prepare('UPDATE support_tickets SET internal_notes = CONCAT(COALESCE(internal_notes, \'\'), ?, "\n\n"), updated_at = NOW() WHERE id = ? LIMIT 1');
-                $st->execute([$log, $id]);
-            }
+            $pdo->prepare('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?')->execute([(int) $id]);
         } catch (\Exception $e) {
         }
 

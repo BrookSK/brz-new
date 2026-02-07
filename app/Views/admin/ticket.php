@@ -163,6 +163,30 @@
                         <div class="form-text mt-2">Conversa interna: não aparece para o cliente. Não há opção de apagar mensagens.</div>
                     </div>
                 </div>
+
+                <script>
+                    (function () {
+                        try {
+                            var qs = new URLSearchParams(window.location.search || '');
+                            var hasVendor = (qs.get('vendedor_id') || '') !== '';
+                            if (!hasVendor) return;
+
+                            var el = document.getElementById('contatarVendedorBox');
+                            if (!el) return;
+
+                            if (window.bootstrap && typeof window.bootstrap.Collapse === 'function') {
+                                var inst = window.bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+                                inst.show();
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                                var inst2 = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+                                inst2.show();
+                            } else {
+                                el.classList.add('show');
+                            }
+                        } catch (e) {
+                        }
+                    })();
+                </script>
             </div>
         </div>
     </div>
