@@ -12,6 +12,19 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function markVendorChatSeen(\PDO $pdo, int $ticketId, int $vendedorId, int $viewerUid): void {
+        if ($ticketId <= 0 || $vendedorId <= 0 || $viewerUid <= 0) return;
+        if (!$this->tableExists($pdo, 'support_ticket_vendor_views')) return;
+        try {
+            $pdo->prepare(
+                'INSERT INTO support_ticket_vendor_views (ticket_id, vendedor_id, viewer_type, viewer_user_id, last_seen_at, updated_at) '
+                . 'VALUES (?, ?, ?, ?, NOW(), NOW()) '
+                . 'ON DUPLICATE KEY UPDATE last_seen_at = NOW(), updated_at = NOW()'
+            )->execute([(int) $ticketId, (int) $vendedorId, 'suporte', (int) $viewerUid]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getUploadsDirVendorChat(): array {
         $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
         $absCandidates = [
@@ -334,6 +347,29 @@ class AdminTicketsController extends Controller {
             $comprasAnteriores = [];
         }
 
+        // Histórico de tickets (do pedido e do cliente)
+        $ticketsDoPedido = [];
+        $ticketsDoCliente = [];
+        try {
+            $clienteId = (int) ($ticket['usuario_id'] ?? 0);
+            $pedidoIdAtual = (int) ($ticket['pedido_id'] ?? 0);
+
+            if ($pedidoIdAtual > 0) {
+                $stTp = $pdo->prepare('SELECT id, pedido_id, assunto, status, COALESCE(updated_at, created_at) AS atualizado_em FROM support_tickets WHERE pedido_id = ? AND id <> ? ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT 10');
+                $stTp->execute([(int) $pedidoIdAtual, (int) $id]);
+                $ticketsDoPedido = $stTp->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+
+            if ($clienteId > 0) {
+                $stTc = $pdo->prepare('SELECT id, pedido_id, assunto, status, COALESCE(updated_at, created_at) AS atualizado_em FROM support_tickets WHERE usuario_id = ? AND id <> ? ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT 20');
+                $stTc->execute([(int) $clienteId, (int) $id]);
+                $ticketsDoCliente = $stTc->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $ticketsDoPedido = [];
+            $ticketsDoCliente = [];
+        }
+
         // Detalhes do pedido relacionado ao ticket
         $pedidoDetalhes = [];
         try {
@@ -401,6 +437,32 @@ class AdminTicketsController extends Controller {
                 unset($vm);
             }
         } catch (\Exception $e) {
+        }
+
+        // badge: existe mensagem do vendedor não vista?
+        $vendorChatHasUnread = false;
+        try {
+            $viewerUid = (int) $this->getLoggedUserId();
+            if ($pedidoManual && $selectedVendedorId > 0 && $viewerUid > 0 && $this->tableExists($pdo, 'support_ticket_vendor_messages')) {
+                $lastSeen = null;
+                if ($this->tableExists($pdo, 'support_ticket_vendor_views')) {
+                    $stLs = $pdo->prepare("SELECT last_seen_at FROM support_ticket_vendor_views WHERE ticket_id = ? AND vendedor_id = ? AND viewer_type = 'suporte' AND viewer_user_id = ? LIMIT 1");
+                    $stLs->execute([(int) $id, (int) $selectedVendedorId, (int) $viewerUid]);
+                    $lastSeen = $stLs->fetchColumn();
+                }
+
+                if ($lastSeen) {
+                    $stUn = $pdo->prepare("SELECT COUNT(*) FROM support_ticket_vendor_messages WHERE ticket_id = ? AND vendedor_id = ? AND sender_type = 'vendedor' AND created_at > ?");
+                    $stUn->execute([(int) $id, (int) $selectedVendedorId, (string) $lastSeen]);
+                } else {
+                    $stUn = $pdo->prepare("SELECT COUNT(*) FROM support_ticket_vendor_messages WHERE ticket_id = ? AND vendedor_id = ? AND sender_type = 'vendedor'");
+                    $stUn->execute([(int) $id, (int) $selectedVendedorId]);
+                }
+
+                $vendorChatHasUnread = ((int) ($stUn->fetchColumn() ?: 0)) > 0;
+            }
+        } catch (\Exception $e) {
+            $vendorChatHasUnread = false;
         }
 
         $stM = $pdo->prepare('SELECT * FROM support_ticket_messages WHERE ticket_id = ? ORDER BY id ASC');
@@ -572,6 +634,25 @@ class AdminTicketsController extends Controller {
         }
 
         header('Location: /admin/tickets/' . $id . '?vendedor_id=' . (int) $vendedorId);
+        exit;
+    }
+
+    public function marcarVendorChatVisto(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $id = (int) ($id ?? $request->getParam('id'));
+        $vendedorId = (int) ($request->getParam('vendedor_id') ?? 0);
+        if ($id <= 0 || $vendedorId <= 0) {
+            header('Location: /admin/tickets/' . (int) $id);
+            exit;
+        }
+
+        $pdo = $this->getPdo();
+        $viewerUid = (int) $this->getLoggedUserId();
+        $this->markVendorChatSeen($pdo, (int) $id, (int) $vendedorId, (int) $viewerUid);
+
+        header('Location: /admin/tickets/' . (int) $id . '?vendedor_id=' . (int) $vendedorId);
         exit;
     }
 

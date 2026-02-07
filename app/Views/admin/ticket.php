@@ -8,8 +8,11 @@
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
         <?php $st = (string) ($ticket['status'] ?? 'open'); ?>
         <?php if (!empty($pedidoManual) && $st === 'open'): ?>
-            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#contatarVendedorBox" aria-expanded="false" aria-controls="contatarVendedorBox">
+            <button class="btn btn-outline-primary btn-sm position-relative" id="btnContatarVendedor" type="button" data-bs-toggle="collapse" data-bs-target="#contatarVendedorBox" aria-expanded="false" aria-controls="contatarVendedorBox">
                 <i class="fas fa-user-tie me-1"></i>Contatar vendedor
+                <?php if (!empty($vendorChatHasUnread)): ?>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="badgeVendorUnread">!</span>
+                <?php endif; ?>
             </button>
         <?php endif; ?>
         <?php if ($st === 'open'): ?>
@@ -47,7 +50,7 @@
 <?php endif; ?>
 
 <?php if (!empty($ticket['closure_decision']) || !empty($ticket['closed_by_type']) || !empty($ticket['closed_by_user_id'])): ?>
-    <div class="card border-0 shadow-sm mt-3">
+    <div class="card border-0 shadow-sm mt-3 mb-3">
         <div class="card-header bg-white"><div class="fw-semibold">Registro de encerramento</div></div>
         <div class="card-body">
             <?php if (!empty($ticket['closure_decision'])): ?>
@@ -182,6 +185,48 @@
                                 inst2.show();
                             } else {
                                 el.classList.add('show');
+                            }
+                        } catch (e) {
+                        }
+                    })();
+                </script>
+
+                <script>
+                    (function () {
+                        try {
+                            var el = document.getElementById('contatarVendedorBox');
+                            if (!el) return;
+
+                            var markSeen = function () {
+                                try {
+                                    var vidEl = document.querySelector('input[name="vendedor_id"]');
+                                    var vid = vidEl ? (vidEl.value || '') : '';
+                                    if (!vid) return;
+
+                                    var badge = document.getElementById('badgeVendorUnread');
+                                    if (badge) badge.style.display = 'none';
+
+                                    var fd = new FormData();
+                                    fd.append('vendedor_id', vid);
+
+                                    var url = '/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/vendor-chat/seen';
+                                    if (navigator.sendBeacon) {
+                                        navigator.sendBeacon(url, fd);
+                                    } else {
+                                        fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).catch(function () {});
+                                    }
+                                } catch (e) {
+                                }
+                            };
+
+                            if (window.bootstrap && window.bootstrap.Collapse) {
+                                el.addEventListener('shown.bs.collapse', markSeen);
+                            } else {
+                                el.addEventListener('click', function () {
+                                    if (el.classList.contains('show')) {
+                                        markSeen();
+                                    }
+                                });
                             }
                         } catch (e) {
                         }
@@ -662,7 +707,7 @@
             </div>
 
             <div class="col-lg-8">
-                <div class="border rounded p-3 h-100">
+                <div class="border rounded p-3 mb-3">
                     <div class="fw-semibold mb-2">Compras anteriores</div>
                     <?php if (empty($comprasAnteriores)): ?>
                         <div class="text-muted">Nenhuma compra anterior encontrada.</div>
@@ -690,6 +735,72 @@
                                             <td class="text-end">
                                                 <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/detalhes/<?= (int) ($p['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a>
                                             </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="border rounded p-3 mb-3">
+                    <div class="fw-semibold mb-2">Tickets do pedido</div>
+                    <?php if (empty($ticketsDoPedido)): ?>
+                        <div class="text-muted">Nenhum outro ticket relacionado a este pedido.</div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Assunto</th>
+                                        <th>Status</th>
+                                        <th>Atualizado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($ticketsDoPedido as $tp): ?>
+                                        <tr>
+                                            <td class="fw-semibold">#<?= (int) ($tp['id'] ?? 0) ?></td>
+                                            <td><?= htmlspecialchars((string) ($tp['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars((string) ($tp['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-muted small"><?= htmlspecialchars((string) ($tp['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tp['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="border rounded p-3">
+                    <div class="fw-semibold mb-2">Tickets do cliente (geral)</div>
+                    <?php if (empty($ticketsDoCliente)): ?>
+                        <div class="text-muted">Nenhum outro ticket do cliente.</div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Pedido</th>
+                                        <th>Assunto</th>
+                                        <th>Status</th>
+                                        <th>Atualizado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($ticketsDoCliente as $tc): ?>
+                                        <tr>
+                                            <td class="fw-semibold">#<?= (int) ($tc['id'] ?? 0) ?></td>
+                                            <td class="text-muted small"><?= !empty($tc['pedido_id']) ? ('#' . (int) $tc['pedido_id']) : '-' ?></td>
+                                            <td><?= htmlspecialchars((string) ($tc['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars((string) ($tc['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-muted small"><?= htmlspecialchars((string) ($tc['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tc['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

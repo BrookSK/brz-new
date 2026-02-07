@@ -247,6 +247,7 @@ $router->post('/admin/tickets/{id}/reabrir', 'AdminTicketsController', 'reabrir'
 $router->post('/admin/tickets/{id}/notas-internas', 'AdminTicketsController', 'salvarNotasInternas');
 $router->post('/admin/tickets/{id}/arquivos', 'AdminTicketsController', 'uploadArquivoTicket');
 $router->post('/admin/tickets/{id}/contatar-vendedor', 'AdminTicketsController', 'contatarVendedor');
+$router->post('/admin/tickets/{id}/vendor-chat/seen', 'AdminTicketsController', 'marcarVendorChatVisto');
 
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
