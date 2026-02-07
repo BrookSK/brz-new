@@ -242,96 +242,85 @@ class AdminPedidosWpController extends Controller {
     }
 
     private function getWpConfig(\PDO $pdo): array {
-        $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
-        $table = null;
-        foreach ($tableCandidates as $t) {
-            try {
-                $st = $pdo->prepare('SHOW TABLES LIKE ?');
-                $st->execute([$t]);
-                if ($st->fetchColumn()) {
-                    $table = $t;
-                    break;
-                }
-            } catch (\Exception $e) {
-            }
-        }
+        $out = ['table_prefix' => 'wp_'];
 
-        if (!$table) {
-            return [];
+        // Este projeto normalmente salva configs em configuracoes_sistema.
+        // Vamos ler de forma robusta tanto no formato categoria+chave quanto no formato chave/valor.
+        try {
+            $st = $pdo->prepare("SHOW TABLES LIKE 'configuracoes_sistema'");
+            $st->execute();
+            $has = (bool) $st->fetchColumn();
+            if (!$has) {
+                return $out;
+            }
+        } catch (\Exception $e) {
+            return $out;
         }
 
         $cols = [];
         try {
-            $st = $pdo->query('DESCRIBE ' . $table);
+            $st = $pdo->query('DESCRIBE configuracoes_sistema');
             $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
         } catch (\Exception $e) {
             $cols = [];
         }
 
-        if (empty($cols)) {
-            return [];
+        $hasCategoria = in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true);
+        if ($hasCategoria) {
+            try {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                $map = [
+                    'db_host' => 'db_host',
+                    'db_name' => 'db_name',
+                    'db_user' => 'db_user',
+                    'db_pass' => 'db_pass',
+                    'table_prefix' => 'table_prefix',
+                ];
+                foreach ($map as $outKey => $chave) {
+                    $st->execute(['wordpress', $chave]);
+                    $val = $st->fetchColumn();
+                    if ($val !== false && $val !== null) {
+                        $out[$outKey] = (string) $val;
+                    }
+                }
+                return $out;
+            } catch (\Exception $e) {
+                // cai para tentativa chave/valor abaixo
+            }
         }
 
-        $out = ['table_prefix' => 'wp_'];
-
-        // single_row schema
-        if (in_array('id', $cols, true) && in_array('asaas_api_key', $cols, true)) {
+        if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
             try {
-                $st = $pdo->query('SELECT * FROM ' . $table . ' ORDER BY id ASC LIMIT 1');
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                $map = [
+                    'db_host' => 'wordpress_db_host',
+                    'db_name' => 'wordpress_db_name',
+                    'db_user' => 'wordpress_db_user',
+                    'db_pass' => 'wordpress_db_pass',
+                    'table_prefix' => 'wordpress_table_prefix',
+                ];
+                foreach ($map as $outKey => $key) {
+                    $st->execute([$key]);
+                    $val = $st->fetchColumn();
+                    if ($val !== false && $val !== null) {
+                        $out[$outKey] = (string) $val;
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        // fallback: schema single-row (colunas diretas)
+        if (!empty($cols) && in_array('id', $cols, true) && !in_array('chave', $cols, true) && !in_array('categoria', $cols, true)) {
+            try {
+                $st = $pdo->query('SELECT * FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
                 $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
                 $out['db_host'] = (string) ($row['wordpress_db_host'] ?? '');
                 $out['db_name'] = (string) ($row['wordpress_db_name'] ?? '');
                 $out['db_user'] = (string) ($row['wordpress_db_user'] ?? '');
                 $out['db_pass'] = (string) ($row['wordpress_db_pass'] ?? '');
                 $out['table_prefix'] = (string) ($row['wordpress_table_prefix'] ?? 'wp_');
-                return $out;
             } catch (\Exception $e) {
-                return $out;
-            }
-        }
-
-        $hasCategoria = in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true);
-        if ($hasCategoria) {
-            try {
-                $st = $pdo->prepare('SELECT chave, valor FROM ' . $table . ' WHERE categoria = ?');
-                $st->execute(['wordpress']);
-                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                foreach ($rows as $r) {
-                    $k = (string) ($r['chave'] ?? '');
-                    if ($k === '') continue;
-                    $out[$k] = $r['valor'] ?? '';
-                }
-                return $out;
-            } catch (\Exception $e) {
-                return $out;
-            }
-        }
-
-        // key/value schema
-        $keyCol = in_array('chave', $cols, true) ? 'chave' : (in_array('key', $cols, true) ? 'key' : '');
-        $valueCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
-        if ($keyCol !== '' && $valueCol !== '') {
-            $keys = [
-                'wordpress_db_host',
-                'wordpress_db_name',
-                'wordpress_db_user',
-                'wordpress_db_pass',
-                'wordpress_table_prefix',
-                'wordpress_db_host',
-            ];
-
-            foreach ($keys as $k) {
-                try {
-                    $st = $pdo->prepare('SELECT ' . $valueCol . ' FROM ' . $table . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
-                    $st->execute([$k]);
-                    $val = (string) ($st->fetchColumn() ?: '');
-                    if ($k === 'wordpress_db_host') $out['db_host'] = $val;
-                    if ($k === 'wordpress_db_name') $out['db_name'] = $val;
-                    if ($k === 'wordpress_db_user') $out['db_user'] = $val;
-                    if ($k === 'wordpress_db_pass') $out['db_pass'] = $val;
-                    if ($k === 'wordpress_table_prefix') $out['table_prefix'] = $val;
-                } catch (\Exception $e) {
-                }
             }
         }
 
