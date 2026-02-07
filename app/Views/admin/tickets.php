@@ -5,6 +5,11 @@ if (!in_array($status, ['open', 'closed', 'all'], true)) {
 }
 $dateFrom = trim((string) ($_GET['date_from'] ?? ''));
 $dateTo = trim((string) ($_GET['date_to'] ?? ''));
+$clienteTipo = strtolower(trim((string) ($_GET['cliente_tipo'] ?? '')));
+if (!in_array($clienteTipo, ['', 'admin', 'suporte', 'vendedor'], true)) {
+    $clienteTipo = '';
+}
+$atendenteId = (int) ($_GET['atendente_id'] ?? 0);
 ?>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
@@ -37,6 +42,26 @@ $dateTo = trim((string) ($_GET['date_to'] ?? ''));
                 <label class="form-label mb-1">Até</label>
                 <input type="date" class="form-control" name="date_to" value="<?= htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') ?>">
             </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1">Usuário (tipo)</label>
+                <select class="form-select" name="cliente_tipo">
+                    <option value="" <?= $clienteTipo === '' ? 'selected' : '' ?>>Todos</option>
+                    <option value="admin" <?= $clienteTipo === 'admin' ? 'selected' : '' ?>>Admin</option>
+                    <option value="suporte" <?= $clienteTipo === 'suporte' ? 'selected' : '' ?>>Suporte</option>
+                    <option value="vendedor" <?= $clienteTipo === 'vendedor' ? 'selected' : '' ?>>Vendedor</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label mb-1">Atendente</label>
+                <select class="form-select" name="atendente_id">
+                    <option value="0" <?= $atendenteId === 0 ? 'selected' : '' ?>>Todos</option>
+                    <?php foreach (($atendentes ?? []) as $a): ?>
+                        <option value="<?= (int) ($a['id'] ?? 0) ?>" <?= (int) ($a['id'] ?? 0) === $atendenteId ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string) ($a['nome'] ?? $a['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div class="col-md-3 d-flex gap-2">
                 <button class="btn btn-primary w-100" type="submit"><i class="fas fa-filter me-1"></i>Filtrar</button>
                 <a class="btn btn-outline-secondary w-100" href="/admin/tickets"><i class="fas fa-eraser me-1"></i>Limpar</a>
@@ -56,6 +81,7 @@ $dateTo = trim((string) ($_GET['date_to'] ?? ''));
                         <tr>
                             <th>#</th>
                             <th>Cliente</th>
+                            <th>Atendente</th>
                             <th>Motivo</th>
                             <th>Assunto</th>
                             <th>Status</th>
@@ -74,6 +100,9 @@ $dateTo = trim((string) ($_GET['date_to'] ?? ''));
                                 <td>
                                     <div class="fw-semibold"><?= htmlspecialchars((string) ($t['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                     <div class="text-muted small"><?= htmlspecialchars((string) ($t['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold"><?= htmlspecialchars((string) ($t['atendente_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                 </td>
                                 <td>
                                     <div><?= htmlspecialchars((string) ($t['motivo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>

@@ -204,6 +204,13 @@ class AdminTicketsController extends Controller {
         $dateFrom = trim((string) ($request->getParam('date_from') ?? ''));
         $dateTo = trim((string) ($request->getParam('date_to') ?? ''));
 
+        $clienteTipo = strtolower(trim((string) ($request->getParam('cliente_tipo') ?? '')));
+        if (!in_array($clienteTipo, ['', 'admin', 'suporte', 'vendedor'], true)) {
+            $clienteTipo = '';
+        }
+
+        $atendenteId = (int) ($request->getParam('atendente_id') ?? 0);
+
         $whereParts = [];
         $params = [];
         if ($status !== 'all') {
@@ -218,20 +225,47 @@ class AdminTicketsController extends Controller {
             $whereParts[] = 'DATE(COALESCE(t.updated_at, t.created_at)) <= ?';
             $params[] = $dateTo;
         }
+
+        if ($clienteTipo !== '') {
+            $whereParts[] = '(
+                LOWER(COALESCE(u.perfil, u.role, \'\')) = ?
+                OR LOWER(COALESCE(u.role, u.perfil, \'\')) = ?
+            )';
+            $params[] = $clienteTipo;
+            $params[] = $clienteTipo;
+        }
+
+        $hasAttendantTypeCol = $this->columnExists($pdo, 'support_tickets', 'attendant_type');
+        $hasAttendantUserIdCol = $this->columnExists($pdo, 'support_tickets', 'attendant_user_id');
+        if ($atendenteId > 0 && $hasAttendantUserIdCol) {
+            $whereParts[] = 't.attendant_user_id = ?';
+            $params[] = $atendenteId;
+        }
         $where = '';
         if (!empty($whereParts)) {
             $where = ' WHERE ' . implode(' AND ', $whereParts) . ' ';
         }
 
-        $sql = 'SELECT t.*, u.nome AS usuario_nome, u.email AS usuario_email '
+        $sql = 'SELECT t.*, u.nome AS usuario_nome, u.email AS usuario_email, a.nome AS atendente_nome '
             . 'FROM support_tickets t '
             . 'INNER JOIN usuarios u ON u.id = t.usuario_id '
+            . 'LEFT JOIN usuarios a ON a.id = t.attendant_user_id '
             . $where
             . 'ORDER BY COALESCE(t.updated_at, t.created_at) ASC, t.created_at ASC';
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $tickets = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Lista de atendentes para filtro (admin/suporte)
+        $atendentes = [];
+        try {
+            $stA = $pdo->prepare("SELECT id, COALESCE(nome, name) AS nome, email FROM usuarios WHERE (LOWER(COALESCE(role,'')) IN ('admin','suporte') OR LOWER(COALESCE(perfil,'')) IN ('admin','suporte')) ORDER BY COALESCE(nome, name) ASC");
+            $stA->execute();
+            $atendentes = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $atendentes = [];
+        }
 
         // Ao abrir a aba/lista, some a bolha de notificação (marca como visto para o admin)
         $adminUid = $this->getLoggedUserId();
@@ -821,6 +855,26 @@ class AdminTicketsController extends Controller {
             }
 
             $pdo->prepare('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?')->execute([$id]);
+
+            // Define atendente do ticket (admin/suporte)
+            $hasAttendantTypeCol = $this->columnExists($pdo, 'support_tickets', 'attendant_type');
+            $hasAttendantUserIdCol = $this->columnExists($pdo, 'support_tickets', 'attendant_user_id');
+            if ($hasAttendantTypeCol || $hasAttendantUserIdCol) {
+                $set = [];
+                $p = [];
+                if ($hasAttendantTypeCol) {
+                    $set[] = 'attendant_type = ?';
+                    $p[] = (string) $this->getUserRoleOrPerfil();
+                }
+                if ($hasAttendantUserIdCol) {
+                    $set[] = 'attendant_user_id = ?';
+                    $p[] = (int) $adminUid;
+                }
+                $p[] = (int) $id;
+                if (!empty($set)) {
+                    $pdo->prepare('UPDATE support_tickets SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($p);
+                }
+            }
             $pdo->commit();
 
             try {
