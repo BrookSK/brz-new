@@ -108,7 +108,7 @@
                         .brz-chat .brz-composer textarea { min-height: 90px; resize: vertical; }
                         .brz-chat .brz-actions { display: flex; flex-direction: column; gap: 10px; }
                         .brz-chat .brz-actions .btn { height: 44px; }
-                        .brz-chat .brz-actions { margin-top: 22px; }
+                        .brz-chat .brz-actions { margin-top: 24px; }
                         @media (max-width: 768px) {
                             .brz-chat .brz-chat-body { height: min(66vh, 560px); }
                             .brz-chat .brz-composer { grid-template-columns: 1fr; }

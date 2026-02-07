@@ -7,7 +7,7 @@
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
         <?php $st = (string) ($ticket['status'] ?? 'open'); ?>
-        <?php if (!empty($pedidoManual) && !empty($vendedores) && is_array($vendedores) && $st === 'open'): ?>
+        <?php if (!empty($pedidoManual) && $st === 'open'): ?>
             <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#contatarVendedorBox" aria-expanded="false" aria-controls="contatarVendedorBox">
                 <i class="fas fa-user-tie me-1"></i>Contatar vendedor
             </button>
@@ -24,7 +24,7 @@
     </div>
 </div>
 
-<?php if (!empty($pedidoManual) && !empty($vendedores) && is_array($vendedores) && $st === 'open'): ?>
+<?php if (!empty($pedidoManual) && $st === 'open'): ?>
     <div class="collapse mb-3" id="contatarVendedorBox">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
@@ -34,12 +34,14 @@
                             <label class="form-label mb-1">Vendedor</label>
                             <select class="form-select" name="vendedor_id" required>
                                 <option value="">Selecione...</option>
-                                <?php foreach ($vendedores as $v): ?>
-                                    <?php $vid = (int) ($v['id'] ?? 0); ?>
-                                    <option value="<?= $vid ?>" <?= (!empty($pedidoDetalhes) && (int) ($pedidoDetalhes['admin_criador_id'] ?? 0) === $vid) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars((string) ($v['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($v['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (!empty($vendedores) && is_array($vendedores)): ?>
+                                    <?php foreach ($vendedores as $v): ?>
+                                        <?php $vid = (int) ($v['id'] ?? 0); ?>
+                                        <option value="<?= $vid ?>" <?= (!empty($pedidoDetalhes) && (int) ($pedidoDetalhes['admin_criador_id'] ?? 0) === $vid) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars((string) ($v['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($v['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="col-md-8">
@@ -54,6 +56,9 @@
                     </div>
                 </form>
                 <div class="form-text mt-2">Esta ação fica registrada em <strong>Anotações internas</strong>.</div>
+                <?php if (empty($vendedores)): ?>
+                    <div class="text-muted small mt-2">Nenhum vendedor encontrado (role/perfil = vendedor). Verifique o cadastro de usuários.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -401,7 +406,7 @@
                         <div class="form-text">Até 20MB. Alguns tipos perigosos são bloqueados.</div>
                     </div>
                     <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100" title="Enviar arquivo">
+                        <button type="submit" class="btn btn-primary w-100 mt-1" title="Enviar arquivo">
                             <i class="fas fa-upload"></i>
                         </button>
                     </div>
