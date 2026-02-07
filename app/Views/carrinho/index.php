@@ -10,6 +10,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
                         <?php foreach ($carrinho as $index => $item): ?>
+                        <?php $itemKeyStable = ((string) ($item['produto_id'] ?? '0')) . ':' . ((string) ((int) ($item['produto_variacao_id'] ?? 0))); ?>
                         <?php $isAtivo = !empty($item['ativo']); ?>
                         <div class="cart-item border-bottom pb-3 mb-3 <?= $isAtivo ? '' : 'opacity-50' ?>">
                             <div class="row align-items-center">
@@ -17,7 +18,7 @@
                                     <div class="form-check mb-0">
                                         <input class="form-check-input" type="checkbox"
                                                <?= $isAtivo ? 'checked' : '' ?>
-                                               onchange='toggleAtivo(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, this.checked ? 1 : 0)'>
+                                               onchange='toggleAtivo(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, this.checked ? 1 : 0)'>
                                     </div>
                                 </div>
                                 <div class="col-4 col-md-2 mb-2 mb-md-0">
@@ -130,7 +131,7 @@
                                         <div class="small text-muted fst-italic">Selecione o item para ativar e prossiga.</div>
                                     <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
-                                        <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
+                                        <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
                                         </button>
                                         <input type="number" class="form-control text-center" 
@@ -139,8 +140,8 @@
                                                max="999"
                                                <?= $isAtivo ? '' : 'disabled' ?>
                                                id="quantidade-<?= htmlspecialchars((string) $index) ?>"
-                                               onchange='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, this.value)'>
-                                        <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= $item['quantidade'] + 1 ?>)'>
+                                               onchange='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, this.value)'>
+                                        <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= $item['quantidade'] + 1 ?>)'>
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -160,7 +161,7 @@
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
                                     <div class="d-flex gap-1 justify-content-end">
-                                        <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $index), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
+                                        <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
