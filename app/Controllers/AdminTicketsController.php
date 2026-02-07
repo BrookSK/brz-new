@@ -12,6 +12,31 @@ class AdminTicketsController extends Controller {
         return \Config\Database::getConnection();
     }
 
+    private function getUploadsDirVendorChat(): array {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $absCandidates = [
+            $docRoot . '/public/uploads/tickets/vendor-chat/',
+            $docRoot . '/uploads/tickets/vendor-chat/',
+            __DIR__ . '/../../public/uploads/tickets/vendor-chat/',
+        ];
+
+        $abs = '';
+        foreach ($absCandidates as $c) {
+            if (is_string($c) && $c !== '' && (is_dir($c) || @mkdir($c, 0775, true))) {
+                $abs = rtrim($c, '/\\') . DIRECTORY_SEPARATOR;
+                break;
+            }
+        }
+        if ($abs === '') {
+            $abs = rtrim((string) $absCandidates[0], '/\\') . DIRECTORY_SEPARATOR;
+        }
+
+        return [
+            'abs' => $abs,
+            'web' => '/uploads/tickets/vendor-chat/',
+        ];
+    }
+
     private function getUserRoleOrPerfil(): string {
         try {
             if (session_status() === PHP_SESSION_NONE) {
@@ -338,6 +363,46 @@ class AdminTicketsController extends Controller {
             }
         }
 
+        $selectedVendedorId = (int) ($request->getParam('vendedor_id') ?? 0);
+        if ($selectedVendedorId <= 0 && $pedidoManual && is_array($pedidoDetalhes)) {
+            $selectedVendedorId = (int) ($pedidoDetalhes['admin_criador_id'] ?? 0);
+        }
+
+        $vendorChatMessages = [];
+        try {
+            if ($pedidoManual && $selectedVendedorId > 0 && $this->tableExists($pdo, 'support_ticket_vendor_messages')) {
+                $stVC = $pdo->prepare('SELECT * FROM support_ticket_vendor_messages WHERE ticket_id = ? AND vendedor_id = ? ORDER BY id ASC');
+                $stVC->execute([(int) $id, (int) $selectedVendedorId]);
+                $vendorChatMessages = $stVC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $vendorChatMessages = [];
+        }
+
+        // anexos do chat interno (por vendedor)
+        try {
+            if (!empty($vendorChatMessages) && $this->tableExists($pdo, 'support_ticket_vendor_message_attachments')) {
+                $stA = $pdo->prepare('SELECT * FROM support_ticket_vendor_message_attachments WHERE ticket_id = ? AND vendedor_id = ? ORDER BY id ASC');
+                $stA->execute([(int) $id, (int) $selectedVendedorId]);
+                $rowsA = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $byMsg = [];
+                foreach ($rowsA as $r) {
+                    $mid = (int) ($r['message_id'] ?? 0);
+                    if ($mid <= 0) continue;
+                    if (!isset($byMsg[$mid])) $byMsg[$mid] = [];
+                    $byMsg[$mid][] = $r;
+                }
+                foreach ($vendorChatMessages as &$vm) {
+                    $mid = (int) ($vm['id'] ?? 0);
+                    if ($mid > 0 && isset($byMsg[$mid])) {
+                        $vm['attachments'] = $byMsg[$mid];
+                    }
+                }
+                unset($vm);
+            }
+        } catch (\Exception $e) {
+        }
+
         $stM = $pdo->prepare('SELECT * FROM support_ticket_messages WHERE ticket_id = ? ORDER BY id ASC');
         $stM->execute([$id]);
         $messages = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -453,6 +518,54 @@ class AdminTicketsController extends Controller {
         $stamp = date('Y-m-d H:i:s');
         $log = "[CONTATO VENDEDOR] {$stamp} | por: {$adminNome} (#{$adminUid}) | para: {$vendNome} (#{$vendedorId}) {$vendEmail}\n{$msg}\n";
 
+        // gravar chat interno por vendedor, quando a tabela existir
+        $vendorMessageId = 0;
+        try {
+            if ($this->tableExists($pdo, 'support_ticket_vendor_messages')) {
+                $stIns = $pdo->prepare('INSERT INTO support_ticket_vendor_messages (ticket_id, vendedor_id, sender_type, sender_user_id, mensagem) VALUES (?, ?, ?, ?, ?)');
+                $stIns->execute([(int) $id, (int) $vendedorId, 'suporte', (int) $adminUid, (string) $msg]);
+                $vendorMessageId = (int) $pdo->lastInsertId();
+            }
+        } catch (\Exception $e) {
+        }
+
+        // upload de anexos (documentos) no chat interno
+        try {
+            if ($vendorMessageId > 0 && $this->tableExists($pdo, 'support_ticket_vendor_message_attachments') && isset($_FILES['documentos']) && is_array($_FILES['documentos']) && !empty($_FILES['documentos']['name'][0])) {
+                $dirs = $this->getUploadsDirVendorChat();
+                $absDir = (string) ($dirs['abs'] ?? '');
+                $webDir = (string) ($dirs['web'] ?? '/uploads/tickets/vendor-chat/');
+                if ($absDir !== '') {
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $blockedExt = ['php', 'phtml', 'phar', 'exe', 'bat', 'cmd', 'sh', 'js', 'html', 'htm'];
+                    $max = 20 * 1024 * 1024;
+
+                    foreach ($_FILES['documentos']['name'] as $k => $origName) {
+                        if (($_FILES['documentos']['error'][$k] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                        $tmp = (string) ($_FILES['documentos']['tmp_name'][$k] ?? '');
+                        if ($tmp === '' || !is_uploaded_file($tmp)) continue;
+                        $size = (int) ($_FILES['documentos']['size'][$k] ?? 0);
+                        if ($size <= 0 || $size > $max) continue;
+
+                        $clean = preg_replace('/[^A-Za-z0-9\-_\.]/', '', (string) $origName);
+                        $ext = strtolower(pathinfo($clean, PATHINFO_EXTENSION));
+                        if ($ext !== '' && in_array($ext, $blockedExt, true)) continue;
+
+                        $mime = (string) $finfo->file($tmp);
+                        $fname = 't' . (int) $id . '_v' . (int) $vendedorId . '_m' . (int) $vendorMessageId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '_' . $clean;
+                        $abs = rtrim($absDir, '/\\') . DIRECTORY_SEPARATOR . $fname;
+                        $rel = rtrim($webDir, '/') . '/' . $fname;
+
+                        if (!@move_uploaded_file($tmp, $abs)) continue;
+
+                        $stA = $pdo->prepare('INSERT INTO support_ticket_vendor_message_attachments (message_id, ticket_id, vendedor_id, file_path, original_name, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                        $stA->execute([(int) $vendorMessageId, (int) $id, (int) $vendedorId, $rel, (string) $origName, $mime, $size]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
         try {
             if ($this->columnExists($pdo, 'support_tickets', 'internal_notes')) {
                 $st = $pdo->prepare('UPDATE support_tickets SET internal_notes = CONCAT(COALESCE(internal_notes, \'\'), ?, "\n\n"), updated_at = NOW() WHERE id = ? LIMIT 1');
@@ -461,7 +574,7 @@ class AdminTicketsController extends Controller {
         } catch (\Exception $e) {
         }
 
-        header('Location: /admin/tickets/' . $id);
+        header('Location: /admin/tickets/' . $id . '?vendedor_id=' . (int) $vendedorId);
         exit;
     }
 
@@ -651,7 +764,33 @@ class AdminTicketsController extends Controller {
 
         $id = (int) ($id ?? $request->getParam('id'));
         $pdo = $this->getPdo();
-        $pdo->prepare("UPDATE support_tickets SET status = 'closed', closed_at = NOW(), updated_at = NOW() WHERE id = ?")->execute([$id]);
+        $decision = trim((string) ($request->getParam('closure_decision') ?? $request->getParam('decisao') ?? ''));
+        $hasDecisionCol = $this->columnExists($pdo, 'support_tickets', 'closure_decision');
+        $hasClosedByTypeCol = $this->columnExists($pdo, 'support_tickets', 'closed_by_type');
+        $hasClosedByUidCol = $this->columnExists($pdo, 'support_tickets', 'closed_by_user_id');
+
+        if ($hasDecisionCol && $decision === '') {
+            header('Location: /admin/tickets/' . $id . '?closure_error=1');
+            exit;
+        }
+
+        $set = ["status = 'closed'", 'closed_at = NOW()', 'updated_at = NOW()'];
+        $params = [];
+        if ($hasDecisionCol) {
+            $set[] = 'closure_decision = ?';
+            $params[] = $decision;
+        }
+        if ($hasClosedByTypeCol) {
+            $set[] = 'closed_by_type = ?';
+            $params[] = 'admin';
+        }
+        if ($hasClosedByUidCol) {
+            $set[] = 'closed_by_user_id = ?';
+            $params[] = (int) $this->getLoggedUserId();
+        }
+        $params[] = $id;
+
+        $pdo->prepare('UPDATE support_tickets SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params);
         header('Location: /admin/tickets/' . $id);
         exit;
     }

@@ -13,9 +13,9 @@
             </button>
         <?php endif; ?>
         <?php if ($st === 'open'): ?>
-            <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/fechar">
-                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-lock me-1"></i>Fechar</button>
-            </form>
+            <button class="btn btn-outline-danger btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#fecharTicketBox" aria-expanded="false" aria-controls="fecharTicketBox">
+                <i class="fas fa-lock me-1"></i>Fechar
+            </button>
         <?php else: ?>
             <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/reabrir">
                 <button type="submit" class="btn btn-outline-success btn-sm"><i class="fas fa-unlock me-1"></i>Reabrir</button>
@@ -24,41 +24,145 @@
     </div>
 </div>
 
+<?php if (!empty($_GET['closure_error'])): ?>
+    <div class="alert alert-warning">Para fechar o ticket, informe o que ficou decidido entre a empresa e o cliente.</div>
+<?php endif; ?>
+
+<?php if ($st === 'open'): ?>
+    <div class="collapse mb-3" id="fecharTicketBox">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/fechar" onsubmit="return confirm('Tem certeza que deseja fechar este ticket?');">
+                    <div class="mb-2">
+                        <label class="form-label mb-1">O que ficou decidido (obrigatório)</label>
+                        <textarea class="form-control" name="closure_decision" rows="3" required></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-danger btn-sm">Confirmar fechamento</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if (!empty($ticket['closure_decision']) || !empty($ticket['closed_by_type']) || !empty($ticket['closed_by_user_id'])): ?>
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-header bg-white"><div class="fw-semibold">Registro de encerramento</div></div>
+        <div class="card-body">
+            <?php if (!empty($ticket['closure_decision'])): ?>
+                <div style="white-space: pre-wrap;"><?= htmlspecialchars((string) $ticket['closure_decision'], ENT_QUOTES, 'UTF-8') ?></div>
+            <?php endif; ?>
+            <div class="text-muted small mt-2">
+                <?= htmlspecialchars((string) ($ticket['closed_by_type'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                <?php if (!empty($ticket['closed_by_user_id'])): ?>
+                    #<?= (int) $ticket['closed_by_user_id'] ?>
+                <?php endif; ?>
+                <?php if (!empty($ticket['closed_at'])): ?>
+                    • <?= htmlspecialchars((string) $ticket['closed_at'], ENT_QUOTES, 'UTF-8') ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (!empty($pedidoManual) && $st === 'open'): ?>
     <div class="collapse mb-3" id="contatarVendedorBox">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/contatar-vendedor">
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <label class="form-label mb-1">Vendedor</label>
-                            <select class="form-select" name="vendedor_id" required>
-                                <option value="">Selecione...</option>
-                                <?php if (!empty($vendedores) && is_array($vendedores)): ?>
-                                    <?php foreach ($vendedores as $v): ?>
-                                        <?php $vid = (int) ($v['id'] ?? 0); ?>
-                                        <option value="<?= $vid ?>" <?= (!empty($pedidoDetalhes) && (int) ($pedidoDetalhes['admin_criador_id'] ?? 0) === $vid) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars((string) ($v['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($v['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label mb-1">Mensagem</label>
-                            <textarea class="form-control" name="mensagem" rows="2" required placeholder="Digite a mensagem para o vendedor..."></textarea>
-                        </div>
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="fas fa-paper-plane me-1"></i>Enviar
-                            </button>
+                <style>
+                    .vendor-chat-box { border: 1px solid rgba(148,163,184,.25); border-radius: 12px; padding: 12px; background: #fff; max-height: 320px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+                    .vendor-row { width: 100%; display: flex; }
+                    .vendor-row.me { justify-content: flex-end; }
+                    .vendor-row.other { justify-content: flex-start; }
+                    .vendor-bubble { width: fit-content; max-width: min(82%, 760px); padding: 10px 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; }
+                    .vendor-bubble.me { background: #0b1f3a; color: #fff; border-top-right-radius: 8px; }
+                    .vendor-bubble.other { background: #f1f5f9; color: #0f172a; border-top-left-radius: 8px; }
+                    .vendor-meta { font-size: 12px; opacity: .85; display: flex; gap: 8px; }
+                    .vendor-text { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; line-height: 1.35; }
+                </style>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">Vendedor</label>
+                        <select class="form-select" onchange="location.href='/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>?vendedor_id=' + this.value + '#contatarVendedorBox';">
+                            <option value="">Selecione...</option>
+                            <?php $selVid = (int) ($selectedVendedorId ?? 0); ?>
+                            <?php if (!empty($vendedores) && is_array($vendedores)): ?>
+                                <?php foreach ($vendedores as $v): ?>
+                                    <?php $vid = (int) ($v['id'] ?? 0); ?>
+                                    <option value="<?= $vid ?>" <?= ($selVid === $vid) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars((string) ($v['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <?php if (empty($vendedores)): ?>
+                            <div class="text-muted small mt-2">Nenhum vendedor encontrado (role/perfil = vendedor). Verifique o cadastro de usuários.</div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label mb-1">Conversa interna (suporte x vendedor)</label>
+                        <div class="vendor-chat-box">
+                            <?php if (empty($selectedVendedorId)): ?>
+                                <div class="text-muted">Selecione um vendedor para ver o histórico.</div>
+                            <?php elseif (empty($vendorChatMessages)): ?>
+                                <div class="text-muted">Sem mensagens ainda com este vendedor.</div>
+                            <?php else: ?>
+                                <?php foreach ($vendorChatMessages as $vm): ?>
+                                    <?php $isMe = ((string) ($vm['sender_type'] ?? '')) === 'suporte'; ?>
+                                    <div class="vendor-row <?= $isMe ? 'me' : 'other' ?>">
+                                        <div class="vendor-bubble <?= $isMe ? 'me' : 'other' ?>">
+                                            <div class="vendor-meta">
+                                                <?= $isMe ? 'Suporte' : 'Vendedor' ?>
+                                                <span class="opacity-75">•</span>
+                                                <span class="opacity-75"><?= htmlspecialchars((string) ($vm['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                            </div>
+                                            <div class="vendor-text"><?= htmlspecialchars((string) ($vm['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+
+                                            <?php if (!empty($vm['attachments']) && is_array($vm['attachments'])): ?>
+                                                <div class="mt-2">
+                                                    <?php foreach ($vm['attachments'] as $va): ?>
+                                                        <?php $fp = (string) ($va['file_path'] ?? ''); ?>
+                                                        <?php $on = (string) ($va['original_name'] ?? ''); ?>
+                                                        <?php if ($fp !== ''): ?>
+                                                            <div>
+                                                                <a href="<?= htmlspecialchars($fp, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="text-decoration-none">
+                                                                    <i class="fas fa-paperclip me-1"></i><?= htmlspecialchars($on !== '' ? $on : $fp, ENT_QUOTES, 'UTF-8') ?>
+                                                                </a>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
-                </form>
-                <div class="form-text mt-2">Esta ação fica registrada em <strong>Anotações internas</strong>.</div>
-                <?php if (empty($vendedores)): ?>
-                    <div class="text-muted small mt-2">Nenhum vendedor encontrado (role/perfil = vendedor). Verifique o cadastro de usuários.</div>
-                <?php endif; ?>
+
+                    <div class="col-12">
+                        <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/contatar-vendedor" enctype="multipart/form-data" class="d-flex gap-2 align-items-start">
+                            <input type="hidden" name="vendedor_id" value="<?= (int) ($selectedVendedorId ?? 0) ?>">
+                            <div class="flex-grow-1">
+                                <label class="form-label mb-1">Mensagem</label>
+                                <textarea class="form-control" name="mensagem" rows="2" required <?= empty($selectedVendedorId) ? 'disabled' : '' ?> placeholder="Digite a mensagem..." ></textarea>
+                                <div class="mt-2">
+                                    <input class="form-control" type="file" name="documentos[]" multiple <?= empty($selectedVendedorId) ? 'disabled' : '' ?> >
+                                    <div class="form-text">Anexe documentos/arquivos (até 20MB cada).</div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 26px;">
+                                <button type="submit" class="btn btn-primary" title="Enviar" <?= empty($selectedVendedorId) ? 'disabled' : '' ?> style="height: 42px; width: 56px;">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </form>
+                        <div class="form-text mt-2">Conversa interna: não aparece para o cliente. Não há opção de apagar mensagens.</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

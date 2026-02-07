@@ -465,7 +465,40 @@ class SupportTicketsController extends Controller {
             exit;
         }
 
-        $pdo->prepare("UPDATE support_tickets SET status = 'closed', closed_at = NOW(), updated_at = NOW() WHERE id = ?")->execute([$id]);
+        $decision = trim((string) ($request->getParam('closure_decision') ?? $request->getParam('decisao') ?? ''));
+        $colsTickets = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE support_tickets');
+            $colsTickets = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsTickets = [];
+        }
+        $hasDecisionCol = in_array('closure_decision', $colsTickets, true);
+        $hasClosedByTypeCol = in_array('closed_by_type', $colsTickets, true);
+        $hasClosedByUidCol = in_array('closed_by_user_id', $colsTickets, true);
+
+        if ($hasDecisionCol && $decision === '') {
+            header('Location: /meu-ticket/' . $id . '?closure_error=1');
+            exit;
+        }
+
+        $set = ["status = 'closed'", 'closed_at = NOW()', 'updated_at = NOW()'];
+        $params = [];
+        if ($hasDecisionCol) {
+            $set[] = 'closure_decision = ?';
+            $params[] = $decision;
+        }
+        if ($hasClosedByTypeCol) {
+            $set[] = 'closed_by_type = ?';
+            $params[] = 'cliente';
+        }
+        if ($hasClosedByUidCol) {
+            $set[] = 'closed_by_user_id = ?';
+            $params[] = (int) $uid;
+        }
+        $params[] = $id;
+
+        $pdo->prepare('UPDATE support_tickets SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params);
         header('Location: /meu-ticket/' . $id);
         exit;
     }

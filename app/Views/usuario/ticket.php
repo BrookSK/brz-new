@@ -125,11 +125,49 @@
                             <?php endif; ?>
                         </div>
                         <?php if ($st === 'open'): ?>
-                            <form method="POST" action="/meu-ticket/<?= (int) ($ticket['id'] ?? 0) ?>/fechar">
-                                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-lock me-1"></i>Encerrar</button>
-                            </form>
+                            <button class="btn btn-outline-danger btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#fecharTicketBox" aria-expanded="false" aria-controls="fecharTicketBox">
+                                <i class="fas fa-lock me-1"></i>Encerrar
+                            </button>
                         <?php endif; ?>
                     </div>
+
+                    <?php if (!empty($_GET['closure_error'])): ?>
+                        <div class="alert alert-warning mt-3 mb-0">Para encerrar o ticket, informe o que ficou decidido entre a empresa e você.</div>
+                    <?php endif; ?>
+
+                    <?php if ($st === 'open'): ?>
+                        <div class="collapse mt-3" id="fecharTicketBox">
+                            <div class="border rounded p-3" style="background: #fff;">
+                                <form method="POST" action="/meu-ticket/<?= (int) ($ticket['id'] ?? 0) ?>/fechar" onsubmit="return confirm('Tem certeza que deseja encerrar este ticket?');">
+                                    <div class="mb-2">
+                                        <label class="form-label mb-1">O que ficou decidido (obrigatório)</label>
+                                        <textarea class="form-control" name="closure_decision" rows="3" required></textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-end">
+                                        <button type="submit" class="btn btn-danger btn-sm">Confirmar encerramento</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($ticket['closure_decision']) || !empty($ticket['closed_by_type']) || !empty($ticket['closed_by_user_id'])): ?>
+                        <div class="border rounded p-3 mt-3" style="background: #fff;">
+                            <div class="fw-semibold mb-2">Registro de encerramento</div>
+                            <?php if (!empty($ticket['closure_decision'])): ?>
+                                <div style="white-space: pre-wrap;"><?= htmlspecialchars((string) $ticket['closure_decision'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php endif; ?>
+                            <div class="text-muted small mt-2">
+                                <?= htmlspecialchars((string) ($ticket['closed_by_type'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                <?php if (!empty($ticket['closed_by_user_id'])): ?>
+                                    #<?= (int) $ticket['closed_by_user_id'] ?>
+                                <?php endif; ?>
+                                <?php if (!empty($ticket['closed_at'])): ?>
+                                    • <?= htmlspecialchars((string) $ticket['closed_at'], ENT_QUOTES, 'UTF-8') ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="brz-chat-body">
                         <?php if (empty($messages)): ?>
