@@ -351,9 +351,24 @@ class CarrinhoController extends Controller {
                 if (!empty($row)) {
                     if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
                     if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
-                    if (array_key_exists('taxa_servico', $row)) $taxaServico = (float) ($row['taxa_servico'] ?? $taxaServico);
-                    if (array_key_exists('valor_impostos', $row)) $impostos = (float) ($row['valor_impostos'] ?? $impostos);
-                    if (array_key_exists('valor_total', $row)) $total = (float) ($row['valor_total'] ?? $total);
+                    if (array_key_exists('taxa_servico', $row)) {
+                        $v = (float) ($row['taxa_servico'] ?? 0);
+                        if ($v > 0 || ((float) $taxaServico) <= 0) {
+                            $taxaServico = $v;
+                        }
+                    }
+                    if (array_key_exists('valor_impostos', $row)) {
+                        $v = (float) ($row['valor_impostos'] ?? 0);
+                        if ($v > 0 || ((float) $impostos) <= 0) {
+                            $impostos = $v;
+                        }
+                    }
+                    if (array_key_exists('valor_total', $row)) {
+                        $v = (float) ($row['valor_total'] ?? 0);
+                        if ($v > 0 || ((float) $total) <= 0) {
+                            $total = $v;
+                        }
+                    }
 
                     if (array_key_exists('frete_manual', $row) && $row['frete_manual'] !== null && $row['frete_manual'] !== '') {
                         $frete = (float) $row['frete_manual'];

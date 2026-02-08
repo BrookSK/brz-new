@@ -1358,10 +1358,16 @@ class CheckoutController extends Controller {
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
         if (isset($taxaServicoFromDb)) {
-            $taxaServico = (float) $taxaServicoFromDb;
+            $v = (float) $taxaServicoFromDb;
+            if ($v > 0 || ((float) $taxaServico) <= 0) {
+                $taxaServico = $v;
+            }
         }
         if (isset($impostosFromDb)) {
-            $impostos = (float) $impostosFromDb;
+            $v = (float) $impostosFromDb;
+            if ($v > 0 || ((float) $impostos) <= 0) {
+                $impostos = $v;
+            }
         }
         if (isset($freteFromDb)) {
             $frete = (float) $freteFromDb;
