@@ -349,42 +349,15 @@ class CarrinhoController extends Controller {
                 $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                 if (!empty($row)) {
-                    if (array_key_exists('subtotal_produtos', $row) && $row['subtotal_produtos'] !== null && $row['subtotal_produtos'] !== '' && (float) $row['subtotal_produtos'] > 0) {
-                        $subtotal = (float) $row['subtotal_produtos'];
-                    }
-                    if (array_key_exists('peso_total', $row) && $row['peso_total'] !== null && $row['peso_total'] !== '' && (float) $row['peso_total'] > 0) {
-                        $pesoTotal = (float) $row['peso_total'];
-                    }
-                    if (array_key_exists('taxa_servico', $row) && $row['taxa_servico'] !== null && $row['taxa_servico'] !== '' && (float) $row['taxa_servico'] >= 0) {
-                        // taxa pode ser 0 em alguns cenários, mas não deve apagar cálculo se DB vier vazio
-                        $taxaServico = (float) $row['taxa_servico'];
-                    }
-                    if (array_key_exists('valor_impostos', $row) && $row['valor_impostos'] !== null && $row['valor_impostos'] !== '' && (float) $row['valor_impostos'] >= 0) {
-                        $impostos = (float) $row['valor_impostos'];
-                    }
-                    if (array_key_exists('valor_total', $row) && $row['valor_total'] !== null && $row['valor_total'] !== '' && (float) $row['valor_total'] > 0) {
-                        $total = (float) $row['valor_total'];
-                    }
                     if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
                     if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
-                    if (array_key_exists('taxa_servico', $row)) {
-                        $v = (float) ($row['taxa_servico'] ?? 0);
-                        if ($v > 0 || ((float) $taxaServico) <= 0) {
-                            $taxaServico = $v;
-                        }
-                    }
-                    if (array_key_exists('valor_impostos', $row)) {
-                        $v = (float) ($row['valor_impostos'] ?? 0);
-                        if ($v > 0 || ((float) $impostos) <= 0) {
-                            $impostos = $v;
-                        }
-                    }
-                    if (array_key_exists('valor_total', $row)) {
-                        $v = (float) ($row['valor_total'] ?? 0);
-                        if ($v > 0 || ((float) $total) <= 0) {
-                            $total = $v;
-                        }
-                    }
+
+                    $taxaServicoFromDb = null;
+                    $impostosFromDb = null;
+                    $totalFromDb = null;
+                    if (array_key_exists('taxa_servico', $row)) $taxaServicoFromDb = (float) ($row['taxa_servico'] ?? 0);
+                    if (array_key_exists('valor_impostos', $row)) $impostosFromDb = (float) ($row['valor_impostos'] ?? 0);
+                    if (array_key_exists('valor_total', $row)) $totalFromDb = (float) ($row['valor_total'] ?? 0);
 
                     if (array_key_exists('frete_manual', $row) && $row['frete_manual'] !== null && $row['frete_manual'] !== '') {
                         $frete = (float) $row['frete_manual'];
@@ -401,6 +374,19 @@ class CarrinhoController extends Controller {
                     }
                     if (is_array($cols) && in_array('cashback_clube_estimado', $cols, true)) {
                         $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
+                    }
+
+                    // Se o DB tiver valores válidos, usar; senão manter cálculo atual
+                    if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
+                        $taxaServico = (float) $taxaServicoFromDb;
+                    }
+                    if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+                        $impostos = (float) $impostosFromDb;
+                    }
+                    if (isset($totalFromDb) && (float) $totalFromDb > 0) {
+                        $total = (float) $totalFromDb;
+                    } else {
+                        $total = (float) $subtotal + (float) $taxaServico + (float) $impostos + (float) $frete;
                     }
                 }
             } catch (\Throwable $e) {
@@ -631,16 +617,6 @@ class CarrinhoController extends Controller {
         session_start();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
-        $produtoIdFallback = ($produtoIdFallback !== null ? trim((string) $produtoIdFallback) : null);
-        $produtoId = ($produtoId !== null ? trim((string) $produtoId) : null);
-
-        // Se vier um índice (ex: "0") mas existe produto_id, preferir o produto_id.
-        if ($produtoId !== null && $produtoId !== '' && $produtoIdFallback !== null && $produtoIdFallback !== '') {
-            $looksLikeIndex = ctype_digit($produtoId) && strpos((string) $produtoIdFallback, ':') !== false;
-            if ($looksLikeIndex) {
-                $produtoId = $produtoIdFallback;
-            }
-        }
         
         if (($produtoId === null || $produtoId === '') && ($produtoIdFallback === null || $produtoIdFallback === '')) {
             $this->json(['error' => 'Produto não informado'], 400);
@@ -724,17 +700,7 @@ class CarrinhoController extends Controller {
         session_start();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
-        $produtoIdFallback = ($produtoIdFallback !== null ? trim((string) $produtoIdFallback) : null);
-        $produtoId = ($produtoId !== null ? trim((string) $produtoId) : null);
         $quantidade = $request->getParam('quantidade', null);
-
-        // Se vier um índice (ex: "0") mas existe produto_id, preferir o produto_id.
-        if ($produtoId !== null && $produtoId !== '' && $produtoIdFallback !== null && $produtoIdFallback !== '') {
-            $looksLikeIndex = ctype_digit($produtoId) && strpos((string) $produtoIdFallback, ':') !== false;
-            if ($looksLikeIndex) {
-                $produtoId = $produtoIdFallback;
-            }
-        }
         
         if ((($produtoId === null || $produtoId === '') && ($produtoIdFallback === null || $produtoIdFallback === '')) || ($quantidade === null || $quantidade === '')) {
             $this->json(['error' => 'Dados incompletos'], 400);

@@ -1357,19 +1357,15 @@ class CheckoutController extends Controller {
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
-        if (isset($taxaServicoFromDb)) {
-            $v = (float) $taxaServicoFromDb;
-            if ($v > 0 || ((float) $taxaServico) <= 0) {
-                $taxaServico = $v;
-            }
+        // Se o DB tiver valores válidos, usar; senão manter cálculo atual
+        if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
+            $taxaServico = (float) $taxaServicoFromDb;
         }
-        if (isset($impostosFromDb)) {
-            $v = (float) $impostosFromDb;
-            if ($v > 0 || ((float) $impostos) <= 0) {
-                $impostos = $v;
-            }
+        if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+            $impostos = (float) $impostosFromDb;
         }
-        if (isset($freteFromDb)) {
+        // Frete 0 é valor válido (frete grátis)
+        if (isset($freteFromDb) && (float) $freteFromDb >= 0) {
             $frete = (float) $freteFromDb;
         }
         if (isset($totalFromDb) && (float) $totalFromDb > 0) {
