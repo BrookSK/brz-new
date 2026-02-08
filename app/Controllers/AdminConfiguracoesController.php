@@ -857,7 +857,7 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label">From Address (JSON)</label>
-                                                <textarea class="form-control" name="entrega_shipstation_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <textarea class="form-control" name="entrega_shipstation_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '')) !== '' ? (string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '') : '{"name":"Fabiana Bond","company_name":"Braziliana LLC","phone":"8432228518","email":"fabiana@brazilianashop.com","address_line1":"1227 W Broad St","address_line2":"","city_locality":"Saint Pauls","state_province":"NC","postal_code":"28384-9200","country_code":"US"}'), ENT_QUOTES, 'UTF-8') . '</textarea>
                                                 <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela ShipStation.</small>
                                             </div>
 
@@ -865,7 +865,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Carrier ID</label>
-                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_id" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '') . '" placeholder="Carrier ID (ShipStation)">
+                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_id" value="' . (trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '')) !== '' ? $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '') : 'se-4875726') . '" placeholder="Carrier ID (ShipStation)">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
@@ -880,7 +880,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Service Code</label>
-                                                        <input type="text" class="form-control" name="entrega_shipstation_service_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '') . '" placeholder="Service code">
+                                                        <input type="text" class="form-control" name="entrega_shipstation_service_code" value="' . (trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '')) !== '' ? $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '') : 'ups_worldwide_saver') . '" placeholder="Service code">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
