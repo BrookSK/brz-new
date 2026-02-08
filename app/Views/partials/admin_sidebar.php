@@ -69,6 +69,8 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Pedidos (WordPress)', 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
+        'tickets' => ['icon' => 'fas fa-life-ring', 'label' => 'Tickets', 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
@@ -80,6 +82,40 @@ function renderAdminSidebar($activePage = '') {
         'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']]
     ];
+
+    $unreadTickets = 0;
+    try {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $adminUid = (int) ($_SESSION['usuario_id'] ?? 0);
+        if ($adminUid > 0 && in_array($perfil, ['admin', 'suporte'], true)) {
+            $pdo = \Config\Database::getConnection();
+            $stT = $pdo->query("SHOW TABLES LIKE 'support_ticket_views'");
+            $hasViews = (bool) ($stT && $stT->fetchColumn());
+            if ($hasViews) {
+                $sqlUnread = "
+                    SELECT COUNT(*)
+                    FROM support_tickets t
+                    INNER JOIN (
+                        SELECT ticket_id, MAX(created_at) AS last_client_msg_at
+                        FROM support_ticket_messages
+                        WHERE autor_tipo = 'cliente'
+                        GROUP BY ticket_id
+                    ) m ON m.ticket_id = t.id
+                    LEFT JOIN support_ticket_views v
+                        ON v.ticket_id = t.id AND v.viewer_type = 'admin' AND v.viewer_user_id = ?
+                    WHERE t.status = 'open'
+                      AND (v.last_seen_at IS NULL OR m.last_client_msg_at > v.last_seen_at)
+                ";
+                $stU = $pdo->prepare($sqlUnread);
+                $stU->execute([$adminUid]);
+                $unreadTickets = (int) ($stU->fetchColumn() ?: 0);
+            }
+        }
+    } catch (\Exception $e) {
+        $unreadTickets = 0;
+    }
 
     // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
     echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">
@@ -100,10 +136,14 @@ function renderAdminSidebar($activePage = '') {
                     continue;
                 }
                 $activeClass = ($activePage === $key) ? 'active' : '';
+                $label = $item['label'];
+                if ($key === 'tickets' && $unreadTickets > 0) {
+                    $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $unreadTickets . '</span>';
+                }
                 echo '<li class="nav-item">
                     <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
                         <i class="fas fa-fw ' . $item['icon'] . '"></i>
-                        <span>' . $item['label'] . '</span>
+                        <span>' . $label . '</span>
                     </a>
                 </li>';
             }

@@ -35,6 +35,10 @@ $router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'import
 $router->post('/admin/pedidos/importar/iniciar', 'AdminPedidosController', 'importarPedidosIniciar');
 $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'importarPedidosProcessar');
 
+// Pedidos do WordPress (somente leitura)
+$router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
+$router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
+
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
 $router->get('/admin/usuarios/detalhes/{id}', 'AdminUsuariosController', 'detalhes');

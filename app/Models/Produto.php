@@ -417,7 +417,7 @@ class Produto extends Model {
         error_log('🔍 [PRODUTO-MODEL] Atualizando foto principal do produto ID: ' . $id . ' - Foto: ' . $fotoPrincipal);
         
         // Se já for URL completa, usar diretamente
-        if (strpos($fotoPrincipal, '/uploads/') === 0) {
+        if (strpos($fotoPrincipal, '/uploads/') === 0 || preg_match('/^https?:\/\//i', (string) $fotoPrincipal)) {
             $urlCompleta = $fotoPrincipal;
         } else {
             // Se for apenas nome do arquivo, criar URL completa

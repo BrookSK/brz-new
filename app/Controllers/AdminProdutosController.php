@@ -7,6 +7,26 @@ use App\Services\AuthService;
 
 class AdminProdutosController extends Controller {
 
+    private function assocGetAny(array $row, array $keys): string {
+        if (empty($row)) return '';
+        $lower = [];
+        foreach ($row as $k => $v) {
+            $lk = strtolower(trim((string) $k));
+            if ($lk === '') continue;
+            if (!array_key_exists($lk, $lower)) {
+                $lower[$lk] = trim((string) $v);
+            }
+        }
+        foreach ($keys as $k) {
+            $lk = strtolower(trim((string) $k));
+            if ($lk === '') continue;
+            if (array_key_exists($lk, $lower)) {
+                return (string) $lower[$lk];
+            }
+        }
+        return '';
+    }
+
     public function importarProdutosModelo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
@@ -158,7 +178,7 @@ class AdminProdutosController extends Controller {
         $offset = (int) ($state['offset'] ?? 0);
         if ($offset < 0) $offset = 0;
 
-        $res = $this->processProdutosCsvBatch($pdo, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
+        $res = $this->processProdutosCsvBatch($pdo, $state, $csvPath, $delimiter, $hasHeader, $header, $offset, $batchSize);
 
         $state['offset'] = $offset + (int) ($res['processedNow'] ?? 0);
         $state['okCount'] = (int) ($state['okCount'] ?? 0) + (int) ($res['okNow'] ?? 0);
@@ -192,13 +212,22 @@ class AdminProdutosController extends Controller {
             return ['ok' => false, 'error' => 'Não foi possível ler o CSV.'];
         }
 
-        $first = fgetcsv($fh, 0, ',');
-        $delimiter = ',';
-        if (is_array($first) && count($first) === 1) {
+        $candidates = [',', ';', "\t"];
+        $best = null;
+        $bestDelim = ',';
+        $bestCount = 0;
+        foreach ($candidates as $d) {
             rewind($fh);
-            $first = fgetcsv($fh, 0, ';');
-            $delimiter = ';';
+            $row = fgetcsv($fh, 0, $d);
+            $cnt = is_array($row) ? count($row) : 0;
+            if ($cnt > $bestCount) {
+                $bestCount = $cnt;
+                $best = $row;
+                $bestDelim = $d;
+            }
         }
+        $first = is_array($best) ? $best : [];
+        $delimiter = $bestDelim;
 
         $normalizeHeader = function($v) {
             $s = trim((string) $v);
@@ -210,7 +239,10 @@ class AdminProdutosController extends Controller {
         $hasHeader = !empty($header);
         if ($hasHeader) {
             $joined = strtolower(implode('|', $header));
-            if (strpos($joined, 'sku') === false || strpos($joined, 'title') === false) {
+            $hasSku = (strpos($joined, 'sku') !== false);
+            $hasTitleOrName = (strpos($joined, 'title') !== false) || (strpos($joined, 'name') !== false) || (strpos($joined, 'nome') !== false);
+            $hasId = (strpos($joined, 'id') !== false);
+            if (!$hasSku || (!$hasTitleOrName && !$hasId)) {
                 $hasHeader = false;
                 $header = null;
                 rewind($fh);
@@ -230,7 +262,7 @@ class AdminProdutosController extends Controller {
         return ['ok' => true, 'delimiter' => $delimiter, 'hasHeader' => (bool) $hasHeader, 'header' => $header, 'total' => $total];
     }
 
-    private function processProdutosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
+    private function processProdutosCsvBatch(\PDO $pdo, array &$state, string $csvPath, string $delimiter, bool $hasHeader, ?array $header, int $offset, int $limit): array {
         $fh = @fopen($csvPath, 'r');
         if (!$fh) {
             return ['processedNow' => 0, 'okNow' => 0, 'failNow' => 0];
@@ -260,6 +292,27 @@ class AdminProdutosController extends Controller {
 
         $this->ensureImportRowStatusTable($pdo);
 
+        // Tentar reprocessar variações pendentes de batches anteriores
+        if (isset($state['pendingVariations']) && is_array($state['pendingVariations']) && !empty($state['pendingVariations'])) {
+            $pending = $state['pendingVariations'];
+            $state['pendingVariations'] = [];
+            foreach ($pending as $rowKey => $assoc) {
+                if (!is_array($assoc)) continue;
+                try {
+                    $this->processProdutoAssocRow($pdo, $assoc);
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowOk($pdo, 'produtos', $rowKey);
+                    }
+                    $okNow++;
+                } catch (\Exception $e) {
+                    // Continua pendente
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $state['pendingVariations'][$rowKey] = $assoc;
+                    }
+                }
+            }
+        }
+
         while ($processedNow < $limit && ($row = fgetcsv($fh, 0, $delimiter)) !== false) {
             if (!is_array($row) || count($row) < 2) {
                 continue;
@@ -277,6 +330,19 @@ class AdminProdutosController extends Controller {
                 }
             }
 
+            $isRowEmpty = true;
+            foreach ($assoc as $v) {
+                if (trim((string) $v) !== '') {
+                    $isRowEmpty = false;
+                    break;
+                }
+            }
+            if ($isRowEmpty) {
+                // Linha vazia no CSV: não é erro, apenas pular
+                $processedNow++;
+                continue;
+            }
+
             $rowKey = $this->getProdutoImportRowKey($assoc);
             if ($rowKey !== '' && $this->isImportRowOk($pdo, 'produtos', $rowKey)) {
                 $okNow++;
@@ -290,12 +356,47 @@ class AdminProdutosController extends Controller {
                 }
                 $okNow++;
             } catch (\Exception $e) {
-                if ($rowKey !== '') {
-                    $this->markImportRowFail($pdo, 'produtos', $rowKey, $e->getMessage());
+                $msg = $e->getMessage();
+                $isPendingParent = (strpos($msg, 'Variação sem vínculo do produto pai') !== false);
+
+                if ($isPendingParent && $rowKey !== '') {
+                    // Guardar para tentar novamente em próximos batches (pai pode vir depois)
+                    if (!isset($state['pendingVariations']) || !is_array($state['pendingVariations'])) {
+                        $state['pendingVariations'] = [];
+                    }
+                    $state['pendingVariations'][$rowKey] = $assoc;
+                } else {
+                    if ($rowKey !== '') {
+                        $this->markImportRowFail($pdo, 'produtos', $rowKey, $msg);
+                    }
+                    $failNow++;
                 }
-                $failNow++;
             }
             $processedNow++;
+        }
+
+        // Se acabou o arquivo (último batch), tentar reprocessar pendências uma última vez.
+        // NOTA: aqui não sabemos com certeza se é o último batch, mas se processou menos que o limite,
+        // geralmente significa EOF.
+        if ($processedNow < $limit && isset($state['pendingVariations']) && is_array($state['pendingVariations']) && !empty($state['pendingVariations'])) {
+            $pending = $state['pendingVariations'];
+            $state['pendingVariations'] = [];
+            foreach ($pending as $rowKey => $assoc) {
+                if (!is_array($assoc)) continue;
+                try {
+                    $this->processProdutoAssocRow($pdo, $assoc);
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowOk($pdo, 'produtos', $rowKey);
+                    }
+                    $okNow++;
+                } catch (\Exception $e) {
+                    // Agora sim: marca como falha definitiva
+                    if (is_string($rowKey) && $rowKey !== '') {
+                        $this->markImportRowFail($pdo, 'produtos', $rowKey, $e->getMessage());
+                    }
+                    $failNow++;
+                }
+            }
         }
 
         fclose($fh);
@@ -303,9 +404,9 @@ class AdminProdutosController extends Controller {
     }
 
     private function getProdutoImportRowKey(array $assoc): string {
-        $sku = strtolower(trim((string) ($assoc['Sku'] ?? '')));
-        $idExt = trim((string) ($assoc['ID'] ?? ''));
-        $slug = strtolower(trim((string) ($assoc['Slug'] ?? '')));
+        $sku = strtolower(trim((string) $this->assocGetAny($assoc, ['Sku', 'SKU', 'sku'])));
+        $idExt = trim((string) $this->assocGetAny($assoc, ['ID', 'Id', 'id', 'product_id', 'produto_id']));
+        $slug = strtolower(trim((string) $this->assocGetAny($assoc, ['Slug', 'slug', 'post_name'])));
 
         if ($sku !== '') return 'sku:' . $sku;
         if ($idExt !== '') return 'id:' . $idExt;
@@ -387,27 +488,175 @@ class AdminProdutosController extends Controller {
     }
 
     private function processProdutoAssocRow(\PDO $pdo, array $row): void {
-        $get = function(string $key) use ($row) {
-            return trim((string) ($row[$key] ?? ''));
+        $getAny = function(array $keys) use ($row) {
+            return $this->assocGetAny($row, $keys);
         };
 
-        $idExt = $get('ID');
-        $sku = $get('Sku');
-        $title = $get('Title');
-        $content = $get('Content');
-        $excerpt = $get('Excerpt');
-        $slug = $get('Slug');
-        $price = $this->parseMoneyCsv($get('Price'));
-        $regularPrice = $this->parseMoneyCsv($get('Regular Price'));
-        $salePrice = $this->parseMoneyCsv($get('Sale Price'));
-        $stock = (int) ($get('Stock') !== '' ? $get('Stock') : 0);
-        $stockStatus = strtolower($get('Stock Status'));
-        $featuredRaw = strtolower($get('Featured'));
-        $weight = (float) str_replace(',', '.', $get('Weight'));
-        $length = (float) str_replace(',', '.', $get('Length'));
-        $width = (float) str_replace(',', '.', $get('Width'));
-        $height = (float) str_replace(',', '.', $get('Height'));
-        $statusRaw = strtolower($get('Status'));
+        $idExt = $getAny(['ID', 'Id', 'id', 'product_id', 'produto_id']);
+        $typeRaw = strtolower(trim((string) $getAny(['Product Type', 'product_type', 'Type', 'type', 'tipo'])));
+        $sku = $getAny(['Sku', 'SKU', 'sku']);
+        $title = $getAny(['Title', 'title', 'Name', 'name', 'nome', 'product_name']);
+        $publishedRaw = strtolower(trim((string) $getAny(['Published', 'published'])));
+        $statusFromCsv = strtolower(trim((string) $getAny(['Status', 'status'])));
+        $manageStockRaw = strtolower(trim((string) $getAny(['Manage Stock', 'manage_stock', 'controla_estoque'])));
+        $dateRaw = trim((string) $getAny(['Date', 'date', 'created_at', 'published_at']));
+        $excerpt = $getAny(['Excerpt', 'excerpt', 'Short description', 'short_description', 'Descricao curta', 'descricao_curta']);
+        $content = $getAny(['Content', 'content', 'Description', 'description', 'Descricao', 'descricao']);
+        $slug = $getAny(['Slug', 'slug', 'post_name']);
+
+        $regularPrice = $this->parseMoneyCsv($getAny(['Regular Price', 'Regular price', 'regular_price', 'preco_regular', 'Price', 'price', 'preco', 'valor']));
+        $salePrice = $this->parseMoneyCsv($getAny(['Sale Price', 'Sale price', 'sale_price', 'preco_promocao']));
+        $price = ($regularPrice > 0 ? $regularPrice : ($salePrice > 0 ? $salePrice : 0));
+
+        $stockRaw = $getAny(['Stock', 'stock', 'Estoque', 'estoque']);
+        $stock = (int) ($stockRaw !== '' ? $stockRaw : 0);
+        $stockStatus = strtolower($getAny(['Stock Status', 'stock_status']));
+        $weight = (float) str_replace(',', '.', $getAny(['Weight (kg)', 'Weight', 'weight', 'peso']));
+        $length = (float) str_replace(',', '.', $getAny(['Length (cm)', 'Length', 'length', 'comprimento']));
+        $width = (float) str_replace(',', '.', $getAny(['Width (cm)', 'Width', 'width', 'largura']));
+        $height = (float) str_replace(',', '.', $getAny(['Height (cm)', 'Height', 'height', 'altura']));
+        $statusRaw = ($statusFromCsv !== '' ? $statusFromCsv : $publishedRaw);
+
+        $imagesRaw = $getAny(['URL', 'url', 'Product Image Gallery', 'product_image_gallery', 'Images', 'images', 'Product Image', 'product_image']);
+        $tagsRaw = $getAny(['Product Tags', 'product_tags', 'Tags', 'tags']);
+        $catsRaw = $getAny(['Product Categories', 'product_categories', 'Categories', 'categories', 'Categoria', 'categoria']);
+        $attrsRaw = $getAny(['Product Attributes', 'product_attributes', 'Attributes', 'attributes', 'Default Attributes', 'default_attributes']);
+        $childrenRaw = $getAny(['Children', 'children', 'Variations', 'variations', 'Variation Description', 'variation_description']);
+
+        $parentSku = trim((string) $getAny(['Parent SKU', 'parent_sku', 'Parent', 'parent', 'Parent product SKU', 'parent_product_sku']));
+        $parentIdExt = trim((string) $getAny(['Parent product ID', 'parent_product_id', 'Parent ID', 'parent_id', 'Parent Product ID']));
+
+        if ($parentSku === '0') {
+            $parentSku = '';
+        }
+        if ($parentIdExt !== '' && ctype_digit($parentIdExt) && (int) $parentIdExt === 0) {
+            $parentIdExt = '';
+        }
+
+        $toJsonList = function($raw): string {
+            $raw = trim((string) $raw);
+            if ($raw === '') return '';
+            if ($raw[0] === '[' || $raw[0] === '{') {
+                return $raw;
+            }
+            $parts = preg_split('/[\|,]/', $raw);
+            $items = [];
+            foreach (($parts ?: []) as $p) {
+                $p = trim((string) $p);
+                if ($p === '') continue;
+                $items[] = $p;
+            }
+            if (empty($items)) return '';
+            $items = array_values(array_unique($items));
+            return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        };
+
+        if (trim((string) $tagsRaw) !== '') {
+            $tagsRaw = $toJsonList($tagsRaw);
+        }
+        if (trim((string) $imagesRaw) !== '') {
+            $imagesRaw = $toJsonList($imagesRaw);
+        }
+        if (trim((string) $childrenRaw) !== '') {
+            $childrenRaw = $toJsonList($childrenRaw);
+        }
+
+        $extractFirstImageUrl = function($rawOrJson): string {
+            $s = trim((string) $rawOrJson);
+            if ($s === '') return '';
+
+            if ($s[0] === '[' || $s[0] === '{') {
+                $decoded = json_decode($s, true);
+                if (is_array($decoded)) {
+                    if (array_is_list($decoded)) {
+                        $first = (string) ($decoded[0] ?? '');
+                        $first = trim($first);
+                        return $first;
+                    }
+                    $first = (string) (reset($decoded) ?: '');
+                    $first = trim($first);
+                    return $first;
+                }
+            }
+
+            $first = trim((string) preg_split('/[\|,]/', $s)[0]);
+            $first = trim($first, " \t\n\r\0\x0B\"'[]");
+            return $first;
+        };
+
+        // Campo Product Attributes do Woo pode vir como PHP serialized (a:...), que NÃO é JSON.
+        // Para evitar erro 4025 em colunas JSON, sempre preferir gerar JSON válido a partir das colunas Attribute Name/Value.
+        $attrsRawTrim = trim((string) $attrsRaw);
+        $attrsRawIsJsonish = ($attrsRawTrim !== '' && ($attrsRawTrim[0] === '[' || $attrsRawTrim[0] === '{'));
+        if ($attrsRawTrim === '' || !$attrsRawIsJsonish) {
+            $attrs = [];
+            foreach ($row as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                if (!preg_match('/^Attribute Name\s*\((.+)\)$/i', $k, $m)) {
+                    continue;
+                }
+                $code = trim((string) ($m[1] ?? ''));
+                if ($code === '') continue;
+
+                $name = trim((string) $v);
+                if ($name === '') {
+                    $name = $code;
+                }
+
+                $value = (string) $this->assocGetAny($row, [
+                    'Attribute Value (' . $code . ')',
+                    'Attribute value (' . $code . ')',
+                ]);
+                $value = trim($value);
+
+                $inVar = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute In Variations (' . $code . ')',
+                    'Attribute in variations (' . $code . ')',
+                ])));
+                $isVisible = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute Is Visible (' . $code . ')',
+                    'Attribute is visible (' . $code . ')',
+                ])));
+                $isTax = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute Is Taxonomy (' . $code . ')',
+                    'Attribute is taxonomy (' . $code . ')',
+                ])));
+
+                $attrs[] = [
+                    'code' => $code,
+                    'name' => $name,
+                    'value' => $value,
+                    'in_variations' => ($inVar === '1' || $inVar === 'yes' || $inVar === 'true'),
+                    'visible' => ($isVisible === '1' || $isVisible === 'yes' || $isVisible === 'true'),
+                    'taxonomy' => ($isTax === '1' || $isTax === 'yes' || $isTax === 'true'),
+                ];
+            }
+
+            if (!empty($attrs)) {
+                $attrsRaw = json_encode($attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            } else {
+                $attrsRaw = '';
+            }
+        }
+
+        $catsRaw = trim((string) $catsRaw);
+        if ($catsRaw !== '') {
+            $parts = preg_split('/\|/', $catsRaw);
+            $normalized = [];
+            foreach (($parts ?: []) as $p) {
+                $p = trim((string) $p);
+                if ($p === '') continue;
+                $levels = preg_split('/\s*>\s*/', $p);
+                $last = trim((string) ($levels ? end($levels) : $p));
+                if ($last !== '') {
+                    $normalized[] = $last;
+                }
+            }
+            if (!empty($normalized)) {
+                $catsRaw = implode('|', $normalized);
+            }
+        }
 
         if ($sku === '' && $title === '' && $idExt === '') {
             throw new \RuntimeException('Linha vazia');
@@ -435,7 +684,7 @@ class AdminProdutosController extends Controller {
         $colSale = $pickCol(['sale_price', 'preco_promocao']);
         $colStock = $pickCol(['stock', 'estoque']);
         $colActive = $pickCol(['active', 'ativo']);
-        $colFeatured = $pickCol(['featured', 'destaque']);
+        $colFeatured = '';
         $colWeight = $pickCol(['weight', 'peso']);
         $colLength = $pickCol(['length', 'comprimento']);
         $colWidth = $pickCol(['width', 'largura']);
@@ -446,6 +695,82 @@ class AdminProdutosController extends Controller {
         $colVariations = $pickCol(['variations']);
         $colStatus = $pickCol(['status']);
         $colType = $pickCol(['type', 'tipo']);
+
+        $colControlaEstoque = $pickCol(['controla_estoque', 'manage_stock']);
+        $colCreatedAt = $pickCol(['created_at']);
+        $colPublishedAt = $pickCol(['published_at']);
+
+        $manageStock = null;
+        if ($colControlaEstoque !== '' && $manageStockRaw !== '') {
+            if ($manageStockRaw === '1' || $manageStockRaw === 'yes' || $manageStockRaw === 'true' || $manageStockRaw === 'sim') {
+                $manageStock = 1;
+            } elseif ($manageStockRaw === '0' || $manageStockRaw === 'no' || $manageStockRaw === 'false' || $manageStockRaw === 'nao' || $manageStockRaw === 'não') {
+                $manageStock = 0;
+            }
+        }
+
+        $dateSql = '';
+        if ($dateRaw !== '') {
+            $ts = strtotime($dateRaw);
+            if ($ts !== false) {
+                $dateSql = date('Y-m-d H:i:s', $ts);
+            }
+        }
+
+        $colCategoriaId = $pickCol(['categoria_id', 'category_id']);
+        $colCategoria = $pickCol(['categoria', 'category']);
+        $colFoto = $pickCol(['foto_principal', 'image', 'imagem', 'featured_image']);
+
+        if ($slug === '' && $title !== '') {
+            $slug = strtolower(trim((string) $title));
+            $slug = preg_replace('/\s+/', '-', $slug);
+            $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+        }
+
+        $isParentRow = ($parentSku === '' && $parentIdExt === '');
+        if ($isParentRow) {
+            $newPrice = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : ($salePrice > 0 ? $salePrice : 0)));
+            if ($newPrice <= 0) {
+                throw new \RuntimeException('Preço zero (produto ignorado)');
+            }
+        }
+
+        if (trim((string) $sku) === '') {
+            if (trim((string) $idExt) !== '') {
+                $sku = 'imp-' . preg_replace('/\s+/', '', (string) $idExt);
+            } elseif (trim((string) $slug) !== '') {
+                $sku = 'imp-' . (string) $slug;
+            } elseif (trim((string) $title) !== '') {
+                $sku = 'imp-' . substr(md5((string) $title), 0, 12);
+            }
+            $sku = substr((string) $sku, 0, 100);
+        }
+
+        $categoriaId = 0;
+        if ($colCategoriaId !== '' && $catsRaw !== '') {
+            // Categorias podem vir como lista (|) e/ou hierarquia (>)
+            $firstCat = trim((string) preg_split('/[\|,]/', (string) $catsRaw)[0]);
+            if ($firstCat !== '') {
+                try {
+                    $st = $pdo->query('SHOW TABLES LIKE "categorias"');
+                    $hasCatTable = (bool) ($st && $st->fetchColumn());
+                } catch (\Exception $e) {
+                    $hasCatTable = false;
+                }
+                if (!empty($hasCatTable)) {
+                    $catSlug = strtolower(trim((string) $firstCat));
+                    $catSlug = preg_replace('/\s+/', '-', $catSlug);
+                    $catSlug = preg_replace('/[^a-z0-9\-]/', '', $catSlug);
+                    try {
+                        $stFind = $pdo->prepare('SELECT id FROM categorias WHERE LOWER(slug) = LOWER(?) OR LOWER(nome) = LOWER(?) ORDER BY id DESC LIMIT 1');
+                        $stFind->execute([(string) $catSlug, (string) $firstCat]);
+                        $categoriaId = (int) ($stFind->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $categoriaId = 0;
+                    }
+                }
+            }
+        }
 
         $produtoId = 0;
         try {
@@ -465,11 +790,18 @@ class AdminProdutosController extends Controller {
 
         $active = null;
         if ($colActive !== '') {
-            if ($statusRaw === 'publish' || $statusRaw === 'published' || $statusRaw === 'ativo' || $statusRaw === 'active') {
+            if ($publishedRaw === '1' || $publishedRaw === 'yes' || $publishedRaw === 'true' || $publishedRaw === 'publish' || $publishedRaw === 'published' || $publishedRaw === 'ativo' || $publishedRaw === 'active') {
                 $active = 1;
-            } elseif ($statusRaw === 'draft' || $statusRaw === 'rascunho' || $statusRaw === 'inativo' || $statusRaw === 'inactive') {
+            } elseif ($publishedRaw === '0' || $publishedRaw === 'no' || $publishedRaw === 'false' || $publishedRaw === 'draft' || $publishedRaw === 'rascunho' || $publishedRaw === 'inativo' || $publishedRaw === 'inactive') {
                 $active = 0;
             }
+        }
+
+        if ($statusRaw === '') {
+            $statusRaw = $publishedRaw;
+        }
+        if (($statusRaw === '1' || $statusRaw === '0' || $statusRaw === 'yes' || $statusRaw === 'no' || $statusRaw === 'true' || $statusRaw === 'false') && $active !== null) {
+            $statusRaw = ($active === 1) ? 'publish' : 'draft';
         }
 
         if ($stockStatus === 'outofstock' && $stock <= 0) {
@@ -477,33 +809,334 @@ class AdminProdutosController extends Controller {
         }
 
         $featured = null;
-        if ($colFeatured !== '') {
-            $featured = ($featuredRaw === '1' || $featuredRaw === 'yes' || $featuredRaw === 'true') ? 1 : 0;
+
+        $isVariationRow = ($typeRaw === 'variation' || $typeRaw === 'variacao' || $typeRaw === 'variação');
+        if (!$isVariationRow && ($parentSku !== '' || ($parentIdExt !== '' && ctype_digit($parentIdExt)))) {
+            $isVariationRow = true;
+        }
+
+        if ($isVariationRow) {
+            if (!$this->tableExists($pdo, 'produto_variacoes')) {
+                throw new \RuntimeException('CSV possui Type=variation, mas schema de variações (produto_variacoes) não existe');
+            }
+
+            $parentProdutoId = 0;
+            if ($parentSku !== '') {
+                $stP = $pdo->prepare('SELECT id FROM produtos WHERE sku = :sku LIMIT 1');
+                $stP->execute([':sku' => $parentSku]);
+                $parentProdutoId = (int) ($stP->fetchColumn() ?: 0);
+            }
+            if ($parentProdutoId <= 0 && $parentIdExt !== '' && ctype_digit($parentIdExt)) {
+                $stP = $pdo->prepare('SELECT id FROM produtos WHERE id = :id LIMIT 1');
+                $stP->execute([':id' => (int) $parentIdExt]);
+                $parentProdutoId = (int) ($stP->fetchColumn() ?: 0);
+            }
+
+            if ($parentProdutoId <= 0 && $parentIdExt !== '' && ctype_digit($parentIdExt)) {
+                // Parent Product ID do Woo não é o mesmo ID interno do nosso banco.
+                // Resolver via produto_meta (onde salvamos o CSV inteiro, incluindo coluna ID).
+                if ($this->tableExists($pdo, 'produto_meta')) {
+                    try {
+                        $stPM = $pdo->prepare("SELECT produto_id FROM produto_meta WHERE meta_key IN ('ID','Id','id','product_id','produto_id','woo_id','external_id') AND meta_value = :v ORDER BY produto_id DESC LIMIT 1");
+                        $stPM->execute([':v' => (string) $parentIdExt]);
+                        $parentProdutoId = (int) ($stPM->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {
+                        $parentProdutoId = 0;
+                    }
+                }
+            }
+
+            if ($parentProdutoId <= 0) {
+                $findParents = function(string $sql, array $params) use ($pdo): array {
+                    $st = $pdo->prepare($sql);
+                    $st->execute($params);
+                    return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                };
+
+                $typeCol = $colType;
+                $typeWhere = ($typeCol !== '' ? (' AND LOWER(COALESCE(p.' . $typeCol . ", '')) = 'variable' ") : '');
+
+                $skuPrefix = '';
+                $skuTrim = trim((string) $sku);
+                if ($skuTrim !== '') {
+                    $parts = preg_split('/[-_\s]+/', $skuTrim);
+                    $skuPrefix = trim((string) ($parts[0] ?? ''));
+                }
+
+                $namePrefix = '';
+                $t = trim((string) $title);
+                if ($t !== '') {
+                    $namePrefix = (string) preg_split('/\s[-–—]\s|\s:\s/', $t)[0];
+                    $namePrefix = trim($namePrefix);
+                }
+
+                $cands = [];
+                if ($skuPrefix !== '') {
+                    $sql = 'SELECT p.id, p.sku, ' . ($colName !== '' ? ('p.' . $colName . ' AS nome') : "'' AS nome")
+                        . ' FROM produtos p WHERE 1=1'
+                        . $typeWhere
+                        . ' AND p.sku LIKE :pref ORDER BY LENGTH(p.sku) DESC, p.id DESC LIMIT 5';
+                    $cands = $findParents($sql, [':pref' => $skuPrefix . '%']);
+                }
+
+                if (count($cands) !== 1 && $namePrefix !== '') {
+                    $sql = 'SELECT p.id, p.sku, ' . ($colName !== '' ? ('p.' . $colName . ' AS nome') : "'' AS nome")
+                        . ' FROM produtos p WHERE 1=1'
+                        . $typeWhere
+                        . ($colName !== '' ? (' AND p.' . $colName . ' LIKE :nm ') : ' AND 1=0 ')
+                        . ' ORDER BY p.id DESC LIMIT 5';
+                    $cands = $findParents($sql, [':nm' => $namePrefix . '%']);
+                }
+
+                if (count($cands) === 1) {
+                    $parentProdutoId = (int) ($cands[0]['id'] ?? 0);
+                } elseif (count($cands) > 1) {
+                    $hint = [];
+                    foreach ($cands as $c) {
+                        $hint[] = 'id=' . (int) ($c['id'] ?? 0) . ' sku=' . (string) ($c['sku'] ?? '') . ' nome=' . (string) ($c['nome'] ?? '');
+                    }
+                    throw new \RuntimeException('Variação ambígua: não foi possível identificar produto pai. Candidatos: ' . implode(' | ', $hint));
+                }
+            }
+
+            if ($parentProdutoId <= 0) {
+                throw new \RuntimeException('Variação sem vínculo do produto pai (faltando coluna Parent SKU/Parent product ID no CSV)');
+            }
+
+            $variationAttrs = [];
+            foreach ($row as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                if (!preg_match('/^Attribute Value\s*\((.+)\)$/i', $k, $m)) {
+                    continue;
+                }
+                $code = trim((string) ($m[1] ?? ''));
+                if ($code === '') continue;
+
+                $inVar = strtolower(trim((string) $this->assocGetAny($row, [
+                    'Attribute In Variations (' . $code . ')',
+                    'Attribute in variations (' . $code . ')',
+                ])));
+                $isInVar = ($inVar === '1' || $inVar === 'yes' || $inVar === 'true' || $inVar === 'sim');
+                if (!$isInVar) continue;
+
+                $val = trim((string) $v);
+                if ($val === '' || $val === 'no') continue;
+
+                $name = trim((string) $this->assocGetAny($row, [
+                    'Attribute Name (' . $code . ')',
+                    'Attribute name (' . $code . ')',
+                ]));
+                if ($name === '') {
+                    $name = $code;
+                }
+
+                $variationAttrs[] = [
+                    'code' => $code,
+                    'name' => $name,
+                    'value' => $val,
+                ];
+            }
+
+            $skuTrimVar = trim((string) $sku);
+            $skuLooksInvalid = false;
+            if ($skuTrimVar === '') {
+                $skuLooksInvalid = true;
+            } elseif (preg_match('/\s/', $skuTrimVar)) {
+                // SKU com espaço costuma ser atributo/nome, não um SKU real
+                $skuLooksInvalid = true;
+            } elseif (preg_match('/^\d+$/', $skuTrimVar) && strlen($skuTrimVar) <= 3) {
+                // Valores muito curtos só numéricos (ex: "9") tendem a ser coluna deslocada
+                $skuLooksInvalid = true;
+            } elseif (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{1,}$/', $skuTrimVar)) {
+                // Regras mínimas de SKU: sem espaços e com chars comuns
+                $skuLooksInvalid = true;
+            }
+
+            if ($skuLooksInvalid) {
+                $seed = (string) $parentProdutoId
+                    . '|' . trim((string) $idExt)
+                    . '|' . trim((string) $title)
+                    . '|' . (string) $regularPrice
+                    . '|' . (string) $salePrice
+                    . '|' . (string) $stock
+                    . '|' . trim((string) $imagesRaw);
+                $sku = 'var-' . (int) $parentProdutoId . '-' . substr(md5($seed), 0, 12);
+                $sku = substr((string) $sku, 0, 120);
+            }
+
+            $stV = $pdo->prepare('SELECT id FROM produto_variacoes WHERE produto_id = :pid AND sku = :sku LIMIT 1');
+            $stV->execute([':pid' => (int) $parentProdutoId, ':sku' => (string) $sku]);
+            $varId = (int) ($stV->fetchColumn() ?: 0);
+
+            $sqlCols = $this->getTableColumns($pdo, 'produto_variacoes');
+            $set = [];
+            $paramsV = [':pid' => (int) $parentProdutoId, ':sku' => (string) $sku];
+            if (in_array('price_override', $sqlCols, true)) { $set[] = 'price_override = :po'; $paramsV[':po'] = ($price > 0 ? $price : null); }
+            if (in_array('stock', $sqlCols, true)) { $set[] = 'stock = :st'; $paramsV[':st'] = (int) $stock; }
+            if (in_array('ativo', $sqlCols, true)) { $set[] = 'ativo = :at'; $paramsV[':at'] = ($active !== null ? (int) $active : 1); }
+            if (in_array('updated_at', $sqlCols, true)) { $set[] = 'updated_at = NOW()'; }
+
+            if ($varId > 0) {
+                if (!empty($set)) {
+                    $stUpV = $pdo->prepare('UPDATE produto_variacoes SET ' . implode(', ', $set) . ' WHERE id = :id');
+                    $paramsV[':id'] = (int) $varId;
+                    $stUpV->execute($paramsV);
+                }
+            } else {
+                $colsInsV = ['produto_id', 'sku'];
+                $valsInsV = [':pid', ':sku'];
+                if (in_array('price_override', $sqlCols, true)) { $colsInsV[] = 'price_override'; $valsInsV[] = ':po'; }
+                if (in_array('stock', $sqlCols, true)) { $colsInsV[] = 'stock'; $valsInsV[] = ':st'; }
+                if (in_array('ativo', $sqlCols, true)) { $colsInsV[] = 'ativo'; $valsInsV[] = ':at'; }
+                if (in_array('created_at', $sqlCols, true)) { $colsInsV[] = 'created_at'; $valsInsV[] = 'NOW()'; }
+                if (in_array('updated_at', $sqlCols, true)) { $colsInsV[] = 'updated_at'; $valsInsV[] = 'NOW()'; }
+
+                $stInV = $pdo->prepare('INSERT INTO produto_variacoes (' . implode(', ', $colsInsV) . ') VALUES (' . implode(', ', $valsInsV) . ')');
+                $paramsV[':po'] = ($price > 0 ? $price : null);
+                $paramsV[':st'] = (int) $stock;
+                $paramsV[':at'] = ($active !== null ? (int) $active : 1);
+                $stInV->execute($paramsV);
+                $varId = (int) $pdo->lastInsertId();
+            }
+
+            if ($varId > 0 && !empty($variationAttrs)) {
+                if ($this->tableExists($pdo, 'variacao_tipos') && $this->tableExists($pdo, 'variacao_opcoes') && $this->tableExists($pdo, 'produto_atributos') && $this->tableExists($pdo, 'produto_variacao_itens')) {
+                    foreach ($variationAttrs as $a) {
+                        $tipoNome = (string) ($a['name'] ?? '');
+                        $tipoSlug = strtolower(trim((string) ($a['code'] ?? $tipoNome)));
+                        $tipoSlug = preg_replace('/\s+/', '-', $tipoSlug);
+                        $tipoSlug = preg_replace('/[^a-z0-9\-]/', '', $tipoSlug);
+                        if ($tipoSlug === '') continue;
+
+                        $stT = $pdo->prepare('SELECT id FROM variacao_tipos WHERE slug = ? LIMIT 1');
+                        $stT->execute([$tipoSlug]);
+                        $tipoId = (int) ($stT->fetchColumn() ?: 0);
+                        if ($tipoId <= 0) {
+                            $stInsT = $pdo->prepare('INSERT INTO variacao_tipos (nome, slug, ativo, created_at, updated_at) VALUES (?, ?, 1, NOW(), NOW())');
+                            $stInsT->execute([$tipoNome !== '' ? $tipoNome : $tipoSlug, $tipoSlug]);
+                            $tipoId = (int) $pdo->lastInsertId();
+                        }
+
+                        if ($tipoId > 0) {
+                            $stPA = $pdo->prepare('INSERT IGNORE INTO produto_atributos (produto_id, tipo_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                            $stPA->execute([(int) $parentProdutoId, (int) $tipoId]);
+
+                            $optVal = trim((string) ($a['value'] ?? ''));
+                            $optSlug = strtolower($optVal);
+                            $optSlug = preg_replace('/\s+/', '-', $optSlug);
+                            $optSlug = preg_replace('/[^a-z0-9\-]/', '', $optSlug);
+                            if ($optSlug === '') {
+                                $optSlug = substr(md5($optVal), 0, 12);
+                            }
+
+                            $stO = $pdo->prepare('SELECT id FROM variacao_opcoes WHERE tipo_id = ? AND slug = ? LIMIT 1');
+                            $stO->execute([(int) $tipoId, (string) $optSlug]);
+                            $opcaoId = (int) ($stO->fetchColumn() ?: 0);
+                            if ($opcaoId <= 0) {
+                                $stInsO = $pdo->prepare('INSERT INTO variacao_opcoes (tipo_id, valor, slug, ordem, ativo, created_at, updated_at) VALUES (?, ?, ?, 0, 1, NOW(), NOW())');
+                                $stInsO->execute([(int) $tipoId, $optVal !== '' ? $optVal : $optSlug, (string) $optSlug]);
+                                $opcaoId = (int) $pdo->lastInsertId();
+                            }
+
+                            if ($opcaoId > 0) {
+                                $stVI = $pdo->prepare('INSERT INTO produto_variacao_itens (produto_variacao_id, tipo_id, opcao_id, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE opcao_id = VALUES(opcao_id), updated_at = NOW()');
+                                $stVI->execute([(int) $varId, (int) $tipoId, (int) $opcaoId]);
+                            }
+                        }
+                    }
+                }
+            }
+            return;
         }
 
         if ($produtoId > 0) {
+            $existing = [];
+            try {
+                $stCur = $pdo->prepare('SELECT * FROM produtos WHERE id = :id LIMIT 1');
+                $stCur->execute([':id' => (int) $produtoId]);
+                $existing = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $existing = [];
+            }
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            $isZeroish = function($v): bool {
+                if ($v === null) return false;
+                if (is_string($v)) {
+                    $vv = trim($v);
+                    if ($vv === '') return false;
+                    if (!is_numeric($vv)) return false;
+                    return ((float) $vv) == 0.0;
+                }
+                if (is_int($v) || is_float($v)) {
+                    return ((float) $v) == 0.0;
+                }
+                return false;
+            };
+
             $set = [];
             $params = [':id' => (int) $produtoId];
 
-            if ($colName !== '' && $title !== '') { $set[] = $colName . ' = :name'; $params[':name'] = $title; }
-            if ($colSku !== '' && $sku !== '') { $set[] = $colSku . ' = :sku'; $params[':sku'] = $sku; }
-            if ($colSlug !== '' && $slug !== '') { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
-            if ($colDesc !== '' && $content !== '') { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
-            if ($colShort !== '' && $excerpt !== '') { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
-            if ($colPrice !== '') { $set[] = $colPrice . ' = :price'; $params[':price'] = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0)); }
-            if ($colRegular !== '' && $regularPrice > 0) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
-            if ($colSale !== '' && $salePrice > 0) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
-            if ($colStock !== '') { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
-            if ($colActive !== '' && $active !== null) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
-            if ($colFeatured !== '' && $featured !== null) { $set[] = $colFeatured . ' = :ft'; $params[':ft'] = (int) $featured; }
-            if ($colWeight !== '' && $weight > 0) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; }
-            if ($colLength !== '' && $length > 0) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; }
-            if ($colWidth !== '' && $width > 0) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; }
-            if ($colHeight !== '' && $height > 0) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; }
-            if ($colStatus !== '' && $statusRaw !== '') { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
+            if ($colName !== '' && $title !== '' && (!array_key_exists($colName, $existing) || $isEmpty($existing[$colName] ?? null))) { $set[] = $colName . ' = :name'; $params[':name'] = $title; }
+            if ($colSku !== '' && $sku !== '' && (!array_key_exists($colSku, $existing) || $isEmpty($existing[$colSku] ?? null))) { $set[] = $colSku . ' = :sku'; $params[':sku'] = $sku; }
+            if ($colSlug !== '' && $slug !== '' && (!array_key_exists($colSlug, $existing) || $isEmpty($existing[$colSlug] ?? null))) { $set[] = $colSlug . ' = :slug'; $params[':slug'] = $slug; }
+            if ($colDesc !== '' && $content !== '' && (!array_key_exists($colDesc, $existing) || $isEmpty($existing[$colDesc] ?? null))) { $set[] = $colDesc . ' = :desc'; $params[':desc'] = $content; }
+            if ($colShort !== '' && $excerpt !== '' && (!array_key_exists($colShort, $existing) || $isEmpty($existing[$colShort] ?? null))) { $set[] = $colShort . ' = :short'; $params[':short'] = $excerpt; }
+            if ($colPrice !== '') {
+                $newPrice = ($price > 0 ? $price : ($regularPrice > 0 ? $regularPrice : 0));
+                $curr = $existing[$colPrice] ?? null;
+                if ($newPrice > 0 && (!array_key_exists($colPrice, $existing) || $isEmpty($curr) || $isZeroish($curr))) { $set[] = $colPrice . ' = :price'; $params[':price'] = $newPrice; }
+            }
+            if ($colRegular !== '' && $regularPrice > 0) {
+                $curr = $existing[$colRegular] ?? null;
+                if (!array_key_exists($colRegular, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colRegular . ' = :rp'; $params[':rp'] = $regularPrice; }
+            }
+            if ($colSale !== '' && $salePrice > 0) {
+                $curr = $existing[$colSale] ?? null;
+                if (!array_key_exists($colSale, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colSale . ' = :sp'; $params[':sp'] = $salePrice; }
+            }
+            if ($colStock !== '') {
+                $curr = $existing[$colStock] ?? null;
+                if ($stockRaw !== '' && (!array_key_exists($colStock, $existing) || $isEmpty($curr) || $isZeroish($curr))) { $set[] = $colStock . ' = :st'; $params[':st'] = (int) $stock; }
+            }
+            if ($colActive !== '' && $active !== null && (!array_key_exists($colActive, $existing) || $isEmpty($existing[$colActive] ?? null))) { $set[] = $colActive . ' = :ac'; $params[':ac'] = (int) $active; }
+            
+            if ($colWeight !== '' && $weight > 0) { $curr = $existing[$colWeight] ?? null; if (!array_key_exists($colWeight, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWeight . ' = :w'; $params[':w'] = $weight; } }
+            if ($colLength !== '' && $length > 0) { $curr = $existing[$colLength] ?? null; if (!array_key_exists($colLength, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colLength . ' = :l'; $params[':l'] = $length; } }
+            if ($colWidth !== '' && $width > 0) { $curr = $existing[$colWidth] ?? null; if (!array_key_exists($colWidth, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colWidth . ' = :wd'; $params[':wd'] = $width; } }
+            if ($colHeight !== '' && $height > 0) { $curr = $existing[$colHeight] ?? null; if (!array_key_exists($colHeight, $existing) || $isEmpty($curr) || $isZeroish($curr)) { $set[] = $colHeight . ' = :h'; $params[':h'] = $height; } }
+            if ($colStatus !== '' && $statusRaw !== '' && (!array_key_exists($colStatus, $existing) || $isEmpty($existing[$colStatus] ?? null))) { $set[] = $colStatus . ' = :sts'; $params[':sts'] = $statusRaw; }
+            if ($colImages !== '' && trim((string) $imagesRaw) !== '' && (!array_key_exists($colImages, $existing) || $isEmpty($existing[$colImages] ?? null))) { $set[] = $colImages . ' = :imgs'; $params[':imgs'] = $imagesRaw; }
+            if ($colTags !== '' && trim((string) $tagsRaw) !== '' && (!array_key_exists($colTags, $existing) || $isEmpty($existing[$colTags] ?? null))) { $set[] = $colTags . ' = :tags'; $params[':tags'] = $tagsRaw; }
+            if ($colAttributes !== '' && trim((string) $attrsRaw) !== '' && (!array_key_exists($colAttributes, $existing) || $isEmpty($existing[$colAttributes] ?? null))) { $set[] = $colAttributes . ' = :attrs'; $params[':attrs'] = $attrsRaw; }
+            if ($colVariations !== '' && trim((string) $childrenRaw) !== '' && (!array_key_exists($colVariations, $existing) || $isEmpty($existing[$colVariations] ?? null))) { $set[] = $colVariations . ' = :vars'; $params[':vars'] = $childrenRaw; }
+            if ($colCategoriaId !== '' && $categoriaId > 0 && (!array_key_exists($colCategoriaId, $existing) || $isEmpty($existing[$colCategoriaId] ?? null))) { $set[] = $colCategoriaId . ' = :cid'; $params[':cid'] = (int) $categoriaId; }
+            if ($colCategoria !== '' && trim((string) $catsRaw) !== '' && (!array_key_exists($colCategoria, $existing) || $isEmpty($existing[$colCategoria] ?? null))) { $set[] = $colCategoria . ' = :cat'; $params[':cat'] = $catsRaw; }
+            if ($colFoto !== '' && trim((string) $imagesRaw) !== '' && (!array_key_exists($colFoto, $existing) || $isEmpty($existing[$colFoto] ?? null))) {
+                $firstImg = $extractFirstImageUrl($imagesRaw);
+                if ($firstImg !== '') { $set[] = $colFoto . ' = :foto'; $params[':foto'] = $firstImg; }
+            }
+            if ($colControlaEstoque !== '' && $manageStock !== null && (!array_key_exists($colControlaEstoque, $existing) || $isEmpty($existing[$colControlaEstoque] ?? null) || $isZeroish($existing[$colControlaEstoque] ?? null))) {
+                $set[] = $colControlaEstoque . ' = :mstock';
+                $params[':mstock'] = (int) $manageStock;
+            }
+            if ($colCreatedAt !== '' && $dateSql !== '' && (!array_key_exists($colCreatedAt, $existing) || $isEmpty($existing[$colCreatedAt] ?? null))) {
+                $set[] = $colCreatedAt . ' = :cat';
+                $params[':cat'] = $dateSql;
+            }
+            if ($colPublishedAt !== '' && $dateSql !== '' && (!array_key_exists($colPublishedAt, $existing) || $isEmpty($existing[$colPublishedAt] ?? null))) {
+                $set[] = $colPublishedAt . ' = :pat';
+                $params[':pat'] = $dateSql;
+            }
             if ($colType !== '') {
-                $type = strtolower(trim($get('Product Type')));
-                if ($type !== '') { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
+                $type = $typeRaw;
+                if ($type !== '' && (!array_key_exists($colType, $existing) || $isEmpty($existing[$colType] ?? null))) { $set[] = $colType . ' = :tp'; $params[':tp'] = $type; }
             }
 
             if (in_array('updated_at', $cols, true)) {
@@ -530,12 +1163,28 @@ class AdminProdutosController extends Controller {
             if ($colSale !== '' && $salePrice > 0) { $colsIns[] = $colSale; $valsIns[] = ':sp'; $params[':sp'] = $salePrice; }
             if ($colStock !== '') { $colsIns[] = $colStock; $valsIns[] = ':st'; $params[':st'] = (int) $stock; }
             if ($colActive !== '' && $active !== null) { $colsIns[] = $colActive; $valsIns[] = ':ac'; $params[':ac'] = (int) $active; }
-            if ($colFeatured !== '' && $featured !== null) { $colsIns[] = $colFeatured; $valsIns[] = ':ft'; $params[':ft'] = (int) $featured; }
+            
             if ($colWeight !== '' && $weight > 0) { $colsIns[] = $colWeight; $valsIns[] = ':w'; $params[':w'] = $weight; }
             if ($colLength !== '' && $length > 0) { $colsIns[] = $colLength; $valsIns[] = ':l'; $params[':l'] = $length; }
             if ($colWidth !== '' && $width > 0) { $colsIns[] = $colWidth; $valsIns[] = ':wd'; $params[':wd'] = $width; }
             if ($colHeight !== '' && $height > 0) { $colsIns[] = $colHeight; $valsIns[] = ':h'; $params[':h'] = $height; }
             if ($colStatus !== '' && $statusRaw !== '') { $colsIns[] = $colStatus; $valsIns[] = ':sts'; $params[':sts'] = $statusRaw; }
+            if ($colImages !== '' && trim((string) $imagesRaw) !== '') { $colsIns[] = $colImages; $valsIns[] = ':imgs'; $params[':imgs'] = $imagesRaw; }
+            if ($colTags !== '' && trim((string) $tagsRaw) !== '') { $colsIns[] = $colTags; $valsIns[] = ':tags'; $params[':tags'] = $tagsRaw; }
+            if ($colAttributes !== '' && trim((string) $attrsRaw) !== '') { $colsIns[] = $colAttributes; $valsIns[] = ':attrs'; $params[':attrs'] = $attrsRaw; }
+            if ($colVariations !== '' && trim((string) $childrenRaw) !== '') { $colsIns[] = $colVariations; $valsIns[] = ':vars'; $params[':vars'] = $childrenRaw; }
+            if ($colCategoriaId !== '' && $categoriaId > 0) { $colsIns[] = $colCategoriaId; $valsIns[] = ':cid'; $params[':cid'] = (int) $categoriaId; }
+            if ($colCategoria !== '' && trim((string) $catsRaw) !== '') { $colsIns[] = $colCategoria; $valsIns[] = ':cat'; $params[':cat'] = $catsRaw; }
+            if ($colFoto !== '' && trim((string) $imagesRaw) !== '') {
+                $firstImg = $extractFirstImageUrl($imagesRaw);
+                if ($firstImg !== '') { $colsIns[] = $colFoto; $valsIns[] = ':foto'; $params[':foto'] = $firstImg; }
+            }
+
+            if ($colType !== '' && $typeRaw !== '') { $colsIns[] = $colType; $valsIns[] = ':tp'; $params[':tp'] = $typeRaw; }
+
+            if ($colControlaEstoque !== '' && $manageStock !== null) { $colsIns[] = $colControlaEstoque; $valsIns[] = ':mstock'; $params[':mstock'] = (int) $manageStock; }
+            if ($colCreatedAt !== '' && $dateSql !== '') { $colsIns[] = $colCreatedAt; $valsIns[] = ':cat'; $params[':cat'] = $dateSql; }
+            if ($colPublishedAt !== '' && $dateSql !== '') { $colsIns[] = $colPublishedAt; $valsIns[] = ':pat'; $params[':pat'] = $dateSql; }
 
             if (empty($colsIns)) {
                 throw new \RuntimeException('Nenhuma coluna compatível para inserir produto');
@@ -588,8 +1237,26 @@ class AdminProdutosController extends Controller {
         $key = trim($key);
         if ($key === '') return;
         try {
-            $st = $pdo->prepare('INSERT INTO produto_meta (produto_id, meta_key, meta_value) VALUES (:pid, :k, :v) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()');
-            $st->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+            $stSel = $pdo->prepare('SELECT meta_value FROM produto_meta WHERE produto_id = :pid AND meta_key = :k LIMIT 1');
+            $stSel->execute([':pid' => (int) $produtoId, ':k' => $key]);
+            $curr = $stSel->fetchColumn();
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            if ($curr === false) {
+                $st = $pdo->prepare('INSERT INTO produto_meta (produto_id, meta_key, meta_value) VALUES (:pid, :k, :v)');
+                $st->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+                return;
+            }
+
+            if ($isEmpty($curr) && trim((string) $value) !== '') {
+                $stUp = $pdo->prepare('UPDATE produto_meta SET meta_value = :v, updated_at = NOW() WHERE produto_id = :pid AND meta_key = :k');
+                $stUp->execute([':pid' => (int) $produtoId, ':k' => $key, ':v' => $value]);
+            }
         } catch (\Exception $e) {
         }
     }
@@ -1629,14 +2296,41 @@ HTML;
         echo '</div>';
 
         if ($totalPaginas > 1) {
+            $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
+            $mkUrl = function(int $p) use ($base, $busca): string {
+                return $base . "?pagina={$p}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+            };
+
+            $start = max(1, $pagina - 1);
+            $end = min($totalPaginas, $pagina + 1);
+            if (($end - $start + 1) < 3) {
+                if ($start === 1) {
+                    $end = min($totalPaginas, $start + 2);
+                } elseif ($end === $totalPaginas) {
+                    $start = max(1, $end - 2);
+                }
+            }
+
             echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
-            for ($i = 1; $i <= $totalPaginas; $i++) {
-                $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
-                $url = $base . "?pagina={$i}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+
+            $prev = max(1, $pagina - 1);
+            $prevDisabled = ($pagina <= 1);
+            echo '<li class="page-item ' . ($prevDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">Anterior</a>'
+                . '</li>';
+
+            for ($i = $start; $i <= $end; $i++) {
                 echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">' 
-                    . '<a class="page-link" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
+                    . '<a class="page-link" href="' . htmlspecialchars($mkUrl($i), ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
                     . '</li>';
             }
+
+            $next = min($totalPaginas, $pagina + 1);
+            $nextDisabled = ($pagina >= $totalPaginas);
+            echo '<li class="page-item ' . ($nextDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">Próximo</a>'
+                . '</li>';
+
             echo '</ul></nav>';
         }
 

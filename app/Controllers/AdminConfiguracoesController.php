@@ -208,6 +208,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
                                 <i class="fas fa-cogs"></i> Sistema
                             </button>
+                            <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
+                                <i class="fab fa-wordpress"></i> WordPress
+                            </button>
                         </div>
                     </div>
                     
@@ -244,6 +247,59 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-wordpress" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Integração WordPress (Somente leitura)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Host</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_host" value="' . $this->getConfigValue($config, 'wordpress', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Database (nome)</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_name" value="' . $this->getConfigValue($config, 'wordpress', 'db_name', '') . '" placeholder="wp_database">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Usuário</label>
+                                                        <input type="text" class="form-control" name="wordpress_db_user" value="' . $this->getConfigValue($config, 'wordpress', 'db_user', '') . '" placeholder="wp_user">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Senha</label>
+                                                        <input type="password" class="form-control" name="wordpress_db_pass" value="' . $this->getConfigValue($config, 'wordpress', 'db_pass', '') . '" placeholder="********">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Prefixo das tabelas</label>
+                                                        <input type="text" class="form-control" name="wordpress_table_prefix" value="' . $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        <small class="text-muted">Normalmente <code>wp_</code>. Se o site antigo tiver outro prefixo, ajuste aqui.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-info mb-0">
+                                                Essa integração é <strong>somente leitura</strong>. O sistema usará essas credenciais para exibir pedidos do site antigo.
                                             </div>
                                         </div>
                                     </div>
@@ -2931,6 +2987,7 @@ HTML;
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
+                'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
@@ -3343,10 +3400,113 @@ HTML;
         exit;
     }
 
-    private function scanUsuariosCsv(string $csvPath): array {
-        $expected = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
+    private function normalizeUsuariosImportHeader(string $v): string {
+        $s = trim($v);
+        $s = strtolower($s);
+        $s = preg_replace('/[^a-z0-9]+/', '', $s);
+        return $s;
+    }
+
+    private function buildUsuariosImportHeaderMap(array $header): array {
+        // Map interno (key -> idx) para reordenar as colunas para o layout esperado do importador.
+        $aliases = [
+            'id' => ['id','userid','user_id'],
+            'email' => ['useremail','usermail','email','emailaddress','user_mail','user_email'],
+            'login' => ['userlogin','login','username','user_name'],
+            'first_name' => ['firstname','first_name','nome','givenname'],
+            'last_name' => ['lastname','last_name','sobrenome','surname','familyname'],
+
+            'billing_company' => ['billingcompany'],
+            'billing_address1' => ['billingaddress1','billingaddress','billingstreet','billingrua','billinglogradouro'],
+            'billing_address2' => ['billingaddress2','billingcomplement','billingcomplemento','billingaddressline2'],
+            'billing_city' => ['billingcity','billingcidade'],
+            'billing_postcode' => ['billingpostcode','billingcep','billingzipcode','billingzip'],
+            'billing_country' => ['billingcountry','billingpais','billingcountrycode'],
+            'billing_state' => ['billingstate','billinguf','billingestado'],
+            'billing_phone' => ['billingphone','billingtelefone','phone','telefone'],
+
+            'shipping_company' => ['shippingcompany'],
+            'shipping_address1' => ['shippingaddress1','shippingaddress','shippingstreet','shippingrua','shippinglogradouro'],
+            'shipping_address2' => ['shippingaddress2','shippingcomplement','shippingcomplemento','shippingaddressline2'],
+            'shipping_city' => ['shippingcity','shippingcidade'],
+            'shipping_postcode' => ['shippingpostcode','shippingcep','shippingzipcode','shippingzip'],
+            'shipping_country' => ['shippingcountry','shippingpais','shippingcountrycode'],
+            'shipping_state' => ['shippingstate','shippinguf','shippingestado'],
+
+            'suite' => ['suite','suíte'],
+            'billing_cpf' => ['billingcpf','cpf','documento'],
+            'billing_birthdate' => ['billingbirthdate','birthdate','datanascimento','billingdob','dob'],
+            'billing_number' => ['billingnumber','billingnumero','numero'],
+            'billing_neighborhood' => ['billingneighborhood','billingbairro','neighborhood','bairro'],
+            'billing_cellphone' => ['billingcellphone','cellphone','celular','billingcelular'],
+            'shipping_number' => ['shippingnumber','shippingnumero'],
+            'shipping_neighborhood' => ['shippingneighborhood','shippingbairro'],
+            'shipping_suite' => ['shippingsuite'],
+            'billing_cnpj' => ['billingcnpj','cnpj'],
+            'woo_wallet_balance' => ['_current_woo_wallet_balance','woowalletbalance','walletbalance','saldo'],
+            'user_role' => ['userrole','role','perfil'],
+            'user_pass' => ['userpass','password','senha'],
         ];
+
+        $aliasToKey = [];
+        foreach ($aliases as $key => $als) {
+            foreach ($als as $a) {
+                $aliasToKey[$this->normalizeUsuariosImportHeader((string) $a)] = $key;
+            }
+        }
+
+        $map = [];
+        foreach ($header as $idx => $name) {
+            $norm = $this->normalizeUsuariosImportHeader((string) $name);
+            if ($norm === '') continue;
+            $key = $aliasToKey[$norm] ?? null;
+            if ($key && !isset($map[$key])) {
+                $map[$key] = (int) $idx;
+            }
+        }
+        return $map;
+    }
+
+    private function getUsuariosImportExpectedKeyOrder(): array {
+        // Essa ordem bate com os índices consumidos por processUsuarioRow()
+        return [
+            'id',
+            'email',
+            'login',
+            'first_name',
+            'last_name',
+            'billing_company',
+            'billing_address1',
+            'billing_address2',
+            'billing_city',
+            'billing_postcode',
+            'billing_country',
+            'billing_state',
+            'billing_phone',
+            'shipping_company',
+            'shipping_address1',
+            'shipping_address2',
+            'shipping_city',
+            'shipping_postcode',
+            'shipping_country',
+            'shipping_state',
+            'suite',
+            'billing_cpf',
+            'billing_birthdate',
+            'billing_number',
+            'billing_neighborhood',
+            'billing_cellphone',
+            'shipping_number',
+            'shipping_neighborhood',
+            'shipping_suite',
+            'billing_cnpj',
+            'woo_wallet_balance',
+            'user_role',
+            'user_pass',
+        ];
+    }
+
+    private function scanUsuariosCsv(string $csvPath): array {
 
         $fh = @fopen($csvPath, 'r');
         if (!$fh) {
@@ -3361,34 +3521,30 @@ HTML;
             $delimiter = ';';
         }
 
-        $normalizeHeader = function($v) {
-            $s = trim((string) $v);
-            $s = preg_replace('/\s+/', ' ', $s);
-            return $s;
-        };
-
-        $header = is_array($first) ? array_map($normalizeHeader, $first) : [];
+        $header = is_array($first) ? $first : [];
         $headerMap = null;
         $isHeader = false;
+
         if (!empty($header)) {
-            $map = [];
-            foreach ($header as $idx => $name) {
-                $key = (string) $name;
-                if ($key === '') continue;
-                $map[$key] = (int) $idx;
+            $tmp = $this->buildUsuariosImportHeaderMap($header);
+            // Considera que tem header se conseguir mapear pelo menos algumas chaves essenciais.
+            $score = 0;
+            foreach (['email','first_name','last_name','billing_postcode','billing_city'] as $k) {
+                if (isset($tmp[$k])) $score++;
             }
-            $ok = true;
-            foreach ($expected as $col) {
-                if (!array_key_exists($col, $map)) {
-                    $ok = false;
-                    break;
+            if ($score >= 2) {
+                $isHeader = true;
+                $headerMap = $tmp;
+            } else {
+                // fallback: detectar header por texto típico
+                $joined = strtolower(implode(' ', array_map('strval', $header)));
+                if (strpos($joined, 'user') !== false && (strpos($joined, 'mail') !== false || strpos($joined, 'email') !== false)) {
+                    $isHeader = true;
+                    $headerMap = $tmp;
                 }
             }
-            if ($ok) {
-                $isHeader = true;
-                $headerMap = $map;
-            }
         }
+
         if (!$isHeader) {
             rewind($fh);
         }
@@ -3405,9 +3561,7 @@ HTML;
     }
 
     private function processUsuariosCsvBatch(\PDO $pdo, string $csvPath, string $delimiter, bool $hasHeader, ?array $headerMap, int $offset, int $limit): array {
-        $expected = [
-            'ID','User Email','User Login','First Name','Last Name','Billing Company','Billing Address 1','Billing Address 2','Billing City','Billing Postcode','Billing Country','Billing State','Billing Phone','Shipping Company','Shipping Address 1','Shipping Address 2','Shipping City','Shipping Postcode','Shipping Country','Shipping State','suite','billing_cpf','billing_birthdate','billing_number','billing_neighborhood','billing_cellphone','shipping_number','shipping_neighborhood','shipping_suite','billing_cnpj','_current_woo_wallet_balance','User Role','User Pass'
-        ];
+        $expectedKeys = $this->getUsuariosImportExpectedKeyOrder();
 
         $fh = @fopen($csvPath, 'r');
         if (!$fh) {
@@ -3416,20 +3570,8 @@ HTML;
 
         if ($hasHeader) {
             $hdrRow = fgetcsv($fh, 0, $delimiter);
-            if ($headerMap === null && is_array($hdrRow)) {
-                $normalizeHeader = function($v) {
-                    $s = trim((string) $v);
-                    $s = preg_replace('/\s+/', ' ', $s);
-                    return $s;
-                };
-                $hdr = array_map($normalizeHeader, $hdrRow);
-                $tmpMap = [];
-                foreach ($hdr as $idx => $name) {
-                    $key = (string) $name;
-                    if ($key === '') continue;
-                    $tmpMap[$key] = (int) $idx;
-                }
-                $headerMap = $tmpMap;
+            if (is_array($hdrRow)) {
+                $headerMap = $this->buildUsuariosImportHeaderMap($hdrRow);
             }
         }
 
@@ -3449,15 +3591,15 @@ HTML;
             if (!is_array($row) || count($row) < 5) {
                 continue;
             }
-            if ($hasHeader && is_array($headerMap)) {
+            if ($hasHeader && is_array($headerMap) && !empty($headerMap)) {
                 $ordered = [];
-                foreach ($expected as $col) {
-                    $idx = $headerMap[$col] ?? null;
+                foreach ($expectedKeys as $k) {
+                    $idx = $headerMap[$k] ?? null;
                     $ordered[] = ($idx !== null && array_key_exists($idx, $row)) ? (string) $row[$idx] : '';
                 }
                 $row = $ordered;
             }
-            $row = array_pad($row, count($expected), '');
+            $row = array_pad($row, count($expectedKeys), '');
 
             $rowKey = $this->getUsuarioImportRowKey($row);
             if ($rowKey !== '' && $this->isImportRowOk($pdo, 'usuarios', $rowKey)) {
@@ -3488,9 +3630,15 @@ HTML;
         $idExt = trim((string) ($row[0] ?? ''));
         $email = strtolower(trim((string) ($row[1] ?? '')));
         $login = strtolower(trim((string) ($row[2] ?? '')));
+        $cpf = trim((string) ($row[21] ?? ''));
+        $cnpj = trim((string) ($row[29] ?? ''));
+
+        $doc = $cpf !== '' ? $cpf : $cnpj;
+        $doc = preg_replace('/[^0-9]/', '', (string) $doc);
 
         if ($email !== '') return 'email:' . $email;
         if ($login !== '') return 'login:' . $login;
+        if ($doc !== '') return 'doc:' . $doc;
         if ($idExt !== '') return 'id:' . $idExt;
         return '';
     }
@@ -3599,6 +3747,13 @@ HTML;
             $doc = $billingCnpj;
         }
 
+        $emailFinal = '';
+        if ($email !== '') {
+            $emailFinal = $email;
+        } elseif ($login !== '') {
+            $emailFinal = $login . '@local';
+        }
+
         $usuarioId = 0;
         try {
             if ($idExt !== '' && ctype_digit($idExt)) {
@@ -3607,25 +3762,74 @@ HTML;
             if ($usuarioId <= 0 && $email !== '') {
                 $usuarioId = $this->findUsuarioIdByEmail($pdo, $email);
             }
+            if ($usuarioId <= 0 && $doc !== '') {
+                $usuarioId = $this->findUsuarioIdByDocumento($pdo, $doc);
+            }
         } catch (\Exception $e) {
             $usuarioId = 0;
         }
 
+        if ($emailFinal === '') {
+            $seed = '';
+            if ($idExt !== '') {
+                $seed = 'id' . $idExt;
+            } elseif (trim((string) $doc) !== '') {
+                $seed = 'doc' . preg_replace('/[^0-9]/', '', (string) $doc);
+            } else {
+                $seed = substr(sha1($nome . '|' . $telefone), 0, 12);
+            }
+            $emailFinal = 'import_' . $seed . '@local';
+        }
+
         $dadosUsuario = [
             'nome' => $nome,
-            'email' => $email !== '' ? $email : ($login . '@local'),
+            'email' => $emailFinal,
             'telefone' => $telefone,
             'cpf' => $billingCpf,
             'documento' => $doc,
             'suite' => ($suite !== '' ? $suite : ($shippingSuite !== '' ? $shippingSuite : null)),
             'perfil' => $perfil,
         ];
+        if (trim((string) $doc) === '') {
+            $dadosUsuario['_allow_missing_documento'] = 1;
+        }
         if ($pass !== '') {
             $dadosUsuario['senha'] = $pass;
         }
 
         if ($usuarioId > 0) {
-            $helper->atualizarUsuario($usuarioId, $dadosUsuario);
+            // Política: preencher somente campos vazios (não sobrescrever)
+            $current = [];
+            try {
+                $stCur = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                $stCur->execute([$usuarioId]);
+                $current = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $current = [];
+            }
+
+            $isEmpty = function($v): bool {
+                if ($v === null) return true;
+                if (is_string($v)) return trim($v) === '';
+                return false;
+            };
+
+            foreach ($dadosUsuario as $k => $v) {
+                if (!array_key_exists($k, $current)) {
+                    continue;
+                }
+                if (!$isEmpty($current[$k] ?? null)) {
+                    unset($dadosUsuario[$k]);
+                }
+            }
+            // Senha: nunca sobrescrever se já existir
+            if (isset($dadosUsuario['senha']) && isset($current['senha']) && !$isEmpty($current['senha'])) {
+                unset($dadosUsuario['senha']);
+            }
+
+            if (!empty($dadosUsuario)) {
+                $helper->atualizarUsuario($usuarioId, $dadosUsuario);
+            }
         } else {
             $usuarioId = (int) $helper->criarUsuario($dadosUsuario);
         }
@@ -3656,11 +3860,46 @@ HTML;
             }
         }
 
-        $addr = $this->pickEnderecoFromRow($row);
+        $addr = $this->pickEnderecoFromRowMapped($get);
         if ($usuarioId > 0 && !empty($addr)) {
             $this->salvarEnderecoPrincipal($pdo, $usuarioId, $addr);
         }
         $this->atualizarCamposUsuarioEnderecoSeExistir($pdo, $usuarioId, $addr ?? [], $billingBirth);
+    }
+
+    private function pickEnderecoFromRowMapped(callable $get): array {
+        $billing = [
+            'endereco' => $get(6),
+            'complemento' => $get(7),
+            'cidade' => $get(8),
+            'cep' => $get(9),
+            'pais' => $get(10),
+            'estado' => $get(11),
+            'numero' => $get(23),
+            'bairro' => $get(24),
+        ];
+
+        $shipping = [
+            'endereco' => $get(14),
+            'complemento' => $get(15),
+            'cidade' => $get(16),
+            'cep' => $get(17),
+            'pais' => $get(18),
+            'estado' => $get(19),
+            'numero' => $get(26),
+            'bairro' => $get(27),
+        ];
+
+        $hasBilling = false;
+        foreach (['endereco','cidade','cep'] as $k) {
+            if (!empty($billing[$k])) { $hasBilling = true; break; }
+        }
+        $src = $hasBilling ? $billing : $shipping;
+        $src['tipo'] = $hasBilling ? 'cobranca' : 'entrega';
+        foreach ($src as $k => $v) {
+            if ($v === '') unset($src[$k]);
+        }
+        return $src;
     }
 
     private function importarUsuariosCsv(\PDO $pdo): array {
@@ -3774,6 +4013,51 @@ HTML;
         return (int) ($st->fetchColumn() ?: 0);
     }
 
+    private function findUsuarioIdByDocumento(\PDO $pdo, string $documento): int {
+        $documento = trim((string) $documento);
+        if ($documento === '') return 0;
+
+        // Normalizar para buscar tanto formatado quanto não formatado
+        $docDigits = preg_replace('/[^0-9]/', '', $documento);
+        $doc = $docDigits !== '' ? $docDigits : $documento;
+
+        $cols = [];
+        try {
+            $st = $pdo->query('DESCRIBE usuarios');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+        if (empty($cols)) return 0;
+
+        $cDocumento = in_array('documento', $cols, true) ? 'documento' : null;
+        $cCpf = in_array('cpf', $cols, true) ? 'cpf' : null;
+
+        try {
+            if ($cDocumento) {
+                // comparar em digits também, removendo pontuação
+                $sql = "SELECT id FROM usuarios WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER({$cDocumento}),'.',''),'-',''),'/',''),' ','') ,',','') = LOWER(?) LIMIT 1";
+                $st = $pdo->prepare($sql);
+                $st->execute([$doc]);
+                $id = (int) ($st->fetchColumn() ?: 0);
+                if ($id > 0) return $id;
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            if ($cCpf) {
+                $sql = "SELECT id FROM usuarios WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER({$cCpf}),'.',''),'-',''),'/',''),' ','') ,',','') = LOWER(?) LIMIT 1";
+                $st = $pdo->prepare($sql);
+                $st->execute([$doc]);
+                return (int) ($st->fetchColumn() ?: 0);
+            }
+        } catch (\Exception $e) {
+        }
+
+        return 0;
+    }
+
     private function pickEnderecoFromRow(array $row): array {
         $get = function(int $idx) use ($row) {
             return trim((string) ($row[$idx] ?? ''));
@@ -3876,9 +4160,28 @@ HTML;
             $existingId = (int) ($stSel->fetchColumn() ?: 0);
 
             if ($existingId > 0) {
+                $existingRow = [];
+                try {
+                    $stRow = $pdo->prepare('SELECT * FROM enderecos WHERE id = :id LIMIT 1');
+                    $stRow->execute([':id' => $existingId]);
+                    $existingRow = $stRow->fetch(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) {
+                    $existingRow = [];
+                }
+
+                $isEmpty = function($v): bool {
+                    if ($v === null) return true;
+                    if (is_string($v)) return trim($v) === '';
+                    return false;
+                };
+
                 $set = [];
                 $params = [':id' => $existingId];
                 foreach ($payload as $col => $val) {
+                    // não sobrescrever campos já preenchidos
+                    if (array_key_exists($col, $existingRow) && !$isEmpty($existingRow[$col] ?? null)) {
+                        continue;
+                    }
                     $set[] = $col . ' = :' . $col;
                     $params[':' . $col] = $val;
                 }
@@ -3921,6 +4224,21 @@ HTML;
         }
         if (empty($cols)) return;
 
+        $current = [];
+        try {
+            $stCur = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+            $stCur->execute([$usuarioId]);
+            $current = $stCur->fetch(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $current = [];
+        }
+
+        $isEmpty = function($v): bool {
+            if ($v === null) return true;
+            if (is_string($v)) return trim($v) === '';
+            return false;
+        };
+
         $set = [];
         $params = [];
 
@@ -3934,6 +4252,9 @@ HTML;
         ];
         foreach ($map as $k => $col) {
             if (!empty($endereco[$k]) && in_array($col, $cols, true)) {
+                if (array_key_exists($col, $current) && !$isEmpty($current[$col] ?? null)) {
+                    continue;
+                }
                 $set[] = $col . ' = ?';
                 $params[] = (string) $endereco[$k];
             }
@@ -3943,6 +4264,10 @@ HTML;
         if ($birth !== '') {
             $colBirth = in_array('data_nascimento', $cols, true) ? 'data_nascimento' : (in_array('birthdate', $cols, true) ? 'birthdate' : '');
             if ($colBirth !== '') {
+                if (array_key_exists($colBirth, $current) && !$isEmpty($current[$colBirth] ?? null)) {
+                    // não sobrescrever data já preenchida
+                    // segue sem setar
+                } else {
                 $norm = trim((string) $birth);
                 $norm = preg_replace('/\s+/', '', $norm);
 
@@ -3959,6 +4284,7 @@ HTML;
                 if ($dt !== null) {
                     $set[] = $colBirth . ' = ?';
                     $params[] = $dt;
+                }
                 }
             }
         }

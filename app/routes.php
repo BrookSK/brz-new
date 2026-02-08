@@ -64,6 +64,14 @@ $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 $router->get('/pedido/detalhes/{id}/pdf', 'UsuarioController', 'pedidoPdf');
 $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirPagamento');
 
+// Tickets (Cliente)
+$router->get('/meus-tickets', 'SupportTicketsController', 'index');
+$router->get('/meu-ticket/{id}', 'SupportTicketsController', 'ver');
+$router->post('/meu-ticket/{id}/mensagem', 'SupportTicketsController', 'enviarMensagem');
+$router->post('/meu-ticket/{id}/fechar', 'SupportTicketsController', 'fechar');
+$router->get('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
+$router->post('/meu-ticket/abrir/pedido/{id}', 'SupportTicketsController', 'abrirPorPedido');
+
 // Checkout
 $router->get('/checkout', 'CheckoutController', 'index');
 $router->post('/checkout/processar', 'CheckoutController', 'processar');
@@ -88,7 +96,7 @@ $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cro
 $router->get('/cron/clube/rendimento', 'ClubeController', 'cronRendimento');
 
 // Área Administrativa - Novos Controllers
-$router->get('/admin', function() {
+$router->get('/admin', function($request) {
     $perfil = '';
     try {
         if (session_status() === PHP_SESSION_NONE) {
@@ -230,6 +238,17 @@ $router->get('/admin', function() {
 </html>';
 });
 
+// Tickets (Admin)
+$router->get('/admin/tickets', 'AdminTicketsController', 'index');
+$router->get('/admin/tickets/{id}', 'AdminTicketsController', 'ver');
+$router->post('/admin/tickets/{id}/mensagem', 'AdminTicketsController', 'enviarMensagem');
+$router->post('/admin/tickets/{id}/fechar', 'AdminTicketsController', 'fechar');
+$router->post('/admin/tickets/{id}/reabrir', 'AdminTicketsController', 'reabrir');
+$router->post('/admin/tickets/{id}/notas-internas', 'AdminTicketsController', 'salvarNotasInternas');
+$router->post('/admin/tickets/{id}/arquivos', 'AdminTicketsController', 'uploadArquivoTicket');
+$router->post('/admin/tickets/{id}/contatar-vendedor', 'AdminTicketsController', 'contatarVendedor');
+$router->post('/admin/tickets/{id}/vendor-chat/seen', 'AdminTicketsController', 'marcarVendorChatVisto');
+
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
@@ -242,6 +261,9 @@ $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cad
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
 $router->get('/admin/produtos/cadastro-representante', 'AdminProdutosNovoController', 'index');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
+$router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
+$router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
+$router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
 $router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
@@ -288,6 +310,11 @@ $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes
 $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
 $router->post('/admin/pedidos/upload-comprovante/{id}', 'AdminPedidosController', 'uploadComprovante');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
+$router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
+$router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
+$router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'importarPedidosModelo');
+$router->post('/admin/pedidos/importar/iniciar', 'AdminPedidosController', 'importarPedidosIniciar');
+$router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'importarPedidosProcessar');
 $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
 $router->get('/admin/pedidos/novo-manual/cliente-endereco/{id}', 'AdminPedidosManualController', 'clienteEndereco');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');

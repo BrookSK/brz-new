@@ -274,6 +274,11 @@
                                                            title="Ver Detalhes">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
+                                                        <a class="btn btn-sm btn-outline-dark"
+                                                           href="/meu-ticket/abrir/pedido/<?= (int) ($pedido['id'] ?? 0) ?>"
+                                                           title="Suporte">
+                                                            <i class="fas fa-life-ring"></i>
+                                                        </a>
                                                         <button class="btn btn-sm btn-outline-success" 
                                                                 onclick="rastrearPedido('<?= htmlspecialchars((string)($pedido['codigo_pedido'] ?? $pedido['codigo'] ?? $pedido['codigo_rastreamento'] ?? $pedido['rastreamento'] ?? $pedido['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')"
                                                                 title="Rastrear">
