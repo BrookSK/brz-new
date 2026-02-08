@@ -756,6 +756,7 @@ class UsuarioController extends Controller {
             'bairro' => ['bairro'],
             'cidade' => ['cidade'],
             'estado' => ['estado', 'uf'],
+            'pais' => ['pais', 'country'],
         ];
 
         $payload = [];
@@ -1331,7 +1332,16 @@ class UsuarioController extends Controller {
         if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
         if (empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
-        if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+
+        $estado = '';
+        if (isset($dados['estado']) && trim((string) $dados['estado']) !== '') {
+            $estado = trim((string) $dados['estado']);
+        } elseif (isset($dados['estado_text']) && trim((string) $dados['estado_text']) !== '') {
+            $estado = trim((string) $dados['estado_text']);
+        } elseif (isset($dados['estado_ui']) && trim((string) $dados['estado_ui']) !== '') {
+            $estado = trim((string) $dados['estado_ui']);
+        }
+        if ($estado === '') $erros[] = 'Estado é obrigatório';
         
         if (!filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
             $erros[] = 'E-mail inválido';

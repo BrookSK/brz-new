@@ -2846,6 +2846,13 @@ class CheckoutController extends Controller {
             if (!in_array($moedaSelecionada, ['BRL', 'USD', 'EUR'], true)) {
                 $moedaSelecionada = 'BRL';
             }
+
+            // Endereço internacional exige pagamento em USD (gateways BR não aceitam).
+            // Usamos o país do formulário (pais) como referência do endereço de entrega.
+            $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+            if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
+                $moedaSelecionada = 'USD';
+            }
             $this->debugLog('[CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
             
             // Calcular totais

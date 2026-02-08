@@ -107,6 +107,17 @@
                         <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
                             <div class="col-md-6">
+                                <label for="pais" class="form-label">País / Country</label>
+                                <select class="form-select" id="pais" name="pais" required>
+                                    <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
+                                    <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
+                                    <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
+                                    <option value="CA" <?= $pp === 'CA' ? 'selected' : '' ?>>Canadá</option>
+                                    <option value="DE" <?= $pp === 'DE' ? 'selected' : '' ?>>Alemanha</option>
+                                    <option value="AU" <?= $pp === 'AU' ? 'selected' : '' ?>>Austrália</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <label for="cep" class="form-label">CEP</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
@@ -175,6 +186,7 @@
                                     <option value="SE" <?= $selectedUf === 'SE' ? 'selected' : '' ?>>Sergipe</option>
                                     <option value="TO" <?= $selectedUf === 'TO' ? 'selected' : '' ?>>Tocantins</option>
                                 </select>
+                                <input type="text" class="form-control" id="estado_text" name="estado_text" style="display:none;" value="<?= htmlspecialchars((string) ($ee['estado'] ?? ($ee['uf'] ?? ($usuario['estado'] ?? '')))) ?>">
                             </div>
                         </div>
                 </div>
@@ -312,6 +324,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Busca CEP via API
         cepInput.addEventListener('blur', function(e) {
+            const paisSel = document.getElementById('pais');
+            const pais = (paisSel && paisSel.value ? String(paisSel.value) : 'BR').toUpperCase();
+            if (pais !== 'BR') {
+                return;
+            }
             const cep = e.target.value.replace(/\D/g, '');
             if (cep.length === 8) {
                 fetch(`https://viacep.com.br/ws/${cep}/json/`)
@@ -331,6 +348,92 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    function atualizarEnderecoPorPais() {
+        const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+        const cep = document.getElementById('cep');
+        const estadoSelect = document.getElementById('estado');
+        const estadoText = document.getElementById('estado_text');
+
+        const statesByCountry = {
+            BR: [
+                'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
+            ],
+            US: [
+                'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
+            ],
+            CA: [
+                'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'
+            ]
+        };
+
+        if (cep) {
+            if (pais === 'BR') {
+                cep.placeholder = '00000-000';
+                cep.maxLength = 9;
+            } else if (pais === 'US') {
+                cep.placeholder = '00000';
+                cep.maxLength = 10;
+            } else {
+                cep.placeholder = '';
+                cep.maxLength = 12;
+            }
+        }
+
+        if (estadoSelect && estadoText) {
+            const list = statesByCountry[pais] || null;
+            const shouldUseSelect = Array.isArray(list) && list.length > 0;
+
+            if (shouldUseSelect) {
+                const current = String(estadoSelect.value || estadoText.value || '').trim();
+
+                while (estadoSelect.options.length > 0) {
+                    estadoSelect.remove(0);
+                }
+                const optEmpty = document.createElement('option');
+                optEmpty.value = '';
+                optEmpty.textContent = 'Selecione...';
+                estadoSelect.appendChild(optEmpty);
+                list.forEach((uf) => {
+                    const opt = document.createElement('option');
+                    opt.value = uf;
+                    opt.textContent = uf;
+                    if (current && uf === current.toUpperCase()) {
+                        opt.selected = true;
+                    }
+                    estadoSelect.appendChild(opt);
+                });
+
+                estadoSelect.style.display = '';
+                estadoText.style.display = 'none';
+
+                estadoSelect.name = 'estado';
+                estadoSelect.required = true;
+                estadoSelect.disabled = false;
+
+                estadoText.name = 'estado_text';
+                estadoText.required = false;
+                estadoText.disabled = true;
+            } else {
+                estadoSelect.style.display = 'none';
+                estadoText.style.display = '';
+
+                estadoSelect.name = 'estado_ui';
+                estadoSelect.required = false;
+                estadoSelect.disabled = true;
+
+                estadoText.name = 'estado';
+                estadoText.required = true;
+                estadoText.disabled = false;
+            }
+        }
+    }
+
+    const paisSel = document.getElementById('pais');
+    if (paisSel) {
+        paisSel.addEventListener('change', atualizarEnderecoPorPais);
+    }
+    atualizarEnderecoPorPais();
     
     // Validação de senhas
     const senhaAtual = document.getElementById('senha_atual');
