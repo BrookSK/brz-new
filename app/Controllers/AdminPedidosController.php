@@ -1874,6 +1874,24 @@ JS;
                 $trackingUrl = '';
 
                 if ($pdoTrack instanceof \PDO) {
+                    // ShipStation (UPS - exterior)
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT tracking_number, label_url, carrier_code FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $trk = trim((string) ($row['tracking_number'] ?? ''));
+                            $url = trim((string) ($row['label_url'] ?? ''));
+                            $car = trim((string) ($row['carrier_code'] ?? ''));
+                            if ($trk !== '') {
+                                $tracking = $trk;
+                                $trackingFonte = 'ShipStation' . ($car !== '' ? (' (' . $car . ')') : '');
+                                $trackingUrl = $url;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     // Stamps (UPS - exterior)
                     if ($tracking === '') {
                         try {

@@ -828,53 +828,27 @@ class AdminConfiguracoesController extends Controller {
 
                                             <hr>
 
-                                            <h6 class="mb-3">Stamps (UPS) - Exterior</h6>
+                                            <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Ativo</label>
                                                         <div class="form-check form-switch">
-                                                            <input class="form-check-input" type="checkbox" id="stamps_enabled" name="entrega_stamps_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'stamps_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="stamps_enabled">Habilitar Stamps (UPS)</label>
+                                                            <input class="form-check-input" type="checkbox" id="shipstation_enabled" name="entrega_shipstation_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'shipstation_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="shipstation_enabled">Habilitar ShipStation (UPS)</label>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
-                                                        <select class="form-select" name="entrega_stamps_ambiente">
-                                                            <option value="staging" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', 'staging') === 'staging' ? 'selected' : '') . '>Staging</option>
-                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Client ID</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_client_id" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_id', '') . '" placeholder="Client ID">
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Client Secret</label>
-                                                        <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_stamps_client_secret" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_secret', '') . '" placeholder="Client Secret">
-                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
-                                                                <i class="fas fa-eye"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                                    <div class="mb-3"></div>
                                                 </div>
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label">Refresh Token</label>
+                                                <label class="form-label">API Key</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_stamps_refresh_token" value="' . $this->getConfigValue($config, 'entrega', 'stamps_refresh_token', '') . '" placeholder="Refresh Token">
+                                                    <input type="password" class="form-control" name="entrega_shipstation_api_key" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_api_key', '') . '" placeholder="Cole a API key da ShipStation">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
@@ -883,23 +857,64 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label">From Address (JSON)</label>
-                                                <textarea class="form-control" name="entrega_stamps_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'stamps_from_address_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela API da Stamps.</small>
+                                                <textarea class="form-control" name="entrega_shipstation_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela ShipStation.</small>
                                             </div>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Service Type</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_service_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_service_type', '') . '" placeholder="Ex.: ups_ground / ups_worldwide_saver">
+                                                        <label class="form-label">Carrier ID</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_id" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '') . '" placeholder="Carrier ID (ShipStation)">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Packaging Type</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_packaging_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_packaging_type', 'package') . '" placeholder="package">
+                                                        <label class="form-label">Carrier Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_carrier_code', 'ups') . '" placeholder="ups">
                                                     </div>
                                                 </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Service Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_service_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '') . '" placeholder="Service code">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Package Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_package_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_package_code', 'package') . '" placeholder="package">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Label Layout</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_layout" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_layout', '4x6') . '" placeholder="4x6">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Label Format</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_format" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_format', 'pdf') . '" placeholder="pdf">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Download Type</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_download_type" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_download_type', 'url') . '" placeholder="url">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Display Scheme</label>
+                                                <input type="text" class="form-control" name="entrega_shipstation_display_scheme" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_display_scheme', 'label') . '" placeholder="label">
                                             </div>
                                         </div>
                                     </div>
@@ -2984,7 +2999,7 @@ HTML;
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
@@ -2993,7 +3008,7 @@ HTML;
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'stamps_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
