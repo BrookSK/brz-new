@@ -2058,6 +2058,8 @@ class PaymentService {
     private function processarPagamentoAsaas($dados, $valor, $descricao) {
         $billingType = $dados['billingType'] ?? 'CREDIT_CARD';
 
+        $docDigits = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
+
         $customerId = $dados['customer_id'] ?? null;
         if (empty($customerId)) {
             $customerId = $this->criarOuReutilizarClienteAsaas($dados);
@@ -2083,7 +2085,7 @@ class PaymentService {
             $payload['creditCardHolderInfo'] = [
                 'name' => $dados['customer_name'],
                 'email' => $dados['customer_email'],
-                'cpfCnpj' => $dados['customer_document'],
+                'cpfCnpj' => $docDigits,
                 'postalCode' => $dados['customer_zipcode'],
                 'addressNumber' => $dados['customer_address_number'],
                 'addressComplement' => $dados['customer_address_complement'] ?? '',
@@ -2121,10 +2123,11 @@ class PaymentService {
     private function criarOuReutilizarClienteAsaas(array $dados): string {
         // Tentativa simples: criar cliente sempre (Asaas lida bem, mas pode duplicar)
         // Em produção, ideal é armazenar customer_id no seu banco.
+        $docDigits = preg_replace('/\D+/', '', (string) ($dados['customer_document'] ?? ''));
         $payload = [
             'name' => $dados['customer_name'] ?? 'Cliente',
             'email' => $dados['customer_email'] ?? null,
-            'cpfCnpj' => $dados['customer_document'] ?? null,
+            'cpfCnpj' => $docDigits !== '' ? $docDigits : null,
             'mobilePhone' => $dados['customer_phone'] ?? null,
         ];
 
