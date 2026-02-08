@@ -349,8 +349,18 @@ class CarrinhoController extends Controller {
                 $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                 if (!empty($row)) {
-                    if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
-                    if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
+                    if (array_key_exists('subtotal_produtos', $row)) {
+                        $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
+                        if ($subtotalFromDb > 0) {
+                            $subtotal = $subtotalFromDb;
+                        }
+                    }
+                    if (array_key_exists('peso_total', $row)) {
+                        $pesoFromDb = (float) ($row['peso_total'] ?? 0);
+                        if ($pesoFromDb > 0) {
+                            $pesoTotal = $pesoFromDb;
+                        }
+                    }
 
                     $taxaServicoFromDb = null;
                     $impostosFromDb = null;
