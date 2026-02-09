@@ -70,5 +70,6 @@ $request = new Request();
 $router = new Router();
 
 require_once __DIR__ . '/../app/routes.php';
+require_once __DIR__ . '/../app/routes_admin.php';
 
 $router->dispatch($request);

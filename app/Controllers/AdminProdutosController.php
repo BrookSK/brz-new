@@ -2183,6 +2183,7 @@ HTML;
 
             $params = [];
             $where = ' WHERE 1=1 ';
+            $where .= " AND NOT (LOWER(COALESCE(p.status,'')) = 'archived' OR p.active = 0) ";
             if ($perfil === 'representante') {
                 if ($repId <= 0) {
                     header('Location: /login');
