@@ -2256,6 +2256,7 @@ HTML;
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
             . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
+            . '<a href="/produtos/arquivados" target="_blank" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados (site)</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
             . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
             . '</div>'
@@ -2784,6 +2785,11 @@ HTML;
 
             if (in_array('status', $cols, true)) $data['status'] = $request->getParam('status') ?: 'published';
             if (in_array('active', $cols, true)) $data['active'] = $request->getParam('active') ?: 1;
+            if (in_array('status', $cols, true) && in_array('active', $cols, true)) {
+                if (strtolower(trim((string) ($data['status'] ?? ''))) === 'archived') {
+                    $data['active'] = 0;
+                }
+            }
             if (in_array('featured', $cols, true)) $data['featured'] = $request->getParam('featured') ?: 0;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
 
@@ -3631,7 +3637,7 @@ HTMLSCRIPT;
                 $request->getParam('min_stock') ?: 0,
                 $request->getParam('weight') ?: 0,
                 $request->getParam('status'),
-                $request->getParam('active') ?: 0,
+                (strtolower(trim((string) $request->getParam('status'))) === 'archived' ? 0 : ($request->getParam('active') ?: 0)),
                 $request->getParam('featured') ?: 0,
                 $id
             ]);
