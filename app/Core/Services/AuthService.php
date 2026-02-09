@@ -101,6 +101,17 @@ class AuthService {
             throw new AuthenticationException('Credenciais inválidas');
         }
 
+        // Se autenticou com hash legado (ex.: WordPress) ou hash antigo, atualizar para o padrão atual
+        $storedHash = $user->getPassword();
+        $hashForRehashCheck = str_starts_with($storedHash, '$wp$') ? substr($storedHash, 4) : $storedHash;
+        $isWpLegacy = str_starts_with($storedHash, '$wp$') || str_starts_with($storedHash, '$P$') || str_starts_with($storedHash, '$H$');
+        if ($isWpLegacy || (password_get_info($hashForRehashCheck)['algo'] ?? 0) !== 0) {
+            if (password_needs_rehash($hashForRehashCheck, PASSWORD_DEFAULT) || $isWpLegacy) {
+                $newHash = password_hash($password, PASSWORD_DEFAULT);
+                $this->userRepository->updatePassword((int) $user->getId(), $newHash);
+            }
+        }
+
         // Login bem-sucedido
         $this->clearLoginAttempts($email);
         $this->createSession($user, $remember);
