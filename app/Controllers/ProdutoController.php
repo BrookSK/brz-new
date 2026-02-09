@@ -107,6 +107,37 @@ class ProdutoController extends Controller {
         ]);
     }
 
+    public function arquivados(Request $request) {
+        $produtos = $this->produtoModel->getArquivadosWithCategoria();
+
+        // Adicionar foto de capa (produtos.foto_principal) com fallback para galeria
+        foreach ($produtos as &$produto) {
+            $capa = $this->normalizeProdutoImagemPath($produto['foto_principal'] ?? null);
+            if (!empty($capa) && $this->produtoImagemExiste($capa)) {
+                $produto['foto_principal'] = Url::absolute($capa);
+                continue;
+            }
+
+            $fotoGaleria = $this->produtoFotoModel->getFotoPrincipal($produto['id']);
+            if ($fotoGaleria && !empty($fotoGaleria['nome_arquivo'])) {
+                $fotoUrl = $this->normalizeProdutoImagemPath($fotoGaleria['nome_arquivo']);
+                $produto['foto_principal'] = ($fotoUrl && $this->produtoImagemExiste($fotoUrl)) ? Url::absolute($fotoUrl) : null;
+            } else {
+                $produto['foto_principal'] = null;
+            }
+        }
+        unset($produto);
+
+        $categorias = $this->produtoModel->getCategorias();
+
+        $this->view('produto/index_moderno', [
+            'produtos' => $produtos,
+            'categorias' => $categorias,
+            'search' => null,
+            'categoriaSelecionada' => null
+        ]);
+    }
+
     public function representante(Request $request) {
         $slug = (string) ($request->getParam('slug') ?? '');
         $slug = strtolower(trim($slug));

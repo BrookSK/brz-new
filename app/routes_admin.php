@@ -6,6 +6,7 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
+$router->get('/admin/produtos/arquivados', 'AdminProdutosController', 'arquivados');
 $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');

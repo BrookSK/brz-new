@@ -231,8 +231,61 @@ class ClubeController extends Controller {
         ]);
     }
 
+    private function getCronSecretFromConfig(): ?string {
+        try {
+            $db = \Config\Database::getConnection();
+
+            // Schema categoria+chave
+            try {
+                $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
+                $stmt->execute(['clube', 'cron_secret']);
+                $val = $stmt->fetchColumn();
+                if (is_string($val) && trim($val) !== '') {
+                    return trim($val);
+                }
+            } catch (\Exception $e) {
+            }
+
+            // Schema chave única
+            try {
+                $stmt = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+                $stmt->execute(['clube_cron_secret']);
+                $val = $stmt->fetchColumn();
+                if (is_string($val) && trim($val) !== '') {
+                    return trim($val);
+                }
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+        }
+
+        return null;
+    }
+
     public function cronRendimento(Request $request) {
         try {
+            $secret = null;
+            if (isset($_ENV['CRON_SECRET'])) {
+                $secret = (string) $_ENV['CRON_SECRET'];
+            } elseif (isset($_SERVER['CRON_SECRET'])) {
+                $secret = (string) $_SERVER['CRON_SECRET'];
+            }
+
+            if ($secret === null || trim($secret) === '') {
+                $secret = $this->getCronSecretFromConfig();
+            }
+
+            if ($secret !== null && trim($secret) !== '') {
+                $token = (string) ($request->getParam('token') ?? '');
+                if ($token === '' && isset($_SERVER['HTTP_X_CRON_TOKEN'])) {
+                    $token = (string) $_SERVER['HTTP_X_CRON_TOKEN'];
+                }
+                if (!hash_equals(trim($secret), trim($token))) {
+                    $this->json(['success' => false, 'error' => 'Unauthorized'], 403);
+                    return;
+                }
+            }
+
             $result = $this->paymentService->processarRendimentoClube();
             $this->json($result);
         } catch (\Exception $e) {

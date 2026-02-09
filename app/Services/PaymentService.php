@@ -57,6 +57,16 @@ class PaymentService {
         }
     }
 
+    private function carteiraHasUpdatedAt(\PDO $db): bool {
+        try {
+            $st = $db->query('DESCRIBE carteiras');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            return (is_array($cols) && in_array('updated_at', $cols, true));
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     private function debitarCashbackClubePorPedidoEstornado(\PDO $db, int $pedidoId): void {
         try {
             $pedidoId = (int) $pedidoId;
@@ -694,6 +704,7 @@ class PaymentService {
             'skipped_idempotent' => 0,
             'skipped_invalid' => 0,
             'errors' => 0,
+            'error_samples' => [],
         ];
 
         try {
@@ -721,6 +732,8 @@ class PaymentService {
             }
 
             $this->garantirTabelaTransacoesCarteira($db);
+
+            $hasUpdatedAt = $this->carteiraHasUpdatedAt($db);
 
             $stmtWallets = $db->query('SELECT usuario_id, saldo_usd, saldo_brl FROM carteiras');
             $wallets = $stmtWallets ? ($stmtWallets->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
@@ -787,7 +800,8 @@ class PaymentService {
                     $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
                     $stmtLock->execute([$usuarioId]);
 
-                    $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                    $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor' . ($hasUpdatedAt ? ', updated_at = NOW()' : '') . ' WHERE usuario_id = :uid';
+                    $stmtUpd = $db->prepare($sqlUpd);
                     $stmtUpd->execute([':valor' => $valorCredito, ':uid' => $usuarioId]);
 
                     try {
@@ -810,6 +824,9 @@ class PaymentService {
                         $db->rollBack();
                     }
                     $out['errors']++;
+                    if (is_array($out['error_samples']) && count($out['error_samples']) < 5) {
+                        $out['error_samples'][] = $e->getMessage();
+                    }
                 }
             }
 
