@@ -197,7 +197,7 @@ class User {
     public function verifyPassword(string $password): bool {
         $storedHash = $this->password;
         if (str_starts_with($storedHash, '$wp$')) {
-            $storedHash = substr($storedHash, 4);
+            $storedHash = '$' . ltrim(substr($storedHash, 4), '$');
         }
 
         if (password_verify($password, $storedHash)) {

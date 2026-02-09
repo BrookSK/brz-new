@@ -189,7 +189,7 @@ class Usuario extends Model {
             $hashToVerify = $hash;
             $isWpPrefixed = false;
             if (str_starts_with($hashToVerify, '$wp$')) {
-                $hashToVerify = substr($hashToVerify, 4);
+                $hashToVerify = '$' . ltrim(substr($hashToVerify, 4), '$');
                 $isWpPrefixed = true;
             }
 
