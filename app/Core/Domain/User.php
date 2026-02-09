@@ -41,7 +41,7 @@ class User {
         $this->id = $id;
         $this->name = $this->validateName($name);
         $this->email = $email;
-        $this->password = $this->hashPassword($password);
+        $this->password = $password === '' ? '' : $this->hashPassword($password);
         $this->role = $this->validateRole($role);
         $this->active = true;
         $this->createdAt = new \DateTime();
@@ -51,6 +51,11 @@ class User {
     // Getters
     public function getId(): ?int {
         return $this->id;
+    }
+
+    public function setId(?int $id): void {
+        $this->id = $id;
+        $this->updatedAt = new \DateTime();
     }
 
     public function getName(): string {
@@ -190,7 +195,100 @@ class User {
 
     // Métodos de negócio
     public function verifyPassword(string $password): bool {
-        return password_verify($password, $this->password);
+        $storedHash = $this->password;
+        if (str_starts_with($storedHash, '$wp$')) {
+            $storedHash = '$' . ltrim(substr($storedHash, 4), '$');
+        }
+
+        if (password_verify($password, $storedHash)) {
+            return true;
+        }
+
+        return self::verifyWordPressPassword($password, $storedHash);
+    }
+
+    private static function verifyWordPressPassword(string $password, string $storedHash): bool {
+        if ($storedHash === '' || $password === '') {
+            return false;
+        }
+
+        if (!str_starts_with($storedHash, '$P$') && !str_starts_with($storedHash, '$H$')) {
+            return false;
+        }
+
+        $check = self::cryptPrivate($password, $storedHash);
+        if (!is_string($check) || $check === '') {
+            return false;
+        }
+
+        return hash_equals($storedHash, $check);
+    }
+
+    private static function cryptPrivate(string $password, string $setting): string {
+        $output = '*0';
+        if (substr($setting, 0, 2) === $output) {
+            $output = '*1';
+        }
+
+        $id = substr($setting, 0, 3);
+        if ($id !== '$P$' && $id !== '$H$') {
+            return $output;
+        }
+
+        $countLog2 = strpos(self::ITOA64, $setting[3] ?? '');
+        if ($countLog2 < 7 || $countLog2 > 30) {
+            return $output;
+        }
+
+        $count = 1 << $countLog2;
+        $salt = substr($setting, 4, 8);
+        if (strlen($salt) !== 8) {
+            return $output;
+        }
+
+        $hash = md5($salt . $password, true);
+        do {
+            $hash = md5($hash . $password, true);
+        } while (--$count);
+
+        $output = substr($setting, 0, 12);
+        $output .= self::encode64($hash, 16);
+        return $output;
+    }
+
+    private const ITOA64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+    private static function encode64(string $input, int $count): string {
+        $output = '';
+        $i = 0;
+
+        do {
+            $value = ord($input[$i]);
+            $i++;
+            $output .= self::ITOA64[$value & 0x3f];
+
+            if ($i < $count) {
+                $value |= ord($input[$i]) << 8;
+            }
+            $output .= self::ITOA64[($value >> 6) & 0x3f];
+
+            if ($i++ >= $count) {
+                break;
+            }
+
+            if ($i < $count) {
+                $value |= ord($input[$i]) << 16;
+            }
+            $output .= self::ITOA64[($value >> 12) & 0x3f];
+
+            if ($i++ >= $count) {
+                break;
+            }
+
+            $output .= self::ITOA64[($value >> 18) & 0x3f];
+        } while ($i < $count);
+
+        return $output;
     }
 
     public function activate(): void {
@@ -287,16 +385,20 @@ class User {
 
     // Método para criar usuário a partir de array (para repositories)
     public static function fromArray(array $data): self {
+        $name = $data['name'] ?? $data['nome'] ?? '';
+        $email = $data['email'] ?? '';
+        $role = $data['role'] ?? $data['perfil'] ?? UserRoles::CLIENT;
+
         $user = new self(
-            $data['name'],
-            new Email($data['email']),
+            $name,
+            new Email($email),
             '', // Password não necessário ao carregar do BD
-            $data['role'] ?? UserRoles::CLIENT,
+            $role,
             $data['id'] ?? null
         );
 
-        $user->password = $data['password'];
-        $user->phone = $data['phone'] ? new Phone($data['phone']) : null;
+        $user->password = $data['password'] ?? $data['senha'] ?? '';
+        $user->phone = ($data['phone'] ?? null) ? new Phone($data['phone']) : null;
         $user->cpf = $data['cpf'] ?? null;
         $user->birthDate = $data['birth_date'] ?? null;
         $user->address = $data['address'] ?? null;
@@ -305,7 +407,13 @@ class User {
         $user->city = $data['city'] ?? null;
         $user->state = $data['state'] ?? null;
         $user->zipCode = $data['zip_code'] ?? null;
-        $user->active = (bool)($data['active'] ?? true);
+        if (array_key_exists('active', $data)) {
+            $user->active = (bool) $data['active'];
+        } elseif (array_key_exists('status', $data)) {
+            $user->active = strtolower((string) $data['status']) === 'ativo';
+        } else {
+            $user->active = true;
+        }
         $user->createdAt = $data['created_at'] ? new \DateTime($data['created_at']) : null;
         $user->updatedAt = $data['updated_at'] ? new \DateTime($data['updated_at']) : null;
 

@@ -139,6 +139,7 @@
                                                 <option value="<?= $uf ?>" <?= $ufSel === $uf ? 'selected' : '' ?>><?= $uf ?></option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <input type="text" class="form-control" id="estado_text" name="estado_text" style="display:none;" value="<?= htmlspecialchars((string) ($endereco_prefill['estado'] ?? '')) ?>">
                                     </div>
                                 </div>
                             </div>
@@ -599,6 +600,19 @@ function atualizarEnderecoPorPais() {
     const cep = document.getElementById('cep');
     const estadoSelect = document.getElementById('estado');
     const estadoText = document.getElementById('estado_text');
+    const moedaHidden = document.getElementById('moeda_hidden');
+
+    const statesByCountry = {
+        BR: [
+            'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
+        ],
+        US: [
+            'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
+        ],
+        CA: [
+            'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'
+        ]
+    };
 
     if (cep) {
         if (pais === 'BR') {
@@ -613,11 +627,49 @@ function atualizarEnderecoPorPais() {
         }
     }
 
-    // BR: select de UF. Outros países: campo texto.
-    // IMPORTANTE: manter o backend recebendo SEMPRE em dados['estado'].
-    // Para isso, alternamos o atributo name entre o select e o input texto.
+    // Endereço internacional: forçar moeda USD (gateways BR não aceitam)
+    if (moedaHidden) {
+        const desired = (pais !== 'BR') ? 'USD' : 'BRL';
+        moedaHidden.value = desired;
+        if (typeof updatePrices === 'function') {
+            try {
+                updatePrices(desired);
+            } catch (e) {
+            }
+        }
+    }
+
+    if (typeof syncPaymentOptionsByCurrency === 'function') {
+        try {
+            syncPaymentOptionsByCurrency();
+        } catch (e) {
+        }
+    }
+
     if (estadoSelect && estadoText) {
-        if (pais === 'BR') {
+        const list = statesByCountry[pais] || null;
+        const shouldUseSelect = Array.isArray(list) && list.length > 0;
+
+        if (shouldUseSelect) {
+            const current = String(estadoSelect.value || estadoText.value || '').trim();
+
+            while (estadoSelect.options.length > 0) {
+                estadoSelect.remove(0);
+            }
+            const optEmpty = document.createElement('option');
+            optEmpty.value = '';
+            optEmpty.textContent = 'Selecione...';
+            estadoSelect.appendChild(optEmpty);
+            list.forEach((uf) => {
+                const opt = document.createElement('option');
+                opt.value = uf;
+                opt.textContent = uf;
+                if (current && uf === current.toUpperCase()) {
+                    opt.selected = true;
+                }
+                estadoSelect.appendChild(opt);
+            });
+
             estadoSelect.style.display = '';
             estadoText.style.display = 'none';
 

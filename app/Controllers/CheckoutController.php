@@ -1322,8 +1322,18 @@ class CheckoutController extends Controller {
                     $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                     if (!empty($row)) {
-                        if (array_key_exists('subtotal_produtos', $row)) $subtotal = (float) ($row['subtotal_produtos'] ?? $subtotal);
-                        if (array_key_exists('peso_total', $row)) $pesoTotal = (float) ($row['peso_total'] ?? $pesoTotal);
+                        if (array_key_exists('subtotal_produtos', $row)) {
+                            $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
+                            if ($subtotalFromDb > 0) {
+                                $subtotal = $subtotalFromDb;
+                            }
+                        }
+                        if (array_key_exists('peso_total', $row)) {
+                            $pesoFromDb = (float) ($row['peso_total'] ?? 0);
+                            if ($pesoFromDb > 0) {
+                                $pesoTotal = $pesoFromDb;
+                            }
+                        }
 
                         if (array_key_exists('taxa_servico', $row)) $taxaServicoFromDb = (float) ($row['taxa_servico'] ?? 0);
                         if (array_key_exists('valor_impostos', $row)) $impostosFromDb = (float) ($row['valor_impostos'] ?? 0);
@@ -1357,13 +1367,15 @@ class CheckoutController extends Controller {
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
-        if (isset($taxaServicoFromDb)) {
+        // Se o DB tiver valores válidos, usar; senão manter cálculo atual
+        if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
             $taxaServico = (float) $taxaServicoFromDb;
         }
-        if (isset($impostosFromDb)) {
+        if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
             $impostos = (float) $impostosFromDb;
         }
-        if (isset($freteFromDb)) {
+        // Frete 0 é valor válido (frete grátis)
+        if (isset($freteFromDb) && (float) $freteFromDb >= 0) {
             $frete = (float) $freteFromDb;
         }
         if (isset($totalFromDb) && (float) $totalFromDb > 0) {
@@ -2833,6 +2845,13 @@ class CheckoutController extends Controller {
             $moedaSelecionada = strtoupper(trim((string) ($dados['moeda'] ?? 'BRL')));
             if (!in_array($moedaSelecionada, ['BRL', 'USD', 'EUR'], true)) {
                 $moedaSelecionada = 'BRL';
+            }
+
+            // Endereço internacional exige pagamento em USD (gateways BR não aceitam).
+            // Usamos o país do formulário (pais) como referência do endereço de entrega.
+            $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+            if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
+                $moedaSelecionada = 'USD';
             }
             $this->debugLog('[CRIAR_PEDIDO] Moeda selecionada pelo cliente: ' . $moedaSelecionada);
             

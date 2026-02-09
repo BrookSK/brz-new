@@ -211,6 +211,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
                                 <i class="fab fa-wordpress"></i> WordPress
                             </button>
+                            <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
+                                <i class="fas fa-plug"></i> WooCommerce
+                            </button>
                         </div>
                     </div>
                     
@@ -247,6 +250,40 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-woocommerce" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">WooCommerce (REST API)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Store URL</label>
+                                                <input type="url" class="form-control" name="woocommerce_store_url" value="' . $this->getConfigValue($config, 'woocommerce', 'store_url', '') . '" placeholder="https://br.brazilianashop.com.br/">
+                                                <small class="text-muted">URL base da loja (sem /wp-admin). Ex: <code>https://br.brazilianashop.com.br</code></small>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Key</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_key', '') . '" placeholder="ck_...">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Secret</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-info mb-0">
+                                                Essas credenciais são usadas para <strong>atualizar o pedido no WooCommerce</strong> (order meta) com <code>wexpress_shipping_id</code>, link da etiqueta e rastreio.
                                             </div>
                                         </div>
                                     </div>
@@ -828,53 +865,27 @@ class AdminConfiguracoesController extends Controller {
 
                                             <hr>
 
-                                            <h6 class="mb-3">Stamps (UPS) - Exterior</h6>
+                                            <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Ativo</label>
                                                         <div class="form-check form-switch">
-                                                            <input class="form-check-input" type="checkbox" id="stamps_enabled" name="entrega_stamps_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'stamps_enabled', '0') === '1' ? 'checked' : '') . '>
-                                                            <label class="form-check-label" for="stamps_enabled">Habilitar Stamps (UPS)</label>
+                                                            <input class="form-check-input" type="checkbox" id="shipstation_enabled" name="entrega_shipstation_enabled" value="1" ' . ($this->getConfigValue($config, 'entrega', 'shipstation_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                            <label class="form-check-label" for="shipstation_enabled">Habilitar ShipStation (UPS)</label>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Ambiente</label>
-                                                        <select class="form-select" name="entrega_stamps_ambiente">
-                                                            <option value="staging" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', 'staging') === 'staging' ? 'selected' : '') . '>Staging</option>
-                                                            <option value="production" ' . ($this->getConfigValue($config, 'entrega', 'stamps_ambiente', '') === 'production' ? 'selected' : '') . '>Produção</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Client ID</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_client_id" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_id', '') . '" placeholder="Client ID">
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Client Secret</label>
-                                                        <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_stamps_client_secret" value="' . $this->getConfigValue($config, 'entrega', 'stamps_client_secret', '') . '" placeholder="Client Secret">
-                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
-                                                                <i class="fas fa-eye"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                                    <div class="mb-3"></div>
                                                 </div>
                                             </div>
 
                                             <div class="mb-3">
-                                                <label class="form-label">Refresh Token</label>
+                                                <label class="form-label">API Key</label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" name="entrega_stamps_refresh_token" value="' . $this->getConfigValue($config, 'entrega', 'stamps_refresh_token', '') . '" placeholder="Refresh Token">
+                                                    <input type="password" class="form-control" name="entrega_shipstation_api_key" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_api_key', '') . '" placeholder="Cole a API key da ShipStation">
                                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
@@ -883,23 +894,64 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label">From Address (JSON)</label>
-                                                <textarea class="form-control" name="entrega_stamps_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'stamps_from_address_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
-                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela API da Stamps.</small>
+                                                <textarea class="form-control" name="entrega_shipstation_from_address_json" rows="6" placeholder="{\n  \"name\": \"Sender\", ... }">' . htmlspecialchars((trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '')) !== '' ? (string) $this->getConfigValue($config, 'entrega', 'shipstation_from_address_json', '') : '{"name":"Fabiana Bond","company_name":"Braziliana LLC","phone":"8432228518","email":"fabiana@brazilianashop.com","address_line1":"1227 W Broad St","address_line2":"","city_locality":"Saint Pauls","state_province":"NC","postal_code":"28384-9200","country_code":"US"}'), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Endereço do remetente (EUA) no formato esperado pela ShipStation.</small>
                                             </div>
 
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Service Type</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_service_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_service_type', '') . '" placeholder="Ex.: ups_ground / ups_worldwide_saver">
+                                                        <label class="form-label">Carrier ID</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_id" value="' . (trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '')) !== '' ? $this->getConfigValue($config, 'entrega', 'shipstation_carrier_id', '') : 'se-4875726') . '" placeholder="Carrier ID (ShipStation)">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
-                                                        <label class="form-label">Packaging Type</label>
-                                                        <input type="text" class="form-control" name="entrega_stamps_packaging_type" value="' . $this->getConfigValue($config, 'entrega', 'stamps_packaging_type', 'package') . '" placeholder="package">
+                                                        <label class="form-label">Carrier Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_carrier_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_carrier_code', 'ups') . '" placeholder="ups">
                                                     </div>
                                                 </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Service Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_service_code" value="' . (trim((string) $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '')) !== '' ? $this->getConfigValue($config, 'entrega', 'shipstation_service_code', '') : 'ups_worldwide_saver') . '" placeholder="Service code">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Package Code</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_package_code" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_package_code', 'package') . '" placeholder="package">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Label Layout</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_layout" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_layout', '4x6') . '" placeholder="4x6">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Label Format</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_format" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_format', 'pdf') . '" placeholder="pdf">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Download Type</label>
+                                                        <input type="text" class="form-control" name="entrega_shipstation_label_download_type" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_label_download_type', 'url') . '" placeholder="url">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Display Scheme</label>
+                                                <input type="text" class="form-control" name="entrega_shipstation_display_scheme" value="' . $this->getConfigValue($config, 'entrega', 'shipstation_display_scheme', 'label') . '" placeholder="label">
                                             </div>
                                         </div>
                                     </div>
@@ -2984,16 +3036,17 @@ HTML;
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'stamps_enabled', 'stamps_ambiente', 'stamps_client_id', 'stamps_client_secret', 'stamps_refresh_token', 'stamps_from_address_json', 'stamps_service_type', 'stamps_packaging_type'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'woocommerce' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'stamps_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
@@ -4386,14 +4439,44 @@ HTML;
             $amb = strtolower(trim((string) $ambiente));
             $wsdl = ($amb === 'producao' || $amb === 'production')
                 ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
-                : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+                : 'https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
-            $client = new \SoapClient($wsdl, [
-                'exceptions' => true,
-                'trace' => false,
-                'cache_wsdl' => WSDL_CACHE_BOTH,
-                'connection_timeout' => 20,
+            $localWsdl = __DIR__ . '/../Resources/wsdl/AtendeCliente.wsdl';
+            if (is_file($localWsdl)) {
+                $wsdl = $localWsdl;
+            }
+
+            $context = stream_context_create([
+                'http' => [
+                    'timeout' => 30,
+                    'protocol_version' => 1.1,
+                    'ignore_errors' => true,
+                    'header' => "Connection: close\r\n"
+                        . "Accept: text/xml, application/xml;q=0.9, */*;q=0.8\r\n"
+                        . "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) brz-sigep/1.0\r\n",
+                ],
+                'ssl' => [
+                    'verify_peer' => true,
+                    'verify_peer_name' => true,
+                ],
             ]);
+
+            try {
+                $client = new \SoapClient($wsdl, [
+                    'exceptions' => true,
+                    'trace' => false,
+                    'cache_wsdl' => WSDL_CACHE_BOTH,
+                    'connection_timeout' => 20,
+                    'stream_context' => $context,
+                    'compression' => SOAP_COMPRESSION_ACCEPT | SOAP_COMPRESSION_GZIP,
+                ]);
+            } catch (\Throwable $e) {
+                $extra = [];
+                $extra[] = 'allow_url_fopen=' . (ini_get('allow_url_fopen') ? '1' : '0');
+                $extra[] = 'openssl.cafile=' . (string) ini_get('openssl.cafile');
+                $extra[] = 'curl.cainfo=' . (string) ini_get('curl.cainfo');
+                throw new \Exception('SIGEP falhou ao carregar WSDL: ' . $e->getMessage() . ' | ' . implode(', ', $extra));
+            }
 
             $params = [
                 'tipoDestinatario' => 'C',

@@ -186,6 +186,13 @@ class Usuario extends Model {
         }
         $ok = false;
         if ($usuario && is_string($hash) && $hash !== '') {
+            $hashToVerify = $hash;
+            $isWpPrefixed = false;
+            if (str_starts_with($hashToVerify, '$wp$')) {
+                $hashToVerify = '$' . ltrim(substr($hashToVerify, 4), '$');
+                $isWpPrefixed = true;
+            }
+
             // Compatibilidade: aceita senha em texto plano antiga
             if (hash_equals($hash, (string) $senha)) {
                 $ok = true;
@@ -200,10 +207,10 @@ class Usuario extends Model {
                     $hash = $newHash;
                 } catch (\Exception $e) {
                 }
-            } elseif (password_verify((string) $senha, $hash)) {
+            } elseif (password_verify((string) $senha, $hashToVerify)) {
                 $ok = true;
                 // Rehash quando necessário
-                if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+                if ($isWpPrefixed || password_needs_rehash($hashToVerify, PASSWORD_DEFAULT)) {
                     $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
                     $col = $senhaCol ?: (array_key_exists('senha', $usuario) ? 'senha' : 'password');
                     try {
