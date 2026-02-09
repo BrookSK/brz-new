@@ -255,7 +255,7 @@ class AdminRemessaCorreiosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa Correios - Braziliana Shop Admin</title>
+    <title>Remessa Correios - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -1024,7 +1024,7 @@ class AdminRemessaCorreiosController extends Controller {
 
     private function getDadosRemetente() {
         return [
-            'nome' => 'Braziliana Shop',
+            'nome' => 'Braziliana',
             'cnpj' => '00.000.000/0001-00',
             'endereco' => 'Rua das Empresas, 123',
             'cidade' => 'São Paulo',

@@ -90,7 +90,7 @@ class NotificationService {
         }
 
         $fromEmail = (string) $this->getConfig('email', 'from', 'noreply@brazilianashop.com.br');
-        $fromName = (string) $this->getConfig('email', 'from_name', 'Braziliana Shop');
+        $fromName = (string) $this->getConfig('email', 'from_name', 'Braziliana');
 
         $headers = [];
         $headers[] = 'MIME-Version: 1.0';

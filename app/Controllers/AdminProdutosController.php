@@ -2353,7 +2353,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Produtos - Braziliana Shop Admin';
+        $title = 'Produtos - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -2542,7 +2542,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Produtos Arquivados - Braziliana Shop Admin';
+        $title = 'Produtos Arquivados - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -2890,7 +2890,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Novo Produto - Braziliana Shop Admin';
+        $title = 'Novo Produto - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -3180,7 +3180,7 @@ HTML;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Produto - Braziliana Shop Admin</title>
+    <title>Editar Produto - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 

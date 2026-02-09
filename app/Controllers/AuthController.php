@@ -293,7 +293,7 @@ class AuthController extends Controller {
                 $base = $host !== '' ? ($scheme . '://' . $host) : '';
                 $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
 
-                $subject = 'Recuperação de senha - Braziliana Shop';
+                $subject = 'Recuperação de senha - Braziliana';
                 $html = 'Olá,<br><br>'
                     . 'Recebemos uma solicitação para redefinir sua senha. Clique no link abaixo para criar uma nova senha:<br><br>'
                     . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
@@ -301,7 +301,7 @@ class AuthController extends Controller {
                     . 'Este link expira em 1 hora.';
 
                 $fromEmail = 'noreply@brazilianashop.com.br';
-                $fromName = 'Braziliana Shop';
+                $fromName = 'Braziliana';
                 $headers = [];
                 $headers[] = 'MIME-Version: 1.0';
                 $headers[] = 'Content-Type: text/html; charset=UTF-8';

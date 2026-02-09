@@ -83,7 +83,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedidos (WordPress) - Braziliana Shop Admin';
+        $title = 'Pedidos (WordPress) - Braziliana Admin';
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp.php';
@@ -495,7 +495,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedido WP - Detalhes - Braziliana Shop Admin';
+        $title = 'Pedido WP - Detalhes - Braziliana Admin';
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp_detalhes.php';

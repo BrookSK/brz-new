@@ -14,7 +14,7 @@ abstract class Controller {
                 $content = ob_get_clean();
                 
                 ob_start();
-                $title = 'Carrinho Vazio - Braziliana Shop';
+                $title = 'Carrinho Vazio - Braziliana';
                 require __DIR__ . '/../Views/layouts/main.php';
                 echo ob_get_clean();
             } else {

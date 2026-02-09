@@ -144,7 +144,7 @@ class AdminConfiguracoesController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - Braziliana Shop Admin</title>
+    <title>Configurações - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -229,7 +229,7 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Nome da Loja</label>
-                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana Shop') . '">
+                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Descrição</label>
@@ -382,7 +382,7 @@ class AdminConfiguracoesController extends Controller {
 
                                                 <div class="mb-3">
                                                     <label class="form-label">Campos Personalizados (JSON)</label>
-                                                    <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana Shop&quot;}"></textarea>
+                                                    <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana&quot;}"></textarea>
                                                     <small class="text-muted">Esses campos são mesclados no payload final enviado ao webhook.</small>
                                                 </div>
 
@@ -532,7 +532,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Nome de Envio</label>
-                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana Shop') . '">
+                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Email de teste (para)</label>
@@ -966,11 +966,11 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Title Padrão</label>
-                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana Shop - Produtos de Qualidade') . '">
+                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana - Produtos de Qualidade') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Description Padrão</label>
-                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana Shop') . '</textarea>
+                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana') . '</textarea>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Palavras-chave</label>

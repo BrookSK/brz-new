@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $title ?? 'Braziliana Shop - E-commerce Internacional' ?></title>
+    <title><?= $title ?? 'Braziliana - E-commerce Internacional' ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -721,7 +721,7 @@
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">
-                <i class="fas fa-globe-americas text-primary"></i> Braziliana Shop
+                <i class="fas fa-globe-americas text-primary"></i> Braziliana
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -898,7 +898,7 @@
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
-                    <h5 class="mb-3"><i class="fas fa-globe-americas"></i> Braziliana Shop</h5>
+                    <h5 class="mb-3"><i class="fas fa-globe-americas"></i> Braziliana</h5>
                     <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
                     <div class="mt-3">
                         <a href="#" class="social-link me-2"><i class="fab fa-facebook"></i></a>
@@ -944,7 +944,7 @@
             
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <p class="text-muted small mb-0">&copy; 2026 Braziliana Shop. Todos os direitos reservados.</p>
+                    <p class="text-muted small mb-0">&copy; 2026 Braziliana. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <a href="/politica-privacidade" class="footer-link small me-3">Política de Privacidade</a>

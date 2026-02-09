@@ -1412,7 +1412,7 @@ class AdminRelatoriosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatórios - Braziliana Shop Admin</title>
+    <title>Relatórios - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         
@@ -2038,7 +2038,7 @@ class AdminRelatoriosController extends Controller {
     </div>
 
     <div class="footer">
-        <p>Relatório gerado pelo Sistema Braziliana Shop Estoque - Página ' . date('d/m/Y H:i') . '</p>
+        <p>Relatório gerado pelo Sistema Braziliana Estoque - Página ' . date('d/m/Y H:i') . '</p>
     </div>
 </body>
 </html>';
