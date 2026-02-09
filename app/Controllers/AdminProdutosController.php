@@ -2197,7 +2197,7 @@ HTML;
                 $params[':busca'] = '%' . $busca . '%';
             }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.id DESC LIMIT :limite OFFSET :offset';
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k => $v) {
                 if ($k === ':rep_id') {
@@ -2272,30 +2272,44 @@ HTML;
             . '</div>'
             . '</form>';
 
-        echo '<div class="row">';
+        echo '<div class="table-responsive">'
+            . '<table class="table table-hover align-middle">'
+            . '<thead><tr>'
+            . '<th style="width:72px">Imagem</th>'
+            . '<th>Nome</th>'
+            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:110px">Status</th>'
+            . '<th style="width:150px">Ações</th>'
+            . '</tr></thead><tbody>';
+
         foreach ($produtos as $produto) {
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
-            echo '<div class="col-md-6 col-lg-4 mb-4">'
-                . '<div class="card product-card h-100">'
-                . '<img src="' . htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8') . '" class="card-img-top product-image" alt="' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '">' 
-                . '<div class="card-body">'
-                . '<h5 class="card-title">' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '</h5>'
-                . '<p class="text-muted small">SKU: ' . htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8') . '</p>'
-                . '<div class="d-flex justify-content-between align-items-center mb-2">'
-                . '<span class="fw-bold text-primary">$' . number_format((float) $produto['price'], 2, '.', ',') . '</span>'
-                . '<span class="badge ' . ((int) $produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ((int) $produto['active'] ? 'Ativo' : 'Inativo') . '</span>'
-                . '</div>'
-                . '<div class="d-flex justify-content-between">'
-                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
-                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display: inline;">'
-                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>'
+            $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
+            $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
+            $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
+            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+
+            echo '<tr>'
+                . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid rgba(0,0,0,0.06);"></td>'
+                . '<td><div class="fw-semibold">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
+                . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
+                . '<td>'
+                . '<div class="btn-group btn-group-sm" role="group">'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
+                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display:inline;">'
+                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>'
                 . '</form>'
                 . '</div>'
-                . '</div>'
-                . '</div>'
-                . '</div>';
+                . '</td>'
+                . '</tr>';
         }
-        echo '</div>';
+
+        echo '</tbody></table></div>';
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
@@ -2378,7 +2392,7 @@ HTML;
                 $params[':busca'] = '%' . $busca . '%';
             }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.updated_at DESC, p.id DESC LIMIT :limite OFFSET :offset';
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k => $v) {
                 if ($k === ':rep_id') {
@@ -2452,27 +2466,39 @@ HTML;
             . '</div>'
             . '</form>';
 
-        echo '<div class="row">';
+        echo '<div class="table-responsive">'
+            . '<table class="table table-hover align-middle">'
+            . '<thead><tr>'
+            . '<th style="width:72px">Imagem</th>'
+            . '<th>Nome</th>'
+            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:110px">Status</th>'
+            . '<th style="width:90px">Ações</th>'
+            . '</tr></thead><tbody>';
+
         foreach ($produtos as $produto) {
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
-            echo '<div class="col-md-6 col-lg-4 mb-4">'
-                . '<div class="card product-card h-100">'
-                . '<img src="' . htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8') . '" class="card-img-top product-image" alt="' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '">' 
-                . '<div class="card-body">'
-                . '<h5 class="card-title">' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '</h5>'
-                . '<p class="text-muted small">SKU: ' . htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8') . '</p>'
-                . '<div class="d-flex justify-content-between align-items-center mb-2">'
-                . '<span class="fw-bold text-primary">$' . number_format((float) $produto['price'], 2, '.', ',') . '</span>'
-                . '<span class="badge ' . ((int) $produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ((int) $produto['active'] ? 'Ativo' : 'Inativo') . '</span>'
-                . '</div>'
-                . '<div class="d-flex justify-content-between">'
-                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
-                . '</div>'
-                . '</div>'
-                . '</div>'
-                . '</div>';
+            $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
+            $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
+            $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
+            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+
+            echo '<tr>'
+                . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid rgba(0,0,0,0.06);"></td>'
+                . '<td><div class="fw-semibold">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
+                . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
+                . '<td>'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
+                . '</td>'
+                . '</tr>';
         }
-        echo '</div>';
+
+        echo '</tbody></table></div>';
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos/arquivados' : '/admin/produtos/arquivados';
