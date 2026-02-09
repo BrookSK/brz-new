@@ -38,7 +38,12 @@ class Usuario extends Model {
     }
     
     public function findByEmail($email) {
-        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE email = :email");
+        $email = strtolower(trim((string) $email));
+        if ($email === '') {
+            return false;
+        }
+
+        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE LOWER(TRIM(email)) = :email LIMIT 1");
         $stmt->bindParam(':email', $email);
         $stmt->execute();
         return $stmt->fetch(\PDO::FETCH_ASSOC);
