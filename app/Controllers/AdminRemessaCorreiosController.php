@@ -102,7 +102,11 @@ class AdminRemessaCorreiosController extends Controller {
         $context = stream_context_create([
             'http' => [
                 'timeout' => 30,
-                'header' => "Connection: close\r\nUser-Agent: brz-sigep/1.0\r\n",
+                'protocol_version' => 1.1,
+                'ignore_errors' => true,
+                'header' => "Connection: close\r\n"
+                    . "Accept: text/xml, application/xml;q=0.9, */*;q=0.8\r\n"
+                    . "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) brz-sigep/1.0\r\n",
             ],
             'ssl' => [
                 'verify_peer' => true,
