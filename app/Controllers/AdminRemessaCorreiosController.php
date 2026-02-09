@@ -99,12 +99,33 @@ class AdminRemessaCorreiosController extends Controller {
             ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
             : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
-        $client = new \SoapClient($wsdl, [
-            'exceptions' => true,
-            'trace' => false,
-            'cache_wsdl' => WSDL_CACHE_BOTH,
-            'connection_timeout' => 20,
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 30,
+                'header' => "Connection: close\r\nUser-Agent: brz-sigep/1.0\r\n",
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
         ]);
+
+        try {
+            $client = new \SoapClient($wsdl, [
+                'exceptions' => true,
+                'trace' => false,
+                'cache_wsdl' => WSDL_CACHE_BOTH,
+                'connection_timeout' => 20,
+                'stream_context' => $context,
+                'compression' => SOAP_COMPRESSION_ACCEPT | SOAP_COMPRESSION_GZIP,
+            ]);
+        } catch (\Throwable $e) {
+            $extra = [];
+            $extra[] = 'allow_url_fopen=' . (ini_get('allow_url_fopen') ? '1' : '0');
+            $extra[] = 'openssl.cafile=' . (string) ini_get('openssl.cafile');
+            $extra[] = 'curl.cainfo=' . (string) ini_get('curl.cainfo');
+            throw new \Exception('SIGEP falhou ao carregar WSDL: ' . $e->getMessage() . ' | ' . implode(', ', $extra));
+        }
 
         // Observação: o SIGEP varia por contrato. Aqui tentamos usar solicitaEtiquetas.
         // Para funcionar em definitivo, o admin deve preencher o código do serviço do contrato.
