@@ -47,7 +47,105 @@
                     }
                 }
 
+                function parseTelefone(telefoneRaw) {
+                    var raw = (telefoneRaw || '').toString().trim();
+                    var m = raw.match(/^\+\s*(\d{1,4})\s*(.*)$/);
+                    if (m) {
+                        return { ddi: (m[1] || '').trim(), numero: (m[2] || '').trim() };
+                    }
+                    return { ddi: '55', numero: raw };
+                }
+
+                function getDdiValue() {
+                    var ddi = (document.getElementById('telefone_ddi')?.value || '').toString();
+                    if (ddi === '0') {
+                        ddi = (document.getElementById('telefone_ddi_outro')?.value || '').toString();
+                    }
+                    return ddi.replace(/\D/g, '');
+                }
+
+                function isDdiBR() {
+                    return getDdiValue() === '55';
+                }
+
+                function syncTelefoneOutroBox() {
+                    var sel = document.getElementById('telefone_ddi');
+                    var box = document.getElementById('telefone_ddi_outro_box');
+                    if (!sel || !box) return;
+                    box.style.display = (sel.value === '0') ? 'flex' : 'none';
+                }
+
+                function mountTelefoneHidden() {
+                    var hidden = document.getElementById('telefone');
+                    var numero = document.getElementById('telefone_numero');
+                    if (!hidden || !numero) return;
+                    var ddi = getDdiValue();
+                    var n = (numero.value || '').toString().trim();
+                    hidden.value = ddi ? ('+' + ddi + ' ' + n) : n;
+                }
+
+                function applyTelefoneMaskIfBR() {
+                    var numero = document.getElementById('telefone_numero');
+                    if (!numero) return;
+                    if (!isDdiBR()) return;
+                    var v = (numero.value || '').toString().replace(/\D/g, '');
+                    if (v.length <= 10) {
+                        v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+                    } else {
+                        v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                    }
+                    numero.value = v;
+                }
+
                 document.addEventListener('DOMContentLoaded', function() {
+                    // Telefone: separar DDI e número
+                    var telefoneHidden = document.getElementById('telefone');
+                    var ddiSel = document.getElementById('telefone_ddi');
+                    var numeroEl = document.getElementById('telefone_numero');
+                    if (telefoneHidden && ddiSel && numeroEl) {
+                        var parsed = parseTelefone(telefoneHidden.value);
+                        numeroEl.value = parsed.numero || '';
+                        var hasOption = false;
+                        for (var i = 0; i < ddiSel.options.length; i++) {
+                            if ((ddiSel.options[i].value || '') === parsed.ddi) { hasOption = true; break; }
+                        }
+                        if (parsed.ddi && hasOption) {
+                            ddiSel.value = parsed.ddi;
+                        } else if (parsed.ddi) {
+                            ddiSel.value = '0';
+                            var outro = document.getElementById('telefone_ddi_outro');
+                            if (outro) outro.value = parsed.ddi;
+                        }
+
+                        syncTelefoneOutroBox();
+                        applyTelefoneMaskIfBR();
+                        mountTelefoneHidden();
+
+                        ddiSel.addEventListener('change', function() {
+                            syncTelefoneOutroBox();
+                            applyTelefoneMaskIfBR();
+                            mountTelefoneHidden();
+                        });
+                        var outroEl = document.getElementById('telefone_ddi_outro');
+                        if (outroEl) {
+                            outroEl.addEventListener('input', function() {
+                                applyTelefoneMaskIfBR();
+                                mountTelefoneHidden();
+                            });
+                        }
+                        numeroEl.addEventListener('input', function() {
+                            applyTelefoneMaskIfBR();
+                            mountTelefoneHidden();
+                        });
+
+                        var form = document.getElementById('formMeusDados');
+                        if (form) {
+                            form.addEventListener('submit', function() {
+                                mountTelefoneHidden();
+                            });
+                        }
+                    }
+
                     var paisResSearch = document.getElementById('pais_residencia_search');
                     var paisResSelect = document.getElementById('pais_residencia');
                     if (paisResSearch && paisResSelect) {
@@ -106,9 +204,28 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="tel" class="form-control" id="telefone" name="telefone" 
-                                       value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
-                                       placeholder="(00) 00000-0000" required>
+                                <div class="input-group">
+                                    <select class="form-select" id="telefone_ddi" style="max-width: 120px;">
+                                        <option value="55" selected>+55</option>
+                                        <option value="1">+1</option>
+                                        <option value="44">+44</option>
+                                        <option value="49">+49</option>
+                                        <option value="33">+33</option>
+                                        <option value="34">+34</option>
+                                        <option value="39">+39</option>
+                                        <option value="351">+351</option>
+                                        <option value="54">+54</option>
+                                        <option value="56">+56</option>
+                                        <option value="57">+57</option>
+                                        <option value="0">Outro</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="telefone_numero" placeholder="Número" required>
+                                    <input type="hidden" class="form-control" id="telefone" name="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                </div>
+                                <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
+                                    <span class="input-group-text">DDI</span>
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="documento" class="form-label" id="label-documento">CPF</label>

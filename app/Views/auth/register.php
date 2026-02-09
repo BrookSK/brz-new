@@ -26,10 +26,28 @@
                                 <label for="telefone" class="form-label">Telefone</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                                    <input type="tel" class="form-control" id="telefone" name="telefone" 
-                                           placeholder="Ex: +1 212 555 1234, +55 11 99999-9999" required>
+                                    <select class="form-select" id="telefone_ddi" style="max-width: 120px;">
+                                        <option value="55" selected>+55</option>
+                                        <option value="1">+1</option>
+                                        <option value="44">+44</option>
+                                        <option value="49">+49</option>
+                                        <option value="33">+33</option>
+                                        <option value="34">+34</option>
+                                        <option value="39">+39</option>
+                                        <option value="351">+351</option>
+                                        <option value="54">+54</option>
+                                        <option value="56">+56</option>
+                                        <option value="57">+57</option>
+                                        <option value="0">Outro</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="telefone_numero" 
+                                           placeholder="Número" required>
+                                    <input type="hidden" class="form-control" id="telefone" name="telefone" value="">
                                 </div>
-                                <small class="text-muted">Você pode informar mais de um número separando por vírgula.</small>
+                                <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
+                                    <span class="input-group-text">DDI</span>
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                </div>
                             </div>
                         </div>
                         
@@ -240,6 +258,21 @@ $(document).ready(function() {
     // Form validation
     $('#registerForm').on('submit', function(e) {
         e.preventDefault();
+
+        // Montar telefone (DDI + número)
+        (function() {
+            var ddi = ($('#telefone_ddi').val() || '').toString();
+            if (ddi === '0') {
+                ddi = ($('#telefone_ddi_outro').val() || '').toString();
+            }
+            ddi = ddi.replace(/\D/g, '');
+            var numero = ($('#telefone_numero').val() || '').toString().trim();
+            if (ddi) {
+                $('#telefone').val('+' + ddi + ' ' + numero);
+            } else {
+                $('#telefone').val(numero);
+            }
+        })();
         
         // Validar senhas
         const senha = $('#senha').val();
@@ -301,8 +334,22 @@ $(document).ready(function() {
     });
     
     // Phone mask (somente BR)
-    $('#telefone').on('input', function() {
-        if (!isBrazil()) return;
+    function isDdiBR() {
+        var ddi = ($('#telefone_ddi').val() || '').toString();
+        if (ddi === '0') {
+            ddi = ($('#telefone_ddi_outro').val() || '').toString();
+        }
+        ddi = ddi.replace(/\D/g, '');
+        return ddi === '55';
+    }
+
+    $('#telefone_ddi').on('change', function() {
+        const other = ($('#telefone_ddi').val() || '').toString() === '0';
+        $('#telefone_ddi_outro_box').toggle(other);
+    }).trigger('change');
+
+    $('#telefone_numero').on('input', function() {
+        if (!isDdiBR()) return;
         let value = $(this).val().replace(/\D/g, '');
         
         if (value.length <= 10) {
