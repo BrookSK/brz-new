@@ -652,7 +652,21 @@ class CarrinhoController extends Controller {
 
                 $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
                 $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-                $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
+                $affected = (int) $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
+                if ($affected < 1) {
+                    $this->json([
+                        'success' => false,
+                        'error' => 'Item não foi removido do carrinho (não encontrado no carrinho do usuário).',
+                        'debug' => [
+                            'cart_id' => $cartId,
+                            'produto_id' => (int) $produtoIdDb,
+                            'produto_variacao_id' => ($pvId !== null ? (int) $pvId : null),
+                            'request_id' => (string) $produtoId,
+                            'uid' => (int) $uid
+                        ]
+                    ], 404);
+                    return;
+                }
 
                 $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
                 $stCnt->execute([$cartId]);
