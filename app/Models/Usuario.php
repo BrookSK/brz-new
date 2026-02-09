@@ -186,7 +186,7 @@ class Usuario extends Model {
         }
         $ok = false;
         if ($usuario && is_string($hash) && $hash !== '') {
-            $hashToVerify = $hash;
+            $hashToVerify = trim($hash, " \t\n\r\0\x0B\"'");
             $isWpPrefixed = false;
             if (str_starts_with($hashToVerify, '$wp$')) {
                 $hashToVerify = '$' . ltrim(substr($hashToVerify, 4), '$');
