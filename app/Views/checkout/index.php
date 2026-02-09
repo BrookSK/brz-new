@@ -41,8 +41,8 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Telefone com WhatsApp *</label>
-                                    <div class="input-group">
-                                        <select class="form-select flex-shrink-0" id="telefone_ddi" style="width: 92px;">
+                                    <div class="input-group w-100" style="flex-wrap: nowrap;">
+                                        <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                             <option value="55" selected>+55</option>
                                             <option value="1">+1</option>
                                             <option value="44">+44</option>
@@ -56,7 +56,7 @@
                                             <option value="57">+57</option>
                                             <option value="0">Outro</option>
                                         </select>
-                                        <input type="text" class="form-control flex-grow-1" id="telefone_numero" placeholder="Número" required>
+                                        <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="Número" required>
                                         <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
                                     </div>
                                     <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
