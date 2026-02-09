@@ -4548,7 +4548,9 @@ HTMLSCRIPT;
             exit;
             
         } catch (\Exception $e) {
-            if (isset($pdo)) $pdo->rollBack();
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
