@@ -34,14 +34,17 @@
                                            value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">CPF/CNPJ *</label>
-                                    <input type="text" class="form-control" name="documento" required 
+                                    <label class="form-label" id="label-documento">CPF</label>
+                                    <input type="text" class="form-control" name="documento" id="documento" 
                                            value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>">
+                                    <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Telefone com WhatsApp *</label>
                                     <input type="tel" class="form-control" name="telefone" required 
+                                           placeholder="Ex: +1 212 555 1234, +55 11 99999-9999"
                                            value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                    <small class="text-muted">Você pode informar mais de um número separando por vírgula.</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Data de Nascimento *</label>
@@ -91,13 +94,14 @@
                                 <div class="row">
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">País / Country *</label>
+                                        <?php require __DIR__ . '/../_countries.php'; ?>
+                                        <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
                                         <select class="form-select" name="pais" id="pais" required>
-                                            <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
-                                            <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                            <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
-                                            <option value="DE">Alemanha</option>
-                                            <option value="AU">Austrália</option>
+                                            <?php foreach ($countries as $code => $name): ?>
+                                                <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                            <?php endforeach; ?>
                                         </select>
+                                        <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
@@ -167,6 +171,33 @@
 
         <script>
         (function() {
+            function filterSelectOptions(selectEl, query) {
+                if (!selectEl) return;
+                query = (query || '').toString().trim().toLowerCase();
+                var opts = selectEl.querySelectorAll('option');
+                for (var i = 0; i < opts.length; i++) {
+                    var o = opts[i];
+                    var txt = (o.textContent || '').toString().toLowerCase();
+                    var val = (o.value || '').toString().toLowerCase();
+                    var match = (query === '') || (txt.indexOf(query) !== -1) || (val.indexOf(query) !== -1);
+                    o.style.display = match ? '' : 'none';
+                }
+            }
+
+            function syncDocumentoRules() {
+                var paisEl = document.getElementById('pais');
+                var docEl = document.getElementById('documento');
+                var labelEl = document.getElementById('label-documento');
+                var hintEl = document.getElementById('hint-documento');
+                if (!paisEl || !docEl || !labelEl) return;
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                labelEl.textContent = br ? 'CPF *' : 'CPF';
+                docEl.required = br;
+                if (hintEl) {
+                    hintEl.style.display = br ? 'none' : 'block';
+                }
+            }
+
             function computeMissingFiltered() {
                 var warn = document.getElementById('checkout-perfil-warning');
                 if (!warn) return;
@@ -219,6 +250,21 @@
                 if (sel) {
                     sel.addEventListener('change', computeMissingFiltered);
                 }
+
+                var paisSearch = document.getElementById('pais_search');
+                var paisSelect = document.getElementById('pais');
+                if (paisSearch && paisSelect) {
+                    paisSearch.addEventListener('input', function() {
+                        filterSelectOptions(paisSelect, paisSearch.value);
+                    });
+                }
+                if (paisSelect) {
+                    paisSelect.addEventListener('change', function() {
+                        syncDocumentoRules();
+                    });
+                }
+
+                syncDocumentoRules();
             });
         })();
         </script>

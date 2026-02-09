@@ -27,8 +27,9 @@
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-phone"></i></span>
                                     <input type="tel" class="form-control" id="telefone" name="telefone" 
-                                           placeholder="(00) 00000-0000" required>
+                                           placeholder="Ex: +1 212 555 1234, +55 11 99999-9999" required>
                                 </div>
+                                <small class="text-muted">Você pode informar mais de um número separando por vírgula.</small>
                             </div>
                         </div>
                         
@@ -42,12 +43,13 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="documento" class="form-label">CPF/CNPJ</label>
+                            <label for="documento" class="form-label" id="label-documento">CPF</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-id-card"></i></span>
                                 <input type="text" class="form-control" id="documento" name="documento" 
-                                       placeholder="000.000.000-00" required>
+                                       placeholder="000.000.000-00">
                             </div>
+                            <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                         </div>
 
                         <div class="row">
@@ -62,11 +64,15 @@
                                 <label for="pais_residencia" class="form-label">País de Residência</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-flag"></i></span>
+                                    <?php require __DIR__ . '/../_countries.php'; ?>
+                                    <?php $pr = strtoupper((string) (($dados['pais_residencia'] ?? 'BR'))); ?>
                                     <select class="form-select" id="pais_residencia" name="pais_residencia" required>
-                                        <option value="BR" selected>Brasil</option>
-                                        <option value="US">Estados Unidos</option>
+                                        <?php foreach ($countries as $code => $name): ?>
+                                            <option value="<?= htmlspecialchars($code) ?>" <?= $pr === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
                             </div>
                         </div>
 
@@ -191,6 +197,32 @@
 
 <script>
 $(document).ready(function() {
+    function filterSelectOptions($select, query) {
+        query = (query || '').toString().trim().toLowerCase();
+        $select.find('option').each(function() {
+            const txt = ($(this).text() || '').toString().toLowerCase();
+            const val = ($(this).val() || '').toString().toLowerCase();
+            const match = (query === '') || txt.indexOf(query) !== -1 || val.indexOf(query) !== -1;
+            $(this).toggle(match);
+        });
+    }
+
+    function isBrazil() {
+        return ($('#pais_residencia').val() || '').toString().toUpperCase() === 'BR';
+    }
+
+    function syncDocumentoRules() {
+        const br = isBrazil();
+        const $doc = $('#documento');
+        const $label = $('#label-documento');
+        const $hint = $('#hint-documento');
+
+        $label.text(br ? 'CPF *' : 'CPF');
+        $doc.prop('required', br);
+        $doc.attr('placeholder', br ? '000.000.000-00' : '');
+        $hint.toggle(!br);
+    }
+
     // Toggle password visibility
     $('#togglePassword').click(function() {
         const senhaField = $('#senha');
@@ -252,23 +284,25 @@ $(document).ready(function() {
         });
     });
     
-    // CPF/CNPJ mask
+    // País: busca
+    $('#pais_residencia_search').on('input', function() {
+        filterSelectOptions($('#pais_residencia'), $(this).val());
+    });
+
+    // CPF mask (somente BR)
     $('#documento').on('input', function() {
-        let value = $(this).val().replace(/\D/g, '');
-        
-        if (value.length <= 11) {
-            // CPF
-            value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-        } else {
-            // CNPJ
-            value = value.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-        }
-        
+        if (!isBrazil()) return;
+        let value = $(this).val().replace(/\D/g, '').slice(0, 11);
+        if (value.length >= 4) value = value.replace(/^(\d{3})(\d)/, '$1.$2');
+        if (value.length >= 8) value = value.replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+        if (value.length >= 12) value = value.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
+        value = value.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
         $(this).val(value);
     });
     
-    // Phone mask
+    // Phone mask (somente BR)
     $('#telefone').on('input', function() {
+        if (!isBrazil()) return;
         let value = $(this).val().replace(/\D/g, '');
         
         if (value.length <= 10) {
@@ -279,6 +313,12 @@ $(document).ready(function() {
         
         $(this).val(value);
     });
+
+    $('#pais_residencia').on('change', function() {
+        syncDocumentoRules();
+    });
+
+    syncDocumentoRules();
 });
 
 function showAlert(type, message) {

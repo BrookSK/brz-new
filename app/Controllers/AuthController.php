@@ -415,18 +415,20 @@ class AuthController extends Controller {
                         $erros[] = 'E-mail já cadastrado';
                     }
                     
-                    // Verificar se documento já existe
-                    if ($this->usuarioModel->findByDocumento($dados['documento'])) {
-                        $erros[] = 'Documento já cadastrado';
+                    // Verificar se CPF já existe (somente se informado)
+                    $docCheck = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+                    if ($docCheck !== '' && $this->usuarioModel->findByDocumento($docCheck)) {
+                        $erros[] = 'CPF já cadastrado';
                     }
                     
                     if (empty($erros)) {
+                        $docToSave = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
                         $usuarioId = $this->usuarioModel->create([
                             'nome' => $dados['nome'],
                             'email' => $dados['email'],
                             'senha' => $dados['senha'],
                             'telefone' => $dados['telefone'],
-                            'documento' => $dados['documento'],
+                            'documento' => $docToSave,
                             'perfil' => 'cliente'
                         ]);
 
@@ -534,8 +536,17 @@ class AuthController extends Controller {
             $erros[] = 'Senhas não conferem';
         }
         
-        if (empty($dados['documento'])) {
-            $erros[] = 'Documento é obrigatório';
+        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        // CPF: obrigatório somente para residentes no Brasil
+        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        if ($pais === 'BR') {
+            if ($doc === '' || strlen($doc) < 11) {
+                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            }
         }
         
         if (empty($dados['telefone'])) {
@@ -546,10 +557,6 @@ class AuthController extends Controller {
             $erros[] = 'Data de nascimento é obrigatória';
         }
 
-        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
-        if ($pais === '') {
-            $pais = 'BR';
-        }
         if (empty($dados['pais_residencia'])) {
             $erros[] = 'País de residência é obrigatório';
         }
@@ -560,13 +567,6 @@ class AuthController extends Controller {
         if (empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
         if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
-
-        if ($pais === 'BR') {
-            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
-            if ($doc === '' || strlen($doc) < 11) {
-                $erros[] = 'CPF é obrigatório para residentes no Brasil';
-            }
-        }
 
         if (empty($dados['termos'])) {
             $erros[] = 'Você precisa aceitar os termos';

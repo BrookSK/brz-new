@@ -1307,10 +1307,6 @@ class UsuarioController extends Controller {
             $erros[] = 'Telefone é obrigatório';
         }
 
-        if (empty($dados['documento'])) {
-            $erros[] = 'Documento é obrigatório';
-        }
-
         if (empty($dados['data_nascimento'])) {
             $erros[] = 'Data de nascimento é obrigatória';
         }
@@ -1320,8 +1316,12 @@ class UsuarioController extends Controller {
         }
 
         $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
-            $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
             }

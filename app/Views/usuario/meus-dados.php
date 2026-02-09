@@ -17,6 +17,62 @@
                     <strong><?= date('d/m/Y', strtotime($usuario['created_at'] ?? 'now')) ?></strong>
                 </div>
             </div>
+
+            <script>
+            (function() {
+                function filterSelectOptions(selectEl, query) {
+                    if (!selectEl) return;
+                    query = (query || '').toString().trim().toLowerCase();
+                    var opts = selectEl.querySelectorAll('option');
+                    for (var i = 0; i < opts.length; i++) {
+                        var o = opts[i];
+                        var txt = (o.textContent || '').toString().toLowerCase();
+                        var val = (o.value || '').toString().toLowerCase();
+                        var match = (query === '') || (txt.indexOf(query) !== -1) || (val.indexOf(query) !== -1);
+                        o.style.display = match ? '' : 'none';
+                    }
+                }
+
+                function syncDocumentoRules() {
+                    var paisRes = document.getElementById('pais_residencia');
+                    var docEl = document.getElementById('documento');
+                    var labelEl = document.getElementById('label-documento');
+                    var hintEl = document.getElementById('hint-documento');
+                    if (!paisRes || !docEl || !labelEl) return;
+                    var br = ((paisRes.value || '').toString().toUpperCase() === 'BR');
+                    labelEl.textContent = br ? 'CPF *' : 'CPF';
+                    docEl.required = br;
+                    if (hintEl) {
+                        hintEl.style.display = br ? 'none' : 'block';
+                    }
+                }
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    var paisResSearch = document.getElementById('pais_residencia_search');
+                    var paisResSelect = document.getElementById('pais_residencia');
+                    if (paisResSearch && paisResSelect) {
+                        paisResSearch.addEventListener('input', function() {
+                            filterSelectOptions(paisResSelect, paisResSearch.value);
+                        });
+                    }
+                    if (paisResSelect) {
+                        paisResSelect.addEventListener('change', function() {
+                            syncDocumentoRules();
+                        });
+                    }
+
+                    var paisSearch = document.getElementById('pais_search');
+                    var paisSelect = document.getElementById('pais');
+                    if (paisSearch && paisSelect) {
+                        paisSearch.addEventListener('input', function() {
+                            filterSelectOptions(paisSelect, paisSearch.value);
+                        });
+                    }
+
+                    syncDocumentoRules();
+                });
+            })();
+            </script>
             
             <!-- Success Message -->
             <?php if (isset($_SESSION['message'])): ?>
@@ -55,10 +111,11 @@
                                        placeholder="(00) 00000-0000" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="documento" class="form-label">CPF/CNPJ</label>
+                                <label for="documento" class="form-label" id="label-documento">CPF</label>
                                 <input type="text" class="form-control" id="documento" name="documento" 
                                        value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>" 
-                                       placeholder="000.000.000-00" required>
+                                       placeholder="000.000.000-00">
+                                <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                             </div>
 
                             <div class="col-md-6">
@@ -68,11 +125,14 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <?php require __DIR__ . '/../_countries.php'; ?>
+                                <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
                                 <select class="form-select" id="pais_residencia" name="pais_residencia" required>
-                                    <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
-                                    <option value="BR" <?= $pr === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                    <option value="US" <?= $pr === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
+                                    <?php foreach ($countries as $code => $name): ?>
+                                        <option value="<?= htmlspecialchars($code) ?>" <?= $pr === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
                             </div>
                         </div>
                 </div>
@@ -108,14 +168,13 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="pais" class="form-label">País / Country</label>
+                                <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
                                 <select class="form-select" id="pais" name="pais" required>
-                                    <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
-                                    <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                    <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
-                                    <option value="CA" <?= $pp === 'CA' ? 'selected' : '' ?>>Canadá</option>
-                                    <option value="DE" <?= $pp === 'DE' ? 'selected' : '' ?>>Alemanha</option>
-                                    <option value="AU" <?= $pp === 'AU' ? 'selected' : '' ?>>Austrália</option>
+                                    <?php foreach ($countries as $code => $name): ?>
+                                        <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
+                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
                             </div>
                             <div class="col-md-6">
                                 <label for="cep" class="form-label">CEP</label>

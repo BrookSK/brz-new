@@ -2524,7 +2524,16 @@ class CheckoutController extends Controller {
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-        if (empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
+        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        if ($pais === 'BR') {
+            if ($doc === '' || strlen($doc) < 11) {
+                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            }
+        }
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
         if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         
@@ -2568,12 +2577,13 @@ class CheckoutController extends Controller {
         }
         
         // Criar novo usuário
+        $docToSave = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
         return $this->usuarioModel->create([
             'nome' => $dados['nome'],
             'email' => $dados['email'],
             'senha' => $dados['senha'],
             'telefone' => $dados['telefone'],
-            'documento' => $dados['documento'],
+            'documento' => $docToSave,
             'data_nascimento' => $dados['data_nascimento'] ?? null,
             'perfil' => 'cliente'
         ]);
