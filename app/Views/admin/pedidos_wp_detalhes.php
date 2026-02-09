@@ -51,12 +51,50 @@ $transactionId = wpVal($meta, '_transaction_id');
     </div>
     <div class="d-flex gap-2">
         <a href="/admin/pedidos-wp" class="btn btn-outline-secondary">Voltar</a>
+        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">Gerar etiqueta W-Express</button>
     </div>
 </div>
 
 <?php if ($erro !== ''): ?>
     <div class="alert alert-danger">Erro ao carregar detalhes do pedido: <?= htmlspecialchars($erro) ?></div>
 <?php endif; ?>
+
+<script>
+function gerarEtiquetaWexpressWp(orderId) {
+    if (!orderId) {
+        alert('Pedido inválido');
+        return;
+    }
+    if (!confirm('Deseja gerar a etiqueta da W-Express para este pedido?')) return;
+
+    fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data || !data.success) {
+            throw new Error((data && (data.error || data.message)) ? (data.error || data.message) : 'Erro ao gerar etiqueta');
+        }
+        return data;
+    })
+    .then((data) => {
+        const labelUrl = data.label_url || '';
+        alert('Etiqueta gerada com sucesso!');
+        if (labelUrl) {
+            window.open(labelUrl, '_blank');
+        } else {
+            location.reload();
+        }
+    })
+    .catch((e) => {
+        alert('Erro: ' + (e && e.message ? e.message : String(e)));
+    });
+}
+</script>
 
 <?php if (!$pedido): ?>
     <div class="alert alert-warning">Pedido não encontrado.</div>

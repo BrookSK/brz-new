@@ -211,6 +211,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
                                 <i class="fab fa-wordpress"></i> WordPress
                             </button>
+                            <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
+                                <i class="fas fa-plug"></i> WooCommerce
+                            </button>
                         </div>
                     </div>
                     
@@ -247,6 +250,40 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-woocommerce" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">WooCommerce (REST API)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Store URL</label>
+                                                <input type="url" class="form-control" name="woocommerce_store_url" value="' . $this->getConfigValue($config, 'woocommerce', 'store_url', '') . '" placeholder="https://br.brazilianashop.com.br/">
+                                                <small class="text-muted">URL base da loja (sem /wp-admin). Ex: <code>https://br.brazilianashop.com.br</code></small>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Key</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_key', '') . '" placeholder="ck_...">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Secret</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-info mb-0">
+                                                Essas credenciais são usadas para <strong>atualizar o pedido no WooCommerce</strong> (order meta) com <code>wexpress_shipping_id</code>, link da etiqueta e rastreio.
                                             </div>
                                         </div>
                                     </div>
@@ -3003,6 +3040,7 @@ HTML;
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'woocommerce' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
