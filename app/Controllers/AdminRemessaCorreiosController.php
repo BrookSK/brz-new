@@ -99,6 +99,11 @@ class AdminRemessaCorreiosController extends Controller {
             ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
             : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
+        $localWsdl = __DIR__ . '/../Resources/wsdl/AtendeCliente.wsdl';
+        if (is_file($localWsdl)) {
+            $wsdl = $localWsdl;
+        }
+
         $context = stream_context_create([
             'http' => [
                 'timeout' => 30,
