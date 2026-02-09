@@ -6,6 +6,7 @@ $router = new Router();
 // Rotas Públicas
 $router->get('/', 'HomeController', 'index');
 $router->get('/produtos', 'ProdutoController', 'index');
+$router->get('/produtos/arquivados', 'ProdutoController', 'arquivados');
 $router->get('/produtos/rep-{slug}', 'ProdutoController', 'representante');
 $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');

@@ -94,9 +94,24 @@ class Produto extends Model {
             FROM {$this->table} p 
             LEFT JOIN categorias c ON p.category_id = c.id 
             WHERE p.active = 1 
+            AND (p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','ativo','active'))
             AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
             AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY p.featured DESC, p.name ASC
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getArquivadosWithCategoria() {
+        $stmt = $this->getConnection()->prepare("
+            SELECT p.*, c.name as categoria 
+            FROM {$this->table} p 
+            LEFT JOIN categorias c ON p.category_id = c.id 
+            WHERE (LOWER(COALESCE(p.status,'')) = 'archived' OR p.active = 0)
+            AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
+            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
+            ORDER BY p.updated_at DESC, p.id DESC
         ");
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -177,6 +192,8 @@ class Produto extends Model {
         $stmt = $this->getConnection()->prepare("
             SELECT * FROM {$this->table} 
             WHERE category_id = :category_id 
+            AND active = 1
+            AND (status IS NULL OR LOWER(COALESCE(status,'')) IN ('published','ativo','active'))
             AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
             AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
             ORDER BY featured DESC, name ASC
