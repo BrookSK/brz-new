@@ -4439,7 +4439,7 @@ HTML;
             $amb = strtolower(trim((string) $ambiente));
             $wsdl = ($amb === 'producao' || $amb === 'production')
                 ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
-                : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+                : 'https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
             $localWsdl = __DIR__ . '/../Resources/wsdl/AtendeCliente.wsdl';
             if (is_file($localWsdl)) {
