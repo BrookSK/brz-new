@@ -2294,7 +2294,7 @@ HTML;
 
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
-                . '<td><div class="fw-semibold">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
                 . '<td><span class="text-muted small">' . $sku . '</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
@@ -2488,7 +2488,7 @@ HTML;
 
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
-                . '<td><div class="fw-semibold">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
                 . '<td><span class="text-muted small">' . $sku . '</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
