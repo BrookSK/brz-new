@@ -514,8 +514,11 @@ class Carrinho extends Model {
             $stmt->bindValue(':produto_variacao_id', (int) $produtoVariacaoId, \PDO::PARAM_INT);
         }
         $stmt->execute();
+
+        $affected = (int) $stmt->rowCount();
         
         $this->atualizarTotais($carrinhoId);
+        return $affected;
     }
 
     public function setQuantidadeItem($carrinhoId, $produtoId, $quantidade, $produtoVariacaoId = null) {
