@@ -26,7 +26,7 @@
                                 <label for="telefone" class="form-label">Telefone</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                                    <select class="form-select" id="telefone_ddi" style="max-width: 120px;">
+                                    <select class="form-select flex-shrink-0" id="telefone_ddi" style="width: 92px;">
                                         <option value="55" selected>+55</option>
                                         <option value="1">+1</option>
                                         <option value="44">+44</option>
@@ -40,7 +40,7 @@
                                         <option value="57">+57</option>
                                         <option value="0">Outro</option>
                                     </select>
-                                    <input type="text" class="form-control" id="telefone_numero" 
+                                    <input type="text" class="form-control flex-grow-1" id="telefone_numero" 
                                            placeholder="Número" required>
                                     <input type="hidden" class="form-control" id="telefone" name="telefone" value="">
                                 </div>
