@@ -1059,7 +1059,11 @@
                         <?php else: ?>
                             <i class="fas fa-globe-americas"></i>
                         <?php endif; ?>
-                        Braziliana
+                        <?php if (!empty($effectiveFooterLogo)): ?>
+                            <span class="visually-hidden">Braziliana</span>
+                        <?php else: ?>
+                            Braziliana
+                        <?php endif; ?>
                     </h5>
                     <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
                     <div class="mt-3">
