@@ -472,6 +472,9 @@ $(document).ready(function() {
     background: transparent;
     margin-left: 0;
     margin-right: 0;
+    margin-top: 15px;
+    border-radius: 18px;
+    overflow: hidden;
 }
 
 .hero-section .home-hero-banner img {
