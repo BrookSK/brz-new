@@ -89,10 +89,10 @@
     ?>
 
     <?php if (!empty($layoutBanners)): ?>
-        <div class="container">
+        <div class="container-fluid p-0">
             <div class="hero-image" data-aos="fade-left">
                 <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner rounded-3 shadow-lg" style="overflow: hidden;">
+                    <div class="carousel-inner" style="overflow: hidden;">
                         <?php foreach ($layoutBanners as $i => $banner): ?>
                             <?php
                                 $desktopSrc = is_array($banner) ? (string) ($banner['desktop'] ?? '') : '';
@@ -106,13 +106,13 @@
                                     <a href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>" style="display:block;">
                                         <picture>
                                             <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
-                                            <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="max-height: 436px; object-fit: cover;">
+                                            <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="height: 100vh; min-height: 333px; max-height: 100vh; object-fit: cover; object-position: center;">
                                         </picture>
                                     </a>
                                 <?php else: ?>
                                     <picture>
                                         <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
-                                        <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="max-height: 436px; object-fit: cover;">
+                                        <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="height: 100vh; min-height: 333px; max-height: 100vh; object-fit: cover; object-position: center;">
                                     </picture>
                                 <?php endif; ?>
                             </div>
@@ -423,15 +423,33 @@ $(document).ready(function() {
 </script>
 
 <style>
+.hero-section {
+    padding: 0;
+    margin: 0;
+}
+
+.hero-section .container-fluid {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.hero-section #homeHeroBanners,
+.hero-section #homeHeroBanners .carousel-inner,
+.hero-section #homeHeroBanners .carousel-item {
+    width: 100vw;
+}
+
 .hero-section .hero-image {
     position: relative;
-    padding: 14px;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 18px 50px rgba(11, 31, 58, 0.28);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     overflow: hidden;
 }
 
@@ -439,7 +457,7 @@ $(document).ready(function() {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0.06);
+    background: transparent;
     pointer-events: none;
 }
 
@@ -447,10 +465,15 @@ $(document).ready(function() {
     position: relative;
     display: block;
     width: 100%;
-    border-radius: 18px;
-    box-shadow: 0 14px 38px rgba(11, 31, 58, 0.30);
-    filter: saturate(1.08) contrast(1.02);
+    border-radius: 0;
+    box-shadow: none;
+    filter: none;
     transform: none;
+}
+
+.hero-section .carousel-control-prev,
+.hero-section .carousel-control-next {
+    width: 8%;
 }
 
 .timeline {
