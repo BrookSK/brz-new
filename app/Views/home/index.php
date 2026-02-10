@@ -89,10 +89,10 @@
     ?>
 
     <?php if (!empty($layoutBanners)): ?>
-        <div class="container-fluid p-0">
+        <div class="container">
             <div class="hero-image" data-aos="fade-left">
                 <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner" style="overflow: hidden;">
+                    <div class="carousel-inner rounded-3" style="overflow: hidden;">
                         <?php foreach ($layoutBanners as $i => $banner): ?>
                             <?php
                                 $desktopSrc = is_array($banner) ? (string) ($banner['desktop'] ?? '') : '';
@@ -104,16 +104,20 @@
                             <div class="carousel-item <?= ($i === 0 ? 'active' : '') ?>">
                                 <?php if (!empty($linkHref)): ?>
                                     <a href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>" style="display:block;">
-                                        <picture>
-                                            <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
-                                            <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="height: 100vh; min-height: 333px; max-height: 100vh; object-fit: cover; object-position: center;">
-                                        </picture>
+                                        <div class="home-hero-banner">
+                                            <picture>
+                                                <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                                <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="w-100 h-100">
+                                            </picture>
+                                        </div>
                                     </a>
                                 <?php else: ?>
-                                    <picture>
-                                        <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
-                                        <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="height: 100vh; min-height: 333px; max-height: 100vh; object-fit: cover; object-position: center;">
-                                    </picture>
+                                    <div class="home-hero-banner">
+                                        <picture>
+                                            <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                            <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="w-100 h-100">
+                                        </picture>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -424,21 +428,7 @@ $(document).ready(function() {
 
 <style>
 .hero-section {
-    padding: 0;
-    margin: 0;
-}
-
-.hero-section .container-fluid {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-}
-
-.hero-section #homeHeroBanners,
-.hero-section #homeHeroBanners .carousel-inner,
-.hero-section #homeHeroBanners .carousel-item {
-    width: 100vw;
+    padding-top: 0 !important;
 }
 
 .hero-section .hero-image {
@@ -454,11 +444,7 @@ $(document).ready(function() {
 }
 
 .hero-section .hero-image::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: transparent;
-    pointer-events: none;
+    display: none;
 }
 
 .hero-section .hero-image img {
@@ -469,6 +455,25 @@ $(document).ready(function() {
     box-shadow: none;
     filter: none;
     transform: none;
+}
+
+.hero-section .home-hero-banner {
+    width: 100%;
+    aspect-ratio: 1149 / 436;
+    background: transparent;
+}
+
+.hero-section .home-hero-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+@media (max-width: 767px) {
+    .hero-section .home-hero-banner {
+        aspect-ratio: 391 / 333;
+    }
 }
 
 .hero-section .carousel-control-prev,
