@@ -427,6 +427,8 @@ class PedidoEcommerce {
 
                 $r['taxa_conversao'] = $taxaConversao;
 
+                // Ajuste opcional: se existirem colunas *_brl, preferir elas para exibição na listagem
+                // (mantém compatibilidade com schemas que salvam total em USD + total_brl em BRL)
                 if ($moeda === 'BRL' && $taxaConversao > 1.01) {
                     $valorTotalBRL = null;
                     foreach (['valor_total_brl', 'total_brl'] as $c) {
@@ -439,26 +441,23 @@ class PedidoEcommerce {
                         }
                     }
 
-                    $totalField = null;
-                    foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
-                        if (array_key_exists($c, $r)) {
-                            $totalField = $c;
-                            break;
+                    if ($valorTotalBRL !== null) {
+                        $totalField = null;
+                        foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+                            if (array_key_exists($c, $r)) {
+                                $totalField = $c;
+                                break;
+                            }
                         }
-                    }
-
-                    if ($totalField !== null) {
-                        $baseTotal = (float) ($r[$totalField] ?? 0);
-                        if ($valorTotalBRL !== null) {
+                        if ($totalField !== null) {
                             $r[$totalField] = $valorTotalBRL;
                             $r['valor_total'] = $valorTotalBRL;
-                        } else {
-                            $moedaOriginal = strtoupper(trim((string) ($r['moeda_original'] ?? '')));
-                            $deveConverter = ($moedaOriginal === 'USD');
-                            if ($deveConverter) {
-                                $conv = $baseTotal * $taxaConversao;
-                                $r[$totalField] = $conv;
-                                $r['valor_total'] = $conv;
+                        }
+                    }
+                }
+            }
+            unset($r);
+
             // total_itens: SUM(quantidade) por pedido
             $ids = [];
             foreach ($rows as $r) {
