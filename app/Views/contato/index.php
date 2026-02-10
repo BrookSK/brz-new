@@ -24,7 +24,7 @@
                             <h5 class="card-title"><i class="fab fa-whatsapp text-success"></i> WhatsApp</h5>
                             <div class="text-muted contact-lines">
                                 <div class="d-flex align-items-center justify-content-between gap-2">
-                                    <strong class="contact-label">Suporte comercial:</strong>
+                                    <strong class="contact-label">Suporte:</strong>
                                     <a class="contact-wa-link" href="https://wa.me/5517991098286" target="_blank" rel="noopener">+55 17 99109-8286</a>
                                 </div>
                                 <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
