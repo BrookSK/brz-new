@@ -429,6 +429,15 @@ $(document).ready(function() {
 <style>
 .hero-section {
     padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    background: transparent !important;
+}
+
+.hero-section .container {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
 }
 
 .hero-section .hero-image {
@@ -461,6 +470,9 @@ $(document).ready(function() {
     width: 100%;
     aspect-ratio: 1149 / 436;
     background: transparent;
+    max-width: 1149px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .hero-section .home-hero-banner img {
@@ -473,6 +485,7 @@ $(document).ready(function() {
 @media (max-width: 767px) {
     .hero-section .home-hero-banner {
         aspect-ratio: 391 / 333;
+        max-width: 391px;
     }
 }
 
