@@ -746,7 +746,7 @@
                         <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> Contato</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Assessoria</a>
+                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Redirecionamento</a>
                     </li>
                 </ul>
                 

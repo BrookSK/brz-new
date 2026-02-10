@@ -174,7 +174,7 @@
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 fw-bold">
-                            <i class="fas fa-clipboard-list me-2"></i> Orçamentos da Assessoria
+                            <i class="fas fa-clipboard-list me-2"></i> Orçamentos do Redirecionamento
                         </h5>
                         <a href="/assessoria" class="btn btn-sm btn-outline-primary">Novo Orçamento</a>
                     </div>
