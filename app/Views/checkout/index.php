@@ -276,6 +276,52 @@
                 labelEl.textContent = br ? 'Bairro / District *' : 'Bairro / District';
             }
 
+            function syncImpostosRules() {
+                var paisEl = document.getElementById('pais');
+                if (!paisEl) return;
+
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                var impostosRow = document.getElementById('impostos-row');
+                var impostosEl = document.getElementById('impostos');
+                var alertEl = document.getElementById('entrega-fora-br-alert');
+
+                if (!window.checkoutBaseValues) return;
+                if (!window.checkoutOriginalValues) {
+                    window.checkoutOriginalValues = Object.assign({}, window.checkoutBaseValues);
+                }
+
+                if (br) {
+                    window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostos || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.total || 0);
+                    if (impostosRow) {
+                        impostosRow.classList.remove('d-none');
+                    }
+                    if (alertEl) {
+                        alertEl.classList.add('d-none');
+                    }
+                } else {
+                    window.checkoutOriginalValues.impostos = 0;
+                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0);
+                    if (impostosEl) {
+                        impostosEl.setAttribute('data-original-value', '0');
+                        impostosEl.textContent = '0';
+                    }
+                    if (impostosRow) {
+                        impostosRow.classList.add('d-none');
+                    }
+                    if (alertEl) {
+                        alertEl.classList.remove('d-none');
+                    }
+                }
+
+                try {
+                    var moedaHidden = document.getElementById('moeda_hidden');
+                    var curr = moedaHidden ? (moedaHidden.value || 'BRL') : 'BRL';
+                    updatePrices(curr);
+                } catch (e) {
+                }
+            }
+
             function computeMissingFiltered() {
                 var warn = document.getElementById('checkout-perfil-warning');
                 if (!warn) return;
@@ -389,11 +435,13 @@
                     paisSelect.addEventListener('change', function() {
                         syncDocumentoRules();
                         syncBairroRules();
+                        syncImpostosRules();
                     });
                 }
 
                 syncDocumentoRules();
                 syncBairroRules();
+                syncImpostosRules();
             });
         })();
         </script>
@@ -570,12 +618,15 @@
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
                                 <?php if (!empty($cobra_impostos_br)): ?>
-                                    <div class="d-flex justify-content-between">
+                                    <div class="d-flex justify-content-between" id="impostos-row">
                                         <span>Impostos:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
                                 <?php else: ?>
-                                    <span id="impostos" class="d-none" data-original-value="0">0</span>
+                                    <div class="d-flex justify-content-between d-none" id="impostos-row">
+                                        <span>Impostos:</span>
+                                        <span id="impostos" class="cart-currency" data-original-value="0">0</span>
+                                    </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
@@ -603,6 +654,11 @@
                                     <?= htmlspecialchars((string) $mensagem_entrega_fora_br, ENT_QUOTES, 'UTF-8') ?>
                                 </div>
                             <?php endif; ?>
+
+                            <div class="alert alert-warning small d-none" id="entrega-fora-br-alert">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.
+                            </div>
 
                             <!-- Termos Legais -->
                             <div class="mb-3">
@@ -1434,14 +1490,20 @@ function updatePrices(currency) {
         return;
     }
     
-    // Valores originais em USD (fixos)
-    const originalValues = {
-        subtotal: <?= $subtotal ?>,
-        frete: <?= ($frete ?? 0) ?>,
-        taxaServico: <?= ($taxa_servico ?? 0) ?>,
-        impostos: <?= ($impostos ?? 0) ?>,
-        total: <?= ($total ?? 0) ?>
-    };
+    // Valores originais em USD (mutáveis, pois país pode mudar no select)
+    if (!window.checkoutBaseValues) {
+        window.checkoutBaseValues = {
+            subtotal: <?= $subtotal ?>,
+            frete: <?= ($frete ?? 0) ?>,
+            taxaServico: <?= ($taxa_servico ?? 0) ?>,
+            impostos: <?= ($impostos ?? 0) ?>,
+            total: <?= ($total ?? 0) ?>
+        };
+    }
+    if (!window.checkoutOriginalValues) {
+        window.checkoutOriginalValues = Object.assign({}, window.checkoutBaseValues);
+    }
+    const originalValues = window.checkoutOriginalValues;
     
     console.log('🔍 [MOEDA] Valores originais:', originalValues);
     
