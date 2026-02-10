@@ -26,6 +26,7 @@ $router->get('/rastreamento', 'RastreamentoController', 'index');
 $router->get('/faq', 'FaqController', 'index');
 $router->get('/como-funciona', 'ComoFuncionaController', 'index');
 $router->get('/contato', 'ContatoController', 'index');
+$router->post('/contato', 'ContatoController', 'index');
 
 // Suporte e políticas
 $router->get('/suporte', 'SuporteController', 'index');

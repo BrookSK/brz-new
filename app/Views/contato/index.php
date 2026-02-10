@@ -7,101 +7,83 @@
                 <p class="lead text-muted">Estamos aqui para ajudar. Fale conosco!</p>
             </div>
             
-            <div class="row">
-                <!-- Formulário de Contato -->
-                <div class="col-lg-8">
-                    <div class="card shadow-sm">
-                        <div class="card-body p-4">
-                            <form method="POST" action="/contato" id="contactForm">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="nome" class="form-label">Nome Completo</label>
-                                        <input type="text" class="form-control" id="nome" name="nome" required>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="email" class="form-label">E-mail</label>
-                                        <input type="email" class="form-control" id="email" name="email" required>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="telefone" class="form-label">Telefone</label>
-                                        <input type="tel" class="form-control" id="telefone" name="telefone">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="assunto" class="form-label">Assunto</label>
-                                        <select class="form-select" id="assunto" name="assunto" required>
-                                            <option value="">Selecione...</option>
-                                            <option value="duvida">Dúvida</option>
-                                            <option value="suporte">Suporte Técnico</option>
-                                            <option value="pedido">Sobre Pedido</option>
-                                            <option value="parceria">Parceria</option>
-                                            <option value="outro">Outro</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="mensagem" class="form-label">Mensagem</label>
-                                    <textarea class="form-control" id="mensagem" name="mensagem" rows="5" required></textarea>
-                                </div>
-                                
-                                <div class="d-grid">
-                                    <button type="submit" class="btn btn-primary btn-lg" id="contactBtn">
-                                        <i class="fas fa-paper-plane me-2"></i> Enviar Mensagem
-                                    </button>
-                                </div>
-                            </form>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-map-marker-alt text-primary"></i> Endereço</h5>
+                            <p class="text-muted mb-0">
+                                Estados Unidos - Carolina do Norte
+                            </p>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Informações de Contato -->
-                <div class="col-lg-4">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-map-marker-alt text-primary"></i> Endereço</h5>
-                            <p class="text-muted">
-                                Av. Paulista, 1000<br>
-                                Bela Vista, São Paulo - SP<br>
-                                CEP: 01310-100
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="card shadow-sm mb-4">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-phone text-success"></i> Telefones</h5>
-                            <p class="text-muted">
-                                <strong>Comercial:</strong> (11) 9999-8888<br>
-                                <strong>Suporte:</strong> (11) 9999-7777<br>
-                                <strong>WhatsApp:</strong> (11) 9999-6666
+                            <p class="text-muted mb-0">
+                                <strong>Suporte comercial:</strong> +55 17 99109-8286<br>
+                                <strong>Vendas:</strong> +55 17 99620-3062
                             </p>
                         </div>
                     </div>
-                    
-                    <div class="card shadow-sm mb-4">
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-envelope text-warning"></i> E-mails</h5>
-                            <p class="text-muted">
-                                <strong>Comercial:</strong> comercial@brzlogistics.com<br>
-                                <strong>Suporte:</strong> suporte@brzlogistics.com<br>
-                                <strong>Financeiro:</strong> financeiro@brzlogistics.com
+                            <h5 class="card-title"><i class="fas fa-envelope text-warning"></i> E-mail comercial</h5>
+                            <p class="text-muted mb-0">
+                                contato@brazilianashop.com.br
                             </p>
                         </div>
                     </div>
-                    
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-clock text-info"></i> Horário de Atendimento</h5>
-                            <p class="text-muted">
-                                <strong>Segunda a Sexta:</strong> 9h às 18h<br>
-                                <strong>Sábado:</strong> 9h às 13h<br>
-                                <strong>Domingo:</strong> Fechado
-                            </p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <form method="POST" action="/contato" id="contactForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nome" class="form-label">Nome Completo</label>
+                                <input type="text" class="form-control" id="nome" name="nome" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">E-mail</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
                         </div>
-                    </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="telefone" class="form-label">Telefone</label>
+                                <input type="tel" class="form-control" id="telefone" name="telefone">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="assunto" class="form-label">Assunto</label>
+                                <select class="form-select" id="assunto" name="assunto" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="duvida">Dúvida</option>
+                                    <option value="suporte">Suporte Técnico</option>
+                                    <option value="pedido">Sobre Pedido</option>
+                                    <option value="parceria">Parceria</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="mensagem" class="form-label">Mensagem</label>
+                            <textarea class="form-control" id="mensagem" name="mensagem" rows="5" required></textarea>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="contactBtn">
+                                <i class="fas fa-paper-plane me-2"></i> Enviar Mensagem
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             
