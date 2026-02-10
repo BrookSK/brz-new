@@ -122,11 +122,74 @@ function renderAdminSidebar($activePage = '') {
             <i class="fas fa-bars"></i>
           </button>';
 
+    $adminLogo = '';
+    try {
+        $pdo = \Config\Database::getConnection();
+        $raw = '';
+        $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTry as $t) {
+            if ($raw !== '') break;
+            try {
+                $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'logo_admin']);
+                        $raw = (string) ($stmt->fetchColumn() ?: '');
+                        if ($raw !== '') break;
+                    }
+                }
+
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_logo_admin']);
+                    $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+
+                if (in_array('layout_logo_admin', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdo->query('SELECT layout_logo_admin AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $raw = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $adminLogo = is_string($raw) ? trim($raw) : '';
+    } catch (\Exception $e) {
+        $adminLogo = '';
+    }
+
     echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
-                <div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div>
-                <div class="sidebar-brand-text mx-3">Braziliana Admin</div>
+                ' . (!empty($adminLogo)
+                    ? '<img src="' . htmlspecialchars($adminLogo, ENT_QUOTES, 'UTF-8') . '" alt="Admin" class="admin-sidebar-logo">'
+                    : '<div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div><div class="sidebar-brand-text mx-3">Braziliana Admin</div>'
+                ) . '
             </a>
             <ul class="nav flex-column">';
             
@@ -410,6 +473,14 @@ function renderAdminSidebarStyles() {
             color: #fff; 
             font-weight: bold; 
             padding: 1rem; 
+        }
+
+        .sidebar .sidebar-brand .admin-sidebar-logo {
+            max-height: 44px;
+            width: auto;
+            max-width: 100%;
+            object-fit: contain;
+            display: inline-block;
         }
         .card-stats { 
             transition: none;
