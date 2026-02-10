@@ -894,6 +894,15 @@ class PedidoEcommerce {
                 }
             }
 
+            // Se identificou que os valores estão em USD, mas não há taxa válida, não pode exibir como BRL.
+            // Nessa situação, preferir exibir como USD para evitar “valor em dólar com prefixo de real”.
+            if ($moeda === 'BRL' && $deveConverterUSDParaBRL && $taxaConversao <= 1.01) {
+                $moeda = 'USD';
+                $pedido['moeda'] = 'USD';
+                $pedido['__forced_usd_display_due_missing_rate'] = true;
+                $deveConverterUSDParaBRL = false;
+            }
+
             $subtotalProdutos = null;
             foreach (['subtotal_produtos', 'subtotal'] as $c) {
                 if (array_key_exists($c, $pedido)) {
