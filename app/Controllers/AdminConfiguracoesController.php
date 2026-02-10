@@ -306,6 +306,48 @@ class AdminConfiguracoesController extends Controller {
                                             echo '
                                             </div>
 
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Logotipo do Rodapé</div>
+                                                <div class="text-muted small mb-3">Upload do logo para aparecer no rodapé do site.</div>
+
+                                                ';
+                                                $existingFooterLogo = (string) $this->getConfigValue($config, 'layout', 'logo_footer', '');
+                                                $existingFooterLogo = is_string($existingFooterLogo) ? trim($existingFooterLogo) : '';
+                                                $existingFooterLogoEsc = htmlspecialchars($existingFooterLogo, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingFooterLogoEsc !== '' ? '<img src="' . $existingFooterLogoEsc . '" alt="Logotipo Rodapé" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo do rodapé cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_logo_footer_keep" value="' . $existingFooterLogoEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Logotipo do Rodapé</label>
+                                                        <input type="file" class="form-control" name="layout_logo_footer" accept="image/*">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFooterLogo">Remover logotipo do rodapé</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutFooterLogo");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_logo_footer_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Logotipo do rodapé será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            echo '
+                                            </div>
+
                                             <div class="mb-2 fw-semibold">Banners</div>
                                             <div class="text-muted small mb-3">Cadastre imagens para rodarem no header do site.</div>
                                             <div class="text-muted small mb-3">
@@ -3250,6 +3292,56 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Upload do logotipo do rodapé
+            try {
+                $keepLogo = (string) ($request->getParam('layout_logo_footer_keep', '') ?? '');
+                $keepLogo = trim($keepLogo);
+
+                $logoUrl = $keepLogo;
+                if (isset($_FILES['layout_logo_footer']) && is_array($_FILES['layout_logo_footer'])) {
+                    $name = (string) ($_FILES['layout_logo_footer']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_logo_footer']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_logo_footer']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg','jpeg','png','webp','gif','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/logo/',
+                                $docRoot . '/uploads/logo/',
+                                $docRoot . '/public/uploads/logos/',
+                                $docRoot . '/uploads/logos/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/logo/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
+                                    $webDir = '/uploads/logos/';
+                                }
+                                $fileName = 'logo_footer_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $logoUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_logo_footer', $logoUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
@@ -3367,7 +3459,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners', 'logo'],
+                'layout' => ['banners', 'logo', 'logo_footer'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],

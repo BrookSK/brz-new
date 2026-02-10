@@ -809,7 +809,11 @@
                 <?php else: ?>
                     <i class="fas fa-globe-americas text-primary"></i>
                 <?php endif; ?>
-                Braziliana
+                <?php if (!empty($siteLogo)): ?>
+                    <span class="visually-hidden">Braziliana</span>
+                <?php else: ?>
+                    Braziliana
+                <?php endif; ?>
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -986,9 +990,72 @@
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
+                    <?php
+                    $footerLogo = '';
+                    try {
+                        $pdo = $pdo ?? \Config\Database::getConnection();
+                        $rawFooter = '';
+                        $tablesToTryFooter = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+                        foreach ($tablesToTryFooter as $t) {
+                            if ($rawFooter !== '') break;
+                            try {
+                                $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                                $stmtT->execute([$t]);
+                                if (!$stmtT->fetchColumn()) {
+                                    continue;
+                                }
+
+                                $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                                if (!is_array($cols)) {
+                                    $cols = [];
+                                }
+
+                                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                                    if ($valCol !== '') {
+                                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                                        $stmt->execute(['layout', 'logo_footer']);
+                                        $rawFooter = (string) ($stmt->fetchColumn() ?: '');
+                                        if ($rawFooter !== '') break;
+                                    }
+                                }
+
+                                $keyCol = '';
+                                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                                $valCol = '';
+                                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                                if ($keyCol !== '' && $valCol !== '') {
+                                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                                    $stmt->execute(['layout_logo_footer']);
+                                    $rawFooter = (string) ($stmt->fetchColumn() ?: '');
+                                    if ($rawFooter !== '') break;
+                                }
+
+                                if (in_array('layout_logo_footer', $cols, true)) {
+                                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                                    $stmt2 = $pdo->query('SELECT layout_logo_footer AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                                    $rawFooter = (string) ($stmt2->fetchColumn() ?: '');
+                                    if ($rawFooter !== '') break;
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        $footerLogo = is_string($rawFooter) ? trim($rawFooter) : '';
+                    } catch (\Exception $e) {
+                        $footerLogo = '';
+                    }
+                    $effectiveFooterLogo = $footerLogo !== '' ? $footerLogo : $siteLogo;
+                    ?>
                     <h5 class="mb-3">
-                        <?php if (!empty($siteLogo)): ?>
-                            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" class="site-logo">
+                        <?php if (!empty($effectiveFooterLogo)): ?>
+                            <img src="<?= htmlspecialchars($effectiveFooterLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" class="site-logo">
                         <?php else: ?>
                             <i class="fas fa-globe-americas"></i>
                         <?php endif; ?>
