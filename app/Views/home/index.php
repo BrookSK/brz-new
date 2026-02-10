@@ -472,7 +472,7 @@ $(document).ready(function() {
     background: transparent;
     margin-left: 0;
     margin-right: 0;
-    margin-top: 15px;
+    margin-top: 50px;
     border-radius: 18px;
     overflow: hidden;
 }
