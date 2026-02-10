@@ -543,7 +543,6 @@ class Usuario extends Model {
             'nome' => ['nome', 'name'],
             'email' => ['email'],
             'telefone' => ['telefone', 'phone'],
-            'documento' => ['documento', 'cpf_cnpj', 'cpf'],
             'cep' => ['cep', 'zip_code'],
             'endereco' => ['endereco', 'address'],
             'numero' => ['numero', 'number'],
