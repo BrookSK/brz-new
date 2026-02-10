@@ -740,7 +740,19 @@ class PedidoEcommerce {
             $colsPedido = $this->getTableColumns('pedidos');
 
             $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
-            if ($moeda === '') $moeda = 'BRL';
+            $moeda = trim($moeda);
+            if ($moeda === '') {
+                $moeda = 'BRL';
+            }
+
+            // Normalizar aliases comuns de moeda
+            if (in_array($moeda, ['US$', 'USD$'], true) || str_contains($moeda, 'DOLAR') || str_contains($moeda, 'DÓLAR')) {
+                $moeda = 'USD';
+            }
+            if (in_array($moeda, ['R$', 'BRL$'], true) || str_contains($moeda, 'REAL') || str_contains($moeda, 'REAIS')) {
+                $moeda = 'BRL';
+            }
+
             $pedido['moeda'] = $moeda;
 
             $taxaConversao = null;
@@ -859,6 +871,24 @@ class PedidoEcommerce {
                         break;
                     }
                 }
+
+                // Fallback: alguns schemas mantêm moeda=BRL, mas a coluna currency pode indicar USD
+                // (nesses casos os valores frequentemente estão em USD e precisam ser convertidos)
+                if ($moedaOriginal === '' && array_key_exists('currency', $pedido)) {
+                    $cur = strtoupper(trim((string) ($pedido['currency'] ?? '')));
+                    if ($cur !== '' && $cur !== $moeda) {
+                        $moedaOriginal = $cur;
+                    }
+                }
+
+                // Normalizar aliases
+                if (in_array($moedaOriginal, ['US$', 'USD$'], true) || str_contains($moedaOriginal, 'DOLAR') || str_contains($moedaOriginal, 'DÓLAR')) {
+                    $moedaOriginal = 'USD';
+                }
+                if (in_array($moedaOriginal, ['R$', 'BRL$'], true) || str_contains($moedaOriginal, 'REAL') || str_contains($moedaOriginal, 'REAIS')) {
+                    $moedaOriginal = 'BRL';
+                }
+
                 if ($moedaOriginal === 'USD') {
                     $deveConverterUSDParaBRL = true;
                 }
