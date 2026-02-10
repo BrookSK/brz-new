@@ -1024,19 +1024,37 @@ class PedidoEcommerce {
                 }
             }
 
-            // Não aplicar heurística de conversão automática.
-            // A conversão USD->BRL só deve ocorrer quando houver indicação explícita (ex.: moeda_original=USD).
+            // Decidir estratégia de conversão quando pedido é exibido em BRL e há taxa.
+            // Alguns schemas salvam parte dos valores em USD (principalmente subtotal/itens)
+            // e parte em BRL (serviços/impostos), então não dá para converter tudo cegamente.
+            $converterSubtotalApenas = false;
+            if ($moeda === 'BRL' && $taxaConversao > 1.01 && $valorTotal > 0) {
+                $baseSum = $subtotalProdutos + $valorFrete + $taxaServico + $valorImpostos;
+                $diffNone = abs($valorTotal - $baseSum);
+                $diffSubtotalOnly = abs($valorTotal - (($subtotalProdutos * $taxaConversao) + $valorFrete + $taxaServico + $valorImpostos));
+                $diffAll = abs($valorTotal - ($baseSum * $taxaConversao));
+
+                // Se o total armazenado “fecha” melhor convertendo apenas o subtotal, usar esse caminho.
+                if ($diffSubtotalOnly < $diffNone && $diffSubtotalOnly <= $diffAll) {
+                    $converterSubtotalApenas = true;
+                }
+            }
 
             if ($moeda === 'BRL' && $taxaConversao > 1.01) {
                 // Preferência: valores explicitamente em BRL quando existirem
                 if ($valorTotalBRL !== null) {
                     $valorTotal = $valorTotalBRL;
+                } elseif ($converterSubtotalApenas) {
+                    $subtotalProdutos = $subtotalProdutos * $taxaConversao;
+                    $pedido['__converted_subtotal_only_brl'] = true;
                 } elseif ($deveConverterUSDParaBRL) {
                     $valorTotal = $valorTotal * $taxaConversao;
                 }
 
                 if ($subtotalProdutosBRL !== null) {
                     $subtotalProdutos = $subtotalProdutosBRL;
+                } elseif ($converterSubtotalApenas) {
+                    // já convertido acima
                 } elseif ($deveConverterUSDParaBRL) {
                     $subtotalProdutos = $subtotalProdutos * $taxaConversao;
                 }
@@ -1424,7 +1442,14 @@ class PedidoEcommerce {
                 }
 
                 // Se normalizou pedido para BRL mas itens vieram em USD, converter aqui também
-                if (!empty($pedido['__converted_to_brl']) && !empty($pedido['taxa_conversao']) && (float) $pedido['taxa_conversao'] > 1.01) {
+                if (
+                    (
+                        !empty($pedido['__converted_to_brl'])
+                        || !empty($pedido['__converted_subtotal_only_brl'])
+                    )
+                    && !empty($pedido['taxa_conversao'])
+                    && (float) $pedido['taxa_conversao'] > 1.01
+                ) {
                     $tx = (float) $pedido['taxa_conversao'];
                     $item['preco_unitario'] = ((float) ($item['preco_unitario'] ?? 0)) * $tx;
                     $item['subtotal'] = ((float) ($item['subtotal'] ?? 0)) * $tx;
