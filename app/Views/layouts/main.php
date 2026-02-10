@@ -867,6 +867,14 @@
     </nav>
 
     <?php
+    $isHomePage = false;
+    try {
+        $reqPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '');
+        $isHomePage = ($reqPath === '' || $reqPath === '/');
+    } catch (\Exception $e) {
+        $isHomePage = false;
+    }
+
     $layoutBanners = [];
     try {
         $pdo = \Config\Database::getConnection();
@@ -878,6 +886,21 @@
         } catch (\Exception $e) {
             $raw = '';
         }
+
+        // Fallback: schema single_row (coluna direta)
+        if ($raw === '') {
+            try {
+                $stmtCols = $pdo->query('DESCRIBE configuracoes_sistema');
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                if (is_array($cols) && in_array('layout_banners', $cols, true)) {
+                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                    $raw = (string) ($stmt2->fetchColumn() ?: '');
+                }
+            } catch (\Exception $e) {
+                $raw = '';
+            }
+        }
+
         if ($raw !== '') {
             $decoded = json_decode($raw, true);
             if (is_array($decoded)) {
@@ -904,7 +927,7 @@
     }
     ?>
 
-    <?php if (!empty($layoutBanners)): ?>
+    <?php if (!$isHomePage && !empty($layoutBanners)): ?>
         <div class="container mt-3">
             <div id="siteHeaderBanners" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner rounded-3 shadow-sm" style="overflow: hidden;">
