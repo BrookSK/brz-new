@@ -489,7 +489,7 @@
                                             <label class="form-label">Forma de Pagamento</label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
                                                 <option value="">Selecione...</option>
-                                                <option value="carteira">Carteira</option>
+                                                <option value="carteira">Crédito da Carteira</option>
                                                 <option value="cartao_credito">Cartão de Crédito</option>
                                                 <option value="boleto">Boleto Bancário</option>
                                                 <option value="pix">PIX</option>
@@ -523,7 +523,7 @@
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
                                             <div id="campos-cartao-stripe" style="display:none;">
-                                                <label class="form-label">Cartão (Stripe)</label>
+                                                <label class="form-label">Cartão</label>
                                                 <div id="stripe-card-element" class="form-control" style="padding: 12px; background: #fff;"></div>
                                                 <div id="stripe-card-errors" class="text-danger small mt-2" style="display:none;"></div>
                                             </div>
@@ -1375,7 +1375,7 @@ function atualizarFormaPagamento() {
     if (botaoFinalizar) {
         switch(formaPagamento) {
             case 'carteira':
-                botaoFinalizar.innerHTML = '<i class="fas fa-wallet"></i> Pagar com Carteira';
+                botaoFinalizar.innerHTML = '<i class="fas fa-wallet"></i> Pagar com Crédito da Carteira';
                 console.log('🔍 [BOTÃO] Texto atualizado para carteira');
                 break;
             case 'cartao_credito':
@@ -1655,14 +1655,14 @@ function updatePaymentMethodsForCurrency(currency) {
     select.appendChild(new Option('Selecione...', ''));
 
     // Carteira deve aparecer sempre (independente da moeda)
-    select.appendChild(new Option('Carteira', 'carteira'));
+    select.appendChild(new Option('Crédito da Carteira', 'carteira'));
 
     if (isBRL) {
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Boleto Bancário', 'boleto'));
         select.appendChild(new Option('PIX', 'pix'));
     } else {
-        select.appendChild(new Option('Cartão de Crédito (Stripe)', 'cartao_credito'));
+        select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
     }
 
     // Manter seleção se ainda válida
