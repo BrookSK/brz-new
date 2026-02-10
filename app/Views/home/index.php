@@ -19,9 +19,85 @@
             </div>
             <div class="col-lg-6">
                 <div class="hero-image" data-aos="fade-left">
-                    <img src="/import.png" 
-                         alt="Importação Internacional" 
-                         class="img-fluid rounded-3 shadow-lg">
+                    <?php
+                    $layoutBanners = [];
+                    try {
+                        $pdo = \Config\Database::getConnection();
+                        $raw = '';
+                        try {
+                            $stmt = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
+                            $stmt->execute(['layout', 'banners']);
+                            $raw = (string) ($stmt->fetchColumn() ?: '');
+                        } catch (\Exception $e) {
+                            $raw = '';
+                        }
+                        if ($raw !== '') {
+                            $decoded = json_decode($raw, true);
+                            if (is_array($decoded)) {
+                                foreach ($decoded as $item) {
+                                    if (is_string($item)) {
+                                        $src = trim($item);
+                                        if ($src === '') continue;
+                                        $layoutBanners[] = ['desktop' => $src, 'mobile' => '', 'link' => ''];
+                                        continue;
+                                    }
+                                    if (is_array($item)) {
+                                        $d = isset($item['desktop']) && is_string($item['desktop']) ? trim((string) $item['desktop']) : '';
+                                        $m = isset($item['mobile']) && is_string($item['mobile']) ? trim((string) $item['mobile']) : '';
+                                        $l = isset($item['link']) && is_string($item['link']) ? trim((string) $item['link']) : '';
+                                        if ($d === '' && $m === '') continue;
+                                        $layoutBanners[] = ['desktop' => $d, 'mobile' => $m, 'link' => $l];
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $layoutBanners = [];
+                    }
+                    ?>
+
+                    <?php if (!empty($layoutBanners)): ?>
+                        <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
+                            <div class="carousel-inner rounded-3 shadow-lg" style="overflow: hidden;">
+                                <?php foreach ($layoutBanners as $i => $banner): ?>
+                                    <?php
+                                        $desktopSrc = is_array($banner) ? (string) ($banner['desktop'] ?? '') : '';
+                                        $mobileSrc = is_array($banner) ? (string) ($banner['mobile'] ?? '') : '';
+                                        $linkHref = is_array($banner) ? (string) ($banner['link'] ?? '') : '';
+                                        if ($desktopSrc === '' && $mobileSrc !== '') $desktopSrc = $mobileSrc;
+                                        if ($mobileSrc === '' && $desktopSrc !== '') $mobileSrc = $desktopSrc;
+                                    ?>
+                                    <div class="carousel-item <?= ($i === 0 ? 'active' : '') ?>">
+                                        <?php if (!empty($linkHref)): ?>
+                                            <a href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>" style="display:block;">
+                                                <picture>
+                                                    <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="max-height: 360px; object-fit: cover;">
+                                                </picture>
+                                            </a>
+                                        <?php else: ?>
+                                            <picture>
+                                                <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                                <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="img-fluid w-100" style="max-height: 360px; object-fit: cover;">
+                                            </picture>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <?php if (count($layoutBanners) > 1): ?>
+                                <button class="carousel-control-prev" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Anterior</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Próximo</span>
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

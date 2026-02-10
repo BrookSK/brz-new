@@ -353,32 +353,38 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
 
                                             <script>
-                                            document.addEventListener('DOMContentLoaded', function() {
-                                                var btn = document.getElementById('btnAddLayoutBanner');
-                                                var list = document.getElementById('layout-banners-upload-list');
+                                            document.addEventListener("DOMContentLoaded", function() {
+                                                var btn = document.getElementById("btnAddLayoutBanner");
+                                                var list = document.getElementById("layout-banners-upload-list");
                                                 if (!btn || !list) return;
-                                                btn.addEventListener('click', function() {
-                                                    var box = document.createElement('div');
-                                                    box.className = 'border rounded p-2';
-                                                    box.innerHTML = ''
-                                                        + '<div class="row g-2 align-items-end">'
-                                                        + '  <div class="col-12 col-md-6">'
-                                                        + '    <label class="form-label small mb-1">Banner Desktop (1149x436)</label>'
-                                                        + '    <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">'
-                                                        + '  </div>'
-                                                        + '  <div class="col-12 col-md-6">'
-                                                        + '    <label class="form-label small mb-1">Banner Mobile (391x333)</label>'
-                                                        + '    <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">'
-                                                        + '  </div>'
-                                                        + '  <div class="col-12">'
-                                                        + '    <label class="form-label small mb-1">Link (ao clicar)</label>'
-                                                        + '    <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">'
-                                                        + '  </div>'
-                                                        + '  <div class="col-12">'
-                                                        + '    <button type="button" class="btn btn-outline-secondary w-100" title="Remover">-</button>'
-                                                        + '  </div>'
-                                                        + '</div>';
-                                                    box.querySelector('button').addEventListener('click', function() { box.remove(); });
+
+                                                btn.addEventListener("click", function() {
+                                                    var box = document.createElement("div");
+                                                    box.className = "border rounded p-2";
+                                                    box.innerHTML = `
+                                                        <div class="row g-2 align-items-end">
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                                <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
+                                                            </div>
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                                <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                                <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <button type="button" class="btn btn-outline-secondary w-100" title="Remover">-</button>
+                                                            </div>
+                                                        </div>
+                                                    `;
+
+                                                    var removeBtn = box.querySelector("button");
+                                                    if (removeBtn) {
+                                                        removeBtn.addEventListener("click", function() { box.remove(); });
+                                                    }
                                                     list.appendChild(box);
                                                 });
                                             });
