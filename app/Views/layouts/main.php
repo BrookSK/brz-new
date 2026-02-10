@@ -879,25 +879,59 @@
     try {
         $pdo = \Config\Database::getConnection();
         $raw = '';
-        try {
-            $stmt = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
-            $stmt->execute(['layout', 'banners']);
-            $raw = (string) ($stmt->fetchColumn() ?: '');
-        } catch (\Exception $e) {
-            $raw = '';
-        }
 
-        // Fallback: schema single_row (coluna direta)
-        if ($raw === '') {
+        $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTry as $t) {
+            if ($raw !== '') break;
             try {
-                $stmtCols = $pdo->query('DESCRIBE configuracoes_sistema');
+                $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdo->query('DESCRIBE ' . $t);
                 $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
-                if (is_array($cols) && in_array('layout_banners', $cols, true)) {
-                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                // schema categoria+chave+valor
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'banners']);
+                        $raw = (string) ($stmt->fetchColumn() ?: '');
+                        if ($raw !== '') break;
+                    }
+                }
+
+                // schema key/value
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_banners']);
+                    $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+
+                // schema single_row (coluna direta)
+                if (in_array('layout_banners', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
                     $raw = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($raw !== '') break;
                 }
             } catch (\Exception $e) {
-                $raw = '';
             }
         }
 
