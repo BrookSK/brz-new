@@ -178,6 +178,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link active" id="v-pills-loja-tab" data-bs-toggle="pill" data-bs-target="#v-pills-loja" type="button">
                                 <i class="fas fa-store"></i> Loja
                             </button>
+                            <button class="nav-link" id="v-pills-layout-tab" data-bs-toggle="pill" data-bs-target="#v-pills-layout" type="button">
+                                <i class="fas fa-image"></i> Layout
+                            </button>
                             <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
                                 <i class="fas fa-envelope"></i> Email
                             </button>
@@ -251,6 +254,135 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-layout" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Layout</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-2 fw-semibold">Banners</div>
+                                            <div class="text-muted small mb-3">Cadastre imagens para rodarem no header do site.</div>
+                                            <div class="text-muted small mb-3">
+                                                Desktop: <strong>1149 x 436</strong><br>
+                                                Mobile: <strong>391 x 333</strong>
+                                            </div>
+
+                                            <div id="layout-banners-existing" class="row g-2 mb-3">
+                                                ';
+                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', 'banners', '[]');
+                                                $existingBanners = json_decode($existingBannersRaw, true);
+                                                if (!is_array($existingBanners)) $existingBanners = [];
+                                                foreach ($existingBanners as $idx => $item) {
+                                                    $desktop = '';
+                                                    $mobile = '';
+                                                    $link = '';
+
+                                                    if (is_string($item)) {
+                                                        $desktop = trim($item);
+                                                    } elseif (is_array($item)) {
+                                                        $desktop = isset($item['desktop']) && is_string($item['desktop']) ? trim((string) $item['desktop']) : '';
+                                                        $mobile = isset($item['mobile']) && is_string($item['mobile']) ? trim((string) $item['mobile']) : '';
+                                                        $link = isset($item['link']) && is_string($item['link']) ? trim((string) $item['link']) : '';
+                                                    }
+
+                                                    if ($desktop === '' && $mobile === '') continue;
+
+                                                    $desktopEsc = htmlspecialchars($desktop, ENT_QUOTES, 'UTF-8');
+                                                    $mobileEsc = htmlspecialchars($mobile, ENT_QUOTES, 'UTF-8');
+                                                    $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+                                                    echo '<div class="col-12 col-md-6">'
+                                                        . '<div class="border rounded p-2 h-100">'
+                                                        . '<div class="row g-2">'
+                                                        . '<div class="col-12 col-sm-6">'
+                                                        . '<div class="small text-muted mb-1">Desktop (1149x436)</div>'
+                                                        . '<div class="ratio ratio-16x9 mb-2">'
+                                                        . ($desktopEsc !== '' ? '<img src="' . $desktopEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Desktop">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . '</div>'
+                                                        . '<input type="hidden" name="layout_banners_keep_desktop[]" value="' . $desktopEsc . '">' 
+                                                        . '</div>'
+                                                        . '<div class="col-12 col-sm-6">'
+                                                        . '<div class="small text-muted mb-1">Mobile (391x333)</div>'
+                                                        . '<div class="ratio" style="--bs-aspect-ratio: 85.2%;">'
+                                                        . ($mobileEsc !== '' ? '<img src="' . $mobileEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Mobile">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . '</div>'
+                                                        . '<input type="hidden" name="layout_banners_keep_mobile[]" value="' . $mobileEsc . '">' 
+                                                        . '</div>'
+                                                        . '<div class="col-12">'
+                                                        . '<label class="form-label small mb-1">Link (ao clicar)</label>'
+                                                        . '<input type="url" class="form-control" name="layout_banners_keep_link[]" value="' . $linkEsc . '" placeholder="https://...">'
+                                                        . '</div>'
+                                                        . '</div>'
+                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="this.closest(\'.col-12\').remove();">Remover</button>'
+                                                        . '</div>'
+                                                        . '</div>';
+                                                }
+                                                echo '
+                                            </div>
+
+                                            <div id="layout-banners-upload-list" class="d-flex flex-column gap-2">
+                                                <div class="border rounded p-2">
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-12 col-md-6">
+                                                            <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                            <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
+                                                        </div>
+                                                        <div class="col-12 col-md-6">
+                                                            <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                            <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                            <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <button type="button" class="btn btn-outline-secondary w-100" onclick="this.closest(\'.border\').remove();" title="Remover">-</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-primary" id="btnAddLayoutBanner">
+                                                    <i class="fas fa-plus me-1"></i>Adicionar banner
+                                                </button>
+                                            </div>
+
+                                            <script>
+                                            document.addEventListener('DOMContentLoaded', function() {
+                                                var btn = document.getElementById('btnAddLayoutBanner');
+                                                var list = document.getElementById('layout-banners-upload-list');
+                                                if (!btn || !list) return;
+                                                btn.addEventListener('click', function() {
+                                                    var box = document.createElement('div');
+                                                    box.className = 'border rounded p-2';
+                                                    box.innerHTML = ''
+                                                        + '<div class="row g-2 align-items-end">'
+                                                        + '  <div class="col-12 col-md-6">'
+                                                        + '    <label class="form-label small mb-1">Banner Desktop (1149x436)</label>'
+                                                        + '    <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">'
+                                                        + '  </div>'
+                                                        + '  <div class="col-12 col-md-6">'
+                                                        + '    <label class="form-label small mb-1">Banner Mobile (391x333)</label>'
+                                                        + '    <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">'
+                                                        + '  </div>'
+                                                        + '  <div class="col-12">'
+                                                        + '    <label class="form-label small mb-1">Link (ao clicar)</label>'
+                                                        + '    <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">'
+                                                        + '  </div>'
+                                                        + '  <div class="col-12">'
+                                                        + '    <button type="button" class="btn btn-outline-secondary w-100" title="Remover">-</button>'
+                                                        + '  </div>'
+                                                        + '</div>';
+                                                    box.querySelector('button').addEventListener('click', function() { box.remove(); });
+                                                    list.appendChild(box);
+                                                });
+                                            });
+                                            </script>
                                         </div>
                                     </div>
                                 </div>
@@ -3020,6 +3152,96 @@ HTML;
 
             $pdo->beginTransaction();
 
+            // Upload de banners do layout
+            try {
+                $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
+                $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
+                $keepLink = $request->getParam('layout_banners_keep_link', []);
+                if (!is_array($keepDesktop)) $keepDesktop = [];
+                if (!is_array($keepMobile)) $keepMobile = [];
+                if (!is_array($keepLink)) $keepLink = [];
+
+                $maxKeep = max(count($keepDesktop), count($keepMobile), count($keepLink));
+                $keptItems = [];
+                for ($i = 0; $i < $maxKeep; $i++) {
+                    $d = isset($keepDesktop[$i]) && is_string($keepDesktop[$i]) ? trim((string) $keepDesktop[$i]) : '';
+                    $m = isset($keepMobile[$i]) && is_string($keepMobile[$i]) ? trim((string) $keepMobile[$i]) : '';
+                    $l = isset($keepLink[$i]) && is_string($keepLink[$i]) ? trim((string) $keepLink[$i]) : '';
+                    if ($d === '' && $m === '') continue;
+                    $keptItems[] = ['desktop' => $d, 'mobile' => $m, 'link' => $l];
+                }
+
+                $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                $candidates = [
+                    $docRoot . '/public/uploads/banners/',
+                    $docRoot . '/uploads/banners/',
+                ];
+                $uploadDir = '';
+                foreach ($candidates as $dir) {
+                    if (!is_dir($dir)) {
+                        @mkdir($dir, 0755, true);
+                    }
+                    if (is_dir($dir) && is_writable($dir)) {
+                        $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                        break;
+                    }
+                }
+
+                $webDir = '/uploads/banners/';
+                $newItems = [];
+
+                $namesDesktop = (isset($_FILES['layout_banners_desktop']['name']) && is_array($_FILES['layout_banners_desktop']['name'])) ? $_FILES['layout_banners_desktop']['name'] : [];
+                $namesMobile  = (isset($_FILES['layout_banners_mobile']['name']) && is_array($_FILES['layout_banners_mobile']['name'])) ? $_FILES['layout_banners_mobile']['name'] : [];
+                $links = $request->getParam('layout_banners_link', []);
+                if (!is_array($links)) $links = [];
+                $maxUploads = max(is_array($namesDesktop) ? count($namesDesktop) : 0, is_array($namesMobile) ? count($namesMobile) : 0);
+
+                for ($i = 0; $i < $maxUploads; $i++) {
+                    $desktopUrl = '';
+                    $mobileUrl = '';
+                    $linkUrl = (isset($links[$i]) && is_string($links[$i])) ? trim((string) $links[$i]) : '';
+
+                    if ($uploadDir !== '' && isset($_FILES['layout_banners_desktop']['tmp_name'][$i])) {
+                        $name = (string) ($_FILES['layout_banners_desktop']['name'][$i] ?? '');
+                        $tmp = (string) ($_FILES['layout_banners_desktop']['tmp_name'][$i] ?? '');
+                        $err = (int) ($_FILES['layout_banners_desktop']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                        if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            if (in_array($ext, ['jpg','jpeg','png','webp','gif'], true)) {
+                                $fileName = 'banner_desktop_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $desktopUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($uploadDir !== '' && isset($_FILES['layout_banners_mobile']['tmp_name'][$i])) {
+                        $name = (string) ($_FILES['layout_banners_mobile']['name'][$i] ?? '');
+                        $tmp = (string) ($_FILES['layout_banners_mobile']['tmp_name'][$i] ?? '');
+                        $err = (int) ($_FILES['layout_banners_mobile']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                        if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            if (in_array($ext, ['jpg','jpeg','png','webp','gif'], true)) {
+                                $fileName = 'banner_mobile_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $mobileUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($desktopUrl === '' && $mobileUrl === '') continue;
+                    $newItems[] = ['desktop' => $desktopUrl, 'mobile' => $mobileUrl, 'link' => $linkUrl];
+                }
+
+                $final = array_merge($keptItems, $newItems);
+                $request->setParam('layout_banners', json_encode(array_values($final), JSON_UNESCAPED_UNICODE));
+            } catch (\Exception $e) {
+            }
+
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
             $valueCol = $tableInfo['valueCol'];
@@ -3047,6 +3269,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
+                'layout' => ['banners'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],

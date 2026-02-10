@@ -15,22 +15,6 @@
                             <i class="fas fa-play-circle me-2"></i> Como Funciona
                         </a>
                     </div>
-                    <div class="hero-stats">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">10K+</h3>
-                                <p class="small">Produtos Importados</p>
-                            </div>
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">98%</h3>
-                                <p class="small">Satisfação</p>
-                            </div>
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">15-30</h3>
-                                <p class="small">Dias Entrega</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="col-lg-6">
@@ -69,7 +53,7 @@
                 <div class="feature-card card h-100 p-4">
                     <div class="text-center mb-3">
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
-                            <i class="fas fa-truck fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
+                            <i class="fas fa-plane fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
                         <h5>Logística Completa</h5>
                     </div>
