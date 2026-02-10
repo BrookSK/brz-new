@@ -287,10 +287,21 @@ class AdminConfiguracoesController extends Controller {
                                                         <label class="form-label">Upload do Logotipo</label>
                                                         <input type="file" class="form-control" name="layout_logo" accept="image/*">
                                                         <div class="mt-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.querySelector('input[name=\'layout_logo_keep\']').value=''; alert('Logotipo será removido ao salvar.');">Remover logotipo</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutLogo">Remover logotipo</button>
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutLogo");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_logo_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Logotipo será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
                                                 ';
                                             echo '
                                             </div>
