@@ -133,7 +133,7 @@
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
-                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro" required>
+                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro">
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
@@ -239,6 +239,14 @@ $(document).ready(function() {
         $doc.prop('required', br);
         $doc.attr('placeholder', br ? '000.000.000-00' : '');
         $hint.toggle(!br);
+    }
+
+    function syncBairroRules() {
+        const br = isBrazil();
+        const $bairro = $('#bairro');
+        if ($bairro.length) {
+            $bairro.prop('required', br);
+        }
     }
 
     // Toggle password visibility
@@ -363,9 +371,11 @@ $(document).ready(function() {
 
     $('#pais_residencia').on('change', function() {
         syncDocumentoRules();
+        syncBairroRules();
     });
 
     syncDocumentoRules();
+    syncBairroRules();
 });
 
 function showAlert(type, message) {

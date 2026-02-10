@@ -143,8 +143,8 @@
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['complemento'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Bairro / District *</label>
-                                        <input type="text" class="form-control" name="bairro" required id="bairro"
+                                        <label class="form-label" id="label-bairro">Bairro / District</label>
+                                        <input type="text" class="form-control" name="bairro" id="bairro"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['bairro'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
@@ -266,6 +266,16 @@
                 }
             }
 
+            function syncBairroRules() {
+                var paisEl = document.getElementById('pais');
+                var bairroEl = document.getElementById('bairro');
+                var labelEl = document.getElementById('label-bairro');
+                if (!paisEl || !bairroEl || !labelEl) return;
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                bairroEl.required = br;
+                labelEl.textContent = br ? 'Bairro / District *' : 'Bairro / District';
+            }
+
             function computeMissingFiltered() {
                 var warn = document.getElementById('checkout-perfil-warning');
                 if (!warn) return;
@@ -378,10 +388,12 @@
                 if (paisSelect) {
                     paisSelect.addEventListener('change', function() {
                         syncDocumentoRules();
+                        syncBairroRules();
                     });
                 }
 
                 syncDocumentoRules();
+                syncBairroRules();
             });
         })();
         </script>

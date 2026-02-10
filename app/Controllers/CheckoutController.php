@@ -2541,7 +2541,7 @@ class CheckoutController extends Controller {
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
         if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
-        if (empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
         if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
         

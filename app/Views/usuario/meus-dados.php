@@ -47,6 +47,14 @@
                     }
                 }
 
+                function syncBairroRules() {
+                    var paisEl = document.getElementById('pais');
+                    var bairroEl = document.getElementById('bairro');
+                    if (!paisEl || !bairroEl) return;
+                    var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                    bairroEl.required = br;
+                }
+
                 function parseTelefone(telefoneRaw) {
                     var raw = (telefoneRaw || '').toString().trim();
                     var m = raw.match(/^\+\s*(\d{1,4})\s*(.*)$/);
@@ -166,8 +174,14 @@
                             filterSelectOptions(paisSelect, paisSearch.value);
                         });
                     }
+                    if (paisSelect) {
+                        paisSelect.addEventListener('change', function() {
+                            syncBairroRules();
+                        });
+                    }
 
                     syncDocumentoRules();
+                    syncBairroRules();
                 });
             })();
             </script>
@@ -321,7 +335,7 @@
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
                                        value="<?= htmlspecialchars((string) ($ee['bairro'] ?? ($usuario['bairro'] ?? ''))) ?>" 
-                                       placeholder="Centro" required>
+                                       placeholder="Centro">
                             </div>
                             <div class="col-md-4">
                                 <label for="cidade" class="form-label">Cidade</label>
