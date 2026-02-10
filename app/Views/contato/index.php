@@ -7,7 +7,7 @@
                 <p class="lead text-muted">Estamos aqui para ajudar. Fale conosco!</p>
             </div>
             
-            <div class="row g-3 mb-4">
+            <div class="row g-3 mb-4 contact-info-cards">
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
@@ -21,11 +21,17 @@
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-phone text-success"></i> Telefones</h5>
-                            <p class="text-muted mb-0">
-                                <strong>Suporte comercial:</strong> +55 17 99109-8286<br>
-                                <strong>Vendas:</strong> +55 17 99620-3062
-                            </p>
+                            <h5 class="card-title"><i class="fab fa-whatsapp text-success"></i> WhatsApp</h5>
+                            <div class="text-muted contact-lines">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <strong class="contact-label">Suporte comercial:</strong>
+                                    <a class="contact-wa-link" href="https://wa.me/5517991098286" target="_blank" rel="noopener">+55 17 99109-8286</a>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
+                                    <strong class="contact-label">Vendas:</strong>
+                                    <a class="contact-wa-link" href="https://wa.me/5517996203062" target="_blank" rel="noopener">+55 17 99620-3062</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -34,7 +40,7 @@
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-envelope text-warning"></i> E-mail comercial</h5>
                             <p class="text-muted mb-0">
-                                contato@brazilianashop.com.br
+                                <a class="contact-email-link" href="mailto:contato@brazilianashop.com.br">contato@brazilianashop.com.br</a>
                             </p>
                         </div>
                     </div>
@@ -190,6 +196,59 @@ function showAlert(type, message) {
 .btn-primary:hover {
     transform: none;
     box-shadow: none;
+}
+
+.contact-info-cards .card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.contact-info-cards .card-title i {
+    font-size: 1.15rem;
+}
+
+.contact-info-cards .card-body {
+    padding: 18px;
+}
+
+.contact-lines {
+    font-size: 0.98rem;
+}
+
+.contact-label {
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.78);
+}
+
+.contact-wa-link {
+    color: rgba(15, 23, 42, 0.86);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.contact-wa-link:hover {
+    text-decoration: underline;
+}
+
+.contact-email-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.contact-email-link:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 575.98px) {
+    .contact-lines .d-flex {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
 }
 
 </style>
