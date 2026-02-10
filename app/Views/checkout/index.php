@@ -569,10 +569,14 @@
                                     <span>Taxa de Serviço:</span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
-                                <div class="d-flex justify-content-between">
-                                    <span>Impostos:</span>
-                                    <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
-                                </div>
+                                <?php if (!empty($cobra_impostos_br)): ?>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Impostos:</span>
+                                        <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <span id="impostos" class="d-none" data-original-value="0">0</span>
+                                <?php endif; ?>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
@@ -592,6 +596,13 @@
                                 <i class="fas fa-info-circle"></i> 
                                 <strong>Peso Total:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
                             </div>
+
+                            <?php if (!empty($entrega_fora_br) && !empty($mensagem_entrega_fora_br)): ?>
+                                <div class="alert alert-warning small">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <?= htmlspecialchars((string) $mensagem_entrega_fora_br, ENT_QUOTES, 'UTF-8') ?>
+                                </div>
+                            <?php endif; ?>
 
                             <!-- Termos Legais -->
                             <div class="mb-3">

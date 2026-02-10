@@ -1398,6 +1398,11 @@ class CheckoutController extends Controller {
             }
         }
 
+        $paisEntrega = strtoupper(trim((string) ($enderecoPrincipal['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
+
         // Ajustar pendências do perfil com base no endereço selecionado (quando existir)
         if (!empty($usuario) && !empty($usuario['id']) && is_array($enderecoPrincipal) && !empty($enderecoPrincipal)) {
             $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $enderecoPrincipal);
@@ -1414,6 +1419,14 @@ class CheckoutController extends Controller {
             'cidade' => (string) ($enderecoPrincipal['cidade'] ?? ($usuario['cidade'] ?? '')),
             'estado' => (string) ($enderecoPrincipal['estado'] ?? ($usuario['estado'] ?? '')),
         ];
+
+        // Impostos (Remessa Conforme/ICMS/II) só devem ser exibidos/cobrados para entrega no Brasil.
+        // Para outros países, a tributação local é responsabilidade do cliente.
+        $cobraImpostosBR = ($paisEntrega === 'BR');
+        if (!$cobraImpostosBR) {
+            $impostos = 0.0;
+            $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
+        }
 
         $rateBRL = 5.5;
         try {
@@ -1444,6 +1457,7 @@ class CheckoutController extends Controller {
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
+            'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
             'exchange_rates' => [
                 'BRL' => $rateBRL,
@@ -1451,6 +1465,8 @@ class CheckoutController extends Controller {
             ],
             'stripe_publishable_key' => $this->paymentService->getStripePublishableKey(),
             'stripe_enabled' => $this->paymentService->isStripeEnabled(),
+            'entrega_fora_br' => !$cobraImpostosBR,
+            'mensagem_entrega_fora_br' => 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.',
         ]);
     }
 
@@ -2953,6 +2969,15 @@ class CheckoutController extends Controller {
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
+
+            $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+            if ($paisEntrega === '') {
+                $paisEntrega = 'BR';
+            }
+            if ($paisEntrega !== 'BR') {
+                $impostosUsd = 0.0;
+            }
+
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
