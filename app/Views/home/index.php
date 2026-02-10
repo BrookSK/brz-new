@@ -92,7 +92,7 @@
         <div class="container">
             <div class="hero-image" data-aos="fade-left">
                 <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner rounded-3" style="overflow: hidden;">
+                    <div class="carousel-inner" style="overflow: hidden;">
                         <?php foreach ($layoutBanners as $i => $banner): ?>
                             <?php
                                 $desktopSrc = is_array($banner) ? (string) ($banner['desktop'] ?? '') : '';
@@ -470,9 +470,8 @@ $(document).ready(function() {
     width: 100%;
     aspect-ratio: 1149 / 436;
     background: transparent;
-    max-width: 1149px;
-    margin-left: auto;
-    margin-right: auto;
+    margin-left: 0;
+    margin-right: 0;
 }
 
 .hero-section .home-hero-banner img {
@@ -485,7 +484,6 @@ $(document).ready(function() {
 @media (max-width: 767px) {
     .hero-section .home-hero-banner {
         aspect-ratio: 391 / 333;
-        max-width: 391px;
     }
 }
 
