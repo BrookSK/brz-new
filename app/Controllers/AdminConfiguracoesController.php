@@ -264,6 +264,37 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">Layout</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Logotipo</div>
+                                                <div class="text-muted small mb-3">Upload do logo para aparecer no topo do site.</div>
+
+                                                ';
+                                                $existingLogo = (string) $this->getConfigValue($config, 'layout', 'logo', '');
+                                                $existingLogo = is_string($existingLogo) ? trim($existingLogo) : '';
+                                                $existingLogoEsc = htmlspecialchars($existingLogo, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingLogoEsc !== '' ? '<img src="' . $existingLogoEsc . '" alt="Logotipo" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_logo_keep" value="' . $existingLogoEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Logotipo</label>
+                                                        <input type="file" class="form-control" name="layout_logo" accept="image/*">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.querySelector('input[name=\'layout_logo_keep\']').value=''; alert('Logotipo será removido ao salvar.');">Remover logotipo</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                ';
+                                            echo '
+                                            </div>
+
                                             <div class="mb-2 fw-semibold">Banners</div>
                                             <div class="text-muted small mb-3">Cadastre imagens para rodarem no header do site.</div>
                                             <div class="text-muted small mb-3">
@@ -3158,6 +3189,56 @@ HTML;
 
             $pdo->beginTransaction();
 
+            // Upload do logotipo do layout
+            try {
+                $keepLogo = (string) ($request->getParam('layout_logo_keep', '') ?? '');
+                $keepLogo = trim($keepLogo);
+
+                $logoUrl = $keepLogo;
+                if (isset($_FILES['layout_logo']) && is_array($_FILES['layout_logo'])) {
+                    $name = (string) ($_FILES['layout_logo']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_logo']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_logo']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg','jpeg','png','webp','gif','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/logo/',
+                                $docRoot . '/uploads/logo/',
+                                $docRoot . '/public/uploads/logos/',
+                                $docRoot . '/uploads/logos/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/logo/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
+                                    $webDir = '/uploads/logos/';
+                                }
+                                $fileName = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $logoUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_logo', $logoUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
@@ -3275,7 +3356,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners'],
+                'layout' => ['banners', 'logo'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],

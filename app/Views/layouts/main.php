@@ -44,10 +44,28 @@
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .navbar-brand i {
             color: var(--primary-color-2) !important;
+        }
+
+        .navbar-brand .site-logo {
+            max-height: 38px;
+            width: auto;
+            object-fit: contain;
+            display: inline-block;
+        }
+
+        .site-footer .site-logo {
+            max-height: 32px;
+            width: auto;
+            object-fit: contain;
+            display: inline-block;
+            filter: brightness(1.08);
         }
 
         .navbar .nav-link {
@@ -720,8 +738,78 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
+            <?php
+            $siteLogo = '';
+            try {
+                $pdo = \Config\Database::getConnection();
+                $raw = '';
+                $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+                foreach ($tablesToTry as $t) {
+                    if ($raw !== '') break;
+                    try {
+                        $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                        $stmtT->execute([$t]);
+                        if (!$stmtT->fetchColumn()) {
+                            continue;
+                        }
+
+                        $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                        $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                        if (!is_array($cols)) {
+                            $cols = [];
+                        }
+
+                        // schema categoria+chave+valor
+                        if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                            $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                            if ($valCol !== '') {
+                                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                                $stmt->execute(['layout', 'logo']);
+                                $raw = (string) ($stmt->fetchColumn() ?: '');
+                                if ($raw !== '') break;
+                            }
+                        }
+
+                        // schema key/value
+                        $keyCol = '';
+                        if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                        elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                        elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                        elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                        $valCol = '';
+                        if (in_array('valor', $cols, true)) $valCol = 'valor';
+                        elseif (in_array('value', $cols, true)) $valCol = 'value';
+                        elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                        if ($keyCol !== '' && $valCol !== '') {
+                            $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                            $stmt->execute(['layout_logo']);
+                            $raw = (string) ($stmt->fetchColumn() ?: '');
+                            if ($raw !== '') break;
+                        }
+
+                        // schema single_row (coluna direta)
+                        if (in_array('layout_logo', $cols, true)) {
+                            $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                            $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                            $raw = (string) ($stmt2->fetchColumn() ?: '');
+                            if ($raw !== '') break;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $siteLogo = is_string($raw) ? trim($raw) : '';
+            } catch (\Exception $e) {
+                $siteLogo = '';
+            }
+            ?>
             <a class="navbar-brand fw-bold" href="/">
-                <i class="fas fa-globe-americas text-primary"></i> Braziliana
+                <?php if (!empty($siteLogo)): ?>
+                    <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" class="site-logo">
+                <?php else: ?>
+                    <i class="fas fa-globe-americas text-primary"></i>
+                <?php endif; ?>
+                Braziliana
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -898,7 +986,14 @@
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
-                    <h5 class="mb-3"><i class="fas fa-globe-americas"></i> Braziliana</h5>
+                    <h5 class="mb-3">
+                        <?php if (!empty($siteLogo)): ?>
+                            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" class="site-logo">
+                        <?php else: ?>
+                            <i class="fas fa-globe-americas"></i>
+                        <?php endif; ?>
+                        Braziliana
+                    </h5>
                     <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
                     <div class="mt-3">
                         <a href="#" class="social-link me-2"><i class="fab fa-facebook"></i></a>
