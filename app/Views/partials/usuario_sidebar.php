@@ -70,27 +70,29 @@ if (empty($avatarUrl)) {
                         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
                         if ($uid > 0) {
                             $pdo = \Config\Database::getConnection();
-                            $stT = $pdo->query("SHOW TABLES LIKE 'support_ticket_views'");
-                            $hasViews = (bool) ($stT && $stT->fetchColumn());
-                            if ($hasViews) {
-                                $sqlUnread = "
-                                    SELECT COUNT(*)
-                                    FROM support_tickets t
-                                    INNER JOIN (
-                                        SELECT ticket_id, MAX(created_at) AS last_admin_msg_at
-                                        FROM support_ticket_messages
-                                        WHERE autor_tipo = 'admin'
-                                        GROUP BY ticket_id
-                                    ) m ON m.ticket_id = t.id
-                                    LEFT JOIN support_ticket_views v
-                                        ON v.ticket_id = t.id AND v.viewer_type = 'cliente' AND v.viewer_user_id = ?
-                                    WHERE t.usuario_id = ?
-                                      AND t.status = 'open'
-                                      AND (v.last_seen_at IS NULL OR m.last_admin_msg_at > v.last_seen_at)
-                                ";
-                                $stU = $pdo->prepare($sqlUnread);
-                                $stU->execute([$uid, $uid]);
-                                $unreadTickets = (int) ($stU->fetchColumn() ?: 0);
+                            if ($pdo instanceof \PDO) {
+                                $stT = $pdo->query("SHOW TABLES LIKE 'support_ticket_views'");
+                                $hasViews = (bool) ($stT && $stT->fetchColumn());
+                                if ($hasViews) {
+                                    $sqlUnread = "
+                                        SELECT COUNT(*)
+                                        FROM support_tickets t
+                                        INNER JOIN (
+                                            SELECT ticket_id, MAX(created_at) AS last_admin_msg_at
+                                            FROM support_ticket_messages
+                                            WHERE autor_tipo = 'admin'
+                                            GROUP BY ticket_id
+                                        ) m ON m.ticket_id = t.id
+                                        LEFT JOIN support_ticket_views v
+                                            ON v.ticket_id = t.id AND v.viewer_type = 'cliente' AND v.viewer_user_id = ?
+                                        WHERE t.usuario_id = ?
+                                          AND t.status = 'open'
+                                          AND (v.last_seen_at IS NULL OR m.last_admin_msg_at > v.last_seen_at)
+                                    ";
+                                    $stU = $pdo->prepare($sqlUnread);
+                                    $stU->execute([$uid, $uid]);
+                                    $unreadTickets = (int) ($stU->fetchColumn() ?: 0);
+                                }
                             }
                         }
                     } catch (\Exception $e) {
