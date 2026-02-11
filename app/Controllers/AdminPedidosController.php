@@ -2903,6 +2903,11 @@ JS;
         $admin = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
 
+        $escopo = strtolower(trim((string) $request->getParam('escopo', '')));
+        if ($escopo !== 'todos') {
+            $escopo = 'me';
+        }
+
         $pedidoModel = new PedidoEcommerce();
         $resumo = [
             'pedidos' => [],
@@ -2914,10 +2919,15 @@ JS;
             'faixas' => [],
         ];
         try {
+            $adminId = (int) ($admin['id'] ?? 0);
             if ($perfil === 'admin') {
-                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisTodos();
+                if ($escopo === 'todos') {
+                    $resumo = $pedidoModel->getResumoComissoesPedidosManuaisTodos();
+                } else {
+                    $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador($adminId);
+                }
             } else {
-                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador((int) ($admin['id'] ?? 0));
+                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador($adminId);
             }
         } catch (\Exception $e) {
             $resumo = $resumo;
@@ -2938,7 +2948,7 @@ JS;
             if ($has) {
                 $where = '';
                 $params = [];
-                if ($perfil !== 'admin') {
+                if ($perfil !== 'admin' || $escopo !== 'todos') {
                     $where = ' WHERE usuario_id = ?';
                     $params[] = (int) ($admin['id'] ?? 0);
                 }
@@ -3182,6 +3192,13 @@ JS;
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Minhas Comissões</h1>
                     <div>
+                        ' . ($perfil === 'admin'
+                            ? (
+                                $escopo === 'todos'
+                                    ? '<a href="/admin/pedidos/comissoes" class="btn btn-outline-dark me-2"><i class="fas fa-user"></i> Ver minhas</a>'
+                                    : '<a href="/admin/pedidos/comissoes?escopo=todos" class="btn btn-outline-dark me-2"><i class="fas fa-users"></i> Ver todos</a>'
+                            )
+                            : '') . '
                         <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
                     </div>
