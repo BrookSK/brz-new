@@ -375,6 +375,12 @@ class AdminPedidosEditController {
                                         <i class="fas fa-rotate me-1"></i>Atualizar Status
                                     </button>
                                 </div>
+
+                                <div class="mb-0">
+                                    <label class="form-label">Observação do vendedor</label>
+                                    <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="Observação interna para compras/PDF...">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                    <div class="form-text">Essa observação é interna e aparece no PDF do relatório de compras.</div>
+                                </div>
                             </div>
                         </div>
 
@@ -646,6 +652,7 @@ class AdminPedidosEditController {
                     status: document.getElementById("pedido_status")?.value,
                     frete: document.getElementById("valor_frete")?.value,
                     desconto: document.getElementById("percentual_desconto")?.value,
+                    observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
                     itens: itens
                 };
 
@@ -957,6 +964,11 @@ class AdminPedidosEditController {
 
             $setParts[] = 'total = :total';
             $paramsUpd[':total'] = $total;
+
+            if (is_array($colsPedidos) && in_array('observacao_vendedor', $colsPedidos, true)) {
+                $setParts[] = 'observacao_vendedor = :observacao_vendedor';
+                $paramsUpd[':observacao_vendedor'] = (string) ($dados['observacao_vendedor'] ?? '');
+            }
 
             // Se marcar como pago/aprovado, manter payment_status/pago_em consistentes (impacta comissões)
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];

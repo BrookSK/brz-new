@@ -2421,9 +2421,12 @@ class AdminComprasController extends Controller {
     public function gerarPDF($request) {
         $lojaId = (int) $request->getParam('loja_id', 0);
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+        $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
         $temCost = $this->columnExists('produtos', 'cost_price');
         $temFoto = $this->columnExists('produtos', 'foto_principal');
         $temImages = $this->columnExists('produtos', 'images');
+
+        $temObsVendedor = $this->columnExists('pedidos', 'observacao_vendedor');
 
         $lojaNome = 'Compras';
         if ($lojaId > 0 && $this->tableExists('lojas')) {
@@ -2463,6 +2466,7 @@ class AdminComprasController extends Controller {
             . ' FROM ('
             . '   SELECT produto_id, '
             . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(pedido_id,0),0)) as pedido_id' : '')
             . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
             . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
             . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
@@ -2517,17 +2521,49 @@ class AdminComprasController extends Controller {
             . '<th style="width:60px;">Foto</th>'
             . '<th>Produto</th>'
             . '<th style="width:70px;">Qtd</th>'
+            . ($temPedidoEmLista && $temObsVendedor ? '<th>Obs. Pedido</th>' : '')
             . '</tr></thead><tbody>';
+
+        $obsByPedido = [];
+        if ($temPedidoEmLista && $temObsVendedor) {
+            $pedidoIds = [];
+            foreach ($rows as $r) {
+                $pid = (int) ($r['pedido_id'] ?? 0);
+                if ($pid > 0) {
+                    $pedidoIds[$pid] = true;
+                }
+            }
+            $pedidoIds = array_keys($pedidoIds);
+            if (!empty($pedidoIds)) {
+                $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                try {
+                    $stmtObs = $this->connection->prepare('SELECT id, observacao_vendedor FROM pedidos WHERE id IN (' . $in . ')');
+                    $stmtObs->execute($pedidoIds);
+                    $obsRows = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($obsRows as $or) {
+                        $id = (int) ($or['id'] ?? 0);
+                        if ($id > 0) {
+                            $obsByPedido[$id] = (string) ($or['observacao_vendedor'] ?? '');
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $obsByPedido = [];
+                }
+            }
+        }
 
         foreach ($rows as $r) {
             $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
             $img = $this->resolveProdutoImagem($r);
             $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
+            $pedidoIdLinha = (int) ($r['pedido_id'] ?? 0);
+            $obsLinha = ($pedidoIdLinha > 0 && isset($obsByPedido[$pedidoIdLinha])) ? trim((string) $obsByPedido[$pedidoIdLinha]) : '';
             echo '<tr>'
                 . '<td style="text-align:center;"><span class="check"></span></td>'
                 . '<td style="text-align:center;">' . $imgTag . '</td>'
                 . '<td><strong>' . htmlspecialchars((string) ($r['produto_nome'] ?? '')) . '</strong></td>'
                 . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
+                . ($temPedidoEmLista && $temObsVendedor ? ('<td>' . htmlspecialchars($obsLinha, ENT_QUOTES, 'UTF-8') . '</td>') : '')
                 . '</tr>';
         }
 
