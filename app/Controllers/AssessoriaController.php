@@ -200,16 +200,16 @@ class AssessoriaController extends Controller {
     private function isOlderThanMinutes(?string $dt, int $minutes): bool {
         $dt = (string) ($dt ?? '');
         if ($dt === '') {
-            return true;
+            return false;
         }
         try {
             $ts = strtotime($dt);
             if (!$ts) {
-                return true;
+                return false;
             }
             return (time() - $ts) > ($minutes * 60);
         } catch (\Exception $e) {
-            return true;
+            return false;
         }
     }
 
