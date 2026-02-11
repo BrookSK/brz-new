@@ -40,27 +40,30 @@ class AdminPedidosConferenciaController extends Controller {
 
     private function renderPageEnd(): void {
         renderAdminScripts();
-        echo '<script>
-            (function(){
-                function syncRow(row){
-                    if(!row) return;
-                    var sel = row.querySelector('select[name="tipo_compra"]');
-                    var file = row.querySelector('input[name="comprovante_compra"]');
-                    var box = row.querySelector('[data-comprovante-box="1"]');
-                    if(!sel || !file) return;
-                    var isOnline = (String(sel.value||'').toLowerCase() === 'online');
-                    if(box){ box.style.display = isOnline ? 'block' : 'none'; }
-                    file.required = isOnline;
-                }
-                document.querySelectorAll('tr[data-pedido-row="1"]').forEach(function(tr){
-                    var sel = tr.querySelector('select[name="tipo_compra"]');
-                    if(sel){
-                        sel.addEventListener('change', function(){ syncRow(tr); });
-                        syncRow(tr);
-                    }
-                });
-            })();
-        </script></body></html>';
+        echo <<<'HTML'
+<script>
+    (function(){
+        function syncRow(row){
+            if(!row) return;
+            var sel = row.querySelector('select[name="tipo_compra"]');
+            var file = row.querySelector('input[name="comprovante_compra"]');
+            var box = row.querySelector('[data-comprovante-box="1"]');
+            if(!sel || !file) return;
+            var isOnline = (String(sel.value||'').toLowerCase() === 'online');
+            if(box){ box.style.display = isOnline ? 'block' : 'none'; }
+            file.required = isOnline;
+        }
+        document.querySelectorAll('tr[data-pedido-row="1"]').forEach(function(tr){
+            var sel = tr.querySelector('select[name="tipo_compra"]');
+            if(sel){
+                sel.addEventListener('change', function(){ syncRow(tr); });
+                syncRow(tr);
+            }
+        });
+    })();
+</script>
+</body></html>
+HTML;
     }
 
     private function renderFlashIfAny(): void {
