@@ -328,6 +328,10 @@ class UsuarioController extends Controller {
         try {
             $db = \Config\Database::getConnection();
 
+            if (!$db instanceof \PDO) {
+                throw new \Exception('Conexão com o banco indisponível');
+            }
+
             $temTabela = false;
             try {
                 $stmtT = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
