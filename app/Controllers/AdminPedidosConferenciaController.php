@@ -111,6 +111,72 @@ HTML;
         return '';
     }
 
+    private function getConfigNumber(string $categoria, array $chaves, float $default = 0.0): float {
+        $categoria = strtolower(trim($categoria));
+        $chavesNorm = [];
+        foreach ($chaves as $k) {
+            $k = trim((string) $k);
+            if ($k !== '') $chavesNorm[] = $k;
+        }
+        if (empty($chavesNorm)) {
+            return $default;
+        }
+
+        try {
+            foreach (['configuracoes_sistema', 'configuracoes', 'settings', 'config'] as $tbl) {
+                if (!$this->tableExists($tbl)) continue;
+
+                $cols = [];
+                try {
+                    $stCols = $this->connection->query('DESCRIBE ' . $tbl);
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $cols = [];
+                }
+                if (empty($cols)) continue;
+
+                $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+                if ($valCol === '') continue;
+
+                // categoria/chave
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $in = implode(',', array_fill(0, count($chavesNorm), '?'));
+                    $sql = 'SELECT ' . $valCol . ' FROM ' . $tbl . ' WHERE categoria = ? AND chave IN (' . $in . ') ORDER BY ' . (in_array('id', $cols, true) ? 'id' : 'chave') . ' DESC LIMIT 1';
+                    $st = $this->connection->prepare($sql);
+                    $st->execute(array_merge([$categoria], $chavesNorm));
+                    $raw = $st->fetchColumn();
+                    if ($raw !== false && $raw !== null && trim((string) $raw) !== '') {
+                        $s = str_replace(',', '.', trim((string) $raw));
+                        return is_numeric($s) ? (float) $s : $default;
+                    }
+                }
+
+                // chave/valor: aceitar tanto chave pura quanto fullKey categoria_chave
+                $keyCol = $this->pickColumn($cols, ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro']);
+                if ($keyCol !== '') {
+                    $keysToTry = [];
+                    foreach ($chavesNorm as $k) {
+                        $keysToTry[] = $k;
+                        $keysToTry[] = $categoria . '_' . $k;
+                    }
+                    $keysToTry = array_values(array_unique($keysToTry));
+                    $in = implode(',', array_fill(0, count($keysToTry), '?'));
+                    $sql = 'SELECT ' . $valCol . ' FROM ' . $tbl . ' WHERE ' . $keyCol . ' IN (' . $in . ') ORDER BY ' . (in_array('id', $cols, true) ? 'id' : $keyCol) . ' DESC LIMIT 1';
+                    $st = $this->connection->prepare($sql);
+                    $st->execute($keysToTry);
+                    $raw = $st->fetchColumn();
+                    if ($raw !== false && $raw !== null && trim((string) $raw) !== '') {
+                        $s = str_replace(',', '.', trim((string) $raw));
+                        return is_numeric($s) ? (float) $s : $default;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $default;
+    }
+
     private function getPedidoItensTable(): ?string {
         try {
             $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -555,30 +621,7 @@ HTML;
 
                     // percentual via config (fallback 0)
                     $percent = 0.0;
-                    try {
-                        foreach (['configuracoes_sistema', 'configuracoes', 'settings', 'config'] as $tbl) {
-                            if (!$this->tableExists($tbl)) continue;
-                            $colsCfg = [];
-                            try {
-                                $stCols = $this->connection->query('DESCRIBE ' . $tbl);
-                                $colsCfg = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                            } catch (\Exception $e) {
-                                $colsCfg = [];
-                            }
-                            $colChave = in_array('chave', $colsCfg, true) ? 'chave' : (in_array('key', $colsCfg, true) ? 'key' : (in_array('nome', $colsCfg, true) ? 'nome' : ''));
-                            $colValor = in_array('valor', $colsCfg, true) ? 'valor' : (in_array('value', $colsCfg, true) ? 'value' : (in_array('conteudo', $colsCfg, true) ? 'conteudo' : ''));
-                            if ($colChave === '' || $colValor === '') continue;
-                            $stV = $this->connection->prepare('SELECT ' . $colValor . ' FROM ' . $tbl . ' WHERE ' . $colChave . ' IN (\'comissao_processamento_percent\',\'processamento_percent\') ORDER BY 1 DESC LIMIT 1');
-                            $stV->execute();
-                            $raw = (string) ($stV->fetchColumn() ?: '');
-                            if ($raw !== '') {
-                                $percent = (float) str_replace(',', '.', $raw);
-                                break;
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        $percent = 0.0;
-                    }
+                    $percent = (float) $this->getConfigNumber('comissao', ['comissao_processamento_percent', 'processamento_percent'], 0.0);
 
                     $valorComissao = max(0.0, $baseLiquida) * (max(0.0, $percent) / 100.0);
 

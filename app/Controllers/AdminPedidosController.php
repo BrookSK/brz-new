@@ -6,6 +6,7 @@ use App\Models\PedidoEcommerce;
 use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
 use App\Services\AuthService;
+use App\Services\SupportTicketNotificationService;
 
 class AdminPedidosController extends Controller {
 
@@ -1818,10 +1819,48 @@ JS;
                 
                 echo '</main></div></div>';
 
+        echo <<<'HTML'
+
+    <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="formLixeiraPedido">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+HTML;
+
     // Renderizar scripts
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var modal = document.getElementById("modalLixeiraPedido");
+            if(!modal) return;
+            modal.addEventListener("show.bs.modal", function (event) {
+                var btn = event.relatedTarget;
+                if(!btn) return;
+                var pid = btn.getAttribute("data-pedido-id") || "";
+                var label = document.getElementById("lixeiraPedidoIdLabel");
+                var form = document.getElementById("formLixeiraPedido");
+                if(label) label.textContent = "#" + pid;
+                if(form) form.action = "/admin/pedidos/excluir/" + pid;
+            });
+        })();
+    </script>
 </body>
 </html>';
         exit;
@@ -1943,6 +1982,11 @@ JS;
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary me-2">'
                             . '<i class="fas fa-pen-to-square me-1"></i>Editar Pedido Manual</a>')
                         : '') . '
+                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block" class="me-2">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-headset me-1"></i>Criar ticket
+                        </button>
+                    </form>
                     <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>
@@ -3179,8 +3223,8 @@ JS;
         renderAdminSidebarStyles();
 
         echo '<style>
-        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:2px}
-        .comm-card{flex:0 0 220px}
+        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
+        .comm-card{flex:0 0 240px;min-height:92px;background:#fff}
         </style></head>
 <body>
     <div class="container-fluid">
@@ -3215,6 +3259,11 @@ JS;
             $percent = (float) ($t['percentual_comissao'] ?? 0);
             $valorComissao = (float) ($t['valor_comissao'] ?? 0);
 
+            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+            $procBase = (float) ($tp['base_liquida'] ?? 0);
+            $procVal = (float) ($tp['valor_comissao'] ?? 0);
+            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
+
             echo '<div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
@@ -3240,26 +3289,18 @@ JS;
                             <div class="text-muted small">Comissão total</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
+
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Base líquida</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>
+                        </div>
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Comissão</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>
+                            <div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>
+                        </div>
                     </div>
                 </div>';
-
-            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
-            $procBase = (float) ($tp['base_liquida'] ?? 0);
-            $procVal = (float) ($tp['valor_comissao'] ?? 0);
-            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
-            echo '<div class="col-12 mb-2">'
-                . '<div class="comm-cards">'
-                . '<div class="border rounded p-3 comm-card">'
-                . '<div class="text-muted small">Processamento (Online) - Base líquida</div>'
-                . '<div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>'
-                . '</div>'
-                . '<div class="border rounded p-3 comm-card">'
-                . '<div class="text-muted small">Processamento (Online) - Comissão</div>'
-                . '<div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>'
-                . '<div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>'
-                . '</div>'
-                . '</div>'
-                . '</div>';
         }
 
         $pedidosUsd = [];
@@ -3971,6 +4012,108 @@ HTML;
             }
             echo '<div class="alert alert-danger">Erro ao excluir pedido: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos/detalhes/' . htmlspecialchars((string)$id) . '" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
+
+    public function criarTicket(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+        $admin = $auth->getUsuarioLogado();
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/pedidos');
+            exit;
+        }
+
+        $adminUid = (int) ($admin['id'] ?? 0);
+        $pdo = \Config\Database::getConnection();
+
+        // Cliente do pedido
+        $colsP = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE pedidos');
+            $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsP = [];
+        }
+        $colUsuario = null;
+        foreach (['usuario_id', 'user_id', 'cliente_id'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $colUsuario = $c;
+                break;
+            }
+        }
+        if ($colUsuario === null) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        $stOwner = $pdo->prepare('SELECT ' . $colUsuario . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stOwner->execute([(int) $id]);
+        $clienteId = (int) ($stOwner->fetchColumn() ?: 0);
+        if ($clienteId <= 0) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        // Reutilizar ticket aberto
+        try {
+            $stFind = $pdo->prepare("SELECT id FROM support_tickets WHERE usuario_id = ? AND pedido_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1");
+            $stFind->execute([(int) $clienteId, (int) $id]);
+            $existingOpen = (int) ($stFind->fetchColumn() ?: 0);
+            if ($existingOpen > 0) {
+                header('Location: /admin/tickets/' . $existingOpen);
+                exit;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $assunto = 'Suporte do Pedido #' . (int) $id;
+        $motivo = 'Problema no pedido';
+        $mensagem = trim((string) ($request->getParam('mensagem') ?? 'Ticket iniciado pelo suporte.'));
+        if ($mensagem === '') {
+            $mensagem = 'Ticket iniciado pelo suporte.';
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $colsT = [];
+            try {
+                $stT = $pdo->query('DESCRIBE support_tickets');
+                $colsT = $stT ? ($stT->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsT = [];
+            }
+
+            if (in_array('motivo', $colsT, true)) {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, motivo, status) VALUES (?, ?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto, (string) $motivo]);
+            } else {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, status) VALUES (?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto]);
+            }
+            $ticketId = (int) $pdo->lastInsertId();
+
+            $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+            $stMsg->execute([(int) $ticketId, 'admin', (int) $adminUid, (string) $mensagem]);
+
+            $pdo->commit();
+
+            try {
+                $not = new SupportTicketNotificationService();
+                $not->notificarTicketCriado((int) $id, (int) $ticketId, [
+                    'assunto' => $assunto,
+                    'motivo' => $motivo,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            header('Location: /admin/tickets/' . $ticketId);
+            exit;
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
             exit;
         }
     }

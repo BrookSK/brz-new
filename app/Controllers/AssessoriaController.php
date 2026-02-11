@@ -2499,6 +2499,7 @@ class AssessoriaController extends Controller {
             'sku' => $sku,
             'description' => $descricao,
             'price' => $preco,
+            'cost_price' => $preco,
             'weight' => $peso,
             'status' => 'published',
             'stock' => 999999,
