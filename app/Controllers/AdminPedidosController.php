@@ -1818,10 +1818,48 @@ JS;
                 
                 echo '</main></div></div>';
 
+        echo <<<'HTML'
+
+    <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="formLixeiraPedido">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+HTML;
+
     // Renderizar scripts
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var modal = document.getElementById("modalLixeiraPedido");
+            if(!modal) return;
+            modal.addEventListener("show.bs.modal", function (event) {
+                var btn = event.relatedTarget;
+                if(!btn) return;
+                var pid = btn.getAttribute("data-pedido-id") || "";
+                var label = document.getElementById("lixeiraPedidoIdLabel");
+                var form = document.getElementById("formLixeiraPedido");
+                if(label) label.textContent = "#" + pid;
+                if(form) form.action = "/admin/pedidos/excluir/" + pid;
+            });
+        })();
+    </script>
 </body>
 </html>';
         exit;
