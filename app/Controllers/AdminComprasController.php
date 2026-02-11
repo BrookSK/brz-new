@@ -1115,7 +1115,7 @@ class AdminComprasController extends Controller {
             $whereTipoCompra = '';
             if ($temTipoCompraEmLista) {
                 if ($tipoCompraView === 'offline') {
-                    $whereTipoCompra = " AND lc.tipo_compra = 'offline'";
+                    $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
                 } else {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
                 }
