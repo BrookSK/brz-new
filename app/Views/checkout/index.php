@@ -655,6 +655,9 @@
                                     <span>Taxa de Serviço:</span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
+                                <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
+                                    <div class="alert alert-info small mt-2 mb-2" id="pixTaxaServicoInfo" style="display:none;"></div>
+                                <?php endif; ?>
                                 <?php if (!empty($cobra_impostos_br)): ?>
                                     <div class="d-flex justify-content-between" id="impostos-row">
                                         <span>Impostos:</span>
@@ -1501,6 +1504,10 @@ function atualizarFormaPagamento() {
         default:
             console.log('🔍 [PAGAMENTO] Nenhuma forma de pagamento selecionada');
     }
+
+    <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
+    try { updatePixServiceFeeInfo(); } catch (e) {}
+    <?php endif; ?>
     
     // Atualizar texto do botão conforme a forma de pagamento
     const botaoFinalizar = document.getElementById('btn-finalizar');
@@ -1608,6 +1615,60 @@ function toggleButton() {
 // Usar taxas de conversão globais se existirem, senão definir locais
 window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.50, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
 
+<?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
+window.pixDescontoTaxaServicoPercent = <?php echo json_encode((float) ($pix_desconto_taxa_servico_percent ?? 0), JSON_UNESCAPED_UNICODE); ?>;
+
+function formatCurrencyValue(v, currency) {
+    const n = Number(v || 0);
+    const symbol = currency === 'BRL' ? 'R$' : '$';
+    return symbol + ' ' + n.toFixed(2).replace('.', ',');
+}
+
+function updatePixServiceFeeInfo() {
+    const box = document.getElementById('pixTaxaServicoInfo');
+    if (!box) return;
+
+    const moedaHidden = document.getElementById('moeda_hidden');
+    const currency = moedaHidden ? String(moedaHidden.value || 'BRL').toUpperCase() : 'BRL';
+
+    // PIX só aparece no checkout BRL
+    if (currency !== 'BRL') {
+        box.textContent = '';
+        box.style.display = 'none';
+        return;
+    }
+
+    const pct = Number(window.pixDescontoTaxaServicoPercent || 0);
+    if (!isFinite(pct) || pct <= 0) {
+        box.textContent = '';
+        box.style.display = 'none';
+        return;
+    }
+
+    const formaPagamentoEl = document.getElementById('forma_pagamento');
+    const forma = formaPagamentoEl ? String(formaPagamentoEl.value || '') : '';
+    if (forma !== 'pix') {
+        box.textContent = '';
+        box.style.display = 'none';
+        return;
+    }
+
+    const taxaEl = document.getElementById('taxa-servico');
+    if (!taxaEl) {
+        box.textContent = '';
+        box.style.display = 'none';
+        return;
+    }
+
+    // Valor atual exibido (já convertido) não é confiável para cálculo; usar o originalValues já ajustado por país.
+    const base = (window.checkoutOriginalValues && window.checkoutOriginalValues.taxaServico) ? Number(window.checkoutOriginalValues.taxaServico) : 0;
+    const taxaComDesconto = Math.max(0, base * (1 - (pct / 100)));
+
+    box.textContent = 'PIX: desconto de ' + pct.toFixed(2) + '% na taxa de serviço. Taxa com desconto: ' + formatCurrencyValue(taxaComDesconto, 'BRL') + '.';
+    box.style.display = '';
+}
+<?php endif; ?>
+
 // Função para atualizar valores com base na moeda
 function updatePrices(currency) {
     console.log('🔍 [MOEDA] updatePrices() chamada com currency:', currency);
@@ -1680,6 +1741,10 @@ function updatePrices(currency) {
         } else {
             console.error(`❌ [MOEDA] Elemento ${key} não encontrado`);
         }
+    }
+
+    if (typeof updatePixServiceFeeInfo === 'function') {
+        try { updatePixServiceFeeInfo(); } catch (e) {}
     }
     
     // Atualizar elementos ocultos se existirem

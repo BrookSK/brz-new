@@ -460,6 +460,17 @@ class PedidoManualService {
         return $usd;
     }
 
+    public function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigKeyValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
+    }
+
     private function calcularImpostosPadrao(float $valorProdutos, float $valorFrete): float {
         $icms = $this->getAliquota('icms_aliquota');
         $ipi = $this->getAliquota('ipi_aliquota');
@@ -1097,6 +1108,67 @@ class PedidoManualService {
         }
 
         $descricao = 'Pedido manual #' . $codigoPedido;
+
+        // PIX: aplicar desconto configurável na taxa de serviço (atualiza o pedido antes de gerar cobrança)
+        if ($billingType === 'PIX') {
+            try {
+                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
+                if ($pct > 0) {
+                    $stCols = $this->db->query('DESCRIBE pedidos');
+                    $colsAll = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                    $colSvc = '';
+                    foreach (['taxa_servico', 'servicos'] as $c) {
+                        if (is_array($colsAll) && in_array($c, $colsAll, true)) {
+                            $colSvc = $c;
+                            break;
+                        }
+                    }
+
+                    if ($colSvc !== '') {
+                        $colSub = in_array('subtotal', $colsAll, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsAll, true) ? 'subtotal_produtos' : '');
+                        $colImp = in_array('impostos', $colsAll, true) ? 'impostos' : (in_array('valor_impostos', $colsAll, true) ? 'valor_impostos' : '');
+                        $colFre = in_array('frete', $colsAll, true) ? 'frete' : (in_array('valor_frete', $colsAll, true) ? 'valor_frete' : '');
+                        $colTot = in_array('total', $colsAll, true) ? 'total' : (in_array('valor_total', $colsAll, true) ? 'valor_total' : (in_array('valor_total_brl', $colsAll, true) ? 'valor_total_brl' : ''));
+                        $colDesc = in_array('desconto', $colsAll, true) ? 'desconto' : '';
+
+                        $sel = ['id'];
+                        $sel[] = $colSvc . ' AS taxa_servico';
+                        if ($colSub !== '') $sel[] = $colSub . ' AS subtotal';
+                        if ($colImp !== '') $sel[] = $colImp . ' AS impostos';
+                        if ($colFre !== '') $sel[] = $colFre . ' AS frete';
+                        if ($colTot !== '') $sel[] = $colTot . ' AS total';
+                        if ($colDesc !== '') $sel[] = $colDesc . ' AS desconto';
+                        $stP = $this->db->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                        $stP->execute([(int) $pedidoId]);
+                        $rowP = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                        $svc = (float) ($rowP['taxa_servico'] ?? 0);
+                        $svcNew = max(0.0, $svc * (1.0 - ($pct / 100.0)));
+
+                        if ($svcNew !== $svc) {
+                            $subtotalCalc = (float) ($rowP['subtotal'] ?? 0);
+                            $impostosCalc = (float) ($rowP['impostos'] ?? 0);
+                            $freteCalc = (float) ($rowP['frete'] ?? 0);
+                            $descontoCalc = (float) ($rowP['desconto'] ?? 0);
+                            $totalNew = $subtotalCalc + $svcNew + $impostosCalc + $freteCalc - $descontoCalc;
+
+                            $set = [$colSvc . ' = :svc'];
+                            $params = [':svc' => $svcNew, ':id' => (int) $pedidoId];
+                            if ($colTot !== '') {
+                                $set[] = $colTot . ' = :tot';
+                                $params[':tot'] = $totalNew;
+                            }
+                            $sqlUp = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                            $this->db->prepare($sqlUp)->execute($params);
+
+                            $total = $colTot !== '' ? $totalNew : $total;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
 
         $pg = new PaymentService();
 

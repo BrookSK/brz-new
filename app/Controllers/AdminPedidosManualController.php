@@ -381,6 +381,7 @@ class AdminPedidosManualController extends Controller {
                                     <span class="text-muted">Taxa de Serviço</span>
                                     <span><span id="resumoMoedaSymbol3">$</span> <span id="resumoTaxaServico">0.00</span></span>
                                 </div>
+                                <div class="alert alert-info small mt-2 mb-0" id="pixDiscountInfo" style="display:none;"></div>
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Impostos</span>
                                     <span><span id="resumoMoedaSymbol4">$</span> <span id="resumoImpostos">0.00</span></span>
@@ -451,6 +452,7 @@ class AdminPedidosManualController extends Controller {
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG_BRL = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG_USD = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgUSD(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const PIX_DESCONTO_TAXA_SERVICO_PERCENT = ' . json_encode((float) (new \App\Services\PedidoManualService())->getPixDescontoTaxaServicoPercent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const USD_BRL_RATE = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaConversaoUSDBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
@@ -797,13 +799,26 @@ function calcTotal(){
             const impostos = Number(data.impostos || 0);
             const total = Number(data.total || 0);
 
+            const pixPct = getPixPct();
+            const moedaSel = getSelectedMoeda();
+            const billingSel = document.getElementById('billingType');
+            const billingType = billingSel ? String(billingSel.value || '').toUpperCase() : '';
+
+            let taxaServicoShown = taxaServico;
+            let totalShown = total;
+
+            if (moedaSel === 'BRL' && billingType === 'PIX' && pixPct > 0) {
+                taxaServicoShown = Math.max(0, taxaServico * (1 - (pixPct / 100)));
+                totalShown = Math.max(0, total - (taxaServico - taxaServicoShown));
+            }
+
             const pesoBack = Number(data.peso_total || 0);
             const pesoEl = document.getElementById('resumoPeso');
             if (pesoEl) {
                 pesoEl.textContent = formatPeso(pesoBack);
             }
 
-            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
+            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServicoShown, moeda);
             document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
 
             const freteWrap = document.getElementById('resumoFreteWrap');
@@ -815,8 +830,8 @@ function calcTotal(){
                 if (rf) rf.textContent = formatForDisplay(frete, moeda);
             }
 
-            document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
-            document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
+            document.getElementById('resumoTotal').textContent = formatForDisplay(totalShown, moeda);
+            document.getElementById('resumoTotal2').textContent = formatForDisplay(totalShown, moeda);
 
             const setVal = (id, v) => {
                 const el = document.getElementById(id);
@@ -824,10 +839,22 @@ function calcTotal(){
             };
             setVal('subtotal_produtos', Number(data.subtotal || subtotal).toFixed(2));
             setVal('peso_total', Number(data.peso_total || pesoTotal).toFixed(3));
-            setVal('taxa_servico', taxaServico.toFixed(2));
+            setVal('taxa_servico', taxaServicoShown.toFixed(2));
             setVal('valor_impostos', impostos.toFixed(2));
             setVal('valor_frete', frete.toFixed(2));
-            setVal('valor_total', total.toFixed(2));
+            setVal('valor_total', totalShown.toFixed(2));
+
+            const pixBox = document.getElementById('pixDiscountInfo');
+            if (pixBox) {
+                if (moedaSel === 'BRL' && pixPct > 0) {
+                    const info = `PIX: desconto de ${pixPct.toFixed(2)}% na taxa de serviço. Taxa com desconto: ${getSymbol(moedaSel)} ${formatForDisplay(taxaServicoShown, moedaSel)}.`;
+                    pixBox.textContent = info;
+                    pixBox.style.display = '';
+                } else {
+                    pixBox.textContent = '';
+                    pixBox.style.display = 'none';
+                }
+            }
         })
         .catch(_err => {
             // fallback simples (não quebra o formulário)
@@ -849,6 +876,12 @@ function calcTotal(){
             setVal('valor_impostos', impostos.toFixed(2));
             setVal('valor_frete', frete.toFixed(2));
             setVal('valor_total', total.toFixed(2));
+
+            const pixBox = document.getElementById('pixDiscountInfo');
+            if (pixBox) {
+                pixBox.textContent = '';
+                pixBox.style.display = 'none';
+            }
         });
 }
 
@@ -863,6 +896,12 @@ function getSelectedClienteLabel(){
 function formatBRL(v){
     const n = Number(v || 0);
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function getPixPct(){
+    const p = Number(PIX_DESCONTO_TAXA_SERVICO_PERCENT || 0);
+    if (!isFinite(p) || p <= 0) return 0;
+    return Math.max(0, Math.min(100, p));
 }
 
 function gerarMensagemOrcamento(){
@@ -913,6 +952,11 @@ function gerarMensagemOrcamento(){
     msg += `- Subtotal dos produtos: ${formatBRL(subtotal)}\n`;
     msg += `- Peso total: ${Number(pesoTotal || 0).toFixed(3)} kg\n`;
     msg += `- Taxa de serviço: ${formatBRL(taxaServico)}\n`;
+    const pixPct = getPixPct();
+    if (pixPct > 0) {
+        const taxaPix = Math.max(0, Number(taxaServico || 0) * (1 - (pixPct / 100)));
+        msg += `- PIX: desconto de ${pixPct.toFixed(2)}% na taxa de serviço (taxa com desconto: ${formatBRL(taxaPix)})\n`;
+    }
     msg += `- Impostos: ${formatBRL(impostos)}\n`;
     msg += `- Frete: ${Number(frete || 0) <= 0 ? 'Frete grátis' : formatBRL(frete)}\n`;
     msg += `- Total: ${formatBRL(total)}\n\n`;

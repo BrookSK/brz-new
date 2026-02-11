@@ -2191,15 +2191,41 @@ class AssessoriaController extends Controller {
         $taxaServico = $this->getTaxaServicoPorKg() * $pesoArredondado;
         $frete = $this->calcularFrete($subtotal, $pesoTotal);
         $impostos = $this->calcularImpostos($subtotal);
+
+        $pixPct = $this->getPixDescontoTaxaServicoPercent();
+        $taxaServicoPix = ($pixPct > 0) ? max(0.0, $taxaServico * (1.0 - ($pixPct / 100.0))) : $taxaServico;
+        $total = $subtotal + $taxaServico + $frete + $impostos;
+        $totalPix = $subtotal + $taxaServicoPix + $frete + $impostos;
         
         return [
             'subtotal' => $subtotal,
             'peso_total' => $pesoTotal,
             'taxa_servico' => $taxaServico,
+            'pix_desconto_taxa_servico_percent' => $pixPct,
+            'taxa_servico_pix' => $taxaServicoPix,
             'frete' => $frete,
             'impostos' => $impostos,
-            'total' => $subtotal + $taxaServico + $frete + $impostos
+            'total' => $total,
+            'total_pix' => $totalPix,
         ];
+    }
+
+    private function getPixDescontoTaxaServicoPercent(): float {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute(['pagamentos_pix_desconto_taxa_servico_percent']);
+            $v = $stmt->fetchColumn();
+            if ($v === false || $v === null || (string) $v === '') {
+                return 0.0;
+            }
+            $p = (float) str_replace(',', '.', (string) $v);
+            if ($p < 0) $p = 0.0;
+            if ($p > 100) $p = 100.0;
+            return $p;
+        } catch (\Exception $e) {
+            return 0.0;
+        }
     }
     
     /**

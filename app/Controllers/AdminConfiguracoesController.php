@@ -1537,6 +1537,19 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
+                                                    <h6 class="mb-3">Desconto no PIX</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Desconto na taxa de serviço para PIX (%)</label>
+                                                        <input type="number" class="form-control" name="pagamentos_pix_desconto_taxa_servico_percent" value="' . $this->getConfigValue($config, 'pagamentos', 'pix_desconto_taxa_servico_percent', '0') . '" step="0.01" min="0" max="100">
+                                                        <small class="text-muted">Aplicado ao calcular a taxa de serviço quando a forma de pagamento selecionada for PIX.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
                                                             <h6 class="mb-0">👑 Clube Brasiliana</h6>
@@ -3560,7 +3573,7 @@ HTML;
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'layout' => ['banners', 'logo', 'logo_footer', 'logo_admin'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
@@ -3607,6 +3620,11 @@ HTML;
                             $valor = is_numeric($valor) ? floatval($valor) : 0;
                         }
                         if ($categoria === 'comissao' && in_array($chave, ['processamento_percent', 'comissao_processamento_percent'], true)) {
+                            $valor = is_numeric($valor) ? (float) $valor : 0;
+                            if ($valor < 0) $valor = 0;
+                            if ($valor > 100) $valor = 100;
+                        }
+                        if ($categoria === 'pagamentos' && $chave === 'pix_desconto_taxa_servico_percent') {
                             $valor = is_numeric($valor) ? (float) $valor : 0;
                             if ($valor < 0) $valor = 0;
                             if ($valor > 100) $valor = 100;

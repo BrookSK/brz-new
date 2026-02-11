@@ -275,6 +275,12 @@ ob_start();
                                 <span>Taxa de Serviço:</span>
                                 <span id="taxaServico">$<?= number_format($totais['taxa_servico'], 2) ?></span>
                             </div>
+                            <?php if (!empty($totais['pix_desconto_taxa_servico_percent']) && (float) $totais['pix_desconto_taxa_servico_percent'] > 0): ?>
+                            <div class="alert alert-info small py-2 px-2 mb-2">
+                                Pagando com <strong>PIX</strong> você ganha <strong><?= number_format((float) $totais['pix_desconto_taxa_servico_percent'], 2) ?>%</strong> de desconto na taxa de serviço.
+                                Taxa com desconto: <strong>$<span id="taxaServicoPix"><?= number_format((float) ($totais['taxa_servico_pix'] ?? 0), 2) ?></span></strong>.
+                            </div>
+                            <?php endif; ?>
                             <div class="d-flex justify-content-between mb-2">
                                 <span>Frete:</span>
                                 <span id="frete">$<?= number_format($totais['frete'], 2) ?></span>
@@ -288,6 +294,12 @@ ob_start();
                                 <span>Total:</span>
                                 <span class="text-primary" id="total">$<?= number_format($totais['total'], 2) ?></span>
                             </div>
+                            <?php if (!empty($totais['pix_desconto_taxa_servico_percent']) && (float) $totais['pix_desconto_taxa_servico_percent'] > 0): ?>
+                            <div class="d-flex justify-content-between mt-1">
+                                <span class="text-muted small">Total com PIX:</span>
+                                <span class="small"><strong>$<span id="totalPix"><?= number_format((float) ($totais['total_pix'] ?? 0), 2) ?></span></strong></span>
+                            </div>
+                            <?php endif; ?>
                         </div>
 
                         <div class="d-grid gap-2">
@@ -324,6 +336,8 @@ ob_start();
 $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
     const totaisOriginais = <?= json_encode($totais) ?>;
+
+    const PIX_PCT = <?= json_encode((float) ($totais['pix_desconto_taxa_servico_percent'] ?? 0)) ?>;
 
     const selections = {};
 
@@ -540,10 +554,21 @@ $(document).ready(function() {
         const impostos = impostosOriginais * proporcao;
         const total = subtotal + taxaServico + frete + impostos;
 
+        let taxaPix = taxaServico;
+        let totalPix = total;
+        if (PIX_PCT > 0) {
+            taxaPix = Math.max(0, taxaServico * (1 - (PIX_PCT / 100)));
+            totalPix = subtotal + taxaPix + frete + impostos;
+        }
+
         // Atualizar interface
         $('#produtosCount').text(selecionados.length);
         $('#subtotal').text('$' + subtotal.toFixed(2));
         $('#taxaServico').text('$' + taxaServico.toFixed(2));
+        if (PIX_PCT > 0) {
+            $('#taxaServicoPix').text(taxaPix.toFixed(2));
+            $('#totalPix').text(totalPix.toFixed(2));
+        }
         $('#frete').text('$' + frete.toFixed(2));
         $('#impostos').text('$' + impostos.toFixed(2));
         $('#total').text('$' + total.toFixed(2));

@@ -294,6 +294,17 @@ class CheckoutController extends Controller {
         return floatval($v);
     }
 
+    private function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
+    }
+
     private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
         $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
         $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
@@ -1457,6 +1468,7 @@ class CheckoutController extends Controller {
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
+            'pix_desconto_taxa_servico_percent' => (float) $this->getPixDescontoTaxaServicoPercent(),
             'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
             'exchange_rates' => [
@@ -3063,6 +3075,15 @@ class CheckoutController extends Controller {
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
+
+            // PIX: desconto configurável na taxa de serviço
+            $formaPagamentoSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+            if ($formaPagamentoSel === 'pix') {
+                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
+                if ($pct > 0) {
+                    $taxaServicoUsd = max(0.0, $taxaServicoUsd * (1.0 - ($pct / 100.0)));
+                }
+            }
 
             $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
             if ($paisEntrega === '') {
