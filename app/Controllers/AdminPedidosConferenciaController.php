@@ -136,6 +136,53 @@ class AdminPedidosConferenciaController extends Controller {
             $pedidos = [];
         }
 
+        $itensPorPedido = [];
+        try {
+            $ids = array_values(array_filter(array_map(function ($r) {
+                return (int) ($r['id'] ?? 0);
+            }, $pedidos)));
+            if (!empty($ids)) {
+                $itensTable = $this->getPedidoItensTable();
+                if ($itensTable) {
+                    $colsItens = [];
+                    try {
+                        $stmtColsI = $this->connection->query('DESCRIBE ' . $itensTable);
+                        $colsItens = $stmtColsI ? ($stmtColsI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsItens = [];
+                    }
+
+                    $colProduto = in_array('produto_id', $colsItens, true) ? 'produto_id' : '';
+                    $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
+                    $colPedido = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : '';
+
+                    if ($colProduto !== '' && $colQtd !== '' && $colPedido !== '') {
+                        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                        $sqlItens = 'SELECT i.' . $colPedido . ' AS pedido_id, i.' . $colProduto . ' AS produto_id, i.' . $colQtd . ' AS quantidade'
+                            . ', COALESCE(p.nome, p.name, \'\') AS produto_nome'
+                            . ' FROM ' . $itensTable . ' i'
+                            . ' LEFT JOIN produtos p ON p.id = i.' . $colProduto
+                            . ' WHERE i.' . $colPedido . ' IN (' . $placeholders . ')';
+                        $stItensAll = $this->connection->prepare($sqlItens);
+                        $stItensAll->execute($ids);
+                        $rows = $stItensAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($rows as $r) {
+                            $pid = (int) ($r['pedido_id'] ?? 0);
+                            if ($pid <= 0) {
+                                continue;
+                            }
+                            if (!isset($itensPorPedido[$pid])) {
+                                $itensPorPedido[$pid] = [];
+                            }
+                            $itensPorPedido[$pid][] = $r;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $itensPorPedido = [];
+        }
+
         $this->renderPageStart('pedidos-conferencia');
 
         echo '<div class="card">
@@ -164,6 +211,8 @@ class AdminPedidosConferenciaController extends Controller {
                 $createdAt = (string) ($p['created_at'] ?? '');
                 $tipoCompraAtual = strtolower(trim((string) ($p['tipo_compra'] ?? '')));
 
+                $detId = 'det-pedido-' . $pid;
+
                 echo '<tr>'
                     . '<td><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank">#' . $pid . '</a></td>'
                     . '<td>' . htmlspecialchars($origem !== '' ? $origem : '-') . '</td>'
@@ -179,11 +228,23 @@ class AdminPedidosConferenciaController extends Controller {
                     . '    </select>'
                     . '</td>'
                     . '<td>'
+                    . '    <button class="btn btn-outline-info btn-sm me-1" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detId . '" aria-expanded="false" aria-controls="' . $detId . '"><i class="fas fa-eye me-1"></i>Detalhes</button>'
                     . '    <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar</button>'
                     . '  </form>'
                     . '  <form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'Cancelar este pedido?\');">'
                     . '    <button type="submit" class="btn btn-outline-danger btn-sm mt-1"><i class="fas fa-times me-1"></i>Cancelar pedido</button>'
                     . '  </form>'
+                    . '</td>'
+                    . '</tr>';
+
+                echo '<tr class="collapse" id="' . $detId . '">'
+                    . '<td colspan="7" class="bg-light">'
+                    . '<div class="small">'
+                    . '<div class="fw-semibold mb-2">Detalhes do pedido</div>'
+                    . '<div style="border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 12px; overflow: hidden; background: #fff;">'
+                    . '<iframe src="/admin/pedidos/detalhes/' . $pid . '?embed=1" style="width: 100%; height: 680px; border: 0;" loading="lazy"></iframe>'
+                    . '</div>'
+                    . '</div>'
                     . '</td>'
                     . '</tr>';
             }
@@ -248,7 +309,7 @@ class AdminPedidosConferenciaController extends Controller {
                 $st->execute($params);
             }
 
-            // inserir itens do pedido na lista_compras
+            // inserir itens do pedido na lista_compras (idempotente)
             $itensTable = $this->getPedidoItensTable();
             if ($itensTable) {
                 $colsItens = [];
@@ -276,11 +337,53 @@ class AdminPedidosConferenciaController extends Controller {
                         $colsLista = [];
                     }
 
+                    $itensConsolidados = [];
                     foreach ($itens as $it) {
                         $produtoId = (int) ($it['produto_id'] ?? 0);
                         $qtd = (int) ($it['quantidade'] ?? 0);
                         if ($produtoId <= 0 || $qtd <= 0) {
                             continue;
+                        }
+                        if (!isset($itensConsolidados[$produtoId])) {
+                            $itensConsolidados[$produtoId] = 0;
+                        }
+                        $itensConsolidados[$produtoId] += $qtd;
+                    }
+
+                    $temQtdFaltante = in_array('quantidade_faltante', $colsLista, true);
+                    $temQtdNec = in_array('quantidade_necessaria', $colsLista, true);
+                    $colQtdLista = $temQtdFaltante ? 'quantidade_faltante' : ($temQtdNec ? 'quantidade_necessaria' : '');
+
+                    foreach ($itensConsolidados as $produtoId => $qtd) {
+                        $produtoId = (int) $produtoId;
+                        $qtd = (int) $qtd;
+                        if ($produtoId <= 0 || $qtd <= 0) {
+                            continue;
+                        }
+
+                        // se já existe item pendente desse pedido/produto/tipo_compra, somar quantidade ao invés de duplicar
+                        try {
+                            if (in_array('pedido_id', $colsLista, true) && in_array('produto_id', $colsLista, true) && $colQtdLista !== '') {
+                                $sqlFind = 'SELECT id, ' . $colQtdLista . ' AS qtd FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = \'pendente\'';
+                                if (in_array('tipo_compra', $colsLista, true)) {
+                                    $sqlFind .= ' AND tipo_compra = ?';
+                                }
+                                $sqlFind .= ' ORDER BY id DESC LIMIT 1';
+                                $stFind = $this->connection->prepare($sqlFind);
+                                if (in_array('tipo_compra', $colsLista, true)) {
+                                    $stFind->execute([$id, $produtoId, $tipoCompra]);
+                                } else {
+                                    $stFind->execute([$id, $produtoId]);
+                                }
+                                $ex = $stFind->fetch(\PDO::FETCH_ASSOC);
+                                if (is_array($ex) && !empty($ex['id'])) {
+                                    $newQtd = ((int) ($ex['qtd'] ?? 0)) + $qtd;
+                                    $stUpd = $this->connection->prepare('UPDATE lista_compras SET ' . $colQtdLista . ' = ? WHERE id = ?');
+                                    $stUpd->execute([$newQtd, (int) $ex['id']]);
+                                    continue;
+                                }
+                            }
+                        } catch (\Exception $e) {
                         }
 
                         $colsIns = [];

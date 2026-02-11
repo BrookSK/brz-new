@@ -1730,6 +1730,7 @@ JS;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
+        $embed = ((string) $request->getParam('embed', '0') === '1');
         
         try {
             // Usar o PedidoEcommerce que já está corrigido e adaptativo
@@ -1787,6 +1788,12 @@ JS;
     </style>
 </head>
 <body>
+    ' . ($embed ? '<style>
+        #adminSidebar { display: none !important; }
+        .admin-menu-toggle { display: none !important; }
+        main.col-md-9, main.col-lg-10 { width: 100% !important; margin-left: 0 !important; }
+        .container-fluid > .row { --bs-gutter-x: 0; }
+    </style>' : '') . '
     <div class="container-fluid">
         <div class="row">';
         
