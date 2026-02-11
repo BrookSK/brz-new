@@ -294,6 +294,9 @@ ob_start();
                             <button type="submit" class="btn btn-primary btn-lg" id="addToCartBtn" disabled>
                                 <i class="fas fa-shopping-cart me-2"></i>Adicionar ao Carrinho
                             </button>
+                            <div class="alert alert-warning small mt-2 d-none" id="variacao-warning" role="alert">
+                                Para continuar, selecione a variação obrigatória (ex.: tamanho/cor) dos produtos selecionados.
+                            </div>
                             <a href="/carrinho" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye me-2"></i>Ver Carrinho
                             </a>
@@ -549,6 +552,9 @@ $(document).ready(function() {
         const termosAceitos = $('#termosAceitos').is(':checked');
         const temSelecionados = selecionados.length > 0;
         $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete));
+
+        const showVariacaoWarning = temSelecionados && !allComplete;
+        $('#variacao-warning').toggleClass('d-none', !showVariacaoWarning);
 
         // Cache payload no botão
         $('#addToCartBtn').data('selecionados', selecionadosPayload);

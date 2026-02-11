@@ -2187,7 +2187,8 @@ class AssessoriaController extends Controller {
         }
         
         // Reutiliza funções de cálculo existentes
-        $taxaServico = $this->getTaxaServicoPorKg() * $pesoTotal;
+        $pesoArredondado = ceil((float) $pesoTotal);
+        $taxaServico = $this->getTaxaServicoPorKg() * $pesoArredondado;
         $frete = $this->calcularFrete($subtotal, $pesoTotal);
         $impostos = $this->calcularImpostos($subtotal);
         
