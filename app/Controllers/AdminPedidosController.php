@@ -6,6 +6,7 @@ use App\Models\PedidoEcommerce;
 use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
 use App\Services\AuthService;
+use App\Services\SupportTicketNotificationService;
 
 class AdminPedidosController extends Controller {
 
@@ -1981,6 +1982,11 @@ HTML;
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary me-2">'
                             . '<i class="fas fa-pen-to-square me-1"></i>Editar Pedido Manual</a>')
                         : '') . '
+                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block" class="me-2">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-headset me-1"></i>Criar ticket
+                        </button>
+                    </form>
                     <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>
@@ -4006,6 +4012,108 @@ HTML;
             }
             echo '<div class="alert alert-danger">Erro ao excluir pedido: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos/detalhes/' . htmlspecialchars((string)$id) . '" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
+
+    public function criarTicket(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+        $admin = $auth->getUsuarioLogado();
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/pedidos');
+            exit;
+        }
+
+        $adminUid = (int) ($admin['id'] ?? 0);
+        $pdo = \Config\Database::getConnection();
+
+        // Cliente do pedido
+        $colsP = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE pedidos');
+            $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsP = [];
+        }
+        $colUsuario = null;
+        foreach (['usuario_id', 'user_id', 'cliente_id'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $colUsuario = $c;
+                break;
+            }
+        }
+        if ($colUsuario === null) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        $stOwner = $pdo->prepare('SELECT ' . $colUsuario . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stOwner->execute([(int) $id]);
+        $clienteId = (int) ($stOwner->fetchColumn() ?: 0);
+        if ($clienteId <= 0) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        // Reutilizar ticket aberto
+        try {
+            $stFind = $pdo->prepare("SELECT id FROM support_tickets WHERE usuario_id = ? AND pedido_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1");
+            $stFind->execute([(int) $clienteId, (int) $id]);
+            $existingOpen = (int) ($stFind->fetchColumn() ?: 0);
+            if ($existingOpen > 0) {
+                header('Location: /admin/tickets/' . $existingOpen);
+                exit;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $assunto = 'Suporte do Pedido #' . (int) $id;
+        $motivo = 'Problema no pedido';
+        $mensagem = trim((string) ($request->getParam('mensagem') ?? 'Ticket iniciado pelo suporte.'));
+        if ($mensagem === '') {
+            $mensagem = 'Ticket iniciado pelo suporte.';
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $colsT = [];
+            try {
+                $stT = $pdo->query('DESCRIBE support_tickets');
+                $colsT = $stT ? ($stT->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsT = [];
+            }
+
+            if (in_array('motivo', $colsT, true)) {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, motivo, status) VALUES (?, ?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto, (string) $motivo]);
+            } else {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, status) VALUES (?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto]);
+            }
+            $ticketId = (int) $pdo->lastInsertId();
+
+            $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+            $stMsg->execute([(int) $ticketId, 'admin', (int) $adminUid, (string) $mensagem]);
+
+            $pdo->commit();
+
+            try {
+                $not = new SupportTicketNotificationService();
+                $not->notificarTicketCriado((int) $id, (int) $ticketId, [
+                    'assunto' => $assunto,
+                    'motivo' => $motivo,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            header('Location: /admin/tickets/' . $ticketId);
+            exit;
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
             exit;
         }
     }

@@ -335,6 +335,7 @@ $router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
 $router->post('/admin/pedidos/restaurar/{id}', 'AdminPedidosController', 'restaurar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
+$router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'criarTicket');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 
 // Usuários
