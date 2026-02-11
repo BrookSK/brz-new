@@ -2308,10 +2308,15 @@ HTML;
                                                 $extraHtml .= '<div class="small text-muted" style="margin-top: 6px;">' . htmlspecialchars($variacaoLinha) . '</div>';
                                             }
 
+                                            $ncmVal = trim((string) ($item['ncm'] ?? ''));
+                                            $ncmHtml = $ncmVal !== ''
+                                                ? htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8')
+                                                : '<span class="badge bg-warning text-dark">Sem NCM</span>';
+
                                             echo '</td>
                                                 <td>' . $nomeHtml . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
-                                                <td>' . htmlspecialchars((string) ($item['ncm'] ?? '')) . '</td>
+                                                <td>' . $ncmHtml . '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
