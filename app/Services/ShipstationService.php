@@ -98,6 +98,12 @@ class ShipstationService {
 
         if ($code >= 400) {
             $msg = '';
+            if (isset($decoded['errors']) && is_array($decoded['errors']) && isset($decoded['errors'][0]) && is_array($decoded['errors'][0])) {
+                $err0 = $decoded['errors'][0];
+                if (!empty($err0['message']) && is_string($err0['message'])) {
+                    $msg = (string) $err0['message'];
+                }
+            }
             foreach (['message', 'error', 'erro', 'detail', 'title'] as $k) {
                 if (!empty($decoded[$k]) && is_string($decoded[$k])) {
                     $msg = (string) $decoded[$k];

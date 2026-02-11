@@ -2536,10 +2536,18 @@ class CheckoutController extends Controller {
     
     private function validarDadosCheckout($dados) {
         $erros = [];
+
+        $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
         
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
+<<<<<<< HEAD
+        if ($paisEntrega === 'BR' && empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
+=======
         $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
         if ($pais === '') {
             $pais = 'BR';
@@ -2550,6 +2558,7 @@ class CheckoutController extends Controller {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
             }
         }
+>>>>>>> fdebdf831d66d5fe381731ff252747b1d861a24a
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
         if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         
