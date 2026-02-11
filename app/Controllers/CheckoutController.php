@@ -1749,7 +1749,42 @@ class CheckoutController extends Controller {
 
                 if (!$reused && $formaSelecionada === 'carteira') {
                     $valorPedido = (float) ($pedidoRowPay['total'] ?? 0);
-                    $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                    $moedaPedidoWallet = strtoupper(trim((string) ($dados['moeda'] ?? ($pedidoRowPay['moeda'] ?? 'BRL'))));
+                    if (!in_array($moedaPedidoWallet, ['BRL', 'USD'], true)) {
+                        $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                    }
+                    if (!in_array($moedaPedidoWallet, ['BRL', 'USD'], true)) {
+                        $moedaPedidoWallet = 'BRL';
+                    }
+
+                    // Garantir que o pedido reflita a moeda que será debitada na carteira
+                    try {
+                        $dbUpdCur = \Config\Database::getConnection();
+                        $colsPedCur = [];
+                        try {
+                            $stColsPedCur = $dbUpdCur->query('DESCRIBE pedidos');
+                            $colsPedCur = $stColsPedCur ? ($stColsPedCur->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPedCur = [];
+                        }
+
+                        $setCur = [];
+                        $pCur = [];
+                        if (is_array($colsPedCur) && in_array('moeda', $colsPedCur, true)) {
+                            $setCur[] = 'moeda = ?';
+                            $pCur[] = $moedaPedidoWallet;
+                        }
+                        if (is_array($colsPedCur) && in_array('taxa_conversao', $colsPedCur, true)) {
+                            // Se está pagando em USD, considerar taxa 1 como padrão; BRL também.
+                            $setCur[] = 'taxa_conversao = COALESCE(taxa_conversao, 1)';
+                        }
+                        if (!empty($setCur)) {
+                            $pCur[] = (int) $pedidoId;
+                            $stUpdCur = $dbUpdCur->prepare('UPDATE pedidos SET ' . implode(', ', $setCur) . ' WHERE id = ?');
+                            $stUpdCur->execute($pCur);
+                        }
+                    } catch (\Exception $e) {
+                    }
                     $payResult = $this->debitarCarteiraParaPedido((int) ($usuario['id'] ?? 0), (int) $pedidoId, $valorPedido, $moedaPedidoWallet);
                     $gateway = 'carteira';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);

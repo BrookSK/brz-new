@@ -112,6 +112,7 @@ class PedidoEcommerce {
                     'created_at' => $r['created_at'] ?? null,
                     'moeda' => $moeda,
                     'faturado' => $fat,
+                    'impostos' => $impostos,
                     'custo' => $custo,
                     'liquido' => $liq,
                 ];

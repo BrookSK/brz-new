@@ -2946,12 +2946,159 @@ JS;
                 $st = $pdo->prepare('SELECT pedido_id, usuario_id, moeda, percentual, base_liquida, valor_comissao, created_at FROM comissoes_processamento' . $where . ' ORDER BY created_at DESC LIMIT 500');
                 $st->execute($params);
                 $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Enriquecer com dados do pedido (valor pago, impostos, custo, líquido)
+                $pedidoInfoMap = [];
+                try {
+                    $pedidoIds = [];
+                    foreach ($rows as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid > 0) $pedidoIds[$pid] = true;
+                    }
+                    $pedidoIds = array_keys($pedidoIds);
+
+                    if (!empty($pedidoIds)) {
+                        $colsP = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pedidos');
+                            $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsP = [];
+                        }
+
+                        $pick = function(array $cols, array $cands): string {
+                            foreach ($cands as $c) {
+                                if (in_array($c, $cols, true)) return $c;
+                            }
+                            return '';
+                        };
+
+                        $colMoeda = $pick($colsP, ['moeda', 'currency']);
+                        $colTotal = $pick($colsP, ['total', 'valor_total', 'amount', 'valor']);
+                        $colImpostos = $pick($colsP, ['impostos', 'valor_impostos', 'taxes']);
+                        $colOrigem = $pick($colsP, ['origem_pedido', 'origem', 'tipo']);
+
+                        $sel = ['id'];
+                        if ($colMoeda !== '') $sel[] = $colMoeda . ' AS moeda';
+                        if ($colTotal !== '') $sel[] = $colTotal . ' AS total';
+                        if ($colImpostos !== '') $sel[] = $colImpostos . ' AS impostos';
+                        if ($colOrigem !== '') $sel[] = $colOrigem . ' AS origem_pedido';
+
+                        $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                        $stP = $pdo->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id IN (' . $in . ')');
+                        $stP->execute($pedidoIds);
+                        $pRows = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        // descobrir tabela de itens
+                        $itensTable = null;
+                        try {
+                            $stT->execute(['pedido_itens']);
+                            $tem1 = (int) ($stT->fetchColumn() ?: 0) > 0;
+                            $stT->execute(['pedido_items']);
+                            $tem2 = (int) ($stT->fetchColumn() ?: 0) > 0;
+                            if ($tem1 && !$tem2) $itensTable = 'pedido_itens';
+                            elseif ($tem2 && !$tem1) $itensTable = 'pedido_items';
+                            elseif ($tem1 && $tem2) $itensTable = 'pedido_itens';
+                        } catch (\Exception $e) {
+                            $itensTable = null;
+                        }
+
+                        $colsItens = [];
+                        if ($itensTable) {
+                            try {
+                                $stColsI = $pdo->query('DESCRIBE ' . $itensTable);
+                                $colsItens = $stColsI ? ($stColsI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
+                                $colsItens = [];
+                            }
+                        }
+
+                        $colPedidoId = $pick($colsItens, ['pedido_id']);
+                        $colQtd = $pick($colsItens, ['quantidade', 'qty']);
+                        $colSubtotal = $pick($colsItens, ['subtotal']);
+                        $colUnit = $pick($colsItens, ['preco_unitario', 'valor_unitario', 'price', 'valor']);
+                        $colProdutoId = $pick($colsItens, ['produto_id']);
+
+                        $colsProd = [];
+                        try {
+                            $stColsPr = $pdo->query('DESCRIBE produtos');
+                            $colsProd = $stColsPr ? ($stColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsProd = [];
+                        }
+                        $colCustoProd = $pick($colsProd, ['preco_custo', 'cost_price', 'custo', 'valor_custo']);
+
+                        foreach ($pRows as $pr) {
+                            $pid = (int) ($pr['id'] ?? 0);
+                            if ($pid <= 0) continue;
+                            $moeda = strtoupper(trim((string) ($pr['moeda'] ?? 'BRL')));
+                            if ($moeda === '') $moeda = 'BRL';
+                            $total = (float) ($pr['total'] ?? 0);
+                            $impostos = (float) ($pr['impostos'] ?? 0);
+                            $origem = strtolower(trim((string) ($pr['origem_pedido'] ?? '')));
+
+                            $custo = 0.0;
+                            $isAssessoria = in_array($origem, ['assessoria', 'redirecionamento'], true);
+                            try {
+                                if ($itensTable && $colPedidoId !== '' && $colQtd !== '') {
+                                    if ($isAssessoria) {
+                                        if ($colSubtotal !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(' . $colSubtotal . ',0)) FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        } elseif ($colUnit !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(' . $colUnit . ',0) * COALESCE(' . $colQtd . ',0)) FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        }
+                                    } else {
+                                        if ($colProdutoId !== '' && $colCustoProd !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(pr.' . $colCustoProd . ',0) * COALESCE(pi.' . $colQtd . ',0)) FROM ' . $itensTable . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId . ' WHERE pi.' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                $custo = 0.0;
+                            }
+
+                            $liq = $total - $impostos - $custo;
+                            $pedidoInfoMap[$pid] = [
+                                'moeda' => $moeda,
+                                'total' => $total,
+                                'impostos' => $impostos,
+                                'custo' => $custo,
+                                'liquido' => $liq,
+                            ];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $pedidoInfoMap = [];
+                }
+
                 foreach ($rows as $r) {
                     $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
                     if ($m === '') $m = 'BRL';
                     if (!isset($resumoProc['por_moeda'][$m])) {
                         $resumoProc['por_moeda'][$m] = ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
                     }
+
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid > 0 && isset($pedidoInfoMap[$pid]) && is_array($pedidoInfoMap[$pid])) {
+                        $r['valor_pago'] = (float) ($pedidoInfoMap[$pid]['total'] ?? 0);
+                        $r['impostos'] = (float) ($pedidoInfoMap[$pid]['impostos'] ?? 0);
+                        $r['custo'] = (float) ($pedidoInfoMap[$pid]['custo'] ?? 0);
+                        $r['liquido_calc'] = (float) ($pedidoInfoMap[$pid]['liquido'] ?? 0);
+                        // preferir moeda do pedido
+                        $r['moeda'] = (string) ($pedidoInfoMap[$pid]['moeda'] ?? $m);
+                        $m = strtoupper(trim((string) ($r['moeda'] ?? $m)));
+                        if ($m === '') $m = 'BRL';
+                        if (!isset($resumoProc['por_moeda'][$m])) {
+                            $resumoProc['por_moeda'][$m] = ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+                        }
+                    }
+
                     $resumoProc['por_moeda'][$m]['base_liquida'] += (float) ($r['base_liquida'] ?? 0);
                     $resumoProc['por_moeda'][$m]['valor_comissao'] += (float) ($r['valor_comissao'] ?? 0);
                     $resumoProc['por_moeda'][$m]['linhas'][] = $r;
@@ -3113,7 +3260,7 @@ JS;
                     <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
                     <div class="card-body">';
 
-        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel) use ($formatMoney) {
+        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel, float $percentMoeda) use ($formatMoney) {
             if (empty($pedidos)) {
                 echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
@@ -3126,8 +3273,10 @@ JS;
                                 <th>Pedido</th>
                                 <th>Data</th>
                                 <th class="text-end">Faturado</th>
+                                <th class="text-end">Impostos</th>
                                 <th class="text-end">Custo</th>
                                 <th class="text-end">Líquido</th>
+                                <th class="text-end">Comissão</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -3137,8 +3286,10 @@ JS;
                 $pid = (int) ($p['id'] ?? 0);
                 $codigo = (string) ($p['codigo'] ?? $pid);
                 $fat = (float) ($p['faturado'] ?? 0);
+                $imp = (float) ($p['impostos'] ?? 0);
                 $cus = (float) ($p['custo'] ?? 0);
-                $liq = (float) ($p['liquido'] ?? ($fat - $cus));
+                $liq = (float) ($p['liquido'] ?? ($fat - $imp - $cus));
+                $com = max(0.0, $liq) * (max(0.0, $percentMoeda) / 100.0);
                 $moeda = strtoupper(trim((string) ($p['moeda'] ?? '')));
                 if ($moeda === '') $moeda = 'BRL';
                 $dt = (string) ($p['created_at'] ?? '');
@@ -3148,8 +3299,10 @@ JS;
                         <td><strong>' . htmlspecialchars($codigo) . '</strong><div class="text-muted small">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</div></td>
                         <td>' . htmlspecialchars($dtFmt) . '</td>
                         <td class="text-end fw-semibold">' . $formatMoney($fat, $moeda) . '</td>
+                        <td class="text-end">' . $formatMoney($imp, $moeda) . '</td>
                         <td class="text-end">' . $formatMoney($cus, $moeda) . '</td>
                         <td class="text-end">' . $formatMoney($liq, $moeda) . '</td>
+                        <td class="text-end fw-semibold">' . number_format($percentMoeda, 2, ',', '.') . '% (' . $formatMoney($com, $moeda) . ')</td>
                         <td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>
                       </tr>';
             }
@@ -3163,14 +3316,14 @@ JS;
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>USD</strong>
                 </div>';
-        $renderTabelaPedidos($pedidosUsd, 'USD');
+        $renderTabelaPedidos($pedidosUsd, 'USD', (float) ($porMoeda['USD']['percentual_comissao'] ?? 0));
         echo '</div>';
 
         echo '<div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>BRL</strong>
                 </div>';
-        $renderTabelaPedidos($pedidosBrl, 'BRL');
+        $renderTabelaPedidos($pedidosBrl, 'BRL', (float) ($porMoeda['BRL']['percentual_comissao'] ?? 0));
         echo '</div>';
 
         echo '        </div>
@@ -3186,17 +3339,24 @@ JS;
             }
             echo '<div class="table-responsive">'
                 . '<table class="table table-hover">'
-                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Base líquida</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Pago</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
             foreach ($linhas as $r) {
                 $pid = (int) ($r['pedido_id'] ?? 0);
                 $dt = (string) ($r['created_at'] ?? '');
                 $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
                 $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
                 if ($m === '') $m = 'BRL';
+                $pago = (float) ($r['valor_pago'] ?? 0);
+                $imp = (float) ($r['impostos'] ?? 0);
+                $cus = (float) ($r['custo'] ?? 0);
+                $liq = (float) ($r['liquido_calc'] ?? (($r['base_liquida'] ?? 0)));
                 echo '<tr>'
                     . '<td><strong>#' . $pid . '</strong></td>'
                     . '<td>' . htmlspecialchars($dtFmt) . '</td>'
-                    . '<td class="text-end">' . $formatMoney((float) ($r['base_liquida'] ?? 0), $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($pago, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($imp, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($cus, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($liq, $m) . '</td>'
                     . '<td class="text-end">' . number_format((float) ($r['percentual'] ?? 0), 2, ',', '.') . '%</td>'
                     . '<td class="text-end fw-semibold">' . $formatMoney((float) ($r['valor_comissao'] ?? 0), $m) . '</td>'
                     . '<td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>'
