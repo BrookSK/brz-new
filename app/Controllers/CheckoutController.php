@@ -2520,11 +2520,16 @@ class CheckoutController extends Controller {
     
     private function validarDadosCheckout($dados) {
         $erros = [];
+
+        $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
         
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-        if (empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
+        if ($paisEntrega === 'BR' && empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
         if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         

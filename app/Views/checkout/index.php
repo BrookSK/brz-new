@@ -34,8 +34,8 @@
                                            value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">CPF/CNPJ *</label>
-                                    <input type="text" class="form-control" name="documento" required 
+                                    <label class="form-label" id="label-documento">CPF/CNPJ</label>
+                                    <input type="text" class="form-control" name="documento" id="documento" 
                                            value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -601,6 +601,8 @@ function atualizarEnderecoPorPais() {
     const estadoSelect = document.getElementById('estado');
     const estadoText = document.getElementById('estado_text');
     const moedaHidden = document.getElementById('moeda_hidden');
+    const docInput = document.getElementById('documento');
+    const docLabel = document.getElementById('label-documento');
 
     const statesByCountry = {
         BR: [
@@ -636,6 +638,15 @@ function atualizarEnderecoPorPais() {
                 updatePrices(desired);
             } catch (e) {
             }
+        }
+    }
+
+    // Documento (CPF/CNPJ) só é obrigatório para BR
+    if (docInput) {
+        const requiredDoc = (pais === 'BR');
+        docInput.required = requiredDoc;
+        if (docLabel) {
+            docLabel.textContent = requiredDoc ? 'CPF/CNPJ *' : 'CPF/CNPJ (opcional)';
         }
     }
 
@@ -1419,7 +1430,16 @@ function updatePaymentMethodsForCurrency(currency) {
 
     // Manter seleção se ainda válida
     const stillValid = Array.from(select.options).some(o => o.value === currentValue);
-    select.value = stillValid ? currentValue : '';
+    if (stillValid) {
+        select.value = currentValue;
+    } else {
+        if (!isBRL) {
+            // Em USD, não pode ficar sem seleção quando o usuário já havia escolhido um método inválido (pix/boleto)
+            select.value = (currentValue === 'carteira') ? 'carteira' : 'cartao_credito';
+        } else {
+            select.value = '';
+        }
+    }
 
     // Atualizar exibição dos campos conforme a forma selecionada
     if (typeof atualizarFormaPagamento === 'function') {
