@@ -662,7 +662,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -679,6 +679,17 @@ class PedidoManualService {
             $fpNorm = trim((string) $formaPagamento);
             if ($fpNorm !== '' && $fpNorm !== 'pagdev' && $fpNorm !== 'carteira') {
                 throw new \Exception('Forma de pagamento inválida');
+            }
+        }
+
+        if ($tipoCompra !== null) {
+            $tc = strtolower(trim((string) $tipoCompra));
+            if ($tc === '') {
+                $tipoCompra = null;
+            } elseif (!in_array($tc, ['online', 'offline'], true)) {
+                throw new \Exception('Tipo de compra inválido');
+            } else {
+                $tipoCompra = $tc;
             }
         }
 
@@ -819,6 +830,12 @@ class PedidoManualService {
             $cols[] = $codigoCol;
             $vals[] = ':codigo';
             $params[':codigo'] = 'MAN-' . date('Ymd-His');
+        }
+
+        if ($tipoCompra !== null && in_array('tipo_compra', $colsPedidos, true)) {
+            $cols[] = 'tipo_compra';
+            $vals[] = ':tipo_compra';
+            $params[':tipo_compra'] = $tipoCompra;
         }
 
         // Origem do pedido / admin criador (quando colunas existirem)

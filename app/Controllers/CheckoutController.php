@@ -1774,10 +1774,17 @@ class CheckoutController extends Controller {
                     }
                 }
 
-                // Se veio da Assessoria, vincular orçamento ao pedido (pago)
+                // Se veio da Assessoria (/assessoria), vincular orçamento ao pedido (pago)
+                // e colocar pedido em pendência de conferência.
+                $orcId = 0;
                 try {
                     $orcId = (int) ($_SESSION['checkout_assessoria_orcamento_id'] ?? 0);
-                    if ($orcId > 0) {
+                } catch (\Exception $e) {
+                    $orcId = 0;
+                }
+
+                if ($orcId > 0) {
+                    try {
                         $orcModel = new AssessoriaOrcamento();
                         $rowOrc = $orcModel->find($orcId);
                         if (is_array($rowOrc) && !empty($rowOrc['id'])) {
@@ -1788,9 +1795,41 @@ class CheckoutController extends Controller {
                                 'updated_at' => date('Y-m-d H:i:s'),
                             ]);
                         }
+                    } catch (\Exception $e) {
                     }
-                    unset($_SESSION['checkout_assessoria_orcamento_id']);
-                } catch (\Exception $e) {
+
+                    // Pedidos de Assessoria entram como pendentes de conferência (quando colunas existirem)
+                    try {
+                        $dbConf = \Config\Database::getConnection();
+                        $colsPed = [];
+                        try {
+                            $stmtColsPed = $dbConf->query('DESCRIBE pedidos');
+                            $colsPed = $stmtColsPed ? ($stmtColsPed->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPed = [];
+                        }
+
+                        $set = [];
+                        $params = [':id' => (int) $pedidoId];
+                        if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
+                            $set[] = 'origem_pedido = :origem_pedido';
+                            $params[':origem_pedido'] = 'redirecionamento';
+                        }
+                        if (is_array($colsPed) && in_array('status_conferencia', $colsPed, true)) {
+                            $set[] = 'status_conferencia = :status_conferencia';
+                            $params[':status_conferencia'] = 'pendente';
+                        }
+                        if (!empty($set)) {
+                            $st = $dbConf->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                            $st->execute($params);
+                        }
+                    } catch (\Exception $e) {
+                    }
+
+                    try {
+                        unset($_SESSION['checkout_assessoria_orcamento_id']);
+                    } catch (\Exception $e) {
+                    }
                 }
                 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.

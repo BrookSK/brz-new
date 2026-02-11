@@ -246,6 +246,15 @@ class AdminPedidosManualController extends Controller {
                                     <option value="BRL">Real (BRL)</option>
                                 </select>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tipo de compra</label>
+                                <select class="form-select" name="tipo_compra" id="tipo_compra" required>
+                                    <option value="" selected>Selecione...</option>
+                                    <option value="online">Online</option>
+                                    <option value="offline">Offline</option>
+                                </select>
+                                <div class="form-text">Obrigatório para pedidos manuais.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1399,6 +1408,10 @@ JS;
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
+            $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
+            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            }
 
             $enderecoEntrega = [
                 'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
@@ -1454,7 +1467,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
@@ -1471,6 +1484,10 @@ JS;
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
+            $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
+            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            }
 
             $enderecoEntrega = [
                 'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
@@ -1526,7 +1543,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);

@@ -69,6 +69,7 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Pedidos para conferência', 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
         'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Pedidos (WordPress)', 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => 'Tickets', 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
@@ -84,6 +85,7 @@ function renderAdminSidebar($activePage = '') {
     ];
 
     $unreadTickets = 0;
+    $pendentesConferencia = 0;
     try {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -115,6 +117,24 @@ function renderAdminSidebar($activePage = '') {
         }
     } catch (\Exception $e) {
         $unreadTickets = 0;
+    }
+
+    try {
+        $pdo = \Config\Database::getConnection();
+        $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+        $stT->execute(['pedidos']);
+        $hasPedidos = ((int) ($stT->fetchColumn() ?: 0) > 0);
+        if ($hasPedidos) {
+            $stC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'pedidos' AND column_name = 'status_conferencia'");
+            $stC->execute();
+            $hasCol = ((int) ($stC->fetchColumn() ?: 0) > 0);
+            if ($hasCol) {
+                $stP = $pdo->query("SELECT COUNT(*) FROM pedidos WHERE status_conferencia = 'pendente'");
+                $pendentesConferencia = (int) ($stP ? ($stP->fetchColumn() ?: 0) : 0);
+            }
+        }
+    } catch (\Exception $e) {
+        $pendentesConferencia = 0;
     }
 
     // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
@@ -202,6 +222,9 @@ function renderAdminSidebar($activePage = '') {
                 $label = $item['label'];
                 if ($key === 'tickets' && $unreadTickets > 0) {
                     $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $unreadTickets . '</span>';
+                }
+                if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
+                    $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $pendentesConferencia . '</span>';
                 }
                 echo '<li class="nav-item">
                     <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
