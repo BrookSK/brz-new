@@ -4,7 +4,7 @@
         <div class="col-lg-8 mx-auto">
             <div class="text-center mb-5">
                 <h1 class="display-4 mb-3">TERMOS E CONDIÇÕES DE USO - BRAZILIANA</h1>
-                <p class="lead text-muted">Última Atualização: 11 de fevereiro de 2026</p>
+                <p class="lead text-muted">Última Atualização: 01 de fevereiro de 2026</p>
             </div>
             
             <!-- Busca de FAQ -->
@@ -27,8 +27,9 @@
                     <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">1. ACEITAÇÃO DOS TERMOS
-Ao utilizar os serviços da Braziliana, navegar pelo site, realizar compras, utilizar o serviço de Assessoria (compra por link) e/ou participar do Clube Brasiliana, você declara aceitar integralmente estes Termos e Condições, bem como nossa Política de Privacidade. Caso não concorde com qualquer disposição aqui estabelecida, recomendamos que não utilize nossos serviços.
-A Braziliana atua como agenciadora de cargas e logística internacional, oferecendo serviços de recebimento, armazenamento, consolidação, embalagem e despacho de mercadorias dos Estados Unidos para diversos países, além de plataforma de e-commerce para compra direta de produtos.</pre>
+Ao utilizar os serviços da Braziliana, navegar pelo site, realizar compras, utilizar o serviço de Assessoria (compra por link) e/ou participar do Clube Braziliana, você declara aceitar integralmente estes Termos e Condições, bem como nossa Política de Privacidade. Caso não concorde com qualquer disposição aqui estabelecida, recomendamos que não utilize nossos serviços.
+
+A Braziliana atua como agente de cargas e logística internacional, oferecendo serviços de recebimento de produtos, armazenamento, consolidação, embalagem e despacho de mercadorias dos Estados Unidos para diversos países, além de plataforma de e-commerce para compra direta de produtos.</pre>
                         </div>
                     </div>
                 </div>
@@ -44,13 +45,14 @@ A Braziliana atua como agenciadora de cargas e logística internacional, oferece
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">2. NATUREZA DOS SERVIÇOS
 A Braziliana oferece os seguintes serviços:
-E-commerce (loja virtual) com produtos disponíveis para compra direta
-Serviço de Assessoria para compra de produtos por meio de links fornecidos pelo cliente
-Serviço de Redirecionamento com endereço exclusivo nos Estados Unidos (Número de Suíte)
-Transporte aéreo internacional com rastreamento completo
-Parceria com os Correios do Brasil para entregas no território brasileiro
-Orientação para declarações aduaneiras e suporte ao cliente
-Clube Braziliana - programa de benefícios com créditos internos
+
+- **E-commerce (loja virtual)** com produtos disponíveis para assessoria à compra direta. Lembrando que a Braziliana não tem estoque de produtos e todos são comprados por demanda.
+- **Serviço de Assessoria** para compra de produtos por meio de links fornecidos pelo cliente
+- **Transporte aéreo internacional** com rastreamento completo
+- **Parceria com os Correios do Brasil** para entregas no território brasileiro no last mile
+- **Orientação para declarações aduaneiras** e suporte ao cliente
+- **Clube Braziliana** - programa de benefícios com créditos internos
+
 Todos os produtos são adquiridos sob demanda e estão sujeitos às regulamentações dos Estados Unidos e do país de destino.</pre>
                         </div>
                     </div>
@@ -67,22 +69,23 @@ Todos os produtos são adquiridos sob demanda e estão sujeitos às regulamenta�
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">3. NAVEGAÇÃO E COMPRA NO SITE
 3.1. Página Inicial e Categorias
-Você pode navegar pelas categorias e vitrines disponíveis no site. Os preços podem aparecer em Real (R$) ou Dólar (US$), dependendo da opção selecionada
+Você pode navegar pelas categorias e vitrines disponíveis no site. Os preços podem aparecer em **Real (R$)** ou **Dólar (US$)**, dependendo da opção selecionada.
 3.2. Página de Produtos
-Mostra os itens disponíveis com preço e informações básicas
-Você pode abrir o produto para ver detalhes completos
+
+- Mostra os itens disponíveis para assessoria nas compras com preço e informações básicas que podem ser alteradas a qualquer momento caso as lojas alterem preços de produtos
+- Você pode clicar no produto para abrir a página para ver detalhes completos
 3.3. Detalhes do Produto
-Escolha a quantidade e, quando existir, variações (cor, tamanho, modelo)
+
+- Escolha a quantidade e, quando existir, variações (cor, tamanho, modelo)
 3.4. Carrinho de Compras
+
 O que você confere no carrinho:
 Produtos escolhidos
 Quantidades
 Valor dos produtos
-Estimativa de taxas (quando aplicável)
+Estimativa de impostos (quando aplicável)
 Frete (quando aplicável)
-Limite de peso:
-Existe um limite de peso total de 30 KG do carrinho
-Se ultrapassar o limite, será necessário remover itens para continuar</pre>
+Taxa de serviço baseada no peso total da compra</pre>
                         </div>
                     </div>
                 </div>
@@ -100,15 +103,15 @@ Se ultrapassar o limite, será necessário remover itens para continuar</pre>
 4.1. Criação de Conta
 Para finalizar uma compra, você pode precisar estar logado. Se você já tem cadastro, basta entrar. Novos usuários devem criar uma conta fornecendo informações básicas.
 4.2. Dados Obrigatórios
-Para concluir o pedido, será necessário completar seus dados pessoais:
+Para concluir o pedido, pode ser necessário completar seus dados pessoais:
 Nome completo
 E-mail
-Telefone
+Telefone de WhatsApp
 Endereço de entrega completo
 Documento (ex.: CPF, quando o endereço de entrega for no Brasil)
 4.3. Responsabilidade pelas Informações
 Você é responsável por informar corretamente:
-Nome, e-mail e telefone
+Nome, e-mail e telefone de WhatsApp
 Endereço de entrega completo
 Documentos solicitados (quando aplicável)
 Importante: Problemas causados por dados incorretos (ex.: endereço incompleto, CPF inválido) podem gerar atrasos, custos adicionais e/ou inviabilizar a entrega.
@@ -131,6 +134,13 @@ Sendo inteiramente responsabilidade do cliente a verificação das corretas info
 5.1. Moeda de Exibição e Pagamento
 O valor considerado como referência é o valor exibido no checkout no momento da finalização
 Dependendo do endereço de entrega e da opção escolhida, o pagamento pode ser em Real (R$) ou Dólar (US$)
+
+Regra importante:
+- Entrega fora do Brasil: pagamento em Dólar (US$)
+- Entrega no Brasil: pagamento pode ser em Real (R$) (conforme disponibilidade no site)
+
+5.2. Conversão de Moeda
+Em compras em Real, o sistema pode aplicar uma taxa de conversão/atualização para compor o valor final em Real.
 5.3. Disponibilidade e Variação de Preços
 Produtos podem ter preço e disponibilidade alterados a qualquer momento
 Itens podem sair de estoque antes da confirmação do pagamento
@@ -163,6 +173,7 @@ Calcular estimativas de impostos
 6.3. Composição do Valor Total
 O total do pedido pode incluir:
 Produtos
+Imposto local da Carolina do Norte (quando aplicável)
 Taxa de serviço (quando aplicável)
 Frete (quando aplicável; pode existir frete grátis)
 Impostos/tributos estimados (quando aplicável)
@@ -220,7 +231,7 @@ Você pode acompanhar o status do pedido na área "Meus Pedidos"
 Detalhes incluem: itens, quantidades, valores e total
 Os valores são exibidos conforme a moeda do pagamento no checkout
 8.3. Comunicações
-O site pode enviar comunicações sobre seu pedido:
+O site enviará comunicações sobre seu pedido por e-mail e, às vezes, WhatsApp:
 Atualizações de status
 Confirmações de pagamento
 Avisos importantes
@@ -241,13 +252,15 @@ Informações de rastreamento</pre>
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">9. SERVIÇO DE ASSESSORIA (COMPRA POR LINK)
 A Assessoria é um serviço para ajudar você a comprar produtos por meio de links de sites dos Estados Unidos.
 9.1. Como Funciona
-Você informa os links dos produtos desejados
-O sistema processa os links e monta um orçamento
-Você revisa o orçamento
-Quando estiver tudo certo, segue para a compra
+
+1. Você cola os links dos produtos desejados nos campos de link de produto
+2. O sistema processa os links e monta um orçamento personalizado
+3. Você revisa o orçamento
+4. Quando estiver tudo certo, prossegue para a finalização do carrinho
+5. Os pesos são baseados nas informações fornecidas online. Caso haja qualquer divergência de peso para mais, haverá uma cobrança da diferença. Caso o produto seja mais leve, a Braziliana estorna a diferença.
 
 9.2. Prazo de Processamento
-Nosso prazo padrão é de 48 horas úteis para processamento e efetivação da compra.
+Nosso prazo padrão é de 48 horas úteis para processamento e efetivação da compra. Com pagamento processado, as compras serão realizadas pela Braziliana no mesmo dia ou dia seguinte caso tenha sido efetuado fora do horário comercial.
 9.3. Limitações e Ressalvas
 Ao usar a Assessoria, você reconhece que:
 O orçamento depende de informações de sites de terceiros
@@ -287,15 +300,14 @@ Você será informado de qualquer alteração</pre>
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">10. SERVIÇO DE REDIRECIONAMENTO
 10.1. Número de Suíte
-Ao criar sua conta no site da Braziliana, você recebe automaticamente um ID exclusivo chamado Número de Suíte, que funciona como seu "apartamento" dentro da estrutura da empresa. Este número permite que você:
-Compre através de nosso site de qualquer loja dos Estados Unidos.
-Nossa equipe irá processar seu pedido e realizar o processamento após o pagamento confirmado.
+Ao criar sua conta no site da Braziliana, você recebe automaticamente um ID exclusivo chamado Número de Suíte, que funciona como seu "apartamento" dentro da estrutura da empresa. Este número permite que você compre através de nosso site de qualquer loja dos Estados Unidos. Nossa equipe irá processar seu pedido e realizar o processamento após o pagamento confirmado.
 10.2. Tratamento de Produtos
-Quando suas compras chegam na Braziliana, elas são tratadas para despacho até 13 dias úteis, contendo:
-Descrição idêntica ao do site do produto
-Peso
-Quantidade
-Foto</pre>
+Quando suas compras chegam na Braziliana, elas são recebidas e embaladas para despacho conforme a chegada de cada um deles (prazos sem estimativa pois está fora do controle da Braziliana o prazo de entrega de lojas terceiras), contendo:
+
+- Descrição idêntica ao do site do produto
+- Peso
+- Quantidade
+- Foto</pre>
                         </div>
                     </div>
                 </div>
@@ -311,27 +323,36 @@ Foto</pre>
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">11. VALORES E TAXAS
 11.1. Taxa de Serviço
-Taxa padrão: US$ 39 por kg de produto (incluindo peso da embalagem)
+Taxa padrão: US$ 39 por kg de produto (incluindo peso da embalagem original de cada produto)
 Exemplo de cálculo:
 Peso total: 4,1 kg
-Cálculo: 4,1 kg × US$ 39 = US$ 159,90
+Cálculo: 4,1 kg fica na grade de 4 a 5 kgs = 5 kg × US$ 39 = US$ 195
 11.2. Frete
 A Braziliana oferece frete grátis para qualquer país , incluindo os Estados Unidos.
 
+Taxa de serviço padrão para qualquer país incluindo Estados Unidos.
+
+Visitantes nos Estados Unidos:
+
+Caso você esteja visitando os Estados Unidos e queira enviar suas compras para que a Braziliana despache, a taxa de serviço é a mesma e o frete local da sua estadia até a Braziliana está incluso. No momento em que você colocar seus produtos em caixa, entre em contato com nosso atendimento passando as medidas e peso que iremos te enviar uma etiqueta da UPS com o endereço de drop off mais próximo assim que o serviço de envio ao Brasil ou qualquer outro país for pago.
 
 
-11.3. Impostos e Tributação para o Brasil.
+
+11.3. Impostos e Tributação para o Brasil
 IMPORTANTE: Para garantir maior agilidade no processamento da sua encomenda, o pagamento dos impostos deverá ser realizado no momento do checkout.
 Após a confirmação do pagamento, a Braziliana efetuará a quitação dos tributos devidos assim que a cobrança for formalmente liberada pela Receita Federal.
 Com os impostos devidamente pagos, a encomenda estará autorizada a ingressar no país e prosseguir para entrega no endereço informado.
 A BRAZILIANA NÃO POSSUI QUALQUER RESPONSABILIDADE, INGERÊNCIA OU PODER DE DECISÃO sobre os procedimentos, análises ou determinações da autoridade aduaneira, sendo tais decisões de competência exclusiva da Receita Federal.
 O serviço prestado pela Braziliana é considerado concluído no momento da entrega da carga para apreciação e fiscalização da Receita Federal, não se responsabilizando por eventuais retenções, exigências adicionais, atrasos ou indeferimentos decorrentes do processo aduaneiro.
 
+Caso sua caixa seja negada a naturalização pela Receita Federal, a Braziliana irá fazer o estorno do valor dos impostos somente. Taxa de serviço e valores de produto não estão sujeitos a estorno pois o serviço foi prestado como anunciado. A Braziliana não dá garantia de entrega.
 
-Para outros países:
-Compras internacionais podem ter incidência de impostos e taxas locais, não cobradas nem gerenciadas pela Braziliana.
+11.4. Impostos e Tributação (Outros Países)
+
+Compras internacionais podem ter incidência de impostos e taxas
+O site pode exibir estimativas, mas o valor final pode variar conforme a fiscalização
 É responsabilidade do cliente conhecer as leis de importação, limites, restrições e possíveis tributos do seu país de residência/destino
-Em algumas situações, podem existir custos adicionais para liberação e entrega, serviço o qual a Braziliana não possui e ou oferta. Ficando a cargo do cliente a responsabilidade por tal gestão.</pre>
+Em algumas situações, podem existir custos adicionais para liberação e entrega</pre>
                         </div>
                     </div>
                 </div>
@@ -340,14 +361,26 @@ Em algumas situações, podem existir custos adicionais para liberação e entre
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq12">
                             <i class="fas fa-file-contract me-2"></i>
-                            12. PRAZOS E RASTREAMENTO
+                            12. ENVIO, PRAZOS E RASTREAMENTO
                         </button>
                     </h2>
                     <div id="faq12" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">12.2. Prazos de Entrega
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">12.1. Modalidades de Envio
+
+Brasil:
+- Envios realizados pela Braziliana Global (transportadora privada do grupo)
+- Contrato próprio com os Correios do Brasil
+- Entrega porta a porta garantida
+
+Outros países e envios dentro dos EUA:
+- Envios realizados via UPS
+
+12.2. Prazos de Envio (não entrega)
+
 Prazo médio: 10 a 15 dias
 Prazos informados são estimativas e podem variar
+
 Fatores que podem impactar o prazo:
 Transporte
 Clima
@@ -356,13 +389,17 @@ Fiscalização aduaneira
 Greves
 Políticas do país de destino
 Condições de voo
+
 12.3. Rastreamento
+
 Assim que a etiqueta de envio for gerada, você receberá:
-Código de rastreio por e-mail e WhatsApp
-Acesso ao rastreio no painel da Braziliana através da aba Meus Pedidos Atualização no detalhe do pedido (quando houver rastreio disponível)
+- Código de rastreio por e-mail e WhatsApp
+- Acesso ao rastreio no painel da Braziliana
+- Atualização no detalhe do pedido (quando houver rastreio disponível)
+
 Como acompanhar:
-Brasil: www.correios.com.br
-EUA e outros países: www.ups.com</pre>
+- Brasil: www.correios.com.br
+- EUA e outros países: www.ups.com</pre>
                         </div>
                     </div>
                 </div>
@@ -371,18 +408,26 @@ EUA e outros países: www.ups.com</pre>
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq13">
                             <i class="fas fa-file-contract me-2"></i>
-                            13. LIMITES DE ENVIO (BRASIL)
+                            13. CONSOLIDAÇÃO DE ENVIOS
                         </button>
                     </h2>
                     <div id="faq13" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">13.2. Limites de Envio (Brasil)
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">13. CONSOLIDAÇÃO DE ENVIOS
+
+Você pode consolidar várias compras em um único envio. Todos os produtos registrados na sua Suíte ficam disponíveis para seleção, permitindo que você escolha quando e o que enviar.
+
+13.1. Divisão Automática
+
+Caso seu pedido ultrapasse 30 kg, a Braziliana automaticamente dividirá em quantas caixas forem necessárias.
+
+13.2. Limites de Envio (Brasil)
 Peso máximo por caixa: 30 kg
 Dimensões máximas: Nenhum lado pode ultrapassar 1 metro
 Soma dos 3 lados (comprimento + largura + altura): máximo de 1,90 m
 Valor máximo de produtos por caixa: US$ 2.999,99
 13.3. Finalidade e Quantidades
-O serviço de redirecionamento destina-se à importação de produtos novos para uso pessoal. É importante atentar-se às quantidades de itens iguais ou similares para evitar que a fiscalização interprete como revenda, o que pode resultar em retenção ou recusa da remessa.</pre>
+O serviço de redirecionamento destina-se à importação de produtos novos para uso pessoal. É importante atentar-se às quantidades de itens iguais ou similares e total de cada caixa para evitar que a fiscalização interprete como revenda, o que pode resultar em cobrança de multa ou recusa de naturalização da remessa.</pre>
                         </div>
                     </div>
                 </div>
@@ -391,14 +436,14 @@ O serviço de redirecionamento destina-se à importação de produtos novos para
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq14">
                             <i class="fas fa-file-contract me-2"></i>
-                            14. PRAZO DE PREPARO
+                            14. PRAZO DE PREPARO E EMBALAGEM
                         </button>
                     </h2>
                     <div id="faq14" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">14. PRAZO DE PREPARO
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">14. PRAZO DE PREPARO E EMBALAGEM
 14.1. Processo de Embalagem
-Assim que os pedidos recebem o status de concluído/ Pago, o sistema automáticamente realiza o pedido de processamento.</pre>
+Assim que os pedidos têm o status de concluído/pago, o time automaticamente inicia o processo do preparo das caixas. Todos os pedidos são preparados e embalados de acordo com a ordem de pagamento. Variações na demanda de pedidos podem causar variações no prazo de embalo e envio.</pre>
                         </div>
                     </div>
                 </div>
@@ -418,9 +463,32 @@ Compras internacionais passarão por fiscalização. Tributos podem ser cobrados
 15.2. Suporte da Braziliana
 Nossa equipe pode orientar você durante o processo de declaração aduaneira, sempre com base nas recomendações e boas práticas divulgadas pelos órgãos oficiais (como a Receita Federal).
 
+15.3. Como Funciona
+
+Quando você receber sua invoice por e-mail para confirmação, deverá:
+
+1. Arrumar (se necessário) todas as informações pessoais:
+   - Endereço de entrega
+   - CPF
+   - Descrição de cada produto
+   - Valores unitários em dólar
+
+2. Confirmar se tudo está correto
+
+3. Contestar a invoice caso não consiga arrumar qualquer informação (nosso time ajudará)
+
+15.4. Formato Recomendado para Declarar Itens
+
+Padrão:
+Marca – Descrição do produto – Variantes (tamanho, cor, fragrância, etc.)
+
+Exemplo:
+Nike – Tênis de corrida – Tamanho 8, Preto
+
 15.5. Valores Declarados
-Os valores declarados SEMPRE serão idênticos aos sites de aquisição.
-Se a Receita Federal solicitar confirmação de conteúdo, você precisará enviar comprovantes de pagamento coerentes aos recibos/e-mails de compra.</pre>
+SEMPRE declare o valor original pago, sem subfaturar. Se a Receita Federal solicitar confirmação de conteúdo, você precisará enviar comprovantes de pagamento coerentes aos recibos/e-mails de compra.
+
+Após a finalização da invoice, nossa equipe iniciará o processo de despacho.</pre>
                         </div>
                     </div>
                 </div>
@@ -436,9 +504,10 @@ Se a Receita Federal solicitar confirmação de conteúdo, você precisará envi
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">16. PROBLEMAS COM CPF
 16.1. CPF Irregular
-Encomendas com CPF irregular serão devolvidas. Verifique a situação do seu CPF em: https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp
+Encomendas com CPF irregular serão negadas e será necessário aguardar o retorno delas aos Estados Unidos. Prazos podem variar de 12 a 24 meses. Verifique a situação do seu CPF em:
+https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp
 16.2. CPF Não Correspondente
-Se o CPF não corresponder ao destinatário, a encomenda será devolvida. Regularize os dados no site onde a compra foi feita.</pre>
+Se o CPF não corresponder ao destinatário e/ou nome não bater com o cadastrado pelo cliente no pedido, a encomenda será negada e eventualmente devolvida aos Estados Unidos. Regularize os dados no site da Braziliana e não onde a compra foi feita.</pre>
                         </div>
                     </div>
                 </div>
@@ -453,14 +522,16 @@ Se o CPF não corresponder ao destinatário, a encomenda será devolvida. Regula
                     <div id="faq17" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">17. CANCELAMENTO, REEMBOLSOS E ALTERAÇÕES
-17.1. Política de Cancelamento (Compras Diretas)
-Como os produtos são adquiridos sob demanda automatizada, cancelamentos incorrem em uma taxa fixa de US$ 100, cobrindo custos de:
+17.1. Política de Cancelamento (Compras pelo Site/Grupo de Compras e Atendimento)
+Como os produtos são adquiridos sob demanda automatizada, cancelamentos serão cobrados uma taxa fixa de US$ 100, cobrindo custos de:
 Operacional
 Aquisição
 Transporte
 Embalagem
 Devoluções
 Esta taxa aplica-se independentemente do motivo ou tempo decorrido desde o pedido.
+
+Caixas com produtos já despachados não estarão sujeitas a cancelamento.
 17.2. Regras e Prazos
 Regras e prazos de cancelamento podem variar conforme o status do pedido e o estágio de processamento
 Se o pedido já estiver em etapa avançada (ex.: compra efetivada, separação, envio), pode não ser possível cancelar integralmente
@@ -469,10 +540,18 @@ Se o pedido já estiver em etapa avançada (ex.: compra efetivada, separação, 
 Após a Embalagem ou Caixa Pronta:
 Taxa de manuseio: US$ 100 por pedido/caixa
 Necessária para: retirar da carga, reabrir, refazer conferência, reembalar e reprocessar documentação
-17.4. Estornos e Reembolsos
+
+17.4. Urgência de Recebimento
+
+Caso você tenha urgência em receber, uma taxa de US$ 100 por pedido/caixa pode ser paga para garantir a entrada da sua caixa na próxima carga caso existam pedidos na frente.
+
+17.5. Estornos e Reembolsos
 Em caso de estorno/reembolso, podem existir prazos de processamento do meio de pagamento
 Reembolsos podem ser processados como crédito em carteira (quando disponível) ou via meio de pagamento original
-.</pre>
+
+17.6. Recomendação
+
+Se você está aguardando a chegada de itens ou tem dúvida sobre o que enviar, aguarde todas as compras chegarem antes de solicitar o envio, evitando custos adicionais.</pre>
                         </div>
                     </div>
                 </div>
@@ -487,9 +566,9 @@ Reembolsos podem ser processados como crédito em carteira (quando disponível) 
                     <div id="faq18" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
                             <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
-O Clube Brasiliana é um programa de benefícios com créditos internos.
+O Clube Braziliana é um programa de benefícios com créditos internos.
 18.1. Ativação e Acesso
-Para ativar e manter o acesso às áreas e produtos do Clube, é necessário manter um saldo mínimo de $ 39,00 em créditos na sua carteira (considerando o equivalente em USD)
+Para ativar e manter o acesso às áreas e produtos do Clube, é necessário manter um saldo mínimo de US$ 39,00 em créditos na sua carteira (considerando o equivalente em USD)
 Se o saldo mínimo não estiver disponível, algumas áreas do Clube podem ficar bloqueadas até a regularização
 18.2. Produtos Elegíveis
 Os benefícios do Clube valem apenas para produtos marcados como Clube Ativo.
@@ -503,7 +582,7 @@ Esses créditos são internos e não são saqueáveis
 Podem ser utilizados para pagar pedidos de Redirecionamentos
 A Braziliana se reserva o direito de reduzir, suspender ou encerrar o programa de créditos adicionais sem aviso prévio.
 18.5. Natureza dos Créditos
-IMPORTANTE - O Clube Brasiliana:
+IMPORTANTE - O Clube Braziliana:
 É um programa de benefícios
 NÃO é banco e NÃO oferece investimento
 Todos os valores do Clube são créditos internos
@@ -512,6 +591,25 @@ Créditos não são saqueáveis
 Créditos não representam investimento
 Créditos podem ser auditados a qualquer momento
 Créditos estão sujeitos às regras e alterações do programa</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq19">
+                            <i class="fas fa-file-contract me-2"></i>
+                            19. SEGURO
+                        </button>
+                    </h2>
+                    <div id="faq19" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">19. SEGURO
+A Braziliana oferece a opção de seguro para cobrir:
+- Furtos
+- Extravios
+
+Cobertura: Limitada ao valor declarado do produto (excluindo o frete)</pre>
                         </div>
                     </div>
                 </div>
@@ -582,11 +680,11 @@ Correta embalagem dos produtos
 Despacho adequado
 Suporte e orientação durante o processo até a entrega aos órgãos fiscalizadores.
 22.2. Responsabilidade do Cliente
-Após a entrega à transportadora, a responsabilidade pelo rastreamento, pagamento de impostos e resolução de demandas passa ao cliente.
+Após a entrega à transportadora, a responsabilidade pelo rastreamento, pagamento de impostos e resolução de demandas passa ao cliente, ao menos que os impostos tenham sido pré-pagos à Braziliana.
 22.3. Importação Não Autorizada
 Em caso de importação não autorizada (dados cadastrais incorretos, proibição por órgãos como Anvisa), a encomenda pode ser devolvida ao exterior. A Braziliana oferece suporte orientativo, mas não se responsabiliza por decisões de órgãos fiscalizadores nem para com os encargos envolvidos neles.
 22.4. Limitações
-A Braziliana atua como agenciadora de cargas/logística internacional e não tem autoridade para:
+A Braziliana atua como agente de cargas/logística internacional e não tem autoridade para:
 Reduzir, isentar ou evitar cobranças alfandegárias
 Controlar decisões, exigências, tributos, prazos e liberações efetuadas por autoridades alfandegárias
 Interferir em processos de operadores postais no país de destino
@@ -608,12 +706,11 @@ Garantir prazos de entrega (apenas estimativas)</pre>
 Para evitar problemas e garantir uma experiência satisfatória:
 Revise seus dados antes de finalizar o pedido
 Acompanhe o status do pedido em "Meus Pedidos"
-Fique Atento a novos Tickes de suporte que possam existir
-Mantenha seu contato atualizado (e-mail e telefone)
+Mantenha seu contato atualizado (e-mail e telefone de WhatsApp)
 Leia as informações do checkout antes de confirmar
 Confira o endereço de entrega cuidadosamente
 Verifique a regularidade do seu CPF (para entregas no Brasil)
-Declare valores corretos na documentação aduaneira quando solicitado
+Declare valores corretos na documentação aduaneira
 Acompanhe prazos de pagamento de impostos
 Responda comunicações da Braziliana prontamente</pre>
                         </div>
