@@ -3179,8 +3179,8 @@ JS;
         renderAdminSidebarStyles();
 
         echo '<style>
-        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:2px}
-        .comm-card{flex:0 0 220px}
+        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
+        .comm-card{flex:0 0 240px;min-height:92px;background:#fff}
         </style></head>
 <body>
     <div class="container-fluid">
@@ -3215,6 +3215,11 @@ JS;
             $percent = (float) ($t['percentual_comissao'] ?? 0);
             $valorComissao = (float) ($t['valor_comissao'] ?? 0);
 
+            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+            $procBase = (float) ($tp['base_liquida'] ?? 0);
+            $procVal = (float) ($tp['valor_comissao'] ?? 0);
+            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
+
             echo '<div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Moeda: ' . htmlspecialchars($moeda) . '</h5>
@@ -3240,26 +3245,18 @@ JS;
                             <div class="text-muted small">Comissão total</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
+
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Base líquida</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>
+                        </div>
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Comissão</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>
+                            <div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>
+                        </div>
                     </div>
                 </div>';
-
-            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
-            $procBase = (float) ($tp['base_liquida'] ?? 0);
-            $procVal = (float) ($tp['valor_comissao'] ?? 0);
-            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
-            echo '<div class="col-12 mb-2">'
-                . '<div class="comm-cards">'
-                . '<div class="border rounded p-3 comm-card">'
-                . '<div class="text-muted small">Processamento (Online) - Base líquida</div>'
-                . '<div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>'
-                . '</div>'
-                . '<div class="border rounded p-3 comm-card">'
-                . '<div class="text-muted small">Processamento (Online) - Comissão</div>'
-                . '<div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>'
-                . '<div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>'
-                . '</div>'
-                . '</div>'
-                . '</div>';
         }
 
         $pedidosUsd = [];
