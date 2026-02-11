@@ -227,8 +227,7 @@
                     </div>
                 </div>
 
-                <!-- Informações Importantes -->
-                <div class="card shadow-sm border-0 mt-3">
+                <div class="card shadow-sm border-0 mt-3" style="display:none;">
                     <div class="card-body">
                         <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
                         <ul class="small text-muted mb-0">

@@ -314,25 +314,25 @@
                                        placeholder="00000-000" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="endereco" class="form-label">Endereço</label>
+                                <label for="endereco" class="form-label" id="label-endereco">Endereço</label>
                                 <input type="text" class="form-control" id="endereco" name="endereco" 
                                        value="<?= htmlspecialchars((string) ($ee['endereco'] ?? ($ee['logradouro'] ?? ($usuario['endereco'] ?? '')))) ?>" 
                                        placeholder="Rua, Avenida, etc." required>
                             </div>
-                            <div class="col-md-3">
-                                <label for="numero" class="form-label">Número</label>
+                            <div class="col-md-3" id="numero-wrap">
+                                <label for="numero" class="form-label" id="label-numero">Número</label>
                                 <input type="text" class="form-control" id="numero" name="numero" 
                                        value="<?= htmlspecialchars((string) ($ee['numero'] ?? ($usuario['numero'] ?? ''))) ?>" 
-                                       placeholder="123" required>
+                                       placeholder="123">
                             </div>
                             <div class="col-md-3">
-                                <label for="complemento" class="form-label">Complemento</label>
+                                <label for="complemento" class="form-label" id="label-complemento">Complemento</label>
                                 <input type="text" class="form-control" id="complemento" name="complemento" 
                                        value="<?= htmlspecialchars((string) ($ee['complemento'] ?? ($usuario['complemento'] ?? ''))) ?>" 
                                        placeholder="Apto, Casa, etc.">
                             </div>
-                            <div class="col-md-4">
-                                <label for="bairro" class="form-label">Bairro</label>
+                            <div class="col-md-4" id="bairro-wrap">
+                                <label for="bairro" class="form-label" id="label-bairro">Bairro</label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
                                        value="<?= htmlspecialchars((string) ($ee['bairro'] ?? ($usuario['bairro'] ?? ''))) ?>" 
                                        placeholder="Centro">
@@ -344,8 +344,8 @@
                                        placeholder="São Paulo" required>
                             </div>
                             <div class="col-md-4">
-                                <label for="estado" class="form-label">Estado</label>
-                                <select class="form-select" id="estado" name="estado" required>
+                                <label for="estado" class="form-label" id="label-estado">Estado</label>
+                                <select class="form-select" id="estado" name="estado">
                                     <option value="">Selecione...</option>
                                     <?php $selectedUf = (string) ($ee['estado'] ?? ($ee['uf'] ?? ($usuario['estado'] ?? ''))); ?>
                                     <option value="AC" <?= $selectedUf === 'AC' ? 'selected' : '' ?>>Acre</option>
@@ -545,6 +545,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const estadoSelect = document.getElementById('estado');
         const estadoText = document.getElementById('estado_text');
 
+        const enderecoLabel = document.getElementById('label-endereco');
+        const numeroWrap = document.getElementById('numero-wrap');
+        const numeroInput = document.getElementById('numero');
+        const numeroLabel = document.getElementById('label-numero');
+        const compLabel = document.getElementById('label-complemento');
+        const bairroWrap = document.getElementById('bairro-wrap');
+        const bairroInput = document.getElementById('bairro');
+
         const statesByCountry = {
             BR: [
                 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
@@ -570,9 +578,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        if (enderecoLabel) {
+            enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : 'Address line 1 *';
+        }
+        if (compLabel) {
+            compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : 'Address line 2 (optional)';
+        }
+
+        if (numeroWrap && numeroInput && numeroLabel) {
+            if (pais === 'BR') {
+                numeroWrap.style.display = '';
+                numeroInput.required = true;
+                numeroLabel.textContent = 'Número / Number *';
+            } else {
+                numeroWrap.style.display = 'none';
+                numeroInput.required = false;
+                numeroInput.value = '';
+            }
+        }
+
+        if (bairroWrap && bairroInput) {
+            if (pais === 'BR') {
+                bairroWrap.style.display = '';
+                bairroInput.required = true;
+            } else {
+                bairroWrap.style.display = 'none';
+                bairroInput.required = false;
+                bairroInput.value = '';
+            }
+        }
+
         if (estadoSelect && estadoText) {
             const list = statesByCountry[pais] || null;
             const shouldUseSelect = Array.isArray(list) && list.length > 0;
+
+            const estadoRequired = (pais === 'BR' || pais === 'US' || pais === 'CA');
 
             if (shouldUseSelect) {
                 const current = String(estadoSelect.value || estadoText.value || '').trim();
@@ -598,7 +638,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 estadoText.style.display = 'none';
 
                 estadoSelect.name = 'estado';
-                estadoSelect.required = true;
+                estadoSelect.required = estadoRequired;
                 estadoSelect.disabled = false;
 
                 estadoText.name = 'estado_text';
@@ -613,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 estadoSelect.disabled = true;
 
                 estadoText.name = 'estado';
-                estadoText.required = true;
+                estadoText.required = estadoRequired;
                 estadoText.disabled = false;
             }
         }
