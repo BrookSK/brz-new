@@ -72,6 +72,32 @@
                             </div>
                         </div>
 
+                        <div class="mb-4">
+                            <h6 class="mb-3"><i class="fas fa-truck"></i> Entrega</h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" value="1" id="entrega_para_outro" name="entrega_para_outro">
+                                <label class="form-check-label" for="entrega_para_outro">Entregar para outra pessoa / outro endereço</label>
+                            </div>
+
+                            <div id="destinatario-box" style="display:none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Nome do destinatário *</label>
+                                        <input type="text" class="form-control" name="destinatario_nome" id="destinatario_nome" value="">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label" id="label-destinatario-documento">CPF do destinatário</label>
+                                        <input type="text" class="form-control" name="destinatario_documento" id="destinatario_documento" value="">
+                                        <small class="text-muted" id="hint-destinatario-documento" style="display:none;">Obrigatório apenas para entregas no Brasil.</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Telefone do destinatário *</label>
+                                        <input type="text" class="form-control" name="destinatario_telefone" id="destinatario_telefone" value="">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Endereço de Entrega -->
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-map-marker-alt"></i> Endereço de Entrega</h6>
@@ -128,21 +154,21 @@
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['cep'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-9 mb-3">
-                                        <label class="form-label">Rua / Street *</label>
+                                        <label class="form-label" id="label-endereco">Rua / Street *</label>
                                         <input type="text" class="form-control" name="endereco" required id="endereco"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['endereco'] ?? '')) ?>">
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Número / Number *</label>
-                                        <input type="text" class="form-control" name="numero" required
+                                    <div class="col-md-3 mb-3" id="numero-wrap">
+                                        <label class="form-label" id="label-numero">Número / Number *</label>
+                                        <input type="text" class="form-control" name="numero" id="numero"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['numero'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Complemento / Complement</label>
+                                        <label class="form-label" id="label-complemento">Complemento / Complement</label>
                                         <input type="text" class="form-control" name="complemento"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['complemento'] ?? '')) ?>">
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3" id="bairro-wrap">
                                         <label class="form-label" id="label-bairro">Bairro / District</label>
                                         <input type="text" class="form-control" name="bairro" id="bairro"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['bairro'] ?? '')) ?>">
@@ -154,7 +180,7 @@
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label" id="label-estado">Estado / State *</label>
-                                        <select class="form-select" name="estado" required id="estado">
+                                        <select class="form-select" name="estado" id="estado">
                                             <option value="">Selecione...</option>
                                             <?php $ufSel = (string) ($endereco_prefill['estado'] ?? ''); ?>
                                             <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
@@ -846,6 +872,14 @@ function atualizarEnderecoPorPais() {
     const docInput = document.getElementById('documento');
     const docLabel = document.getElementById('label-documento');
 
+    const enderecoLabel = document.getElementById('label-endereco');
+    const numeroWrap = document.getElementById('numero-wrap');
+    const numeroInput = document.getElementById('numero');
+    const numeroLabel = document.getElementById('label-numero');
+    const compLabel = document.getElementById('label-complemento');
+    const bairroWrap = document.getElementById('bairro-wrap');
+    const bairroInput = document.getElementById('bairro');
+
     const statesByCountry = {
         BR: [
             'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
@@ -892,6 +926,38 @@ function atualizarEnderecoPorPais() {
         }
     }
 
+    // Endereço: regras globais (BR tem campos específicos; fora do BR, simplificar)
+    if (enderecoLabel) {
+        enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : 'Address line 1 *';
+    }
+    if (compLabel) {
+        compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : 'Address line 2 (optional)';
+    }
+
+    if (numeroWrap && numeroInput && numeroLabel) {
+        if (pais === 'BR') {
+            numeroWrap.style.display = '';
+            numeroInput.required = true;
+            numeroLabel.textContent = 'Número / Number *';
+        } else {
+            numeroWrap.style.display = 'none';
+            numeroInput.required = false;
+            numeroInput.value = '';
+            numeroLabel.textContent = 'Number';
+        }
+    }
+
+    if (bairroWrap && bairroInput) {
+        if (pais === 'BR') {
+            bairroWrap.style.display = '';
+            bairroInput.required = true;
+        } else {
+            bairroWrap.style.display = 'none';
+            bairroInput.required = false;
+            bairroInput.value = '';
+        }
+    }
+
     if (typeof syncPaymentOptionsByCurrency === 'function') {
         try {
             syncPaymentOptionsByCurrency();
@@ -902,6 +968,8 @@ function atualizarEnderecoPorPais() {
     if (estadoSelect && estadoText) {
         const list = statesByCountry[pais] || null;
         const shouldUseSelect = Array.isArray(list) && list.length > 0;
+
+        const estadoRequired = (pais === 'BR' || pais === 'US' || pais === 'CA');
 
         if (shouldUseSelect) {
             const current = String(estadoSelect.value || estadoText.value || '').trim();
@@ -927,7 +995,7 @@ function atualizarEnderecoPorPais() {
             estadoText.style.display = 'none';
 
             estadoSelect.name = 'estado';
-            estadoSelect.required = true;
+            estadoSelect.required = estadoRequired;
             estadoSelect.disabled = false;
 
             estadoText.name = 'estado_text';
@@ -942,7 +1010,7 @@ function atualizarEnderecoPorPais() {
             estadoSelect.disabled = true;
 
             estadoText.name = 'estado';
-            estadoText.required = true;
+            estadoText.required = estadoRequired;
             estadoText.disabled = false;
         }
     }
@@ -954,6 +1022,49 @@ document.addEventListener('DOMContentLoaded', function(){
         paisSel.addEventListener('change', atualizarEnderecoPorPais);
     }
     atualizarEnderecoPorPais();
+
+    function syncDestinatarioRules() {
+        const cb = document.getElementById('entrega_para_outro');
+        const box = document.getElementById('destinatario-box');
+        const nome = document.getElementById('destinatario_nome');
+        const doc = document.getElementById('destinatario_documento');
+        const tel = document.getElementById('destinatario_telefone');
+        const docLabel = document.getElementById('label-destinatario-documento');
+        const docHint = document.getElementById('hint-destinatario-documento');
+        const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+        const enabled = !!(cb && cb.checked);
+
+        if (box) {
+            box.style.display = enabled ? 'block' : 'none';
+        }
+
+        if (nome) {
+            nome.required = enabled;
+            if (!enabled) nome.value = '';
+        }
+
+        if (doc) {
+            const requiredDoc = enabled && (pais === 'BR');
+            doc.required = requiredDoc;
+            if (docLabel) docLabel.textContent = requiredDoc ? 'CPF do destinatário *' : 'CPF do destinatário (opcional)';
+            if (docHint) docHint.style.display = (enabled && pais !== 'BR') ? 'block' : 'none';
+            if (!enabled) doc.value = '';
+        }
+
+        if (tel) {
+            tel.required = enabled;
+            if (!enabled) tel.value = '';
+        }
+    }
+
+    const cb = document.getElementById('entrega_para_outro');
+    if (cb) {
+        cb.addEventListener('change', syncDestinatarioRules);
+    }
+    if (paisSel) {
+        paisSel.addEventListener('change', syncDestinatarioRules);
+    }
+    syncDestinatarioRules();
 });
 
 function showCheckoutLoading() {

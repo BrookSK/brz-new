@@ -826,6 +826,242 @@ class UsuarioController extends Controller {
         }
     }
 
+    public function meusEnderecos(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        $usuario = $this->usuarioModel->find($usuarioId);
+
+        $enderecos = [];
+        try {
+            $enderecos = $this->usuarioModel->getEnderecos($usuarioId);
+        } catch (\Exception $e) {
+            $enderecos = [];
+        }
+
+        $this->view('usuario/meus-enderecos', [
+            'usuario' => $usuario,
+            'enderecos' => $enderecos,
+        ]);
+    }
+
+    public function salvarEndereco(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        $dados = $request->getParams();
+        $enderecoId = (int) ($dados['id'] ?? 0);
+
+        try {
+            $db = \Config\Database::getConnection();
+            if (!$db instanceof \PDO) {
+                throw new \Exception('Conexão com o banco indisponível');
+            }
+
+            $cols = [];
+            try {
+                $stmtCols = $db->query('DESCRIBE enderecos');
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+            if ($usuarioCol === '') {
+                throw new \Exception('Tabela de endereços incompatível');
+            }
+
+            $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
+
+            if ($enderecoId > 0) {
+                $stOwn = $db->prepare('SELECT ' . $usuarioCol . ' FROM enderecos WHERE id = ? LIMIT 1');
+                $stOwn->execute([(int) $enderecoId]);
+                $uidEnd = (int) ($stOwn->fetchColumn() ?: 0);
+                if ($uidEnd !== $usuarioId) {
+                    throw new \Exception('Endereço inválido');
+                }
+            }
+
+            $map = [
+                'tipo' => ['tipo'],
+                'pais' => ['pais', 'country'],
+                'cep' => ['cep'],
+                'endereco' => ['endereco', 'logradouro'],
+                'numero' => ['numero'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro'],
+                'cidade' => ['cidade'],
+                'estado' => ['estado', 'uf'],
+            ];
+
+            $payload = [];
+            foreach ($map as $inputKey => $colCandidates) {
+                $val = isset($dados[$inputKey]) ? trim((string) $dados[$inputKey]) : '';
+                $colFound = null;
+                foreach ($colCandidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        $colFound = $c;
+                        break;
+                    }
+                }
+                if ($colFound !== null) {
+                    $payload[$colFound] = $val;
+                }
+            }
+
+            if (empty($payload['pais']) && in_array('pais', $cols, true)) {
+                $payload['pais'] = 'BR';
+            }
+
+            if ($enderecoId > 0) {
+                $set = [];
+                $params = [':id' => (int) $enderecoId];
+                foreach ($payload as $col => $val) {
+                    $set[] = $col . ' = :' . $col;
+                    $params[':' . $col] = $val;
+                }
+                if (!empty($set)) {
+                    $sql = 'UPDATE enderecos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                    $st = $db->prepare($sql);
+                    $st->execute($params);
+                }
+            } else {
+                $colsIns = [$usuarioCol];
+                $valsIns = [':uid'];
+                $params = [':uid' => $usuarioId];
+
+                foreach ($payload as $col => $val) {
+                    $colsIns[] = $col;
+                    $valsIns[] = ':' . $col;
+                    $params[':' . $col] = $val;
+                }
+
+                if ($principalCol !== '' && (string) ($dados['principal'] ?? '') === '1') {
+                    $colsIns[] = $principalCol;
+                    $valsIns[] = ':principal';
+                    $params[':principal'] = 1;
+                }
+
+                $sql = 'INSERT INTO enderecos (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')';
+                $st = $db->prepare($sql);
+                $st->execute($params);
+                $enderecoId = (int) $db->lastInsertId();
+            }
+
+            if ($principalCol !== '' && $enderecoId > 0 && (string) ($dados['principal'] ?? '') === '1') {
+                $st = $db->prepare('UPDATE enderecos SET ' . $principalCol . ' = 0 WHERE ' . $usuarioCol . ' = :uid AND id <> :id');
+                $st->execute([':uid' => $usuarioId, ':id' => $enderecoId]);
+            }
+
+            $_SESSION['message'] = 'Endereço salvo com sucesso!';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao salvar endereço: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meus-enderecos');
+    }
+
+    public function excluirEndereco(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) {
+            $this->redirect('/meus-enderecos');
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            if (!$db instanceof \PDO) {
+                throw new \Exception('Conexão com o banco indisponível');
+            }
+
+            $cols = [];
+            $stmtCols = $db->query('DESCRIBE enderecos');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+            if ($usuarioCol === '') {
+                throw new \Exception('Tabela de endereços incompatível');
+            }
+
+            $stOwn = $db->prepare('SELECT ' . $usuarioCol . ' FROM enderecos WHERE id = ? LIMIT 1');
+            $stOwn->execute([$id]);
+            $uidEnd = (int) ($stOwn->fetchColumn() ?: 0);
+            if ($uidEnd !== $usuarioId) {
+                throw new \Exception('Endereço inválido');
+            }
+
+            $st = $db->prepare('DELETE FROM enderecos WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+
+            $_SESSION['message'] = 'Endereço excluído.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao excluir endereço: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meus-enderecos');
+    }
+
+    public function definirEnderecoPrincipal(Request $request) {
+        $this->authService->requerAutenticacao();
+
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) {
+            $this->redirect('/meus-enderecos');
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            if (!$db instanceof \PDO) {
+                throw new \Exception('Conexão com o banco indisponível');
+            }
+
+            $cols = [];
+            $stmtCols = $db->query('DESCRIBE enderecos');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            $usuarioCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('user_id', $cols, true) ? 'user_id' : '');
+            $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
+            if ($usuarioCol === '' || $principalCol === '') {
+                throw new \Exception('Tabela de endereços incompatível');
+            }
+
+            $stOwn = $db->prepare('SELECT ' . $usuarioCol . ' FROM enderecos WHERE id = ? LIMIT 1');
+            $stOwn->execute([$id]);
+            $uidEnd = (int) ($stOwn->fetchColumn() ?: 0);
+            if ($uidEnd !== $usuarioId) {
+                throw new \Exception('Endereço inválido');
+            }
+
+            $db->beginTransaction();
+            $st1 = $db->prepare('UPDATE enderecos SET ' . $principalCol . ' = 0 WHERE ' . $usuarioCol . ' = ?');
+            $st1->execute([$usuarioId]);
+            $st2 = $db->prepare('UPDATE enderecos SET ' . $principalCol . ' = 1 WHERE id = ?');
+            $st2->execute([$id]);
+            $db->commit();
+
+            $_SESSION['message'] = 'Endereço principal atualizado.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            try {
+                if (isset($db) && $db instanceof \PDO && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+            $_SESSION['message'] = 'Erro ao definir principal: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meus-enderecos');
+    }
+
     public function avatarUpload(Request $request) {
         $this->authService->requerAutenticacao();
 

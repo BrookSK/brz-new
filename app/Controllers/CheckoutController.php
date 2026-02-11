@@ -2597,10 +2597,28 @@ class CheckoutController extends Controller {
         // Endereço
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
-        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if ($pais === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
         if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
-        if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+        if (in_array($pais, ['BR','US','CA'], true) && empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+
+        // Destinatário (quando entregar para outra pessoa)
+        $entregaOutro = (string) ($dados['entrega_para_outro'] ?? '0');
+        $entregaOutro = ($entregaOutro === '1' || strtolower($entregaOutro) === 'true' || $entregaOutro === 'on');
+        if ($entregaOutro) {
+            if (empty($dados['destinatario_nome'])) {
+                $erros[] = 'Nome do destinatário é obrigatório';
+            }
+            if (empty($dados['destinatario_telefone'])) {
+                $erros[] = 'Telefone do destinatário é obrigatório';
+            }
+            if ($pais === 'BR') {
+                $docDest = preg_replace('/\D+/', '', (string) ($dados['destinatario_documento'] ?? ''));
+                if ($docDest === '' || strlen($docDest) < 11) {
+                    $erros[] = 'CPF do destinatário é obrigatório para entregas no Brasil';
+                }
+            }
+        }
         
         // Pagamento
         if (empty($dados['forma_pagamento'])) $erros[] = 'Método de pagamento é obrigatório';
@@ -2652,11 +2670,11 @@ class CheckoutController extends Controller {
             'tipo' => $tipo,
             'cep' => $dados['cep'],
             'endereco' => $dados['endereco'],
-            'numero' => $dados['numero'],
+            'numero' => $dados['numero'] ?? '',
             'complemento' => $dados['complemento'] ?? '',
-            'bairro' => $dados['bairro'],
+            'bairro' => $dados['bairro'] ?? '',
             'cidade' => $dados['cidade'],
-            'estado' => $dados['estado'],
+            'estado' => $dados['estado'] ?? '',
             'pais' => (string) ($dados['pais'] ?? 'BR'),
             'principal' => false
         ];
@@ -3130,6 +3148,17 @@ class CheckoutController extends Controller {
                     }
 
                     foreach ([
+                        'destinatario_nome' => (string) ($dados['destinatario_nome'] ?? ''),
+                        'destinatario_documento' => (string) ($dados['destinatario_documento'] ?? ''),
+                        'destinatario_telefone' => (string) ($dados['destinatario_telefone'] ?? ''),
+                    ] as $col => $val) {
+                        if (in_array($col, $colsPed, true) && trim($val) !== '') {
+                            $set[] = $col . ' = :' . $col;
+                            $p[$col] = $val;
+                        }
+                    }
+
+                    foreach ([
                         'endereco' => (string) ($dados['endereco'] ?? ''),
                         'numero' => (string) ($dados['numero'] ?? ''),
                         'complemento' => (string) ($dados['complemento'] ?? ''),
@@ -3251,11 +3280,11 @@ class CheckoutController extends Controller {
                     'tipo' => 'entrega',
                     'cep' => $dados['cep'],
                     'endereco' => $dados['endereco'],
-                    'numero' => $dados['numero'],
+                    'numero' => $dados['numero'] ?? '',
                     'complemento' => $dados['complemento'] ?? '',
-                    'bairro' => $dados['bairro'],
+                    'bairro' => $dados['bairro'] ?? '',
                     'cidade' => $dados['cidade'],
-                    'estado' => $dados['estado'],
+                    'estado' => $dados['estado'] ?? '',
                     'pais' => (string) (($dados['pais'] ?? '') !== '' ? $dados['pais'] : 'BR'),
                     'principal' => $principal,
                 ];

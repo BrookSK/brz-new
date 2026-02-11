@@ -1036,26 +1036,13 @@ function inicializarDetalhesProduto() {
                 }
 
                 if (!data || typeof data !== 'object') {
-                    $('#variacoes-card').show();
-                    const status = $('#variacao-status');
-                    if (status.length) {
-                        status.text('Não foi possível carregar as variações.');
-                    }
-                    if (contentType.indexOf('text/html') !== -1 || text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
-                        if (status.length) {
-                            status.text('Não foi possível carregar as variações (resposta HTML).');
-                        }
-                    }
+                    $('#variacoes-card').hide();
                     return;
                 }
 
                 variacoesState = normalizeVariacoesUi(data);
                 if (!variacoesState.enabled) {
-                    $('#variacoes-card').show();
-                    const status = $('#variacao-status');
-                    if (status.length) {
-                        status.text('Este produto não possui variações disponíveis.');
-                    }
+                    $('#variacoes-card').hide();
                     return;
                 }
 
@@ -1079,11 +1066,7 @@ function inicializarDetalhesProduto() {
                 refreshOptionAvailability();
             })
             .catch(() => {
-                $('#variacoes-card').show();
-                const status = $('#variacao-status');
-                if (status.length) {
-                    status.text('Erro ao carregar variações.');
-                }
+                $('#variacoes-card').hide();
             });
     }
 }

@@ -192,12 +192,45 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                     </h5>
                                 </div>
                                 <div class="card-body">
+                                    <?php
+                                    $destNome = (string) ($pedido['destinatario_nome'] ?? '');
+                                    $destDoc = (string) ($pedido['destinatario_documento'] ?? '');
+                                    $destTel = (string) ($pedido['destinatario_telefone'] ?? '');
+                                    ?>
+                                    <?php if ($destNome !== '' || $destDoc !== '' || $destTel !== ''): ?>
+                                        <div class="mb-3">
+                                            <div class="fw-semibold">Destinatário</div>
+                                            <div class="text-muted small">
+                                                <?= htmlspecialchars($destNome !== '' ? $destNome : 'Não informado') ?>
+                                                <?php if ($destDoc !== ''): ?>
+                                                    <span class="ms-1">(<?= htmlspecialchars($destDoc) ?>)</span>
+                                                <?php endif; ?>
+                                                <?php if ($destTel !== ''): ?>
+                                                    <span class="ms-1">• <?= htmlspecialchars($destTel) ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php
+                                    $linha1 = trim((string) ($pedido['endereco_entrega'] ?? ''));
+                                    $num = trim((string) ($pedido['numero_entrega'] ?? ''));
+                                    $comp = trim((string) ($pedido['complemento_entrega'] ?? ''));
+                                    $bairro = trim((string) ($pedido['bairro_entrega'] ?? ''));
+                                    $cidade = trim((string) ($pedido['cidade_entrega'] ?? ''));
+                                    $estado = trim((string) ($pedido['estado_entrega'] ?? ''));
+                                    $cep = trim((string) ($pedido['cep_entrega'] ?? ''));
+                                    $linha1Fmt = $linha1;
+                                    if ($linha1Fmt !== '' && $num !== '') {
+                                        $linha1Fmt .= ', ' . $num;
+                                    }
+                                    ?>
                                     <address class="mb-0">
-                                        <?= htmlspecialchars($pedido['endereco_entrega'] ?? 'Não informado') ?>, <?= htmlspecialchars($pedido['numero_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['complemento_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['bairro_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['cidade_entrega'] ?? '') ?> - <?= htmlspecialchars($pedido['estado_entrega'] ?? '') ?><br>
-                                        CEP: <?= htmlspecialchars($pedido['cep_entrega'] ?? '') ?>
+                                        <?= htmlspecialchars($linha1Fmt !== '' ? $linha1Fmt : 'Não informado') ?><br>
+                                        <?php if ($comp !== ''): ?><?= htmlspecialchars($comp) ?><br><?php endif; ?>
+                                        <?php if ($bairro !== ''): ?><?= htmlspecialchars($bairro) ?><br><?php endif; ?>
+                                        <?= htmlspecialchars($cidade) ?><?= ($estado !== '' ? (' - ' . htmlspecialchars($estado)) : '') ?><br>
+                                        <?= ($cep !== '' ? ('CEP/ZIP: ' . htmlspecialchars($cep)) : '') ?>
                                     </address>
                                 </div>
                             </div>

@@ -58,6 +58,9 @@ if (empty($avatarUrl)) {
                 <a class="nav-link <?= $activePage === 'dados' ? 'active' : '' ?>" href="/meus-dados">
                     <i class="fas fa-user me-2"></i> Meus Dados
                 </a>
+                <a class="nav-link <?= $activePage === 'enderecos' ? 'active' : '' ?>" href="/meus-enderecos">
+                    <i class="fas fa-map-marker-alt me-2"></i> Endereços
+                </a>
                 <a class="nav-link <?= $activePage === 'pedidos' ? 'active' : '' ?>" href="/meus-pedidos">
                     <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
                 </a>
