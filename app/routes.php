@@ -327,6 +327,8 @@ $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualContro
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
+$router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
+$router->post('/admin/pedidos/restaurar/{id}', 'AdminPedidosController', 'restaurar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');

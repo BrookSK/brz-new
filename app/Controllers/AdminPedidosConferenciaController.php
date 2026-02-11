@@ -40,7 +40,27 @@ class AdminPedidosConferenciaController extends Controller {
 
     private function renderPageEnd(): void {
         renderAdminScripts();
-        echo '</main></div></div></body></html>';
+        echo '<script>
+            (function(){
+                function syncRow(row){
+                    if(!row) return;
+                    var sel = row.querySelector('select[name="tipo_compra"]');
+                    var file = row.querySelector('input[name="comprovante_compra"]');
+                    var box = row.querySelector('[data-comprovante-box="1"]');
+                    if(!sel || !file) return;
+                    var isOnline = (String(sel.value||'').toLowerCase() === 'online');
+                    if(box){ box.style.display = isOnline ? 'block' : 'none'; }
+                    file.required = isOnline;
+                }
+                document.querySelectorAll('tr[data-pedido-row="1"]').forEach(function(tr){
+                    var sel = tr.querySelector('select[name="tipo_compra"]');
+                    if(sel){
+                        sel.addEventListener('change', function(){ syncRow(tr); });
+                        syncRow(tr);
+                    }
+                });
+            })();
+        </script></body></html>';
     }
 
     private function renderFlashIfAny(): void {
@@ -64,6 +84,16 @@ class AdminPedidosConferenciaController extends Controller {
             $stmt = $this->connection->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE ?');
             $stmt->execute([$column]);
             return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmtT->execute([$table]);
+            return (int) ($stmtT->fetchColumn() ?: 0) > 0;
         } catch (\Exception $e) {
             return false;
         }
@@ -213,19 +243,23 @@ class AdminPedidosConferenciaController extends Controller {
 
                 $detId = 'det-pedido-' . $pid;
 
-                echo '<tr>'
+                echo '<tr data-pedido-row="1">'
                     . '<td><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank">#' . $pid . '</a></td>'
                     . '<td>' . htmlspecialchars($origem !== '' ? $origem : '-') . '</td>'
                     . '<td>' . htmlspecialchars($moeda !== '' ? $moeda : '-') . '</td>'
                     . '<td>' . htmlspecialchars(number_format($total, 2, ',', '.')) . '</td>'
                     . '<td>' . htmlspecialchars($createdAt !== '' ? date('d/m/Y H:i', strtotime($createdAt)) : '-') . '</td>'
                     . '<td>'
-                    . '  <form class="d-flex gap-2" method="POST" action="/admin/pedidos/conferencia/confirmar/' . $pid . '">'
+                    . '  <form class="d-flex gap-2" method="POST" action="/admin/pedidos/conferencia/confirmar/' . $pid . '" enctype="multipart/form-data">'
                     . '    <select class="form-select form-select-sm" name="tipo_compra" required>'
                     . '      <option value=""' . ($tipoCompraAtual === '' ? ' selected' : '') . '>Selecione...</option>'
                     . '      <option value="online"' . ($tipoCompraAtual === 'online' ? ' selected' : '') . '>Online</option>'
                     . '      <option value="offline"' . ($tipoCompraAtual === 'offline' ? ' selected' : '') . '>Offline</option>'
                     . '    </select>'
+                    . '    <div data-comprovante-box="1" style="display:none; min-width: 200px;">'
+                    . '      <input class="form-control form-control-sm" type="file" name="comprovante_compra" accept="image/*,application/pdf">'
+                    . '      <div class="form-text">Obrigatório para compra online.</div>'
+                    . '    </div>'
                     . '</td>'
                     . '<td>'
                     . '    <button class="btn btn-outline-info btn-sm me-1" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detId . '" aria-expanded="false" aria-controls="' . $detId . '"><i class="fas fa-eye me-1"></i>Detalhes</button>'
@@ -280,6 +314,15 @@ class AdminPedidosConferenciaController extends Controller {
             exit;
         }
 
+        $usuarioId = 0;
+        try {
+            $auth = new AuthService();
+            $u = $auth->getUsuarioLogado();
+            $usuarioId = (int) ($u['id'] ?? 0);
+        } catch (\Exception $e) {
+            $usuarioId = 0;
+        }
+
         try {
             $this->connection->beginTransaction();
 
@@ -307,6 +350,194 @@ class AdminPedidosConferenciaController extends Controller {
             if (!empty($set)) {
                 $st = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
                 $st->execute($params);
+            }
+
+            // Compra online: exige comprovante, conclui o pedido e gera comissão do processador
+            if ($tipoCompra === 'online') {
+                if (!isset($_FILES['comprovante_compra']) || !is_array($_FILES['comprovante_compra'])) {
+                    throw new \Exception('Comprovante obrigatório para compra online');
+                }
+                $f = $_FILES['comprovante_compra'];
+                $err = (int) ($f['error'] ?? UPLOAD_ERR_NO_FILE);
+                if ($err !== UPLOAD_ERR_OK) {
+                    throw new \Exception('Falha no upload do comprovante');
+                }
+                $tmp = (string) ($f['tmp_name'] ?? '');
+                $origName = (string) ($f['name'] ?? '');
+                $mime = (string) ($f['type'] ?? '');
+                if ($tmp === '' || !is_uploaded_file($tmp)) {
+                    throw new \Exception('Arquivo inválido');
+                }
+
+                $ext = '';
+                if (strpos($origName, '.') !== false) {
+                    $parts = explode('.', $origName);
+                    $ext = strtolower(trim((string) end($parts)));
+                    if ($ext !== '') {
+                        $ext = '.' . preg_replace('/[^a-z0-9]/', '', $ext);
+                    }
+                }
+                if ($ext === '') {
+                    $ext = '.bin';
+                }
+
+                $baseDir = realpath(__DIR__ . '/../../public');
+                if (!$baseDir) {
+                    $baseDir = __DIR__ . '/../../public';
+                }
+                $targetDir = rtrim($baseDir, '/\\') . '/uploads/comprovantes_compra';
+                if (!is_dir($targetDir)) {
+                    @mkdir($targetDir, 0775, true);
+                }
+
+                $fname = 'pedido_' . (int) $id . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . $ext;
+                $absPath = rtrim($targetDir, '/\\') . '/' . $fname;
+                $relPath = '/uploads/comprovantes_compra/' . $fname;
+
+                if (!move_uploaded_file($tmp, $absPath)) {
+                    throw new \Exception('Não foi possível salvar o arquivo');
+                }
+
+                if ($this->tableExists('pedidos_compra_documentos')) {
+                    $colsDocs = [];
+                    try {
+                        $stmtColsD = $this->connection->query('DESCRIBE pedidos_compra_documentos');
+                        $colsDocs = $stmtColsD ? ($stmtColsD->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsDocs = [];
+                    }
+
+                    $insertCols = ['pedido_id', 'tipo_compra', 'status', 'arquivo_path', 'mime', 'uploaded_at'];
+                    $insertVals = [':pedido_id', ':tipo_compra', ':status', ':path', ':mime', 'NOW()'];
+                    $p = [':pedido_id' => $id, ':tipo_compra' => 'online', ':status' => 'ok', ':path' => $relPath, ':mime' => $mime];
+                    if ($usuarioId > 0 && in_array('usuario_id', $colsDocs, true)) {
+                        $insertCols[] = 'usuario_id';
+                        $insertVals[] = ':usuario_id';
+                        $p[':usuario_id'] = $usuarioId;
+                    }
+                    $sqlInsDoc = 'INSERT INTO pedidos_compra_documentos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
+                    $st = $this->connection->prepare($sqlInsDoc);
+                    $st->execute($p);
+                }
+
+                // concluir pedido e registrar finalizador (quando colunas existirem)
+                $colsPedidos2 = $colsPedidos;
+                $set2 = [];
+                $p2 = [':id' => $id];
+                if (in_array('status', $colsPedidos2, true)) {
+                    $set2[] = 'status = :st';
+                    $p2[':st'] = 'produto_consolidado';
+                }
+                if ($usuarioId > 0 && in_array('compra_finalizada_por', $colsPedidos2, true)) {
+                    $set2[] = 'compra_finalizada_por = :cfp';
+                    $p2[':cfp'] = $usuarioId;
+                }
+                if (in_array('compra_finalizada_em', $colsPedidos2, true)) {
+                    $set2[] = 'compra_finalizada_em = NOW()';
+                }
+                if (!empty($set2)) {
+                    $st2 = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $set2) . ' WHERE id = :id');
+                    $st2->execute($p2);
+                }
+
+                // comissão de processamento
+                if ($usuarioId > 0 && $this->tableExists('comissoes_processamento')) {
+                    $moeda = 'BRL';
+                    $total = 0.0;
+                    $impostos = 0.0;
+                    try {
+                        $stP = $this->connection->prepare('SELECT COALESCE(moeda, \'BRL\') AS moeda, COALESCE(total, COALESCE(valor_total,0)) AS total, COALESCE(impostos, COALESCE(valor_impostos,0)) AS impostos FROM pedidos WHERE id = ? LIMIT 1');
+                        $stP->execute([$id]);
+                        $row = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'BRL')));
+                        if ($moeda === '') $moeda = 'BRL';
+                        $total = (float) ($row['total'] ?? 0);
+                        $impostos = (float) ($row['impostos'] ?? 0);
+                    } catch (\Exception $e) {
+                        $moeda = 'BRL';
+                        $total = 0.0;
+                        $impostos = 0.0;
+                    }
+
+                    $custo = 0.0;
+                    try {
+                        $itensTable2 = $this->getPedidoItensTable();
+                        if ($itensTable2 && $this->tableExists('produtos')) {
+                            $colsItens2 = [];
+                            try {
+                                $stmtColsI2 = $this->connection->query('DESCRIBE ' . $itensTable2);
+                                $colsItens2 = $stmtColsI2 ? ($stmtColsI2->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
+                                $colsItens2 = [];
+                            }
+                            $colPedidoId = in_array('pedido_id', $colsItens2, true) ? 'pedido_id' : '';
+                            $colProduto2 = in_array('produto_id', $colsItens2, true) ? 'produto_id' : '';
+                            $colQtd2 = in_array('quantidade', $colsItens2, true) ? 'quantidade' : (in_array('qty', $colsItens2, true) ? 'qty' : '');
+                            if ($colPedidoId !== '' && $colProduto2 !== '' && $colQtd2 !== '') {
+                                $colsProd = [];
+                                try {
+                                    $stmtColsPr = $this->connection->query('DESCRIBE produtos');
+                                    $colsProd = $stmtColsPr ? ($stmtColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                } catch (\Exception $e) {
+                                    $colsProd = [];
+                                }
+                                $colCusto = in_array('preco_custo', $colsProd, true) ? 'preco_custo' : (in_array('cost_price', $colsProd, true) ? 'cost_price' : (in_array('custo', $colsProd, true) ? 'custo' : ''));
+                                if ($colCusto !== '') {
+                                    $sqlC = 'SELECT SUM(COALESCE(pr.' . $colCusto . ',0) * COALESCE(pi.' . $colQtd2 . ',0)) AS custo_total FROM ' . $itensTable2 . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProduto2 . ' WHERE pi.' . $colPedidoId . ' = ?';
+                                    $stC = $this->connection->prepare($sqlC);
+                                    $stC->execute([$id]);
+                                    $custo = (float) ($stC->fetchColumn() ?: 0);
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $custo = 0.0;
+                    }
+
+                    $baseLiquida = max(0.0, $total - $custo - $impostos);
+
+                    // percentual via config (fallback 0)
+                    $percent = 0.0;
+                    try {
+                        foreach (['configuracoes_sistema', 'configuracoes', 'settings', 'config'] as $tbl) {
+                            if (!$this->tableExists($tbl)) continue;
+                            $colsCfg = [];
+                            try {
+                                $stCols = $this->connection->query('DESCRIBE ' . $tbl);
+                                $colsCfg = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
+                                $colsCfg = [];
+                            }
+                            $colChave = in_array('chave', $colsCfg, true) ? 'chave' : (in_array('key', $colsCfg, true) ? 'key' : (in_array('nome', $colsCfg, true) ? 'nome' : ''));
+                            $colValor = in_array('valor', $colsCfg, true) ? 'valor' : (in_array('value', $colsCfg, true) ? 'value' : (in_array('conteudo', $colsCfg, true) ? 'conteudo' : ''));
+                            if ($colChave === '' || $colValor === '') continue;
+                            $stV = $this->connection->prepare('SELECT ' . $colValor . ' FROM ' . $tbl . ' WHERE ' . $colChave . ' IN (\'comissao_processamento_percent\',\'processamento_percent\') ORDER BY 1 DESC LIMIT 1');
+                            $stV->execute();
+                            $raw = (string) ($stV->fetchColumn() ?: '');
+                            if ($raw !== '') {
+                                $percent = (float) str_replace(',', '.', $raw);
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $percent = 0.0;
+                    }
+
+                    $valorComissao = max(0.0, $baseLiquida) * (max(0.0, $percent) / 100.0);
+
+                    try {
+                        $stInsC = $this->connection->prepare('INSERT INTO comissoes_processamento (pedido_id, usuario_id, moeda, percentual, base_liquida, valor_comissao) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE moeda=VALUES(moeda), percentual=VALUES(percentual), base_liquida=VALUES(base_liquida), valor_comissao=VALUES(valor_comissao)');
+                        $stInsC->execute([(int) $id, (int) $usuarioId, (string) $moeda, (float) $percent, (float) $baseLiquida, (float) $valorComissao]);
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $this->connection->commit();
+
+                $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada.';
+                $_SESSION['message_type'] = 'success';
+                header('Location: /admin/pedidos/conferencia');
+                exit;
             }
 
             // inserir itens do pedido na lista_compras (idempotente)

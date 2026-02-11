@@ -1088,10 +1088,7 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
-            $tipoCompraView = strtolower(trim((string) $request->getParam('tipo_compra', 'online')));
-            if (!in_array($tipoCompraView, ['online', 'offline'], true)) {
-                $tipoCompraView = 'online';
-            }
+            $tipoCompraView = 'offline';
 
             $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
             $reabertos = null;
@@ -1308,7 +1305,7 @@ class AdminComprasController extends Controller {
             $lojaIdFilter = 0;
             $semLoja = false;
             $statusView = 'pendente';
-            $tipoCompraView = 'online';
+            $tipoCompraView = 'offline';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
@@ -1372,31 +1369,24 @@ class AdminComprasController extends Controller {
                     $qsLoja = '&loja_id=' . (int) $lojaIdFilter;
                 }
 
-                $qsTipoCompra = '&tipo_compra=' . urlencode($tipoCompraView);
-
                 echo '<div class="d-flex flex-wrap gap-2 mb-2">'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Compras Online</a>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Compras Offline</a>'
-                    . '</div>';
-
-                echo '<div class="d-flex flex-wrap gap-2 mb-2">'
-                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . $qsTipoCompra . '">Pendentes</a>'
-                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . $qsTipoCompra . '">Concluídas</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">Pendentes</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
                     . '</div>';
 
                 echo '<div class="card mb-4">
                     <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . $qsTipoCompra . '">Todas</a>';
+                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '">Todas</a>';
 
                 foreach ($lojas as $l) {
                     $lid = (int) ($l['id'] ?? 0);
                     $lname = (string) ($l['nome'] ?? '');
                     $active = (!$semLoja && $lojaIdFilter === $lid);
-                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '&loja_id=' . $lid . $qsTipoCompra . '">' . htmlspecialchars($lname) . '</a>';
+                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '&loja_id=' . $lid . '">' . htmlspecialchars($lname) . '</a>';
                 }
 
-                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1' . $qsTipoCompra . '">Sem loja</a>'
+                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
                     . '</div>'
                     . '</div>'
                     . '</div>';

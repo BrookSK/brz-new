@@ -24,6 +24,130 @@ class AdminPedidosController extends Controller {
         exit;
     }
 
+    public function lixeira(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $colsPedidos = [];
+            try {
+                $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!in_array('deleted_at', $colsPedidos, true)) {
+                echo '<div class="alert alert-warning">Sua base ainda não possui lixeira (deleted_at). Rode a migration 087_soft_delete_pedidos_lixeira.sql.</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+
+            $stmt = $pdo->query("SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
+            $pedidos = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Exception $e) {
+            $pedidos = [];
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lixeira de Pedidos - Braziliana Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+        renderAdminSidebar('pedidos');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2"><i class="fas fa-trash me-2"></i>Lixeira de Pedidos</h1>
+                    <div>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    </div>
+                </div>';
+
+        if (empty($pedidos)) {
+            echo '<div class="text-muted">Nenhum pedido na lixeira.</div>';
+        } else {
+            echo '<div class="table-responsive">'
+                . '<table class="table table-sm align-middle">'
+                . '<thead><tr><th>Pedido</th><th>Cliente</th><th>Email</th><th>Excluído em</th><th>Ações</th></tr></thead><tbody>';
+            foreach ($pedidos as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $dt = (string) ($p['deleted_at'] ?? '');
+                $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+                echo '<tr>'
+                    . '<td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>'
+                    . '<td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? '')) . '</td>'
+                    . '<td>' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</td>'
+                    . '<td>' . htmlspecialchars($dtFmt) . '</td>'
+                    . '<td>'
+                    . '<div class="d-flex gap-2">'
+                    . '<a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i></a>'
+                    . '<form method="POST" action="/admin/pedidos/restaurar/' . $pid . '">'
+                    . '<button type="submit" class="btn btn-sm btn-success"><i class="fas fa-rotate-left me-1"></i>Restaurar</button>'
+                    . '</form>'
+                    . '</div>'
+                    . '</td>'
+                    . '</tr>';
+            }
+            echo '</tbody></table></div>';
+        }
+
+        echo '</main></div></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function restaurar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        $id = $id ?? $request->getParam('id');
+        $id = (int) $id;
+        if ($id <= 0) {
+            header('Location: /admin/pedidos/lixeira');
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!in_array('deleted_at', $colsPedidos, true)) {
+                header('Location: /admin/pedidos');
+                exit;
+            }
+
+            $set = ['deleted_at = NULL'];
+            if (in_array('deleted_by', $colsPedidos, true)) {
+                $set[] = 'deleted_by = NULL';
+            }
+            $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
+            $st->execute([(int) $id]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/pedidos/lixeira');
+        exit;
+    }
+
     public function importarPedidosIniciar(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -1107,6 +1231,7 @@ JS;
             $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
             $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
+            $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
             // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
             $rateUSDBRL = 5.5;
@@ -1123,6 +1248,10 @@ JS;
             
             $sql = "SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $params = [];
+
+            if ($temDeletedAt) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
             
             if (!empty($busca)) {
                 $sql .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
@@ -1223,6 +1352,9 @@ JS;
             
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
+            if ($temDeletedAt) {
+                $sqlTotal .= " AND p.deleted_at IS NULL";
+            }
             if (!empty($busca)) {
                 $sqlTotal .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
@@ -1286,6 +1418,9 @@ JS;
                         </a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
+                        </a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger me-2">
+                            <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
@@ -1412,9 +1547,9 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
@@ -1523,9 +1658,9 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
@@ -1633,9 +1768,9 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
@@ -1814,9 +1949,9 @@ JS;
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
                         <i class="fas fa-edit me-1"></i>Editar Pedido
                     </a>
-                    <a href="/admin/pedidos/excluir/' . $id . '" class="btn btn-danger me-2" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
-                        <i class="fas fa-trash me-1"></i>Excluir Pedido
-                    </a>
+                    <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
+                        <i class="fas fa-trash me-1"></i>Enviar para Lixeira
+                    </button>
                     <a href="/admin/pedidos" class="btn btn-secondary">
                         <i class="fas fa-arrow-left me-1"></i>Voltar
                     </a>
@@ -1953,6 +2088,86 @@ JS;
                         . ($trackingFonte !== '' ? ('<div class="small text-muted">Fonte: ' . htmlspecialchars($trackingFonte) . '</div>') : '')
                         . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">Ver etiqueta</a></div>') : '')
                         . '</div>';
+                }
+            } catch (\Exception $e) {
+            }
+
+            // Comprovante de compra (online) + comissão de processamento
+            try {
+                $pdoLocal2 = null;
+                try {
+                    if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
+                        $pdoLocal2 = $pdoCols;
+                    } else {
+                        $pdoLocal2 = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    }
+                } catch (\Exception $e) {
+                    $pdoLocal2 = null;
+                }
+
+                if ($pdoLocal2 instanceof \PDO) {
+                    $hasCompraDocs = false;
+                    try {
+                        $st = $pdoLocal2->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['pedidos_compra_documentos']);
+                        $hasCompraDocs = (bool) $st->fetchColumn();
+                    } catch (\Exception $e) {
+                        $hasCompraDocs = false;
+                    }
+
+                    if ($hasCompraDocs) {
+                        $doc = null;
+                        try {
+                            $st = $pdoLocal2->prepare("SELECT status, arquivo_path, uploaded_at, usuario_id FROM pedidos_compra_documentos WHERE pedido_id = ? AND tipo_compra = 'online' ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $doc = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                        } catch (\Exception $e) {
+                            $doc = null;
+                        }
+
+                        if (is_array($doc) && !empty($doc['arquivo_path'])) {
+                            $upAt = (string) ($doc['uploaded_at'] ?? '');
+                            $path = (string) ($doc['arquivo_path'] ?? '');
+                            echo '<div class="alert alert-success mb-3">'
+                                . '<div><strong>Comprovante de compra (Online) anexado.</strong></div>'
+                                . ($upAt !== '' ? ('<div class="small">Enviado em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($upAt))) . '</strong></div>') : '')
+                                . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($path) . '" target="_blank" rel="noopener">Abrir comprovante</a></div>'
+                                . '</div>';
+                        }
+                    }
+
+                    $hasComProc = false;
+                    try {
+                        $st = $pdoLocal2->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['comissoes_processamento']);
+                        $hasComProc = (bool) $st->fetchColumn();
+                    } catch (\Exception $e) {
+                        $hasComProc = false;
+                    }
+
+                    if ($hasComProc) {
+                        $rowC = null;
+                        try {
+                            $st = $pdoLocal2->prepare('SELECT usuario_id, moeda, percentual, base_liquida, valor_comissao, created_at FROM comissoes_processamento WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([(int) $id]);
+                            $rowC = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                        } catch (\Exception $e) {
+                            $rowC = null;
+                        }
+
+                        if (is_array($rowC) && (float) ($rowC['valor_comissao'] ?? 0) > 0) {
+                            $m = strtoupper(trim((string) ($rowC['moeda'] ?? 'BRL')));
+                            if ($m === '') $m = 'BRL';
+                            $dt = (string) ($rowC['created_at'] ?? '');
+                            echo '<div class="alert alert-info mb-3">'
+                                . '<div><strong>Comissão de processamento registrada.</strong></div>'
+                                . '<div class="small">Percentual: <strong>' . number_format((float) ($rowC['percentual'] ?? 0), 2, ',', '.') . '%</strong></div>'
+                                . '<div class="small">Base líquida: <strong>' . $this->formatarMoeda((float) ($rowC['base_liquida'] ?? 0), $m) . '</strong></div>'
+                                . '<div class="small">Comissão: <strong>' . $this->formatarMoeda((float) ($rowC['valor_comissao'] ?? 0), $m) . '</strong></div>'
+                                . ($dt !== '' ? ('<div class="small">Registrada em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($dt))) . '</strong></div>') : '')
+                                . '</div>';
+                        }
+                    }
                 }
             } catch (\Exception $e) {
             }
@@ -2708,6 +2923,55 @@ JS;
             $resumo = $resumo;
         }
 
+        // Comissões de processamento (pedidos online finalizados com comprovante)
+        $resumoProc = [
+            'por_moeda' => [
+                'USD' => ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []],
+                'BRL' => ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []],
+            ],
+        ];
+        try {
+            $pdo = \Config\Database::getConnection();
+            $stT = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+            $stT->execute(['comissoes_processamento']);
+            $has = (int) ($stT->fetchColumn() ?: 0) > 0;
+            if ($has) {
+                $where = '';
+                $params = [];
+                if ($perfil !== 'admin') {
+                    $where = ' WHERE usuario_id = ?';
+                    $params[] = (int) ($admin['id'] ?? 0);
+                }
+
+                $st = $pdo->prepare('SELECT pedido_id, usuario_id, moeda, percentual, base_liquida, valor_comissao, created_at FROM comissoes_processamento' . $where . ' ORDER BY created_at DESC LIMIT 500');
+                $st->execute($params);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                    if ($m === '') $m = 'BRL';
+                    if (!isset($resumoProc['por_moeda'][$m])) {
+                        $resumoProc['por_moeda'][$m] = ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+                    }
+                    $resumoProc['por_moeda'][$m]['base_liquida'] += (float) ($r['base_liquida'] ?? 0);
+                    $resumoProc['por_moeda'][$m]['valor_comissao'] += (float) ($r['valor_comissao'] ?? 0);
+                    $resumoProc['por_moeda'][$m]['linhas'][] = $r;
+                }
+
+                foreach ($resumoProc['por_moeda'] as $m => &$t) {
+                    $sumPerc = 0.0;
+                    $n = 0;
+                    foreach (($t['linhas'] ?? []) as $r) {
+                        $sumPerc += (float) ($r['percentual'] ?? 0);
+                        $n++;
+                    }
+                    $t['percentual_medio'] = $n > 0 ? ($sumPerc / $n) : 0.0;
+                }
+                unset($t);
+            }
+        } catch (\Exception $e) {
+            $resumoProc = $resumoProc;
+        }
+
         $cPedidos = is_array($resumo) && isset($resumo['pedidos']) && is_array($resumo['pedidos']) ? $resumo['pedidos'] : [];
         $porMoeda = (is_array($resumo) && isset($resumo['por_moeda']) && is_array($resumo['por_moeda'])) ? $resumo['por_moeda'] : [];
         if (empty($porMoeda)) {
@@ -2814,6 +3078,24 @@ JS;
                         </div>
                     </div>
                 </div>';
+
+            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+            $procBase = (float) ($tp['base_liquida'] ?? 0);
+            $procVal = (float) ($tp['valor_comissao'] ?? 0);
+            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
+            echo '<div class="col-12 mb-2">'
+                . '<div class="comm-cards">'
+                . '<div class="border rounded p-3 comm-card">'
+                . '<div class="text-muted small">Processamento (Online) - Base líquida</div>'
+                . '<div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>'
+                . '</div>'
+                . '<div class="border rounded p-3 comm-card">'
+                . '<div class="text-muted small">Processamento (Online) - Comissão</div>'
+                . '<div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>'
+                . '<div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>'
+                . '</div>'
+                . '</div>'
+                . '</div>';
         }
 
         $pedidosUsd = [];
@@ -2827,7 +3109,7 @@ JS;
 
         echo '</div>
 
-                <div class="card">
+                <div class="card mb-4">
                     <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
                     <div class="card-body">';
 
@@ -2893,11 +3175,89 @@ JS;
 
         echo '        </div>
                 </div>
+                <div class="card">
+                    <div class="card-header"><strong>Comissões de Processamento (Online)</strong></div>
+                    <div class="card-body">';
+
+        $renderTabelaProc = function(array $linhas, string $moedaLabel) use ($formatMoney) {
+            if (empty($linhas)) {
+                echo '<div class="text-muted">Sem comissões de processamento em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                return;
+            }
+            echo '<div class="table-responsive">'
+                . '<table class="table table-hover">'
+                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Base líquida</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
+            foreach ($linhas as $r) {
+                $pid = (int) ($r['pedido_id'] ?? 0);
+                $dt = (string) ($r['created_at'] ?? '');
+                $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+                $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                if ($m === '') $m = 'BRL';
+                echo '<tr>'
+                    . '<td><strong>#' . $pid . '</strong></td>'
+                    . '<td>' . htmlspecialchars($dtFmt) . '</td>'
+                    . '<td class="text-end">' . $formatMoney((float) ($r['base_liquida'] ?? 0), $m) . '</td>'
+                    . '<td class="text-end">' . number_format((float) ($r['percentual'] ?? 0), 2, ',', '.') . '%</td>'
+                    . '<td class="text-end fw-semibold">' . $formatMoney((float) ($r['valor_comissao'] ?? 0), $m) . '</td>'
+                    . '<td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>'
+                    . '</tr>';
+            }
+            echo '</tbody></table></div>';
+        };
+
+        $procUsd = (array) (($resumoProc['por_moeda']['USD']['linhas'] ?? []) ?: []);
+        $procBrl = (array) (($resumoProc['por_moeda']['BRL']['linhas'] ?? []) ?: []);
+
+        echo '<div class="mb-4"><strong>USD</strong>';
+        $renderTabelaProc($procUsd, 'USD');
+        echo '</div>';
+
+        echo '<div><strong>BRL</strong>';
+        $renderTabelaProc($procBrl, 'BRL');
+        echo '</div>';
+
+        echo '        </div>
+                </div>
             </main>
         </div>
     </div>
 
+    <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="formLixeiraPedido">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var modal = document.getElementById('modalLixeiraPedido');
+            if(!modal) return;
+            modal.addEventListener('show.bs.modal', function (event) {
+                var btn = event.relatedTarget;
+                if(!btn) return;
+                var pid = btn.getAttribute('data-pedido-id') || '';
+                var label = document.getElementById('lixeiraPedidoIdLabel');
+                var form = document.getElementById('formLixeiraPedido');
+                if(label) label.textContent = '#' + pid;
+                if(form) form.action = '/admin/pedidos/excluir/' + pid;
+            });
+        })();
+    </script>
 </body>
 </html>';
         exit;
@@ -3371,6 +3731,7 @@ JS;
     public function excluir(Request $request, $id = null) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
+        $admin = $auth->getUsuarioLogado();
         $id = $id ?? $request->getParam('id');
 
         if (empty($id)) {
@@ -3382,6 +3743,31 @@ JS;
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
+
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $temDeletedAt = is_array($colsPedidos) && in_array('deleted_at', $colsPedidos, true);
+            $temDeletedBy = is_array($colsPedidos) && in_array('deleted_by', $colsPedidos, true);
+
+            if ($temDeletedAt) {
+                $set = ['deleted_at = NOW()'];
+                $params = [':id' => (int) $id];
+                if ($temDeletedBy) {
+                    $set[] = 'deleted_by = :uid';
+                    $params[':uid'] = (int) ($admin['id'] ?? 0);
+                }
+                $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                $st->execute($params);
+                $pdo->commit();
+                header('Location: /admin/pedidos?success=lixeira');
+                exit;
+            }
 
             $stmt = $pdo->prepare("SELECT id FROM pedidos WHERE id = ?");
             $stmt->execute([$id]);
