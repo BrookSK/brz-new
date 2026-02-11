@@ -15,22 +15,6 @@
                 </div>
             </div>
             
-            <!-- Categorias de FAQ -->
-            <div class="row mb-4">
-                <div class="col-md-3 mb-2">
-                    <button class="btn btn-outline-primary w-100" onclick="filtrarCategoria('todos')">Todos</button>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <button class="btn btn-outline-secondary w-100" onclick="filtrarCategoria('todos')">Importação</button>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <button class="btn btn-outline-secondary w-100" onclick="filtrarCategoria('todos')">Pagamento</button>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <button class="btn btn-outline-secondary w-100" onclick="filtrarCategoria('todos')">Entrega</button>
-                </div>
-            </div>
-            
             <!-- Perguntas e Respostas -->
             <div class="accordion" id="faqAccordion">
                 <div class="accordion-item mb-3" data-categoria="todos">

@@ -2541,24 +2541,17 @@ class CheckoutController extends Controller {
         if ($paisEntrega === '') {
             $paisEntrega = 'BR';
         }
+        $pais = $paisEntrega;
         
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-<<<<<<< HEAD
-        if ($paisEntrega === 'BR' && empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
-=======
-        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
-        if ($pais === '') {
-            $pais = 'BR';
-        }
         $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
             }
         }
->>>>>>> fdebdf831d66d5fe381731ff252747b1d861a24a
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
         if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         
