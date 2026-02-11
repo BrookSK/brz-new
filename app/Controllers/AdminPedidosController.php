@@ -3220,7 +3220,9 @@ JS;
                 </div>
             </main>
         </div>
-    </div>
+    </div>';
+
+        echo <<<'HTML'
 
     <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -3245,21 +3247,22 @@ JS;
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (function(){
-            var modal = document.getElementById('modalLixeiraPedido');
+            var modal = document.getElementById("modalLixeiraPedido");
             if(!modal) return;
-            modal.addEventListener('show.bs.modal', function (event) {
+            modal.addEventListener("show.bs.modal", function (event) {
                 var btn = event.relatedTarget;
                 if(!btn) return;
-                var pid = btn.getAttribute('data-pedido-id') || '';
-                var label = document.getElementById('lixeiraPedidoIdLabel');
-                var form = document.getElementById('formLixeiraPedido');
-                if(label) label.textContent = '#' + pid;
-                if(form) form.action = '/admin/pedidos/excluir/' + pid;
+                var pid = btn.getAttribute("data-pedido-id") || "";
+                var label = document.getElementById("lixeiraPedidoIdLabel");
+                var form = document.getElementById("formLixeiraPedido");
+                if(label) label.textContent = "#" + pid;
+                if(form) form.action = "/admin/pedidos/excluir/" + pid;
             });
         })();
     </script>
 </body>
-</html>';
+</html>
+HTML;
         exit;
     }
     
