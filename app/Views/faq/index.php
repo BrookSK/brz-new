@@ -37,20 +37,28 @@
                     <h2 class="accordion-header">
                         <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
                             <i class="fas fa-file-contract me-2"></i>
-                            Termos e Condições de Uso
+                            1. ACEITAÇÃO DOS TERMOS
                         </button>
                     </h2>
                     <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">
-TERMOS E CONDIÇÕES DE USO - BRAZILIANA
-Última Atualização: 11 de fevereiro de 2026
-
-1. ACEITAÇÃO DOS TERMOS
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">1. ACEITAÇÃO DOS TERMOS
 Ao utilizar os serviços da Braziliana, navegar pelo site, realizar compras, utilizar o serviço de Assessoria (compra por link) e/ou participar do Clube Brasiliana, você declara aceitar integralmente estes Termos e Condições, bem como nossa Política de Privacidade. Caso não concorde com qualquer disposição aqui estabelecida, recomendamos que não utilize nossos serviços.
-A Braziliana atua como agenciadora de cargas e logística internacional, oferecendo serviços de recebimento, armazenamento, consolidação, embalagem e despacho de mercadorias dos Estados Unidos para diversos países, além de plataforma de e-commerce para compra direta de produtos.
+A Braziliana atua como agenciadora de cargas e logística internacional, oferecendo serviços de recebimento, armazenamento, consolidação, embalagem e despacho de mercadorias dos Estados Unidos para diversos países, além de plataforma de e-commerce para compra direta de produtos.</pre>
+                        </div>
+                    </div>
+                </div>
 
-2. NATUREZA DOS SERVIÇOS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                            <i class="fas fa-file-contract me-2"></i>
+                            2. NATUREZA DOS SERVIÇOS
+                        </button>
+                    </h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">2. NATUREZA DOS SERVIÇOS
 A Braziliana oferece os seguintes serviços:
 E-commerce (loja virtual) com produtos disponíveis para compra direta
 Serviço de Assessoria para compra de produtos por meio de links fornecidos pelo cliente
@@ -59,10 +67,21 @@ Transporte aéreo internacional com rastreamento completo
 Parceria com os Correios do Brasil para entregas no território brasileiro
 Orientação para declarações aduaneiras e suporte ao cliente
 Clube Braziliana - programa de benefícios com créditos internos
-Todos os produtos são adquiridos sob demanda e estão sujeitos às regulamentações dos Estados Unidos e do país de destino.
+Todos os produtos são adquiridos sob demanda e estão sujeitos às regulamentações dos Estados Unidos e do país de destino.</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-3. NAVEGAÇÃO E COMPRA NO SITE
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                            <i class="fas fa-file-contract me-2"></i>
+                            3. NAVEGAÇÃO E COMPRA NO SITE
+                        </button>
+                    </h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">3. NAVEGAÇÃO E COMPRA NO SITE
 3.1. Página Inicial e Categorias
 Você pode navegar pelas categorias e vitrines disponíveis no site. Os preços podem aparecer em Real (R$) ou Dólar (US$), dependendo da opção selecionada
 3.2. Página de Produtos
@@ -79,9 +98,21 @@ Estimativa de taxas (quando aplicável)
 Frete (quando aplicável)
 Limite de peso:
 Existe um limite de peso total de 30 KG do carrinho
-Se ultrapassar o limite, será necessário remover itens para continuar
+Se ultrapassar o limite, será necessário remover itens para continuar</pre>
+                        </div>
+                    </div>
+                </div>
 
-4. CADASTRO E LOGIN
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                            <i class="fas fa-file-contract me-2"></i>
+                            4. CADASTRO E LOGIN
+                        </button>
+                    </h2>
+                    <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">4. CADASTRO E LOGIN
 4.1. Criação de Conta
 Para finalizar uma compra, você pode precisar estar logado. Se você já tem cadastro, basta entrar. Novos usuários devem criar uma conta fornecendo informações básicas.
 4.2. Dados Obrigatórios
@@ -98,9 +129,21 @@ Endereço de entrega completo
 Documentos solicitados (quando aplicável)
 Importante: Problemas causados por dados incorretos (ex.: endereço incompleto, CPF inválido) podem gerar atrasos, custos adicionais e/ou inviabilizar a entrega.
 
-Sendo inteiramente responsabilidade do cliente a verificação das corretas informações.
+Sendo inteiramente responsabilidade do cliente a verificação das corretas informações.</pre>
+                        </div>
+                    </div>
+                </div>
 
-5. PREÇOS, MOEDAS E DISPONIBILIDADE
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                            <i class="fas fa-file-contract me-2"></i>
+                            5. PREÇOS, MOEDAS E DISPONIBILIDADE
+                        </button>
+                    </h2>
+                    <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">5. PREÇOS, MOEDAS E DISPONIBILIDADE
 5.1. Moeda de Exibição e Pagamento
 O valor considerado como referência é o valor exibido no checkout no momento da finalização
 Dependendo do endereço de entrega e da opção escolhida, o pagamento pode ser em Real (R$) ou Dólar (US$)
@@ -108,9 +151,21 @@ Dependendo do endereço de entrega e da opção escolhida, o pagamento pode ser 
 Produtos podem ter preço e disponibilidade alterados a qualquer momento
 Itens podem sair de estoque antes da confirmação do pagamento
 A confirmação do pedido depende do processamento do pagamento
-Não nos responsabilizamos por alterações de preço em sites de terceiros
+Não nos responsabilizamos por alterações de preço em sites de terceiros</pre>
+                        </div>
+                    </div>
+                </div>
 
-6. CHECKOUT E FINALIZAÇÃO DO PEDIDO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                            <i class="fas fa-file-contract me-2"></i>
+                            6. CHECKOUT E FINALIZAÇÃO DO PEDIDO
+                        </button>
+                    </h2>
+                    <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">6. CHECKOUT E FINALIZAÇÃO DO PEDIDO
 6.1. Acesso ao Checkout
 O checkout deve ser acessado a partir do carrinho
 Se você tentar acessar o checkout diretamente após muito tempo, o sistema pode pedir para voltar ao carrinho e iniciar novamente
@@ -127,9 +182,21 @@ Produtos
 Taxa de serviço (quando aplicável)
 Frete (quando aplicável; pode existir frete grátis)
 Impostos/tributos estimados (quando aplicável)
-Observação: Algumas taxas e impostos são estimativas e podem variar conforme regras de fiscalização, transporte e destino.
+Observação: Algumas taxas e impostos são estimativas e podem variar conforme regras de fiscalização, transporte e destino.</pre>
+                        </div>
+                    </div>
+                </div>
 
-7. FORMAS DE PAGAMENTO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">
+                            <i class="fas fa-file-contract me-2"></i>
+                            7. FORMAS DE PAGAMENTO
+                        </button>
+                    </h2>
+                    <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">7. FORMAS DE PAGAMENTO
 7.1. Pagamento em Real (R$)
 Quando o pedido é pago em Real, o valor exibido no checkout é o valor final do pedido em Real.
 7.2. Pagamento em Dólar (US$)
@@ -147,9 +214,21 @@ Se a opção de carteira estiver disponível, poderá ser utilizada para pagar p
 O saldo utilizado é debitado na moeda do pedido
 Créditos em carteira estão disponíveis por 90 dias após a inserção em casos de créditos frutos de cashbacks e ou bônus.
 Após esse período, os valores expiram e não poderão ser utilizados novamente
-Todas as transações são processadas por plataformas seguras e criptografadas.
+Todas as transações são processadas por plataformas seguras e criptografadas.</pre>
+                        </div>
+                    </div>
+                </div>
 
-8. CONFIRMAÇÃO E ACOMPANHAMENTO DO PEDIDO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq8">
+                            <i class="fas fa-file-contract me-2"></i>
+                            8. CONFIRMAÇÃO E ACOMPANHAMENTO DO PEDIDO
+                        </button>
+                    </h2>
+                    <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">8. CONFIRMAÇÃO E ACOMPANHAMENTO DO PEDIDO
 8.1. Página de Conclusão
 Após finalizar, você verá uma confirmação do pedido com número de identificação.
 8.2. Meus Pedidos
@@ -161,9 +240,21 @@ O site pode enviar comunicações sobre seu pedido:
 Atualizações de status
 Confirmações de pagamento
 Avisos importantes
-Informações de rastreamento
+Informações de rastreamento</pre>
+                        </div>
+                    </div>
+                </div>
 
-9. SERVIÇO DE ASSESSORIA (COMPRA POR LINK)
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq9">
+                            <i class="fas fa-file-contract me-2"></i>
+                            9. SERVIÇO DE ASSESSORIA (COMPRA POR LINK)
+                        </button>
+                    </h2>
+                    <div id="faq9" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">9. SERVIÇO DE ASSESSORIA (COMPRA POR LINK)
 A Assessoria é um serviço para ajudar você a comprar produtos por meio de links de sites dos Estados Unidos.
 9.1. Como Funciona
 Você informa os links dos produtos desejados
@@ -196,11 +287,21 @@ Ou será realizado estorno/reembolso conforme a forma de pagamento
 9.5. Promoções e Estoque
 Se valores promocionais acabarem e/ou o estoque se esgotar pode ser necessário pagar a diferença para seguir com o pedido
 
-Você será informado de qualquer alteração
+Você será informado de qualquer alteração</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-
-10. SERVIÇO DE REDIRECIONAMENTO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq10">
+                            <i class="fas fa-file-contract me-2"></i>
+                            10. SERVIÇO DE REDIRECIONAMENTO
+                        </button>
+                    </h2>
+                    <div id="faq10" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">10. SERVIÇO DE REDIRECIONAMENTO
 10.1. Número de Suíte
 Ao criar sua conta no site da Braziliana, você recebe automaticamente um ID exclusivo chamado Número de Suíte, que funciona como seu "apartamento" dentro da estrutura da empresa. Este número permite que você:
 Compre através de nosso site de qualquer loja dos Estados Unidos.
@@ -210,9 +311,21 @@ Quando suas compras chegam na Braziliana, elas são tratadas para despacho até 
 Descrição idêntica ao do site do produto
 Peso
 Quantidade
-Foto
+Foto</pre>
+                        </div>
+                    </div>
+                </div>
 
-11. VALORES E TAXAS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq11">
+                            <i class="fas fa-file-contract me-2"></i>
+                            11. VALORES E TAXAS
+                        </button>
+                    </h2>
+                    <div id="faq11" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">11. VALORES E TAXAS
 11.1. Taxa de Serviço
 Taxa padrão: US$ 39 por kg de produto (incluindo peso da embalagem)
 Exemplo de cálculo:
@@ -234,10 +347,21 @@ O serviço prestado pela Braziliana é considerado concluído no momento da entr
 Para outros países:
 Compras internacionais podem ter incidência de impostos e taxas locais, não cobradas nem gerenciadas pela Braziliana.
 É responsabilidade do cliente conhecer as leis de importação, limites, restrições e possíveis tributos do seu país de residência/destino
-Em algumas situações, podem existir custos adicionais para liberação e entrega, serviço o qual a Braziliana não possui e ou oferta. Ficando a cargo do cliente a responsabilidade por tal gestão.
+Em algumas situações, podem existir custos adicionais para liberação e entrega, serviço o qual a Braziliana não possui e ou oferta. Ficando a cargo do cliente a responsabilidade por tal gestão.</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-12.2. Prazos de Entrega
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq12">
+                            <i class="fas fa-file-contract me-2"></i>
+                            12. PRAZOS E RASTREAMENTO
+                        </button>
+                    </h2>
+                    <div id="faq12" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">12.2. Prazos de Entrega
 Prazo médio: 10 a 15 dias
 Prazos informados são estimativas e podem variar
 Fatores que podem impactar o prazo:
@@ -254,25 +378,57 @@ Código de rastreio por e-mail e WhatsApp
 Acesso ao rastreio no painel da Braziliana através da aba Meus Pedidos Atualização no detalhe do pedido (quando houver rastreio disponível)
 Como acompanhar:
 Brasil: www.correios.com.br
-EUA e outros países: www.ups.com
+EUA e outros países: www.ups.com</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-13.2. Limites de Envio (Brasil)
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq13">
+                            <i class="fas fa-file-contract me-2"></i>
+                            13. LIMITES DE ENVIO (BRASIL)
+                        </button>
+                    </h2>
+                    <div id="faq13" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">13.2. Limites de Envio (Brasil)
 Peso máximo por caixa: 30 kg
 Dimensões máximas: Nenhum lado pode ultrapassar 1 metro
 Soma dos 3 lados (comprimento + largura + altura): máximo de 1,90 m
 Valor máximo de produtos por caixa: US$ 2.999,99
 13.3. Finalidade e Quantidades
-O serviço de redirecionamento destina-se à importação de produtos novos para uso pessoal. É importante atentar-se às quantidades de itens iguais ou similares para evitar que a fiscalização interprete como revenda, o que pode resultar em retenção ou recusa da remessa.
+O serviço de redirecionamento destina-se à importação de produtos novos para uso pessoal. É importante atentar-se às quantidades de itens iguais ou similares para evitar que a fiscalização interprete como revenda, o que pode resultar em retenção ou recusa da remessa.</pre>
+                        </div>
+                    </div>
+                </div>
 
-14. PRAZO DE PREPARO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq14">
+                            <i class="fas fa-file-contract me-2"></i>
+                            14. PRAZO DE PREPARO
+                        </button>
+                    </h2>
+                    <div id="faq14" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">14. PRAZO DE PREPARO
 14.1. Processo de Embalagem
-Assim que os pedidos recebem o status de concluído/ Pago, o sistema automáticamente realiza o pedido de processamento.
+Assim que os pedidos recebem o status de concluído/ Pago, o sistema automáticamente realiza o pedido de processamento.</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-
-
-15. DECLARAÇÃO ADUANEIRA
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq15">
+                            <i class="fas fa-file-contract me-2"></i>
+                            15. DECLARAÇÃO ADUANEIRA
+                        </button>
+                    </h2>
+                    <div id="faq15" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">15. DECLARAÇÃO ADUANEIRA
 15.1. Tributação e Fiscalização
 Compras internacionais passarão por fiscalização. Tributos podem ser cobrados conforme regras do país de destino.
 15.2. Suporte da Braziliana
@@ -280,18 +436,39 @@ Nossa equipe pode orientar você durante o processo de declaração aduaneira, s
 
 15.5. Valores Declarados
 Os valores declarados SEMPRE serão idênticos aos sites de aquisição.
-Se a Receita Federal solicitar confirmação de conteúdo, você precisará enviar comprovantes de pagamento coerentes aos recibos/e-mails de compra.
+Se a Receita Federal solicitar confirmação de conteúdo, você precisará enviar comprovantes de pagamento coerentes aos recibos/e-mails de compra.</pre>
+                        </div>
+                    </div>
+                </div>
 
-16. PROBLEMAS COM CPF
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq16">
+                            <i class="fas fa-file-contract me-2"></i>
+                            16. PROBLEMAS COM CPF
+                        </button>
+                    </h2>
+                    <div id="faq16" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">16. PROBLEMAS COM CPF
 16.1. CPF Irregular
 Encomendas com CPF irregular serão devolvidas. Verifique a situação do seu CPF em: https://servicos.receita.fazenda.gov.br/Servicos/CPF/ConsultaSituacao/ConsultaPublica.asp
 16.2. CPF Não Correspondente
-Se o CPF não corresponder ao destinatário, a encomenda será devolvida. Regularize os dados no site onde a compra foi feita.
+Se o CPF não corresponder ao destinatário, a encomenda será devolvida. Regularize os dados no site onde a compra foi feita.</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-
-
-17. CANCELAMENTO, REEMBOLSOS E ALTERAÇÕES
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq17">
+                            <i class="fas fa-file-contract me-2"></i>
+                            17. CANCELAMENTO, REEMBOLSOS E ALTERAÇÕES
+                        </button>
+                    </h2>
+                    <div id="faq17" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">17. CANCELAMENTO, REEMBOLSOS E ALTERAÇÕES
 17.1. Política de Cancelamento (Compras Diretas)
 Como os produtos são adquiridos sob demanda automatizada, cancelamentos incorrem em uma taxa fixa de US$ 100, cobrindo custos de:
 Operacional
@@ -311,11 +488,21 @@ Necessária para: retirar da carga, reabrir, refazer conferência, reembalar e r
 17.4. Estornos e Reembolsos
 Em caso de estorno/reembolso, podem existir prazos de processamento do meio de pagamento
 Reembolsos podem ser processados como crédito em carteira (quando disponível) ou via meio de pagamento original
-.
+.</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-
-18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq18">
+                            <i class="fas fa-file-contract me-2"></i>
+                            18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
+                        </button>
+                    </h2>
+                    <div id="faq18" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
 O Clube Brasiliana é um programa de benefícios com créditos internos.
 18.1. Ativação e Acesso
 Para ativar e manter o acesso às áreas e produtos do Clube, é necessário manter um saldo mínimo de $ 39,00 em créditos na sua carteira (considerando o equivalente em USD)
@@ -340,11 +527,21 @@ Créditos não são dinheiro
 Créditos não são saqueáveis
 Créditos não representam investimento
 Créditos podem ser auditados a qualquer momento
-Créditos estão sujeitos às regras e alterações do programa
+Créditos estão sujeitos às regras e alterações do programa</pre>
+                        </div>
+                    </div>
+                </div>
 
-
-
-20. ITENS PROIBIDOS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq20">
+                            <i class="fas fa-file-contract me-2"></i>
+                            20. ITENS PROIBIDOS
+                        </button>
+                    </h2>
+                    <div id="faq20" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">20. ITENS PROIBIDOS
 Para garantir conformidade com regras de transporte aéreo e fiscalização, alguns itens são proibidos e outros permitidos apenas com restrições e documentação.
 20.1. Itens PROIBIDOS (pelos Correios do Brasil):
 Animais
@@ -361,16 +558,40 @@ Material radioativo
 Produtos perecíveis
 Sementes, Plantas e suas partes
 20.2. Responsabilidade do Cliente
-É responsabilidade do cliente garantir que o conteúdo enviado esteja permitido e com a documentação correta para o seu destino. Se conteúdo proibido for identificado, a remessa pode ser recusada, devolvida ou retida.
+É responsabilidade do cliente garantir que o conteúdo enviado esteja permitido e com a documentação correta para o seu destino. Se conteúdo proibido for identificado, a remessa pode ser recusada, devolvida ou retida.</pre>
+                        </div>
+                    </div>
+                </div>
 
-21. LIMITAÇÕES DE USO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq21">
+                            <i class="fas fa-file-contract me-2"></i>
+                            21. LIMITAÇÕES DE USO
+                        </button>
+                    </h2>
+                    <div id="faq21" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">21. LIMITAÇÕES DE USO
 21.1. Uso Pessoal
 Nossos serviços são destinados exclusivamente ao uso pessoal. Compras interpretadas como destinadas à revenda podem ser negadas pela Receita Federal.
 21.2. Itens Controlados
 Itens proibidos pela Anvisa ou Receita Federal (armas, produtos inflamáveis, remédios controlados) não podem ser enviados.
-Consulte a lista completa em: https://consultas.anvisa.gov.br/#/dossie/
+Consulte a lista completa em: https://consultas.anvisa.gov.br/#/dossie/</pre>
+                        </div>
+                    </div>
+                </div>
 
-22. GARANTIA E RESPONSABILIDADE
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq22">
+                            <i class="fas fa-file-contract me-2"></i>
+                            22. GARANTIA E RESPONSABILIDADE
+                        </button>
+                    </h2>
+                    <div id="faq22" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">22. GARANTIA E RESPONSABILIDADE
 22.1. Garantias da Braziliana
 A Braziliana garante:
 Correta embalagem dos produtos
@@ -385,9 +606,21 @@ A Braziliana atua como agenciadora de cargas/logística internacional e não tem
 Reduzir, isentar ou evitar cobranças alfandegárias
 Controlar decisões, exigências, tributos, prazos e liberações efetuadas por autoridades alfandegárias
 Interferir em processos de operadores postais no país de destino
-Garantir prazos de entrega (apenas estimativas)
+Garantir prazos de entrega (apenas estimativas)</pre>
+                        </div>
+                    </div>
+                </div>
 
-23. BOAS PRÁTICAS DO CLIENTE
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq23">
+                            <i class="fas fa-file-contract me-2"></i>
+                            23. BOAS PRÁTICAS DO CLIENTE
+                        </button>
+                    </h2>
+                    <div id="faq23" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">23. BOAS PRÁTICAS DO CLIENTE
 Para evitar problemas e garantir uma experiência satisfatória:
 Revise seus dados antes de finalizar o pedido
 Acompanhe o status do pedido em "Meus Pedidos"
@@ -398,16 +631,40 @@ Confira o endereço de entrega cuidadosamente
 Verifique a regularidade do seu CPF (para entregas no Brasil)
 Declare valores corretos na documentação aduaneira quando solicitado
 Acompanhe prazos de pagamento de impostos
-Responda comunicações da Braziliana prontamente
+Responda comunicações da Braziliana prontamente</pre>
+                        </div>
+                    </div>
+                </div>
 
-24. ATUALIZAÇÕES DE POLÍTICAS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq24">
+                            <i class="fas fa-file-contract me-2"></i>
+                            24. ATUALIZAÇÕES DE POLÍTICAS
+                        </button>
+                    </h2>
+                    <div id="faq24" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">24. ATUALIZAÇÕES DE POLÍTICAS
 A Braziliana reserva-se o direito de alterar ou atualizar condições, políticas, serviços e preços a qualquer momento, sem aviso prévio, para:
 Aprimorar a operação
 Garantir qualidade do serviço
 Manter conformidade com normas e regulamentações aplicáveis
-Recomendamos que o cliente revise periodicamente os Termos e Condições vigentes, especialmente antes de realizar novos pedidos ou solicitar envios.
+Recomendamos que o cliente revise periodicamente os Termos e Condições vigentes, especialmente antes de realizar novos pedidos ou solicitar envios.</pre>
+                        </div>
+                    </div>
+                </div>
 
-25. DECLARAÇÃO DE CIÊNCIA E CONCORDÂNCIA
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq25">
+                            <i class="fas fa-file-contract me-2"></i>
+                            25. DECLARAÇÃO DE CIÊNCIA E CONCORDÂNCIA
+                        </button>
+                    </h2>
+                    <div id="faq25" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">25. DECLARAÇÃO DE CIÊNCIA E CONCORDÂNCIA
 Ao criar uma conta e/ou efetuar compras e solicitações de envio pela Braziliana, o cliente reconhece que se trata de um serviço de logística internacional e declara estar ciente e concordar integralmente com:
 Navegação e processo de compra no site
 Serviço de Assessoria e suas limitações
@@ -418,23 +675,43 @@ Declaração alfandegária e responsabilidades do cliente
 Tributação de importações, fiscalização e processos aduaneiros
 Políticas de cancelamento, taxas, reembolsos e regras de abandono de mercadorias
 Regras do Clube Brasiliana e natureza dos créditos internos
-Moedas de pagamento e conversões aplicáveis
+Moedas de pagamento e conversões aplicáveis</pre>
+                        </div>
+                    </div>
+                </div>
 
-26. CONTATO
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq26">
+                            <i class="fas fa-file-contract me-2"></i>
+                            26. CONTATO
+                        </button>
+                    </h2>
+                    <div id="faq26" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">26. CONTATO
 Para dúvidas, suporte ou solicitações:
 WhatsApp: Disponível em nosso site oficial
-E-mail (Privacidade): suporte@braziliana.com.br
+E-mail (Privacidade): suporte@braziliana.com.br</pre>
+                        </div>
+                    </div>
+                </div>
 
-27. DISPOSIÇÕES FINAIS
+                <div class="accordion-item mb-3" data-categoria="todos">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq27">
+                            <i class="fas fa-file-contract me-2"></i>
+                            27. DISPOSIÇÕES FINAIS
+                        </button>
+                    </h2>
+                    <div id="faq27" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">27. DISPOSIÇÕES FINAIS
 Estes Termos e Condições constituem o acordo integral entre você e a Braziliana relativamente ao uso dos serviços oferecidos. A invalidade de qualquer disposição não afetará a validade das demais.
 Ao utilizar nossos serviços, você confirma ter lido, compreendido e aceito todos os termos aqui estabelecidos.
 
 Braziliana - Logística Internacional e E-commerce
- Última Atualização: 01 de fevereiro de 2026
-
-
-
-                            </pre>
+ Última Atualização: 01 de fevereiro de 2026</pre>
                         </div>
                     </div>
                 </div>
