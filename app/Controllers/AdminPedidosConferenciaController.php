@@ -102,6 +102,15 @@ HTML;
         }
     }
 
+    private function pickColumn(array $cols, array $candidates): string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return '';
+    }
+
     private function getPedidoItensTable(): ?string {
         try {
             $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -448,24 +457,49 @@ HTML;
                     $moeda = 'BRL';
                     $total = 0.0;
                     $impostos = 0.0;
+                    $origemPedido = '';
                     try {
-                        $stP = $this->connection->prepare('SELECT COALESCE(moeda, \'BRL\') AS moeda, COALESCE(total, COALESCE(valor_total,0)) AS total, COALESCE(impostos, COALESCE(valor_impostos,0)) AS impostos FROM pedidos WHERE id = ? LIMIT 1');
-                        $stP->execute([$id]);
-                        $row = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
-                        $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'BRL')));
-                        if ($moeda === '') $moeda = 'BRL';
-                        $total = (float) ($row['total'] ?? 0);
-                        $impostos = (float) ($row['impostos'] ?? 0);
+                        $colsP = [];
+                        try {
+                            $stColsP = $this->connection->query('DESCRIBE pedidos');
+                            $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsP = [];
+                        }
+
+                        $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency']);
+                        $colTotal = $this->pickColumn($colsP, ['total', 'valor_total', 'amount', 'valor']);
+                        $colImpostos = $this->pickColumn($colsP, ['impostos', 'valor_impostos', 'taxes']);
+                        $colOrigem = $this->pickColumn($colsP, ['origem_pedido', 'origem', 'tipo']);
+
+                        $sel = [];
+                        if ($colMoeda !== '') $sel[] = $colMoeda . ' AS moeda';
+                        if ($colTotal !== '') $sel[] = $colTotal . ' AS total';
+                        if ($colImpostos !== '') $sel[] = $colImpostos . ' AS impostos';
+                        if ($colOrigem !== '') $sel[] = $colOrigem . ' AS origem_pedido';
+
+                        if (!empty($sel)) {
+                            $stP = $this->connection->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                            $stP->execute([$id]);
+                            $row = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                            $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'BRL')));
+                            if ($moeda === '') $moeda = 'BRL';
+                            $total = (float) ($row['total'] ?? 0);
+                            $impostos = (float) ($row['impostos'] ?? 0);
+                            $origemPedido = strtolower(trim((string) ($row['origem_pedido'] ?? '')));
+                        }
                     } catch (\Exception $e) {
                         $moeda = 'BRL';
                         $total = 0.0;
                         $impostos = 0.0;
+                        $origemPedido = '';
                     }
 
                     $custo = 0.0;
                     try {
                         $itensTable2 = $this->getPedidoItensTable();
-                        if ($itensTable2 && $this->tableExists('produtos')) {
+                        if ($itensTable2) {
                             $colsItens2 = [];
                             try {
                                 $stmtColsI2 = $this->connection->query('DESCRIBE ' . $itensTable2);
@@ -477,19 +511,39 @@ HTML;
                             $colProduto2 = in_array('produto_id', $colsItens2, true) ? 'produto_id' : '';
                             $colQtd2 = in_array('quantidade', $colsItens2, true) ? 'quantidade' : (in_array('qty', $colsItens2, true) ? 'qty' : '');
                             if ($colPedidoId !== '' && $colProduto2 !== '' && $colQtd2 !== '') {
-                                $colsProd = [];
-                                try {
-                                    $stmtColsPr = $this->connection->query('DESCRIBE produtos');
-                                    $colsProd = $stmtColsPr ? ($stmtColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                } catch (\Exception $e) {
-                                    $colsProd = [];
-                                }
-                                $colCusto = in_array('preco_custo', $colsProd, true) ? 'preco_custo' : (in_array('cost_price', $colsProd, true) ? 'cost_price' : (in_array('custo', $colsProd, true) ? 'custo' : ''));
-                                if ($colCusto !== '') {
-                                    $sqlC = 'SELECT SUM(COALESCE(pr.' . $colCusto . ',0) * COALESCE(pi.' . $colQtd2 . ',0)) AS custo_total FROM ' . $itensTable2 . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProduto2 . ' WHERE pi.' . $colPedidoId . ' = ?';
-                                    $stC = $this->connection->prepare($sqlC);
-                                    $stC->execute([$id]);
-                                    $custo = (float) ($stC->fetchColumn() ?: 0);
+                                $isAssessoria = in_array($origemPedido, ['assessoria', 'redirecionamento'], true);
+
+                                // Para assessoria/redirecionamento: custo = valor de venda do próprio item (subtotal ou unit*qtd)
+                                if ($isAssessoria) {
+                                    $colSubtotal = $this->pickColumn($colsItens2, ['subtotal']);
+                                    $colUnit = $this->pickColumn($colsItens2, ['preco_unitario', 'valor_unitario', 'price', 'valor']);
+                                    if ($colSubtotal !== '') {
+                                        $st = $this->connection->prepare('SELECT SUM(COALESCE(' . $colSubtotal . ',0)) FROM ' . $itensTable2 . ' WHERE ' . $colPedidoId . ' = ?');
+                                        $st->execute([$id]);
+                                        $custo = (float) ($st->fetchColumn() ?: 0);
+                                    } elseif ($colUnit !== '') {
+                                        $st = $this->connection->prepare('SELECT SUM(COALESCE(' . $colUnit . ',0) * COALESCE(' . $colQtd2 . ',0)) FROM ' . $itensTable2 . ' WHERE ' . $colPedidoId . ' = ?');
+                                        $st->execute([$id]);
+                                        $custo = (float) ($st->fetchColumn() ?: 0);
+                                    }
+                                } else {
+                                    // Outros: custo pelo custo do produto
+                                    if ($this->tableExists('produtos')) {
+                                        $colsProd = [];
+                                        try {
+                                            $stmtColsPr = $this->connection->query('DESCRIBE produtos');
+                                            $colsProd = $stmtColsPr ? ($stmtColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                        } catch (\Exception $e) {
+                                            $colsProd = [];
+                                        }
+                                        $colCusto = $this->pickColumn($colsProd, ['preco_custo', 'cost_price', 'custo', 'valor_custo']);
+                                        if ($colCusto !== '') {
+                                            $sqlC = 'SELECT SUM(COALESCE(pr.' . $colCusto . ',0) * COALESCE(pi.' . $colQtd2 . ',0)) AS custo_total FROM ' . $itensTable2 . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProduto2 . ' WHERE pi.' . $colPedidoId . ' = ?';
+                                            $stC = $this->connection->prepare($sqlC);
+                                            $stC->execute([$id]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -571,6 +625,45 @@ HTML;
                         $colsLista = [];
                     }
 
+                    // loja_id do produto (quando existir), para não exigir seleção manual depois
+                    $produtoLojaMap = [];
+                    $temLojaIdLista = in_array('loja_id', $colsLista, true);
+                    $temLojaIdProduto = false;
+                    if ($temLojaIdLista && $this->tableExists('produtos')) {
+                        try {
+                            $colsProd = [];
+                            try {
+                                $stmtColsPr = $this->connection->query('DESCRIBE produtos');
+                                $colsProd = $stmtColsPr ? ($stmtColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
+                                $colsProd = [];
+                            }
+                            $colLojaProd = $this->pickColumn($colsProd, ['loja_id']);
+                            $temLojaIdProduto = ($colLojaProd !== '');
+
+                            if ($temLojaIdProduto) {
+                                $idsProd = array_values(array_unique(array_filter(array_map(function ($x) {
+                                    return (int) ($x['produto_id'] ?? 0);
+                                }, $itens))));
+                                $idsProd = array_values(array_filter($idsProd));
+                                if (!empty($idsProd)) {
+                                    $in = implode(',', array_fill(0, count($idsProd), '?'));
+                                    $stL = $this->connection->prepare('SELECT id, ' . $colLojaProd . ' AS loja_id FROM produtos WHERE id IN (' . $in . ')');
+                                    $stL->execute($idsProd);
+                                    foreach (($stL->fetchAll(\PDO::FETCH_ASSOC) ?: []) as $r) {
+                                        $pidP = (int) ($r['id'] ?? 0);
+                                        $lid = (int) ($r['loja_id'] ?? 0);
+                                        if ($pidP > 0 && $lid > 0) {
+                                            $produtoLojaMap[$pidP] = $lid;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $produtoLojaMap = [];
+                        }
+                    }
+
                     $itensConsolidados = [];
                     foreach ($itens as $it) {
                         $produtoId = (int) ($it['produto_id'] ?? 0);
@@ -628,6 +721,14 @@ HTML;
                             $colsIns[] = 'produto_id';
                             $valsIns[] = ':produto_id';
                             $pIns[':produto_id'] = $produtoId;
+                        }
+                        if ($temLojaIdLista) {
+                            $lid = (int) ($produtoLojaMap[$produtoId] ?? 0);
+                            if ($lid > 0) {
+                                $colsIns[] = 'loja_id';
+                                $valsIns[] = ':loja_id';
+                                $pIns[':loja_id'] = $lid;
+                            }
                         }
                         if (in_array('pedido_id', $colsLista, true)) {
                             $colsIns[] = 'pedido_id';
