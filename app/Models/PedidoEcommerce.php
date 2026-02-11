@@ -222,44 +222,53 @@ class PedidoEcommerce {
     private function getConfigValue(string $categoria, string $chave, $default = null) {
         try {
             $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
-            $table = null;
-            foreach ($tableCandidates as $t) {
-                if ($this->tableExists($t)) {
-                    $table = $t;
-                    break;
+            foreach ($tableCandidates as $table) {
+                if (!$this->tableExists($table)) {
+                    continue;
                 }
-            }
-            if (!$table) {
-                return $default;
-            }
 
-            $cols = $this->getTableColumns($table);
+                $cols = $this->getTableColumns($table);
+                if (empty($cols)) {
+                    continue;
+                }
 
-            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                // mode: categoria/chave
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
+                    if ($valCol) {
+                        $orderCol = in_array('id', $cols, true) ? 'id' : (in_array('updated_at', $cols, true) ? 'updated_at' : 'chave');
+                        $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE categoria = ? AND chave = ? ORDER BY ' . $orderCol . ' DESC LIMIT 1');
+                        $st->execute([$categoria, $chave]);
+                        $v = $st->fetchColumn();
+                        if ($v !== false && $v !== null) {
+                            return $v;
+                        }
+                    }
+                }
+
+                // mode: chave/valor (fullKey)
+                $keyCol = $this->pickColumn($cols, ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro']);
                 $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
-                if ($valCol) {
-                    $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE categoria = ? AND chave = ? ORDER BY id DESC LIMIT 1');
-                    $st->execute([$categoria, $chave]);
+                if ($keyCol && $valCol) {
+                    $fullKey = $categoria . '_' . $chave;
+                    $orderCol = in_array('id', $cols, true) ? 'id' : (in_array('updated_at', $cols, true) ? 'updated_at' : $keyCol);
+                    $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE ' . $keyCol . ' = ? ORDER BY ' . $orderCol . ' DESC LIMIT 1');
+                    $st->execute([$fullKey]);
                     $v = $st->fetchColumn();
-                    return ($v !== false && $v !== null) ? $v : $default;
+                    if ($v !== false && $v !== null) {
+                        return $v;
+                    }
                 }
-            }
 
-            $keyCol = $this->pickColumn($cols, ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro']);
-            $valCol = $this->pickColumn($cols, ['valor', 'value', 'conteudo', 'content', 'config_value']);
-            if ($keyCol && $valCol) {
-                $fullKey = $categoria . '_' . $chave;
-                $st = $this->connection->prepare('SELECT ' . $valCol . ' FROM ' . $table . ' WHERE ' . $keyCol . ' = ? ORDER BY id DESC LIMIT 1');
-                $st->execute([$fullKey]);
-                $v = $st->fetchColumn();
-                return ($v !== false && $v !== null) ? $v : $default;
-            }
-
-            if (in_array('id', $cols, true) && !in_array('categoria', $cols, true) && !in_array('chave', $cols, true)) {
-                if (in_array($chave, $cols, true)) {
-                    $st = $this->connection->query('SELECT ' . $chave . ' FROM ' . $table . ' ORDER BY id ASC LIMIT 1');
-                    $v = $st ? $st->fetchColumn() : null;
-                    return ($v !== false && $v !== null) ? $v : $default;
+                // mode: single row table
+                if (in_array('id', $cols, true) && !in_array('categoria', $cols, true) && !in_array('chave', $cols, true)) {
+                    if (in_array($chave, $cols, true)) {
+                        $st = $this->connection->query('SELECT ' . $chave . ' FROM ' . $table . ' ORDER BY id ASC LIMIT 1');
+                        $v = $st ? $st->fetchColumn() : null;
+                        if ($v !== false && $v !== null) {
+                            return $v;
+                        }
+                    }
                 }
             }
         } catch (\Exception $e) {
