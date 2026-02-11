@@ -3072,6 +3072,11 @@ class CheckoutController extends Controller {
                 $impostosUsd = 0.0;
             }
 
+            // Imposto de compra nos EUA (10%) embutido no subtotal dos produtos.
+            if ($paisEntrega === 'US') {
+                $subtotal = (float) $subtotal * 1.10;
+            }
+
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {

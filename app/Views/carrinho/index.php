@@ -290,7 +290,7 @@
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Impostos</span>
+                        <span>Impostos do Brasil</span>
                         <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
                     

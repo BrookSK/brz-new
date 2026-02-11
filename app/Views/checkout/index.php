@@ -306,14 +306,26 @@
                 var paisEl = document.getElementById('pais');
                 if (!paisEl) return;
 
-                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                var pais = ((paisEl.value || '').toString().toUpperCase() || 'BR');
+                var br = (pais === 'BR');
+                var us = (pais === 'US');
                 var impostosRow = document.getElementById('impostos-row');
                 var impostosEl = document.getElementById('impostos');
                 var alertEl = document.getElementById('entrega-fora-br-alert');
+                var subtotalLabel = document.getElementById('subtotal-label');
 
                 if (!window.checkoutBaseValues) return;
                 if (!window.checkoutOriginalValues) {
                     window.checkoutOriginalValues = Object.assign({}, window.checkoutBaseValues);
+                }
+
+                var baseSubtotal = (window.checkoutBaseValues.subtotal || 0);
+                if (us) {
+                    window.checkoutOriginalValues.subtotal = baseSubtotal * 1.10;
+                    if (subtotalLabel) subtotalLabel.textContent = 'Subtotal Produtos (incl. imposto EUA 10%):';
+                } else {
+                    window.checkoutOriginalValues.subtotal = baseSubtotal;
+                    if (subtotalLabel) subtotalLabel.textContent = 'Subtotal Produtos:';
                 }
 
                 if (br) {
@@ -327,7 +339,7 @@
                     }
                 } else {
                     window.checkoutOriginalValues.impostos = 0;
-                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0);
                     if (impostosEl) {
                         impostosEl.setAttribute('data-original-value', '0');
                         impostosEl.textContent = '0';

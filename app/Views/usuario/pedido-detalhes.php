@@ -264,7 +264,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
-                                        <span>Impostos:</span>
+                                        <span>Impostos do Brasil:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <hr>

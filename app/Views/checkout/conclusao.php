@@ -143,7 +143,7 @@
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'], 2, ',', '.') ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Impostos:</span>
+                        <span>Impostos do Brasil:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
                     <hr>
