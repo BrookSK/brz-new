@@ -363,7 +363,7 @@ class AdminPedidosEditController {
                                         <option value="pendente" ' . ($statusAtual === 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($statusAtual === 'pago' ? 'selected' : '') . '>Pago</option>
                                         <option value="processando" ' . ($statusAtual === 'processando' ? 'selected' : '') . '>Processando</option>
-                                        <option value="produto_consolidado" ' . ($statusAtual === 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="produto_consolidado" ' . ($statusAtual === 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                         <option value="em_transporte" ' . ($statusAtual === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                         <option value="aguardando_liberacao_aduaneira" ' . ($statusAtual === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                         <option value="enviado_ao_destinatario" ' . ($statusAtual === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
