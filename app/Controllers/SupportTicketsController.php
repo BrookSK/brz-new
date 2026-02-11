@@ -499,6 +499,17 @@ class SupportTicketsController extends Controller {
         $params[] = $id;
 
         $pdo->prepare('UPDATE support_tickets SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params);
+
+        try {
+            $stHasMsg = $pdo->query("SHOW TABLES LIKE 'support_ticket_messages'");
+            $hasMsg = (bool) ($stHasMsg && $stHasMsg->fetchColumn());
+            if ($hasMsg && $decision !== '') {
+                $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+                $stMsg->execute([(int) $id, 'cliente', (int) $uid, (string) ('Encerramento do ticket: ' . $decision)]);
+            }
+        } catch (\Exception $e) {
+        }
+
         header('Location: /meu-ticket/' . $id);
         exit;
     }
