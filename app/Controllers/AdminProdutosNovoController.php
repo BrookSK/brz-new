@@ -673,7 +673,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Novo Produto - Braziliana Shop Admin';
+        $title = 'Novo Produto - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }

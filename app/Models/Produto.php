@@ -89,15 +89,80 @@ class Produto extends Model {
     }
     
     public function getAllWithCategoria() {
-        $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria 
-            FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE p.active = 1 
-            AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
-            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY p.featured DESC, p.name ASC
-        ");
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $where = [];
+        if (in_array('active', $cols, true)) {
+            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
+        }
+        if (in_array('status', $cols, true)) {
+            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+        }
+
+        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        $sql = "\n            SELECT p.*, c.name as categoria\n            FROM {$this->table} p\n            LEFT JOIN categorias c ON p.category_id = c.id\n            WHERE " . implode(' AND ', $where) . "\n            ORDER BY p.featured DESC, p.name ASC\n        ";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getArquivadosWithCategoria() {
+        $pdo = $this->getConnection();
+
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $where = [];
+        if (in_array('status', $cols, true)) {
+            $where[] = "LOWER(COALESCE(p.status,'')) = 'archived'";
+        }
+        if (in_array('active', $cols, true)) {
+            $where[] = "(p.active = 0 OR LOWER(COALESCE(p.active,'')) IN ('false','no','nao','não'))";
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = "(p.ativo = 0 OR LOWER(COALESCE(p.ativo,'')) IN ('false','no','nao','não'))";
+        }
+
+        // Se não existir status, ainda assim considera arquivado se active/ativo for falso
+        if (!in_array('status', $cols, true)) {
+            // garante que existe pelo menos 1 condição
+            if (empty($where)) {
+                $where[] = '1=0';
+            }
+        }
+
+        // archived OR inactive
+        if (count($where) >= 2) {
+            $first = array_shift($where);
+            $second = array_shift($where);
+            $where = ['(' . $first . ' OR ' . $second . ')'];
+        }
+
+        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.updated_at DESC, p.id DESC";
+        $stmt = $pdo->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -117,12 +182,12 @@ class Produto extends Model {
         $where = [];
         if (in_array('status', $cols, true)) {
             // Compatibilidade: alguns bancos usam 'published' e outros usam 'ativo'
-            $where[] = "LOWER(COALESCE(p.status,'')) IN ('published','ativo','active')";
+            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
         }
         if (in_array('active', $cols, true)) {
-            $where[] = 'p.active = 1';
+            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
         } elseif (in_array('ativo', $cols, true)) {
-            $where[] = 'p.ativo = 1';
+            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
         }
         $hasFeatured = in_array('featured', $cols, true);
         if ($hasFeatured) {
@@ -154,17 +219,31 @@ class Produto extends Model {
     }
     
     public function search($term, $limit = 20) {
-        $stmt = $this->getConnection()->prepare("
-            SELECT p.*, c.name as categoria 
-            FROM {$this->table} p 
-            LEFT JOIN categorias c ON p.category_id = c.id 
-            WHERE (p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)
-            AND p.status = 'published' AND p.active = 1
-            AND (p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')
-            AND (p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY p.featured DESC, p.name ASC 
-            LIMIT :limit
-        ");
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $where = ["(p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)"];
+        if (in_array('active', $cols, true)) {
+            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
+        }
+        if (in_array('status', $cols, true)) {
+            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+        }
+        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.featured DESC, p.name ASC\n                LIMIT :limit";
+        $stmt = $pdo->prepare($sql);
         $term = "%{$term}%";
         $limit = (int) $limit;
         $stmt->bindParam(':term', $term);
@@ -174,13 +253,31 @@ class Produto extends Model {
     }
 
     public function getByCategoriaId($categoriaId) {
-        $stmt = $this->getConnection()->prepare("
-            SELECT * FROM {$this->table} 
-            WHERE category_id = :category_id 
-            AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
-            AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
-            ORDER BY featured DESC, name ASC
-        ");
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $where = ['category_id = :category_id'];
+        if (in_array('active', $cols, true)) {
+            $where[] = "(active = 1 OR LOWER(COALESCE(active,'')) IN ('true','yes','sim','ativo','active'))";
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = "(ativo = 1 OR LOWER(COALESCE(ativo,'')) IN ('true','yes','sim','ativo','active'))";
+        }
+        if (in_array('status', $cols, true)) {
+            $where[] = "(status IS NULL OR LOWER(COALESCE(status,'')) IN ('published','publish','publicado','ativo','active'))";
+        }
+        $where[] = "(sku IS NULL OR sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        $sql = "SELECT * FROM {$this->table}\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY featured DESC, name ASC";
+        $stmt = $pdo->prepare($sql);
         $stmt->bindParam(':category_id', $categoriaId);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);

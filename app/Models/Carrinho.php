@@ -506,12 +506,19 @@ class Carrinho extends Model {
 
     public function removerItem($carrinhoId, $produtoId, $produtoVariacaoId = null) {
         $stmt = $this->connection->prepare("DELETE FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0)");
-        $stmt->bindParam(':carrinho_id', $carrinhoId);
-        $stmt->bindParam(':produto_id', $produtoId);
-        $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
+        $stmt->bindValue(':carrinho_id', (int) $carrinhoId, \PDO::PARAM_INT);
+        $stmt->bindValue(':produto_id', (int) $produtoId, \PDO::PARAM_INT);
+        if ($produtoVariacaoId === null || $produtoVariacaoId === '') {
+            $stmt->bindValue(':produto_variacao_id', null, \PDO::PARAM_NULL);
+        } else {
+            $stmt->bindValue(':produto_variacao_id', (int) $produtoVariacaoId, \PDO::PARAM_INT);
+        }
         $stmt->execute();
+
+        $affected = (int) $stmt->rowCount();
         
         $this->atualizarTotais($carrinhoId);
+        return $affected;
     }
 
     public function setQuantidadeItem($carrinhoId, $produtoId, $quantidade, $produtoVariacaoId = null) {
@@ -522,9 +529,13 @@ class Carrinho extends Model {
 
         // Obter item
         $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
-        $stmt->bindParam(':carrinho_id', $carrinhoId);
-        $stmt->bindParam(':produto_id', $produtoId);
-        $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
+        $stmt->bindValue(':carrinho_id', (int) $carrinhoId, \PDO::PARAM_INT);
+        $stmt->bindValue(':produto_id', (int) $produtoId, \PDO::PARAM_INT);
+        if ($produtoVariacaoId === null || $produtoVariacaoId === '') {
+            $stmt->bindValue(':produto_variacao_id', null, \PDO::PARAM_NULL);
+        } else {
+            $stmt->bindValue(':produto_variacao_id', (int) $produtoVariacaoId, \PDO::PARAM_INT);
+        }
         $stmt->execute();
         $item = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$item) {

@@ -144,7 +144,7 @@ class AdminConfiguracoesController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - Braziliana Shop Admin</title>
+    <title>Configurações - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -177,6 +177,9 @@ class AdminConfiguracoesController extends Controller {
                         <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist">
                             <button class="nav-link active" id="v-pills-loja-tab" data-bs-toggle="pill" data-bs-target="#v-pills-loja" type="button">
                                 <i class="fas fa-store"></i> Loja
+                            </button>
+                            <button class="nav-link" id="v-pills-layout-tab" data-bs-toggle="pill" data-bs-target="#v-pills-layout" type="button">
+                                <i class="fas fa-image"></i> Layout
                             </button>
                             <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
                                 <i class="fas fa-envelope"></i> Email
@@ -211,6 +214,9 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
                                 <i class="fab fa-wordpress"></i> WordPress
                             </button>
+                            <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
+                                <i class="fas fa-plug"></i> WooCommerce
+                            </button>
                         </div>
                     </div>
                     
@@ -226,7 +232,7 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Nome da Loja</label>
-                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana Shop') . '">
+                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Descrição</label>
@@ -247,6 +253,301 @@ class AdminConfiguracoesController extends Controller {
                                             <div class="mb-3">
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-layout" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Layout</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Logotipo</div>
+                                                <div class="text-muted small mb-3">Upload do logo para aparecer no topo do site.</div>
+
+                                                ';
+                                                $existingLogo = (string) $this->getConfigValue($config, 'layout', 'logo', '');
+                                                $existingLogo = is_string($existingLogo) ? trim($existingLogo) : '';
+                                                $existingLogoEsc = htmlspecialchars($existingLogo, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingLogoEsc !== '' ? '<img src="' . $existingLogoEsc . '" alt="Logotipo" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_logo_keep" value="' . $existingLogoEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Logotipo</label>
+                                                        <input type="file" class="form-control" name="layout_logo" accept="image/*">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutLogo">Remover logotipo</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutLogo");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_logo_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Logotipo será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Logotipo do Rodapé</div>
+                                                <div class="text-muted small mb-3">Upload do logo para aparecer no rodapé do site.</div>
+
+                                                ';
+                                                $existingFooterLogo = (string) $this->getConfigValue($config, 'layout', 'logo_footer', '');
+                                                $existingFooterLogo = is_string($existingFooterLogo) ? trim($existingFooterLogo) : '';
+                                                $existingFooterLogoEsc = htmlspecialchars($existingFooterLogo, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingFooterLogoEsc !== '' ? '<img src="' . $existingFooterLogoEsc . '" alt="Logotipo Rodapé" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logotipo do rodapé cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_logo_footer_keep" value="' . $existingFooterLogoEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Logotipo do Rodapé</label>
+                                                        <input type="file" class="form-control" name="layout_logo_footer" accept="image/*">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFooterLogo">Remover logotipo do rodapé</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutFooterLogo");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_logo_footer_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Logotipo do rodapé será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Logo do Admin</div>
+                                                <div class="text-muted small mb-3">Upload do logo para aparecer no painel administrativo.</div>
+
+                                                ';
+                                                $existingAdminLogo = (string) $this->getConfigValue($config, 'layout', 'logo_admin', '');
+                                                $existingAdminLogo = is_string($existingAdminLogo) ? trim($existingAdminLogo) : '';
+                                                $existingAdminLogoEsc = htmlspecialchars($existingAdminLogo, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingAdminLogoEsc !== '' ? '<img src="' . $existingAdminLogoEsc . '" alt="Logo Admin" style="max-height: 48px; max-width: 100%; object-fit: contain;">' : '<div class="text-muted">Nenhum logo do admin cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_logo_admin_keep" value="' . $existingAdminLogoEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Logo do Admin</label>
+                                                        <input type="file" class="form-control" name="layout_logo_admin" accept="image/*">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutAdminLogo">Remover logo do admin</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutAdminLogo");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_logo_admin_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Logo do admin será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-2 fw-semibold">Banners</div>
+                                            <div class="text-muted small mb-3">Cadastre imagens para rodarem no header do site.</div>
+                                            <div class="text-muted small mb-3">
+                                                Desktop: <strong>1149 x 436</strong><br>
+                                                Mobile: <strong>391 x 333</strong>
+                                            </div>
+
+                                            <div id="layout-banners-existing" class="row g-2 mb-3">
+                                                ';
+                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', 'banners', '[]');
+                                                $existingBanners = json_decode($existingBannersRaw, true);
+                                                if (!is_array($existingBanners)) $existingBanners = [];
+                                                foreach ($existingBanners as $idx => $item) {
+                                                    $desktop = '';
+                                                    $mobile = '';
+                                                    $link = '';
+
+                                                    if (is_string($item)) {
+                                                        $desktop = trim($item);
+                                                    } elseif (is_array($item)) {
+                                                        $desktop = isset($item['desktop']) && is_string($item['desktop']) ? trim((string) $item['desktop']) : '';
+                                                        $mobile = isset($item['mobile']) && is_string($item['mobile']) ? trim((string) $item['mobile']) : '';
+                                                        $link = isset($item['link']) && is_string($item['link']) ? trim((string) $item['link']) : '';
+                                                    }
+
+                                                    if ($desktop === '' && $mobile === '') continue;
+
+                                                    $desktopEsc = htmlspecialchars($desktop, ENT_QUOTES, 'UTF-8');
+                                                    $mobileEsc = htmlspecialchars($mobile, ENT_QUOTES, 'UTF-8');
+                                                    $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+                                                    echo '<div class="col-12 col-md-6">'
+                                                        . '<div class="border rounded p-2 h-100">'
+                                                        . '<div class="row g-2">'
+                                                        . '<div class="col-12 col-sm-6">'
+                                                        . '<div class="small text-muted mb-1">Desktop (1149x436)</div>'
+                                                        . '<div class="ratio ratio-16x9 mb-2">'
+                                                        . ($desktopEsc !== '' ? '<img src="' . $desktopEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Desktop">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . '</div>'
+                                                        . '<input type="hidden" name="layout_banners_keep_desktop[]" value="' . $desktopEsc . '">' 
+                                                        . '</div>'
+                                                        . '<div class="col-12 col-sm-6">'
+                                                        . '<div class="small text-muted mb-1">Mobile (391x333)</div>'
+                                                        . '<div class="ratio" style="--bs-aspect-ratio: 85.2%;">'
+                                                        . ($mobileEsc !== '' ? '<img src="' . $mobileEsc . '" class="w-100 h-100" style="object-fit: cover;" alt="Banner Mobile">' : '<div class="d-flex align-items-center justify-content-center text-muted" style="background:#f8fafc;">Sem imagem</div>')
+                                                        . '</div>'
+                                                        . '<input type="hidden" name="layout_banners_keep_mobile[]" value="' . $mobileEsc . '">' 
+                                                        . '</div>'
+                                                        . '<div class="col-12">'
+                                                        . '<label class="form-label small mb-1">Link (ao clicar)</label>'
+                                                        . '<input type="url" class="form-control" name="layout_banners_keep_link[]" value="' . $linkEsc . '" placeholder="https://...">'
+                                                        . '</div>'
+                                                        . '</div>'
+                                                        . '<button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="this.closest(\'.col-12\').remove();">Remover</button>'
+                                                        . '</div>'
+                                                        . '</div>';
+                                                }
+                                                echo '
+                                            </div>
+
+                                            <div id="layout-banners-upload-list" class="d-flex flex-column gap-2">
+                                                <div class="border rounded p-2">
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-12 col-md-6">
+                                                            <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                            <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
+                                                        </div>
+                                                        <div class="col-12 col-md-6">
+                                                            <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                            <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                            <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <button type="button" class="btn btn-outline-secondary w-100" onclick="this.closest(\'.border\').remove();" title="Remover">-</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-primary" id="btnAddLayoutBanner">
+                                                    <i class="fas fa-plus me-1"></i>Adicionar banner
+                                                </button>
+                                            </div>
+
+                                            <script>
+                                            document.addEventListener("DOMContentLoaded", function() {
+                                                var btn = document.getElementById("btnAddLayoutBanner");
+                                                var list = document.getElementById("layout-banners-upload-list");
+                                                if (!btn || !list) return;
+
+                                                btn.addEventListener("click", function() {
+                                                    var box = document.createElement("div");
+                                                    box.className = "border rounded p-2";
+                                                    box.innerHTML = `
+                                                        <div class="row g-2 align-items-end">
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label small mb-1">Banner Desktop (1149x436)</label>
+                                                                <input type="file" class="form-control" name="layout_banners_desktop[]" accept="image/*">
+                                                            </div>
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label small mb-1">Banner Mobile (391x333)</label>
+                                                                <input type="file" class="form-control" name="layout_banners_mobile[]" accept="image/*">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label small mb-1">Link (ao clicar)</label>
+                                                                <input type="url" class="form-control" name="layout_banners_link[]" placeholder="https://...">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <button type="button" class="btn btn-outline-secondary w-100" title="Remover">-</button>
+                                                            </div>
+                                                        </div>
+                                                    `;
+
+                                                    var removeBtn = box.querySelector("button");
+                                                    if (removeBtn) {
+                                                        removeBtn.addEventListener("click", function() { box.remove(); });
+                                                    }
+                                                    list.appendChild(box);
+                                                });
+                                            });
+                                            </script>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tab-pane fade" id="v-pills-woocommerce" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">WooCommerce (REST API)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Store URL</label>
+                                                <input type="url" class="form-control" name="woocommerce_store_url" value="' . $this->getConfigValue($config, 'woocommerce', 'store_url', '') . '" placeholder="https://br.brazilianashop.com.br/">
+                                                <small class="text-muted">URL base da loja (sem /wp-admin). Ex: <code>https://br.brazilianashop.com.br</code></small>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Key</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_key', '') . '" placeholder="ck_...">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Consumer Secret</label>
+                                                        <input type="password" class="form-control" name="woocommerce_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-info mb-0">
+                                                Essas credenciais são usadas para <strong>atualizar o pedido no WooCommerce</strong> (order meta) com <code>wexpress_shipping_id</code>, link da etiqueta e rastreio.
                                             </div>
                                         </div>
                                     </div>
@@ -345,7 +646,7 @@ class AdminConfiguracoesController extends Controller {
 
                                                 <div class="mb-3">
                                                     <label class="form-label">Campos Personalizados (JSON)</label>
-                                                    <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana Shop&quot;}"></textarea>
+                                                    <textarea name="webhook_campos" class="form-control" rows="5" placeholder="{&quot;empresa&quot;: &quot;Braziliana&quot;}"></textarea>
                                                     <small class="text-muted">Esses campos são mesclados no payload final enviado ao webhook.</small>
                                                 </div>
 
@@ -495,7 +796,7 @@ class AdminConfiguracoesController extends Controller {
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Nome de Envio</label>
-                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana Shop') . '">
+                                                <input type="text" class="form-control" name="email_from_name" value="' . $this->getConfigValue($config, 'email', 'from_name', 'Braziliana') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Email de teste (para)</label>
@@ -929,11 +1230,11 @@ class AdminConfiguracoesController extends Controller {
                                         <div class="card-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Title Padrão</label>
-                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana Shop - Produtos de Qualidade') . '">
+                                                <input type="text" class="form-control" name="seo_title" value="' . $this->getConfigValue($config, 'seo', 'title', 'Braziliana - Produtos de Qualidade') . '">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Meta Description Padrão</label>
-                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana Shop') . '</textarea>
+                                                <textarea class="form-control" name="seo_description" rows="3">' . $this->getConfigValue($config, 'seo', 'description', 'Encontre os melhores produtos na Braziliana') . '</textarea>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Palavras-chave</label>
@@ -1276,6 +1577,21 @@ class AdminConfiguracoesController extends Controller {
                                                                         </select>
                                                                     </div>
                                                                     <small class="text-muted">Configura a periodicidade do crédito por permanência.</small>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row mt-2">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Cron Secret (Rendimento)</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="clube_cron_secret" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'clube', 'cron_secret', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Token para /cron/clube/rendimento">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <small class="text-muted">Usado para proteger o endpoint <code>/cron/clube/rendimento?token=...</code>.</small>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -2968,6 +3284,246 @@ HTML;
 
             $pdo->beginTransaction();
 
+            // Upload do logotipo do layout
+            try {
+                $keepLogo = (string) ($request->getParam('layout_logo_keep', '') ?? '');
+                $keepLogo = trim($keepLogo);
+
+                $logoUrl = $keepLogo;
+                if (isset($_FILES['layout_logo']) && is_array($_FILES['layout_logo'])) {
+                    $name = (string) ($_FILES['layout_logo']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_logo']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_logo']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg','jpeg','png','webp','gif','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/logo/',
+                                $docRoot . '/uploads/logo/',
+                                $docRoot . '/public/uploads/logos/',
+                                $docRoot . '/uploads/logos/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/logo/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
+                                    $webDir = '/uploads/logos/';
+                                }
+                                $fileName = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $logoUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_logo', $logoUrl);
+            } catch (\Exception $e) {
+            }
+
+            // Upload do logotipo do rodapé
+            try {
+                $keepLogo = (string) ($request->getParam('layout_logo_footer_keep', '') ?? '');
+                $keepLogo = trim($keepLogo);
+
+                $logoUrl = $keepLogo;
+                if (isset($_FILES['layout_logo_footer']) && is_array($_FILES['layout_logo_footer'])) {
+                    $name = (string) ($_FILES['layout_logo_footer']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_logo_footer']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_logo_footer']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg','jpeg','png','webp','gif','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/logo/',
+                                $docRoot . '/uploads/logo/',
+                                $docRoot . '/public/uploads/logos/',
+                                $docRoot . '/uploads/logos/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/logo/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
+                                    $webDir = '/uploads/logos/';
+                                }
+                                $fileName = 'logo_footer_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $logoUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_logo_footer', $logoUrl);
+            } catch (\Exception $e) {
+            }
+
+            // Upload do logo do admin
+            try {
+                $keepLogo = (string) ($request->getParam('layout_logo_admin_keep', '') ?? '');
+                $keepLogo = trim($keepLogo);
+
+                $logoUrl = $keepLogo;
+                if (isset($_FILES['layout_logo_admin']) && is_array($_FILES['layout_logo_admin'])) {
+                    $name = (string) ($_FILES['layout_logo_admin']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_logo_admin']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_logo_admin']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg','jpeg','png','webp','gif','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/logo/',
+                                $docRoot . '/uploads/logo/',
+                                $docRoot . '/public/uploads/logos/',
+                                $docRoot . '/uploads/logos/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/logo/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
+                                    $webDir = '/uploads/logos/';
+                                }
+                                $fileName = 'logo_admin_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $logoUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_logo_admin', $logoUrl);
+            } catch (\Exception $e) {
+            }
+
+            // Upload de banners do layout
+            try {
+                $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
+                $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
+                $keepLink = $request->getParam('layout_banners_keep_link', []);
+                if (!is_array($keepDesktop)) $keepDesktop = [];
+                if (!is_array($keepMobile)) $keepMobile = [];
+                if (!is_array($keepLink)) $keepLink = [];
+
+                $maxKeep = max(count($keepDesktop), count($keepMobile), count($keepLink));
+                $keptItems = [];
+                for ($i = 0; $i < $maxKeep; $i++) {
+                    $d = isset($keepDesktop[$i]) && is_string($keepDesktop[$i]) ? trim((string) $keepDesktop[$i]) : '';
+                    $m = isset($keepMobile[$i]) && is_string($keepMobile[$i]) ? trim((string) $keepMobile[$i]) : '';
+                    $l = isset($keepLink[$i]) && is_string($keepLink[$i]) ? trim((string) $keepLink[$i]) : '';
+                    if ($d === '' && $m === '') continue;
+                    $keptItems[] = ['desktop' => $d, 'mobile' => $m, 'link' => $l];
+                }
+
+                $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                $candidates = [
+                    $docRoot . '/public/uploads/banners/',
+                    $docRoot . '/uploads/banners/',
+                ];
+                $uploadDir = '';
+                foreach ($candidates as $dir) {
+                    if (!is_dir($dir)) {
+                        @mkdir($dir, 0755, true);
+                    }
+                    if (is_dir($dir) && is_writable($dir)) {
+                        $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                        break;
+                    }
+                }
+
+                $webDir = '/uploads/banners/';
+                $newItems = [];
+
+                $namesDesktop = (isset($_FILES['layout_banners_desktop']['name']) && is_array($_FILES['layout_banners_desktop']['name'])) ? $_FILES['layout_banners_desktop']['name'] : [];
+                $namesMobile  = (isset($_FILES['layout_banners_mobile']['name']) && is_array($_FILES['layout_banners_mobile']['name'])) ? $_FILES['layout_banners_mobile']['name'] : [];
+                $links = $request->getParam('layout_banners_link', []);
+                if (!is_array($links)) $links = [];
+                $maxUploads = max(is_array($namesDesktop) ? count($namesDesktop) : 0, is_array($namesMobile) ? count($namesMobile) : 0);
+
+                for ($i = 0; $i < $maxUploads; $i++) {
+                    $desktopUrl = '';
+                    $mobileUrl = '';
+                    $linkUrl = (isset($links[$i]) && is_string($links[$i])) ? trim((string) $links[$i]) : '';
+
+                    if ($uploadDir !== '' && isset($_FILES['layout_banners_desktop']['tmp_name'][$i])) {
+                        $name = (string) ($_FILES['layout_banners_desktop']['name'][$i] ?? '');
+                        $tmp = (string) ($_FILES['layout_banners_desktop']['tmp_name'][$i] ?? '');
+                        $err = (int) ($_FILES['layout_banners_desktop']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                        if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            if (in_array($ext, ['jpg','jpeg','png','webp','gif'], true)) {
+                                $fileName = 'banner_desktop_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $desktopUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($uploadDir !== '' && isset($_FILES['layout_banners_mobile']['tmp_name'][$i])) {
+                        $name = (string) ($_FILES['layout_banners_mobile']['name'][$i] ?? '');
+                        $tmp = (string) ($_FILES['layout_banners_mobile']['tmp_name'][$i] ?? '');
+                        $err = (int) ($_FILES['layout_banners_mobile']['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                        if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            if (in_array($ext, ['jpg','jpeg','png','webp','gif'], true)) {
+                                $fileName = 'banner_mobile_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $mobileUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($desktopUrl === '' && $mobileUrl === '') continue;
+                    $newItems[] = ['desktop' => $desktopUrl, 'mobile' => $mobileUrl, 'link' => $linkUrl];
+                }
+
+                $final = array_merge($keptItems, $newItems);
+                $request->setParam('layout_banners', json_encode(array_values($final), JSON_UNESCAPED_UNICODE));
+            } catch (\Exception $e) {
+            }
+
             $tableInfo = $this->getConfigTableInfo($pdo);
             $table = $tableInfo['table'];
             $valueCol = $tableInfo['valueCol'];
@@ -2995,14 +3551,16 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
+                'layout' => ['banners', 'logo', 'logo_footer', 'logo_admin'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
-                'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade'],
+                'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'woocommerce' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
@@ -4401,14 +4959,44 @@ HTML;
             $amb = strtolower(trim((string) $ambiente));
             $wsdl = ($amb === 'producao' || $amb === 'production')
                 ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
-                : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+                : 'https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
-            $client = new \SoapClient($wsdl, [
-                'exceptions' => true,
-                'trace' => false,
-                'cache_wsdl' => WSDL_CACHE_BOTH,
-                'connection_timeout' => 20,
+            $localWsdl = __DIR__ . '/../Resources/wsdl/AtendeCliente.wsdl';
+            if (is_file($localWsdl)) {
+                $wsdl = $localWsdl;
+            }
+
+            $context = stream_context_create([
+                'http' => [
+                    'timeout' => 30,
+                    'protocol_version' => 1.1,
+                    'ignore_errors' => true,
+                    'header' => "Connection: close\r\n"
+                        . "Accept: text/xml, application/xml;q=0.9, */*;q=0.8\r\n"
+                        . "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) brz-sigep/1.0\r\n",
+                ],
+                'ssl' => [
+                    'verify_peer' => true,
+                    'verify_peer_name' => true,
+                ],
             ]);
+
+            try {
+                $client = new \SoapClient($wsdl, [
+                    'exceptions' => true,
+                    'trace' => false,
+                    'cache_wsdl' => WSDL_CACHE_BOTH,
+                    'connection_timeout' => 20,
+                    'stream_context' => $context,
+                    'compression' => SOAP_COMPRESSION_ACCEPT | SOAP_COMPRESSION_GZIP,
+                ]);
+            } catch (\Throwable $e) {
+                $extra = [];
+                $extra[] = 'allow_url_fopen=' . (ini_get('allow_url_fopen') ? '1' : '0');
+                $extra[] = 'openssl.cafile=' . (string) ini_get('openssl.cafile');
+                $extra[] = 'curl.cainfo=' . (string) ini_get('curl.cainfo');
+                throw new \Exception('SIGEP falhou ao carregar WSDL: ' . $e->getMessage() . ' | ' . implode(', ', $extra));
+            }
 
             $params = [
                 'tipoDestinatario' => 'C',

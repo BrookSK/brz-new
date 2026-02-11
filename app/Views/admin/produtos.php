@@ -10,6 +10,9 @@
             <a href="/admin" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Voltar
             </a>
+            <a href="/produtos/arquivados" class="btn btn-outline-dark" target="_blank">
+                <i class="fas fa-archive me-2"></i>Arquivados (site)
+            </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProduto">
                 <i class="fas fa-plus me-2"></i>Novo Produto
             </button>

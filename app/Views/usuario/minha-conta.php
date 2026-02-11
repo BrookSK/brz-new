@@ -321,7 +321,7 @@
             <!-- Orçamentos da Assessoria -->
             <div class="card shadow-sm mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Orçamentos da Assessoria</h5>
+                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Orçamentos do Redirecionamento</h5>
                     <a href="/assessoria" class="btn btn-sm btn-outline-primary">Novo Orçamento</a>
                 </div>
                 <div class="card-body">
@@ -330,7 +330,7 @@
                         <div class="text-center py-4">
                             <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
                             <h6>Nenhum orçamento ainda</h6>
-                            <p class="text-muted">Gere um orçamento pela Assessoria para aparecer aqui.</p>
+                            <p class="text-muted">Gere um orçamento pelo Redirecionamento para aparecer aqui.</p>
                             <a href="/assessoria" class="btn btn-primary">
                                 <i class="fas fa-plus me-2"></i> Criar Orçamento
                             </a>

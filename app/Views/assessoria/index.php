@@ -138,7 +138,7 @@ $(document).ready(function() {
         const result = await Swal.fire({
             icon: 'warning',
             title: 'Login obrigatório',
-            text: 'Para acessar a Assessoria de Compras, você precisa realizar login.',
+            text: 'Para acessar o Redirecionamento, você precisa realizar login.',
             allowOutsideClick: false,
             allowEscapeKey: false,
             showCancelButton: true,
@@ -161,7 +161,7 @@ $(document).ready(function() {
 
         const result = await Swal.fire({
             icon: 'info',
-            title: 'Aviso importante - Assessoria',
+            title: 'Aviso importante - Redirecionamento',
             html: `
                 <div class="text-start">
                     <p><strong>Este é um processo inovador</strong> e, por conta disso, pode apresentar alguma inconsistência.</p>

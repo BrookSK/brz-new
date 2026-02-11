@@ -448,7 +448,7 @@ class AdminNotificacoesController extends Controller {
                 $tplId = (int) ($stTpl->fetchColumn() ?: 0);
                 if ($tplId <= 0) {
                     $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
-                    $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{courier_tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                    $html = 'Olá {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> já foi postado.<br><br><strong>Código de rastreio:</strong> {{courier_tracking_number}}<br><br>Você pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana';
                     $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
                     $stIns->execute([$eventoId, $evento, $assunto, $html]);
                 }
@@ -469,7 +469,7 @@ class AdminNotificacoesController extends Controller {
                 $tplId = (int) ($stTpl->fetchColumn() ?: 0);
                 if ($tplId <= 0) {
                     $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
-                    $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                    $html = 'Olá {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> já foi postado.<br><br><strong>Código de rastreio:</strong> {{tracking_number}}<br><br>Você pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana';
                     $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
                     $stIns->execute([$eventoId, $evento, $assunto, $html]);
                 }
@@ -521,7 +521,7 @@ class AdminNotificacoesController extends Controller {
             $tplId = (int) ($stTpl->fetchColumn() ?: 0);
             if ($tplId <= 0) {
                 $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
-                $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{courier_tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                $html = 'Olá {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> já foi postado.<br><br><strong>Código de rastreio:</strong> {{courier_tracking_number}}<br><br>Você pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana';
                 $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
                 $stIns->execute([$eventoId, $evento, $assunto, $html]);
             }
@@ -542,7 +542,7 @@ class AdminNotificacoesController extends Controller {
             $tplId = (int) ($stTpl->fetchColumn() ?: 0);
             if ($tplId <= 0) {
                 $assunto = 'Seu pedido #{{codigo_pedido}} foi enviado';
-                $html = 'Ol\u00e1 {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> j\u00e1 foi postado.<br><br><strong>C\u00f3digo de rastreio:</strong> {{tracking_number}}<br><br>Voc\u00ea pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop';
+                $html = 'Olá {{nome}},<br><br>Seu pedido <strong>#{{codigo_pedido}}</strong> já foi postado.<br><br><strong>Código de rastreio:</strong> {{tracking_number}}<br><br>Você pode imprimir/visualizar a etiqueta aqui: <a href="{{label_url}}" target="_blank">{{label_url}}</a><br><br>Atenciosamente,<br>Braziliana';
                 $stIns = $pdo->prepare('INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())');
                 $stIns->execute([$eventoId, $evento, $assunto, $html]);
             }
@@ -853,7 +853,7 @@ class AdminNotificacoesController extends Controller {
             $fromEmail = $to;
         }
         if ($fromName === '') {
-            $fromName = 'Braziliana Shop';
+            $fromName = 'Braziliana';
         }
 
         $headers = [];
@@ -1200,7 +1200,7 @@ class AdminNotificacoesController extends Controller {
             $html = $this->renderMustacheLike((string) ($tpl['corpo_html'] ?? ''), $vars);
 
             $fromEmail = 'noreply@brazilianashop.com.br';
-            $fromName = 'Braziliana Shop';
+            $fromName = 'Braziliana';
 
             if (!empty($emailCfg['from']) && filter_var((string) $emailCfg['from'], FILTER_VALIDATE_EMAIL)) {
                 $fromEmail = (string) $emailCfg['from'];

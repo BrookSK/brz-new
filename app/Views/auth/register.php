@@ -24,10 +24,29 @@
                             
                             <div class="col-md-6 mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                                    <input type="tel" class="form-control" id="telefone" name="telefone" 
-                                           placeholder="(00) 00000-0000" required>
+                                <div class="input-group w-100" style="flex-wrap: nowrap;">
+                                    <span class="input-group-text" style="padding-left: 10px; padding-right: 10px;"><i class="fas fa-phone"></i></span>
+                                    <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
+                                        <option value="55" selected>+55</option>
+                                        <option value="1">+1</option>
+                                        <option value="44">+44</option>
+                                        <option value="49">+49</option>
+                                        <option value="33">+33</option>
+                                        <option value="34">+34</option>
+                                        <option value="39">+39</option>
+                                        <option value="351">+351</option>
+                                        <option value="54">+54</option>
+                                        <option value="56">+56</option>
+                                        <option value="57">+57</option>
+                                        <option value="0">Outro</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" 
+                                           placeholder="Número" required>
+                                    <input type="hidden" class="form-control" id="telefone" name="telefone" value="">
+                                </div>
+                                <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
+                                    <span class="input-group-text">DDI</span>
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
                                 </div>
                             </div>
                         </div>
@@ -42,12 +61,13 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="documento" class="form-label">CPF/CNPJ</label>
+                            <label for="documento" class="form-label" id="label-documento">CPF</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-id-card"></i></span>
                                 <input type="text" class="form-control" id="documento" name="documento" 
-                                       placeholder="000.000.000-00" required>
+                                       placeholder="000.000.000-00">
                             </div>
+                            <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                         </div>
 
                         <div class="row">
@@ -62,11 +82,15 @@
                                 <label for="pais_residencia" class="form-label">País de Residência</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-flag"></i></span>
+                                    <?php require __DIR__ . '/../_countries.php'; ?>
+                                    <?php $pr = strtoupper((string) (($dados['pais_residencia'] ?? 'BR'))); ?>
                                     <select class="form-select" id="pais_residencia" name="pais_residencia" required>
-                                        <option value="BR" selected>Brasil</option>
-                                        <option value="US">Estados Unidos</option>
+                                        <?php foreach ($countries as $code => $name): ?>
+                                            <option value="<?= htmlspecialchars($code) ?>" <?= $pr === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
                             </div>
                         </div>
 
@@ -109,7 +133,7 @@
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
-                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro" required>
+                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro">
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
@@ -191,6 +215,40 @@
 
 <script>
 $(document).ready(function() {
+    function filterSelectOptions($select, query) {
+        query = (query || '').toString().trim().toLowerCase();
+        $select.find('option').each(function() {
+            const txt = ($(this).text() || '').toString().toLowerCase();
+            const val = ($(this).val() || '').toString().toLowerCase();
+            const match = (query === '') || txt.indexOf(query) !== -1 || val.indexOf(query) !== -1;
+            $(this).toggle(match);
+        });
+    }
+
+    function isBrazil() {
+        return ($('#pais_residencia').val() || '').toString().toUpperCase() === 'BR';
+    }
+
+    function syncDocumentoRules() {
+        const br = isBrazil();
+        const $doc = $('#documento');
+        const $label = $('#label-documento');
+        const $hint = $('#hint-documento');
+
+        $label.text(br ? 'CPF *' : 'CPF');
+        $doc.prop('required', br);
+        $doc.attr('placeholder', br ? '000.000.000-00' : '');
+        $hint.toggle(!br);
+    }
+
+    function syncBairroRules() {
+        const br = isBrazil();
+        const $bairro = $('#bairro');
+        if ($bairro.length) {
+            $bairro.prop('required', br);
+        }
+    }
+
     // Toggle password visibility
     $('#togglePassword').click(function() {
         const senhaField = $('#senha');
@@ -208,6 +266,21 @@ $(document).ready(function() {
     // Form validation
     $('#registerForm').on('submit', function(e) {
         e.preventDefault();
+
+        // Montar telefone (DDI + número)
+        (function() {
+            var ddi = ($('#telefone_ddi').val() || '').toString();
+            if (ddi === '0') {
+                ddi = ($('#telefone_ddi_outro').val() || '').toString();
+            }
+            ddi = ddi.replace(/\D/g, '');
+            var numero = ($('#telefone_numero').val() || '').toString().trim();
+            if (ddi) {
+                $('#telefone').val('+' + ddi + ' ' + numero);
+            } else {
+                $('#telefone').val(numero);
+            }
+        })();
         
         // Validar senhas
         const senha = $('#senha').val();
@@ -252,23 +325,39 @@ $(document).ready(function() {
         });
     });
     
-    // CPF/CNPJ mask
+    // País: busca
+    $('#pais_residencia_search').on('input', function() {
+        filterSelectOptions($('#pais_residencia'), $(this).val());
+    });
+
+    // CPF mask (somente BR)
     $('#documento').on('input', function() {
-        let value = $(this).val().replace(/\D/g, '');
-        
-        if (value.length <= 11) {
-            // CPF
-            value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-        } else {
-            // CNPJ
-            value = value.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-        }
-        
+        if (!isBrazil()) return;
+        let value = $(this).val().replace(/\D/g, '').slice(0, 11);
+        if (value.length >= 4) value = value.replace(/^(\d{3})(\d)/, '$1.$2');
+        if (value.length >= 8) value = value.replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+        if (value.length >= 12) value = value.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
+        value = value.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
         $(this).val(value);
     });
     
-    // Phone mask
-    $('#telefone').on('input', function() {
+    // Phone mask (somente BR)
+    function isDdiBR() {
+        var ddi = ($('#telefone_ddi').val() || '').toString();
+        if (ddi === '0') {
+            ddi = ($('#telefone_ddi_outro').val() || '').toString();
+        }
+        ddi = ddi.replace(/\D/g, '');
+        return ddi === '55';
+    }
+
+    $('#telefone_ddi').on('change', function() {
+        const other = ($('#telefone_ddi').val() || '').toString() === '0';
+        $('#telefone_ddi_outro_box').toggle(other);
+    }).trigger('change');
+
+    $('#telefone_numero').on('input', function() {
+        if (!isDdiBR()) return;
         let value = $(this).val().replace(/\D/g, '');
         
         if (value.length <= 10) {
@@ -279,6 +368,14 @@ $(document).ready(function() {
         
         $(this).val(value);
     });
+
+    $('#pais_residencia').on('change', function() {
+        syncDocumentoRules();
+        syncBairroRules();
+    });
+
+    syncDocumentoRules();
+    syncBairroRules();
 });
 
 function showAlert(type, message) {

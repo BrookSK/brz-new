@@ -17,6 +17,174 @@
                     <strong><?= date('d/m/Y', strtotime($usuario['created_at'] ?? 'now')) ?></strong>
                 </div>
             </div>
+
+            <script>
+            (function() {
+                function filterSelectOptions(selectEl, query) {
+                    if (!selectEl) return;
+                    query = (query || '').toString().trim().toLowerCase();
+                    var opts = selectEl.querySelectorAll('option');
+                    for (var i = 0; i < opts.length; i++) {
+                        var o = opts[i];
+                        var txt = (o.textContent || '').toString().toLowerCase();
+                        var val = (o.value || '').toString().toLowerCase();
+                        var match = (query === '') || (txt.indexOf(query) !== -1) || (val.indexOf(query) !== -1);
+                        o.style.display = match ? '' : 'none';
+                    }
+                }
+
+                function syncDocumentoRules() {
+                    var paisRes = document.getElementById('pais_residencia');
+                    var docEl = document.getElementById('documento');
+                    var labelEl = document.getElementById('label-documento');
+                    var hintEl = document.getElementById('hint-documento');
+                    if (!paisRes || !docEl || !labelEl) return;
+                    var br = ((paisRes.value || '').toString().toUpperCase() === 'BR');
+                    labelEl.textContent = br ? 'CPF *' : 'CPF';
+                    docEl.required = br;
+                    if (hintEl) {
+                        hintEl.style.display = br ? 'none' : 'block';
+                    }
+                }
+
+                function syncBairroRules() {
+                    var paisEl = document.getElementById('pais');
+                    var bairroEl = document.getElementById('bairro');
+                    if (!paisEl || !bairroEl) return;
+                    var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                    bairroEl.required = br;
+                }
+
+                function parseTelefone(telefoneRaw) {
+                    var raw = (telefoneRaw || '').toString().trim();
+                    var m = raw.match(/^\+\s*(\d{1,4})\s*(.*)$/);
+                    if (m) {
+                        return { ddi: (m[1] || '').trim(), numero: (m[2] || '').trim() };
+                    }
+                    return { ddi: '55', numero: raw };
+                }
+
+                function getDdiValue() {
+                    var ddi = (document.getElementById('telefone_ddi')?.value || '').toString();
+                    if (ddi === '0') {
+                        ddi = (document.getElementById('telefone_ddi_outro')?.value || '').toString();
+                    }
+                    return ddi.replace(/\D/g, '');
+                }
+
+                function isDdiBR() {
+                    return getDdiValue() === '55';
+                }
+
+                function syncTelefoneOutroBox() {
+                    var sel = document.getElementById('telefone_ddi');
+                    var box = document.getElementById('telefone_ddi_outro_box');
+                    if (!sel || !box) return;
+                    box.style.display = (sel.value === '0') ? 'flex' : 'none';
+                }
+
+                function mountTelefoneHidden() {
+                    var hidden = document.getElementById('telefone');
+                    var numero = document.getElementById('telefone_numero');
+                    if (!hidden || !numero) return;
+                    var ddi = getDdiValue();
+                    var n = (numero.value || '').toString().trim();
+                    hidden.value = ddi ? ('+' + ddi + ' ' + n) : n;
+                }
+
+                function applyTelefoneMaskIfBR() {
+                    var numero = document.getElementById('telefone_numero');
+                    if (!numero) return;
+                    if (!isDdiBR()) return;
+                    var v = (numero.value || '').toString().replace(/\D/g, '');
+                    if (v.length <= 10) {
+                        v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+                    } else {
+                        v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                    }
+                    numero.value = v;
+                }
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Telefone: separar DDI e número
+                    var telefoneHidden = document.getElementById('telefone');
+                    var ddiSel = document.getElementById('telefone_ddi');
+                    var numeroEl = document.getElementById('telefone_numero');
+                    if (telefoneHidden && ddiSel && numeroEl) {
+                        var parsed = parseTelefone(telefoneHidden.value);
+                        numeroEl.value = parsed.numero || '';
+                        var hasOption = false;
+                        for (var i = 0; i < ddiSel.options.length; i++) {
+                            if ((ddiSel.options[i].value || '') === parsed.ddi) { hasOption = true; break; }
+                        }
+                        if (parsed.ddi && hasOption) {
+                            ddiSel.value = parsed.ddi;
+                        } else if (parsed.ddi) {
+                            ddiSel.value = '0';
+                            var outro = document.getElementById('telefone_ddi_outro');
+                            if (outro) outro.value = parsed.ddi;
+                        }
+
+                        syncTelefoneOutroBox();
+                        applyTelefoneMaskIfBR();
+                        mountTelefoneHidden();
+
+                        ddiSel.addEventListener('change', function() {
+                            syncTelefoneOutroBox();
+                            applyTelefoneMaskIfBR();
+                            mountTelefoneHidden();
+                        });
+                        var outroEl = document.getElementById('telefone_ddi_outro');
+                        if (outroEl) {
+                            outroEl.addEventListener('input', function() {
+                                applyTelefoneMaskIfBR();
+                                mountTelefoneHidden();
+                            });
+                        }
+                        numeroEl.addEventListener('input', function() {
+                            applyTelefoneMaskIfBR();
+                            mountTelefoneHidden();
+                        });
+
+                        var form = document.getElementById('formMeusDados');
+                        if (form) {
+                            form.addEventListener('submit', function() {
+                                mountTelefoneHidden();
+                            });
+                        }
+                    }
+
+                    var paisResSearch = document.getElementById('pais_residencia_search');
+                    var paisResSelect = document.getElementById('pais_residencia');
+                    if (paisResSearch && paisResSelect) {
+                        paisResSearch.addEventListener('input', function() {
+                            filterSelectOptions(paisResSelect, paisResSearch.value);
+                        });
+                    }
+                    if (paisResSelect) {
+                        paisResSelect.addEventListener('change', function() {
+                            syncDocumentoRules();
+                        });
+                    }
+
+                    var paisSearch = document.getElementById('pais_search');
+                    var paisSelect = document.getElementById('pais');
+                    if (paisSearch && paisSelect) {
+                        paisSearch.addEventListener('input', function() {
+                            filterSelectOptions(paisSelect, paisSearch.value);
+                        });
+                    }
+                    if (paisSelect) {
+                        paisSelect.addEventListener('change', function() {
+                            syncBairroRules();
+                        });
+                    }
+
+                    syncDocumentoRules();
+                    syncBairroRules();
+                });
+            })();
+            </script>
             
             <!-- Success Message -->
             <?php if (isset($_SESSION['message'])): ?>
@@ -50,15 +218,35 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="tel" class="form-control" id="telefone" name="telefone" 
-                                       value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
-                                       placeholder="(00) 00000-0000" required>
+                                <div class="input-group w-100" style="flex-wrap: nowrap;">
+                                    <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
+                                        <option value="55" selected>+55</option>
+                                        <option value="1">+1</option>
+                                        <option value="44">+44</option>
+                                        <option value="49">+49</option>
+                                        <option value="33">+33</option>
+                                        <option value="34">+34</option>
+                                        <option value="39">+39</option>
+                                        <option value="351">+351</option>
+                                        <option value="54">+54</option>
+                                        <option value="56">+56</option>
+                                        <option value="57">+57</option>
+                                        <option value="0">Outro</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="Número" required>
+                                    <input type="hidden" class="form-control" id="telefone" name="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                </div>
+                                <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
+                                    <span class="input-group-text">DDI</span>
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label for="documento" class="form-label">CPF/CNPJ</label>
+                                <label for="documento" class="form-label" id="label-documento">CPF</label>
                                 <input type="text" class="form-control" id="documento" name="documento" 
                                        value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>" 
-                                       placeholder="000.000.000-00" required>
+                                       placeholder="000.000.000-00">
+                                <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                             </div>
 
                             <div class="col-md-6">
@@ -68,11 +256,14 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <?php require __DIR__ . '/../_countries.php'; ?>
+                                <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
                                 <select class="form-select" id="pais_residencia" name="pais_residencia" required>
-                                    <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
-                                    <option value="BR" <?= $pr === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                    <option value="US" <?= $pr === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
+                                    <?php foreach ($countries as $code => $name): ?>
+                                        <option value="<?= htmlspecialchars($code) ?>" <?= $pr === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
                             </div>
                         </div>
                 </div>
@@ -108,14 +299,13 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="pais" class="form-label">País / Country</label>
+                                <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
                                 <select class="form-select" id="pais" name="pais" required>
-                                    <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
-                                    <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                    <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
-                                    <option value="CA" <?= $pp === 'CA' ? 'selected' : '' ?>>Canadá</option>
-                                    <option value="DE" <?= $pp === 'DE' ? 'selected' : '' ?>>Alemanha</option>
-                                    <option value="AU" <?= $pp === 'AU' ? 'selected' : '' ?>>Austrália</option>
+                                    <?php foreach ($countries as $code => $name): ?>
+                                        <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
+                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
                             </div>
                             <div class="col-md-6">
                                 <label for="cep" class="form-label">CEP</label>
@@ -145,7 +335,7 @@
                                 <label for="bairro" class="form-label">Bairro</label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
                                        value="<?= htmlspecialchars((string) ($ee['bairro'] ?? ($usuario['bairro'] ?? ''))) ?>" 
-                                       placeholder="Centro" required>
+                                       placeholder="Centro">
                             </div>
                             <div class="col-md-4">
                                 <label for="cidade" class="form-label">Cidade</label>

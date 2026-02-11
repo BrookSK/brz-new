@@ -18,9 +18,31 @@ use PDOException;
 
 class MySQLUserRepository implements UserRepositoryInterface {
     private PDO $connection;
+    private ?array $cachedColumns = null;
 
     public function __construct(PDO $connection) {
         $this->connection = $connection;
+    }
+
+    private function getColumns(): array {
+        if (is_array($this->cachedColumns)) {
+            return $this->cachedColumns;
+        }
+
+        try {
+            $stmt = $this->connection->query("DESCRIBE usuarios");
+            $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+            $this->cachedColumns = is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            $this->cachedColumns = [];
+        }
+
+        return $this->cachedColumns;
+    }
+
+    private function hasColumn(string $name): bool {
+        $cols = $this->getColumns();
+        return in_array($name, $cols, true);
     }
 
     public function save(User $user): User {
@@ -29,19 +51,45 @@ class MySQLUserRepository implements UserRepositoryInterface {
 
             $data = $user->toArray();
 
+            $colName = $this->hasColumn('name') ? 'name' : 'nome';
+            $colPassword = $this->hasColumn('password') ? 'password' : 'senha';
+            $colRole = $this->hasColumn('role') ? 'role' : 'perfil';
+            $colActive = $this->hasColumn('active') ? 'active' : 'status';
+
+            $data[$colName] = $data['name'] ?? $data[$colName] ?? null;
+            $data[$colPassword] = $data['password'] ?? $data[$colPassword] ?? null;
+            $data[$colRole] = $data['role'] ?? $data[$colRole] ?? null;
+            if ($colActive === 'status') {
+                $data['status'] = ($data['active'] ?? true) ? 'ativo' : 'inativo';
+            }
+
             if ($user->getId() === null) {
                 // Insert
-                $sql = "
-                    INSERT INTO usuarios (
-                        name, email, password, phone, cpf, birth_date,
-                        address, number, neighborhood, city, state, zip_code,
-                        role, active, created_at, updated_at
-                    ) VALUES (
-                        :name, :email, :password, :phone, :cpf, :birth_date,
-                        :address, :number, :neighborhood, :city, :state, :zip_code,
-                        :role, :active, :created_at, :updated_at
-                    )
-                ";
+                $sql = "INSERT INTO usuarios (";
+
+                $columns = [
+                    $colName,
+                    'email',
+                    $colPassword,
+                    'phone',
+                    'cpf',
+                    'birth_date',
+                    'address',
+                    'number',
+                    'neighborhood',
+                    'city',
+                    'state',
+                    'zip_code',
+                    $colRole,
+                    $colActive,
+                    'created_at',
+                    'updated_at'
+                ];
+
+                $sql .= implode(', ', $columns) . ") VALUES (";
+
+                $placeholders = array_map(static fn($c) => ':' . $c, $columns);
+                $sql .= implode(', ', $placeholders) . ")";
 
                 $stmt = $this->connection->prepare($sql);
                 $this->bindUserParameters($stmt, $data);
@@ -50,11 +98,10 @@ class MySQLUserRepository implements UserRepositoryInterface {
                 $user->setId($this->connection->lastInsertId());
             } else {
                 // Update
-                $sql = "
-                    UPDATE usuarios SET
-                        name = :name,
+                $sql = "UPDATE usuarios SET
+                        {$colName} = :{$colName},
                         email = :email,
-                        password = :password,
+                        {$colPassword} = :{$colPassword},
                         phone = :phone,
                         cpf = :cpf,
                         birth_date = :birth_date,
@@ -64,11 +111,10 @@ class MySQLUserRepository implements UserRepositoryInterface {
                         city = :city,
                         state = :state,
                         zip_code = :zip_code,
-                        role = :role,
-                        active = :active,
+                        {$colRole} = :{$colRole},
+                        {$colActive} = :{$colActive},
                         updated_at = :updated_at
-                    WHERE id = :id
-                ";
+                    WHERE id = :id";
 
                 $stmt = $this->connection->prepare($sql);
                 $data['id'] = $user->getId();
@@ -295,7 +341,12 @@ class MySQLUserRepository implements UserRepositoryInterface {
     }
 
     public function updateLastLogin(int $id): bool {
-        $sql = "UPDATE usuarios SET last_login = NOW() WHERE id = :id";
+        $col = $this->hasColumn('last_login') ? 'last_login' : ($this->hasColumn('ultimo_login') ? 'ultimo_login' : null);
+        if ($col === null) {
+            return false;
+        }
+
+        $sql = "UPDATE usuarios SET {$col} = NOW() WHERE id = :id";
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
 
@@ -303,7 +354,8 @@ class MySQLUserRepository implements UserRepositoryInterface {
     }
 
     public function updatePassword(int $id, string $hashedPassword): bool {
-        $sql = "UPDATE usuarios SET password = :password, updated_at = NOW() WHERE id = :id";
+        $col = $this->hasColumn('password') ? 'password' : ($this->hasColumn('senha') ? 'senha' : 'password');
+        $sql = "UPDATE usuarios SET {$col} = :password, updated_at = NOW() WHERE id = :id";
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':password', $hashedPassword);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
@@ -312,12 +364,24 @@ class MySQLUserRepository implements UserRepositoryInterface {
     }
 
     public function isActive(int $id): bool {
-        $sql = "SELECT active FROM usuarios WHERE id = :id";
+        if ($this->hasColumn('active')) {
+            $sql = "SELECT active FROM usuarios WHERE id = :id";
+        } elseif ($this->hasColumn('status')) {
+            $sql = "SELECT status FROM usuarios WHERE id = :id";
+        } else {
+            return false;
+        }
+
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
 
-        return (bool) $stmt->fetchColumn();
+        $val = $stmt->fetchColumn();
+        if ($this->hasColumn('status')) {
+            return strtolower((string) $val) === 'ativo';
+        }
+
+        return (bool) $val;
     }
 
     public function getStatistics(): array {
@@ -405,9 +469,18 @@ class MySQLUserRepository implements UserRepositoryInterface {
 
     // Métodos auxiliares
     private function bindUserParameters($stmt, array $data): void {
-        $stmt->bindValue(':name', $data['name']);
+        $colName = $this->hasColumn('name') ? 'name' : 'nome';
+        $colPassword = $this->hasColumn('password') ? 'password' : 'senha';
+        $colRole = $this->hasColumn('role') ? 'role' : 'perfil';
+        $colActive = $this->hasColumn('active') ? 'active' : 'status';
+
+        $nameValue = $data['name'] ?? $data['nome'] ?? null;
+        $stmt->bindValue(':' . $colName, $nameValue);
         $stmt->bindValue(':email', $data['email']);
-        $stmt->bindValue(':password', $data['password']);
+
+        $passwordValue = $data['password'] ?? $data['senha'] ?? null;
+        $stmt->bindValue(':' . $colPassword, $passwordValue);
+
         $stmt->bindValue(':phone', $data['phone']);
         $stmt->bindValue(':cpf', $data['cpf']);
         $stmt->bindValue(':birth_date', $data['birth_date']);
@@ -417,8 +490,17 @@ class MySQLUserRepository implements UserRepositoryInterface {
         $stmt->bindValue(':city', $data['city']);
         $stmt->bindValue(':state', $data['state']);
         $stmt->bindValue(':zip_code', $data['zip_code']);
-        $stmt->bindValue(':role', $data['role']);
-        $stmt->bindValue(':active', $data['active'], PDO::PARAM_BOOL);
+
+        $roleValue = $data['role'] ?? $data['perfil'] ?? null;
+        $stmt->bindValue(':' . $colRole, $roleValue);
+
+        if ($colActive === 'active') {
+            $stmt->bindValue(':active', $data['active'], PDO::PARAM_BOOL);
+        } else {
+            $statusValue = $data['status'] ?? (($data['active'] ?? true) ? 'ativo' : 'inativo');
+            $stmt->bindValue(':status', $statusValue);
+        }
+
         $stmt->bindValue(':created_at', $data['created_at']);
         $stmt->bindValue(':updated_at', $data['updated_at']);
 

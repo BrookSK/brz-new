@@ -10,7 +10,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4 p-md-5">
                     <p class="text-muted mb-4">
-                        Esta Política de Privacidade descreve como a Braziliana Shop coleta, utiliza e compartilha informações quando você utiliza nosso site.
+                        Esta Política de Privacidade descreve como a Braziliana coleta, utiliza e compartilha informações quando você utiliza nosso site.
                         Ao acessar ou usar nossos serviços, você concorda com as práticas descritas neste documento.
                     </p>
 

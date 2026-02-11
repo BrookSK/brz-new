@@ -10,7 +10,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4 p-md-5">
                     <p class="text-muted mb-4">
-                        Estes Termos de Uso regulam o acesso e a utilização do site Braziliana Shop.
+                        Estes Termos de Uso regulam o acesso e a utilização do site Braziliana.
                         Ao utilizar nossos serviços, você concorda com estes termos.
                     </p>
 
@@ -30,28 +30,40 @@
                         As condições podem variar conforme o produto, forma de pagamento e logística.
                     </p>
 
-                    <h4 class="mt-4 mb-3">4. Propriedade intelectual</h4>
+                    <h4 class="mt-4 mb-3">4. Taxas de serviço e frete</h4>
+                    <p class="text-muted">
+                        As taxas de serviço e os valores de frete podem ser alterados a qualquer momento, sem aviso prévio.
+                        Os valores aplicáveis serão aqueles apresentados no momento da finalização do pedido.
+                    </p>
+
+                    <h4 class="mt-4 mb-3">5. Envios internacionais e responsabilidade do residente</h4>
+                    <p class="text-muted">
+                        Para envios para países além do Brasil, o residente do país de destino é o único responsável por cumprir as leis e exigências de importação locais,
+                        incluindo, mas não se limitando, ao pagamento de impostos, taxas, tarifas, desembaraço aduaneiro e quaisquer outras obrigações relacionadas à importação.
+                    </p>
+
+                    <h4 class="mt-4 mb-3">6. Propriedade intelectual</h4>
                     <p class="text-muted">
                         Conteúdos, marcas, logotipos e materiais presentes no site são protegidos por leis de propriedade intelectual e não podem ser utilizados sem autorização.
                     </p>
 
-                    <h4 class="mt-4 mb-3">5. Limitação de responsabilidade</h4>
+                    <h4 class="mt-4 mb-3">7. Limitação de responsabilidade</h4>
                     <p class="text-muted">
                         Buscamos manter o serviço estável e seguro, mas não garantimos disponibilidade ininterrupta.
                         Não nos responsabilizamos por danos indiretos decorrentes do uso da plataforma, na medida permitida por lei.
                     </p>
 
-                    <h4 class="mt-4 mb-3">6. Suspensão e encerramento</h4>
+                    <h4 class="mt-4 mb-3">8. Suspensão e encerramento</h4>
                     <p class="text-muted">
                         Podemos suspender ou encerrar contas em caso de suspeita de fraude, uso indevido ou violação destes termos.
                     </p>
 
-                    <h4 class="mt-4 mb-3">7. Alterações</h4>
+                    <h4 class="mt-4 mb-3">9. Alterações</h4>
                     <p class="text-muted">
                         Podemos atualizar estes Termos de Uso periodicamente. A versão vigente será sempre disponibilizada nesta página.
                     </p>
 
-                    <h4 class="mt-4 mb-3">8. Contato</h4>
+                    <h4 class="mt-4 mb-3">10. Contato</h4>
                     <p class="text-muted mb-0">
                         Para dúvidas, utilize a página de <a href="/contato">Contato</a>.
                     </p>

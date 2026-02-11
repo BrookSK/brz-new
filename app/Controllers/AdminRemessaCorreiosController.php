@@ -97,14 +97,44 @@ class AdminRemessaCorreiosController extends Controller {
         $amb = strtolower(trim((string) ($cfg['ambiente'] ?? 'homologacao')));
         $wsdl = ($amb === 'producao' || $amb === 'production')
             ? 'https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl'
-            : 'https://hom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
+            : 'https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente?wsdl';
 
-        $client = new \SoapClient($wsdl, [
-            'exceptions' => true,
-            'trace' => false,
-            'cache_wsdl' => WSDL_CACHE_BOTH,
-            'connection_timeout' => 20,
+        $localWsdl = __DIR__ . '/../Resources/wsdl/AtendeCliente.wsdl';
+        if (is_file($localWsdl)) {
+            $wsdl = $localWsdl;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 30,
+                'protocol_version' => 1.1,
+                'ignore_errors' => true,
+                'header' => "Connection: close\r\n"
+                    . "Accept: text/xml, application/xml;q=0.9, */*;q=0.8\r\n"
+                    . "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) brz-sigep/1.0\r\n",
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
         ]);
+
+        try {
+            $client = new \SoapClient($wsdl, [
+                'exceptions' => true,
+                'trace' => false,
+                'cache_wsdl' => WSDL_CACHE_BOTH,
+                'connection_timeout' => 20,
+                'stream_context' => $context,
+                'compression' => SOAP_COMPRESSION_ACCEPT | SOAP_COMPRESSION_GZIP,
+            ]);
+        } catch (\Throwable $e) {
+            $extra = [];
+            $extra[] = 'allow_url_fopen=' . (ini_get('allow_url_fopen') ? '1' : '0');
+            $extra[] = 'openssl.cafile=' . (string) ini_get('openssl.cafile');
+            $extra[] = 'curl.cainfo=' . (string) ini_get('curl.cainfo');
+            throw new \Exception('SIGEP falhou ao carregar WSDL: ' . $e->getMessage() . ' | ' . implode(', ', $extra));
+        }
 
         // Observação: o SIGEP varia por contrato. Aqui tentamos usar solicitaEtiquetas.
         // Para funcionar em definitivo, o admin deve preencher o código do serviço do contrato.
@@ -225,7 +255,7 @@ class AdminRemessaCorreiosController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa Correios - Braziliana Shop Admin</title>
+    <title>Remessa Correios - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -994,7 +1024,7 @@ class AdminRemessaCorreiosController extends Controller {
 
     private function getDadosRemetente() {
         return [
-            'nome' => 'Braziliana Shop',
+            'nome' => 'Braziliana',
             'cnpj' => '00.000.000/0001-00',
             'endereco' => 'Rua das Empresas, 123',
             'cidade' => 'São Paulo',

@@ -3,6 +3,8 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\WExpressService;
+use App\Services\WooCommerceService;
 use Config\Database;
 
 class AdminPedidosWpController extends Controller {
@@ -81,12 +83,311 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedidos (WordPress) - Braziliana Shop Admin';
+        $title = 'Pedidos (WordPress) - Braziliana Admin';
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp.php';
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    public function gerarEtiquetaWexpress(Request $request, int $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            return;
+        }
+
+        try {
+            $localPdo = Database::getConnection();
+            $wp = $this->getWpPdo($localPdo);
+            $prefix = $wp['prefix'];
+            $wpPdo = $wp['pdo'];
+
+            $stP = $wpPdo->prepare("SELECT ID, post_date, post_status, post_title FROM {$prefix}posts WHERE ID = ? AND post_type = 'shop_order' LIMIT 1");
+            $stP->execute([$orderId]);
+            $pedido = $stP->fetch(\PDO::FETCH_ASSOC) ?: null;
+            if (!$pedido) {
+                $this->json(['success' => false, 'error' => 'Pedido não encontrado no WordPress'], 404);
+                return;
+            }
+
+            $stM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}postmeta WHERE post_id = ?");
+            $stM->execute([$orderId]);
+            $rowsMeta = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $meta = [];
+            foreach ($rowsMeta as $r) {
+                $k = (string) ($r['meta_key'] ?? '');
+                if ($k === '') continue;
+                $meta[$k] = $r['meta_value'] ?? '';
+            }
+
+            $currency = strtoupper(trim((string) ($meta['_order_currency'] ?? 'USD')));
+            if ($currency === '') $currency = 'USD';
+
+            $billingCpf = (string) ($meta['_billing_cpf'] ?? ($meta['_billing_cnpj'] ?? ''));
+            $billingDocDigits = (string) preg_replace('/\D+/', '', $billingCpf);
+            if ($billingDocDigits === '') {
+                $this->json(['success' => false, 'error' => 'Documento (CPF/CNPJ) não encontrado no pedido. Preencha o campo de CPF/CNPJ no WooCommerce antes de gerar a etiqueta.'], 400);
+                return;
+            }
+
+            $nome = trim((string) (($meta['_shipping_first_name'] ?? '') . ' ' . ($meta['_shipping_last_name'] ?? '')));
+            if ($nome === '') {
+                $nome = trim((string) (($meta['_billing_first_name'] ?? '') . ' ' . ($meta['_billing_last_name'] ?? '')));
+            }
+            if ($nome === '') {
+                $nome = 'Cliente';
+            }
+            $partes = preg_split('/\s+/', $nome) ?: [];
+            $firstName = $partes[0] ?? $nome;
+            $lastName = count($partes) > 1 ? implode(' ', array_slice($partes, 1)) : '';
+
+            $shipAddress1 = trim((string) ($meta['_shipping_address_1'] ?? ''));
+            $shipAddress2 = trim((string) ($meta['_shipping_address_2'] ?? ''));
+            $shipNumber = trim((string) ($meta['_shipping_number'] ?? ($meta['shipping_number'] ?? '')));
+            $shipCity = trim((string) ($meta['_shipping_city'] ?? ''));
+            $shipState = trim((string) ($meta['_shipping_state'] ?? ''));
+            $shipPostcode = preg_replace('/\D+/', '', (string) ($meta['_shipping_postcode'] ?? ''));
+            $shipSuite = trim((string) ($meta['suite'] ?? ($meta['_shipping_suite'] ?? ($meta['shipping_suite'] ?? ''))));
+            $shipNeighborhood = trim((string) ($meta['_shipping_neighborhood'] ?? ($meta['_shipping_bairro'] ?? ($meta['shipping_bairro'] ?? ''))));
+
+            $addr2Parts = [];
+            if ($shipAddress2 !== '') $addr2Parts[] = $shipAddress2;
+            if ($shipSuite !== '') $addr2Parts[] = $shipSuite;
+            if ($shipNeighborhood !== '') $addr2Parts[] = $shipNeighborhood;
+            $addr2 = trim(implode(', ', $addr2Parts));
+
+            if ($shipAddress1 === '' || $shipCity === '' || $shipState === '' || $shipPostcode === '') {
+                $this->json(['success' => false, 'error' => 'Endereço de entrega incompleto no pedido (shipping). Corrija no WooCommerce antes de gerar a etiqueta.'], 400);
+                return;
+            }
+
+            $email = (string) ($meta['_billing_email'] ?? '');
+            $phone = (string) ($meta['_billing_phone'] ?? '');
+
+            $stI = $wpPdo->prepare("SELECT order_item_id, order_item_name, order_item_type FROM {$prefix}woocommerce_order_items WHERE order_id = ? ORDER BY order_item_id ASC");
+            $stI->execute([$orderId]);
+            $orderItems = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $stIM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id = ?");
+
+            $items = [];
+            $pesoTotalKg = 0.0;
+            $usdToBrl = $this->getUsdToBrlRate($localPdo);
+            $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
+
+            foreach ($orderItems as $oi) {
+                if (strtolower((string) ($oi['order_item_type'] ?? '')) !== 'line_item') {
+                    continue;
+                }
+
+                $itemId = (int) ($oi['order_item_id'] ?? 0);
+                if ($itemId <= 0) continue;
+
+                $stIM->execute([$itemId]);
+                $metaItemRows = $stIM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $m = [];
+                foreach ($metaItemRows as $mr) {
+                    $k = (string) ($mr['meta_key'] ?? '');
+                    if ($k === '') continue;
+                    $m[$k] = $mr['meta_value'] ?? '';
+                }
+
+                $produtoId = (int) ($m['_product_id'] ?? 0);
+                $variacaoId = (int) ($m['_variation_id'] ?? 0);
+                $qtd = (int) ($m['_qty'] ?? 0);
+                if ($qtd <= 0) $qtd = 1;
+
+                $lineTotal = is_numeric($m['_line_total'] ?? null) ? (float) $m['_line_total'] : 0.0;
+                $unit = $qtd > 0 ? round($lineTotal / $qtd, 2) : 0.0;
+                if ($unit <= 0) $unit = 1.0;
+                if ($currency === 'BRL') {
+                    $unit = $unit * $brlToUsd;
+                }
+
+                $desc = trim((string) ($oi['order_item_name'] ?? 'item'));
+                if ($desc === '') $desc = 'item';
+
+                $ncm = '';
+                $ncmCandidatesItem = ['_ncm', 'ncm', 'tariff_code', '_tariff_code', 'invoice_ncm', '_invoice_ncm', 'ncm_code', '_ncm_code'];
+                foreach ($ncmCandidatesItem as $nk) {
+                    $val = trim((string) ($m[$nk] ?? ''));
+                    if ($val !== '') {
+                        $ncm = $val;
+                        break;
+                    }
+                }
+                if ($ncm === '') {
+                    $prodLookupId = $variacaoId > 0 ? $variacaoId : $produtoId;
+                    if ($prodLookupId > 0) {
+                        $ncmKeys = ['_ncm', 'ncm', '_woo_ncm', '_product_ncm', '_ncm_code'];
+                        foreach ($ncmKeys as $nk) {
+                            $stN = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = ? LIMIT 1");
+                            $stN->execute([(int) $prodLookupId, $nk]);
+                            $val = (string) ($stN->fetchColumn() ?: '');
+                            if (trim($val) !== '') {
+                                $ncm = $val;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                $ncmDigits = preg_replace('/\D+/', '', (string) $ncm);
+                if ($ncmDigits === '') {
+                    $this->json(['success' => false, 'error' => 'NCM não encontrado para um ou mais itens do pedido. Cadastre o NCM nos produtos (ou no Invoice) antes de gerar a etiqueta.'], 400);
+                    return;
+                }
+
+                $pesoKg = null;
+                $weightCandidatesItem = ['peso', '_peso', 'weight', '_weight', 'peso_kg', '_peso_kg', 'invoice_weight', '_invoice_weight', 'invoice_peso', '_invoice_peso'];
+                foreach ($weightCandidatesItem as $wk) {
+                    $v = str_replace(',', '.', (string) ($m[$wk] ?? ''));
+                    if (is_numeric($v) && (float) $v > 0) {
+                        $pesoKg = (float) $v;
+                        break;
+                    }
+                }
+                if ($pesoKg === null) {
+                    $prodLookupId = $variacaoId > 0 ? $variacaoId : $produtoId;
+                    if ($prodLookupId > 0) {
+                        $stW = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_weight' LIMIT 1");
+                        $stW->execute([(int) $prodLookupId]);
+                        $w = str_replace(',', '.', (string) ($stW->fetchColumn() ?: ''));
+                        if (is_numeric($w) && (float) $w > 0) {
+                            $pesoKg = (float) $w;
+                        }
+                    }
+                }
+
+                if ($pesoKg !== null && $pesoKg > 0) {
+                    $pesoTotalKg += ($pesoKg * $qtd);
+                }
+
+                $items[] = [
+                    'description' => $desc,
+                    'quantity' => $qtd,
+                    'unit_value' => round((float) $unit, 2),
+                    'tariff_code' => (int) $ncmDigits,
+                ];
+            }
+
+            if (empty($items)) {
+                $this->json(['success' => false, 'error' => 'Sem itens no pedido'], 400);
+                return;
+            }
+
+            if ($pesoTotalKg <= 0) {
+                $pesoTotalKg = 1.0;
+            }
+
+            $svcWx = new WExpressService();
+            $sender = $svcWx->getSender();
+            if (!is_array($sender) || empty($sender)) {
+                $err = $svcWx->getSenderJsonError();
+                $this->json(['success' => false, 'error' => 'W-Express: configure o Sender (JSON) em Admin > Configurações > Entrega' . ($err ? (': ' . $err) : '')], 400);
+                return;
+            }
+
+            $taxIdType = strlen($billingDocDigits) > 11 ? 'CNPJ' : 'CPF';
+            $recipientType = ($taxIdType === 'CPF') ? 'individual' : 'business';
+
+            $declared = is_numeric($meta['_order_total'] ?? null) ? (float) $meta['_order_total'] : 0.0;
+            if ($declared <= 0) $declared = 1.0;
+            if ($currency === 'BRL') {
+                $declared = $declared * $brlToUsd;
+            }
+
+            $externalShippingId = (string) $orderId;
+            $payload = [
+                'shipment_purpose' => 'personal',
+                'external_shipping_id' => $externalShippingId,
+                'external_shipping_reference' => 'woo',
+                'service_code' => $svcWx->getServiceCode(),
+                'incoterms' => 'DDU',
+                'dimensions_unit' => 'cm',
+                'weight_unit' => 'g',
+                'currency' => 'USD',
+                'declared_value' => round((float) $declared, 2),
+                'freight_value' => 0.01,
+                'insurance_value' => 0,
+                'invoice_number' => (string) $orderId,
+                'packages' => [[
+                    'weight' => round($pesoTotalKg * 1000, 2),
+                    'width' => 10,
+                    'length' => 15,
+                    'height' => 10,
+                ]],
+                'sender' => $sender,
+                'recipient' => [
+                    'type' => $recipientType,
+                    'business_name' => $recipientType === 'business' ? $nome : ' ',
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'tax_id_type' => $taxIdType,
+                    'tax_id' => $billingDocDigits,
+                    'email' => $email,
+                    'phone' => $phone,
+                    'address' => [
+                        'address_number' => $shipNumber,
+                        'address_line_1' => $shipAddress1,
+                        'address_line_2' => $addr2,
+                        'postal_code' => $shipPostcode,
+                        'city' => $shipCity,
+                        'state' => $shipState,
+                        'country' => 'BR',
+                    ],
+                ],
+                'items' => $items,
+            ];
+
+            $resp = $svcWx->createShipping($payload);
+
+            $wxStatus = is_array($resp) ? (string) ($resp['shipping_status'] ?? '') : '';
+            $wxShipId = is_array($resp) ? (string) ($resp['shipping_id'] ?? '') : '';
+            $wxTrack = is_array($resp) ? (string) ($resp['wexpress_tracking_number'] ?? '') : '';
+            $wxCourier = is_array($resp) ? (string) ($resp['courier_tracking_number'] ?? '') : '';
+
+            if (trim($wxShipId) === '') {
+                $this->json(['success' => false, 'error' => 'W-Express não retornou shipping_id', 'response' => $resp], 400);
+                return;
+            }
+
+            $labelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId);
+
+            try {
+                $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_shipping_id', $wxShipId);
+                $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_label_url', $labelUrl);
+                $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_status', $wxStatus);
+                if ($wxTrack !== '') $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_tracking_number', $wxTrack);
+                if ($wxCourier !== '') $this->savePedidoMeta($localPdo, $orderId, 'wp_courier_tracking_number', $wxCourier);
+            } catch (\Throwable $e) {
+            }
+
+            $woo = new WooCommerceService();
+            $woo->updateOrderMeta($orderId, [
+                'wexpress_shipping_id' => $wxShipId,
+                'wexpress_label_url' => $labelUrl,
+                'wexpress_status' => $wxStatus,
+                'wexpress_tracking_number' => $wxTrack,
+                'courier_tracking_number' => $wxCourier,
+            ]);
+
+            $this->json([
+                'success' => true,
+                'shipping_id' => $wxShipId,
+                'wexpress_status' => $wxStatus,
+                'wexpress_tracking_number' => $wxTrack,
+                'courier_tracking_number' => $wxCourier,
+                'label_url' => $labelUrl,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function detalhes(Request $request, int $id) {
@@ -194,7 +495,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $sidebarActive = 'pedidos-wp';
-        $title = 'Pedido WP - Detalhes - Braziliana Shop Admin';
+        $title = 'Pedido WP - Detalhes - Braziliana Admin';
 
         ob_start();
         include __DIR__ . '/../Views/admin/pedidos_wp_detalhes.php';
@@ -239,6 +540,44 @@ class AdminPedidosWpController extends Controller {
         ]);
 
         return ['pdo' => $pdo, 'prefix' => $prefix];
+    }
+
+    private function getUsdToBrlRate(\PDO $pdo): float {
+        try {
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'sistema' AND chave = 'usd_brl_rate' LIMIT 1");
+            $st->execute();
+            $v = $st->fetchColumn();
+            if ($v !== false && $v !== null && is_numeric($v)) {
+                $r = (float) $v;
+                if ($r > 0.000001) return $r;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'sistema_usd_brl_rate' LIMIT 1");
+            $st->execute();
+            $v = $st->fetchColumn();
+            if ($v !== false && $v !== null && is_numeric($v)) {
+                $r = (float) $v;
+                if ($r > 0.000001) return $r;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return 5.5;
+    }
+
+    private function savePedidoMeta(\PDO $pdo, int $pedidoId, string $metaKey, $metaValue): void {
+        $pedidoId = (int) $pedidoId;
+        $metaKey = trim($metaKey);
+        if ($pedidoId <= 0 || $metaKey === '') return;
+
+        try {
+            $st = $pdo->prepare("INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP");
+            $st->execute([$pedidoId, $metaKey, is_scalar($metaValue) ? (string) $metaValue : json_encode($metaValue)]);
+        } catch (\Throwable $e) {
+        }
     }
 
     private function getWpConfig(\PDO $pdo): array {

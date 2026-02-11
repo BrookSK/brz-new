@@ -34,14 +34,35 @@
                                            value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label" id="label-documento">CPF/CNPJ</label>
+                                    <label class="form-label" id="label-documento">CPF</label>
                                     <input type="text" class="form-control" name="documento" id="documento" 
                                            value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>">
+                                    <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Telefone com WhatsApp *</label>
-                                    <input type="tel" class="form-control" name="telefone" required 
-                                           value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                    <div class="input-group w-100" style="flex-wrap: nowrap;">
+                                        <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
+                                            <option value="55" selected>+55</option>
+                                            <option value="1">+1</option>
+                                            <option value="44">+44</option>
+                                            <option value="49">+49</option>
+                                            <option value="33">+33</option>
+                                            <option value="34">+34</option>
+                                            <option value="39">+39</option>
+                                            <option value="351">+351</option>
+                                            <option value="54">+54</option>
+                                            <option value="56">+56</option>
+                                            <option value="57">+57</option>
+                                            <option value="0">Outro</option>
+                                        </select>
+                                        <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="Número" required>
+                                        <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                    </div>
+                                    <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
+                                        <span class="input-group-text">DDI</span>
+                                        <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Data de Nascimento *</label>
@@ -91,13 +112,14 @@
                                 <div class="row">
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">País / Country *</label>
+                                        <?php require __DIR__ . '/../_countries.php'; ?>
+                                        <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
                                         <select class="form-select" name="pais" id="pais" required>
-                                            <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
-                                            <option value="BR" <?= $pp === 'BR' ? 'selected' : '' ?>>Brasil</option>
-                                            <option value="US" <?= $pp === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
-                                            <option value="DE">Alemanha</option>
-                                            <option value="AU">Austrália</option>
+                                            <?php foreach ($countries as $code => $name): ?>
+                                                <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                            <?php endforeach; ?>
                                         </select>
+                                        <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
@@ -121,8 +143,8 @@
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['complemento'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Bairro / District *</label>
-                                        <input type="text" class="form-control" name="bairro" required id="bairro"
+                                        <label class="form-label" id="label-bairro">Bairro / District</label>
+                                        <input type="text" class="form-control" name="bairro" id="bairro"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['bairro'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
@@ -167,6 +189,139 @@
 
         <script>
         (function() {
+            function parseTelefone(telefoneRaw) {
+                var raw = (telefoneRaw || '').toString().trim();
+                var m = raw.match(/^\+\s*(\d{1,4})\s*(.*)$/);
+                if (m) {
+                    return { ddi: (m[1] || '').trim(), numero: (m[2] || '').trim() };
+                }
+                return { ddi: '55', numero: raw };
+            }
+
+            function getDdiValue() {
+                var ddi = (document.getElementById('telefone_ddi')?.value || '').toString();
+                if (ddi === '0') {
+                    ddi = (document.getElementById('telefone_ddi_outro')?.value || '').toString();
+                }
+                return ddi.replace(/\D/g, '');
+            }
+
+            function isDdiBR() {
+                return getDdiValue() === '55';
+            }
+
+            function syncTelefoneOutroBox() {
+                var sel = document.getElementById('telefone_ddi');
+                var box = document.getElementById('telefone_ddi_outro_box');
+                if (!sel || !box) return;
+                box.style.display = (sel.value === '0') ? 'flex' : 'none';
+            }
+
+            function mountTelefoneHidden() {
+                var hidden = document.getElementById('telefone');
+                var numero = document.getElementById('telefone_numero');
+                if (!hidden || !numero) return;
+                var ddi = getDdiValue();
+                var n = (numero.value || '').toString().trim();
+                hidden.value = ddi ? ('+' + ddi + ' ' + n) : n;
+            }
+
+            function applyTelefoneMaskIfBR() {
+                var numero = document.getElementById('telefone_numero');
+                if (!numero) return;
+                if (!isDdiBR()) return;
+                var v = (numero.value || '').toString().replace(/\D/g, '');
+                if (v.length <= 10) {
+                    v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+                } else {
+                    v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                }
+                numero.value = v;
+            }
+
+            function filterSelectOptions(selectEl, query) {
+                if (!selectEl) return;
+                query = (query || '').toString().trim().toLowerCase();
+                var opts = selectEl.querySelectorAll('option');
+                for (var i = 0; i < opts.length; i++) {
+                    var o = opts[i];
+                    var txt = (o.textContent || '').toString().toLowerCase();
+                    var val = (o.value || '').toString().toLowerCase();
+                    var match = (query === '') || (txt.indexOf(query) !== -1) || (val.indexOf(query) !== -1);
+                    o.style.display = match ? '' : 'none';
+                }
+            }
+
+            function syncDocumentoRules() {
+                var paisEl = document.getElementById('pais');
+                var docEl = document.getElementById('documento');
+                var labelEl = document.getElementById('label-documento');
+                var hintEl = document.getElementById('hint-documento');
+                if (!paisEl || !docEl || !labelEl) return;
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                labelEl.textContent = br ? 'CPF *' : 'CPF';
+                docEl.required = br;
+                if (hintEl) {
+                    hintEl.style.display = br ? 'none' : 'block';
+                }
+            }
+
+            function syncBairroRules() {
+                var paisEl = document.getElementById('pais');
+                var bairroEl = document.getElementById('bairro');
+                var labelEl = document.getElementById('label-bairro');
+                if (!paisEl || !bairroEl || !labelEl) return;
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                bairroEl.required = br;
+                labelEl.textContent = br ? 'Bairro / District *' : 'Bairro / District';
+            }
+
+            function syncImpostosRules() {
+                var paisEl = document.getElementById('pais');
+                if (!paisEl) return;
+
+                var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
+                var impostosRow = document.getElementById('impostos-row');
+                var impostosEl = document.getElementById('impostos');
+                var alertEl = document.getElementById('entrega-fora-br-alert');
+
+                if (!window.checkoutBaseValues) return;
+                if (!window.checkoutOriginalValues) {
+                    window.checkoutOriginalValues = Object.assign({}, window.checkoutBaseValues);
+                }
+
+                if (br) {
+                    window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostos || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.total || 0);
+                    if (impostosRow) {
+                        impostosRow.classList.remove('d-none');
+                    }
+                    if (alertEl) {
+                        alertEl.classList.add('d-none');
+                    }
+                } else {
+                    window.checkoutOriginalValues.impostos = 0;
+                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0);
+                    if (impostosEl) {
+                        impostosEl.setAttribute('data-original-value', '0');
+                        impostosEl.textContent = '0';
+                    }
+                    if (impostosRow) {
+                        impostosRow.classList.add('d-none');
+                    }
+                    if (alertEl) {
+                        alertEl.classList.remove('d-none');
+                    }
+                }
+
+                try {
+                    var moedaHidden = document.getElementById('moeda_hidden');
+                    var curr = moedaHidden ? (moedaHidden.value || 'BRL') : 'BRL';
+                    updatePrices(curr);
+                } catch (e) {
+                }
+            }
+
             function computeMissingFiltered() {
                 var warn = document.getElementById('checkout-perfil-warning');
                 if (!warn) return;
@@ -219,6 +374,74 @@
                 if (sel) {
                     sel.addEventListener('change', computeMissingFiltered);
                 }
+
+                // Telefone: separar DDI e número
+                var telefoneHidden = document.getElementById('telefone');
+                var ddiSel = document.getElementById('telefone_ddi');
+                var numeroEl = document.getElementById('telefone_numero');
+                if (telefoneHidden && ddiSel && numeroEl) {
+                    var parsed = parseTelefone(telefoneHidden.value);
+                    numeroEl.value = parsed.numero || '';
+                    var hasOption = false;
+                    for (var i = 0; i < ddiSel.options.length; i++) {
+                        if ((ddiSel.options[i].value || '') === parsed.ddi) { hasOption = true; break; }
+                    }
+                    if (parsed.ddi && hasOption) {
+                        ddiSel.value = parsed.ddi;
+                    } else if (parsed.ddi) {
+                        ddiSel.value = '0';
+                        var outro = document.getElementById('telefone_ddi_outro');
+                        if (outro) outro.value = parsed.ddi;
+                    }
+
+                    syncTelefoneOutroBox();
+                    applyTelefoneMaskIfBR();
+                    mountTelefoneHidden();
+
+                    ddiSel.addEventListener('change', function() {
+                        syncTelefoneOutroBox();
+                        applyTelefoneMaskIfBR();
+                        mountTelefoneHidden();
+                    });
+                    var outroEl = document.getElementById('telefone_ddi_outro');
+                    if (outroEl) {
+                        outroEl.addEventListener('input', function() {
+                            applyTelefoneMaskIfBR();
+                            mountTelefoneHidden();
+                        });
+                    }
+                    numeroEl.addEventListener('input', function() {
+                        applyTelefoneMaskIfBR();
+                        mountTelefoneHidden();
+                    });
+
+                    // Garante montagem antes de submit
+                    var form = numeroEl.closest('form');
+                    if (form) {
+                        form.addEventListener('submit', function() {
+                            mountTelefoneHidden();
+                        });
+                    }
+                }
+
+                var paisSearch = document.getElementById('pais_search');
+                var paisSelect = document.getElementById('pais');
+                if (paisSearch && paisSelect) {
+                    paisSearch.addEventListener('input', function() {
+                        filterSelectOptions(paisSelect, paisSearch.value);
+                    });
+                }
+                if (paisSelect) {
+                    paisSelect.addEventListener('change', function() {
+                        syncDocumentoRules();
+                        syncBairroRules();
+                        syncImpostosRules();
+                    });
+                }
+
+                syncDocumentoRules();
+                syncBairroRules();
+                syncImpostosRules();
             });
         })();
         </script>
@@ -266,7 +489,7 @@
                                             <label class="form-label">Forma de Pagamento</label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
                                                 <option value="">Selecione...</option>
-                                                <option value="carteira">Carteira</option>
+                                                <option value="carteira">Crédito da Carteira</option>
                                                 <option value="cartao_credito">Cartão de Crédito</option>
                                                 <option value="boleto">Boleto Bancário</option>
                                                 <option value="pix">PIX</option>
@@ -300,7 +523,7 @@
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
                                             <div id="campos-cartao-stripe" style="display:none;">
-                                                <label class="form-label">Cartão (Stripe)</label>
+                                                <label class="form-label">Cartão</label>
                                                 <div id="stripe-card-element" class="form-control" style="padding: 12px; background: #fff;"></div>
                                                 <div id="stripe-card-errors" class="text-danger small mt-2" style="display:none;"></div>
                                             </div>
@@ -394,10 +617,17 @@
                                     <span>Taxa de Serviço:</span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
-                                <div class="d-flex justify-content-between">
-                                    <span>Impostos:</span>
-                                    <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
-                                </div>
+                                <?php if (!empty($cobra_impostos_br)): ?>
+                                    <div class="d-flex justify-content-between" id="impostos-row">
+                                        <span>Impostos:</span>
+                                        <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="d-flex justify-content-between d-none" id="impostos-row">
+                                        <span>Impostos:</span>
+                                        <span id="impostos" class="cart-currency" data-original-value="0">0</span>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="d-flex justify-content-between">
                                     <span>Frete:</span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
@@ -416,6 +646,18 @@
                             <div class="alert alert-info small">
                                 <i class="fas fa-info-circle"></i> 
                                 <strong>Peso Total:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
+                            </div>
+
+                            <?php if (!empty($entrega_fora_br) && !empty($mensagem_entrega_fora_br)): ?>
+                                <div class="alert alert-warning small">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <?= htmlspecialchars((string) $mensagem_entrega_fora_br, ENT_QUOTES, 'UTF-8') ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="alert alert-warning small d-none" id="entrega-fora-br-alert">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.
                             </div>
 
                             <!-- Termos Legais -->
@@ -1144,7 +1386,7 @@ function atualizarFormaPagamento() {
     if (botaoFinalizar) {
         switch(formaPagamento) {
             case 'carteira':
-                botaoFinalizar.innerHTML = '<i class="fas fa-wallet"></i> Pagar com Carteira';
+                botaoFinalizar.innerHTML = '<i class="fas fa-wallet"></i> Pagar com Crédito da Carteira';
                 console.log('🔍 [BOTÃO] Texto atualizado para carteira');
                 break;
             case 'cartao_credito':
@@ -1259,14 +1501,20 @@ function updatePrices(currency) {
         return;
     }
     
-    // Valores originais em USD (fixos)
-    const originalValues = {
-        subtotal: <?= $subtotal ?>,
-        frete: <?= ($frete ?? 0) ?>,
-        taxaServico: <?= ($taxa_servico ?? 0) ?>,
-        impostos: <?= ($impostos ?? 0) ?>,
-        total: <?= ($total ?? 0) ?>
-    };
+    // Valores originais em USD (mutáveis, pois país pode mudar no select)
+    if (!window.checkoutBaseValues) {
+        window.checkoutBaseValues = {
+            subtotal: <?= $subtotal ?>,
+            frete: <?= ($frete ?? 0) ?>,
+            taxaServico: <?= ($taxa_servico ?? 0) ?>,
+            impostos: <?= ($impostos ?? 0) ?>,
+            total: <?= ($total ?? 0) ?>
+        };
+    }
+    if (!window.checkoutOriginalValues) {
+        window.checkoutOriginalValues = Object.assign({}, window.checkoutBaseValues);
+    }
+    const originalValues = window.checkoutOriginalValues;
     
     console.log('🔍 [MOEDA] Valores originais:', originalValues);
     
@@ -1418,14 +1666,14 @@ function updatePaymentMethodsForCurrency(currency) {
     select.appendChild(new Option('Selecione...', ''));
 
     // Carteira deve aparecer sempre (independente da moeda)
-    select.appendChild(new Option('Carteira', 'carteira'));
+    select.appendChild(new Option('Crédito da Carteira', 'carteira'));
 
     if (isBRL) {
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Boleto Bancário', 'boleto'));
         select.appendChild(new Option('PIX', 'pix'));
     } else {
-        select.appendChild(new Option('Cartão de Crédito (Stripe)', 'cartao_credito'));
+        select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
     }
 
     // Manter seleção se ainda válida

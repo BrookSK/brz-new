@@ -6,6 +6,7 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
+$router->get('/admin/produtos/arquivados', 'AdminProdutosController', 'arquivados');
 $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
@@ -38,6 +39,7 @@ $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'im
 // Pedidos do WordPress (somente leitura)
 $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
+ $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');

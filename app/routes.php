@@ -26,6 +26,7 @@ $router->get('/rastreamento', 'RastreamentoController', 'index');
 $router->get('/faq', 'FaqController', 'index');
 $router->get('/como-funciona', 'ComoFuncionaController', 'index');
 $router->get('/contato', 'ContatoController', 'index');
+$router->post('/contato', 'ContatoController', 'index');
 
 // Suporte e políticas
 $router->get('/suporte', 'SuporteController', 'index');
@@ -145,7 +146,7 @@ $router->get('/admin', function($request) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Braziliana Shop Admin</title>
+    <title>Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -213,7 +214,7 @@ $router->get('/admin', function($request) {
             <div class="admin-logo">
                 <i class="fas fa-shipping-fast"></i>
             </div>
-            <h1 class="admin-title">Braziliana Shop Admin</h1>
+            <h1 class="admin-title">Braziliana Admin</h1>
             <p class="text-muted mb-4">Painel Administrativo da Loja</p>
             
             <div class="admin-menu">';

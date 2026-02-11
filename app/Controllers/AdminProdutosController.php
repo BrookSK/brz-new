@@ -2183,6 +2183,7 @@ HTML;
 
             $params = [];
             $where = ' WHERE 1=1 ';
+            $where .= " AND NOT (LOWER(COALESCE(p.status,'')) = 'archived' OR p.active = 0) ";
             if ($perfil === 'representante') {
                 if ($repId <= 0) {
                     header('Location: /login');
@@ -2196,7 +2197,7 @@ HTML;
                 $params[':busca'] = '%' . $busca . '%';
             }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.id DESC LIMIT :limite OFFSET :offset';
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k => $v) {
                 if ($k === ':rep_id') {
@@ -2256,6 +2257,7 @@ HTML;
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
             . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
+            . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
             . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
             . '</div>'
@@ -2270,30 +2272,44 @@ HTML;
             . '</div>'
             . '</form>';
 
-        echo '<div class="row">';
+        echo '<div class="table-responsive">'
+            . '<table class="table table-hover align-middle">'
+            . '<thead><tr>'
+            . '<th style="width:72px">Imagem</th>'
+            . '<th>Nome</th>'
+            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:110px">Status</th>'
+            . '<th style="width:150px">Ações</th>'
+            . '</tr></thead><tbody>';
+
         foreach ($produtos as $produto) {
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
-            echo '<div class="col-md-6 col-lg-4 mb-4">'
-                . '<div class="card product-card h-100">'
-                . '<img src="' . htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8') . '" class="card-img-top product-image" alt="' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '">' 
-                . '<div class="card-body">'
-                . '<h5 class="card-title">' . htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8') . '</h5>'
-                . '<p class="text-muted small">SKU: ' . htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8') . '</p>'
-                . '<div class="d-flex justify-content-between align-items-center mb-2">'
-                . '<span class="fw-bold text-primary">$' . number_format((float) $produto['price'], 2, '.', ',') . '</span>'
-                . '<span class="badge ' . ((int) $produto['active'] ? 'bg-success' : 'bg-danger') . '">' . ((int) $produto['active'] ? 'Ativo' : 'Inativo') . '</span>'
-                . '</div>'
-                . '<div class="d-flex justify-content-between">'
-                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>'
-                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display: inline;">'
-                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>'
+            $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
+            $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
+            $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
+            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+
+            echo '<tr>'
+                . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
+                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
+                . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
+                . '<td>'
+                . '<div class="btn-group btn-group-sm" role="group">'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
+                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display:inline;">'
+                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>'
                 . '</form>'
                 . '</div>'
-                . '</div>'
-                . '</div>'
-                . '</div>';
+                . '</td>'
+                . '</tr>';
         }
-        echo '</div>';
+
+        echo '</tbody></table></div>';
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
@@ -2337,7 +2353,196 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Produtos - Braziliana Shop Admin';
+        $title = 'Produtos - Braziliana Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    public function arquivados(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $perfil = $this->getSessionPerfil();
+        $repId = $this->getSessionUserId();
+
+        $isRepresentante = ($perfil === 'representante');
+        $sidebarActive = $isRepresentante ? 'rep_produtos' : 'produtos';
+
+        $pagina = (int) $request->getParam('pagina', 1);
+        if ($pagina <= 0) $pagina = 1;
+        $limite = 20;
+        $offset = ($pagina - 1) * $limite;
+        $busca = (string) $request->getParam('busca', '');
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $params = [];
+            $where = ' WHERE (LOWER(COALESCE(p.status,\'\')) = \'archived\' OR p.active = 0) ';
+            if ($perfil === 'representante') {
+                if ($repId <= 0) {
+                    header('Location: /login');
+                    exit;
+                }
+                $where .= ' AND p.representante_id = :rep_id ';
+                $params[':rep_id'] = $repId;
+            }
+            if (trim($busca) !== '') {
+                $where .= ' AND (p.name LIKE :busca OR p.sku LIKE :busca) ';
+                $params[':busca'] = '%' . $busca . '%';
+            }
+
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                if ($k === ':rep_id') {
+                    $stmt->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                } else {
+                    $stmt->bindValue($k, (string) $v);
+                }
+            }
+            $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $sqlTotal = 'SELECT COUNT(*) FROM produtos p' . $where;
+            $stmtT = $pdo->prepare($sqlTotal);
+            foreach ($params as $k => $v) {
+                if ($k === ':rep_id') {
+                    $stmtT->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                } else {
+                    $stmtT->bindValue($k, (string) $v);
+                }
+            }
+            $stmtT->execute();
+            $total = (int) ($stmtT->fetchColumn() ?: 0);
+            $totalPaginas = (int) ceil($total / $limite);
+
+            $produtos = [];
+            foreach ($rows as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $img = (string) ($r['foto_principal'] ?? '');
+                if ($img === '') {
+                    $img = '/uploads/produtos/placeholder.jpg';
+                }
+                $produtos[] = [
+                    'id' => $id,
+                    'name' => (string) ($r['name'] ?? ($r['nome'] ?? '')),
+                    'sku' => (string) ($r['sku'] ?? ''),
+                    'price' => (float) ($r['price'] ?? ($r['preco'] ?? ($r['valor'] ?? 0))),
+                    'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
+                    'imagem' => $img,
+                ];
+            }
+        } catch (\Exception $e) {
+            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            exit;
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        ob_start();
+
+        $urlNovo = $isRepresentante ? '/admin/produtos/cadastro-representante' : '/admin/produtos/novo';
+        $urlCadastroRapido = $isRepresentante ? '/admin/produtos/cadastro-representante' : '/admin/produtos/cadastro-rapido';
+
+        echo '<div class="pt-3">'
+            . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
+            . '<h1 class="h2">Arquivados (' . (int) $total . ')</h1>'
+            . '<div class="d-flex gap-2">'
+            . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>'
+            . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
+            . '<a href="' . htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') . '" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>'
+            . '</div>'
+            . '</div>';
+
+        echo '<form method="GET" class="row g-3 mb-4">'
+            . '<div class="col-md-8">'
+            . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '</div>'
+            . '<div class="col-md-4">'
+            . '<button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>'
+            . '</div>'
+            . '</form>';
+
+        echo '<div class="table-responsive">'
+            . '<table class="table table-hover align-middle">'
+            . '<thead><tr>'
+            . '<th style="width:72px">Imagem</th>'
+            . '<th>Nome</th>'
+            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:140px">Preço</th>'
+            . '<th style="width:110px">Status</th>'
+            . '<th style="width:90px">Ações</th>'
+            . '</tr></thead><tbody>';
+
+        foreach ($produtos as $produto) {
+            $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
+            $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
+            $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
+            $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
+            $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
+
+            echo '<tr>'
+                . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
+                . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
+                . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
+                . '<td>'
+                . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
+                . '</td>'
+                . '</tr>';
+        }
+
+        echo '</tbody></table></div>';
+
+        if ($totalPaginas > 1) {
+            $base = $isRepresentante ? '/admin/representante/produtos/arquivados' : '/admin/produtos/arquivados';
+            $mkUrl = function(int $p) use ($base, $busca): string {
+                return $base . "?pagina={$p}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+            };
+
+            $start = max(1, $pagina - 1);
+            $end = min($totalPaginas, $pagina + 1);
+            if (($end - $start + 1) < 3) {
+                if ($start === 1) {
+                    $end = min($totalPaginas, $start + 2);
+                } elseif ($end === $totalPaginas) {
+                    $start = max(1, $end - 2);
+                }
+            }
+
+            echo '<nav class="mt-4"><ul class="pagination justify-content-center">';
+
+            $prev = max(1, $pagina - 1);
+            $prevDisabled = ($pagina <= 1);
+            echo '<li class="page-item ' . ($prevDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($prev), ENT_QUOTES, 'UTF-8') . '" tabindex="-1">Anterior</a>'
+                . '</li>';
+
+            for ($i = $start; $i <= $end; $i++) {
+                echo '<li class="page-item ' . ($i == $pagina ? 'active' : '') . '">' 
+                    . '<a class="page-link" href="' . htmlspecialchars($mkUrl($i), ENT_QUOTES, 'UTF-8') . '">' . (int) $i . '</a>'
+                    . '</li>';
+            }
+
+            $next = min($totalPaginas, $pagina + 1);
+            $nextDisabled = ($pagina >= $totalPaginas);
+            echo '<li class="page-item ' . ($nextDisabled ? 'disabled' : '') . '">' 
+                . '<a class="page-link" href="' . htmlspecialchars($mkUrl($next), ENT_QUOTES, 'UTF-8') . '">Próximo</a>'
+                . '</li>';
+
+            echo '</ul></nav>';
+        }
+
+        echo '</div>';
+
+        $content = ob_get_clean();
+        $title = 'Produtos Arquivados - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -2685,7 +2890,7 @@ HTML;
         echo '</div>';
 
         $content = ob_get_clean();
-        $title = 'Novo Produto - Braziliana Shop Admin';
+        $title = 'Novo Produto - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
         exit;
     }
@@ -2784,6 +2989,11 @@ HTML;
 
             if (in_array('status', $cols, true)) $data['status'] = $request->getParam('status') ?: 'published';
             if (in_array('active', $cols, true)) $data['active'] = $request->getParam('active') ?: 1;
+            if (in_array('status', $cols, true) && in_array('active', $cols, true)) {
+                if (strtolower(trim((string) ($data['status'] ?? ''))) === 'archived') {
+                    $data['active'] = 0;
+                }
+            }
             if (in_array('featured', $cols, true)) $data['featured'] = $request->getParam('featured') ?: 0;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
 
@@ -2871,7 +3081,9 @@ HTML;
             exit;
             
         } catch (\Exception $e) {
-            if (isset($pdo)) $pdo->rollBack();
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
@@ -2968,7 +3180,7 @@ HTML;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Produto - Braziliana Shop Admin</title>
+    <title>Editar Produto - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -3629,7 +3841,7 @@ HTMLSCRIPT;
                 $request->getParam('min_stock') ?: 0,
                 $request->getParam('weight') ?: 0,
                 $request->getParam('status'),
-                $request->getParam('active') ?: 0,
+                (strtolower(trim((string) $request->getParam('status'))) === 'archived' ? 0 : ($request->getParam('active') ?: 0)),
                 $request->getParam('featured') ?: 0,
                 $id
             ]);
@@ -4546,7 +4758,9 @@ HTMLSCRIPT;
             exit;
             
         } catch (\Exception $e) {
-            if (isset($pdo)) $pdo->rollBack();
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }

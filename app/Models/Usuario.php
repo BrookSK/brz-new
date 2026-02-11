@@ -38,7 +38,12 @@ class Usuario extends Model {
     }
     
     public function findByEmail($email) {
-        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE email = :email");
+        $email = strtolower(trim((string) $email));
+        if ($email === '') {
+            return false;
+        }
+
+        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE LOWER(TRIM(email)) = :email LIMIT 1");
         $stmt->bindParam(':email', $email);
         $stmt->execute();
         return $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -186,6 +191,13 @@ class Usuario extends Model {
         }
         $ok = false;
         if ($usuario && is_string($hash) && $hash !== '') {
+            $hashToVerify = trim($hash, " \t\n\r\0\x0B\"'");
+            $isWpPrefixed = false;
+            if (str_starts_with($hashToVerify, '$wp$')) {
+                $hashToVerify = '$' . ltrim(substr($hashToVerify, 4), '$');
+                $isWpPrefixed = true;
+            }
+
             // Compatibilidade: aceita senha em texto plano antiga
             if (hash_equals($hash, (string) $senha)) {
                 $ok = true;
@@ -200,10 +212,10 @@ class Usuario extends Model {
                     $hash = $newHash;
                 } catch (\Exception $e) {
                 }
-            } elseif (password_verify((string) $senha, $hash)) {
+            } elseif (password_verify((string) $senha, $hashToVerify)) {
                 $ok = true;
                 // Rehash quando necessário
-                if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+                if ($isWpPrefixed || password_needs_rehash($hashToVerify, PASSWORD_DEFAULT)) {
                     $newHash = password_hash((string) $senha, PASSWORD_DEFAULT);
                     $col = $senhaCol ?: (array_key_exists('senha', $usuario) ? 'senha' : 'password');
                     try {
@@ -531,7 +543,6 @@ class Usuario extends Model {
             'nome' => ['nome', 'name'],
             'email' => ['email'],
             'telefone' => ['telefone', 'phone'],
-            'documento' => ['documento', 'cpf_cnpj', 'cpf'],
             'cep' => ['cep', 'zip_code'],
             'endereco' => ['endereco', 'address'],
             'numero' => ['numero', 'number'],

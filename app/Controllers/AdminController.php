@@ -21,7 +21,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Braziliana Shop Admin - Painel Administrativo</title>
+    <title>Braziliana Admin - Painel Administrativo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         
@@ -199,7 +199,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Braziliana Shop Admin</title>
+    <title>Dashboard - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         
@@ -487,7 +487,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Braziliana Shop Admin</title>
+    <title>Pedidos - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -506,11 +506,12 @@ class AdminController extends Controller {
 <body>
     <div class="container-fluid">
         <div class="row">
+            <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
                 <div class="position-sticky pt-3">
                     <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                         <div class="sidebar-brand-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
+                        <div class="sidebar-brand-text mx-3">Braziliana Admin</div>
                     </a>
                     <ul class="nav flex-column">
                         <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>
@@ -638,7 +639,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Produto - Braziliana Shop Admin</title>
+    <title>Novo Produto - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -673,7 +674,7 @@ class AdminController extends Controller {
                         <div class="sidebar-brand-icon">
                             <i class="fas fa-shipping-fast"></i>
                         </div>
-                        <div class="sidebar-brand-text mx-3">Braziliana Shop Admin</div>
+                        <div class="sidebar-brand-text mx-3">Braziliana Admin</div>
                     </a>
                     
                     <ul class="nav flex-column">
@@ -936,7 +937,7 @@ class AdminController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Erro - Braziliana Shop Admin</title>
+    <title>Erro - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>

@@ -117,21 +117,8 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <?php if (!empty($pedido['items'])): ?>
                                 <?php
                                 $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
-                                $simboloMoeda = 'US$';
-                                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
-                                if ($tx <= 1.01) {
-                                    try {
-                                        $svcTx = new \App\Services\PedidoManualService();
-                                        $tx = (float) $svcTx->getTaxaConversaoUSDBRL();
-                                    } catch (\Exception $e) {
-                                        $tx = 5.5;
-                                    }
-                                }
-                                $brlToUsd = $tx > 0 ? (1.0 / $tx) : 1.0;
+                                $simboloMoeda = ($moedaPedido === 'BRL') ? 'R$' : 'US$';
                                 ?>
-                                <div class="alert alert-info small mb-3">
-                                    Valores exibidos em USD (US$). Taxa: 1 USD = R$ <?= number_format((float) $tx, 2, ',', '.') ?>
-                                </div>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
                                         <?php
@@ -175,18 +162,12 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                             <span class="text-muted">x</span>
                                             <?php
                                             $pu = (float) ($item['preco_unitario'] ?? 0);
-                                            if ($moedaPedido === 'BRL') {
-                                                $pu = $pu * $brlToUsd;
-                                            }
                                             ?>
                                             <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($pu, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
-                                            if ($moedaPedido === 'BRL') {
-                                                $st = $st * $brlToUsd;
-                                            }
                                             ?>
                                             <small class="text-muted">Subtotal: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
@@ -234,9 +215,6 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <span>Subtotal:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
-                                        if ($moedaPedido === 'BRL') {
-                                            $sub = $sub * $brlToUsd;
-                                        }
                                         ?>
                                         <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
@@ -245,9 +223,6 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                         <?php $freteVal = (float) ($pedido['valor_frete'] ?? 0); ?>
                                         <?php
                                         $freteUsd = $freteVal;
-                                        if ($moedaPedido === 'BRL') {
-                                            $freteUsd = $freteUsd * $brlToUsd;
-                                        }
                                         ?>
                                         <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteUsd, 2, ',', '.'))) ?></span>
                                     </div>

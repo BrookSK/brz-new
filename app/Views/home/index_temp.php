@@ -49,7 +49,7 @@
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">Por que escolher a Braziliana Shop?</h2>
+            <h2 class="section-title" data-aos="fade-up">Por que escolher a Braziliana?</h2>
             <p class="section-subtitle" data-aos="fade-up">Oferecemos a melhor experiência de importação com tecnologia e confiança</p>
         </div>
         

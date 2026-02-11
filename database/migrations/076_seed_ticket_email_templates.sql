@@ -15,7 +15,7 @@ INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, create
 SELECT e.id,
        'ticket_created',
        'Recebemos seu ticket #{{ticket_id}} (Pedido #{{codigo_pedido}})',
-       'Olá {{nome}},<br><br>Recebemos sua solicitação de suporte e nosso time já vai analisar.<br><br><strong>Ticket:</strong> #{{ticket_id}}<br><strong>Pedido:</strong> #{{codigo_pedido}}<br><strong>Motivo:</strong> {{ticket_motivo}}<br><strong>Assunto:</strong> {{ticket_assunto}}<br><br>Você pode acompanhar e responder pelo link:<br><a href="{{ticket_url}}" target="_blank">{{ticket_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop',
+       'Olá {{nome}},<br><br>Recebemos sua solicitação de suporte e nosso time já vai analisar.<br><br><strong>Ticket:</strong> #{{ticket_id}}<br><strong>Pedido:</strong> #{{codigo_pedido}}<br><strong>Motivo:</strong> {{ticket_motivo}}<br><strong>Assunto:</strong> {{ticket_assunto}}<br><br>Você pode acompanhar e responder pelo link:<br><a href="{{ticket_url}}" target="_blank">{{ticket_url}}</a><br><br>Atenciosamente,<br>Braziliana',
        1,
        NOW(),
        NOW()
@@ -27,7 +27,7 @@ INSERT INTO email_templates (evento_id, nome, assunto, corpo_html, ativo, create
 SELECT e.id,
        'ticket_admin_reply',
        'Atualização no seu ticket #{{ticket_id}} (Pedido #{{codigo_pedido}})',
-       'Olá {{nome}},<br><br>Você recebeu uma nova resposta no seu ticket.<br><br><strong>Ticket:</strong> #{{ticket_id}}<br><strong>Pedido:</strong> #{{codigo_pedido}}<br><strong>Respondido por:</strong> {{admin_nome}}<br><br><strong>Mensagem:</strong><br>{{ticket_mensagem}}<br><br>Para responder e acompanhar o atendimento, acesse:<br><a href="{{ticket_url}}" target="_blank">{{ticket_url}}</a><br><br>Atenciosamente,<br>Braziliana Shop',
+       'Olá {{nome}},<br><br>Você recebeu uma nova resposta no seu ticket.<br><br><strong>Ticket:</strong> #{{ticket_id}}<br><strong>Pedido:</strong> #{{codigo_pedido}}<br><strong>Respondido por:</strong> {{admin_nome}}<br><br><strong>Mensagem:</strong><br>{{ticket_mensagem}}<br><br>Para responder e acompanhar o atendimento, acesse:<br><a href="{{ticket_url}}" target="_blank">{{ticket_url}}</a><br><br>Atenciosamente,<br>Braziliana',
        1,
        NOW(),
        NOW()

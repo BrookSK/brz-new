@@ -638,6 +638,7 @@ class CarrinhoController extends Controller {
         }
 
         $uid = $this->getLoggedUserId();
+        $dbRemoveDebug = null;
         if ($uid > 0) {
             try {
                 $pvId = null;
@@ -652,23 +653,35 @@ class CarrinhoController extends Controller {
 
                 $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
                 $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-                $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
+                $affected = (int) $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
+                if ($affected < 1) {
+                    // Não encontrou no carrinho do usuário no DB.
+                    // Pode ser que a view esteja exibindo itens da sessão (fallback) mesmo com usuário logado.
+                    // Nesse caso, tentaremos remover da sessão abaixo.
+                    $dbRemoveDebug = [
+                        'cart_id' => $cartId,
+                        'produto_id' => (int) $produtoIdDb,
+                        'produto_variacao_id' => ($pvId !== null ? (int) $pvId : null),
+                        'request_id' => (string) $produtoId,
+                        'uid' => (int) $uid
+                    ];
+                } else {
+                    $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cartId]);
+                    $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
 
-                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
-                $stCnt->execute([$cartId]);
-                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+                    $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                    $stTot->execute([$cartId]);
+                    $totalValor = (float) ($stTot->fetchColumn() ?: 0);
 
-                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
-                $stTot->execute([$cartId]);
-                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
-
-                $this->json([
-                    'success' => true,
-                    'message' => 'Produto removido do carrinho',
-                    'total_itens' => $totalItens,
-                    'total_valor' => $totalValor
-                ]);
-                return;
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Produto removido do carrinho',
+                        'total_itens' => $totalItens,
+                        'total_valor' => $totalValor
+                    ]);
+                    return;
+                }
             } catch (\Throwable $e) {
                 // fallback session
             }
@@ -699,10 +712,15 @@ class CarrinhoController extends Controller {
                 'success' => true,
                 'message' => 'Produto removido do carrinho',
                 'total_itens' => $totalItens,
-                'total_valor' => $totalValor
+                'total_valor' => $totalValor,
+                'debug' => ($dbRemoveDebug !== null ? ['db_not_found' => $dbRemoveDebug] : null)
             ]);
         } else {
-            $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+            $payload = ['error' => 'Produto não encontrado no carrinho'];
+            if ($dbRemoveDebug !== null) {
+                $payload['debug'] = ['db_not_found' => $dbRemoveDebug];
+            }
+            $this->json($payload, 404);
         }
     }
 

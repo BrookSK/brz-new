@@ -1,54 +1,149 @@
 <?php ob_start(); ?>
 <!-- Hero Section -->
 <section class="hero-section">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-lg-6">
-                <div class="hero-content" data-aos="fade-right">
-                    <h1 class="display-3 fw-bold mb-4">Importe Produtos dos EUA com Logística Completa</h1>
-                    <p class="lead mb-4">Sua plataforma confiável para importar eletrônicos, vestuário e muito mais com processo 100% transparente e seguro.</p>
-                    <div class="d-flex gap-3 mb-4">
-                        <a href="/produtos" class="cta-button">
-                            <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
-                        </a>
-                        <a href="/como-funciona" class="btn btn-outline-light btn-lg">
-                            <i class="fas fa-play-circle me-2"></i> Como Funciona
-                        </a>
+    <?php
+    $layoutBanners = [];
+    try {
+        $pdo = \Config\Database::getConnection();
+        $raw = '';
+
+        $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTry as $t) {
+            if ($raw !== '') break;
+            try {
+                $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                // schema categoria+chave+valor
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'banners']);
+                        $raw = (string) ($stmt->fetchColumn() ?: '');
+                        if ($raw !== '') break;
+                    }
+                }
+
+                // schema key/value
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_banners']);
+                    $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+
+                // schema single_row (coluna direta)
+                if (in_array('layout_banners', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $raw = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $item) {
+                    if (is_string($item)) {
+                        $src = trim($item);
+                        if ($src === '') continue;
+                        $layoutBanners[] = ['desktop' => $src, 'mobile' => '', 'link' => ''];
+                        continue;
+                    }
+                    if (is_array($item)) {
+                        $d = isset($item['desktop']) && is_string($item['desktop']) ? trim((string) $item['desktop']) : '';
+                        $m = isset($item['mobile']) && is_string($item['mobile']) ? trim((string) $item['mobile']) : '';
+                        $l = isset($item['link']) && is_string($item['link']) ? trim((string) $item['link']) : '';
+                        if ($d === '' && $m === '') continue;
+                        $layoutBanners[] = ['desktop' => $d, 'mobile' => $m, 'link' => $l];
+                        continue;
+                    }
+                }
+            }
+        }
+    } catch (\Exception $e) {
+        $layoutBanners = [];
+    }
+    ?>
+
+    <?php if (!empty($layoutBanners)): ?>
+        <div class="container">
+            <div class="hero-image" data-aos="fade-left">
+                <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner" style="overflow: hidden;">
+                        <?php foreach ($layoutBanners as $i => $banner): ?>
+                            <?php
+                                $desktopSrc = is_array($banner) ? (string) ($banner['desktop'] ?? '') : '';
+                                $mobileSrc = is_array($banner) ? (string) ($banner['mobile'] ?? '') : '';
+                                $linkHref = is_array($banner) ? (string) ($banner['link'] ?? '') : '';
+                                if ($desktopSrc === '' && $mobileSrc !== '') $desktopSrc = $mobileSrc;
+                                if ($mobileSrc === '' && $desktopSrc !== '') $mobileSrc = $desktopSrc;
+                            ?>
+                            <div class="carousel-item <?= ($i === 0 ? 'active' : '') ?>">
+                                <?php if (!empty($linkHref)): ?>
+                                    <a href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>" style="display:block;">
+                                        <div class="home-hero-banner">
+                                            <picture>
+                                                <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                                <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="w-100 h-100">
+                                            </picture>
+                                        </div>
+                                    </a>
+                                <?php else: ?>
+                                    <div class="home-hero-banner">
+                                        <picture>
+                                            <source media="(max-width: 767px)" srcset="<?= htmlspecialchars($mobileSrc, ENT_QUOTES, 'UTF-8') ?>">
+                                            <img src="<?= htmlspecialchars($desktopSrc, ENT_QUOTES, 'UTF-8') ?>" alt="Banner" class="w-100 h-100">
+                                        </picture>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                    <div class="hero-stats">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">10K+</h3>
-                                <p class="small">Produtos Importados</p>
-                            </div>
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">98%</h3>
-                                <p class="small">Satisfação</p>
-                            </div>
-                            <div class="col-4">
-                                <h3 class="h2 mb-0">15-30</h3>
-                                <p class="small">Dias Entrega</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="hero-image" data-aos="fade-left">
-                    <img src="/import.png" 
-                         alt="Importação Internacional" 
-                         class="img-fluid rounded-3 shadow-lg">
+
+                    <?php if (count($layoutBanners) > 1): ?>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Próximo</span>
+                        </button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
-    </div>
+    <?php endif; ?>
 </section>
 
 <!-- Features Section -->
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">Por que escolher a Braziliana Shop?</h2>
+            <h2 class="section-title" data-aos="fade-up">Por que escolher a Braziliana?</h2>
             <p class="section-subtitle" data-aos="fade-up">Oferecemos a melhor experiência de importação com tecnologia e confiança</p>
         </div>
         
@@ -69,7 +164,7 @@
                 <div class="feature-card card h-100 p-4">
                     <div class="text-center mb-3">
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
-                            <i class="fas fa-truck fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
+                            <i class="fas fa-plane fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
                         <h5>Logística Completa</h5>
                     </div>
@@ -332,34 +427,72 @@ $(document).ready(function() {
 </script>
 
 <style>
+.hero-section {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    background: transparent !important;
+}
+
+.hero-section .container {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}
+
 .hero-section .hero-image {
     position: relative;
-    padding: 14px;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 18px 50px rgba(11, 31, 58, 0.28);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     overflow: hidden;
 }
 
 .hero-section .hero-image::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.06);
-    pointer-events: none;
+    display: none;
 }
 
 .hero-section .hero-image img {
     position: relative;
     display: block;
     width: 100%;
-    border-radius: 18px;
-    box-shadow: 0 14px 38px rgba(11, 31, 58, 0.30);
-    filter: saturate(1.08) contrast(1.02);
+    border-radius: 0;
+    box-shadow: none;
+    filter: none;
     transform: none;
+}
+
+.hero-section .home-hero-banner {
+    width: 100%;
+    aspect-ratio: 1149 / 436;
+    background: transparent;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 50px;
+    border-radius: 18px;
+    overflow: hidden;
+}
+
+.hero-section .home-hero-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+@media (max-width: 767px) {
+    .hero-section .home-hero-banner {
+        aspect-ratio: 391 / 333;
+    }
+}
+
+.hero-section .carousel-control-prev,
+.hero-section .carousel-control-next {
+    width: 8%;
 }
 
 .timeline {
