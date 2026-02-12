@@ -69,6 +69,7 @@ class AdminPagamentosController extends Controller {
             $exprPaymentId = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
             $exprPaymentStatus = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_status', 'pagamento_status', 'status_pagamento'], "''");
             $exprPaymentMetodo = $this->buildCoalesceExpr('p', $colsPedidos, ['forma_pagamento', 'pagamento_metodo', 'payment_method', 'metodo_pagamento'], "''");
+            $exprValorTotal = $this->buildCoalesceExpr('p', $colsPedidos, ['valor_total', 'total', 'total_valor', 'valor', 'amount', 'amount_total', 'total_amount', 'total_pedido', 'valor_final'], '0');
 
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
@@ -91,7 +92,8 @@ class AdminPagamentosController extends Controller {
                     {$exprGateway} as gateway_pagamento,
                     {$exprPaymentId} as codigo_transacao,
                     {$exprPaymentStatus} as status_pagamento,
-                    {$exprPaymentMetodo} as metodo_pagamento
+                    {$exprPaymentMetodo} as metodo_pagamento,
+                    {$exprValorTotal} as valor_total_calc
                 FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
                 WHERE 1=1
@@ -157,7 +159,7 @@ class AdminPagamentosController extends Controller {
             // Estatísticas (não pode derrubar a listagem caso falhe por schema)
             $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
             try {
-                $colValorTotal = $this->pickColumn($colsPedidos, ['valor_total', 'total', 'total_valor', 'valor']);
+                $colValorTotal = $this->pickColumn($colsPedidos, ['valor_total', 'total', 'total_valor', 'valor', 'amount', 'amount_total', 'total_amount', 'total_pedido', 'valor_final']);
                 if ($colValorTotal !== '' && $colPedidoCreatedAt !== '') {
                     $stmtStats = $pdo->query("
                         SELECT 
@@ -315,6 +317,7 @@ class AdminPagamentosController extends Controller {
                             <option value="">Todos gateways</option>
                             <option value="stripe" ' . ($gateway === 'stripe' ? 'selected' : '') . '>Stripe</option>
                             <option value="appmax" ' . ($gateway === 'appmax' ? 'selected' : '') . '>AppMax</option>
+                            <option value="carteira" ' . ($gateway === 'carteira' ? 'selected' : '') . '>Carteira</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -328,6 +331,12 @@ class AdminPagamentosController extends Controller {
                     $pedidoIdRow = (int) ($pagamento['id'] ?? 0);
                     $stRow = strtolower(trim((string) ($pagamento['status_pagamento'] ?? 'pending')));
                     $gwRow = strtolower(trim((string) ($pagamento['gateway_pagamento'] ?? '')));
+                    $valorRow = 0.0;
+                    if (isset($pagamento['valor_total_calc'])) {
+                        $valorRow = (float) $pagamento['valor_total_calc'];
+                    } elseif (isset($pagamento['valor_total'])) {
+                        $valorRow = (float) $pagamento['valor_total'];
+                    }
 
                     $statusBadge = 'Pendente';
                     $statusClass = 'status-pendente';
@@ -355,7 +364,7 @@ class AdminPagamentosController extends Controller {
                                     <small class="text-muted">Método: ' . htmlspecialchars((string) ($pagamento['metodo_pagamento'] ?? 'N/A')) . '</small><br>
                                     <small class="text-muted">Gateway: ' . htmlspecialchars($gwRow !== '' ? strtoupper($gwRow) : 'N/A') . '</small><br>
                                     <small class="text-muted">Transação: ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
-                                    <strong>Valor: R$ ' . number_format($pagamento['valor_total'], 2, ',', '.') . '</strong>
+                                    <strong>Valor: R$ ' . number_format($valorRow, 2, ',', '.') . '</strong>
                                 </p>
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="/admin/pedidos/detalhes/' . $pedidoIdRow . '" class="btn btn-sm btn-outline-primary">
