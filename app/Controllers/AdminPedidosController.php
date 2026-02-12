@@ -10,6 +10,119 @@ use App\Services\SupportTicketNotificationService;
 
 class AdminPedidosController extends Controller {
 
+    private function tableExistsPdo(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getTableColumnsPdo(\PDO $pdo, string $table): array {
+        try {
+            $st = $pdo->query('DESCRIBE ' . $table);
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $cols, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    private function getPedidosMissingDataWarnings(\PDO $pdo, array $pedidoIds): array {
+        $out = [];
+        $pedidoIds = array_values(array_filter(array_map('intval', $pedidoIds), function ($v) { return $v > 0; }));
+        if (empty($pedidoIds)) {
+            return $out;
+        }
+
+        $itensTable = null;
+        if ($this->tableExistsPdo($pdo, 'pedido_itens')) {
+            $itensTable = 'pedido_itens';
+        } elseif ($this->tableExistsPdo($pdo, 'pedido_items')) {
+            $itensTable = 'pedido_items';
+        }
+        if (!$itensTable || !$this->tableExistsPdo($pdo, 'produtos')) {
+            return $out;
+        }
+
+        $colsItens = $this->getTableColumnsPdo($pdo, $itensTable);
+        $colsProd = $this->getTableColumnsPdo($pdo, 'produtos');
+
+        $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+        $colProdutoId = $this->pickColumn($colsItens, ['produto_id']);
+        $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+
+        $colCusto = $this->pickColumn($colsProd, ['preco_custo', 'custo', 'cost_price', 'valor_custo']);
+        $colNcm = $this->pickColumn($colsProd, ['ncm', 'codigo_ncm', 'ncm_code']);
+
+        if (!$colPedidoId || !$colProdutoId) {
+            return $out;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($pedidoIds), '?'));
+
+        // Missing cost
+        if ($colCusto) {
+            try {
+                $sql = 'SELECT pi.' . $colPedidoId . ' AS pedido_id, COUNT(*) AS cnt'
+                    . ' FROM ' . $itensTable . ' pi'
+                    . ' INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId
+                    . ' WHERE pi.' . $colPedidoId . ' IN (' . $placeholders . ')'
+                    . ' AND (pr.' . $colCusto . ' IS NULL OR COALESCE(pr.' . $colCusto . ',0) <= 0)'
+                    . ' GROUP BY pi.' . $colPedidoId;
+
+                $st = $pdo->prepare($sql);
+                $st->execute($pedidoIds);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    if (!isset($out[$pid])) $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $out[$pid]['missing_cost'] = true;
+                    $out[$pid]['missing_cost_count'] = (int) ($r['cnt'] ?? 0);
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        // Missing NCM
+        if ($colNcm) {
+            try {
+                $sql = 'SELECT pi.' . $colPedidoId . ' AS pedido_id, COUNT(*) AS cnt'
+                    . ' FROM ' . $itensTable . ' pi'
+                    . ' INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId
+                    . ' WHERE pi.' . $colPedidoId . ' IN (' . $placeholders . ')'
+                    . ' AND (pr.' . $colNcm . ' IS NULL OR TRIM(COALESCE(pr.' . $colNcm . ', \'\')) = \'\')'
+                    . ' GROUP BY pi.' . $colPedidoId;
+
+                $st = $pdo->prepare($sql);
+                $st->execute($pedidoIds);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    if (!isset($out[$pid])) $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $out[$pid]['missing_ncm'] = true;
+                    $out[$pid]['missing_ncm_count'] = (int) ($r['cnt'] ?? 0);
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $out;
+    }
+
     public function importarPedidosModelo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -1272,6 +1385,20 @@ JS;
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
+            $warningsMap = [];
+            try {
+                $pedidoIds = [];
+                if (is_array($pedidos)) {
+                    foreach ($pedidos as $pp) {
+                        if (!isset($pp['id'])) continue;
+                        $pedidoIds[] = (int) $pp['id'];
+                    }
+                }
+                $warningsMap = $this->getPedidosMissingDataWarnings($pdo, $pedidoIds);
+            } catch (\Exception $e) {
+                $warningsMap = [];
+            }
+
             // Normalizar moeda/total para exibição (sem alterar o banco)
             if (is_array($pedidos) && !empty($pedidos)) {
                 foreach ($pedidos as &$p) {
@@ -1397,6 +1524,11 @@ JS;
             transition: none;
             border-left: 4px solid #dee2e6;
         }
+        .order-card.needs-review {
+            border-left-color: #ffc107;
+            background: rgba(255, 193, 7, 0.08);
+            border-color: rgba(255, 193, 7, 0.35) !important;
+        }
         .order-card .badge {
             font-size: 1.2rem;
             padding: 0.5rem;
@@ -1484,6 +1616,19 @@ JS;
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
+
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                    }
                     
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
@@ -1515,7 +1660,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1531,6 +1676,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -1596,6 +1742,19 @@ JS;
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
 
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                    }
+
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
                         $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
@@ -1626,7 +1785,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1642,6 +1801,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -1706,6 +1866,19 @@ JS;
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
 
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                    }
+
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
                         $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
@@ -1736,7 +1909,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1752,6 +1925,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -2040,6 +2214,26 @@ HTML;
                             <div class="small">Pago em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($difPaidAt))) . '</strong></div>
                         </div>
                     </div>';
+            }
+
+            // Aviso: itens sem custo ou sem NCM
+            try {
+                $pdoWarn = $pdoCols ?? null;
+                if (!($pdoWarn instanceof \PDO)) {
+                    $pdoWarn = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                }
+                $warnMap = $this->getPedidosMissingDataWarnings($pdoWarn, [(int) $id]);
+                $warn = isset($warnMap[(int) $id]) && is_array($warnMap[(int) $id]) ? $warnMap[(int) $id] : null;
+                if (is_array($warn) && (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']))) {
+                    $parts = [];
+                    if (!empty($warn['missing_cost'])) $parts[] = 'custo do produto vazio/0';
+                    if (!empty($warn['missing_ncm'])) $parts[] = 'NCM não cadastrado';
+                    echo '<div class="alert alert-warning">
+                            <div style="font-weight:800;">Atenção: pedido precisa de revisão</div>
+                            <div class="small">Encontrado item com ' . htmlspecialchars(implode(' e ', $parts)) . '. Edite o(s) produto(s) do pedido e cadastre corretamente.</div>
+                        </div>';
+                }
+            } catch (\Exception $e) {
             }
 
             // Bloco: rastreio / etiqueta (Correios ou W-Express)
