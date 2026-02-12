@@ -29,6 +29,27 @@ class AdminPagamentosController extends Controller {
         }
         return '';
     }
+
+    private function buildCoalesceExpr(string $tableAlias, array $tableColumns, array $candidates, string $fallback = "''"): string {
+        $parts = [];
+        $lower = [];
+        foreach ($tableColumns as $c) {
+            $lower[strtolower((string) $c)] = (string) $c;
+        }
+        foreach ($candidates as $cand) {
+            $key = strtolower((string) $cand);
+            if (isset($lower[$key])) {
+                $parts[] = $tableAlias . '.' . $lower[$key];
+            }
+        }
+        if (empty($parts)) {
+            return $fallback;
+        }
+        if (count($parts) === 1) {
+            return 'COALESCE(' . $parts[0] . ', ' . $fallback . ')';
+        }
+        return 'COALESCE(' . implode(', ', $parts) . ', ' . $fallback . ')';
+    }
     
     public function index(Request $request) {
         $auth = new AuthService();
@@ -43,6 +64,11 @@ class AdminPagamentosController extends Controller {
 
             $colUsuarioNome = $this->pickColumn($colsUsuarios, ['nome', 'name', 'full_name']);
             $colPedidoCreatedAt = $this->pickColumn($colsPedidos, ['created_at', 'data_criacao', 'created', 'data']);
+
+            $exprGateway = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_gateway', 'pagamento_gateway', 'gateway_pagamento'], "''");
+            $exprPaymentId = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
+            $exprPaymentStatus = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_status', 'pagamento_status', 'status_pagamento'], "''");
+            $exprPaymentMetodo = $this->buildCoalesceExpr('p', $colsPedidos, ['forma_pagamento', 'pagamento_metodo', 'payment_method', 'metodo_pagamento'], "''");
 
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
@@ -62,10 +88,10 @@ class AdminPagamentosController extends Controller {
                     p.*,
                     {$selectUsuarioNome} as cliente_nome,
                     u.email as cliente_email,
-                    COALESCE(p.payment_gateway, p.pagamento_gateway, '') as gateway_pagamento,
-                    COALESCE(p.payment_id, p.pagamento_transacao, '') as codigo_transacao,
-                    COALESCE(p.payment_status, p.pagamento_status, '') as status_pagamento,
-                    COALESCE(p.forma_pagamento, p.pagamento_metodo, '') as metodo_pagamento
+                    {$exprGateway} as gateway_pagamento,
+                    {$exprPaymentId} as codigo_transacao,
+                    {$exprPaymentStatus} as status_pagamento,
+                    {$exprPaymentMetodo} as metodo_pagamento
                 FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
                 WHERE 1=1
@@ -73,19 +99,19 @@ class AdminPagamentosController extends Controller {
             $params = [];
             
             if (!empty($busca)) {
-                $sql .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
+                $sql .= " AND (p.id LIKE :busca OR {$selectUsuarioNome} LIKE :busca OR {$exprPaymentId} LIKE :busca)";
                 $params[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sql .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
+                $sql .= " AND {$exprPaymentStatus} = :status";
                 $params[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sql .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
+                $sql .= " AND {$exprPaymentMetodo} = :metodo";
                 $params[':metodo'] = $metodo;
             }
             if (!empty($gateway)) {
-                $sql .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $sql .= " AND LOWER({$exprGateway}) = :gateway";
                 $params[':gateway'] = strtolower((string) $gateway);
             }
             
@@ -106,19 +132,19 @@ class AdminPagamentosController extends Controller {
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
             if (!empty($busca)) {
-                $sqlTotal .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
+                $sqlTotal .= " AND (p.id LIKE :busca OR {$selectUsuarioNome} LIKE :busca OR {$exprPaymentId} LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sqlTotal .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
+                $sqlTotal .= " AND {$exprPaymentStatus} = :status";
                 $paramsTotal[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sqlTotal .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
+                $sqlTotal .= " AND {$exprPaymentMetodo} = :metodo";
                 $paramsTotal[':metodo'] = $metodo;
             }
             if (!empty($gateway)) {
-                $sqlTotal .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $sqlTotal .= " AND LOWER({$exprGateway}) = :gateway";
                 $paramsTotal[':gateway'] = strtolower((string) $gateway);
             }
             
