@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="<?= htmlspecialchars((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocaleHtml() : 'pt-BR'), ENT_QUOTES, 'UTF-8') ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -823,26 +823,36 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mx-auto gap-lg-1">
                     <li class="nav-item">
-                        <a class="nav-link" href="/"><i class="fas fa-home"></i> Início</a>
+                        <a class="nav-link" href="/"><i class="fas fa-home"></i> <?= __('nav.home', 'Início') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> Produtos</a>
+                        <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> <?= __('nav.products', 'Produtos') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> Como Funciona</a>
+                        <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> <?= __('nav.how_it_works', 'Como Funciona') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/faq"><i class="fas fa-comments"></i> FAQ</a>
+                        <a class="nav-link" href="/faq"><i class="fas fa-comments"></i> <?= __('nav.faq', 'FAQ') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> Contato</a>
+                        <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> <?= __('nav.contact', 'Contato') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Redirecionamento</a>
+                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> <?= __('nav.forwarding', 'Redirecionamento') ?></a>
                     </li>
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-language me-1"></i>
+                            <span><?= __('nav.language', 'Idioma') ?></span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/lang/pt"><span class="me-2">PT</span> <?= __('nav.language_pt', 'Português') ?></a></li>
+                            <li><a class="dropdown-item" href="/lang/en"><span class="me-2">EN</span> <?= __('nav.language_en', 'English') ?></a></li>
+                        </ul>
+                    </li>
                     <!-- Seletor de Moeda -->
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
@@ -851,10 +861,10 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item currency-selector" href="#" data-currency="BRL">
-                                <i class="fas fa-dollar-sign me-2"></i> Real (BRL)
+                                <i class="fas fa-dollar-sign me-2"></i> <?= __('nav.currency_brl', 'Real (BRL)') ?>
                             </a></li>
                             <li><a class="dropdown-item currency-selector" href="#" data-currency="USD">
-                                <i class="fas fa-dollar-sign me-2"></i> Dólar (USD)
+                                <i class="fas fa-dollar-sign me-2"></i> <?= __('nav.currency_usd', 'Dólar (USD)') ?>
                             </a></li>
                         </ul>
                     </li>
@@ -915,27 +925,27 @@
                                 <span class="d-none d-md-inline"><?= htmlspecialchars($usuarioLogado) ?></span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> Minha Conta</a></li>
+                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> <?= __('nav.my_account', 'Minha Conta') ?></a></li>
                                 <?php if ($usuarioPerfil === 'representante'): ?>
-                                    <li><a class="dropdown-item" href="/meu-painel"><i class="fas fa-chart-line"></i> Meu Painel</a></li>
+                                    <li><a class="dropdown-item" href="/meu-painel"><i class="fas fa-chart-line"></i> <?= __('nav.my_panel', 'Meu Painel') ?></a></li>
                                 <?php endif; ?>
-                                <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> Meus Pedidos</a></li>
-                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> Meus Dados</a></li>
+                                <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> <?= __('nav.my_orders', 'Meus Pedidos') ?></a></li>
+                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> <?= __('nav.my_data', 'Meus Dados') ?></a></li>
                                 <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)): ?>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> Painel Admin</a></li>
+                                    <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> <?= __('nav.admin_panel', 'Painel Admin') ?></a></li>
                                 <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
+                                <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> <?= __('nav.logout', 'Sair') ?></a></li>
                             </ul>
                         </li>
                     <?php else: ?>
                         <!-- Botões Login/Cadastro -->
                         <li class="nav-item">
-                            <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Entrar</a>
+                            <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> <?= __('nav.login', 'Entrar') ?></a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-primary btn-sm ms-2" href="/register">Cadastrar</a>
+                            <a class="btn btn-primary btn-sm ms-2" href="/register"><?= __('nav.register', 'Cadastrar') ?></a>
                         </li>
                         <li class="nav-item">
                             <a class="btn btn-outline-danger btn-sm ms-2" href="/loginadmin">
@@ -1065,7 +1075,7 @@
                             Braziliana
                         <?php endif; ?>
                     </h5>
-                    <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
+                    <p class="text-muted"><?= __('footer.tagline', 'Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.') ?></p>
                     <div class="mt-3">
                         <a href="#" class="social-link me-2"><i class="fab fa-facebook"></i></a>
                         <a href="#" class="social-link me-2"><i class="fab fa-instagram"></i></a>
@@ -1075,22 +1085,22 @@
                 </div>
                 
                 <div class="col-lg-2 mb-4">
-                    <h6 class="mb-3">Links Úteis</h6>
+                    <h6 class="mb-3"><?= __('footer.useful_links', 'Links Úteis') ?></h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/" class="footer-link">Início</a></li>
-                        <li class="mb-2"><a href="/produtos" class="footer-link">Produtos</a></li>
-                        <li class="mb-2"><a href="/como-funciona" class="footer-link">Como Funciona</a></li>
+                        <li class="mb-2"><a href="/" class="footer-link"><?= __('nav.home', 'Início') ?></a></li>
+                        <li class="mb-2"><a href="/produtos" class="footer-link"><?= __('nav.products', 'Produtos') ?></a></li>
+                        <li class="mb-2"><a href="/como-funciona" class="footer-link"><?= __('nav.how_it_works', 'Como Funciona') ?></a></li>
                         <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                     </ul>
                 </div>
                 
                 <div class="col-lg-3 mb-4">
-                    <h6 class="mb-3">Atendimento</h6>
+                    <h6 class="mb-3"><?= __('footer.support', 'Atendimento') ?></h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/contato" class="footer-link">Contato</a></li>
-                        <li class="mb-2"><a href="/suporte" class="footer-link">Suporte</a></li>
-                        <li class="mb-2"><a href="/rastreamento" class="footer-link">Rastrear Pedido</a></li>
-                        <li class="mb-2"><a href="/politicas" class="footer-link">Políticas</a></li>
+                        <li class="mb-2"><a href="/contato" class="footer-link"><?= __('nav.contact', 'Contato') ?></a></li>
+                        <li class="mb-2"><a href="/suporte" class="footer-link"><?= __('footer.support_page', 'Suporte') ?></a></li>
+                        <li class="mb-2"><a href="/rastreamento" class="footer-link"><?= __('footer.track_order', 'Rastrear Pedido') ?></a></li>
+                        <li class="mb-2"><a href="/politicas" class="footer-link"><?= __('footer.policies', 'Políticas') ?></a></li>
                     </ul>
                 </div>
                 

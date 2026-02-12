@@ -14,34 +14,34 @@ function wpFormatMoney($v, $currency) {
     if ($currency === '') $currency = 'BRL';
     $v = is_numeric($v) ? (float) $v : 0.0;
     $fmt = number_format($v, 2, ',', '.');
-    if ($currency === 'BRL') return 'R$ ' . $fmt;
-    if ($currency === 'USD') return 'US$ ' . $fmt;
+    if ($currency === 'BRL') return __('admin.orders.js.currency_brl', 'R$') . ' ' . $fmt;
+    if ($currency === 'USD') return __('admin.orders.js.currency_usd', 'US$') . ' ' . $fmt;
     return $currency . ' ' . $fmt;
 }
 
 ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Pedidos (WordPress) (<?= (int) $total ?>)</h1>
+    <h1 class="h2"><?= __('admin.orders_wp.title', 'Pedidos (WordPress)') ?> (<?= (int) $total ?>)</h1>
 </div>
 
 <?php if ($erro !== ''): ?>
-    <div class="alert alert-danger">Erro ao carregar pedidos do WordPress: <?= htmlspecialchars($erro) ?></div>
+    <div class="alert alert-danger"><?= __('admin.orders_wp.error_load_prefix', 'Erro ao carregar pedidos do WordPress:') ?> <?= htmlspecialchars($erro) ?></div>
 <?php endif; ?>
 
 <form method="GET" class="row g-3 mb-4">
     <div class="col-md-6">
-        <input type="text" class="form-control" name="busca" placeholder="Buscar por ID, número, nome ou email..." value="<?= htmlspecialchars($busca) ?>">
+        <input type="text" class="form-control" name="busca" placeholder="<?= htmlspecialchars(__('admin.orders_wp.search_placeholder', 'Buscar por ID, número, nome ou email...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($busca) ?>">
     </div>
     <div class="col-md-2">
         <select class="form-select" name="limit">
             <?php foreach ([25,50,100,200] as $l): ?>
-                <option value="<?= $l ?>" <?= ((int)$limite === (int)$l) ? 'selected' : '' ?>><?= $l ?>/página</option>
+                <option value="<?= $l ?>" <?= ((int)$limite === (int)$l) ? 'selected' : '' ?>><?= $l ?>/<?= __('common.page', 'página') ?></option>
             <?php endforeach; ?>
         </select>
     </div>
     <div class="col-md-4">
-        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Filtrar</button>
+        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> <?= __('common.filter', 'Filtrar') ?></button>
     </div>
 </form>
 
@@ -51,18 +51,18 @@ function wpFormatMoney($v, $currency) {
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Data</th>
-                        <th>Status</th>
-                        <th>Cliente</th>
-                        <th>Total</th>
-                        <th class="text-end">Ações</th>
+                        <th><?= __('admin.orders.table.id', 'ID') ?></th>
+                        <th><?= __('admin.orders_wp.table.date', 'Data') ?></th>
+                        <th><?= __('common.status', 'Status') ?></th>
+                        <th><?= __('admin.orders_wp.table.customer', 'Cliente') ?></th>
+                        <th><?= __('common.total', 'Total') ?></th>
+                        <th class="text-end"><?= __('common.actions', 'Ações') ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pedidos)): ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Nenhum pedido encontrado.</td>
+                            <td colspan="6" class="text-center text-muted"><?= __('admin.orders_wp.empty', 'Nenhum pedido encontrado.') ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pedidos as $p): ?>
@@ -93,7 +93,7 @@ function wpFormatMoney($v, $currency) {
                                 <td class="fw-semibold text-primary"><?= htmlspecialchars(wpFormatMoney($totalV, $curr)) ?></td>
                                 <td class="text-end">
                                     <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= $id ?>">
-                                        <i class="fas fa-eye"></i> Ver
+                                        <i class="fas fa-eye"></i> <?= __('common.view', 'Ver') ?>
                                     </a>
                                 </td>
                             </tr>

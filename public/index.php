@@ -63,6 +63,20 @@ spl_autoload_register(function ($class) {
     }
 });
 
+try {
+    \App\Core\I18n::boot();
+} catch (\Throwable $e) {
+}
+if (!function_exists('__')) {
+    function __(string $key, ?string $fallback = null, array $params = []): string {
+        try {
+            return \App\Core\I18n::t($key, $fallback, $params);
+        } catch (\Throwable $e) {
+            return $fallback !== null ? $fallback : $key;
+        }
+    }
+}
+
 use App\Core\Router;
 use App\Core\Request;
 

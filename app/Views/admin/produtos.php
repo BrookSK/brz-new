@@ -4,17 +4,17 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">
             <i class="fas fa-box me-2"></i>
-            Gerenciamento de Produtos
+            <?= __('admin.products.title', 'Gerenciamento de Produtos') ?>
         </h1>
         <div>
             <a href="/admin" class="btn btn-secondary">
-                <i class="fas fa-arrow-left me-2"></i>Voltar
+                <i class="fas fa-arrow-left me-2"></i><?= __('common.back', 'Voltar') ?>
             </a>
             <a href="/produtos/arquivados" class="btn btn-outline-dark" target="_blank">
-                <i class="fas fa-archive me-2"></i>Arquivados (site)
+                <i class="fas fa-archive me-2"></i><?= __('admin.products.archived_site', 'Arquivados (site)') ?>
             </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProduto">
-                <i class="fas fa-plus me-2"></i>Novo Produto
+                <i class="fas fa-plus me-2"></i><?= __('admin.products.new', 'Novo Produto') ?>
             </button>
         </div>
     </div>
@@ -24,9 +24,9 @@
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Categoria</label>
+                    <label class="form-label"><?= __('admin.products.filter.category', 'Categoria') ?></label>
                     <select name="categoria_id" class="form-select">
-                        <option value="">Todas</option>
+                        <option value=""><?= __('common.all', 'Todas') ?></option>
                         <?php foreach ($categorias as $categoria): ?>
                             <option value="<?= $categoria['id'] ?>" <?= $categoria_id == $categoria['id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($categoria['nome']) ?>
@@ -35,21 +35,21 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= __('common.status', 'Status') ?></label>
                     <select name="status" class="form-select">
-                        <option value="">Todos</option>
-                        <option value="ativo" <?= $status == 'ativo' ? 'selected' : '' ?>>Ativo</option>
-                        <option value="inativo" <?= $status == 'inativo' ? 'selected' : '' ?>>Inativo</option>
+                        <option value=""><?= __('common.all', 'Todos') ?></option>
+                        <option value="ativo" <?= $status == 'ativo' ? 'selected' : '' ?>><?= __('admin.products.status.active', 'Ativo') ?></option>
+                        <option value="inativo" <?= $status == 'inativo' ? 'selected' : '' ?>><?= __('admin.products.status.inactive', 'Inativo') ?></option>
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Buscar</label>
-                    <input type="text" name="busca" class="form-control" placeholder="Nome ou SKU" value="<?= $busca ?>">
+                    <label class="form-label"><?= __('common.search', 'Buscar') ?></label>
+                    <input type="text" name="busca" class="form-control" placeholder="<?= htmlspecialchars(__('admin.products.search_placeholder', 'Nome ou SKU'), ENT_QUOTES, 'UTF-8') ?>" value="<?= $busca ?>">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">&nbsp;</label>
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-search me-2"></i>Filtrar
+                        <i class="fas fa-search me-2"></i><?= __('common.filter', 'Filtrar') ?>
                     </button>
                 </div>
             </form>
@@ -63,21 +63,21 @@
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
-                            <th>Imagem</th>
-                            <th>Nome</th>
-                            <th>SKU</th>
-                            <th>Categoria</th>
-                            <th>Preço</th>
-                            <th>Estoque</th>
-                            <th>Status</th>
-                            <th>Ações</th>
+                            <th><?= __('admin.products.table.id', 'ID') ?></th>
+                            <th><?= __('admin.products.table.image', 'Imagem') ?></th>
+                            <th><?= __('common.name', 'Nome') ?></th>
+                            <th><?= __('admin.products.table.sku', 'SKU') ?></th>
+                            <th><?= __('admin.products.table.category', 'Categoria') ?></th>
+                            <th><?= __('admin.products.table.price', 'Preço') ?></th>
+                            <th><?= __('admin.products.table.stock', 'Estoque') ?></th>
+                            <th><?= __('common.status', 'Status') ?></th>
+                            <th><?= __('common.actions', 'Ações') ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($produtos)): ?>
                             <tr>
-                                <td colspan="9" class="text-center">Nenhum produto encontrado.</td>
+                                <td colspan="9" class="text-center"><?= __('admin.products.empty', 'Nenhum produto encontrado.') ?></td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($produtos as $produto): ?>
@@ -94,12 +94,12 @@
                                                      alt="<?= htmlspecialchars($produto['nome']) ?>"
                                                      class="img-thumbnail"
                                                      style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
-                                                     title="Clique para ver imagem em tamanho real">
+                                                     title="<?= htmlspecialchars(__('product_details.click_full_size', 'Clique para ver imagem em tamanho real'), ENT_QUOTES, 'UTF-8') ?>">
                                             </a>
                                         <?php else: ?>
                                             <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" 
                                                  style="width: 60px; height: 60px; cursor: not-allowed;"
-                                                 title="Sem imagem">
+                                                 title="<?= htmlspecialchars(__('admin.products.no_image', 'Sem imagem'), ENT_QUOTES, 'UTF-8') ?>">
                                                 <i class="fas fa-image text-muted"></i>
                                             </div>
                                         <?php endif; ?>
@@ -107,7 +107,7 @@
                                     <td>
                                         <div>
                                             <strong><?= htmlspecialchars($produto['nome']) ?></strong>
-                                            <small class="text-muted d-block">SKU: <?= htmlspecialchars($produto['sku']) ?></small>
+                                            <small class="text-muted d-block"><?= __('admin.products.sku', 'SKU') ?>: <?= htmlspecialchars($produto['sku']) ?></small>
                                         </div>
                                     </td>
                                     <td><?= htmlspecialchars($produto['sku']) ?></td>
@@ -117,7 +117,7 @@
                                             $ <?= number_format($produto['valor'], 2, '.', ',') ?> USD
                                         </span>
                                         <?php if ($produto['moeda'] === 'BRL'): ?>
-                                        <br><small class="text-warning">⚠️ Moeda incorreta: BRL</small>
+                                        <br><small class="text-warning">⚠️ <?= __('admin.products.wrong_currency_brl', 'Moeda incorreta: BRL') ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -161,7 +161,7 @@
 
             <!-- Paginação -->
             <?php if ($total_paginas > 1): ?>
-                <nav aria-label="Paginação">
+                <nav aria-label="<?= htmlspecialchars(__('common.pagination', 'Paginação'), ENT_QUOTES, 'UTF-8') ?>">
                     <ul class="pagination justify-content-center">
                         <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
                             <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
@@ -182,7 +182,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalProdutoTitle">Novo Produto</h5>
+                <h5 class="modal-title" id="modalProdutoTitle"><?= __('admin.products.new', 'Novo Produto') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -190,94 +190,125 @@
                     <input type="hidden" name="id" id="produto_id">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Nome *</label>
+                            <label class="form-label"><?= __('admin.products.form.name_required', 'Nome *') ?></label>
                             <input type="text" name="nome" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">SKU *</label>
+                            <label class="form-label"><?= __('admin.products.form.sku_required', 'SKU *') ?></label>
                             <input type="text" name="sku" class="form-control" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Descrição *</label>
-                            <textarea name="descricao_curta" class="form-control" rows="3" required placeholder="Descreva o produto brevemente"></textarea>
+                            <label class="form-label"><?= __('admin.products.form.description_required', 'Descrição *') ?></label>
+                            <textarea name="descricao_curta" class="form-control" rows="3" required placeholder="<?= htmlspecialchars(__('admin.products.form.description_placeholder', 'Descreva o produto brevemente'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Categoria *</label>
+                            <label class="form-label"><?= __('admin.products.filter.category_required', 'Categoria *') ?></label>
                             <select name="categoria_id" class="form-select" required>
-                                <option value="">Selecione...</option>
+                                <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                 <?php foreach ($categorias as $categoria): ?>
                                     <option value="<?= $categoria['id'] ?>"><?= htmlspecialchars($categoria['nome']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Valor (USD) *</label>
+                            <label class="form-label"><?= __('admin.products.form.value_usd_required', 'Valor (USD) *') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" name="valor" class="form-control" step="0.01" placeholder="0.00" required>
                                 <span class="input-group-text">USD</span>
                             </div>
-                            <small class="text-muted">Todos os produtos devem ser cadastrados em Dólar Americano (USD)</small>
+                            <small class="text-muted"><?= __('admin.products.form.usd_only_hint', 'Todos os produtos devem ser cadastrados em Dólar Americano (USD)') ?></small>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Moeda</label>
+                            <label class="form-label"><?= __('admin.products.form.currency', 'Moeda') ?></label>
                             <select name="moeda" class="form-select" required>
-                                <option value="USD" selected>Dólar Americano (USD) - Padrão</option>
-                                <option value="BRL" disabled>Real Brasileiro (BRL) - Desativado</option>
+                                <option value="USD" selected><?= __('admin.products.currency.usd_default', 'Dólar Americano (USD) - Padrão') ?></option>
+                                <option value="BRL" disabled><?= __('admin.products.currency.brl_disabled', 'Real Brasileiro (BRL) - Desativado') ?></option>
                             </select>
-                            <small class="text-muted">Moeda padrão fixada em USD para todos os produtos</small>
+                            <small class="text-muted"><?= __('admin.products.form.currency_fixed_usd_hint', 'Moeda padrão fixada em USD para todos os produtos') ?></small>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Peso (kg)</label>
+                            <label class="form-label"><?= __('admin.products.form.weight_kg', 'Peso (kg)') ?></label>
                             <input type="number" name="peso" class="form-control" step="0.001" required>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Estoque</label>
+                            <label class="form-label"><?= __('admin.products.form.stock', 'Estoque') ?></label>
                             <input type="number" name="estoque" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Status</label>
+                            <label class="form-label"><?= __('common.status', 'Status') ?></label>
                             <select name="status" class="form-select" required>
-                                <option value="ativo">Ativo</option>
-                                <option value="inativo">Inativo</option>
+                                <option value="ativo"><?= __('admin.products.status.active', 'Ativo') ?></option>
+                                <option value="inativo"><?= __('admin.products.status.inactive', 'Inativo') ?></option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Imagem Principal</label>
+                            <label class="form-label"><?= __('admin.products.form.main_image', 'Imagem Principal') ?></label>
                             <input type="file" name="imagem_principal" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp" id="imagem_principal">
-                            <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB)</small>
+                            <small class="text-muted"><?= __('admin.products.form.main_image_hint', 'Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB)') ?></small>
                             
                             <!-- Preview da imagem -->
                             <div id="imagem_preview" class="mt-2" style="display: none;">
-                                <img id="preview_img" src="" alt="Preview" style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+                                <img id="preview_img" src="" alt="<?= htmlspecialchars(__('admin.products.form.preview_alt', 'Preview'), ENT_QUOTES, 'UTF-8') ?>" style="max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 4px;">
                                 <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removerImagem()">
-                                    <i class="fas fa-trash"></i> Remover
+                                    <i class="fas fa-trash"></i> <?= __('common.remove', 'Remover') ?>
                                 </button>
                                 <div class="mt-2">
                                     <small class="text-success">
                                         <i class="fas fa-check-circle"></i> 
-                                        <span id="imagem_status">Imagem carregada com sucesso!</span>
+                                        <span id="imagem_status"><?= __('admin.products.js.image_uploaded_success', 'Imagem carregada com sucesso!') ?></span>
                                     </small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Imagens Adicionais</label>
+                            <label class="form-label"><?= __('admin.products.form.additional_images', 'Imagens Adicionais') ?></label>
                             <input type="file" name="imagens[]" class="form-control" accept="image/jpeg,image/jpg,image/png,image/webp" multiple>
-                            <small class="text-muted">Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB por imagem)</small>
+                            <small class="text-muted"><?= __('admin.products.form.additional_images_hint', 'Formatos aceitos: JPEG, JPG, PNG, WebP (Máx: 5MB por imagem)') ?></small>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarProduto()">Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('common.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" onclick="salvarProduto()"><?= __('common.save', 'Salvar') ?></button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+window.ADMIN_PRODUCTS_I18N = {
+    uploading_processing: <?= json_encode(__('admin.products.js.uploading_processing', 'Processando upload...'), JSON_UNESCAPED_UNICODE) ?>,
+    image_uploaded_success_prefix: <?= json_encode(__('admin.products.js.image_uploaded_success_prefix', 'Imagem carregada com sucesso! URL:'), JSON_UNESCAPED_UNICODE) ?>,
+    upload_error_prefix: <?= json_encode(__('admin.products.js.upload_error_prefix', 'Erro no upload:'), JSON_UNESCAPED_UNICODE) ?>,
+    upload_try_again: <?= json_encode(__('admin.products.js.upload_try_again', 'Erro no upload. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>,
+    loading: <?= json_encode(__('common.loading', 'Carregando...'), JSON_UNESCAPED_UNICODE) ?>,
+    edit_title: <?= json_encode(__('admin.products.edit', 'Editar Produto'), JSON_UNESCAPED_UNICODE) ?>,
+    error_load_prefix: <?= json_encode(__('admin.products.js.error_load_prefix', 'Erro ao carregar produto:'), JSON_UNESCAPED_UNICODE) ?>,
+    data_not_found: <?= json_encode(__('admin.products.js.data_not_found', 'Dados não encontrados'), JSON_UNESCAPED_UNICODE) ?>,
+    error_load: <?= json_encode(__('admin.products.js.error_load', 'Erro ao carregar produto'), JSON_UNESCAPED_UNICODE) ?>,
+    confirm_change_status: <?= json_encode(__('admin.products.js.confirm_change_status', 'Deseja realmente alterar o status deste produto?'), JSON_UNESCAPED_UNICODE) ?>,
+    status_changed_success: <?= json_encode(__('admin.products.js.status_changed_success', 'Status alterado com sucesso!'), JSON_UNESCAPED_UNICODE) ?>,
+    error_change_status_prefix: <?= json_encode(__('admin.products.js.error_change_status_prefix', 'Erro ao alterar status:'), JSON_UNESCAPED_UNICODE) ?>,
+    confirm_delete: <?= json_encode(__('admin.products.js.confirm_delete', 'Deseja realmente excluir este produto? Esta ação não pode ser desfeita!'), JSON_UNESCAPED_UNICODE) ?>,
+    deleted_success: <?= json_encode(__('admin.products.js.deleted_success', 'Produto excluído com sucesso!'), JSON_UNESCAPED_UNICODE) ?>,
+    error_delete_prefix: <?= json_encode(__('admin.products.js.error_delete_prefix', 'Erro ao excluir produto:'), JSON_UNESCAPED_UNICODE) ?>,
+    name_required: <?= json_encode(__('admin.products.js.name_required', 'Por favor, informe o nome do produto!'), JSON_UNESCAPED_UNICODE) ?>,
+    sku_required: <?= json_encode(__('admin.products.js.sku_required', 'Por favor, informe o SKU do produto!'), JSON_UNESCAPED_UNICODE) ?>,
+    sku_min_length: <?= json_encode(__('admin.products.js.sku_min_length', 'O SKU deve ter pelo menos 3 caracteres!'), JSON_UNESCAPED_UNICODE) ?>,
+    desc_required: <?= json_encode(__('admin.products.js.desc_required', 'Por favor, informe a descrição do produto!'), JSON_UNESCAPED_UNICODE) ?>,
+    category_required: <?= json_encode(__('admin.products.js.category_required', 'Por favor, selecione uma categoria!'), JSON_UNESCAPED_UNICODE) ?>,
+    invalid_usd_value: <?= json_encode(__('admin.products.js.invalid_usd_value', 'Por favor, informe um valor válido em USD!'), JSON_UNESCAPED_UNICODE) ?>,
+    invalid_weight: <?= json_encode(__('admin.products.js.invalid_weight', 'Por favor, informe um peso válido!'), JSON_UNESCAPED_UNICODE) ?>,
+    invalid_stock: <?= json_encode(__('admin.products.js.invalid_stock', 'Por favor, informe um estoque válido!'), JSON_UNESCAPED_UNICODE) ?>,
+    updated_success_usd: <?= json_encode(__('admin.products.js.updated_success_usd', 'Produto atualizado com sucesso em USD!'), JSON_UNESCAPED_UNICODE) ?>,
+    created_success_usd: <?= json_encode(__('admin.products.js.created_success_usd', 'Produto criado com sucesso em USD!'), JSON_UNESCAPED_UNICODE) ?>,
+    error_save_prefix: <?= json_encode(__('admin.products.js.error_save_prefix', 'Erro ao salvar produto:'), JSON_UNESCAPED_UNICODE) ?>,
+    error_save_check_console: <?= json_encode(__('admin.products.js.error_save_check_console', 'Erro ao salvar produto. Verifique o console para mais detalhes.'), JSON_UNESCAPED_UNICODE) ?>,
+    new_title: <?= json_encode(__('admin.products.new', 'Novo Produto'), JSON_UNESCAPED_UNICODE) ?>
+};
+
 // Upload instantâneo com preview
 document.getElementById('imagem_principal').addEventListener('change', function(e) {
     const file = e.target.files[0];
@@ -291,7 +322,7 @@ document.getElementById('imagem_principal').addEventListener('change', function(
         reader.onload = function(e) {
             previewImg.src = e.target.result;
             preview.style.display = 'block';
-            statusSpan.textContent = 'Processando upload...';
+            statusSpan.textContent = (window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.uploading_processing) ? window.ADMIN_PRODUCTS_I18N.uploading_processing : 'Processando upload...';
         }
         reader.readAsDataURL(file);
         
@@ -308,7 +339,7 @@ document.getElementById('imagem_principal').addEventListener('change', function(
             if (data.success) {
                 // Atualizar preview com a URL do servidor
                 previewImg.src = data.imagem.src;
-                statusSpan.textContent = 'Imagem carregada com sucesso! URL: ' + data.imagem.href;
+                statusSpan.textContent = ((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.image_uploaded_success_prefix) ? window.ADMIN_PRODUCTS_I18N.image_uploaded_success_prefix : 'Imagem carregada com sucesso! URL:') + ' ' + data.imagem.href;
                 statusSpan.className = 'text-success';
                 
                 // Adicionar campo hidden com a URL
@@ -324,13 +355,13 @@ document.getElementById('imagem_principal').addEventListener('change', function(
                 
                 console.log('✅ Upload instantâneo:', data.imagem);
             } else {
-                statusSpan.textContent = 'Erro no upload: ' + data.error;
+                statusSpan.textContent = ((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.upload_error_prefix) ? window.ADMIN_PRODUCTS_I18N.upload_error_prefix : 'Erro no upload:') + ' ' + data.error;
                 statusSpan.className = 'text-danger';
             }
         })
         .catch(error => {
             console.error('❌ Erro no upload:', error);
-            statusSpan.textContent = 'Erro no upload. Tente novamente.';
+            statusSpan.textContent = (window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.upload_try_again) ? window.ADMIN_PRODUCTS_I18N.upload_try_again : 'Erro no upload. Tente novamente.';
             statusSpan.className = 'text-danger';
         });
     } else {
@@ -361,7 +392,7 @@ function editarProduto(id) {
     // Limpar formulário
     document.getElementById('formProduto').reset();
     document.getElementById('produto_id').value = '';
-    document.getElementById('modalProdutoTitle').textContent = 'Carregando...';
+    document.getElementById('modalProdutoTitle').textContent = (window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.loading) ? window.ADMIN_PRODUCTS_I18N.loading : 'Carregando...';
     
     fetch(`/admin/produto/${id}`)
         .then(response => response.json())
@@ -370,7 +401,7 @@ function editarProduto(id) {
             
             if (data.success && data.produto) {
                 // Preencher o modal
-                document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
+                document.getElementById('modalProdutoTitle').textContent = (window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.edit_title) ? window.ADMIN_PRODUCTS_I18N.edit_title : 'Editar Produto';
                 document.getElementById('produto_id').value = data.produto.id || '';
                 
                 // Preencher campos com validação robusta
@@ -425,44 +456,44 @@ function editarProduto(id) {
                 }, 100);
                 
             } else {
-                alert('Erro ao carregar produto: ' + (data.error || 'Dados não encontrados'));
+                alert(((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_load_prefix) ? window.ADMIN_PRODUCTS_I18N.error_load_prefix : 'Erro ao carregar produto:') + ' ' + (data.error || ((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.data_not_found) ? window.ADMIN_PRODUCTS_I18N.data_not_found : 'Dados não encontrados')));
             }
         })
         .catch(error => {
             console.error('❌ [PRODUTOS] Erro:', error);
-            alert('Erro ao carregar produto');
+            alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_load) ? window.ADMIN_PRODUCTS_I18N.error_load : 'Erro ao carregar produto');
         });
 }
 
 function alterarStatus(id) {
-    if (confirm('Deseja realmente alterar o status deste produto?')) {
+    if (confirm((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.confirm_change_status) ? window.ADMIN_PRODUCTS_I18N.confirm_change_status : 'Deseja realmente alterar o status deste produto?')) {
         fetch(`/admin/alterar-status-produto/${id}`, {
             method: 'POST'
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Status alterado com sucesso!');
+                alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.status_changed_success) ? window.ADMIN_PRODUCTS_I18N.status_changed_success : 'Status alterado com sucesso!');
                 location.reload();
             } else {
-                alert('Erro ao alterar status: ' + data.error);
+                alert(((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_change_status_prefix) ? window.ADMIN_PRODUCTS_I18N.error_change_status_prefix : 'Erro ao alterar status:') + ' ' + data.error);
             }
         });
     }
 }
 
 function excluirProduto(id) {
-    if (confirm('Deseja realmente excluir este produto? Esta ação não pode ser desfeita!')) {
+    if (confirm((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.confirm_delete) ? window.ADMIN_PRODUCTS_I18N.confirm_delete : 'Deseja realmente excluir este produto? Esta ação não pode ser desfeita!')) {
         fetch(`/admin/excluir-produto/${id}`, {
             method: 'DELETE'
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Produto excluído com sucesso!');
+                alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.deleted_success) ? window.ADMIN_PRODUCTS_I18N.deleted_success : 'Produto excluído com sucesso!');
                 location.reload();
             } else {
-                alert('Erro ao excluir produto: ' + data.error);
+                alert(((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_delete_prefix) ? window.ADMIN_PRODUCTS_I18N.error_delete_prefix : 'Erro ao excluir produto:') + ' ' + data.error);
             }
         });
     }
@@ -476,7 +507,9 @@ function gerenciarImagens(id) {
 function updateProductPrices(currency) {
     console.log('🔍 [PRODUTOS] updateProductPrices() chamada com currency:', currency);
     
-    const currencySymbol = currency === 'BRL' ? 'R$' : '$';
+    const currencySymbol = currency === 'BRL'
+        ? ((window.ADMIN_ORDERS_I18N && window.ADMIN_ORDERS_I18N.currency_brl) ? window.ADMIN_ORDERS_I18N.currency_brl : 'R$')
+        : ((window.ADMIN_ORDERS_I18N && window.ADMIN_ORDERS_I18N.currency_usd) ? window.ADMIN_ORDERS_I18N.currency_usd : 'US$');
     const rate = window.exchangeRates ? window.exchangeRates[currency] : 1;
     
     console.log('🔍 [PRODUTOS] currencySymbol:', currencySymbol);
@@ -515,7 +548,9 @@ function updateProductPrices(currency) {
         
         allSpans.forEach((span, index) => {
             const text = span.textContent.trim();
-            if (text.includes('R$') || text.includes('$')) {
+            const brlFallback = ((window.ADMIN_ORDERS_I18N && window.ADMIN_ORDERS_I18N.currency_brl) ? window.ADMIN_ORDERS_I18N.currency_brl : 'R$');
+            const usdFallback = ((window.ADMIN_ORDERS_I18N && window.ADMIN_ORDERS_I18N.currency_usd) ? window.ADMIN_ORDERS_I18N.currency_usd : 'US$');
+            if (text.includes(brlFallback) || text.includes(usdFallback) || text.includes('R$') || text.includes('$') || text.includes('US$')) {
                 const originalValue = parseFloat(span.getAttribute('data-original-value'));
                 console.log(`🔍 [PRODUTOS] Span ${index} com preço:`, text, 'data-original-value:', span.getAttribute('data-original-value'));
                 
@@ -601,42 +636,42 @@ function salvarProduto() {
     
     // Validação robusta
     if (!nome || nome.trim() === '') {
-        alert('Por favor, informe o nome do produto!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.name_required) ? window.ADMIN_PRODUCTS_I18N.name_required : 'Por favor, informe o nome do produto!');
         return;
     }
     
     if (!sku || sku.trim() === '') {
-        alert('Por favor, informe o SKU do produto!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.sku_required) ? window.ADMIN_PRODUCTS_I18N.sku_required : 'Por favor, informe o SKU do produto!');
         return;
     }
     
     if (sku.trim().length < 3) {
-        alert('O SKU deve ter pelo menos 3 caracteres!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.sku_min_length) ? window.ADMIN_PRODUCTS_I18N.sku_min_length : 'O SKU deve ter pelo menos 3 caracteres!');
         return;
     }
     
     if (!descricao_curta || descricao_curta.trim() === '') {
-        alert('Por favor, informe a descrição do produto!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.desc_required) ? window.ADMIN_PRODUCTS_I18N.desc_required : 'Por favor, informe a descrição do produto!');
         return;
     }
     
     if (!categoriaId || categoriaId === '') {
-        alert('Por favor, selecione uma categoria!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.category_required) ? window.ADMIN_PRODUCTS_I18N.category_required : 'Por favor, selecione uma categoria!');
         return;
     }
     
     if (isNaN(valor) || valor <= 0) {
-        alert('Por favor, informe um valor válido em USD!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.invalid_usd_value) ? window.ADMIN_PRODUCTS_I18N.invalid_usd_value : 'Por favor, informe um valor válido em USD!');
         return;
     }
     
     if (isNaN(peso) || peso < 0) {
-        alert('Por favor, informe um peso válido!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.invalid_weight) ? window.ADMIN_PRODUCTS_I18N.invalid_weight : 'Por favor, informe um peso válido!');
         return;
     }
     
     if (isNaN(estoque) || estoque < 0) {
-        alert('Por favor, informe um estoque válido!');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.invalid_stock) ? window.ADMIN_PRODUCTS_I18N.invalid_stock : 'Por favor, informe um estoque válido!');
         return;
     }
     
@@ -667,9 +702,9 @@ function salvarProduto() {
         console.log('🔍 [PRODUTOS] Resposta do servidor:', data);
         
         if (data.success) {
-            const mensagem = isEdicao ? 
-                'Produto atualizado com sucesso em USD!' : 
-                'Produto criado com sucesso em USD!';
+            const mensagem = isEdicao ?
+                ((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.updated_success_usd) ? window.ADMIN_PRODUCTS_I18N.updated_success_usd : 'Produto atualizado com sucesso em USD!') :
+                ((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.created_success_usd) ? window.ADMIN_PRODUCTS_I18N.created_success_usd : 'Produto criado com sucesso em USD!');
             alert(mensagem);
             
             // Fechar modal
@@ -682,19 +717,19 @@ function salvarProduto() {
             location.reload();
         } else {
             console.error('❌ [PRODUTOS] Erro do servidor:', data.error);
-            alert('Erro ao salvar produto: ' + data.error);
+            alert(((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_save_prefix) ? window.ADMIN_PRODUCTS_I18N.error_save_prefix : 'Erro ao salvar produto:') + ' ' + data.error);
         }
     })
     .catch(error => {
         console.error('🔍 [PRODUTOS] Erro ao salvar produto:', error);
-        alert('Erro ao salvar produto. Verifique o console para mais detalhes.');
+        alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_save_check_console) ? window.ADMIN_PRODUCTS_I18N.error_save_check_console : 'Erro ao salvar produto. Verifique o console para mais detalhes.');
     });
 }
 
 // Função para resetar formulário e garantir USD
 function resetarFormularioProduto() {
     document.getElementById('formProduto').reset();
-    document.getElementById('modalProdutoTitle').textContent = 'Novo Produto';
+    document.getElementById('modalProdutoTitle').textContent = (window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.new_title) ? window.ADMIN_PRODUCTS_I18N.new_title : 'Novo Produto';
     document.getElementById('produto_id').value = '';
     
     // Forçar moeda USD para novos produtos

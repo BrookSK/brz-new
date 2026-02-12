@@ -170,7 +170,7 @@ class SupportTicketsController extends Controller {
         $pdo = $this->getPdo();
         $ownerId = $this->getPedidoOwnerUserId($pdo, $pedidoId);
         if ($ownerId !== $uid) {
-            echo '<div class="alert alert-danger">Acesso negado.</div>';
+            echo '<div class="alert alert-danger">' . htmlspecialchars(__('common.access_denied', 'Acesso negado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             exit;
         }
 
@@ -189,7 +189,7 @@ class SupportTicketsController extends Controller {
             $this->view('usuario/ticket_novo', [
                 'usuario' => $usuario,
                 'pedidoId' => $pedidoId,
-                'assunto' => 'Suporte do Pedido #' . $pedidoId,
+                'assunto' => __('ticket_new.default_subject', 'Suporte do Pedido #{id}', ['id' => (int) $pedidoId]),
             ]);
             return;
         }
@@ -205,9 +205,9 @@ class SupportTicketsController extends Controller {
                 'usuario' => $usuario,
                 'pedidoId' => $pedidoId,
                 'motivo' => $motivo,
-                'assunto' => $assunto !== '' ? $assunto : ('Suporte do Pedido #' . $pedidoId),
+                'assunto' => $assunto !== '' ? $assunto : __('ticket_new.default_subject', 'Suporte do Pedido #{id}', ['id' => (int) $pedidoId]),
                 'mensagem' => $mensagem,
-                'error' => 'Preencha motivo, assunto e descrição do problema.',
+                'error' => __('ticket_new.error_required_fields', 'Preencha motivo, assunto e descrição do problema.'),
             ]);
             return;
         }
@@ -304,7 +304,7 @@ class SupportTicketsController extends Controller {
                 'motivo' => $motivo,
                 'assunto' => $assunto,
                 'mensagem' => $mensagem,
-                'error' => 'Não foi possível criar o ticket.',
+                'error' => __('ticket_new.error_create_failed', 'Não foi possível criar o ticket.'),
             ]);
             return;
         }
@@ -327,7 +327,7 @@ class SupportTicketsController extends Controller {
         $st->execute([$id, $uid]);
         $ticket = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$ticket) {
-            echo '<div class="alert alert-danger">Ticket não encontrado.</div>';
+            echo '<div class="alert alert-danger">' . htmlspecialchars(__('ticket.not_found', 'Ticket não encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             exit;
         }
 
@@ -374,12 +374,12 @@ class SupportTicketsController extends Controller {
         $st->execute([$id, $uid]);
         $ticket = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$ticket) {
-            echo '<div class="alert alert-danger">Ticket não encontrado.</div>';
+            echo '<div class="alert alert-danger">' . htmlspecialchars(__('ticket.not_found', 'Ticket não encontrado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             exit;
         }
 
         if ((string) ($ticket['status'] ?? '') !== 'open') {
-            echo '<div class="alert alert-warning">Este ticket está fechado.</div>';
+            echo '<div class="alert alert-warning">' . htmlspecialchars(__('ticket.closed_warning', 'Este ticket está fechado.'), ENT_QUOTES, 'UTF-8') . '</div>';
             exit;
         }
 
@@ -505,7 +505,7 @@ class SupportTicketsController extends Controller {
             $hasMsg = (bool) ($stHasMsg && $stHasMsg->fetchColumn());
             if ($hasMsg && $decision !== '') {
                 $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
-                $stMsg->execute([(int) $id, 'cliente', (int) $uid, (string) ('Encerramento do ticket: ' . $decision)]);
+                $stMsg->execute([(int) $id, 'cliente', (int) $uid, (string) (__('ticket.closure_message_prefix', 'Encerramento do ticket: ') . $decision)]);
             }
         } catch (\Exception $e) {
         }

@@ -1,6 +1,40 @@
 <?php ob_start(); ?>
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
+    <script>
+        window.CHECKOUT_I18N = {
+            attention: <?= json_encode(__('checkout.attention', 'Atenção'), JSON_UNESCAPED_UNICODE) ?>,
+            complete_data_and_terms: <?= json_encode(__('checkout.complete_data_and_terms', 'você precisa completar seus dados e aceitar os termos para finalizar a compra.'), JSON_UNESCAPED_UNICODE) ?>,
+            pending_fields: <?= json_encode(__('checkout.pending_fields', 'Campos pendentes:'), JSON_UNESCAPED_UNICODE) ?>,
+            complete_registration: <?= json_encode(__('checkout.complete_registration', 'Completar cadastro'), JSON_UNESCAPED_UNICODE) ?>,
+            other: <?= json_encode(__('auth.other', 'Outro'), JSON_UNESCAPED_UNICODE) ?>,
+            number: <?= json_encode(__('auth.number', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+            ddi_example: <?= json_encode(__('auth.ddi_example', 'Ex: 81'), JSON_UNESCAPED_UNICODE) ?>,
+            select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
+            free_shipping: <?= json_encode(__('cart.free_shipping', 'Frete grátis'), JSON_UNESCAPED_UNICODE) ?>,
+            processing_order: <?= json_encode(__('checkout.processing_order', 'Processando seu pedido...'), JSON_UNESCAPED_UNICODE) ?>,
+            stripe_not_configured: <?= json_encode(__('checkout.stripe_not_configured', 'Stripe não configurado. Verifique as configurações de pagamento.'), JSON_UNESCAPED_UNICODE) ?>,
+            stripe_card_form_error: <?= json_encode(__('checkout.stripe_card_form_error', 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.'), JSON_UNESCAPED_UNICODE) ?>,
+            payment_error_prefix: <?= json_encode(__('checkout.payment_error_prefix', 'Erro no pagamento:'), JSON_UNESCAPED_UNICODE) ?>,
+            delivery_outside_br_no_taxes: <?= json_encode(__('checkout.delivery_outside_br_no_taxes', 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.'), JSON_UNESCAPED_UNICODE) ?>,
+            terms_and_conditions: <?= json_encode(__('checkout.terms_and_conditions', 'termos e condições'), JSON_UNESCAPED_UNICODE) ?>,
+            terms_accept_full: <?= json_encode(__('checkout.terms_accept_full', 'Li e aceito os {terms} de uso e política de privacidade. *'), JSON_UNESCAPED_UNICODE) ?>,
+            finalize_secure: <?= json_encode(__('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro'), JSON_UNESCAPED_UNICODE) ?>,
+            address_line_1: <?= json_encode(__('checkout.address_line_1', 'Address line 1 *'), JSON_UNESCAPED_UNICODE) ?>,
+            address_line_2_optional: <?= json_encode(__('checkout.address_line_2_optional', 'Address line 2 (optional)'), JSON_UNESCAPED_UNICODE) ?>,
+            cpf_cnpj_required: <?= json_encode(__('checkout.cpf_cnpj_required', 'CPF/CNPJ *'), JSON_UNESCAPED_UNICODE) ?>,
+            cpf_cnpj_optional: <?= json_encode(__('checkout.cpf_cnpj_optional', 'CPF/CNPJ (opcional)'), JSON_UNESCAPED_UNICODE) ?>,
+            subtotal_products: <?= json_encode(__('checkout.subtotal_products', 'Subtotal Produtos:'), JSON_UNESCAPED_UNICODE) ?>,
+            subtotal_products_us_tax: <?= json_encode(__('checkout.subtotal_products_us_tax', 'Subtotal Produtos (incl. imposto EUA 10%):'), JSON_UNESCAPED_UNICODE) ?>,
+            select_state: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
+            state_label: <?= json_encode(__('auth.state', 'Estado'), JSON_UNESCAPED_UNICODE) ?>,
+            state_label_en: <?= json_encode(__('checkout.state_en', 'State'), JSON_UNESCAPED_UNICODE) ?>,
+            district_label: <?= json_encode(__('auth.neighborhood', 'Bairro'), JSON_UNESCAPED_UNICODE) ?>,
+            district_label_en: <?= json_encode(__('checkout.district_en', 'District'), JSON_UNESCAPED_UNICODE) ?>,
+            number_label: <?= json_encode(__('auth.number_label', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+            number_label_en: <?= json_encode(__('checkout.number_en', 'Number'), JSON_UNESCAPED_UNICODE) ?>
+        };
+    </script>
     <div class="row g-4 align-items-start">
         <!-- Formulário Principal -->
         <div class="col-lg-8 mb-4 mb-lg-0">
@@ -11,9 +45,9 @@
                             $warnMissing = (!empty($campos_faltando) && is_array($campos_faltando)) ? array_values($campos_faltando) : [];
                         ?>
                         <div class="alert alert-warning" id="checkout-perfil-warning" style="display: <?= $warnPerfil ? 'block' : 'none' ?>;" data-missing='<?= htmlspecialchars(json_encode($warnMissing, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>' data-termos-ok="<?= (!empty($termos_ok) ? '1' : '0') ?>">
-                            <div><strong>Atenção:</strong> você precisa completar seus dados e aceitar os termos para finalizar a compra.</div>
-                            <div class="small mt-1" id="checkout-perfil-warning-missing" style="display:none;">Campos pendentes: <strong></strong></div>
-                            <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados">Completar cadastro</a></div>
+                            <div><strong><?= __('checkout.attention', 'Atenção') ?>:</strong> <?= __('checkout.complete_data_and_terms', 'você precisa completar seus dados e aceitar os termos para finalizar a compra.') ?></div>
+                            <div class="small mt-1" id="checkout-perfil-warning-missing" style="display:none;"><?= __('checkout.pending_fields', 'Campos pendentes:') ?> <strong></strong></div>
+                            <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados"><?= __('checkout.complete_registration', 'Completar cadastro') ?></a></div>
                         </div>
 
                         <!-- Campo oculto para moeda -->
@@ -21,15 +55,15 @@
                         
                         <!-- Dados Pessoais -->
                         <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-user"></i> Dados Pessoais</h6>
+                            <h6 class="mb-3"><i class="fas fa-user"></i> <?= __('checkout.personal_data', 'Dados Pessoais') ?></h6>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Nome Completo *</label>
+                                    <label class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                     <input type="text" class="form-control" name="nome" required 
                                            value="<?= htmlspecialchars($usuario['nome'] ?? '') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">E-mail *</label>
+                                    <label class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                                     <input type="email" class="form-control" name="email" required 
                                            value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
                                 </div>
@@ -37,10 +71,10 @@
                                     <label class="form-label" id="label-documento">CPF</label>
                                     <input type="text" class="form-control" name="documento" id="documento" 
                                            value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>">
-                                    <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
+                                    <small class="text-muted" id="hint-documento" style="display:none;"><?= __('auth.document_br_required_hint', 'Obrigatório apenas para residentes no Brasil.') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Telefone com WhatsApp *</label>
+                                    <label class="form-label"><?= __('checkout.phone_whatsapp', 'Telefone com WhatsApp') ?> *</label>
                                     <div class="input-group w-100" style="flex-wrap: nowrap;">
                                         <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                             <option value="55" selected>+55</option>
@@ -54,18 +88,18 @@
                                             <option value="54">+54</option>
                                             <option value="56">+56</option>
                                             <option value="57">+57</option>
-                                            <option value="0">Outro</option>
+                                            <option value="0"><?= __('auth.other', 'Outro') ?></option>
                                         </select>
-                                        <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="Número" required>
+                                        <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
                                         <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
                                     </div>
                                     <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
                                         <span class="input-group-text">DDI</span>
-                                        <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                        <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="<?= htmlspecialchars(__('auth.ddi_example', 'Ex: 81'), ENT_QUOTES, 'UTF-8') ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Data de Nascimento *</label>
+                                    <label class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?> *</label>
                                     <input type="date" class="form-control" name="data_nascimento" required
                                            value="<?= htmlspecialchars((string) ($usuario['data_nascimento'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
@@ -73,25 +107,25 @@
                         </div>
 
                         <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-truck"></i> Entrega</h6>
+                            <h6 class="mb-3"><i class="fas fa-truck"></i> <?= __('checkout.delivery', 'Entrega') ?></h6>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" value="1" id="entrega_para_outro" name="entrega_para_outro">
-                                <label class="form-check-label" for="entrega_para_outro">Entregar para outra pessoa / outro endereço</label>
+                                <label class="form-check-label" for="entrega_para_outro"><?= __('checkout.deliver_to_other', 'Entregar para outra pessoa / outro endereço') ?></label>
                             </div>
 
                             <div id="destinatario-box" style="display:none;">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Nome do destinatário *</label>
+                                        <label class="form-label"><?= __('checkout.recipient_name', 'Nome do destinatário') ?> *</label>
                                         <input type="text" class="form-control" name="destinatario_nome" id="destinatario_nome" value="">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label" id="label-destinatario-documento">CPF do destinatário</label>
+                                        <label class="form-label" id="label-destinatario-documento"><?= __('checkout.recipient_cpf', 'CPF do destinatário') ?></label>
                                         <input type="text" class="form-control" name="destinatario_documento" id="destinatario_documento" value="">
-                                        <small class="text-muted" id="hint-destinatario-documento" style="display:none;">Obrigatório apenas para entregas no Brasil.</small>
+                                        <small class="text-muted" id="hint-destinatario-documento" style="display:none;"><?= __('checkout.recipient_doc_br_only', 'Obrigatório apenas para entregas no Brasil.') ?></small>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Telefone do destinatário *</label>
+                                        <label class="form-label"><?= __('checkout.recipient_phone', 'Telefone do destinatário') ?> *</label>
                                         <input type="text" class="form-control" name="destinatario_telefone" id="destinatario_telefone" value="">
                                     </div>
                                 </div>
@@ -100,14 +134,14 @@
 
                         <!-- Endereço de Entrega -->
                         <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-map-marker-alt"></i> Endereço de Entrega</h6>
+                            <h6 class="mb-3"><i class="fas fa-map-marker-alt"></i> <?= __('checkout.shipping_address', 'Endereço de Entrega') ?></h6>
                             
                             <?php if (!empty($usuario) && !empty($enderecos)): ?>
                                 <!-- Dropdown para selecionar endereço -->
                                 <div class="mb-3">
-                                    <label class="form-label">Selecione um endereço</label>
+                                    <label class="form-label"><?= __('checkout.select_address', 'Selecione um endereço') ?></label>
                                     <select class="form-select" id="endereco-select" name="endereco_selecionado">
-                                        <option value="">Novo endereço...</option>
+                                        <option value=""><?= __('checkout.new_address', 'Novo endereço...') ?></option>
                                         <?php foreach ($enderecos as $endereco): ?>
                                             <option value="<?= $endereco['id'] ?>" 
                                                     data-pais="<?= htmlspecialchars((string) ($endereco['pais'] ?? 'BR')) ?>"
@@ -128,7 +162,7 @@
                                 <!-- Botão para adicionar novo endereço -->
                                 <div class="mb-3">
                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btn-novo-endereco">
-                                        <i class="fas fa-plus me-2"></i> Adicionar Novo Endereço
+                                        <i class="fas fa-plus me-2"></i> <?= __('checkout.add_new_address', 'Adicionar Novo Endereço') ?>
                                     </button>
                                 </div>
                             <?php endif; ?>
@@ -137,7 +171,7 @@
                             <div id="endereco-form" <?= (!empty($usuario) && !empty($enderecos)) ? 'style="display: none;"' : '' ?>>
                                 <div class="row">
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">País / Country *</label>
+                                        <label class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?> *</label>
                                         <?php require __DIR__ . '/../_countries.php'; ?>
                                         <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
                                         <select class="form-select" name="pais" id="pais" required>
@@ -145,43 +179,43 @@
                                                 <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
+                                        <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
+                                        <label class="form-label" id="label-cep"><?= __('auth.zip', 'CEP') ?> / <?= __('checkout.zip', 'ZIP Code') ?> *</label>
                                         <input type="text" class="form-control" name="cep" required 
                                                id="cep" maxlength="12"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['cep'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-9 mb-3">
-                                        <label class="form-label" id="label-endereco">Rua / Street *</label>
+                                        <label class="form-label" id="label-endereco"><?= __('checkout.street', 'Rua') ?> / <?= __('checkout.street_en', 'Street') ?> *</label>
                                         <input type="text" class="form-control" name="endereco" required id="endereco"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['endereco'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3" id="numero-wrap">
-                                        <label class="form-label" id="label-numero">Número / Number *</label>
+                                        <label class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?> / <?= __('checkout.number_en', 'Number') ?> *</label>
                                         <input type="text" class="form-control" name="numero" id="numero"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['numero'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="label-complemento">Complemento / Complement</label>
+                                        <label class="form-label" id="label-complemento"><?= __('auth.complement', 'Complemento') ?> / <?= __('checkout.complement_en', 'Complement') ?></label>
                                         <input type="text" class="form-control" name="complemento"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['complemento'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3" id="bairro-wrap">
-                                        <label class="form-label" id="label-bairro">Bairro / District</label>
+                                        <label class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?> / <?= __('checkout.district_en', 'District') ?></label>
                                         <input type="text" class="form-control" name="bairro" id="bairro"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['bairro'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label">Cidade / City *</label>
+                                        <label class="form-label"><?= __('auth.city', 'Cidade') ?> / <?= __('checkout.city_en', 'City') ?> *</label>
                                         <input type="text" class="form-control" name="cidade" required id="cidade"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['cidade'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label class="form-label" id="label-estado">Estado / State *</label>
+                                        <label class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?> / <?= __('checkout.state_en', 'State') ?> *</label>
                                         <select class="form-select" name="estado" id="estado">
-                                            <option value="">Selecione...</option>
+                                            <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                             <?php $ufSel = (string) ($endereco_prefill['estado'] ?? ''); ?>
                                             <?php foreach (['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as $uf): ?>
                                                 <option value="<?= $uf ?>" <?= $ufSel === $uf ? 'selected' : '' ?>><?= $uf ?></option>
@@ -196,14 +230,14 @@
                         <!-- Senha (se não logado) -->
                         <?php if (empty($usuario)): ?>
                         <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-lock"></i> Criar Conta</h6>
+                            <h6 class="mb-3"><i class="fas fa-lock"></i> <?= __('auth.create_account', 'Criar Conta') ?></h6>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Senha *</label>
+                                    <label class="form-label"><?= __('auth.password_min', 'Senha') ?> *</label>
                                     <input type="password" class="form-control" name="senha" required minlength="6">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Confirmar Senha *</label>
+                                    <label class="form-label"><?= __('auth.confirm_password', 'Confirmar Senha') ?> *</label>
                                     <input type="password" class="form-control" name="senha_confirmacao" required>
                                 </div>
                             </div>
@@ -285,7 +319,7 @@
                 var hintEl = document.getElementById('hint-documento');
                 if (!paisEl || !docEl || !labelEl) return;
                 var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
-                labelEl.textContent = br ? 'CPF *' : 'CPF';
+                labelEl.textContent = br ? (window.CHECKOUT_I18N && window.CHECKOUT_I18N.cpf_cnpj_required ? window.CHECKOUT_I18N.cpf_cnpj_required : 'CPF *') : 'CPF';
                 docEl.required = br;
                 if (hintEl) {
                     hintEl.style.display = br ? 'none' : 'block';
@@ -299,7 +333,9 @@
                 if (!paisEl || !bairroEl || !labelEl) return;
                 var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
                 bairroEl.required = br;
-                labelEl.textContent = br ? 'Bairro / District *' : 'Bairro / District';
+                const pt = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.district_label) ? window.CHECKOUT_I18N.district_label : 'Bairro';
+                const en = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.district_label_en) ? window.CHECKOUT_I18N.district_label_en : 'District';
+                labelEl.textContent = br ? (pt + ' / ' + en + ' *') : (pt + ' / ' + en);
             }
 
             function syncImpostosRules() {
@@ -322,10 +358,10 @@
                 var baseSubtotal = (window.checkoutBaseValues.subtotal || 0);
                 if (us) {
                     window.checkoutOriginalValues.subtotal = baseSubtotal * 1.10;
-                    if (subtotalLabel) subtotalLabel.textContent = 'Subtotal Produtos (incl. imposto EUA 10%):';
+                    if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products_us_tax) ? window.CHECKOUT_I18N.subtotal_products_us_tax : 'Subtotal Produtos (incl. imposto EUA 10%):';
                 } else {
                     window.checkoutOriginalValues.subtotal = baseSubtotal;
-                    if (subtotalLabel) subtotalLabel.textContent = 'Subtotal Produtos:';
+                    if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products) ? window.CHECKOUT_I18N.subtotal_products : 'Subtotal Produtos:';
                 }
 
                 if (br) {
@@ -489,13 +525,13 @@
             <div class="checkout-sticky">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header">
-                        <h6 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h6>
+                        <h6 class="mb-0"><i class="fas fa-receipt"></i> <?= __('cart.order_summary', 'Resumo do Pedido') ?></h6>
                     </div>
                     <div class="card-body">
                         <div id="resumo-pedido">
                             <!-- Itens do Carrinho -->
                             <div class="mb-3">
-                                <h6>Itens do Pedido</h6>
+                                <h6><?= __('checkout.order_items', 'Itens do Pedido') ?></h6>
                                 <div id="items-resumo">
                                     <?php foreach ($items as $item): ?>
                                     <div class="d-flex justify-content-between">
@@ -503,7 +539,7 @@
                                             <small>
                                                 <?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)
                                                 <?php if (!empty($item['clube_ativo'])): ?>
-                                                    <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i>Clube Ativo</span>
+                                                    <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                                 <?php endif; ?>
                                             </small>
                                             <?php if (!empty($item['variacao_descricao'])): ?>
@@ -520,16 +556,16 @@
 
                             <!-- Informações de Pagamento -->
                             <div class="mb-3">
-                                <h6><i class="fas fa-credit-card"></i> Informações de Pagamento</h6>
+                                <h6><i class="fas fa-credit-card"></i> <?= __('checkout.payment_info', 'Informações de Pagamento') ?></h6>
                                 <div class="border rounded p-3" style="background: rgba(248, 250, 252, 0.85);">
                                     <div class="row g-2">
                                         <div class="col-12">
-                                            <label class="form-label">Forma de Pagamento</label>
+                                            <label class="form-label"><?= __('checkout.payment_method', 'Forma de Pagamento') ?></label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
-                                                <option value="">Selecione...</option>
-                                                <option value="carteira">Crédito da Carteira</option>
-                                                <option value="cartao_credito">Cartão de Crédito</option>
-                                                <option value="boleto">Boleto Bancário</option>
+                                                <option value=""><?= __('common.select', 'Selecione...') ?></option>
+                                                <option value="carteira"><?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?></option>
+                                                <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
+                                                <option value="boleto"><?= __('checkout.payment.boleto', 'Boleto Bancário') ?></option>
                                                 <option value="pix">PIX</option>
                                             </select>
                                             <script>
@@ -561,20 +597,20 @@
                                         </div>
                                         <div class="col-12" id="campos-cartao" style="display: none;">
                                             <div id="campos-cartao-stripe" style="display:none;">
-                                                <label class="form-label">Cartão</label>
+                                                <label class="form-label"><?= __('checkout.card', 'Cartão') ?></label>
                                                 <div id="stripe-card-element" class="form-control" style="padding: 12px; background: #fff;"></div>
                                                 <div id="stripe-card-errors" class="text-danger small mt-2" style="display:none;"></div>
                                             </div>
                                             <div id="campos-cartao-manual">
-                                                <label class="form-label">Nome no Cartão</label>
-                                                <input type="text" name="card_holder_name" class="form-control" placeholder="Nome como está no cartão" required>
+                                                <label class="form-label"><?= __('checkout.card_holder_name', 'Nome no Cartão') ?></label>
+                                                <input type="text" name="card_holder_name" class="form-control" placeholder="<?= htmlspecialchars(__('checkout.card_holder_name_placeholder', 'Nome como está no cartão'), ENT_QUOTES, 'UTF-8') ?>" required>
                                                 <div class="row g-2 mt-2">
                                                     <div class="col-6">
-                                                        <label class="form-label">Número do Cartão</label>
+                                                        <label class="form-label"><?= __('checkout.card_number', 'Número do Cartão') ?></label>
                                                         <input type="text" name="card_number" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="cc-number" inputmode="numeric" required>
                                                     </div>
                                                     <div class="col-3">
-                                                        <label class="form-label">Validade</label>
+                                                        <label class="form-label"><?= __('checkout.card_expiry', 'Validade') ?></label>
                                                         <input type="text" name="card_expiry_month" class="form-control" placeholder="MM" maxlength="2" autocomplete="cc-exp-month" inputmode="numeric" required>
                                                     </div>
                                                     <div class="col-3">
@@ -591,13 +627,13 @@
                                             </div>
                                         </div>
                                         <div class="col-12" id="campos-boleto" style="display: none;">
-                                            <label class="form-label">CPF/CNPJ do Titular</label>
+                                            <label class="form-label"><?= __('checkout.holder_document', 'CPF/CNPJ do Titular') ?></label>
                                             <input type="text" name="boleto_cpf" class="form-control" placeholder="000.000.000-00">
                                         </div>
                                         <div class="col-12" id="campos-transferencia" style="display: none;">
-                                            <label class="form-label">Banco</label>
+                                            <label class="form-label"><?= __('checkout.bank', 'Banco') ?></label>
                                             <select name="banco" class="form-select">
-                                                <option value="">Selecione...</option>
+                                                <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                                 <option value="001">Banco do Brasil</option>
                                                 <option value="104">Caixa Econômica Federal</option>
                                                 <option value="237">Banco Bradesco</option>
@@ -606,11 +642,11 @@
                                             </select>
                                         </div>
                                         <div class="col-12" id="campos-pagamento-entrega" style="display: none;">
-                                            <label class="form-label">Forma de Pagamento na Entrega</label>
+                                            <label class="form-label"><?= __('checkout.pay_on_delivery_method', 'Forma de Pagamento na Entrega') ?></label>
                                             <div class="alert alert-info">
                                                 <i class="fas fa-info-circle"></i>
-                                                <strong>Pagamento na entrega:</strong> 
-                                                Você pode pagar com dinheiro, cartão ou maquininha na entrega.
+                                                <strong><?= __('checkout.pay_on_delivery', 'Pagamento na entrega') ?>:</strong>
+                                                <?= __('checkout.pay_on_delivery_desc', 'Você pode pagar com dinheiro, cartão ou maquininha na entrega.') ?>
                                             </div>
                                         </div>
                                     </div>
@@ -622,37 +658,37 @@
                             <!-- Valores -->
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
-                                    <span>Subtotal Produtos:</span>
+                                    <span id="subtotal-label"><?= __('checkout.subtotal_products', 'Subtotal Produtos:') ?></span>
                                     <span id="subtotal" class="cart-currency" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
 
                                 <?php if (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube)): ?>
                                     <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
-                                        <div class="fw-semibold mb-1" style="color:#0b1f3a;">Clube Brasiliana</div>
+                                        <div class="fw-semibold mb-1" style="color:#0b1f3a;"><?= __('cart.club', 'Clube Brasiliana') ?></div>
                                         <div class="d-flex justify-content-between small">
-                                            <span class="text-muted">Peso Clube</span>
+                                            <span class="text-muted"><?= __('cart.club_weight', 'Peso Clube') ?></span>
                                             <span><?= number_format((float) ($peso_clube_total ?? 0), 3, ',', '.') ?> kg</span>
                                         </div>
                                         <div class="d-flex justify-content-between small">
-                                            <span class="text-muted">Subtotal Clube</span>
+                                            <span class="text-muted"><?= __('cart.club_subtotal', 'Subtotal Clube') ?></span>
                                             <span class="cart-currency" data-original-value="<?= (float) ($subtotal_clube ?? 0) ?>"><?= number_format((float) ($subtotal_clube ?? 0), 2, '.', ',') ?></span>
                                         </div>
                                         <?php if (!empty($desconto_clube)): ?>
                                             <div class="d-flex justify-content-between small">
-                                                <span class="text-muted">Desconto Clube</span>
+                                                <span class="text-muted"><?= __('cart.club_discount', 'Desconto Clube') ?></span>
                                                 <span class="cart-currency" data-original-value="<?= (float) ($desconto_clube ?? 0) ?>">-<?= number_format((float) ($desconto_clube ?? 0), 2, '.', ',') ?></span>
                                             </div>
                                         <?php endif; ?>
                                         <?php if (!empty($cashback_clube_estimado)): ?>
                                             <div class="d-flex justify-content-between small">
-                                                <span class="text-muted">Cashback estimado</span>
+                                                <span class="text-muted"><?= __('cart.club_cashback_est', 'Cashback estimado') ?></span>
                                                 <span class="cart-currency" data-original-value="<?= (float) ($cashback_clube_estimado ?? 0) ?>"><?= number_format((float) ($cashback_clube_estimado ?? 0), 2, '.', ',') ?></span>
                                             </div>
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
-                                    <span>Taxa de Serviço:</span>
+                                    <span><?= __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
                                 <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
@@ -660,19 +696,19 @@
                                 <?php endif; ?>
                                 <?php if (!empty($cobra_impostos_br)): ?>
                                     <div class="d-flex justify-content-between" id="impostos-row">
-                                        <span>Impostos:</span>
+                                        <span><?= __('cart.taxes', 'Impostos') ?>:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
                                 <?php else: ?>
                                     <div class="d-flex justify-content-between d-none" id="impostos-row">
-                                        <span>Impostos:</span>
+                                        <span><?= __('cart.taxes', 'Impostos') ?>:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="0">0</span>
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
-                                    <span>Frete:</span>
+                                    <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?>:</span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
-                                        <?= (((float) ($frete ?? 0)) <= 0) ? 'Frete grátis' : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
+                                        <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
                                     </span>
                                 </div>
                             </div>
@@ -680,13 +716,13 @@
                             <hr>
 
                             <div class="d-flex justify-content-between mb-3">
-                                <h6>Total:</h6>
+                                <h6><?= __('cart.total', 'Total') ?>:</h6>
                                 <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0))), 2, '.', ',') ?></h6>
                             </div>
 
                             <div class="alert alert-info small">
                                 <i class="fas fa-info-circle"></i> 
-                                <strong>Peso Total:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
+                                <strong><?= __('checkout.total_weight', 'Peso Total') ?>:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
                             </div>
 
                             <?php if (!empty($entrega_fora_br) && !empty($mensagem_entrega_fora_br)): ?>
@@ -698,7 +734,7 @@
 
                             <div class="alert alert-warning small d-none" id="entrega-fora-br-alert">
                                 <i class="fas fa-exclamation-triangle"></i>
-                                A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.
+                                <?= __('checkout.delivery_outside_br_no_taxes', 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.') ?>
                             </div>
 
                             <!-- Termos Legais -->
@@ -706,7 +742,10 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="consentimento_legal" id="consentimento_legal" required>
                                     <label class="form-check-label small" for="consentimento_legal">
-                                        Li e aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos e condições</a> de uso e política de privacidade. *
+                                        <?php
+                                            $termsLink = '<a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">' . __('checkout.terms_and_conditions', 'termos e condições') . '</a>';
+                                            echo __('checkout.terms_accept_full', 'Li e aceito os {terms} de uso e política de privacidade. *', ['terms' => $termsLink]);
+                                        ?>
                                     </label>
                                 </div>
                             </div>
@@ -714,7 +753,7 @@
                             <!-- Botão Finalizar -->
                             <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
                                     onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
-                                <i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro
+                                <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
                             </button>
                             
                             <!-- Botão de Teste Inline -->
@@ -740,7 +779,7 @@
 <div id="checkout-loading" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 9999;">
     <div style="position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); text-align:center; color:#fff;">
         <div class="spinner-border" role="status" aria-hidden="true"></div>
-        <div style="margin-top: 10px; font-weight: 600;">Processando seu pedido...</div>
+        <div style="margin-top: 10px; font-weight: 600;"><?= __('checkout.processing_order', 'Processando seu pedido...') ?></div>
     </div>
 </div>
 
@@ -810,7 +849,7 @@ function ensureStripeInit() {
                     const errEl = document.getElementById('stripe-card-errors');
                     if (errEl) {
                         errEl.style.display = 'block';
-                        errEl.textContent = 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.';
+                        errEl.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.stripe_card_form_error) ? window.CHECKOUT_I18N.stripe_card_form_error : 'Erro ao carregar o formulário de cartão. Verifique a chave pública do Stripe.';
                     }
                 }
             });
@@ -824,7 +863,7 @@ function ensureStripeInit() {
 function iniciarPagamentoStripeElements(pedidoId, email) {
     if (!ensureStripeInit()) {
         hideCheckoutLoading();
-        alert('Stripe não configurado. Verifique as configurações de pagamento.');
+        alert((window.CHECKOUT_I18N && window.CHECKOUT_I18N.stripe_not_configured) ? window.CHECKOUT_I18N.stripe_not_configured : 'Stripe não configurado. Verifique as configurações de pagamento.');
         return;
     }
 
@@ -870,7 +909,8 @@ function iniciarPagamentoStripeElements(pedidoId, email) {
     .catch((e) => {
         console.error(e);
         hideCheckoutLoading();
-        alert('Erro no pagamento: ' + (e && e.message ? e.message : e));
+        const prefix = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.payment_error_prefix) ? window.CHECKOUT_I18N.payment_error_prefix : 'Erro no pagamento:';
+        alert(prefix + ' ' + (e && e.message ? e.message : e));
         const botao = document.getElementById('btn-finalizar');
         if (botao) {
             botao.disabled = false;
@@ -937,28 +977,32 @@ function atualizarEnderecoPorPais() {
         const requiredDoc = (pais === 'BR');
         docInput.required = requiredDoc;
         if (docLabel) {
-            docLabel.textContent = requiredDoc ? 'CPF/CNPJ *' : 'CPF/CNPJ (opcional)';
+            docLabel.textContent = requiredDoc
+                ? ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.cpf_cnpj_required) ? window.CHECKOUT_I18N.cpf_cnpj_required : 'CPF/CNPJ *')
+                : ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.cpf_cnpj_optional) ? window.CHECKOUT_I18N.cpf_cnpj_optional : 'CPF/CNPJ (opcional)');
         }
     }
 
     // Endereço: regras globais (BR tem campos específicos; fora do BR, simplificar)
     if (enderecoLabel) {
-        enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : 'Address line 1 *';
+        enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.address_line_1) ? window.CHECKOUT_I18N.address_line_1 : 'Address line 1 *');
     }
     if (compLabel) {
-        compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : 'Address line 2 (optional)';
+        compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : ((window.CHECKOUT_I18N && window.CHECKOUT_I18N.address_line_2_optional) ? window.CHECKOUT_I18N.address_line_2_optional : 'Address line 2 (optional)');
     }
 
     if (numeroWrap && numeroInput && numeroLabel) {
         if (pais === 'BR') {
             numeroWrap.style.display = '';
             numeroInput.required = true;
-            numeroLabel.textContent = 'Número / Number *';
+            const pt = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.number_label) ? window.CHECKOUT_I18N.number_label : 'Número';
+            const en = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.number_label_en) ? window.CHECKOUT_I18N.number_label_en : 'Number';
+            numeroLabel.textContent = pt + ' / ' + en + ' *';
         } else {
             numeroWrap.style.display = 'none';
             numeroInput.required = false;
             numeroInput.value = '';
-            numeroLabel.textContent = 'Number';
+            numeroLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.number_label_en) ? window.CHECKOUT_I18N.number_label_en : 'Number';
         }
     }
 
@@ -994,7 +1038,7 @@ function atualizarEnderecoPorPais() {
             }
             const optEmpty = document.createElement('option');
             optEmpty.value = '';
-            optEmpty.textContent = 'Selecione...';
+            optEmpty.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.select_state) ? window.CHECKOUT_I18N.select_state : 'Selecione...';
             estadoSelect.appendChild(optEmpty);
             list.forEach((uf) => {
                 const opt = document.createElement('option');

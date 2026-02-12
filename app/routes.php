@@ -42,6 +42,7 @@ $router->post('/login', 'AuthController', 'login');
 $router->get('/loginadmin', 'AuthController', 'loginAdmin');
 $router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
+$router->get('/lang/{locale}', 'LangController', 'set');
 $router->get('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->post('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->get('/redefinir-senha/{token}', 'AuthController', 'redefinirSenha');

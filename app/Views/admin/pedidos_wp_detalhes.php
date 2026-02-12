@@ -13,8 +13,8 @@ function wpFormatMoney2($v, $currency) {
     if ($currency === '') $currency = 'BRL';
     $v = is_numeric($v) ? (float) $v : 0.0;
     $fmt = number_format($v, 2, ',', '.');
-    if ($currency === 'BRL') return 'R$ ' . $fmt;
-    if ($currency === 'USD') return 'US$ ' . $fmt;
+    if ($currency === 'BRL') return __('admin.orders.js.currency_brl', 'R$') . ' ' . $fmt;
+    if ($currency === 'USD') return __('admin.orders.js.currency_usd', 'US$') . ' ' . $fmt;
     return $currency . ' ' . $fmt;
 }
 
@@ -44,28 +44,36 @@ $transactionId = wpVal($meta, '_transaction_id');
 
 ?>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h1 class="h2 mb-0">Pedido WP #<?= htmlspecialchars((string) (($pedido['ID'] ?? $pedido['id'] ?? '') ?: '')) ?></h1>
+        <h1 class="h4 mb-0">#<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?></h1>
         <div class="text-muted small"><?= htmlspecialchars((string) (($pedido['post_title'] ?? $pedido['numero_pedido'] ?? '') ?: '')) ?></div>
     </div>
     <div class="d-flex gap-2">
-        <a href="/admin/pedidos-wp" class="btn btn-outline-secondary">Voltar</a>
-        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">Gerar etiqueta W-Express</button>
+        <a href="/admin/pedidos-wp" class="btn btn-outline-secondary"><?= __('common.back', 'Voltar') ?></a>
+        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></button>
     </div>
 </div>
 
 <?php if ($erro !== ''): ?>
-    <div class="alert alert-danger">Erro ao carregar detalhes do pedido: <?= htmlspecialchars($erro) ?></div>
+    <div class="alert alert-danger"><?= __('admin.orders_wp.details.error_load_details_prefix', 'Erro ao carregar detalhes do pedido:') ?> <?= htmlspecialchars($erro) ?></div>
 <?php endif; ?>
 
 <script>
+window.ADMIN_ORDERS_WP_DETAILS_I18N = {
+    invalid_order: <?= json_encode(__('admin.orders_wp.details.js.invalid_order', 'Pedido inválido'), JSON_UNESCAPED_UNICODE) ?>,
+    confirm_generate_label: <?= json_encode(__('admin.orders_wp.details.js.confirm_generate_label', 'Deseja gerar a etiqueta da W-Express para este pedido?'), JSON_UNESCAPED_UNICODE) ?>,
+    error_generate_label: <?= json_encode(__('admin.orders_wp.details.js.error_generate_label', 'Erro ao gerar etiqueta'), JSON_UNESCAPED_UNICODE) ?>,
+    label_generated_success: <?= json_encode(__('admin.orders_wp.details.js.label_generated_success', 'Etiqueta gerada com sucesso!'), JSON_UNESCAPED_UNICODE) ?>,
+    error_prefix: <?= json_encode(__('admin.orders_wp.details.js.error_prefix', 'Erro:'), JSON_UNESCAPED_UNICODE) ?>
+};
+
 function gerarEtiquetaWexpressWp(orderId) {
     if (!orderId) {
-        alert('Pedido inválido');
+        alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order : 'Pedido inválido');
         return;
     }
-    if (!confirm('Deseja gerar a etiqueta da W-Express para este pedido?')) return;
+    if (!confirm((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label : 'Deseja gerar a etiqueta da W-Express para este pedido?')) return;
 
     fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId, {
         method: 'POST',
@@ -77,13 +85,13 @@ function gerarEtiquetaWexpressWp(orderId) {
     .then(async (r) => {
         const data = await r.json().catch(() => ({}));
         if (!r.ok || !data || !data.success) {
-            throw new Error((data && (data.error || data.message)) ? (data.error || data.message) : 'Erro ao gerar etiqueta');
+            throw new Error((data && (data.error || data.message)) ? (data.error || data.message) : ((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.error_generate_label) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.error_generate_label : 'Erro ao gerar etiqueta'));
         }
         return data;
     })
     .then((data) => {
         const labelUrl = data.label_url || '';
-        alert('Etiqueta gerada com sucesso!');
+        alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success : 'Etiqueta gerada com sucesso!');
         if (labelUrl) {
             window.open(labelUrl, '_blank');
         } else {
@@ -91,90 +99,91 @@ function gerarEtiquetaWexpressWp(orderId) {
         }
     })
     .catch((e) => {
-        alert('Erro: ' + (e && e.message ? e.message : String(e)));
+        const errPrefix = (window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix : 'Erro:';
+        alert(errPrefix + ' ' + (e && e.message ? e.message : String(e)));
     });
 }
 </script>
 
 <?php if (!$pedido): ?>
-    <div class="alert alert-warning">Pedido não encontrado.</div>
+    <div class="alert alert-warning"><?= __('admin.orders_wp.details.order_not_found', 'Pedido não encontrado.') ?></div>
 <?php else: ?>
 
 <div class="row g-3">
     <div class="col-lg-6">
         <div class="card">
-            <div class="card-header"><strong>Cliente</strong></div>
+            <div class="card-header"><strong><?= __('admin.orders_wp.details.customer', 'Cliente') ?></strong></div>
             <div class="card-body">
-                <div><strong>Nome:</strong> <?= htmlspecialchars($billingName ?: '-') ?></div>
-                <div><strong>Email:</strong> <?= htmlspecialchars($billingEmail ?: '-') ?></div>
-                <?php if ($billingCpf !== ''): ?><div><strong>CPF:</strong> <?= htmlspecialchars($billingCpf) ?></div><?php endif; ?>
-                <?php if ($billingPhone !== ''): ?><div><strong>Telefone:</strong> <?= htmlspecialchars($billingPhone) ?></div><?php endif; ?>
+                <div><strong><?= __('common.name', 'Nome') ?>:</strong> <?= htmlspecialchars($billingName ?: '-') ?></div>
+                <div><strong><?= __('common.email', 'E-mail') ?>:</strong> <?= htmlspecialchars($billingEmail ?: '-') ?></div>
+                <?php if ($billingCpf !== ''): ?><div><strong><?= __('checkout.cpf_cnpj', 'CPF/CNPJ') ?>:</strong> <?= htmlspecialchars($billingCpf) ?></div><?php endif; ?>
+                <?php if ($billingPhone !== ''): ?><div><strong><?= __('common.phone', 'Telefone') ?>:</strong> <?= htmlspecialchars($billingPhone) ?></div><?php endif; ?>
             </div>
         </div>
     </div>
 
     <div class="col-lg-6">
         <div class="card">
-            <div class="card-header"><strong>Pedido</strong></div>
+            <div class="card-header"><strong><?= __('admin.orders_wp.details.order', 'Pedido') ?></strong></div>
             <div class="card-body">
-                <div><strong>Status:</strong> <?= htmlspecialchars((string) ($pedido['post_status'] ?? $pedido['status'] ?? '')) ?></div>
-                <div><strong>Data:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($pedido['post_date'] ?? $pedido['created_at'] ?? 'now')))) ?></div>
-                <div><strong>Total:</strong> <?= htmlspecialchars(wpFormatMoney2($total, $currency)) ?></div>
-                <div><strong>Moeda:</strong> <?= htmlspecialchars($currency ?: '-') ?></div>
+                <div><strong><?= __('common.status', 'Status') ?>:</strong> <?= htmlspecialchars((string) ($pedido['post_status'] ?? $pedido['status'] ?? '')) ?></div>
+                <div><strong><?= __('common.date', 'Data') ?>:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($pedido['post_date'] ?? $pedido['created_at'] ?? 'now')))) ?></div>
+                <div><strong><?= __('common.total', 'Total') ?>:</strong> <?= htmlspecialchars(wpFormatMoney2($total, $currency)) ?></div>
+                <div><strong><?= __('admin.orders_wp.details.currency', 'Moeda') ?>:</strong> <?= htmlspecialchars($currency ?: '-') ?></div>
             </div>
         </div>
     </div>
 
     <div class="col-lg-12">
         <div class="card">
-            <div class="card-header"><strong>Entrega</strong></div>
+            <div class="card-header"><strong><?= __('admin.orders_wp.details.delivery', 'Entrega') ?></strong></div>
             <div class="card-body">
-                <div><strong>Endereço:</strong> <?= htmlspecialchars(trim($shipAddress1 . ' ' . $shipAddress2) ?: '-') ?></div>
-                <div><strong>Cidade/Estado:</strong> <?= htmlspecialchars(trim($shipCity . ' / ' . $shipState) ?: '-') ?></div>
-                <div><strong>CEP:</strong> <?= htmlspecialchars($shipPostcode ?: '-') ?></div>
-                <div><strong>País:</strong> <?= htmlspecialchars($shipCountry ?: '-') ?></div>
-                <?php if ($shipSuite !== ''): ?><div><strong>Suite:</strong> <?= htmlspecialchars($shipSuite) ?></div><?php endif; ?>
-                <?php if ($tracking !== ''): ?><div><strong>Rastreio:</strong> <?= htmlspecialchars($tracking) ?></div><?php endif; ?>
+                <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?>:</strong> <?= htmlspecialchars(trim($shipAddress1 . ' ' . $shipAddress2) ?: '-') ?></div>
+                <div><strong><?= __('admin.orders_wp.details.city_state', 'Cidade/Estado') ?>:</strong> <?= htmlspecialchars(trim($shipCity . ' / ' . $shipState) ?: '-') ?></div>
+                <div><strong><?= __('checkout.zip_code', 'CEP') ?>:</strong> <?= htmlspecialchars($shipPostcode ?: '-') ?></div>
+                <div><strong><?= __('admin.orders_wp.details.country', 'País') ?>:</strong> <?= htmlspecialchars($shipCountry ?: '-') ?></div>
+                <?php if ($shipSuite !== ''): ?><div><strong><?= __('admin.orders_wp.details.suite', 'Suite') ?>:</strong> <?= htmlspecialchars($shipSuite) ?></div><?php endif; ?>
+                <?php if ($tracking !== ''): ?><div><strong><?= __('admin.orders_wp.details.tracking', 'Rastreio') ?>:</strong> <?= htmlspecialchars($tracking) ?></div><?php endif; ?>
             </div>
         </div>
     </div>
 
     <div class="col-lg-12">
         <div class="card">
-            <div class="card-header"><strong>Pagamento</strong></div>
+            <div class="card-header"><strong><?= __('admin.orders_wp.details.payment', 'Pagamento') ?></strong></div>
             <div class="card-body">
-                <div><strong>Método:</strong> <?= htmlspecialchars($paymentMethod ?: '-') ?></div>
-                <?php if ($transactionId !== ''): ?><div><strong>Transaction ID:</strong> <?= htmlspecialchars($transactionId) ?></div><?php endif; ?>
+                <div><strong><?= __('admin.orders_wp.details.payment_method', 'Método') ?>:</strong> <?= htmlspecialchars($paymentMethod ?: '-') ?></div>
+                <?php if ($transactionId !== ''): ?><div><strong><?= __('admin.orders_wp.details.transaction_id', 'Transaction ID') ?>:</strong> <?= htmlspecialchars($transactionId) ?></div><?php endif; ?>
             </div>
         </div>
     </div>
 
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><strong>Itens</strong></div>
+            <div class="card-header"><strong><?= __('admin.orders_wp.details.items', 'Itens') ?></strong></div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
                             <tr>
-                                <th>Produto</th>
-                                <th>SKU</th>
-                                <th>NCM</th>
-                                <th>Qtd</th>
-                                <th>Unitário</th>
-                                <th>Subtotal</th>
-                                <th>Total</th>
+                                <th><?= __('admin.orders_wp.details.table.product', 'Produto') ?></th>
+                                <th><?= __('admin.orders_wp.details.table.sku', 'SKU') ?></th>
+                                <th><?= __('admin.orders_wp.details.table.ncm', 'NCM') ?></th>
+                                <th><?= __('admin.orders_wp.details.table.qty', 'Qtd') ?></th>
+                                <th><?= __('admin.orders_wp.details.table.unit_price', 'Unitário') ?></th>
+                                <th><?= __('checkout.subtotal', 'Subtotal') ?></th>
+                                <th><?= __('common.total', 'Total') ?></th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($itens)): ?>
-                                <tr><td colspan="7" class="text-center text-muted">Sem itens encontrados.</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted"><?= __('admin.orders_wp.details.items_empty', 'Sem itens encontrados.') ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($itens as $it): ?>
                                     <tr>
                                         <td>
                                             <div class="fw-semibold"><?= htmlspecialchars((string) ($it['nome'] ?? '')) ?></div>
-                                            <div class="text-muted small">Produto ID: <?= (int) ($it['produto_id'] ?? 0) ?> | Variação ID: <?= (int) ($it['variacao_id'] ?? 0) ?></div>
+                                            <div class="text-muted small"><?= __('admin.orders_wp.details.product_id', 'Produto ID') ?>: <?= (int) ($it['produto_id'] ?? 0) ?> | <?= __('admin.orders_wp.details.variation_id', 'Variação ID') ?>: <?= (int) ($it['variacao_id'] ?? 0) ?></div>
                                         </td>
                                         <td><?= htmlspecialchars((string) ($it['sku'] ?? '')) ?></td>
                                         <td><?= htmlspecialchars((string) ($it['ncm'] ?? '')) ?></td>
