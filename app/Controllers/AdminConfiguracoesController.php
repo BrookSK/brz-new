@@ -387,6 +387,11 @@ class AdminConfiguracoesController extends Controller {
                                                 });
                                                 </script>
                                                 ';
+                                            $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
+                                            if (!in_array($selectedLang, ['pt', 'en'], true)) {
+                                                $selectedLang = 'pt';
+                                            }
+
                                             echo '
                                             </div>
 
@@ -397,9 +402,20 @@ class AdminConfiguracoesController extends Controller {
                                                 Mobile: <strong>391 x 333</strong>
                                             </div>
 
+                                            <div class="mb-3">
+                                                <label class="form-label small mb-1">Idioma do banner</label>
+                                                <select class="form-select" name="layout_banners_lang" onchange="this.form.submit()">
+                                                    <option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>
+                                                    <option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>
+                                                </select>
+                                                <div class="text-muted small mt-1">Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.</div>
+                                            </div>
+
                                             <div id="layout-banners-existing" class="row g-2 mb-3">
                                                 ';
-                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', 'banners', '[]');
+                                                $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
+                                                $bannersKey = ($selectedLang === 'en') ? 'banners_en' : 'banners';
+                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', $bannersKey, '[]');
                                                 $existingBanners = json_decode($existingBannersRaw, true);
                                                 if (!is_array($existingBanners)) $existingBanners = [];
                                                 foreach ($existingBanners as $idx => $item) {
@@ -3456,6 +3472,11 @@ HTML;
 
             // Upload de banners do layout
             try {
+                $bannersLang = (string) $request->getParam('layout_banners_lang', 'pt');
+                if (!in_array($bannersLang, ['pt', 'en'], true)) {
+                    $bannersLang = 'pt';
+                }
+
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
                 $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
                 $keepLink = $request->getParam('layout_banners_keep_link', []);
@@ -3540,7 +3561,12 @@ HTML;
                 }
 
                 $final = array_merge($keptItems, $newItems);
-                $request->setParam('layout_banners', json_encode(array_values($final), JSON_UNESCAPED_UNICODE));
+                $json = json_encode(array_values($final), JSON_UNESCAPED_UNICODE);
+                if ($bannersLang === 'en') {
+                    $request->setParam('layout_banners_en', $json);
+                } else {
+                    $request->setParam('layout_banners', $json);
+                }
             } catch (\Exception $e) {
             }
 
@@ -3571,7 +3597,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners', 'logo', 'logo_footer', 'logo_admin'],
+                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],

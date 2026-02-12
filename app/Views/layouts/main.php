@@ -73,7 +73,15 @@
             font-weight: 600;
             padding: 0.55rem 0.75rem;
             border-radius: 999px;
+            white-space: nowrap;
             transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        @media (min-width: 992px) {
+            .navbar .navbar-nav.mx-auto {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
         }
 
         .navbar .nav-link:hover {
@@ -561,7 +569,8 @@
                 padding-top: var(--navbar-height) !important;
             }
 
-            .navbar .container {
+            .navbar .container,
+            .navbar .container-fluid {
                 padding-left: 12px;
                 padding-right: 12px;
             }
@@ -737,16 +746,17 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container">
+        <div class="container-fluid px-3">
             <?php
             $siteLogo = '';
             try {
-                $pdo = \Config\Database::getConnection();
+                $raw = isset($settings) ? ($settings['site_logo'] ?? '') : '';
                 $raw = '';
                 $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
                 foreach ($tablesToTry as $t) {
                     if ($raw !== '') break;
                     try {
+                        $pdo = \Config\Database::getConnection();
                         $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
                         $stmtT->execute([$t]);
                         if (!$stmtT->fetchColumn()) {

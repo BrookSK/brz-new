@@ -4,6 +4,13 @@
     <?php
     $layoutBanners = [];
     try {
+        $locale = class_exists('\\App\\Core\\I18n') ? (string) \App\Core\I18n::getLocaleHtml() : 'pt-BR';
+        $isEn = (stripos($locale, 'en') === 0);
+        $layoutKey = $isEn ? 'banners_en' : 'banners';
+        $layoutKeyLegacy = 'banners';
+        $layoutColKey = $isEn ? 'layout_banners_en' : 'layout_banners';
+        $layoutColKeyLegacy = 'layout_banners';
+
         $pdo = \Config\Database::getConnection();
         $raw = '';
 
@@ -28,8 +35,12 @@
                     $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
                     if ($valCol !== '') {
                         $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
-                        $stmt->execute(['layout', 'banners']);
+                        $stmt->execute(['layout', $layoutKey]);
                         $raw = (string) ($stmt->fetchColumn() ?: '');
+                        if ($raw === '' && $layoutKey !== $layoutKeyLegacy) {
+                            $stmt->execute(['layout', $layoutKeyLegacy]);
+                            $raw = (string) ($stmt->fetchColumn() ?: '');
+                        }
                         if ($raw !== '') break;
                     }
                 }
@@ -46,15 +57,20 @@
                 elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
                 if ($keyCol !== '' && $valCol !== '') {
                     $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
-                    $stmt->execute(['layout_banners']);
+                    $stmt->execute([$layoutColKey]);
                     $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw === '' && $layoutColKey !== $layoutColKeyLegacy) {
+                        $stmt->execute([$layoutColKeyLegacy]);
+                        $raw = (string) ($stmt->fetchColumn() ?: '');
+                    }
                     if ($raw !== '') break;
                 }
 
                 // schema single_row (coluna direta)
-                if (in_array('layout_banners', $cols, true)) {
+                if (in_array($layoutColKey, $cols, true) || in_array($layoutColKeyLegacy, $cols, true)) {
                     $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
-                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $col = in_array($layoutColKey, $cols, true) ? $layoutColKey : $layoutColKeyLegacy;
+                    $stmt2 = $pdo->query('SELECT ' . $col . ' AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
                     $raw = (string) ($stmt2->fetchColumn() ?: '');
                     if ($raw !== '') break;
                 }
