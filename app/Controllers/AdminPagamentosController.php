@@ -63,7 +63,7 @@ class AdminPagamentosController extends Controller {
             $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
 
             $colUsuarioNome = $this->pickColumn($colsUsuarios, ['nome', 'name', 'full_name']);
-            $colPedidoCreatedAt = $this->pickColumn($colsPedidos, ['created_at', 'data_criacao', 'created', 'data']);
+            $colPedidoCreatedAt = $this->pickColumn($colsPedidos, ['created_at', 'data_criacao', 'created', 'data', 'data_pedido']);
 
             $exprGateway = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_gateway', 'pagamento_gateway', 'gateway_pagamento'], "''");
             $exprPaymentId = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
@@ -159,25 +159,31 @@ class AdminPagamentosController extends Controller {
             // Estatísticas (não pode derrubar a listagem caso falhe por schema)
             $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
             try {
-                $colValorTotal = $this->pickColumn($colsPedidos, ['valor_total', 'total', 'total_valor', 'valor', 'amount', 'amount_total', 'total_amount', 'total_pedido', 'valor_final']);
-                if ($colValorTotal !== '' && $colPedidoCreatedAt !== '') {
-                    $stmtStats = $pdo->query("
-                        SELECT 
-                            COUNT(*) as total_transacoes,
-                            SUM(p.{$colValorTotal}) as valor_total,
-                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'approved' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'aprovado' THEN p.{$colValorTotal} ELSE 0 END) as valor_aprovado,
-                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'pending' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'pendente' THEN p.{$colValorTotal} ELSE 0 END) as valor_pendente,
-                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'rejected' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'recusado' THEN p.{$colValorTotal} ELSE 0 END) as valor_recusado
-                        FROM pedidos p
-                        WHERE p.{$colPedidoCreatedAt} >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                    ");
-                    $rowStats = $stmtStats ? $stmtStats->fetch(\PDO::FETCH_ASSOC) : null;
-                    if (is_array($rowStats)) {
-                        $stats = array_merge($stats, $rowStats);
-                    }
+                $where30 = '';
+                if ($colPedidoCreatedAt !== '') {
+                    $where30 = ' WHERE p.' . $colPedidoCreatedAt . ' >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                }
+                $stmtStats = $pdo->query("
+                    SELECT 
+                        COUNT(*) as total_transacoes,
+                        SUM({$exprValorTotal}) as valor_total,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('approved','aprovado','paid','pago','succeeded','success') THEN {$exprValorTotal} ELSE 0 END) as valor_aprovado,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('pending','pendente') THEN {$exprValorTotal} ELSE 0 END) as valor_pendente,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('rejected','recusado','failed','canceled','cancelled') THEN {$exprValorTotal} ELSE 0 END) as valor_recusado
+                    FROM pedidos p
+                    {$where30}
+                ");
+                $rowStats = $stmtStats ? $stmtStats->fetch(\PDO::FETCH_ASSOC) : null;
+                if (is_array($rowStats)) {
+                    $stats = array_merge($stats, $rowStats);
                 }
             } catch (\Exception $e) {
                 // fallback silencioso
+            }
+
+            // Se o stats não veio, ao menos refletir a existência de dados na tela.
+            if ((int) ($stats['total_transacoes'] ?? 0) <= 0) {
+                $stats['total_transacoes'] = (int) ($total ?? 0);
             }
             
         } catch (\Exception $e) {
@@ -525,23 +531,18 @@ class AdminPagamentosController extends Controller {
             $svc = new PaymentService();
 
             $db = \Config\Database::getConnection();
-            $colsP = [];
-            try {
-                $stmtColsP = $db->query('DESCRIBE pedidos');
-                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            } catch (\Exception $e) {
-                $colsP = [];
-            }
+            $colsP = $this->getTableColumnsPdo($db, 'pedidos');
 
-            $gateway = '';
-            $paymentId = '';
-            if (!empty($colsP)) {
-                $st = $db->prepare('SELECT payment_gateway, payment_id, payment_status FROM pedidos WHERE id = ? LIMIT 1');
-                $st->execute([$pedidoId]);
-                $row = $st->fetch(\PDO::FETCH_ASSOC);
-                $gateway = strtolower(trim((string) ($row['payment_gateway'] ?? '')));
-                $paymentId = trim((string) ($row['payment_id'] ?? ''));
-            }
+            $exprGateway = $this->buildCoalesceExpr('p', $colsP, ['payment_gateway', 'pagamento_gateway', 'gateway_pagamento'], "''");
+            $exprPaymentId = $this->buildCoalesceExpr('p', $colsP, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
+            $exprPaymentStatus = $this->buildCoalesceExpr('p', $colsP, ['payment_status', 'pagamento_status', 'status_pagamento'], "''");
+
+            $st = $db->prepare('SELECT ' . $exprGateway . ' AS gateway_pagamento, ' . $exprPaymentId . ' AS payment_id_calc, ' . $exprPaymentStatus . ' AS status_pagamento FROM pedidos p WHERE p.id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $gateway = strtolower(trim((string) ($row['gateway_pagamento'] ?? '')));
+            $paymentId = trim((string) ($row['payment_id_calc'] ?? ''));
+            $paymentStatus = strtolower(trim((string) ($row['status_pagamento'] ?? '')));
 
             if ($gateway === 'stripe') {
                 $resp = $svc->atualizarStatusPagamentoStripePorPedido($pedidoId);
@@ -552,6 +553,17 @@ class AdminPagamentosController extends Controller {
             if ($gateway === 'appmax') {
                 $resp = $svc->atualizarStatusPagamentoAppmaxPorPedido($pedidoId);
                 $this->json($resp);
+                return;
+            }
+
+            if (in_array($gateway, ['carteira', 'wallet'], true)) {
+                $this->json([
+                    'success' => true,
+                    'gateway' => $gateway,
+                    'payment_id' => $paymentId,
+                    'payment_status' => $paymentStatus !== '' ? $paymentStatus : 'approved',
+                    'message' => 'Status da carteira é local (sem refresh externo)'
+                ]);
                 return;
             }
 
