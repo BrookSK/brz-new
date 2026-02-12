@@ -11,7 +11,7 @@ class AdminPagamentosController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
