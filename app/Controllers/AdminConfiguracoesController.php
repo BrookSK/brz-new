@@ -387,6 +387,49 @@ class AdminConfiguracoesController extends Controller {
                                                 });
                                                 </script>
                                                 ';
+
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Favicon</div>
+                                                <div class="text-muted small mb-3">Upload do ícone para aparecer na aba do navegador.</div>
+
+                                                ';
+                                                $existingFavicon = (string) $this->getConfigValue($config, 'layout', 'favicon', '');
+                                                $existingFavicon = is_string($existingFavicon) ? trim($existingFavicon) : '';
+                                                $existingFaviconEsc = htmlspecialchars($existingFavicon, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingFaviconEsc !== '' ? '<img src="' . $existingFaviconEsc . '" alt="Favicon" style="height: 32px; width: 32px; object-fit: contain;"> <span class="text-muted small">' . $existingFaviconEsc . '</span>' : '<div class="text-muted">Nenhum favicon cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_favicon_keep" value="' . $existingFaviconEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Favicon</label>
+                                                        <input type="file" class="form-control" name="layout_favicon" accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFavicon">Remover favicon</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutFavicon");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_favicon_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Favicon será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
                                             $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
                                             if (!in_array($selectedLang, ['pt', 'en'], true)) {
                                                 $selectedLang = 'pt';
@@ -3472,6 +3515,56 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Upload do favicon
+            try {
+                $keepFavicon = (string) ($request->getParam('layout_favicon_keep', '') ?? '');
+                $keepFavicon = trim($keepFavicon);
+
+                $faviconUrl = $keepFavicon;
+                if (isset($_FILES['layout_favicon']) && is_array($_FILES['layout_favicon'])) {
+                    $name = (string) ($_FILES['layout_favicon']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_favicon']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_favicon']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['ico','png','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/favicon/',
+                                $docRoot . '/uploads/favicon/',
+                                $docRoot . '/public/uploads/favicons/',
+                                $docRoot . '/uploads/favicons/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/favicon/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/favicons/') !== false) {
+                                    $webDir = '/uploads/favicons/';
+                                }
+                                $fileName = 'favicon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $faviconUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_favicon', $faviconUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
                 $bannersLang = (string) $request->getParam('layout_banners_lang', 'pt');
@@ -3599,7 +3692,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin'],
+                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],

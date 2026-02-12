@@ -4,6 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? __('admin.panel_title', 'Painel Administrativo - Braziliana') ?></title>
+    <?php
+    $adminFavicon = '';
+    try {
+        $rawFav = '';
+        $tablesToTryFav = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTryFav as $t) {
+            if ($rawFav !== '') break;
+            try {
+                $pdoFav = \Config\Database::getConnection();
+                $stmtT = $pdoFav->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdoFav->query('DESCRIBE ' . $t);
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'favicon']);
+                        $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                        if ($rawFav !== '') break;
+                    }
+                }
+
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_favicon']);
+                    $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+
+                if (in_array('layout_favicon', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdoFav->query('SELECT layout_favicon AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $rawFav = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $adminFavicon = is_string($rawFav) ? trim($rawFav) : '';
+    } catch (\Exception $e) {
+        $adminFavicon = '';
+    }
+
+    $adminFaviconEsc = htmlspecialchars($adminFavicon, ENT_QUOTES, 'UTF-8');
+    $faviconMime = '';
+    if ($adminFavicon !== '') {
+        $ext = strtolower(pathinfo(parse_url($adminFavicon, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+        if ($ext === 'ico') $faviconMime = 'image/x-icon';
+        elseif ($ext === 'png') $faviconMime = 'image/png';
+        elseif ($ext === 'svg') $faviconMime = 'image/svg+xml';
+    }
+    ?>
+    <?php if ($adminFaviconEsc !== ''): ?>
+        <link rel="icon" href="<?= $adminFaviconEsc ?>" <?= $faviconMime !== '' ? ('type="' . htmlspecialchars($faviconMime, ENT_QUOTES, 'UTF-8') . '"') : '' ?>>
+        <link rel="shortcut icon" href="<?= $adminFaviconEsc ?>" <?= $faviconMime !== '' ? ('type="' . htmlspecialchars($faviconMime, ENT_QUOTES, 'UTF-8') . '"') : '' ?>>
+    <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php
