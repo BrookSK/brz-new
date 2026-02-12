@@ -10,9 +10,9 @@
                         <i class="fas fa-search text-muted"></i>
                     </span>
                     <input type="text" name="search" class="form-control border-start-0" 
-                           placeholder="Buscar produtos..." value="<?= htmlspecialchars($search ?? '') ?>">
+                           placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
                     <button type="submit" class="btn btn-primary btn-lg">
-                        Buscar
+                        <?= __('products.search_button', 'Buscar') ?>
                     </button>
                 </div>
             </form>
@@ -20,7 +20,7 @@
         <div class="col-lg-3">
             <form method="GET">
                 <select name="categoria" class="form-select form-select-lg" onchange="this.form.submit()">
-                    <option value="">Todas as Categorias</option>
+                    <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
                     <?php foreach ($categorias as $cat): ?>
                         <option value="<?= htmlspecialchars($cat['id']) ?>" 
                                 <?= ($categoriaSelecionada ?? '') == $cat['id'] ? 'selected' : '' ?>>
@@ -33,7 +33,7 @@
         <div class="col-lg-3 text-end">
             <a href="/carrinho" class="btn btn-success btn-lg">
                 <i class="fas fa-shopping-cart me-2"></i>
-                Ver Carrinho
+                <?= __('products.view_cart', 'Ver Carrinho') ?>
                 <span class="badge bg-white text-success ms-2 cart-badge">0</span>
             </a>
         </div>
@@ -45,8 +45,8 @@
             <div class="col-lg-12">
                 <div class="text-center py-5">
                     <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Nenhum produto encontrado</h3>
-                    <p class="text-muted">Tente ajustar sua busca ou filtros</p>
+                    <h3 class="text-muted"><?= __('products.none_found', 'Nenhum produto encontrado') ?></h3>
+                    <p class="text-muted"><?= __('products.try_adjust_search', 'Tente ajustar sua busca ou filtros') ?></p>
                 </div>
             </div>
         <?php else: ?>
@@ -62,13 +62,13 @@
                             <?php if ($produto['stock'] <= 5 && $produto['stock'] > 0): ?>
                                 <span class="position-absolute top-0 end-0 m-2 badge bg-warning">
                                     <i class="fas fa-exclamation-triangle me-1"></i>
-                                    <?= $produto['stock'] ?> unidades
+                                    <?= (int) $produto['stock'] ?> <?= __('home.units_short', 'unidades') ?>
                                 </span>
                             <?php endif; ?>
                             <!-- Badge de Destaque -->
                             <?php if ($produto['featured']): ?>
                                 <span class="position-absolute top-0 start-0 m-2 badge bg-danger">
-                                    <i class="fas fa-star me-1"></i>Destaque
+                                    <i class="fas fa-star me-1"></i><?= __('products.featured', 'Destaque') ?>
                                 </span>
                             <?php endif; ?>
                         <?php else: ?>
@@ -82,7 +82,7 @@
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="fas fa-tag me-1"></i>
-                                <?= htmlspecialchars($produto['categoria'] ?? 'Sem categoria') ?>
+                                <?= htmlspecialchars($produto['categoria'] ?? __('products.no_category', 'Sem categoria')) ?>
                             </small>
                         </div>
                         
@@ -110,11 +110,11 @@
                             <div class="stock-info">
                                 <?php if ($produto['stock'] > 0): ?>
                                     <span class="badge bg-success">
-                                        <i class="fas fa-check-circle me-1"></i>Disponível
+                                        <i class="fas fa-check-circle me-1"></i><?= __('products.available', 'Disponível') ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="badge bg-danger">
-                                        <i class="fas fa-times-circle me-1"></i>Esgotado
+                                        <i class="fas fa-times-circle me-1"></i><?= __('products.out_of_stock', 'Esgotado') ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
@@ -125,7 +125,7 @@
                         <div class="d-grid gap-2">
                             <a href="/produto/detalhes/<?= $produto['id'] ?>" 
                                class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-eye me-2"></i>Ver Detalhes
+                                <i class="fas fa-eye me-2"></i><?= __('products.view_details', 'Ver Detalhes') ?>
                             </a>
                             <button class="btn btn-primary btn-sm btn-adicionar-modern" 
                                     data-produto-id="<?= $produto['id'] ?>"
@@ -134,7 +134,7 @@
                                     data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
                                     <?= $produto['stock'] > 0 ? '' : 'disabled' ?>>
                                 <i class="fas fa-cart-plus me-2"></i>
-                                <?= $produto['stock'] > 0 ? 'Adicionar ao Carrinho' : 'Indisponível' ?>
+                                <?= $produto['stock'] > 0 ? __('products.add_to_cart', 'Adicionar ao Carrinho') : __('products.unavailable', 'Indisponível') ?>
                             </button>
                         </div>
                     </div>
@@ -144,6 +144,14 @@
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+window.PRODUCTS_MODERNO_I18N = {
+    add_to_cart: <?= json_encode(__('products.add_to_cart', 'Adicionar ao Carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('products.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    error_add: <?= json_encode(__('products.error_add', 'Erro ao adicionar produto'), JSON_UNESCAPED_UNICODE) ?>
+};
+</script>
 
 <style>
 .product-card-modern {
@@ -271,7 +279,7 @@ function adicionarAoCarrinhoModerno(botao) {
     
     // Desabilitar botão
     botao.disabled = true;
-    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adicionando...';
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.adding) ? window.PRODUCTS_MODERNO_I18N.adding : 'Adicionando...');
     
     // Fazer requisição AJAX
     fetch('/carrinho/adicionar', {
@@ -286,7 +294,7 @@ function adicionarAoCarrinhoModerno(botao) {
     .then(data => {
         // Reabilitar botão
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.add_to_cart) ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
         
         if (data.success) {
             mostrarAlerta('success', data.message);
@@ -297,8 +305,8 @@ function adicionarAoCarrinhoModerno(botao) {
     })
     .catch(error => {
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
-        mostrarAlerta('danger', 'Erro ao adicionar produto');
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.add_to_cart) ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
+        mostrarAlerta('danger', (window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.error_add) ? window.PRODUCTS_MODERNO_I18N.error_add : 'Erro ao adicionar produto');
     });
 }
 

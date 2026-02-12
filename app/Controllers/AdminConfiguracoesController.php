@@ -404,16 +404,18 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label small mb-1">Idioma do banner</label>
-                                                <select class="form-select" name="layout_banners_lang" onchange="this.form.submit()">
-                                                    <option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>
-                                                    <option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>
-                                                </select>
+                                                <select class="form-select" name="layout_banners_lang" onchange="(function(sel){var u=new URL(window.location.href);u.searchParams.set(\'layout_banners_lang\', sel.value);window.location.href=u.toString();})(this)">';
+
+                                            echo '<option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>';
+                                            echo '<option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>';
+
+                                            echo '</select>
                                                 <div class="text-muted small mt-1">Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.</div>
                                             </div>
 
                                             <div id="layout-banners-existing" class="row g-2 mb-3">
                                                 ';
-                                                $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
+
                                                 $bannersKey = ($selectedLang === 'en') ? 'banners_en' : 'banners';
                                                 $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', $bannersKey, '[]');
                                                 $existingBanners = json_decode($existingBannersRaw, true);
