@@ -6,12 +6,44 @@ use App\Services\AuthService;
 use App\Services\PaymentService;
 
 class AdminPagamentosController extends Controller {
+
+    private function getTableColumnsPdo(\PDO $pdo, string $table): array {
+        try {
+            $stmt = $pdo->query('DESCRIBE ' . $table);
+            return $stmt ? ($stmt->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $columns, array $candidates): string {
+        $lower = [];
+        foreach ($columns as $c) {
+            $lower[strtolower((string) $c)] = (string) $c;
+        }
+        foreach ($candidates as $cand) {
+            $key = strtolower((string) $cand);
+            if (isset($lower[$key])) {
+                return $lower[$key];
+            }
+        }
+        return '';
+    }
     
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
+
+        $loadError = '';
         try {
             $pdo = \Config\Database::getConnection();
+
+            $colsPedidos = $this->getTableColumnsPdo($pdo, 'pedidos');
+            $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
+
+            $colUsuarioNome = $this->pickColumn($colsUsuarios, ['nome', 'name', 'full_name']);
+            $colPedidoCreatedAt = $this->pickColumn($colsPedidos, ['created_at', 'data_criacao', 'created', 'data']);
+
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
@@ -19,11 +51,16 @@ class AdminPagamentosController extends Controller {
             $status = $request->getParam('status', '');
             $metodo = $request->getParam('metodo', '');
             $gateway = $request->getParam('gateway', '');
+
+            $selectUsuarioNome = "'Visitante'";
+            if ($colUsuarioNome !== '') {
+                $selectUsuarioNome = 'u.' . $colUsuarioNome;
+            }
             
             $sql = "
                 SELECT
                     p.*,
-                    u.nome as cliente_nome,
+                    {$selectUsuarioNome} as cliente_nome,
                     u.email as cliente_email,
                     COALESCE(p.payment_gateway, p.pagamento_gateway, '') as gateway_pagamento,
                     COALESCE(p.payment_id, p.pagamento_transacao, '') as codigo_transacao,
@@ -52,7 +89,12 @@ class AdminPagamentosController extends Controller {
                 $params[':gateway'] = strtolower((string) $gateway);
             }
             
-            $sql .= " ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset";
+            if ($colPedidoCreatedAt !== '') {
+                $sql .= ' ORDER BY p.' . $colPedidoCreatedAt . ' DESC';
+            } else {
+                $sql .= ' ORDER BY p.id DESC';
+            }
+            $sql .= " LIMIT :limite OFFSET :offset";
             
             $stmt = $pdo->prepare($sql);
             foreach ($params as $key => $value) $stmt->bindValue($key, $value);
@@ -86,24 +128,36 @@ class AdminPagamentosController extends Controller {
             $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
             $totalPaginas = ceil($total / $limite);
             
-            // Estatísticas
-            $stmtStats = $pdo->query("
-                SELECT 
-                    COUNT(*) as total_transacoes,
-                    SUM(p.valor_total) as valor_total,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'approved' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'aprovado' THEN p.valor_total ELSE 0 END) as valor_aprovado,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'pending' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'pendente' THEN p.valor_total ELSE 0 END) as valor_pendente,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'rejected' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'recusado' THEN p.valor_total ELSE 0 END) as valor_recusado
-                FROM pedidos p
-                WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            ");
-            $stats = $stmtStats->fetch(\PDO::FETCH_ASSOC);
+            // Estatísticas (não pode derrubar a listagem caso falhe por schema)
+            $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
+            try {
+                $colValorTotal = $this->pickColumn($colsPedidos, ['valor_total', 'total', 'total_valor', 'valor']);
+                if ($colValorTotal !== '' && $colPedidoCreatedAt !== '') {
+                    $stmtStats = $pdo->query("
+                        SELECT 
+                            COUNT(*) as total_transacoes,
+                            SUM(p.{$colValorTotal}) as valor_total,
+                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'approved' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'aprovado' THEN p.{$colValorTotal} ELSE 0 END) as valor_aprovado,
+                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'pending' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'pendente' THEN p.{$colValorTotal} ELSE 0 END) as valor_pendente,
+                            SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'rejected' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'recusado' THEN p.{$colValorTotal} ELSE 0 END) as valor_recusado
+                        FROM pedidos p
+                        WHERE p.{$colPedidoCreatedAt} >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    ");
+                    $rowStats = $stmtStats ? $stmtStats->fetch(\PDO::FETCH_ASSOC) : null;
+                    if (is_array($rowStats)) {
+                        $stats = array_merge($stats, $rowStats);
+                    }
+                }
+            } catch (\Exception $e) {
+                // fallback silencioso
+            }
             
         } catch (\Exception $e) {
             $pagamentos = [];
             $total = 0;
             $totalPaginas = 0;
             $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
+            $loadError = $e->getMessage();
         }
         
         // Incluir o partial do menu lateral
@@ -149,6 +203,10 @@ class AdminPagamentosController extends Controller {
                         </button>
                     </div>
                 </div>';
+
+                if (!empty($loadError)) {
+                    echo '<div class="alert alert-danger">Erro ao carregar pagamentos: ' . htmlspecialchars($loadError) . '</div>';
+                }
                 
                 echo '<div class="row mb-4">
                     <div class="col-xl-3 col-md-6 mb-4">
