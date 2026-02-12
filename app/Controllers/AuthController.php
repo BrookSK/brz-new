@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\CpfValidator;
 use App\Models\Usuario;
 
 class AuthController extends Controller {
@@ -542,10 +543,16 @@ class AuthController extends Controller {
         }
 
         // CPF: obrigatório somente para residentes no Brasil
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
             }
         }
         

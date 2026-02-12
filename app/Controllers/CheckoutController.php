@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\CpfValidator;
 use App\Models\Carrinho;
 use App\Models\Usuario;
 use App\Models\Endereco;
@@ -2632,10 +2633,16 @@ class CheckoutController extends Controller {
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
             }
         }
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
@@ -2660,9 +2667,16 @@ class CheckoutController extends Controller {
                 $erros[] = 'Telefone do destinatário é obrigatório';
             }
             if ($pais === 'BR') {
-                $docDest = preg_replace('/\D+/', '', (string) ($dados['destinatario_documento'] ?? ''));
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
                 if ($docDest === '' || strlen($docDest) < 11) {
                     $erros[] = 'CPF do destinatário é obrigatório para entregas no Brasil';
+                } elseif (strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
+                }
+            } else {
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
+                if ($docDest !== '' && strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
                 }
             }
         }
