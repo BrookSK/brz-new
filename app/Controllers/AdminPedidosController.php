@@ -7,6 +7,7 @@ use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
 use App\Services\AuthService;
 use App\Services\SupportTicketNotificationService;
+use App\Services\CpfValidator;
 
 class AdminPedidosController extends Controller {
 
@@ -118,6 +119,80 @@ class AdminPedidosController extends Controller {
                 }
             } catch (\Exception $e) {
             }
+        }
+
+        // Invalid CPF (from pedido or usuario)
+        try {
+            if ($this->tableExistsPdo($pdo, 'pedidos')) {
+                $colsPed = $this->getTableColumnsPdo($pdo, 'pedidos');
+                $colsUsu = $this->tableExistsPdo($pdo, 'usuarios') ? $this->getTableColumnsPdo($pdo, 'usuarios') : [];
+
+                $colUsuarioId = $this->pickColumn($colsPed, ['usuario_id', 'user_id', 'cliente_id']);
+
+                $docPedCols = [];
+                foreach (['cliente_documento', 'documento', 'cpf_cnpj', 'customer_document', 'cpf'] as $c) {
+                    if (in_array($c, $colsPed, true)) {
+                        $docPedCols[] = $c;
+                    }
+                }
+                $docUsuCols = [];
+                foreach (['documento', 'cpf', 'cpf_cnpj'] as $c) {
+                    if (in_array($c, $colsUsu, true)) {
+                        $docUsuCols[] = $c;
+                    }
+                }
+
+                if (!empty($docPedCols) || (!empty($docUsuCols) && $colUsuarioId)) {
+                    $select = ['p.id AS pedido_id'];
+                    foreach ($docPedCols as $c) {
+                        $select[] = 'p.' . $c . ' AS ped_' . $c;
+                    }
+                    if (!empty($docUsuCols) && $colUsuarioId) {
+                        foreach ($docUsuCols as $c) {
+                            $select[] = 'u.' . $c . ' AS usu_' . $c;
+                        }
+                        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p LEFT JOIN usuarios u ON u.id = p.' . $colUsuarioId . ' WHERE p.id IN (' . $placeholders . ')';
+                    } else {
+                        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.id IN (' . $placeholders . ')';
+                    }
+
+                    $stCpf = $pdo->prepare($sql);
+                    $stCpf->execute($pedidoIds);
+                    $rowsCpf = $stCpf->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsCpf as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid <= 0) continue;
+
+                        $doc = '';
+                        foreach ($docPedCols as $c) {
+                            $v = trim((string) ($r['ped_' . $c] ?? ''));
+                            if ($v !== '') {
+                                $doc = $v;
+                                break;
+                            }
+                        }
+                        if ($doc === '' && !empty($docUsuCols)) {
+                            foreach ($docUsuCols as $c) {
+                                $v = trim((string) ($r['usu_' . $c] ?? ''));
+                                if ($v !== '') {
+                                    $doc = $v;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $digits = CpfValidator::onlyDigits($doc);
+                        $cpfInvalid = ($digits !== '' && strlen($digits) === 11 && !CpfValidator::isValid($digits));
+                        if ($cpfInvalid) {
+                            if (!isset($out[$pid])) {
+                                $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                            }
+                            $out[$pid]['cpf_invalid'] = true;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
         }
 
         return $out;
@@ -1618,8 +1693,10 @@ JS;
                     $statusColor = $this->getStatusColor($pedido['status']);
 
                     $pid = (int) ($pedido['id'] ?? 0);
-                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -1627,6 +1704,9 @@ JS;
                         }
                         if (!empty($warn['missing_ncm'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
                         }
                     }
                     
@@ -1743,8 +1823,10 @@ JS;
                     $statusColor = $this->getStatusColor($pedido['status']);
 
                     $pid = (int) ($pedido['id'] ?? 0);
-                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -1752,6 +1834,9 @@ JS;
                         }
                         if (!empty($warn['missing_ncm'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
                         }
                     }
 
@@ -1867,8 +1952,10 @@ JS;
                     $statusColor = $this->getStatusColor($pedido['status']);
 
                     $pid = (int) ($pedido['id'] ?? 0);
-                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid])) ? $warningsMap[$pid] : ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']));
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -1876,6 +1963,9 @@ JS;
                         }
                         if (!empty($warn['missing_ncm'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
                         }
                     }
 
@@ -2216,7 +2306,7 @@ HTML;
                     </div>';
             }
 
-            // Aviso: itens sem custo ou sem NCM
+            // Aviso: itens sem custo / sem NCM / CPF inválido
             try {
                 $pdoWarn = $pdoCols ?? null;
                 if (!($pdoWarn instanceof \PDO)) {
@@ -2224,10 +2314,11 @@ HTML;
                 }
                 $warnMap = $this->getPedidosMissingDataWarnings($pdoWarn, [(int) $id]);
                 $warn = isset($warnMap[(int) $id]) && is_array($warnMap[(int) $id]) ? $warnMap[(int) $id] : null;
-                if (is_array($warn) && (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']))) {
+                if (is_array($warn) && (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']))) {
                     $parts = [];
                     if (!empty($warn['missing_cost'])) $parts[] = 'custo do produto vazio/0';
                     if (!empty($warn['missing_ncm'])) $parts[] = 'NCM não cadastrado';
+                    if (!empty($warn['cpf_invalid'])) $parts[] = 'CPF inválido';
                     echo '<div class="alert alert-warning">
                             <div style="font-weight:800;">Atenção: pedido precisa de revisão</div>
                             <div class="small">Encontrado item com ' . htmlspecialchars(implode(' e ', $parts)) . '. Edite o(s) produto(s) do pedido e cadastre corretamente.</div>

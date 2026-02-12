@@ -4,9 +4,11 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\CpfValidator;
 use App\Services\PdfPedidoService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
+use App\Models\Endereco;
 use App\Models\Carrinho;
 use App\Models\AssessoriaOrcamento;
 
@@ -1560,10 +1562,16 @@ class UsuarioController extends Controller {
             $pais = 'BR';
         }
 
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
             }
         }
 

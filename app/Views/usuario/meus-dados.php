@@ -215,6 +215,19 @@
             <?php unset($_SESSION['message'], $_SESSION['message_type']); ?>
             <?php endif; ?>
 
+            <?php
+                $docDigits = preg_replace('/\D+/', '', (string) ($usuario['documento'] ?? ($usuario['cpf'] ?? '')));
+                $cpfInvalid = false;
+                if ($docDigits !== '' && strlen($docDigits) === 11) {
+                    $cpfInvalid = !\App\Services\CpfValidator::isValid($docDigits);
+                }
+            ?>
+            <?php if (!empty($cpfInvalid)): ?>
+            <div class="alert alert-warning">
+                <?= __('user_data.cpf_invalid_warning', 'Atenção: seu CPF está inválido. Atualize seus dados cadastrais para continuar comprando.') ?>
+            </div>
+            <?php endif; ?>
+
             <form method="POST" action="/meus-dados" id="formMeusDados">
             
             <!-- Profile Form -->
