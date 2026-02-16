@@ -28,6 +28,10 @@ $billingPhone = wpVal($meta, '_billing_phone');
 
 $shipAddress1 = wpVal($meta, '_shipping_address_1');
 $shipAddress2 = wpVal($meta, '_shipping_address_2');
+$shipNumber = wpVal($meta, '_shipping_number');
+if ($shipNumber === '') $shipNumber = wpVal($meta, 'shipping_number');
+if ($shipNumber === '') $shipNumber = wpVal($meta, '_shipping_numero');
+if ($shipNumber === '') $shipNumber = wpVal($meta, 'shipping_numero');
 $shipCity = wpVal($meta, '_shipping_city');
 $shipState = wpVal($meta, '_shipping_state');
 $shipPostcode = wpVal($meta, '_shipping_postcode');
@@ -45,6 +49,10 @@ if ($tracking === '') $tracking = wpVal($meta, 'tracking_code');
 $paymentMethod = wpVal($meta, '_payment_method');
 $transactionId = wpVal($meta, '_transaction_id');
 
+$wexpressLabelUrl = wpVal($meta, 'wexpress_label_url');
+if ($wexpressLabelUrl === '') $wexpressLabelUrl = wpVal($meta, '_wexpress_label_url');
+if ($wexpressLabelUrl === '') $wexpressLabelUrl = wpVal($meta, 'wp_wexpress_label_url');
+
 ?>
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -54,7 +62,13 @@ $transactionId = wpVal($meta, '_transaction_id');
     </div>
     <div class="d-flex gap-2">
         <a href="/admin/pedidos-wp" class="btn btn-outline-secondary"><?= __('common.back', 'Voltar') ?></a>
-        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></button>
+        <?php if ($wexpressLabelUrl !== ''): ?>
+            <a class="btn btn-success" href="<?= htmlspecialchars($wexpressLabelUrl) ?>" target="_blank" rel="noopener">
+                <?= __('admin.orders_wp.details.download_wexpress_label', 'Baixar etiqueta W-Express') ?>
+            </a>
+        <?php else: ?>
+            <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -96,7 +110,14 @@ function gerarEtiquetaWexpressWp(orderId) {
         const labelUrl = data.label_url || '';
         alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success : 'Etiqueta gerada com sucesso!');
         if (labelUrl) {
-            window.open(labelUrl, '_blank');
+            const w = window.open(labelUrl, '_blank');
+            if (!w) {
+                // fallback quando o navegador bloquear popup
+                window.location.href = labelUrl;
+                return;
+            }
+            // Atualiza a tela para refletir a etiqueta salva no WooCommerce
+            setTimeout(() => location.reload(), 800);
         } else {
             location.reload();
         }
@@ -143,6 +164,7 @@ function gerarEtiquetaWexpressWp(orderId) {
             <div class="card-body">
                 <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?> 1:</strong> <?= htmlspecialchars($shipAddress1 ?: '-') ?></div>
                 <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?> 2:</strong> <?= htmlspecialchars($shipAddress2 ?: '-') ?></div>
+                <?php if ($shipNumber !== ''): ?><div><strong><?= __('checkout.number', 'Número') ?>:</strong> <?= htmlspecialchars($shipNumber) ?></div><?php endif; ?>
                 <?php if ($shipNeighborhood !== ''): ?><div><strong><?= __('checkout.neighborhood', 'Bairro') ?>:</strong> <?= htmlspecialchars($shipNeighborhood) ?></div><?php endif; ?>
                 <div><strong><?= __('admin.orders_wp.details.city_state', 'Cidade/Estado') ?>:</strong> <?= htmlspecialchars(trim($shipCity . ' / ' . $shipState) ?: '-') ?></div>
                 <div><strong><?= __('checkout.zip_code', 'CEP') ?>:</strong> <?= htmlspecialchars($shipPostcode ?: '-') ?></div>
