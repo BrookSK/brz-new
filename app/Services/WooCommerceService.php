@@ -6,15 +6,24 @@ class WooCommerceService {
     private string $consumerKey;
     private string $consumerSecret;
     private int $lastHttpCode = 0;
+    private bool $sslVerify = true;
+    private string $caBundlePath = '';
 
     public function __construct() {
         $this->storeUrl = (string) $this->getConfig('woocommerce', 'store_url', '');
         $this->consumerKey = (string) $this->getConfig('woocommerce', 'consumer_key', '');
         $this->consumerSecret = (string) $this->getConfig('woocommerce', 'consumer_secret', '');
+        $sslVerifyRaw = $this->getConfig('woocommerce', 'ssl_verify', null);
+        $this->caBundlePath = trim((string) $this->getConfig('woocommerce', 'ca_bundle_path', ''));
 
         $this->storeUrl = rtrim(trim($this->storeUrl), '/');
         $this->consumerKey = trim($this->consumerKey);
         $this->consumerSecret = trim($this->consumerSecret);
+
+        if ($sslVerifyRaw !== null) {
+            $v = strtolower(trim((string) $sslVerifyRaw));
+            $this->sslVerify = !in_array($v, ['0', 'false', 'no', 'off'], true);
+        }
     }
 
     public function getLastHttpCode(): int {
@@ -86,6 +95,16 @@ class WooCommerceService {
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_USERPWD, $this->consumerKey . ':' . $this->consumerSecret);
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        if (!$this->sslVerify) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } else {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            if ($this->caBundlePath !== '') {
+                curl_setopt($ch, CURLOPT_CAINFO, $this->caBundlePath);
+            }
+        }
         if ($payload !== null) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         }
