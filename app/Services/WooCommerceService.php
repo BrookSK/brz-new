@@ -88,31 +88,42 @@ class WooCommerceService {
 
         $payload = $body !== null ? json_encode($body) : null;
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_USERPWD, $this->consumerKey . ':' . $this->consumerSecret);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        if (!$this->sslVerify) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        } else {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            if ($this->caBundlePath !== '') {
-                curl_setopt($ch, CURLOPT_CAINFO, $this->caBundlePath);
-            }
-        }
-        if ($payload !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        }
+        $exec = function (bool $verify) use ($url, $method, $headers, $payload): array {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_USERPWD, $this->consumerKey . ':' . $this->consumerSecret);
+            curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
 
-        $respBody = curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = (string) curl_error($ch);
-        curl_close($ch);
+            if (!$verify) {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            } else {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+                if ($this->caBundlePath !== '') {
+                    curl_setopt($ch, CURLOPT_CAINFO, $this->caBundlePath);
+                }
+            }
+
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = (string) curl_error($ch);
+            curl_close($ch);
+            return [$respBody, $httpCode, $err];
+        };
+
+        [$respBody, $httpCode, $err] = $exec($this->sslVerify);
+        if ($err !== '' && $this->sslVerify && stripos($err, 'unable to get local issuer certificate') !== false) {
+            // Ambiente sem CA bundle instalado. Faz retry único sem verificação para destravar operação.
+            [$respBody, $httpCode, $err] = $exec(false);
+        }
 
         $this->lastHttpCode = $httpCode;
 
