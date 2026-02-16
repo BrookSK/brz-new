@@ -32,6 +32,9 @@ $shipCity = wpVal($meta, '_shipping_city');
 $shipState = wpVal($meta, '_shipping_state');
 $shipPostcode = wpVal($meta, '_shipping_postcode');
 $shipCountry = wpVal($meta, '_shipping_country');
+$shipNeighborhood = wpVal($meta, '_shipping_neighborhood');
+if ($shipNeighborhood === '') $shipNeighborhood = wpVal($meta, '_shipping_bairro');
+if ($shipNeighborhood === '') $shipNeighborhood = wpVal($meta, 'shipping_bairro');
 $shipSuite = wpVal($meta, 'suite');
 if ($shipSuite === '') $shipSuite = wpVal($meta, '_shipping_suite');
 if ($shipSuite === '') $shipSuite = wpVal($meta, 'shipping_suite');
@@ -138,7 +141,9 @@ function gerarEtiquetaWexpressWp(orderId) {
         <div class="card">
             <div class="card-header"><strong><?= __('admin.orders_wp.details.delivery', 'Entrega') ?></strong></div>
             <div class="card-body">
-                <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?>:</strong> <?= htmlspecialchars(trim($shipAddress1 . ' ' . $shipAddress2) ?: '-') ?></div>
+                <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?> 1:</strong> <?= htmlspecialchars($shipAddress1 ?: '-') ?></div>
+                <div><strong><?= __('admin.orders_wp.details.address', 'Endereço') ?> 2:</strong> <?= htmlspecialchars($shipAddress2 ?: '-') ?></div>
+                <?php if ($shipNeighborhood !== ''): ?><div><strong><?= __('checkout.neighborhood', 'Bairro') ?>:</strong> <?= htmlspecialchars($shipNeighborhood) ?></div><?php endif; ?>
                 <div><strong><?= __('admin.orders_wp.details.city_state', 'Cidade/Estado') ?>:</strong> <?= htmlspecialchars(trim($shipCity . ' / ' . $shipState) ?: '-') ?></div>
                 <div><strong><?= __('checkout.zip_code', 'CEP') ?>:</strong> <?= htmlspecialchars($shipPostcode ?: '-') ?></div>
                 <div><strong><?= __('admin.orders_wp.details.country', 'País') ?>:</strong> <?= htmlspecialchars($shipCountry ?: '-') ?></div>
