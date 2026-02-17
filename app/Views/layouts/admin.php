@@ -259,7 +259,7 @@
         </div>
 
         <footer class="border-top py-3 mt-auto">
-            <div class="text-center text-muted small">&copy; 2024 Braziliana. <?= __('admin.all_rights_reserved', 'Todos os direitos reservados.') ?></div>
+            <div class="text-center text-muted small">&copy; 2026 Braziliana. <?= __('admin.all_rights_reserved', 'Todos os direitos reservados.') ?></div>
         </footer>
     </div>
     
