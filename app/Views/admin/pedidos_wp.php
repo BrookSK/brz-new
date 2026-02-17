@@ -83,6 +83,7 @@ function wpFormatMoney($v, $currency) {
                             $created = (string) ($p['created_at'] ?? '');
                             $status = (string) ($p['status'] ?? '');
                             $num = (string) ($p['numero_pedido'] ?? '');
+                            $orderNumberDisplay = trim((string) ($p['order_number_display'] ?? ''));
                             $src = strtolower(trim((string) ($p['source'] ?? $source)));
                             if (!in_array($src, ['br','red','us'], true)) $src = 'br';
                             $totalV = $p['order_total'] ?? 0;
@@ -95,8 +96,11 @@ function wpFormatMoney($v, $currency) {
                             ?>
                             <tr>
                                 <td>
-                                    <div class="fw-semibold">#<?= $id ?></div>
+                                    <div class="fw-semibold">#<?= htmlspecialchars($orderNumberDisplay !== '' ? $orderNumberDisplay : (string) $id) ?></div>
                                     <div class="text-muted small"><?= htmlspecialchars($num) ?></div>
+                                    <?php if ($orderNumberDisplay !== '' && (string) $id !== $orderNumberDisplay): ?>
+                                        <div class="text-muted small">ID: <?= (int) $id ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td><span class="badge bg-dark"><?= htmlspecialchars(strtoupper($src)) ?></span></td>
                                 <td><?= $created !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($created))) : '-' ?></td>

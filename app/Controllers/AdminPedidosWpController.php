@@ -546,12 +546,19 @@ class AdminPedidosWpController extends Controller {
             p.post_date AS created_at,
             p.post_status AS status,
             p.post_title AS numero_pedido,
+            COALESCE(pm_on.meta_value, pm_onf.meta_value, pm_ond.meta_value, pm_onfull.meta_value, pm_wcon.meta_value, pm_onplain.meta_value) AS order_number_display,
             pm_total.meta_value AS order_total,
             pm_curr.meta_value AS currency,
             pm_mail.meta_value AS billing_email,
             pm_fn.meta_value AS billing_first_name,
             pm_ln.meta_value AS billing_last_name
         FROM {$prefix}posts p
+        LEFT JOIN {$prefix}postmeta pm_on ON pm_on.post_id = p.ID AND pm_on.meta_key = '_order_number'
+        LEFT JOIN {$prefix}postmeta pm_onf ON pm_onf.post_id = p.ID AND pm_onf.meta_key = '_order_number_formatted'
+        LEFT JOIN {$prefix}postmeta pm_ond ON pm_ond.post_id = p.ID AND pm_ond.meta_key = '_order_number_display'
+        LEFT JOIN {$prefix}postmeta pm_onfull ON pm_onfull.post_id = p.ID AND pm_onfull.meta_key = '_order_number_full'
+        LEFT JOIN {$prefix}postmeta pm_wcon ON pm_wcon.post_id = p.ID AND pm_wcon.meta_key = '_wc_order_number'
+        LEFT JOIN {$prefix}postmeta pm_onplain ON pm_onplain.post_id = p.ID AND pm_onplain.meta_key = 'order_number'
         LEFT JOIN {$prefix}postmeta pm_total ON pm_total.post_id = p.ID AND pm_total.meta_key = '_order_total'
         LEFT JOIN {$prefix}postmeta pm_curr ON pm_curr.post_id = p.ID AND pm_curr.meta_key = '_order_currency'
         LEFT JOIN {$prefix}postmeta pm_mail ON pm_mail.post_id = p.ID AND pm_mail.meta_key = '_billing_email'
