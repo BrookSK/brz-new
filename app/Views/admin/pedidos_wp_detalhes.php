@@ -64,7 +64,7 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
         <div class="text-muted small"><?= htmlspecialchars((string) (($pedido['post_title'] ?? $pedido['numero_pedido'] ?? '') ?: '')) ?></div>
     </div>
     <div class="d-flex gap-2">
-        <a href="/admin/pedidos-wp" class="btn btn-outline-secondary"><?= __('common.back', 'Voltar') ?></a>
+        <a href="/admin/pedidos-wp?<?= http_build_query(['source' => $source]) ?>" class="btn btn-outline-secondary"><?= __('common.back', 'Voltar') ?></a>
         <?php if ($wexpressLabelUrl !== ''): ?>
             <a class="btn btn-success" href="<?= htmlspecialchars($wexpressLabelUrl) ?>" target="_blank" rel="noopener">
                 <?= __('admin.orders_wp.details.download_wexpress_label', 'Baixar etiqueta W-Express') ?>
@@ -72,8 +72,6 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
         <?php else: ?>
             <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></button>
         <?php endif; ?>
-        <a href="/admin/pedidos-wp?<?= http_build_query(['source' => $source]) ?>" class="btn btn-outline-secondary">Voltar</a>
-        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>, '<?= htmlspecialchars($source, ENT_QUOTES, 'UTF-8') ?>')">Gerar etiqueta W-Express</button>
     </div>
 </div>
 
@@ -90,15 +88,20 @@ window.ADMIN_ORDERS_WP_DETAILS_I18N = {
     error_prefix: <?= json_encode(__('admin.orders_wp.details.js.error_prefix', 'Erro:'), JSON_UNESCAPED_UNICODE) ?>
 };
 
-function gerarEtiquetaWexpressWp(orderId) {
+window.ADMIN_ORDERS_WP_DETAILS_SOURCE = <?= json_encode($source, JSON_UNESCAPED_UNICODE) ?>;
+
 function gerarEtiquetaWexpressWp(orderId, source) {
     if (!orderId) {
         alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order : 'Pedido inválido');
         return;
     }
+    source = (source || window.ADMIN_ORDERS_WP_DETAILS_SOURCE || 'br').toString().toLowerCase();
     if (!confirm((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label : 'Deseja gerar a etiqueta da W-Express para este pedido?')) return;
-    source = (source || 'br').toString().toLowerCase();
-    if (!confirm('Deseja gerar a etiqueta da W-Express para este pedido?')) return;
+
+    var btn = document.getElementById('btnGerarEtiquetaWexpress');
+    if (btn) {
+        btn.disabled = true;
+    }
 
     fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId + '?source=' + encodeURIComponent(source), {
         method: 'POST',
@@ -120,9 +123,13 @@ function gerarEtiquetaWexpressWp(orderId, source) {
         if (labelUrl) {
             const w = window.open(labelUrl, '_blank');
             if (!w) {
-                // fallback quando o navegador bloquear popup
-                window.location.href = labelUrl;
-                return;
+                // Popup bloqueado: não navega para fora do admin. Mostra a URL para abrir manualmente.
+                var msg = 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:\n' + labelUrl;
+                try {
+                    window.prompt(msg, labelUrl);
+                } catch (e) {
+                    alert(msg);
+                }
             }
             // Atualiza a tela para refletir a etiqueta salva no WooCommerce
             setTimeout(() => location.reload(), 800);
@@ -133,6 +140,11 @@ function gerarEtiquetaWexpressWp(orderId, source) {
     .catch((e) => {
         const errPrefix = (window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix : 'Erro:';
         alert(errPrefix + ' ' + (e && e.message ? e.message : String(e)));
+    })
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+        }
     });
 }
 </script>
