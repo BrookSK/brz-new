@@ -5,6 +5,9 @@ $limite = $limite ?? 50;
 $total = $total ?? 0;
 $pedidos = is_array($pedidos ?? null) ? $pedidos : [];
 $erro = (string) ($erro ?? '');
+$source = strtolower(trim((string) ($source ?? ($_GET['source'] ?? 'br'))));
+$allowedSources = ['all', 'br', 'red', 'us'];
+if (!in_array($source, $allowedSources, true)) $source = 'br';
 
 $totalPaginas = $limite > 0 ? (int) ceil($total / $limite) : 1;
 if ($totalPaginas <= 0) $totalPaginas = 1;
@@ -34,6 +37,14 @@ function wpFormatMoney($v, $currency) {
         <input type="text" class="form-control" name="busca" placeholder="Buscar por ID, número, nome ou email..." value="<?= htmlspecialchars($busca) ?>">
     </div>
     <div class="col-md-2">
+        <select class="form-select" name="source">
+            <option value="all" <?= $source === 'all' ? 'selected' : '' ?>>Todas</option>
+            <option value="br" <?= $source === 'br' ? 'selected' : '' ?>>BR</option>
+            <option value="red" <?= $source === 'red' ? 'selected' : '' ?>>RED</option>
+            <option value="us" <?= $source === 'us' ? 'selected' : '' ?>>US</option>
+        </select>
+    </div>
+    <div class="col-md-2">
         <select class="form-select" name="limit">
             <?php foreach ([25,50,100,200] as $l): ?>
                 <option value="<?= $l ?>" <?= ((int)$limite === (int)$l) ? 'selected' : '' ?>><?= $l ?>/página</option>
@@ -52,6 +63,7 @@ function wpFormatMoney($v, $currency) {
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Origem</th>
                         <th>Data</th>
                         <th>Status</th>
                         <th>Cliente</th>
@@ -62,7 +74,7 @@ function wpFormatMoney($v, $currency) {
                 <tbody>
                     <?php if (empty($pedidos)): ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Nenhum pedido encontrado.</td>
+                            <td colspan="7" class="text-center text-muted">Nenhum pedido encontrado.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pedidos as $p): ?>
@@ -71,6 +83,8 @@ function wpFormatMoney($v, $currency) {
                             $created = (string) ($p['created_at'] ?? '');
                             $status = (string) ($p['status'] ?? '');
                             $num = (string) ($p['numero_pedido'] ?? '');
+                            $src = strtolower(trim((string) ($p['source'] ?? $source)));
+                            if (!in_array($src, ['br','red','us'], true)) $src = 'br';
                             $totalV = $p['order_total'] ?? 0;
                             $curr = (string) ($p['currency'] ?? '');
                             $email = (string) ($p['billing_email'] ?? '');
@@ -84,6 +98,7 @@ function wpFormatMoney($v, $currency) {
                                     <div class="fw-semibold">#<?= $id ?></div>
                                     <div class="text-muted small"><?= htmlspecialchars($num) ?></div>
                                 </td>
+                                <td><span class="badge bg-dark"><?= htmlspecialchars(strtoupper($src)) ?></span></td>
                                 <td><?= $created !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($created))) : '-' ?></td>
                                 <td><span class="badge bg-secondary"><?= htmlspecialchars($status) ?></span></td>
                                 <td>
@@ -92,7 +107,7 @@ function wpFormatMoney($v, $currency) {
                                 </td>
                                 <td class="fw-semibold text-primary"><?= htmlspecialchars(wpFormatMoney($totalV, $curr)) ?></td>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= $id ?>">
+                                    <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= $id ?>?<?= http_build_query(['source' => $src]) ?>">
                                         <i class="fas fa-eye"></i> Ver
                                     </a>
                                 </td>

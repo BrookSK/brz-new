@@ -42,6 +42,9 @@ if ($tracking === '') $tracking = wpVal($meta, 'tracking_code');
 $paymentMethod = wpVal($meta, '_payment_method');
 $transactionId = wpVal($meta, '_transaction_id');
 
+$source = strtolower(trim((string) ($source ?? ($_GET['source'] ?? 'br'))));
+if (!in_array($source, ['br','red','us'], true)) $source = 'br';
+
 ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -50,8 +53,8 @@ $transactionId = wpVal($meta, '_transaction_id');
         <div class="text-muted small"><?= htmlspecialchars((string) (($pedido['post_title'] ?? $pedido['numero_pedido'] ?? '') ?: '')) ?></div>
     </div>
     <div class="d-flex gap-2">
-        <a href="/admin/pedidos-wp" class="btn btn-outline-secondary">Voltar</a>
-        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">Gerar etiqueta W-Express</button>
+        <a href="/admin/pedidos-wp?<?= http_build_query(['source' => $source]) ?>" class="btn btn-outline-secondary">Voltar</a>
+        <button type="button" class="btn btn-primary" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>, '<?= htmlspecialchars($source, ENT_QUOTES, 'UTF-8') ?>')">Gerar etiqueta W-Express</button>
     </div>
 </div>
 
@@ -60,14 +63,15 @@ $transactionId = wpVal($meta, '_transaction_id');
 <?php endif; ?>
 
 <script>
-function gerarEtiquetaWexpressWp(orderId) {
+function gerarEtiquetaWexpressWp(orderId, source) {
     if (!orderId) {
         alert('Pedido inválido');
         return;
     }
+    source = (source || 'br').toString().toLowerCase();
     if (!confirm('Deseja gerar a etiqueta da W-Express para este pedido?')) return;
 
-    fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId, {
+    fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId + '?source=' + encodeURIComponent(source), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

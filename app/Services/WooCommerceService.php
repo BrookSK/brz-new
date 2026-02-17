@@ -6,15 +6,27 @@ class WooCommerceService {
     private string $consumerKey;
     private string $consumerSecret;
     private int $lastHttpCode = 0;
+    private string $source;
 
-    public function __construct() {
-        $this->storeUrl = (string) $this->getConfig('woocommerce', 'store_url', '');
-        $this->consumerKey = (string) $this->getConfig('woocommerce', 'consumer_key', '');
-        $this->consumerSecret = (string) $this->getConfig('woocommerce', 'consumer_secret', '');
+    public function __construct(string $source = 'br') {
+        $source = strtolower(trim($source));
+        if (!in_array($source, ['br', 'red', 'us'], true)) {
+            $source = 'br';
+        }
+        $this->source = $source;
+
+        $cat = 'woocommerce_' . $this->source;
+        $this->storeUrl = (string) ($this->getConfig($cat, 'store_url', null) ?? $this->getConfig('woocommerce', 'store_url', ''));
+        $this->consumerKey = (string) ($this->getConfig($cat, 'consumer_key', null) ?? $this->getConfig('woocommerce', 'consumer_key', ''));
+        $this->consumerSecret = (string) ($this->getConfig($cat, 'consumer_secret', null) ?? $this->getConfig('woocommerce', 'consumer_secret', ''));
 
         $this->storeUrl = rtrim(trim($this->storeUrl), '/');
         $this->consumerKey = trim($this->consumerKey);
         $this->consumerSecret = trim($this->consumerSecret);
+    }
+
+    public function getSource(): string {
+        return $this->source;
     }
 
     public function getLastHttpCode(): int {

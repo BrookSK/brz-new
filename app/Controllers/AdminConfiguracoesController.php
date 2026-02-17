@@ -525,6 +525,76 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">WooCommerce (REST API)</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                Configure as credenciais por origem (BR / RED / US). Se estiver vazio, o sistema pode cair para a configuração antiga (sem origem) quando aplicável.
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">BR (https://br.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_br_store_url" value="' . $this->getConfigValue($config, 'woocommerce_br', 'store_url', $this->getConfigValue($config, 'woocommerce', 'store_url', '')) . '" placeholder="https://br.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_br_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_br', 'consumer_key', $this->getConfigValue($config, 'woocommerce', 'consumer_key', '')) . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_br_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_br', 'consumer_secret', $this->getConfigValue($config, 'woocommerce', 'consumer_secret', '')) . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">RED (https://redirecionamento.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_red_store_url" value="' . $this->getConfigValue($config, 'woocommerce_red', 'store_url', '') . '" placeholder="https://redirecionamento.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_red_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_red', 'consumer_key', '') . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_red_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_red', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3">
+                                                <div class="fw-semibold mb-2">US (https://us.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_us_store_url" value="' . $this->getConfigValue($config, 'woocommerce_us', 'store_url', '') . '" placeholder="https://us.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_us_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_us', 'consumer_key', '') . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_us_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_us', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="mb-3">
                                                 <label class="form-label">Store URL</label>
                                                 <input type="url" class="form-control" name="woocommerce_store_url" value="' . $this->getConfigValue($config, 'woocommerce', 'store_url', '') . '" placeholder="https://br.brazilianashop.com.br/">
@@ -559,6 +629,136 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">Integração WordPress (Somente leitura)</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                Configure as credenciais do banco WordPress por origem (BR / RED / US). Como são sites diferentes, podem existir IDs/números repetidos.
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">BR (https://br.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_host" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_host', $this->getConfigValue($config, 'wordpress', 'db_host', 'localhost')) . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_name" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_name', $this->getConfigValue($config, 'wordpress', 'db_name', '')) . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_user" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_user', $this->getConfigValue($config, 'wordpress', 'db_user', '')) . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_br_db_pass" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_pass', $this->getConfigValue($config, 'wordpress', 'db_pass', '')) . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_br', 'table_prefix', $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_')) . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">RED (https://redirecionamento.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_host" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_name" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_name', '') . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_user" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_user', '') . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_red_db_pass" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_pass', '') . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_red', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3">
+                                                <div class="fw-semibold mb-2">US (https://us.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_host" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_name" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_name', '') . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_user" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_user', '') . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_us_db_pass" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_pass', '') . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_us', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
@@ -3560,7 +3760,13 @@ HTML;
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_br' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_red' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_us' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'woocommerce' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_br' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_red' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_us' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']

@@ -9,11 +9,15 @@ use Config\Database;
 
 class AdminPedidosWpController extends Controller {
 
+    private const SOURCES = ['br', 'red', 'us'];
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $busca = trim((string) ($request->getParam('busca') ?? ''));
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
         $page = (int) ($request->getParam('page') ?? 1);
         if ($page <= 0) $page = 1;
         $limite = (int) ($request->getParam('limit') ?? 50);
@@ -27,55 +31,43 @@ class AdminPedidosWpController extends Controller {
 
         try {
             $localPdo = Database::getConnection();
-            $wp = $this->getWpPdo($localPdo);
+            if ($source === 'all') {
+                $target = $page * $limite;
+                $merged = [];
+                $sumTotal = 0;
 
-            $prefix = $wp['prefix'];
-            $wpPdo = $wp['pdo'];
+                foreach (self::SOURCES as $src) {
+                    $res = $this->fetchWpPedidos($localPdo, $src, $busca, $target, 0);
+                    $rows = $res['rows'] ?? [];
+                    if (is_array($rows)) {
+                        foreach ($rows as $r) {
+                            if (!is_array($r)) continue;
+                            $r['source'] = $src;
+                            $merged[] = $r;
+                        }
+                    }
+                    $sumTotal += (int) ($res['total'] ?? 0);
+                }
 
-            $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
-            $params = [];
+                usort($merged, function ($a, $b) {
+                    $da = strtotime((string) ($a['created_at'] ?? ''));
+                    $db = strtotime((string) ($b['created_at'] ?? ''));
+                    if ($da === $db) return 0;
+                    return $da > $db ? -1 : 1;
+                });
 
-            if ($busca !== '') {
-                $where[] = '(CAST(p.ID AS CHAR) LIKE :busca OR p.post_title LIKE :busca OR pm_mail.meta_value LIKE :busca OR CONCAT(COALESCE(pm_fn.meta_value,\'\'),\' \',COALESCE(pm_ln.meta_value,\'\')) LIKE :busca)';
-                $params[':busca'] = '%' . $busca . '%';
+                $pedidos = array_slice($merged, $offset, $limite);
+                $total = $sumTotal;
+            } else {
+                $res = $this->fetchWpPedidos($localPdo, $source, $busca, $limite, $offset);
+                $pedidos = $res['rows'] ?? [];
+                if (!is_array($pedidos)) $pedidos = [];
+                foreach ($pedidos as &$r) {
+                    if (is_array($r)) $r['source'] = $source;
+                }
+                unset($r);
+                $total = (int) ($res['total'] ?? 0);
             }
-
-            $sql = "SELECT
-                p.ID AS id,
-                p.post_date AS created_at,
-                p.post_status AS status,
-                p.post_title AS numero_pedido,
-                pm_total.meta_value AS order_total,
-                pm_curr.meta_value AS currency,
-                pm_mail.meta_value AS billing_email,
-                pm_fn.meta_value AS billing_first_name,
-                pm_ln.meta_value AS billing_last_name
-            FROM {$prefix}posts p
-            LEFT JOIN {$prefix}postmeta pm_total ON pm_total.post_id = p.ID AND pm_total.meta_key = '_order_total'
-            LEFT JOIN {$prefix}postmeta pm_curr ON pm_curr.post_id = p.ID AND pm_curr.meta_key = '_order_currency'
-            LEFT JOIN {$prefix}postmeta pm_mail ON pm_mail.post_id = p.ID AND pm_mail.meta_key = '_billing_email'
-            LEFT JOIN {$prefix}postmeta pm_fn ON pm_fn.post_id = p.ID AND pm_fn.meta_key = '_billing_first_name'
-            LEFT JOIN {$prefix}postmeta pm_ln ON pm_ln.post_id = p.ID AND pm_ln.meta_key = '_billing_last_name'
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY p.post_date DESC
-            LIMIT {$limite} OFFSET {$offset}";
-
-            $st = $wpPdo->prepare($sql);
-            foreach ($params as $k => $v) $st->bindValue($k, $v);
-            $st->execute();
-            $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-
-            $sqlCount = "SELECT COUNT(*)
-            FROM {$prefix}posts p
-            LEFT JOIN {$prefix}postmeta pm_mail ON pm_mail.post_id = p.ID AND pm_mail.meta_key = '_billing_email'
-            LEFT JOIN {$prefix}postmeta pm_fn ON pm_fn.post_id = p.ID AND pm_fn.meta_key = '_billing_first_name'
-            LEFT JOIN {$prefix}postmeta pm_ln ON pm_ln.post_id = p.ID AND pm_ln.meta_key = '_billing_last_name'
-            WHERE " . implode(' AND ', $where);
-
-            $stC = $wpPdo->prepare($sqlCount);
-            foreach ($params as $k => $v) $stC->bindValue($k, $v);
-            $stC->execute();
-            $total = (int) ($stC->fetchColumn() ?: 0);
         } catch (\Exception $e) {
             $erro = $e->getMessage();
             $pedidos = [];
@@ -101,9 +93,12 @@ class AdminPedidosWpController extends Controller {
             return;
         }
 
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, self::SOURCES, true) ? $sourceParam : 'br';
+
         try {
             $localPdo = Database::getConnection();
-            $wp = $this->getWpPdo($localPdo);
+            $wp = $this->getWpPdo($localPdo, $source);
             $prefix = $wp['prefix'];
             $wpPdo = $wp['pdo'];
 
@@ -368,7 +363,7 @@ class AdminPedidosWpController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            $woo = new WooCommerceService();
+            $woo = new WooCommerceService($source);
             $woo->updateOrderMeta($orderId, [
                 'wexpress_shipping_id' => $wxShipId,
                 'wexpress_label_url' => $labelUrl,
@@ -394,6 +389,9 @@ class AdminPedidosWpController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, self::SOURCES, true) ? $sourceParam : 'br';
+
         $pedido = null;
         $meta = [];
         $itens = [];
@@ -401,7 +399,7 @@ class AdminPedidosWpController extends Controller {
 
         try {
             $localPdo = Database::getConnection();
-            $wp = $this->getWpPdo($localPdo);
+            $wp = $this->getWpPdo($localPdo, $source);
 
             $prefix = $wp['prefix'];
             $wpPdo = $wp['pdo'];
@@ -503,8 +501,67 @@ class AdminPedidosWpController extends Controller {
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
-    private function getWpPdo(\PDO $localPdo): array {
-        $cfg = $this->getWpConfig($localPdo);
+    private function fetchWpPedidos(\PDO $localPdo, string $source, string $busca, int $limite, int $offset): array {
+        $wp = $this->getWpPdo($localPdo, $source);
+        $prefix = $wp['prefix'];
+        $wpPdo = $wp['pdo'];
+
+        $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
+        $params = [];
+
+        if ($busca !== '') {
+            $where[] = "(CAST(p.ID AS CHAR) LIKE :busca OR p.post_title LIKE :busca OR pm_mail.meta_value LIKE :busca OR CONCAT(COALESCE(pm_fn.meta_value,''),' ',COALESCE(pm_ln.meta_value,'')) LIKE :busca)";
+            $params[':busca'] = '%' . $busca . '%';
+        }
+
+        $limite = (int) $limite;
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 2000) $limite = 2000;
+        $offset = (int) $offset;
+        if ($offset < 0) $offset = 0;
+
+        $sql = "SELECT
+            p.ID AS id,
+            p.post_date AS created_at,
+            p.post_status AS status,
+            p.post_title AS numero_pedido,
+            pm_total.meta_value AS order_total,
+            pm_curr.meta_value AS currency,
+            pm_mail.meta_value AS billing_email,
+            pm_fn.meta_value AS billing_first_name,
+            pm_ln.meta_value AS billing_last_name
+        FROM {$prefix}posts p
+        LEFT JOIN {$prefix}postmeta pm_total ON pm_total.post_id = p.ID AND pm_total.meta_key = '_order_total'
+        LEFT JOIN {$prefix}postmeta pm_curr ON pm_curr.post_id = p.ID AND pm_curr.meta_key = '_order_currency'
+        LEFT JOIN {$prefix}postmeta pm_mail ON pm_mail.post_id = p.ID AND pm_mail.meta_key = '_billing_email'
+        LEFT JOIN {$prefix}postmeta pm_fn ON pm_fn.post_id = p.ID AND pm_fn.meta_key = '_billing_first_name'
+        LEFT JOIN {$prefix}postmeta pm_ln ON pm_ln.post_id = p.ID AND pm_ln.meta_key = '_billing_last_name'
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY p.post_date DESC
+        LIMIT {$limite} OFFSET {$offset}";
+
+        $st = $wpPdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $sqlCount = "SELECT COUNT(*)
+        FROM {$prefix}posts p
+        LEFT JOIN {$prefix}postmeta pm_mail ON pm_mail.post_id = p.ID AND pm_mail.meta_key = '_billing_email'
+        LEFT JOIN {$prefix}postmeta pm_fn ON pm_fn.post_id = p.ID AND pm_fn.meta_key = '_billing_first_name'
+        LEFT JOIN {$prefix}postmeta pm_ln ON pm_ln.post_id = p.ID AND pm_ln.meta_key = '_billing_last_name'
+        WHERE " . implode(' AND ', $where);
+
+        $stC = $wpPdo->prepare($sqlCount);
+        foreach ($params as $k => $v) $stC->bindValue($k, $v);
+        $stC->execute();
+        $total = (int) ($stC->fetchColumn() ?: 0);
+
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    private function getWpPdo(\PDO $localPdo, string $source = 'br'): array {
+        $cfg = $this->getWpConfig($localPdo, $source);
 
         $host = (string) ($cfg['db_host'] ?? '');
         $dbname = (string) ($cfg['db_name'] ?? '');
@@ -580,8 +637,15 @@ class AdminPedidosWpController extends Controller {
         }
     }
 
-    private function getWpConfig(\PDO $pdo): array {
+    private function getWpConfig(\PDO $pdo, string $source = 'br'): array {
         $out = ['table_prefix' => 'wp_'];
+
+        $source = strtolower(trim($source));
+        if (!in_array($source, self::SOURCES, true)) {
+            $source = 'br';
+        }
+
+        $cat = 'wordpress_' . $source;
 
         // Este projeto normalmente salva configs em configuracoes_sistema.
         // Vamos ler de forma robusta tanto no formato categoria+chave quanto no formato chave/valor.
@@ -616,9 +680,19 @@ class AdminPedidosWpController extends Controller {
                     'table_prefix' => 'table_prefix',
                 ];
                 foreach ($map as $outKey => $chave) {
-                    $st->execute(['wordpress', $chave]);
-                    $val = $st->fetchColumn();
-                    if ($val !== false && $val !== null) {
+                    $val = null;
+                    $st->execute([$cat, $chave]);
+                    $v1 = $st->fetchColumn();
+                    if ($v1 !== false && $v1 !== null) {
+                        $val = $v1;
+                    } elseif ($source === 'br') {
+                        $st->execute(['wordpress', $chave]);
+                        $v2 = $st->fetchColumn();
+                        if ($v2 !== false && $v2 !== null) {
+                            $val = $v2;
+                        }
+                    }
+                    if ($val !== null) {
                         $out[$outKey] = (string) $val;
                     }
                 }
