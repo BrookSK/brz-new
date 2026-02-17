@@ -734,16 +734,30 @@ class AdminPedidosWpController extends Controller {
             try {
                 $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
                 $map = [
-                    'db_host' => 'wordpress_db_host',
-                    'db_name' => 'wordpress_db_name',
-                    'db_user' => 'wordpress_db_user',
-                    'db_pass' => 'wordpress_db_pass',
-                    'table_prefix' => 'wordpress_table_prefix',
+                    'db_host' => 'db_host',
+                    'db_name' => 'db_name',
+                    'db_user' => 'db_user',
+                    'db_pass' => 'db_pass',
+                    'table_prefix' => 'table_prefix',
                 ];
-                foreach ($map as $outKey => $key) {
-                    $st->execute([$key]);
-                    $val = $st->fetchColumn();
-                    if ($val !== false && $val !== null) {
+                foreach ($map as $outKey => $suffix) {
+                    $val = null;
+
+                    // Primeiro tenta por origem: wordpress_red_db_host, etc.
+                    $st->execute([$cat . '_' . $suffix]);
+                    $v1 = $st->fetchColumn();
+                    if ($v1 !== false && $v1 !== null) {
+                        $val = $v1;
+                    } elseif ($source === 'br') {
+                        // Compatibilidade: wordpress_db_host (genérico) para BR
+                        $st->execute(['wordpress_' . $suffix]);
+                        $v2 = $st->fetchColumn();
+                        if ($v2 !== false && $v2 !== null) {
+                            $val = $v2;
+                        }
+                    }
+
+                    if ($val !== null) {
                         $out[$outKey] = (string) $val;
                     }
                 }
