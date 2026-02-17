@@ -42,6 +42,7 @@ $router->post('/login', 'AuthController', 'login');
 $router->get('/loginadmin', 'AuthController', 'loginAdmin');
 $router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
+$router->get('/lang/{locale}', 'LangController', 'set');
 $router->get('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->post('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->get('/redefinir-senha/{token}', 'AuthController', 'redefinirSenha');
@@ -58,6 +59,10 @@ $router->get('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados', 'UsuarioController', 'meusDados');
 $router->post('/meus-dados/avatar', 'UsuarioController', 'avatarUpload');
 $router->post('/meus-dados/avatar/remover', 'UsuarioController', 'avatarRemover');
+$router->get('/meus-enderecos', 'UsuarioController', 'meusEnderecos');
+$router->post('/meus-enderecos/salvar', 'UsuarioController', 'salvarEndereco');
+$router->post('/meus-enderecos/excluir/{id}', 'UsuarioController', 'excluirEndereco');
+$router->post('/meus-enderecos/principal/{id}', 'UsuarioController', 'definirEnderecoPrincipal');
 $router->post('/carteira/recarga/criar', 'UsuarioController', 'carteiraRecargaCriar');
 $router->post('/carteira/recarga/stripe/finalizar', 'UsuarioController', 'carteiraRecargaStripeFinalizar');
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
@@ -311,6 +316,9 @@ $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes
 $router->get('/admin/pedidos/detalhes/{id}/pdf', 'AdminPedidosController', 'pdf');
 $router->post('/admin/pedidos/upload-comprovante/{id}', 'AdminPedidosController', 'uploadComprovante');
 $router->post('/admin/pedidos/reemitir-pagamento/{id}', 'AdminPedidosController', 'reemitirPagamento');
+$router->get('/admin/pedidos/conferencia', 'AdminPedidosConferenciaController', 'index');
+$router->post('/admin/pedidos/conferencia/confirmar/{id}', 'AdminPedidosConferenciaController', 'confirmar');
+$router->post('/admin/pedidos/conferencia/cancelar/{id}', 'AdminPedidosConferenciaController', 'cancelar');
 $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
 $router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'importarPedidosModelo');
@@ -324,8 +332,11 @@ $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualContro
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
+$router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
+$router->post('/admin/pedidos/restaurar/{id}', 'AdminPedidosController', 'restaurar');
 $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
+$router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'criarTicket');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 
 // Usuários

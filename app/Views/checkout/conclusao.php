@@ -12,8 +12,8 @@
         }
         $isPagoHeader = !empty($statusPagamentoHeader) && in_array($statusPagamentoHeader, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);
         ?>
-        <h1 class="display-4 fw-bold" style="color: var(--primary-color);"><?= $isPagoHeader ? 'Pedido Confirmado!' : 'Pedido realizado!' ?></h1>
-        <p class="lead text-muted"><?= $isPagoHeader ? 'Seu pedido foi processado com sucesso e está sendo preparado.' : 'Seu pedido foi criado. Finalize o pagamento para confirmar.' ?></p>
+        <h1 class="display-4 fw-bold" style="color: var(--primary-color);"><?= $isPagoHeader ? __('checkout_done.order_confirmed', 'Pedido Confirmado!') : __('checkout_done.order_placed', 'Pedido realizado!') ?></h1>
+        <p class="lead text-muted"><?= $isPagoHeader ? __('checkout_done.confirmed_subtitle', 'Seu pedido foi processado com sucesso e está sendo preparado.') : __('checkout_done.placed_subtitle', 'Seu pedido foi criado. Finalize o pagamento para confirmar.') ?></p>
     </div>
 
     <!-- Resumo do Pedido -->
@@ -21,41 +21,41 @@
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-receipt"></i> Resumo do Pedido</h5>
+                    <h5 class="mb-0"><i class="fas fa-receipt"></i> <?= __('checkout_done.order_summary', 'Resumo do Pedido') ?></h5>
                 </div>
                 <div class="card-body">
                     <?php $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL'))); ?>
                     <?php $simboloMoeda = ($moedaPedido === 'USD') ? 'US$' : 'R$'; ?>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <strong>Número do Pedido:</strong>
+                            <strong><?= __('checkout_done.order_number', 'Número do Pedido') ?>:</strong>
                             <span class="text-primary"><?= $pedido['numero_pedido'] ?></span>
                         </div>
                         <div class="col-md-6">
-                            <strong>Data:</strong>
+                            <strong><?= __('checkout_done.date', 'Data') ?>:</strong>
                             <span><?= date('d/m/Y H:i', strtotime($pedido['created_at'])) ?></span>
                         </div>
                     </div>
                     
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <strong>Status:</strong>
+                            <strong><?= __('checkout_done.status', 'Status') ?>:</strong>
                             <?php
                             $statusPagamentoResumo = $pedido['payment_status'] ?? ((is_array($paymentDetails) ? ($paymentDetails['status'] ?? null) : null));
                             if (is_string($statusPagamentoResumo)) {
                                 $statusPagamentoResumo = strtoupper($statusPagamentoResumo);
                             }
-                            $statusPedidoBadgeText = 'Aguardando pagamento';
+                            $statusPedidoBadgeText = __('checkout_done.awaiting_payment', 'Aguardando pagamento');
                             $statusPedidoBadgeStyle = 'background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);';
                             if (!empty($statusPagamentoResumo)) {
                                 if (in_array($statusPagamentoResumo, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
-                                    $statusPedidoBadgeText = 'Confirmado';
+                                    $statusPedidoBadgeText = __('checkout_done.confirmed', 'Confirmado');
                                     $statusPedidoBadgeStyle = 'background: rgba(34, 197, 94, 0.14); border: 1px solid rgba(34, 197, 94, 0.35); color: rgba(20, 83, 45, 1);';
                                 } elseif (in_array($statusPagamentoResumo, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
-                                    $statusPedidoBadgeText = 'Cancelado';
+                                    $statusPedidoBadgeText = __('checkout_done.cancelled', 'Cancelado');
                                     $statusPedidoBadgeStyle = 'background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.35); color: rgba(127, 29, 29, 1);';
                                 } elseif (in_array($statusPagamentoResumo, ['REFUNDED'], true)) {
-                                    $statusPedidoBadgeText = 'Estornado';
+                                    $statusPedidoBadgeText = __('checkout_done.refunded', 'Estornado');
                                     $statusPedidoBadgeStyle = 'background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);';
                                 }
                             }
@@ -63,21 +63,21 @@
                             <span class="badge" style="<?= $statusPedidoBadgeStyle ?>"><?= htmlspecialchars($statusPedidoBadgeText) ?></span>
                         </div>
                         <div class="col-md-6">
-                            <strong>Moeda:</strong>
+                            <strong><?= __('checkout_done.currency', 'Moeda') ?>:</strong>
                             <span><?= htmlspecialchars($moedaPedido) ?></span>
                         </div>
                     </div>
 
                     <!-- Itens do Pedido -->
-                    <h6 class="mt-4 mb-3"><i class="fas fa-box"></i> Itens do Pedido</h6>
+                    <h6 class="mt-4 mb-3"><i class="fas fa-box"></i> <?= __('checkout_done.order_items', 'Itens do Pedido') ?></h6>
                     <div class="table-responsive">
                         <table class="table table-sm">
                             <thead>
                                 <tr>
-                                    <th>Produto</th>
-                                    <th class="text-center">Qtd</th>
-                                    <th class="text-end">Valor Unit.</th>
-                                    <th class="text-end">Subtotal</th>
+                                    <th><?= __('checkout_done.product', 'Produto') ?></th>
+                                    <th class="text-center"><?= __('checkout_done.qty', 'Qtd') ?></th>
+                                    <th class="text-end"><?= __('checkout_done.unit_price', 'Valor Unit.') ?></th>
+                                    <th class="text-end"><?= __('checkout_done.subtotal', 'Subtotal') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -101,20 +101,20 @@
                     <!-- Valores -->
                     <div class="row mt-4">
                         <div class="col-md-6">
-                            <h6><i class="fas fa-user"></i> Dados do Cliente</h6>
+                            <h6><i class="fas fa-user"></i> <?= __('checkout_done.customer_data', 'Dados do Cliente') ?></h6>
                             <p class="mb-1">
-                                <strong>Nome:</strong> <?= htmlspecialchars($pedido['cliente_nome']) ?><br>
-                                <strong>Email:</strong> <?= htmlspecialchars($pedido['cliente_email']) ?><br>
-                                <strong>Telefone:</strong> <?= htmlspecialchars($pedido['cliente_telefone']) ?>
+                                <strong><?= __('checkout_done.name', 'Nome') ?>:</strong> <?= htmlspecialchars($pedido['cliente_nome']) ?><br>
+                                <strong><?= __('checkout_done.email', 'Email') ?>:</strong> <?= htmlspecialchars($pedido['cliente_email']) ?><br>
+                                <strong><?= __('checkout_done.phone', 'Telefone') ?>:</strong> <?= htmlspecialchars($pedido['cliente_telefone']) ?>
                             </p>
                         </div>
                         <div class="col-md-6">
-                            <h6><i class="fas fa-truck"></i> Endereço de Entrega</h6>
+                            <h6><i class="fas fa-truck"></i> <?= __('checkout_done.shipping_address', 'Endereço de Entrega') ?></h6>
                             <p class="mb-1">
                                 <?= htmlspecialchars($pedido['endereco']) ?>, <?= htmlspecialchars($pedido['numero']) ?><br>
                                 <?= htmlspecialchars($pedido['bairro']) ?><br>
                                 <?= htmlspecialchars($pedido['cidade']) ?> - <?= htmlspecialchars($pedido['estado']) ?><br>
-                                CEP: <?= htmlspecialchars($pedido['cep']) ?>
+                                <?= __('auth.zip', 'CEP') ?>: <?= htmlspecialchars($pedido['cep']) ?>
                             </p>
                         </div>
                     </div>
@@ -126,24 +126,24 @@
             <!-- Valores Totais -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-calculator"></i> Valores</h5>
+                    <h5 class="mb-0"><i class="fas fa-calculator"></i> <?= __('checkout_done.values', 'Valores') ?></h5>
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Subtotal:</span>
+                        <span><?= __('checkout_done.subtotal', 'Subtotal') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['subtotal'], 2, ',', '.') ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Frete:</span>
+                        <span><?= __('checkout_done.shipping', 'Frete') ?>:</span>
                         <?php $freteVal = (float) ($pedido['frete'] ?? 0); ?>
-                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
+                        <span><?= ($freteVal <= 0 ? __('cart.free_shipping', 'Frete grátis') : ($simboloMoeda . ' ' . number_format($freteVal, 2, ',', '.'))) ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Taxa de Serviço:</span>
+                        <span><?= __('checkout_done.service_fee', 'Taxa de Serviço') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'], 2, ',', '.') ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Impostos:</span>
+                        <span><?= __('checkout_done.taxes_brazil', 'Impostos do Brasil') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
                     <hr>
@@ -157,16 +157,16 @@
             <!-- Forma de Pagamento -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-credit-card"></i> Pagamento</h5>
+                    <h5 class="mb-0"><i class="fas fa-credit-card"></i> <?= __('checkout_done.payment', 'Pagamento') ?></h5>
                 </div>
                 <div class="card-body">
                     <p class="mb-1">
-                        <strong>Forma:</strong> 
+                        <strong><?= __('checkout_done.method', 'Forma') ?>:</strong>
                         <?php
                         $formas = [
-                            'carteira' => 'Carteira',
-                            'cartao_credito' => 'Cartão de Crédito',
-                            'boleto' => 'Boleto Bancário',
+                            'carteira' => __('checkout.payment.wallet_credit', 'Carteira'),
+                            'cartao_credito' => __('checkout.payment.credit_card', 'Cartão de Crédito'),
+                            'boleto' => __('checkout.payment.boleto', 'Boleto Bancário'),
                             'pix' => 'PIX',
                         ];
                         $fp = (string) ($pedido['forma_pagamento'] ?? '');
@@ -181,25 +181,25 @@
                     }
 
                     $badgeClass = 'bg-warning text-dark';
-                    $statusLabel = 'Aguardando';
+                    $statusLabel = __('checkout_done.awaiting_payment', 'Aguardando');
                     $isPago = false;
                     if (!empty($statusPagamento)) {
                         if (in_array($statusPagamento, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
                             $badgeClass = 'bg-success';
-                            $statusLabel = 'Pago';
+                            $statusLabel = __('checkout_done.paid', 'Pago');
                             $isPago = true;
                         } elseif (in_array($statusPagamento, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
                             $badgeClass = 'bg-danger';
-                            $statusLabel = 'Cancelado';
+                            $statusLabel = __('checkout_done.cancelled', 'Cancelado');
                         } elseif (in_array($statusPagamento, ['REFUNDED'], true)) {
                             $badgeClass = 'bg-secondary';
-                            $statusLabel = 'Estornado';
+                            $statusLabel = __('checkout_done.refunded', 'Estornado');
                         }
                     }
                     ?>
 
                     <p class="mb-2 text-muted">
-                        <small>Status do pagamento: <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
+                        <small><?= __('checkout_done.payment_status', 'Status do pagamento') ?>: <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
                     </p>
 
                     <?php
@@ -219,23 +219,23 @@
                         <?php endif; ?>
                         <?php if (!empty($pixPayload)): ?>
                             <div class="mb-2">
-                                <strong>Copia e cola:</strong>
+                                <strong><?= __('checkout_done.copy_paste', 'Copia e cola') ?>:</strong>
                                 <div class="input-group">
                                     <input id="pix-payload" type="text" class="form-control" value="<?= htmlspecialchars($pixPayload) ?>" readonly onclick="this.select();" />
-                                    <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('pix-payload','pix-copied', this)">Copiar</button>
+                                    <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('pix-payload','pix-copied', this)"><?= __('checkout_done.copy', 'Copiar') ?></button>
                                 </div>
-                                <div id="pix-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>
+                                <div id="pix-copied" class="small text-success mt-1" style="display:none;"><?= __('checkout_done.copied', 'Copiado!') ?></div>
                             </div>
                         <?php endif; ?>
                     <?php elseif ($billingType === 'BOLETO'): ?>
                         <?php if (!empty($bankSlipUrl) || !empty($invoiceUrl)): ?>
                             <p class="mb-2">
-                                <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars($bankSlipUrl ?: $invoiceUrl) ?>" target="_blank" rel="noopener">Abrir boleto</a>
+                                <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars($bankSlipUrl ?: $invoiceUrl) ?>" target="_blank" rel="noopener"><?= __('checkout_done.open_boleto', 'Abrir boleto') ?></a>
                             </p>
                         <?php endif; ?>
                         <?php if (!empty($digitableLine)): ?>
                             <div class="mb-2">
-                                <strong>Linha digitável:</strong>
+                                <strong><?= __('checkout_done.digitable_line', 'Linha digitável') ?>:</strong>
                                 <input type="text" class="form-control" value="<?= htmlspecialchars($digitableLine) ?>" readonly onclick="this.select();" />
                             </div>
                         <?php endif; ?>
@@ -248,7 +248,7 @@
     <!-- Timeline de Próximas Etapas -->
     <div class="card shadow-sm mt-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="fas fa-clock"></i> Próximas Etapas</h5>
+            <h5 class="mb-0"><i class="fas fa-clock"></i> <?= __('checkout_done.next_steps', 'Próximas Etapas') ?></h5>
         </div>
         <div class="card-body">
             <?php
@@ -258,15 +258,15 @@
             }
 
             $hasInvoiceLink = (is_array($paymentDetails) && (!empty($paymentDetails['invoiceUrl']) || !empty($paymentDetails['bankSlipUrl'])));
-            $rotuloCobranca = 'cobrança';
+            $rotuloCobranca = __('checkout_done.billing.default', 'cobrança');
             if ($billingTypeEtapas === 'PIX') {
-                $rotuloCobranca = 'código PIX';
+                $rotuloCobranca = __('checkout_done.billing.pix', 'código PIX');
             } elseif ($billingTypeEtapas === 'BOLETO') {
-                $rotuloCobranca = 'boleto';
+                $rotuloCobranca = __('checkout_done.billing.boleto', 'boleto');
             } elseif ($billingTypeEtapas === 'CREDIT_CARD') {
-                $rotuloCobranca = 'link de pagamento';
+                $rotuloCobranca = __('checkout_done.billing.payment_link', 'link de pagamento');
             } elseif ($billingTypeEtapas === 'CARTEIRA' || $billingTypeEtapas === 'WALLET') {
-                $rotuloCobranca = 'carteira';
+                $rotuloCobranca = __('checkout_done.billing.wallet', 'carteira');
             }
 
             $stepDoneClass = 'text-success';
@@ -278,65 +278,65 @@
                 $steps[] = [
                     'icon' => 'fa-check-circle',
                     'iconClass' => $stepDoneClass,
-                    'title' => 'Pagamento confirmado',
-                    'desc' => 'Recebemos a confirmação do pagamento e seu pedido entrou em fila de processamento.',
+                    'title' => __('checkout_done.step_payment_confirmed', 'Pagamento confirmado'),
+                    'desc' => __('checkout_done.step_payment_confirmed_desc', 'Recebemos a confirmação do pagamento e seu pedido entrou em fila de processamento.'),
                 ];
                 $steps[] = [
                     'icon' => 'fa-box',
                     'iconClass' => $stepCurrentClass,
-                    'title' => 'Preparação',
-                    'desc' => 'Sua compra está sendo separada e preparada para envio.',
+                    'title' => __('checkout_done.step_preparing', 'Preparação'),
+                    'desc' => __('checkout_done.step_preparing_desc', 'Sua compra está sendo separada e preparada para envio.'),
                 ];
                 $steps[] = [
                     'icon' => 'fa-shipping-fast',
                     'iconClass' => $stepPendingClass,
-                    'title' => 'Envio',
-                    'desc' => 'Assim que o pedido for postado, você receberá atualizações.',
+                    'title' => __('checkout_done.step_shipping', 'Envio'),
+                    'desc' => __('checkout_done.step_shipping_desc', 'Assim que o pedido for postado, você receberá atualizações.'),
                 ];
                 $steps[] = [
                     'icon' => 'fa-home',
                     'iconClass' => $stepPendingClass,
-                    'title' => 'Entrega',
-                    'desc' => 'Entrega no endereço informado no checkout.',
+                    'title' => __('checkout_done.step_delivery', 'Entrega'),
+                    'desc' => __('checkout_done.step_delivery_desc', 'Entrega no endereço informado no checkout.'),
                 ];
             } else {
                 $steps[] = [
                     'icon' => 'fa-check-circle',
                     'iconClass' => $stepDoneClass,
-                    'title' => 'Pedido criado',
-                    'desc' => 'Seu pedido foi registrado. O próximo passo é finalizar o pagamento para confirmar.',
+                    'title' => __('checkout_done.step_order_created', 'Pedido criado'),
+                    'desc' => __('checkout_done.step_order_created_desc', 'Seu pedido foi registrado. O próximo passo é finalizar o pagamento para confirmar.'),
                 ];
 
-                $descPagamento = 'Finalize o pagamento para confirmar o pedido.';
+                $descPagamento = __('checkout_done.step_awaiting_payment_desc', 'Finalize o pagamento para confirmar o pedido.');
                 if ($hasInvoiceLink) {
-                    $descPagamento = 'Aguarde a geração da ' . $rotuloCobranca . ' e finalize o pagamento para confirmar o pedido.';
+                    $descPagamento = __('checkout_done.wait_for_billing', 'Aguarde a geração da {billing} e finalize o pagamento para confirmar o pedido.', ['billing' => $rotuloCobranca]);
                 } elseif ($billingTypeEtapas !== '') {
-                    $descPagamento = 'Finalize o pagamento via ' . $rotuloCobranca . ' para confirmar o pedido.';
+                    $descPagamento = __('checkout_done.pay_via_billing', 'Finalize o pagamento via {billing} para confirmar o pedido.', ['billing' => $rotuloCobranca]);
                 }
 
                 $steps[] = [
                     'icon' => 'fa-file-invoice-dollar',
                     'iconClass' => $stepCurrentClass,
-                    'title' => 'Aguardando pagamento',
+                    'title' => __('checkout_done.step_awaiting_payment', 'Aguardando pagamento'),
                     'desc' => $descPagamento,
                 ];
                 $steps[] = [
                     'icon' => 'fa-box',
                     'iconClass' => $stepPendingClass,
-                    'title' => 'Preparação',
-                    'desc' => 'Após a confirmação do pagamento, iniciamos a preparação do seu pedido.',
+                    'title' => __('checkout_done.step_preparing', 'Preparação'),
+                    'desc' => __('checkout_done.step_preparing_after_pay_desc', 'Após a confirmação do pagamento, iniciamos a preparação do seu pedido.'),
                 ];
                 $steps[] = [
                     'icon' => 'fa-shipping-fast',
                     'iconClass' => $stepPendingClass,
-                    'title' => 'Envio',
-                    'desc' => 'Após a preparação, o pedido é enviado e você recebe atualizações.',
+                    'title' => __('checkout_done.step_shipping', 'Envio'),
+                    'desc' => __('checkout_done.step_shipping_after_prep_desc', 'Após a preparação, o pedido é enviado e você recebe atualizações.'),
                 ];
                 $steps[] = [
                     'icon' => 'fa-home',
                     'iconClass' => $stepPendingClass,
-                    'title' => 'Entrega',
-                    'desc' => 'Entrega no endereço informado no checkout.',
+                    'title' => __('checkout_done.step_delivery', 'Entrega'),
+                    'desc' => __('checkout_done.step_delivery_desc', 'Entrega no endereço informado no checkout.'),
                 ];
             }
 
@@ -364,10 +364,10 @@
     <!-- Ações -->
     <div class="text-center mt-5">
         <a href="/produtos" class="btn btn-primary btn-lg me-3">
-            <i class="fas fa-shopping-bag"></i> Continuar Comprando
+            <i class="fas fa-shopping-bag"></i> <?= __('checkout_done.actions_continue_shopping', 'Continuar Comprando') ?>
         </a>
         <a href="/meus-pedidos" class="btn btn-outline-primary btn-lg">
-            <i class="fas fa-list"></i> Meus Pedidos
+            <i class="fas fa-list"></i> <?= __('checkout_done.actions_my_orders', 'Meus Pedidos') ?>
         </a>
     </div>
 </div>
@@ -407,8 +407,8 @@ function copiarPixPayload(inputId, msgId, btn) {
             setTimeout(() => { msg.style.display = "none"; }, 1800);
         }
         if (btn) {
-            btn.innerText = "Copiado";
-            setTimeout(() => { btn.innerText = old || "Copiar"; }, 1800);
+            btn.innerText = <?= json_encode(__('checkout_done.copied', 'Copiado!'), JSON_UNESCAPED_UNICODE) ?>;
+            setTimeout(() => { btn.innerText = old || <?= json_encode(__('checkout_done.copy', 'Copiar'), JSON_UNESCAPED_UNICODE) ?>; }, 1800);
         }
     };
 

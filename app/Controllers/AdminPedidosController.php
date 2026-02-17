@@ -6,8 +6,197 @@ use App\Models\PedidoEcommerce;
 use App\Services\PdfPedidoService;
 use App\Services\PaymentService;
 use App\Services\AuthService;
+use App\Services\SupportTicketNotificationService;
+use App\Services\CpfValidator;
 
 class AdminPedidosController extends Controller {
+
+    private function tableExistsPdo(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getTableColumnsPdo(\PDO $pdo, string $table): array {
+        try {
+            $st = $pdo->query('DESCRIBE ' . $table);
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $cols, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    private function getPedidosMissingDataWarnings(\PDO $pdo, array $pedidoIds): array {
+        $out = [];
+        $pedidoIds = array_values(array_filter(array_map('intval', $pedidoIds), function ($v) { return $v > 0; }));
+        if (empty($pedidoIds)) {
+            return $out;
+        }
+
+        $itensTable = null;
+        if ($this->tableExistsPdo($pdo, 'pedido_itens')) {
+            $itensTable = 'pedido_itens';
+        } elseif ($this->tableExistsPdo($pdo, 'pedido_items')) {
+            $itensTable = 'pedido_items';
+        }
+        if (!$itensTable || !$this->tableExistsPdo($pdo, 'produtos')) {
+            return $out;
+        }
+
+        $colsItens = $this->getTableColumnsPdo($pdo, $itensTable);
+        $colsProd = $this->getTableColumnsPdo($pdo, 'produtos');
+
+        $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+        $colProdutoId = $this->pickColumn($colsItens, ['produto_id']);
+        $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+
+        $colCusto = $this->pickColumn($colsProd, ['preco_custo', 'custo', 'cost_price', 'valor_custo']);
+        $colNcm = $this->pickColumn($colsProd, ['ncm', 'codigo_ncm', 'ncm_code']);
+
+        if (!$colPedidoId || !$colProdutoId) {
+            return $out;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($pedidoIds), '?'));
+
+        // Missing cost
+        if ($colCusto) {
+            try {
+                $sql = 'SELECT pi.' . $colPedidoId . ' AS pedido_id, COUNT(*) AS cnt'
+                    . ' FROM ' . $itensTable . ' pi'
+                    . ' INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId
+                    . ' WHERE pi.' . $colPedidoId . ' IN (' . $placeholders . ')'
+                    . ' AND (pr.' . $colCusto . ' IS NULL OR COALESCE(pr.' . $colCusto . ',0) <= 0)'
+                    . ' GROUP BY pi.' . $colPedidoId;
+
+                $st = $pdo->prepare($sql);
+                $st->execute($pedidoIds);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    if (!isset($out[$pid])) $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $out[$pid]['missing_cost'] = true;
+                    $out[$pid]['missing_cost_count'] = (int) ($r['cnt'] ?? 0);
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        // Missing NCM
+        if ($colNcm) {
+            try {
+                $sql = 'SELECT pi.' . $colPedidoId . ' AS pedido_id, COUNT(*) AS cnt'
+                    . ' FROM ' . $itensTable . ' pi'
+                    . ' INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId
+                    . ' WHERE pi.' . $colPedidoId . ' IN (' . $placeholders . ')'
+                    . ' AND (pr.' . $colNcm . ' IS NULL OR TRIM(COALESCE(pr.' . $colNcm . ', \'\')) = \'\')'
+                    . ' GROUP BY pi.' . $colPedidoId;
+
+                $st = $pdo->prepare($sql);
+                $st->execute($pedidoIds);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    if (!isset($out[$pid])) $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $out[$pid]['missing_ncm'] = true;
+                    $out[$pid]['missing_ncm_count'] = (int) ($r['cnt'] ?? 0);
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        // Invalid CPF (from pedido or usuario)
+        try {
+            if ($this->tableExistsPdo($pdo, 'pedidos')) {
+                $colsPed = $this->getTableColumnsPdo($pdo, 'pedidos');
+                $colsUsu = $this->tableExistsPdo($pdo, 'usuarios') ? $this->getTableColumnsPdo($pdo, 'usuarios') : [];
+
+                $colUsuarioId = $this->pickColumn($colsPed, ['usuario_id', 'user_id', 'cliente_id']);
+
+                $docPedCols = [];
+                foreach (['cliente_documento', 'documento', 'cpf_cnpj', 'customer_document', 'cpf'] as $c) {
+                    if (in_array($c, $colsPed, true)) {
+                        $docPedCols[] = $c;
+                    }
+                }
+                $docUsuCols = [];
+                foreach (['documento', 'cpf', 'cpf_cnpj'] as $c) {
+                    if (in_array($c, $colsUsu, true)) {
+                        $docUsuCols[] = $c;
+                    }
+                }
+
+                if (!empty($docPedCols) || (!empty($docUsuCols) && $colUsuarioId)) {
+                    $select = ['p.id AS pedido_id'];
+                    foreach ($docPedCols as $c) {
+                        $select[] = 'p.' . $c . ' AS ped_' . $c;
+                    }
+                    if (!empty($docUsuCols) && $colUsuarioId) {
+                        foreach ($docUsuCols as $c) {
+                            $select[] = 'u.' . $c . ' AS usu_' . $c;
+                        }
+                        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p LEFT JOIN usuarios u ON u.id = p.' . $colUsuarioId . ' WHERE p.id IN (' . $placeholders . ')';
+                    } else {
+                        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.id IN (' . $placeholders . ')';
+                    }
+
+                    $stCpf = $pdo->prepare($sql);
+                    $stCpf->execute($pedidoIds);
+                    $rowsCpf = $stCpf->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsCpf as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid <= 0) continue;
+
+                        $doc = '';
+                        foreach ($docPedCols as $c) {
+                            $v = trim((string) ($r['ped_' . $c] ?? ''));
+                            if ($v !== '') {
+                                $doc = $v;
+                                break;
+                            }
+                        }
+                        if ($doc === '' && !empty($docUsuCols)) {
+                            foreach ($docUsuCols as $c) {
+                                $v = trim((string) ($r['usu_' . $c] ?? ''));
+                                if ($v !== '') {
+                                    $doc = $v;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $digits = CpfValidator::onlyDigits($doc);
+                        $cpfInvalid = ($digits !== '' && strlen($digits) === 11 && !CpfValidator::isValid($digits));
+                        if ($cpfInvalid) {
+                            if (!isset($out[$pid])) {
+                                $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                            }
+                            $out[$pid]['cpf_invalid'] = true;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $out;
+    }
 
     public function importarPedidosModelo(Request $request) {
         $auth = new AuthService();
@@ -21,6 +210,130 @@ class AdminPedidosController extends Controller {
         $out = fopen('php://output', 'w');
         fputcsv($out, $headers);
         fclose($out);
+        exit;
+    }
+
+    public function lixeira(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $colsPedidos = [];
+            try {
+                $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!in_array('deleted_at', $colsPedidos, true)) {
+                echo '<div class="alert alert-warning">Sua base ainda não possui lixeira (deleted_at). Rode a migration 087_soft_delete_pedidos_lixeira.sql.</div>';
+                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                exit;
+            }
+
+            $stmt = $pdo->query("SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
+            $pedidos = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Exception $e) {
+            $pedidos = [];
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lixeira de Pedidos - Braziliana Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+        renderAdminSidebar('pedidos');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2"><i class="fas fa-trash me-2"></i>Lixeira de Pedidos</h1>
+                    <div>
+                        <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    </div>
+                </div>';
+
+        if (empty($pedidos)) {
+            echo '<div class="text-muted">Nenhum pedido na lixeira.</div>';
+        } else {
+            echo '<div class="table-responsive">'
+                . '<table class="table table-sm align-middle">'
+                . '<thead><tr><th>Pedido</th><th>Cliente</th><th>Email</th><th>Excluído em</th><th>Ações</th></tr></thead><tbody>';
+            foreach ($pedidos as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $dt = (string) ($p['deleted_at'] ?? '');
+                $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+                echo '<tr>'
+                    . '<td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>'
+                    . '<td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? '')) . '</td>'
+                    . '<td>' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</td>'
+                    . '<td>' . htmlspecialchars($dtFmt) . '</td>'
+                    . '<td>'
+                    . '<div class="d-flex gap-2">'
+                    . '<a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '" target="_blank"><i class="fas fa-eye"></i></a>'
+                    . '<form method="POST" action="/admin/pedidos/restaurar/' . $pid . '">'
+                    . '<button type="submit" class="btn btn-sm btn-success"><i class="fas fa-rotate-left me-1"></i>Restaurar</button>'
+                    . '</form>'
+                    . '</div>'
+                    . '</td>'
+                    . '</tr>';
+            }
+            echo '</tbody></table></div>';
+        }
+
+        echo '</main></div></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function restaurar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        $id = $id ?? $request->getParam('id');
+        $id = (int) $id;
+        if ($id <= 0) {
+            header('Location: /admin/pedidos/lixeira');
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            if (!in_array('deleted_at', $colsPedidos, true)) {
+                header('Location: /admin/pedidos');
+                exit;
+            }
+
+            $set = ['deleted_at = NULL'];
+            if (in_array('deleted_by', $colsPedidos, true)) {
+                $set[] = 'deleted_by = NULL';
+            }
+            $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
+            $st->execute([(int) $id]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/pedidos/lixeira');
         exit;
     }
 
@@ -1107,6 +1420,7 @@ JS;
             $colOrigem = $pickCol($colsPedidos, ['origem', 'canal', 'channel', 'source', 'utm_source', 'pedido_origem']);
             $colManual = $pickCol($colsPedidos, ['pedido_manual', 'manual', 'is_manual', 'criado_manual', 'admin_criou', 'criado_por_admin']);
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
+            $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
             // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
             $rateUSDBRL = 5.5;
@@ -1123,6 +1437,10 @@ JS;
             
             $sql = "SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $params = [];
+
+            if ($temDeletedAt) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
             
             if (!empty($busca)) {
                 $sql .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
@@ -1141,6 +1459,20 @@ JS;
             $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $warningsMap = [];
+            try {
+                $pedidoIds = [];
+                if (is_array($pedidos)) {
+                    foreach ($pedidos as $pp) {
+                        if (!isset($pp['id'])) continue;
+                        $pedidoIds[] = (int) $pp['id'];
+                    }
+                }
+                $warningsMap = $this->getPedidosMissingDataWarnings($pdo, $pedidoIds);
+            } catch (\Exception $e) {
+                $warningsMap = [];
+            }
 
             // Normalizar moeda/total para exibição (sem alterar o banco)
             if (is_array($pedidos) && !empty($pedidos)) {
@@ -1223,6 +1555,9 @@ JS;
             
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
+            if ($temDeletedAt) {
+                $sqlTotal .= " AND p.deleted_at IS NULL";
+            }
             if (!empty($busca)) {
                 $sqlTotal .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
@@ -1264,6 +1599,11 @@ JS;
             transition: none;
             border-left: 4px solid #dee2e6;
         }
+        .order-card.needs-review {
+            border-left-color: #ffc107;
+            background: rgba(255, 193, 7, 0.08);
+            border-color: rgba(255, 193, 7, 0.35) !important;
+        }
         .order-card .badge {
             font-size: 1.2rem;
             padding: 0.5rem;
@@ -1287,6 +1627,9 @@ JS;
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger me-2">
+                            <i class="fas fa-trash me-1"></i>Lixeira
+                        </a>
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar
                         </button>
@@ -1306,7 +1649,7 @@ JS;
                             <option value="pendente" ' . ($status === 'pendente' ? 'selected' : '') . '>Pendente</option>
                             <option value="pago" ' . ($status === 'pago' ? 'selected' : '') . '>Pago</option>
                             <option value="processando" ' . ($status === 'processando' ? 'selected' : '') . '>Processando</option>
-                            <option value="produto_consolidado" ' . ($status === 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                            <option value="produto_consolidado" ' . ($status === 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                             <option value="em_transporte" ' . ($status === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                             <option value="aguardando_liberacao_aduaneira" ' . ($status === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                             <option value="enviado_ao_destinatario" ' . ($status === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
@@ -1348,6 +1691,24 @@ JS;
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
+
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                    }
                     
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
@@ -1379,7 +1740,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1395,6 +1756,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -1412,15 +1774,15 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
                                                 <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
@@ -1460,6 +1822,24 @@ JS;
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
 
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                    }
+
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
                         $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
@@ -1490,7 +1870,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1506,6 +1886,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -1523,15 +1904,15 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
                                                 <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
@@ -1570,6 +1951,24 @@ JS;
                     $statusIcon = $this->getStatusIcon($pedido['status']);
                     $statusColor = $this->getStatusColor($pedido['status']);
 
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
+                        ? $warningsMap[$pid]
+                        : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $reviewBadges = '';
+                    if ($needsReview) {
+                        if (!empty($warn['missing_cost'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark me-2">Custo 0/vazio</span>';
+                        }
+                        if (!empty($warn['missing_ncm'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                        }
+                        if (!empty($warn['cpf_invalid'])) {
+                            $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                    }
+
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
                         $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
@@ -1600,7 +1999,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center">
                                     <div class="col-md-2">
@@ -1616,6 +2015,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -1633,15 +2033,15 @@ JS;
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            <a href="/admin/pedidos/excluir/' . $pedido['id'] . '" class="btn btn-sm btn-outline-danger" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
                                                 <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
@@ -1683,10 +2083,48 @@ JS;
                 
                 echo '</main></div></div>';
 
+        echo <<<'HTML'
+
+    <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="formLixeiraPedido">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+HTML;
+
     // Renderizar scripts
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var modal = document.getElementById("modalLixeiraPedido");
+            if(!modal) return;
+            modal.addEventListener("show.bs.modal", function (event) {
+                var btn = event.relatedTarget;
+                if(!btn) return;
+                var pid = btn.getAttribute("data-pedido-id") || "";
+                var label = document.getElementById("lixeiraPedidoIdLabel");
+                var form = document.getElementById("formLixeiraPedido");
+                if(label) label.textContent = "#" + pid;
+                if(form) form.action = "/admin/pedidos/excluir/" + pid;
+            });
+        })();
+    </script>
 </body>
 </html>';
         exit;
@@ -1730,6 +2168,7 @@ JS;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
+        $embed = ((string) $request->getParam('embed', '0') === '1');
         
         try {
             // Usar o PedidoEcommerce que já está corrigido e adaptativo
@@ -1787,6 +2226,12 @@ JS;
     </style>
 </head>
 <body>
+    ' . ($embed ? '<style>
+        #adminSidebar { display: none !important; }
+        .admin-menu-toggle { display: none !important; }
+        main.col-md-9, main.col-lg-10 { width: 100% !important; margin-left: 0 !important; }
+        .container-fluid > .row { --bs-gutter-x: 0; }
+    </style>' : '') . '
     <div class="container-fluid">
         <div class="row">';
         
@@ -1801,15 +2246,20 @@ JS;
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary me-2">'
                             . '<i class="fas fa-pen-to-square me-1"></i>Editar Pedido Manual</a>')
                         : '') . '
+                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block" class="me-2">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-headset me-1"></i>Criar ticket
+                        </button>
+                    </form>
                     <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
                         <i class="fas fa-edit me-1"></i>Editar Pedido
                     </a>
-                    <a href="/admin/pedidos/excluir/' . $id . '" class="btn btn-danger me-2" onclick="return confirm(\"Tem certeza que deseja excluir este pedido? Essa ação não pode ser desfeita.\");">
-                        <i class="fas fa-trash me-1"></i>Excluir Pedido
-                    </a>
+                    <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
+                        <i class="fas fa-trash me-1"></i>Enviar para Lixeira
+                    </button>
                     <a href="/admin/pedidos" class="btn btn-secondary">
                         <i class="fas fa-arrow-left me-1"></i>Voltar
                     </a>
@@ -1854,6 +2304,27 @@ JS;
                             <div class="small">Pago em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($difPaidAt))) . '</strong></div>
                         </div>
                     </div>';
+            }
+
+            // Aviso: itens sem custo / sem NCM / CPF inválido
+            try {
+                $pdoWarn = $pdoCols ?? null;
+                if (!($pdoWarn instanceof \PDO)) {
+                    $pdoWarn = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                }
+                $warnMap = $this->getPedidosMissingDataWarnings($pdoWarn, [(int) $id]);
+                $warn = isset($warnMap[(int) $id]) && is_array($warnMap[(int) $id]) ? $warnMap[(int) $id] : null;
+                if (is_array($warn) && (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']))) {
+                    $parts = [];
+                    if (!empty($warn['missing_cost'])) $parts[] = 'custo do produto vazio/0';
+                    if (!empty($warn['missing_ncm'])) $parts[] = 'NCM não cadastrado';
+                    if (!empty($warn['cpf_invalid'])) $parts[] = 'CPF inválido';
+                    echo '<div class="alert alert-warning">
+                            <div style="font-weight:800;">Atenção: pedido precisa de revisão</div>
+                            <div class="small">Encontrado item com ' . htmlspecialchars(implode(' e ', $parts)) . '. Edite o(s) produto(s) do pedido e cadastre corretamente.</div>
+                        </div>';
+                }
+            } catch (\Exception $e) {
             }
 
             // Bloco: rastreio / etiqueta (Correios ou W-Express)
@@ -1946,6 +2417,86 @@ JS;
                         . ($trackingFonte !== '' ? ('<div class="small text-muted">Fonte: ' . htmlspecialchars($trackingFonte) . '</div>') : '')
                         . ($trackingUrl !== '' ? ('<div class="small"><a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" rel="noopener">Ver etiqueta</a></div>') : '')
                         . '</div>';
+                }
+            } catch (\Exception $e) {
+            }
+
+            // Comprovante de compra (online) + comissão de processamento
+            try {
+                $pdoLocal2 = null;
+                try {
+                    if (isset($pdoCols) && ($pdoCols instanceof \PDO)) {
+                        $pdoLocal2 = $pdoCols;
+                    } else {
+                        $pdoLocal2 = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    }
+                } catch (\Exception $e) {
+                    $pdoLocal2 = null;
+                }
+
+                if ($pdoLocal2 instanceof \PDO) {
+                    $hasCompraDocs = false;
+                    try {
+                        $st = $pdoLocal2->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['pedidos_compra_documentos']);
+                        $hasCompraDocs = (bool) $st->fetchColumn();
+                    } catch (\Exception $e) {
+                        $hasCompraDocs = false;
+                    }
+
+                    if ($hasCompraDocs) {
+                        $doc = null;
+                        try {
+                            $st = $pdoLocal2->prepare("SELECT status, arquivo_path, uploaded_at, usuario_id FROM pedidos_compra_documentos WHERE pedido_id = ? AND tipo_compra = 'online' ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $doc = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                        } catch (\Exception $e) {
+                            $doc = null;
+                        }
+
+                        if (is_array($doc) && !empty($doc['arquivo_path'])) {
+                            $upAt = (string) ($doc['uploaded_at'] ?? '');
+                            $path = (string) ($doc['arquivo_path'] ?? '');
+                            echo '<div class="alert alert-success mb-3">'
+                                . '<div><strong>Comprovante de compra (Online) anexado.</strong></div>'
+                                . ($upAt !== '' ? ('<div class="small">Enviado em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($upAt))) . '</strong></div>') : '')
+                                . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($path) . '" target="_blank" rel="noopener">Abrir comprovante</a></div>'
+                                . '</div>';
+                        }
+                    }
+
+                    $hasComProc = false;
+                    try {
+                        $st = $pdoLocal2->prepare('SHOW TABLES LIKE ?');
+                        $st->execute(['comissoes_processamento']);
+                        $hasComProc = (bool) $st->fetchColumn();
+                    } catch (\Exception $e) {
+                        $hasComProc = false;
+                    }
+
+                    if ($hasComProc) {
+                        $rowC = null;
+                        try {
+                            $st = $pdoLocal2->prepare('SELECT usuario_id, moeda, percentual, base_liquida, valor_comissao, created_at FROM comissoes_processamento WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([(int) $id]);
+                            $rowC = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                        } catch (\Exception $e) {
+                            $rowC = null;
+                        }
+
+                        if (is_array($rowC) && (float) ($rowC['valor_comissao'] ?? 0) > 0) {
+                            $m = strtoupper(trim((string) ($rowC['moeda'] ?? 'BRL')));
+                            if ($m === '') $m = 'BRL';
+                            $dt = (string) ($rowC['created_at'] ?? '');
+                            echo '<div class="alert alert-info mb-3">'
+                                . '<div><strong>Comissão de processamento registrada.</strong></div>'
+                                . '<div class="small">Percentual: <strong>' . number_format((float) ($rowC['percentual'] ?? 0), 2, ',', '.') . '%</strong></div>'
+                                . '<div class="small">Base líquida: <strong>' . $this->formatarMoeda((float) ($rowC['base_liquida'] ?? 0), $m) . '</strong></div>'
+                                . '<div class="small">Comissão: <strong>' . $this->formatarMoeda((float) ($rowC['valor_comissao'] ?? 0), $m) . '</strong></div>'
+                                . ($dt !== '' ? ('<div class="small">Registrada em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($dt))) . '</strong></div>') : '')
+                                . '</div>';
+                        }
+                    }
                 }
             } catch (\Exception $e) {
             }
@@ -2042,10 +2593,15 @@ JS;
                                                 $extraHtml .= '<div class="small text-muted" style="margin-top: 6px;">' . htmlspecialchars($variacaoLinha) . '</div>';
                                             }
 
+                                            $ncmVal = trim((string) ($item['ncm'] ?? ''));
+                                            $ncmHtml = $ncmVal !== ''
+                                                ? htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8')
+                                                : '<span class="badge bg-warning text-dark">Sem NCM</span>';
+
                                             echo '</td>
                                                 <td>' . $nomeHtml . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
-                                                <td>' . htmlspecialchars((string) ($item['ncm'] ?? '')) . '</td>
+                                                <td>' . $ncmHtml . '</td>
                                                 <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
@@ -2274,12 +2830,12 @@ JS;
                                 <hr>
                                 <div class="mb-3">
                                     <label class="form-label">Atualizar Status:</label>
-                                    <select class="form-select" id="novo_status" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>
+                                    <select class="form-select" id="novo_status">
                                         <option value="">Selecione...</option>
                                         <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
                                         <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                         <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                         <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                         <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
@@ -2614,7 +3170,7 @@ JS;
             'pendente' => 'Pendente',
             'pago' => 'Pago',
             'processando' => 'Processando',
-            'produto_consolidado' => 'Produto Consolidado',
+            'produto_consolidado' => 'Caixa Fechada',
             'em_transporte' => 'Em Transporte',
             'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
             'enviado_ao_destinatario' => 'Enviado ao Destinatário',
@@ -2681,6 +3237,11 @@ JS;
         $admin = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
 
+        $escopo = strtolower(trim((string) $request->getParam('escopo', '')));
+        if ($escopo !== 'todos') {
+            $escopo = 'me';
+        }
+
         $pedidoModel = new PedidoEcommerce();
         $resumo = [
             'pedidos' => [],
@@ -2692,13 +3253,214 @@ JS;
             'faixas' => [],
         ];
         try {
+            $adminId = (int) ($admin['id'] ?? 0);
             if ($perfil === 'admin') {
-                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisTodos();
+                if ($escopo === 'todos') {
+                    $resumo = $pedidoModel->getResumoComissoesPedidosManuaisTodos();
+                } else {
+                    $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador($adminId);
+                }
             } else {
-                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador((int) ($admin['id'] ?? 0));
+                $resumo = $pedidoModel->getResumoComissoesPedidosManuaisPorAdminCriador($adminId);
             }
         } catch (\Exception $e) {
             $resumo = $resumo;
+        }
+
+        // Comissões de processamento (pedidos online finalizados com comprovante)
+        $resumoProc = [
+            'por_moeda' => [
+                'USD' => ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []],
+                'BRL' => ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []],
+            ],
+        ];
+        try {
+            $pdo = \Config\Database::getConnection();
+            $stT = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+            $stT->execute(['comissoes_processamento']);
+            $has = (int) ($stT->fetchColumn() ?: 0) > 0;
+            if ($has) {
+                $where = '';
+                $params = [];
+                if ($perfil !== 'admin' || $escopo !== 'todos') {
+                    $where = ' WHERE usuario_id = ?';
+                    $params[] = (int) ($admin['id'] ?? 0);
+                }
+
+                $st = $pdo->prepare('SELECT pedido_id, usuario_id, moeda, percentual, base_liquida, valor_comissao, created_at FROM comissoes_processamento' . $where . ' ORDER BY created_at DESC LIMIT 500');
+                $st->execute($params);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Enriquecer com dados do pedido (valor pago, impostos, custo, líquido)
+                $pedidoInfoMap = [];
+                try {
+                    $pedidoIds = [];
+                    foreach ($rows as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid > 0) $pedidoIds[$pid] = true;
+                    }
+                    $pedidoIds = array_keys($pedidoIds);
+
+                    if (!empty($pedidoIds)) {
+                        $colsP = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pedidos');
+                            $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsP = [];
+                        }
+
+                        $pick = function(array $cols, array $cands): string {
+                            foreach ($cands as $c) {
+                                if (in_array($c, $cols, true)) return $c;
+                            }
+                            return '';
+                        };
+
+                        $colMoeda = $pick($colsP, ['moeda', 'currency']);
+                        $colTotal = $pick($colsP, ['total', 'valor_total', 'amount', 'valor']);
+                        $colImpostos = $pick($colsP, ['impostos', 'valor_impostos', 'taxes']);
+                        $colOrigem = $pick($colsP, ['origem_pedido', 'origem', 'tipo']);
+
+                        $sel = ['id'];
+                        if ($colMoeda !== '') $sel[] = $colMoeda . ' AS moeda';
+                        if ($colTotal !== '') $sel[] = $colTotal . ' AS total';
+                        if ($colImpostos !== '') $sel[] = $colImpostos . ' AS impostos';
+                        if ($colOrigem !== '') $sel[] = $colOrigem . ' AS origem_pedido';
+
+                        $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                        $stP = $pdo->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id IN (' . $in . ')');
+                        $stP->execute($pedidoIds);
+                        $pRows = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        // descobrir tabela de itens
+                        $itensTable = null;
+                        try {
+                            $stT->execute(['pedido_itens']);
+                            $tem1 = (int) ($stT->fetchColumn() ?: 0) > 0;
+                            $stT->execute(['pedido_items']);
+                            $tem2 = (int) ($stT->fetchColumn() ?: 0) > 0;
+                            if ($tem1 && !$tem2) $itensTable = 'pedido_itens';
+                            elseif ($tem2 && !$tem1) $itensTable = 'pedido_items';
+                            elseif ($tem1 && $tem2) $itensTable = 'pedido_itens';
+                        } catch (\Exception $e) {
+                            $itensTable = null;
+                        }
+
+                        $colsItens = [];
+                        if ($itensTable) {
+                            try {
+                                $stColsI = $pdo->query('DESCRIBE ' . $itensTable);
+                                $colsItens = $stColsI ? ($stColsI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
+                                $colsItens = [];
+                            }
+                        }
+
+                        $colPedidoId = $pick($colsItens, ['pedido_id']);
+                        $colQtd = $pick($colsItens, ['quantidade', 'qty']);
+                        $colSubtotal = $pick($colsItens, ['subtotal']);
+                        $colUnit = $pick($colsItens, ['preco_unitario', 'valor_unitario', 'price', 'valor']);
+                        $colProdutoId = $pick($colsItens, ['produto_id']);
+
+                        $colsProd = [];
+                        try {
+                            $stColsPr = $pdo->query('DESCRIBE produtos');
+                            $colsProd = $stColsPr ? ($stColsPr->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsProd = [];
+                        }
+                        $colCustoProd = $pick($colsProd, ['preco_custo', 'cost_price', 'custo', 'valor_custo']);
+
+                        foreach ($pRows as $pr) {
+                            $pid = (int) ($pr['id'] ?? 0);
+                            if ($pid <= 0) continue;
+                            $moeda = strtoupper(trim((string) ($pr['moeda'] ?? 'BRL')));
+                            if ($moeda === '') $moeda = 'BRL';
+                            $total = (float) ($pr['total'] ?? 0);
+                            $impostos = (float) ($pr['impostos'] ?? 0);
+                            $origem = strtolower(trim((string) ($pr['origem_pedido'] ?? '')));
+
+                            $custo = 0.0;
+                            $isAssessoria = in_array($origem, ['assessoria', 'redirecionamento'], true);
+                            try {
+                                if ($itensTable && $colPedidoId !== '' && $colQtd !== '') {
+                                    if ($isAssessoria) {
+                                        if ($colSubtotal !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(' . $colSubtotal . ',0)) FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        } elseif ($colUnit !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(' . $colUnit . ',0) * COALESCE(' . $colQtd . ',0)) FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        }
+                                    } else {
+                                        if ($colProdutoId !== '' && $colCustoProd !== '') {
+                                            $stC = $pdo->prepare('SELECT SUM(COALESCE(pr.' . $colCustoProd . ',0) * COALESCE(pi.' . $colQtd . ',0)) FROM ' . $itensTable . ' pi INNER JOIN produtos pr ON pr.id = pi.' . $colProdutoId . ' WHERE pi.' . $colPedidoId . ' = ?');
+                                            $stC->execute([$pid]);
+                                            $custo = (float) ($stC->fetchColumn() ?: 0);
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                $custo = 0.0;
+                            }
+
+                            $liq = $total - $impostos - $custo;
+                            $pedidoInfoMap[$pid] = [
+                                'moeda' => $moeda,
+                                'total' => $total,
+                                'impostos' => $impostos,
+                                'custo' => $custo,
+                                'liquido' => $liq,
+                            ];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $pedidoInfoMap = [];
+                }
+
+                foreach ($rows as $r) {
+                    $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                    if ($m === '') $m = 'BRL';
+                    if (!isset($resumoProc['por_moeda'][$m])) {
+                        $resumoProc['por_moeda'][$m] = ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+                    }
+
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid > 0 && isset($pedidoInfoMap[$pid]) && is_array($pedidoInfoMap[$pid])) {
+                        $r['valor_pago'] = (float) ($pedidoInfoMap[$pid]['total'] ?? 0);
+                        $r['impostos'] = (float) ($pedidoInfoMap[$pid]['impostos'] ?? 0);
+                        $r['custo'] = (float) ($pedidoInfoMap[$pid]['custo'] ?? 0);
+                        $r['liquido_calc'] = (float) ($pedidoInfoMap[$pid]['liquido'] ?? 0);
+                        // preferir moeda do pedido
+                        $r['moeda'] = (string) ($pedidoInfoMap[$pid]['moeda'] ?? $m);
+                        $m = strtoupper(trim((string) ($r['moeda'] ?? $m)));
+                        if ($m === '') $m = 'BRL';
+                        if (!isset($resumoProc['por_moeda'][$m])) {
+                            $resumoProc['por_moeda'][$m] = ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+                        }
+                    }
+
+                    $resumoProc['por_moeda'][$m]['base_liquida'] += (float) ($r['base_liquida'] ?? 0);
+                    $resumoProc['por_moeda'][$m]['valor_comissao'] += (float) ($r['valor_comissao'] ?? 0);
+                    $resumoProc['por_moeda'][$m]['linhas'][] = $r;
+                }
+
+                foreach ($resumoProc['por_moeda'] as $m => &$t) {
+                    $sumPerc = 0.0;
+                    $n = 0;
+                    foreach (($t['linhas'] ?? []) as $r) {
+                        $sumPerc += (float) ($r['percentual'] ?? 0);
+                        $n++;
+                    }
+                    $t['percentual_medio'] = $n > 0 ? ($sumPerc / $n) : 0.0;
+                }
+                unset($t);
+            }
+        } catch (\Exception $e) {
+            $resumoProc = $resumoProc;
         }
 
         $cPedidos = is_array($resumo) && isset($resumo['pedidos']) && is_array($resumo['pedidos']) ? $resumo['pedidos'] : [];
@@ -2751,8 +3513,8 @@ JS;
         renderAdminSidebarStyles();
 
         echo '<style>
-        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:2px}
-        .comm-card{flex:0 0 220px}
+        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
+        .comm-card{flex:0 0 240px;min-height:92px;background:#fff}
         </style></head>
 <body>
     <div class="container-fluid">
@@ -2764,6 +3526,13 @@ JS;
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Minhas Comissões</h1>
                     <div>
+                        ' . ($perfil === 'admin'
+                            ? (
+                                $escopo === 'todos'
+                                    ? '<a href="/admin/pedidos/comissoes" class="btn btn-outline-dark me-2"><i class="fas fa-user"></i> Ver minhas</a>'
+                                    : '<a href="/admin/pedidos/comissoes?escopo=todos" class="btn btn-outline-dark me-2"><i class="fas fa-users"></i> Ver todos</a>'
+                            )
+                            : '') . '
                         <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
                     </div>
@@ -2779,6 +3548,11 @@ JS;
             $totalLiquido = (float) ($t['total_liquido'] ?? 0);
             $percent = (float) ($t['percentual_comissao'] ?? 0);
             $valorComissao = (float) ($t['valor_comissao'] ?? 0);
+
+            $tp = $resumoProc['por_moeda'][$moeda] ?? ['base_liquida' => 0.0, 'valor_comissao' => 0.0, 'percentual_medio' => 0.0, 'linhas' => []];
+            $procBase = (float) ($tp['base_liquida'] ?? 0);
+            $procVal = (float) ($tp['valor_comissao'] ?? 0);
+            $procPercMed = (float) ($tp['percentual_medio'] ?? 0);
 
             echo '<div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -2805,6 +3579,16 @@ JS;
                             <div class="text-muted small">Comissão total</div>
                             <div class="fs-5 fw-bold">' . $formatMoney($valorComissao, $moeda) . '</div>
                         </div>
+
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Base líquida</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procBase, $moeda) . '</div>
+                        </div>
+                        <div class="border rounded p-3 comm-card">
+                            <div class="text-muted small">Processamento (Online) - Comissão</div>
+                            <div class="fs-5 fw-bold">' . $formatMoney($procVal, $moeda) . '</div>
+                            <div class="small text-muted">% médio: ' . number_format($procPercMed, 2, ',', '.') . '%</div>
+                        </div>
                     </div>
                 </div>';
         }
@@ -2820,11 +3604,11 @@ JS;
 
         echo '</div>
 
-                <div class="card">
+                <div class="card mb-4">
                     <div class="card-header"><strong>Pedidos Manuais Pagos</strong></div>
                     <div class="card-body">';
 
-        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel) use ($formatMoney) {
+        $renderTabelaPedidos = function(array $pedidos, string $moedaLabel, float $percentMoeda) use ($formatMoney) {
             if (empty($pedidos)) {
                 echo '<div class="text-muted">Sem pedidos manuais pagos em ' . htmlspecialchars($moedaLabel) . '.</div>';
                 return;
@@ -2837,8 +3621,10 @@ JS;
                                 <th>Pedido</th>
                                 <th>Data</th>
                                 <th class="text-end">Faturado</th>
+                                <th class="text-end">Impostos</th>
                                 <th class="text-end">Custo</th>
                                 <th class="text-end">Líquido</th>
+                                <th class="text-end">Comissão</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -2848,8 +3634,10 @@ JS;
                 $pid = (int) ($p['id'] ?? 0);
                 $codigo = (string) ($p['codigo'] ?? $pid);
                 $fat = (float) ($p['faturado'] ?? 0);
+                $imp = (float) ($p['impostos'] ?? 0);
                 $cus = (float) ($p['custo'] ?? 0);
-                $liq = (float) ($p['liquido'] ?? ($fat - $cus));
+                $liq = (float) ($p['liquido'] ?? ($fat - $imp - $cus));
+                $com = max(0.0, $liq) * (max(0.0, $percentMoeda) / 100.0);
                 $moeda = strtoupper(trim((string) ($p['moeda'] ?? '')));
                 if ($moeda === '') $moeda = 'BRL';
                 $dt = (string) ($p['created_at'] ?? '');
@@ -2859,8 +3647,10 @@ JS;
                         <td><strong>' . htmlspecialchars($codigo) . '</strong><div class="text-muted small">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</div></td>
                         <td>' . htmlspecialchars($dtFmt) . '</td>
                         <td class="text-end fw-semibold">' . $formatMoney($fat, $moeda) . '</td>
+                        <td class="text-end">' . $formatMoney($imp, $moeda) . '</td>
                         <td class="text-end">' . $formatMoney($cus, $moeda) . '</td>
                         <td class="text-end">' . $formatMoney($liq, $moeda) . '</td>
+                        <td class="text-end fw-semibold">' . number_format($percentMoeda, 2, ',', '.') . '% (' . $formatMoney($com, $moeda) . ')</td>
                         <td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>
                       </tr>';
             }
@@ -2874,25 +3664,113 @@ JS;
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>USD</strong>
                 </div>';
-        $renderTabelaPedidos($pedidosUsd, 'USD');
+        $renderTabelaPedidos($pedidosUsd, 'USD', (float) ($porMoeda['USD']['percentual_comissao'] ?? 0));
         echo '</div>';
 
         echo '<div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>BRL</strong>
                 </div>';
-        $renderTabelaPedidos($pedidosBrl, 'BRL');
+        $renderTabelaPedidos($pedidosBrl, 'BRL', (float) ($porMoeda['BRL']['percentual_comissao'] ?? 0));
+        echo '</div>';
+
+        echo '        </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><strong>Comissões de Processamento (Online)</strong></div>
+                    <div class="card-body">';
+
+        $renderTabelaProc = function(array $linhas, string $moedaLabel) use ($formatMoney) {
+            if (empty($linhas)) {
+                echo '<div class="text-muted">Sem comissões de processamento em ' . htmlspecialchars($moedaLabel) . '.</div>';
+                return;
+            }
+            echo '<div class="table-responsive">'
+                . '<table class="table table-hover">'
+                . '<thead><tr><th>Pedido</th><th>Data</th><th class="text-end">Pago</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">%</th><th class="text-end">Comissão</th><th>Ações</th></tr></thead><tbody>';
+            foreach ($linhas as $r) {
+                $pid = (int) ($r['pedido_id'] ?? 0);
+                $dt = (string) ($r['created_at'] ?? '');
+                $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+                $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                if ($m === '') $m = 'BRL';
+                $pago = (float) ($r['valor_pago'] ?? 0);
+                $imp = (float) ($r['impostos'] ?? 0);
+                $cus = (float) ($r['custo'] ?? 0);
+                $liq = (float) ($r['liquido_calc'] ?? (($r['base_liquida'] ?? 0)));
+                echo '<tr>'
+                    . '<td><strong>#' . $pid . '</strong></td>'
+                    . '<td>' . htmlspecialchars($dtFmt) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($pago, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($imp, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($cus, $m) . '</td>'
+                    . '<td class="text-end">' . $formatMoney($liq, $m) . '</td>'
+                    . '<td class="text-end">' . number_format((float) ($r['percentual'] ?? 0), 2, ',', '.') . '%</td>'
+                    . '<td class="text-end fw-semibold">' . $formatMoney((float) ($r['valor_comissao'] ?? 0), $m) . '</td>'
+                    . '<td><a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '"><i class="fas fa-eye"></i></a></td>'
+                    . '</tr>';
+            }
+            echo '</tbody></table></div>';
+        };
+
+        $procUsd = (array) (($resumoProc['por_moeda']['USD']['linhas'] ?? []) ?: []);
+        $procBrl = (array) (($resumoProc['por_moeda']['BRL']['linhas'] ?? []) ?: []);
+
+        echo '<div class="mb-4"><strong>USD</strong>';
+        $renderTabelaProc($procUsd, 'USD');
+        echo '</div>';
+
+        echo '<div><strong>BRL</strong>';
+        $renderTabelaProc($procBrl, 'BRL');
         echo '</div>';
 
         echo '        </div>
                 </div>
             </main>
         </div>
+    </div>';
+
+        echo <<<'HTML'
+
+    <div class="modal fade" id="modalLixeiraPedido" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="formLixeiraPedido">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviar pedido para lixeira</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div>Confirma enviar o pedido <strong id="lixeiraPedidoIdLabel"></strong> para a lixeira?</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Enviar para lixeira</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var modal = document.getElementById("modalLixeiraPedido");
+            if(!modal) return;
+            modal.addEventListener("show.bs.modal", function (event) {
+                var btn = event.relatedTarget;
+                if(!btn) return;
+                var pid = btn.getAttribute("data-pedido-id") || "";
+                var label = document.getElementById("lixeiraPedidoIdLabel");
+                var form = document.getElementById("formLixeiraPedido");
+                if(label) label.textContent = "#" + pid;
+                if(form) form.action = "/admin/pedidos/excluir/" + pid;
+            });
+        })();
+    </script>
 </body>
-</html>';
+</html>
+HTML;
         exit;
     }
     
@@ -3364,6 +4242,7 @@ JS;
     public function excluir(Request $request, $id = null) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
+        $admin = $auth->getUsuarioLogado();
         $id = $id ?? $request->getParam('id');
 
         if (empty($id)) {
@@ -3375,6 +4254,31 @@ JS;
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
+
+            $colsPedidos = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $temDeletedAt = is_array($colsPedidos) && in_array('deleted_at', $colsPedidos, true);
+            $temDeletedBy = is_array($colsPedidos) && in_array('deleted_by', $colsPedidos, true);
+
+            if ($temDeletedAt) {
+                $set = ['deleted_at = NOW()'];
+                $params = [':id' => (int) $id];
+                if ($temDeletedBy) {
+                    $set[] = 'deleted_by = :uid';
+                    $params[':uid'] = (int) ($admin['id'] ?? 0);
+                }
+                $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                $st->execute($params);
+                $pdo->commit();
+                header('Location: /admin/pedidos?success=lixeira');
+                exit;
+            }
 
             $stmt = $pdo->prepare("SELECT id FROM pedidos WHERE id = ?");
             $stmt->execute([$id]);
@@ -3398,6 +4302,108 @@ JS;
             }
             echo '<div class="alert alert-danger">Erro ao excluir pedido: ' . $e->getMessage() . '</div>';
             echo '<a href="/admin/pedidos/detalhes/' . htmlspecialchars((string)$id) . '" class="btn btn-secondary">Voltar</a>';
+            exit;
+        }
+    }
+
+    public function criarTicket(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+        $admin = $auth->getUsuarioLogado();
+        $id = (int) ($id ?? $request->getParam('id'));
+        if ($id <= 0) {
+            header('Location: /admin/pedidos');
+            exit;
+        }
+
+        $adminUid = (int) ($admin['id'] ?? 0);
+        $pdo = \Config\Database::getConnection();
+
+        // Cliente do pedido
+        $colsP = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE pedidos');
+            $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $colsP = [];
+        }
+        $colUsuario = null;
+        foreach (['usuario_id', 'user_id', 'cliente_id'] as $c) {
+            if (in_array($c, $colsP, true)) {
+                $colUsuario = $c;
+                break;
+            }
+        }
+        if ($colUsuario === null) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        $stOwner = $pdo->prepare('SELECT ' . $colUsuario . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stOwner->execute([(int) $id]);
+        $clienteId = (int) ($stOwner->fetchColumn() ?: 0);
+        if ($clienteId <= 0) {
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+
+        // Reutilizar ticket aberto
+        try {
+            $stFind = $pdo->prepare("SELECT id FROM support_tickets WHERE usuario_id = ? AND pedido_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1");
+            $stFind->execute([(int) $clienteId, (int) $id]);
+            $existingOpen = (int) ($stFind->fetchColumn() ?: 0);
+            if ($existingOpen > 0) {
+                header('Location: /admin/tickets/' . $existingOpen);
+                exit;
+            }
+        } catch (\Exception $e) {
+        }
+
+        $assunto = 'Suporte do Pedido #' . (int) $id;
+        $motivo = 'Problema no pedido';
+        $mensagem = trim((string) ($request->getParam('mensagem') ?? 'Ticket iniciado pelo suporte.'));
+        if ($mensagem === '') {
+            $mensagem = 'Ticket iniciado pelo suporte.';
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $colsT = [];
+            try {
+                $stT = $pdo->query('DESCRIBE support_tickets');
+                $colsT = $stT ? ($stT->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsT = [];
+            }
+
+            if (in_array('motivo', $colsT, true)) {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, motivo, status) VALUES (?, ?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto, (string) $motivo]);
+            } else {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, status) VALUES (?, ?, ?, 'open')");
+                $stIns->execute([(int) $clienteId, (int) $id, (string) $assunto]);
+            }
+            $ticketId = (int) $pdo->lastInsertId();
+
+            $stMsg = $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)');
+            $stMsg->execute([(int) $ticketId, 'admin', (int) $adminUid, (string) $mensagem]);
+
+            $pdo->commit();
+
+            try {
+                $not = new SupportTicketNotificationService();
+                $not->notificarTicketCriado((int) $id, (int) $ticketId, [
+                    'assunto' => $assunto,
+                    'motivo' => $motivo,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            header('Location: /admin/tickets/' . $ticketId);
+            exit;
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
             exit;
         }
     }

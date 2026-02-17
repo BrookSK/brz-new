@@ -1088,6 +1088,8 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
+            $tipoCompraView = 'offline';
+
             $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
             $reabertos = null;
             if ($somenteReabertos && isset($_SESSION['compras_reabertas']) && is_array($_SESSION['compras_reabertas'])) {
@@ -1098,6 +1100,7 @@ class AdminComprasController extends Controller {
             $pedidosSelect = $this->fetchPedidosSelect();
 
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+            $temTipoCompraEmLista = $this->columnExists('lista_compras', 'tipo_compra');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
             $temCost = $this->columnExists('produtos', 'cost_price');
             $temFoto = $this->columnExists('produtos', 'foto_principal');
@@ -1108,6 +1111,15 @@ class AdminComprasController extends Controller {
             $temImage = $this->columnExists('produtos', 'image');
             $temThumb = $this->columnExists('produtos', 'thumb');
             $temThumbnail = $this->columnExists('produtos', 'thumbnail');
+
+            $whereTipoCompra = '';
+            if ($temTipoCompraEmLista) {
+                if ($tipoCompraView === 'offline') {
+                    $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                } else {
+                    $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                }
+            }
 
             $selectCols = [
                 'p.id as produto_id',
@@ -1150,6 +1162,7 @@ class AdminComprasController extends Controller {
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
                 . '   FROM lista_compras lc WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
+                . $whereTipoCompra
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
                         ? (' AND (' . implode(' OR ', array_values(array_filter(array_map(function ($x) {
@@ -1292,6 +1305,7 @@ class AdminComprasController extends Controller {
             $lojaIdFilter = 0;
             $semLoja = false;
             $statusView = 'pendente';
+            $tipoCompraView = 'offline';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
@@ -2407,9 +2421,12 @@ class AdminComprasController extends Controller {
     public function gerarPDF($request) {
         $lojaId = (int) $request->getParam('loja_id', 0);
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+        $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
         $temCost = $this->columnExists('produtos', 'cost_price');
         $temFoto = $this->columnExists('produtos', 'foto_principal');
         $temImages = $this->columnExists('produtos', 'images');
+
+        $temObsVendedor = $this->columnExists('pedidos', 'observacao_vendedor');
 
         $lojaNome = 'Compras';
         if ($lojaId > 0 && $this->tableExists('lojas')) {
@@ -2449,6 +2466,7 @@ class AdminComprasController extends Controller {
             . ' FROM ('
             . '   SELECT produto_id, '
             . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(pedido_id,0),0)) as pedido_id' : '')
             . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
             . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
             . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
@@ -2503,17 +2521,49 @@ class AdminComprasController extends Controller {
             . '<th style="width:60px;">Foto</th>'
             . '<th>Produto</th>'
             . '<th style="width:70px;">Qtd</th>'
+            . ($temPedidoEmLista && $temObsVendedor ? '<th>Obs. Pedido</th>' : '')
             . '</tr></thead><tbody>';
+
+        $obsByPedido = [];
+        if ($temPedidoEmLista && $temObsVendedor) {
+            $pedidoIds = [];
+            foreach ($rows as $r) {
+                $pid = (int) ($r['pedido_id'] ?? 0);
+                if ($pid > 0) {
+                    $pedidoIds[$pid] = true;
+                }
+            }
+            $pedidoIds = array_keys($pedidoIds);
+            if (!empty($pedidoIds)) {
+                $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                try {
+                    $stmtObs = $this->connection->prepare('SELECT id, observacao_vendedor FROM pedidos WHERE id IN (' . $in . ')');
+                    $stmtObs->execute($pedidoIds);
+                    $obsRows = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($obsRows as $or) {
+                        $id = (int) ($or['id'] ?? 0);
+                        if ($id > 0) {
+                            $obsByPedido[$id] = (string) ($or['observacao_vendedor'] ?? '');
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $obsByPedido = [];
+                }
+            }
+        }
 
         foreach ($rows as $r) {
             $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
             $img = $this->resolveProdutoImagem($r);
             $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
+            $pedidoIdLinha = (int) ($r['pedido_id'] ?? 0);
+            $obsLinha = ($pedidoIdLinha > 0 && isset($obsByPedido[$pedidoIdLinha])) ? trim((string) $obsByPedido[$pedidoIdLinha]) : '';
             echo '<tr>'
                 . '<td style="text-align:center;"><span class="check"></span></td>'
                 . '<td style="text-align:center;">' . $imgTag . '</td>'
                 . '<td><strong>' . htmlspecialchars((string) ($r['produto_nome'] ?? '')) . '</strong></td>'
                 . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
+                . ($temPedidoEmLista && $temObsVendedor ? ('<td>' . htmlspecialchars($obsLinha, ENT_QUOTES, 'UTF-8') . '</td>') : '')
                 . '</tr>';
         }
 

@@ -34,7 +34,7 @@
                     </span>
                     <?php $suiteValue = $usuario['suite'] ?? ($usuario['switch'] ?? null); ?>
                     <?php if (!empty($suiteValue)): ?>
-                        <div class="mt-2 small text-muted">Suite: <strong><?= (int) $suiteValue ?></strong></div>
+                        <div class="mt-2 small text-muted"><?= __('user.suite', 'Suite') ?>: <strong><?= (int) $suiteValue ?></strong></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -42,19 +42,19 @@
             <!-- Quick Menu -->
             <div class="card border-0 shadow-sm mt-3">
                 <div class="card-body p-4">
-                    <h6 class="card-title mb-3">Menu Rápido</h6>
+                    <h6 class="card-title mb-3"><?= __('user.quick_menu', 'Menu Rápido') ?></h6>
                     <nav class="nav flex-column">
                         <a class="nav-link active mb-2" href="/minha-conta">
-                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                            <i class="fas fa-tachometer-alt me-2"></i> <?= __('user.dashboard', 'Dashboard') ?>
                         </a>
                         <a class="nav-link mb-2" href="/meus-dados">
-                            <i class="fas fa-user me-2"></i> Meus Dados
+                            <i class="fas fa-user me-2"></i> <?= __('user.my_data', 'Meus Dados') ?>
                         </a>
                         <a class="nav-link mb-2" href="/meus-pedidos">
-                            <i class="fas fa-shopping-bag me-2"></i> Meus Pedidos
+                            <i class="fas fa-shopping-bag me-2"></i> <?= __('user.my_orders', 'Meus Pedidos') ?>
                         </a>
                         <a class="nav-link mb-2" href="/carrinho">
-                            <i class="fas fa-shopping-cart me-2"></i> Meu Carrinho
+                            <i class="fas fa-shopping-cart me-2"></i> <?= __('user.my_cart', 'Meu Carrinho') ?>
                             <?php if (!empty($_SESSION['carrinho'])): ?>
                                 <span class="badge rounded-pill ms-auto" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
                                     <?= count($_SESSION['carrinho']) ?>
@@ -63,7 +63,7 @@
                         </a>
                         <hr class="my-3">
                         <a class="nav-link text-danger mb-2" href="/logout">
-                            <i class="fas fa-sign-out-alt me-2"></i> Sair
+                            <i class="fas fa-sign-out-alt me-2"></i> <?= __('auth.logout', 'Sair') ?>
                         </a>
                     </nav>
                 </div>
@@ -75,11 +75,11 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-1">Minha Conta</h2>
-                    <p class="text-muted mb-0">Bem-vindo de volta, <strong><?= htmlspecialchars($usuario['nome']) ?></strong>!</p>
+                    <h2 class="mb-1"><?= __('user.my_account', 'Minha Conta') ?></h2>
+                    <p class="text-muted mb-0"><?= __('user.welcome_back', 'Bem-vindo de volta, {name}!', ['name' => '<strong>' . htmlspecialchars($usuario['nome']) . '</strong>']) ?></p>
                 </div>
                 <div class="text-end">
-                    <small class="text-muted">Último acesso:</small><br>
+                    <small class="text-muted"><?= __('user.last_access', 'Último acesso:') ?></small><br>
                     <strong><?= date('d/m/Y H:i', strtotime($usuario['ultimo_acesso'] ?? 'now')) ?></strong>
                 </div>
             </div>
@@ -92,7 +92,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="flex-grow-1">
                                     <h3 class="mb-1 fw-bold"><?= $total_pedidos ?></h3>
-                                    <p class="text-muted small mb-0">Total de Pedidos</p>
+                                    <p class="text-muted small mb-0"><?= __('user.stats.total_orders', 'Total de Pedidos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-primary bg-opacity-10 rounded-circle p-3">
@@ -115,7 +115,7 @@
                                         echo count($ativos);
                                         ?>
                                     </h3>
-                                    <p class="text-muted small mb-0">Pedidos Ativos</p>
+                                    <p class="text-muted small mb-0"><?= __('user.stats.active_orders', 'Pedidos Ativos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
@@ -138,7 +138,7 @@
                                         echo 'R$ ' . number_format($totalGasto, 2, ',', '.');
                                         ?>
                                     </h3>
-                                    <p class="text-muted small mb-0">Total Gasto</p>
+                                    <p class="text-muted small mb-0"><?= __('user.stats.total_spent', 'Total Gasto') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
@@ -156,7 +156,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="flex-grow-1">
                                     <h3 class="mb-1 fw-bold"><?= count($enderecos) ?></h3>
-                                    <p class="text-muted small mb-0">Endereços</p>
+                                    <p class="text-muted small mb-0"><?= __('user.stats.addresses', 'Endereços') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-info bg-opacity-10 rounded-circle p-3">
@@ -174,9 +174,9 @@
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 fw-bold">
-                            <i class="fas fa-clipboard-list me-2"></i> Orçamentos do Redirecionamento
+                            <i class="fas fa-clipboard-list me-2"></i> <?= __('user.redirect_quotes', 'Orçamentos do Redirecionamento') ?>
                         </h5>
-                        <a href="/assessoria" class="btn btn-sm btn-outline-primary">Novo Orçamento</a>
+                        <a href="/assessoria" class="btn btn-sm btn-outline-primary"><?= __('user.new_quote', 'Novo Orçamento') ?></a>
                     </div>
                 </div>
                 <div class="card-body">
@@ -190,17 +190,17 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <h6 class="card-title mb-3">
-                                <i class="fas fa-bolt me-2"></i> Ações Rápidas
+                                <i class="fas fa-bolt me-2"></i> <?= __('user.quick_actions', 'Ações Rápidas') ?>
                             </h6>
                             <div class="d-grid gap-2">
                                 <a href="/produtos" class="btn btn-outline-primary">
-                                    <i class="fas fa-shopping-cart me-2"></i> Comprar Produtos
+                                    <i class="fas fa-shopping-cart me-2"></i> <?= __('user.buy_products', 'Comprar Produtos') ?>
                                 </a>
                                 <a href="/carrinho" class="btn btn-outline-success">
-                                    <i class="fas fa-shopping-basket me-2"></i> Ver Carrinho
+                                    <i class="fas fa-shopping-basket me-2"></i> <?= __('user.view_cart', 'Ver Carrinho') ?>
                                 </a>
                                 <a href="/rastreamento" class="btn btn-outline-info">
-                                    <i class="fas fa-search-location me-2"></i> Rastrear Pedido
+                                    <i class="fas fa-search-location me-2"></i> <?= __('user.track_order', 'Rastrear Pedido') ?>
                                 </a>
                             </div>
                         </div>
@@ -211,17 +211,17 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <h6 class="card-title mb-3">
-                                <i class="fas fa-user-cog me-2"></i> Configurações
+                                <i class="fas fa-user-cog me-2"></i> <?= __('user.settings', 'Configurações') ?>
                             </h6>
                             <div class="d-grid gap-2">
                                 <a href="/meus-dados" class="btn btn-outline-secondary">
-                                    <i class="fas fa-user-edit me-2"></i> Editar Perfil
+                                    <i class="fas fa-user-edit me-2"></i> <?= __('user.edit_profile', 'Editar Perfil') ?>
                                 </a>
                                 <a href="/meus-pedidos" class="btn btn-outline-secondary">
-                                    <i class="fas fa-history me-2"></i> Histórico
+                                    <i class="fas fa-history me-2"></i> <?= __('user.history', 'Histórico') ?>
                                 </a>
                                 <a href="/contato" class="btn btn-outline-secondary">
-                                    <i class="fas fa-headset me-2"></i> Suporte
+                                    <i class="fas fa-headset me-2"></i> <?= __('user.support', 'Suporte') ?>
                                 </a>
                             </div>
                         </div>

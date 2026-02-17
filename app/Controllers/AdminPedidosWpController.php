@@ -457,20 +457,31 @@ class AdminPedidosWpController extends Controller {
                 $sku = '';
                 $ncm = '';
 
+                $ncmCandidatesItem = ['_ncm', 'ncm', 'tariff_code', '_tariff_code', 'invoice_ncm', '_invoice_ncm', 'ncm_code', '_ncm_code'];
+                foreach ($ncmCandidatesItem as $nk) {
+                    $val = trim((string) ($m[$nk] ?? ''));
+                    if ($val !== '') {
+                        $ncm = $val;
+                        break;
+                    }
+                }
+
                 $prodLookupId = $variacaoId > 0 ? $variacaoId : $produtoId;
                 if ($prodLookupId > 0) {
                     $stSku = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_sku' LIMIT 1");
                     $stSku->execute([(int) $prodLookupId]);
                     $sku = (string) ($stSku->fetchColumn() ?: '');
 
-                    $ncmKeys = ['_ncm', 'ncm', '_woo_ncm', '_product_ncm', '_ncm_code'];
-                    foreach ($ncmKeys as $nk) {
-                        $stN = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = ? LIMIT 1");
-                        $stN->execute([(int) $prodLookupId, $nk]);
-                        $n = (string) ($stN->fetchColumn() ?: '');
-                        if (trim($n) !== '') {
-                            $ncm = $n;
-                            break;
+                    if ($ncm === '') {
+                        $ncmKeys = ['_ncm', 'ncm', '_woo_ncm', '_product_ncm', '_ncm_code'];
+                        foreach ($ncmKeys as $nk) {
+                            $stN = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = ? LIMIT 1");
+                            $stN->execute([(int) $prodLookupId, $nk]);
+                            $n = (string) ($stN->fetchColumn() ?: '');
+                            if (trim($n) !== '') {
+                                $ncm = $n;
+                                break;
+                            }
                         }
                     }
                 }

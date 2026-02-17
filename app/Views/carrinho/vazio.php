@@ -1,17 +1,17 @@
 <div class="card">
     <div class="card-body text-center py-5">
         <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
-        <h3 class="mb-2">Carrinho vazio</h3>
-        <p class="text-muted mb-4">Adicione produtos ao carrinho para ver o resumo e finalizar a compra.</p>
+        <h3 class="mb-2"><?= __('cart.empty_title', 'Carrinho vazio') ?></h3>
+        <p class="text-muted mb-4"><?= __('cart.empty_subtitle', 'Adicione produtos ao carrinho para ver o resumo e finalizar a compra.') ?></p>
 
         <div class="d-grid gap-3 d-flex justify-content-center">
             <a href="/produtos" class="btn btn-primary">
                 <i class="fas fa-shopping-cart me-2"></i>
-                Ver Produtos
+                <?= __('cart.view_products', 'Ver Produtos') ?>
             </a>
             <a href="/" class="btn btn-outline-primary">
                 <i class="fas fa-home me-2"></i>
-                Voltar à Home
+                <?= __('cart.back_home', 'Voltar à Home') ?>
             </a>
         </div>
     </div>

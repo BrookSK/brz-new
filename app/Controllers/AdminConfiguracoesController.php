@@ -387,6 +387,54 @@ class AdminConfiguracoesController extends Controller {
                                                 });
                                                 </script>
                                                 ';
+
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Favicon</div>
+                                                <div class="text-muted small mb-3">Upload do ícone para aparecer na aba do navegador.</div>
+
+                                                ';
+                                                $existingFavicon = (string) $this->getConfigValue($config, 'layout', 'favicon', '');
+                                                $existingFavicon = is_string($existingFavicon) ? trim($existingFavicon) : '';
+                                                $existingFaviconEsc = htmlspecialchars($existingFavicon, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingFaviconEsc !== '' ? '<img src="' . $existingFaviconEsc . '" alt="Favicon" style="height: 32px; width: 32px; object-fit: contain;"> <span class="text-muted small">' . $existingFaviconEsc . '</span>' : '<div class="text-muted">Nenhum favicon cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_favicon_keep" value="' . $existingFaviconEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Favicon</label>
+                                                        <input type="file" class="form-control" name="layout_favicon" accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFavicon">Remover favicon</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutFavicon");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_favicon_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Favicon será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
+                                            if (!in_array($selectedLang, ['pt', 'en'], true)) {
+                                                $selectedLang = 'pt';
+                                            }
+
                                             echo '
                                             </div>
 
@@ -397,9 +445,22 @@ class AdminConfiguracoesController extends Controller {
                                                 Mobile: <strong>391 x 333</strong>
                                             </div>
 
+                                            <div class="mb-3">
+                                                <label class="form-label small mb-1">Idioma do banner</label>
+                                                <select class="form-select" name="layout_banners_lang" onchange="(function(sel){var u=new URL(window.location.href);u.searchParams.set(\'layout_banners_lang\', sel.value);window.location.href=u.toString();})(this)">';
+
+                                            echo '<option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>';
+                                            echo '<option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>';
+
+                                            echo '</select>
+                                                <div class="text-muted small mt-1">Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.</div>
+                                            </div>
+
                                             <div id="layout-banners-existing" class="row g-2 mb-3">
                                                 ';
-                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', 'banners', '[]');
+
+                                                $bannersKey = ($selectedLang === 'en') ? 'banners_en' : 'banners';
+                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', $bannersKey, '[]');
                                                 $existingBanners = json_decode($existingBannersRaw, true);
                                                 if (!is_array($existingBanners)) $existingBanners = [];
                                                 foreach ($existingBanners as $idx => $item) {
@@ -1737,6 +1798,19 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
+                                                    <h6 class="mb-3">Desconto no PIX</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Desconto na taxa de serviço para PIX (%)</label>
+                                                        <input type="number" class="form-control" name="pagamentos_pix_desconto_taxa_servico_percent" value="' . $this->getConfigValue($config, 'pagamentos', 'pix_desconto_taxa_servico_percent', '0') . '" step="0.01" min="0" max="100">
+                                                        <small class="text-muted">Aplicado ao calcular a taxa de serviço quando a forma de pagamento selecionada for PIX.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
                                                             <h6 class="mb-0">👑 Clube Brasiliana</h6>
@@ -1985,6 +2059,13 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">Configurações de Comissões</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="row g-3 mb-4">
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Comissão de processamento (Online) %</label>
+                                                    <input type="number" step="0.01" min="0" max="100" class="form-control" name="comissao_processamento_percent" value="' . htmlspecialchars($this->getConfigValue($config, 'comissao', 'processamento_percent', $this->getConfigValue($config, 'comissao', 'comissao_processamento_percent', '0')), ENT_QUOTES, 'UTF-8') . '">
+                                                    <small class="text-muted">Percentual aplicado sobre o valor líquido (total - impostos - custo do produto) ao finalizar compras online.</small>
+                                                </div>
+                                            </div>
                                             <div class="row g-3 mb-4">
                                                 <div class="col-md-4">
                                                     <label class="form-label">Início da 1ª janela</label>
@@ -3634,8 +3715,63 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Upload do favicon
+            try {
+                $keepFavicon = (string) ($request->getParam('layout_favicon_keep', '') ?? '');
+                $keepFavicon = trim($keepFavicon);
+
+                $faviconUrl = $keepFavicon;
+                if (isset($_FILES['layout_favicon']) && is_array($_FILES['layout_favicon'])) {
+                    $name = (string) ($_FILES['layout_favicon']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_favicon']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_favicon']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['ico','png','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/favicon/',
+                                $docRoot . '/uploads/favicon/',
+                                $docRoot . '/public/uploads/favicons/',
+                                $docRoot . '/uploads/favicons/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/favicon/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/favicons/') !== false) {
+                                    $webDir = '/uploads/favicons/';
+                                }
+                                $fileName = 'favicon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $faviconUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_favicon', $faviconUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
+                $bannersLang = (string) $request->getParam('layout_banners_lang', 'pt');
+                if (!in_array($bannersLang, ['pt', 'en'], true)) {
+                    $bannersLang = 'pt';
+                }
+
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
                 $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
                 $keepLink = $request->getParam('layout_banners_keep_link', []);
@@ -3720,7 +3856,12 @@ HTML;
                 }
 
                 $final = array_merge($keptItems, $newItems);
-                $request->setParam('layout_banners', json_encode(array_values($final), JSON_UNESCAPED_UNICODE));
+                $json = json_encode(array_values($final), JSON_UNESCAPED_UNICODE);
+                if ($bannersLang === 'en') {
+                    $request->setParam('layout_banners_en', $json);
+                } else {
+                    $request->setParam('layout_banners', $json);
+                }
             } catch (\Exception $e) {
             }
 
@@ -3751,11 +3892,11 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners', 'logo', 'logo_footer', 'logo_admin'],
+                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
-                'comissao' => ['manual_faixas', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
+                'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
@@ -3804,6 +3945,16 @@ HTML;
                         }
                         if ($chave === 'custo_envio_por_item_usd') {
                             $valor = is_numeric($valor) ? floatval($valor) : 0;
+                        }
+                        if ($categoria === 'comissao' && in_array($chave, ['processamento_percent', 'comissao_processamento_percent'], true)) {
+                            $valor = is_numeric($valor) ? (float) $valor : 0;
+                            if ($valor < 0) $valor = 0;
+                            if ($valor > 100) $valor = 100;
+                        }
+                        if ($categoria === 'pagamentos' && $chave === 'pix_desconto_taxa_servico_percent') {
+                            $valor = is_numeric($valor) ? (float) $valor : 0;
+                            if ($valor < 0) $valor = 0;
+                            if ($valor > 100) $valor = 100;
                         }
                         if ($chave === 'comissao_percentual') {
                             $valor = is_numeric($valor) ? floatval($valor) : 0;

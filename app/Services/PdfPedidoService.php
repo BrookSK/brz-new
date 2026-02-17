@@ -46,6 +46,11 @@ class PdfPedidoService {
 
         $freteLabel = ($frete <= 0.0) ? 'Frete grátis' : $fmtMoney($frete);
 
+        $qtdTotal = 0;
+        foreach ($itens as $it) {
+            $qtdTotal += (int) ($it['quantidade'] ?? 0);
+        }
+
         $rows = '';
         $idx = 1;
         foreach ($itens as $it) {
@@ -133,6 +138,7 @@ class PdfPedidoService {
             . '<tbody>' . $rows . '</tbody>'
             . '</table>'
             . '<table class="totals">'
+            . '<tr><td class="label">Qtd total:</td><td class="value">' . (int) $qtdTotal . '</td></tr>'
             . '<tr><td class="label">Subtotal:</td><td class="value">' . htmlspecialchars($fmtMoney($subtotal), ENT_QUOTES, 'UTF-8') . '</td></tr>'
             . '<tr><td class="label">Taxa de Serviço:</td><td class="value">' . htmlspecialchars($fmtMoney($taxaServico), ENT_QUOTES, 'UTF-8') . '</td></tr>'
             . '<tr><td class="label">Impostos:</td><td class="value">' . htmlspecialchars($fmtMoney($impostos), ENT_QUOTES, 'UTF-8') . '</td></tr>'

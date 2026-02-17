@@ -112,7 +112,7 @@
                                     <h6 class="mb-1">
                                         <?= htmlspecialchars($item['nome']) ?>
                                         <?php if (!empty($isClubeAtivo)): ?>
-                                            <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i>Clube Ativo</span>
+                                            <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                         <?php endif; ?>
                                     </h6>
                                     <?php if (!empty($item['variacao_descricao'])): ?>
@@ -120,15 +120,15 @@
                                     <?php endif; ?>
                                     <?php if (isset($item['peso_unit'])): ?>
                                         <div class="small text-muted">
-                                            Peso: <?= number_format((float) ($item['peso_unit'] ?? 0), 3, ',', '.') ?> kg (x<?= (int) ($item['quantidade'] ?? 0) ?>)
+                                            <?= __('cart.weight', 'Peso') ?>: <?= number_format((float) ($item['peso_unit'] ?? 0), 3, ',', '.') ?> kg (x<?= (int) ($item['quantidade'] ?? 0) ?>)
                                             = <?= number_format((float) ($item['peso_item'] ?? 0), 3, ',', '.') ?> kg
                                         </div>
                                     <?php endif; ?>
                                     <?php if (!empty($item['ativo'])): ?>
-                                        <div class="small text-success">Ativo</div>
+                                        <div class="small text-success"><?= __('cart.active', 'Ativo') ?></div>
                                     <?php else: ?>
-                                        <div class="small text-danger">Desativado</div>
-                                        <div class="small text-muted fst-italic">Selecione o item para ativar e prossiga.</div>
+                                        <div class="small text-danger"><?= __('cart.inactive', 'Desativado') ?></div>
+                                        <div class="small text-muted fst-italic"><?= __('cart.select_to_activate', 'Selecione o item para ativar e prossiga.') ?></div>
                                     <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
@@ -145,7 +145,7 @@
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
-                                    <small class="text-muted">ID: <?= $item['produto_id'] ?></small>
+                                    <small class="text-muted"><?= __('cart.id', 'ID') ?>: <?= $item['produto_id'] ?></small>
                                 </div>
                                 <div class="col-8 col-md-3 text-start text-md-end mt-2 mt-md-0">
                                     <div class="fw-bold">
@@ -153,7 +153,7 @@
                                             <?= number_format($item['subtotal'], 2, ',', '.') ?>
                                         </span>
                                     </div>
-                                    <small class="text-muted">unit: 
+                                    <small class="text-muted"><?= __('cart.unit', 'unit') ?>: 
                                         <span class="cart-item-unit" data-original-price="<?= $item['price'] ?? $item['preco_unitario'] ?>">
                                             <?= number_format($item['price'] ?? $item['preco_unitario'], 2, ',', '.') ?>
                                         </span>
@@ -175,10 +175,10 @@
                 <div class="mt-3">
                     <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between">
                         <a href="/produtos" class="btn btn-outline-primary">
-                            <i class="fas fa-arrow-left"></i> Continuar Comprando
+                            <i class="fas fa-arrow-left"></i> <?= __('cart.continue_shopping', 'Continuar Comprando') ?>
                         </a>
                         <button class="btn btn-outline-danger" onclick="limparCarrinho()">
-                            <i class="fas fa-trash"></i> Limpar Carrinho
+                            <i class="fas fa-trash"></i> <?= __('cart.clear_cart', 'Limpar Carrinho') ?>
                         </button>
                     </div>
                 </div>
@@ -190,53 +190,52 @@
                 <!-- Resumo do Pedido (Carrinho vazio) -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header">
-                        <h5 class="mb-0">Resumo do Pedido</h5>
+                        <h5 class="mb-0"><?= __('cart.order_summary', 'Resumo do Pedido') ?></h5>
                     </div>
                     <div class="card-body">
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal (0 itens)</span>
+                            <span><?= __('cart.subtotal_items', 'Subtotal ({count} itens)', ['count' => 0]) ?></span>
                             <span class="cart-currency subtotal-value" data-original-value="0">0,00</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Taxa de Serviço (0 kg)</span>
+                            <span><?= __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => 0]) ?></span>
                             <span class="cart-currency taxa-servico-value" data-original-value="0">0,00</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Impostos</span>
+                            <span><?= __('cart.taxes', 'Impostos') ?></span>
                             <span class="cart-currency impostos-value" data-original-value="0">0,00</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Frete (0 kg)</span>
-                            <span class="cart-currency frete-value" data-original-value="0">Frete grátis</span>
+                            <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => 0]) ?></span>
+                            <span class="cart-currency frete-value" data-original-value="0"><?= __('cart.free_shipping', 'Frete grátis') ?></span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
-                            <h5>Total</h5>
+                            <h5><?= __('cart.total', 'Total') ?></h5>
                             <h5 id="total-valor" class="cart-currency total-value" data-original-value="0">0,00</h5>
                         </div>
                         <div class="d-grid">
                             <a href="/checkout" class="btn btn-primary btn-lg disabled" aria-disabled="true" tabindex="-1">
-                                <i class="fas fa-lock"></i> Finalizar Compra
+                                <i class="fas fa-lock"></i> <?= __('cart.checkout', 'Finalizar Compra') ?>
                             </a>
                         </div>
                         <div class="text-center mt-3">
                             <small class="text-muted">
-                                <i class="fas fa-info-circle"></i> Adicione itens ao carrinho para continuar.
+                                <i class="fas fa-info-circle"></i> <?= __('cart.add_items_to_continue', 'Adicione itens ao carrinho para continuar.') ?>
                             </small>
                         </div>
                     </div>
                 </div>
 
-                <!-- Informações Importantes -->
-                <div class="card shadow-sm border-0 mt-3">
+                <div class="card shadow-sm border-0 mt-3" style="display:none;">
                     <div class="card-body">
-                        <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                        <h6 class="card-title"><i class="fas fa-info-circle"></i> <?= __('cart.important_info', 'Informações Importantes') ?></h6>
                         <ul class="small text-muted mb-0">
-                            <li>Prazo de entrega: 15-30 dias</li>
-                            <li>Impostos inclusos no valor final</li>
-                            <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
-                            <li>Frete calculado pelo peso total arredondado</li>
-                            <li>Seguro contra perda/dano</li>
+                            <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li>
+                            <li><?= __('cart.info.taxes_included', 'Impostos inclusos no valor final') ?></li>
+                            <li><?= __('cart.info.service_fee', 'Taxa de serviço: US$ 39/kg (arredondado para cima)') ?></li>
+                            <li><?= __('cart.info.shipping_calc', 'Frete calculado pelo peso total arredondado') ?></li>
+                            <li><?= __('cart.info.insurance', 'Seguro contra perda/dano') ?></li>
                         </ul>
                     </div>
                 </div>
@@ -244,41 +243,41 @@
                 <!-- Resumo do Pedido -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header">
-                        <h5 class="mb-0">Resumo do Pedido</h5>
+                        <h5 class="mb-0"><?= __('cart.order_summary', 'Resumo do Pedido') ?></h5>
                     </div>
                     <div class="card-body">
                         <?php if (!empty($excede_peso)): ?>
                             <div class="alert alert-warning">
-                                Peso máximo é <?= number_format((float) ($peso_max_kg ?? 30), 0, ',', '.') ?>kg. Desative itens para continuar.
+                                <?= __('cart.max_weight_disable_items', 'Peso máximo é {kg}kg. Desative itens para continuar.', ['kg' => number_format((float) ($peso_max_kg ?? 30), 0, ',', '.')]) ?>
                             </div>
                         <?php endif; ?>
                         <hr>
                         
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal (<?= $total_itens ?> itens)</span>
+                            <span><?= __('cart.subtotal_items', 'Subtotal ({count} itens)', ['count' => (int) $total_itens]) ?></span>
                             <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
                         </div>
 
                         <?php if (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube)): ?>
                             <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
-                                <div class="fw-semibold mb-1" style="color:#0b1f3a;">Clube Brasiliana</div>
+                                <div class="fw-semibold mb-1" style="color:#0b1f3a;"><?= __('cart.club', 'Clube Brasiliana') ?></div>
                                 <div class="d-flex justify-content-between small">
-                                    <span class="text-muted">Peso Clube</span>
+                                    <span class="text-muted"><?= __('cart.club_weight', 'Peso Clube') ?></span>
                                     <span><?= number_format((float) ($peso_clube_total ?? 0), 3, ',', '.') ?> kg</span>
                                 </div>
                                 <div class="d-flex justify-content-between small">
-                                    <span class="text-muted">Subtotal Clube</span>
+                                    <span class="text-muted"><?= __('cart.club_subtotal', 'Subtotal Clube') ?></span>
                                     <span class="cart-currency" data-original-value="<?= (float) ($subtotal_clube ?? 0) ?>"><?= number_format((float) ($subtotal_clube ?? 0), 2, ',', '.') ?></span>
                                 </div>
                                 <?php if (!empty($desconto_clube)): ?>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Desconto Clube</span>
+                                        <span class="text-muted"><?= __('cart.club_discount', 'Desconto Clube') ?></span>
                                         <span class="cart-currency" data-original-value="<?= (float) ($desconto_clube ?? 0) ?>">-<?= number_format((float) ($desconto_clube ?? 0), 2, ',', '.') ?></span>
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($cashback_clube_estimado)): ?>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Cashback estimado</span>
+                                        <span class="text-muted"><?= __('cart.club_cashback_est', 'Cashback estimado') ?></span>
                                         <span class="cart-currency" data-original-value="<?= (float) ($cashback_clube_estimado ?? 0) ?>"><?= number_format((float) ($cashback_clube_estimado ?? 0), 2, ',', '.') ?></span>
                                     </div>
                                 <?php endif; ?>
@@ -286,36 +285,36 @@
                         <?php endif; ?>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Taxa de Serviço (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
+                        <span><?= __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                         <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Impostos</span>
+                        <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?></span>
                         <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Frete (<?= number_format(ceil($peso_total), 0, ',', '.') ?> kg)</span>
-                        <span class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>"><?= (((float) ($frete ?? 0)) <= 0 ? 'Frete grátis' : number_format((float) ($frete ?? 0), 2, ',', '.')) ?></span>
+                        <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
+                        <span class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>"><?= (((float) ($frete ?? 0)) <= 0 ? __('cart.free_shipping', 'Frete grátis') : number_format((float) ($frete ?? 0), 2, ',', '.')) ?></span>
                     </div>
                     
                     <hr>
                     
                     <div class="d-flex justify-content-between mb-3">
-                        <h5>Total</h5>
+                        <h5><?= __('cart.total', 'Total') ?></h5>
                         <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, ',', '.') ?></h5>
                     </div>
                     
                     <div class="d-grid">
                         <a href="/carrinho/checkout" class="btn btn-primary btn-lg <?= !empty($excede_peso) ? 'disabled' : '' ?>" <?= !empty($excede_peso) ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
-                            <i class="fas fa-lock"></i> Finalizar Compra
+                            <i class="fas fa-lock"></i> <?= __('cart.checkout', 'Finalizar Compra') ?>
                         </a>
                     </div>
                     
                     <div class="text-center mt-3">
                         <small class="text-muted">
-                            <i class="fas fa-shield-alt"></i> Pagamento 100% Seguro
+                            <i class="fas fa-shield-alt"></i> <?= __('cart.secure_payment', 'Pagamento 100% Seguro') ?>
                         </small>
                     </div>
                 </div>
@@ -324,13 +323,13 @@
                 <!-- Informações Importantes -->
                 <div class="card shadow-sm border-0 mt-3">
                     <div class="card-body">
-                        <h6 class="card-title"><i class="fas fa-info-circle"></i> Informações Importantes</h6>
+                        <h6 class="card-title"><i class="fas fa-info-circle"></i> <?= __('cart.important_info', 'Informações Importantes') ?></h6>
                         <ul class="small text-muted mb-0">
-                            <li>Prazo de entrega: 15-30 dias</li>
-                            <li>Impostos inclusos no valor final</li>
-                            <li>Taxa de serviço: US$ 39/kg (arredondado para cima)</li>
-                            <li>Frete calculado pelo peso total arredondado</li>
-                            <li>Seguro contra perda/dano</li>
+                            <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li>
+                            <li><?= __('cart.info.taxes_included', 'Impostos inclusos no valor final') ?></li>
+                            <li><?= __('cart.info.service_fee', 'Taxa de serviço: US$ 39/kg (arredondado para cima)') ?></li>
+                            <li><?= __('cart.info.shipping_calc', 'Frete calculado pelo peso total arredondado') ?></li>
+                            <li><?= __('cart.info.insurance', 'Seguro contra perda/dano') ?></li>
                         </ul>
                     </div>
                 </div>
@@ -340,6 +339,15 @@
 </div>
 
 <script>
+const I18N = {
+    err_update_cart: <?= json_encode(__('cart.err_update_cart', 'Erro ao atualizar carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    confirm_remove_item: <?= json_encode(__('cart.confirm_remove_item', 'Deseja remover este item do carrinho?'), JSON_UNESCAPED_UNICODE) ?>,
+    err_remove_item: <?= json_encode(__('cart.err_remove_item', 'Erro ao remover item'), JSON_UNESCAPED_UNICODE) ?>,
+    err_update_item: <?= json_encode(__('cart.err_update_item', 'Erro ao atualizar item'), JSON_UNESCAPED_UNICODE) ?>,
+    confirm_clear_cart: <?= json_encode(__('cart.confirm_clear_cart', 'Deseja limpar o carrinho?'), JSON_UNESCAPED_UNICODE) ?>,
+    err_clear_cart: <?= json_encode(__('cart.err_clear_cart', 'Erro ao limpar carrinho'), JSON_UNESCAPED_UNICODE) ?>
+};
+
 function atualizarQuantidade(itemKey, produtoId, quantidade) {
     if (quantidade < 1) return;
     
@@ -359,13 +367,13 @@ function atualizarQuantidade(itemKey, produtoId, quantidade) {
             }
         },
         error: function() {
-            alert('Erro ao atualizar carrinho');
+            alert(I18N.err_update_cart);
         }
     });
 }
 
 function removerItem(itemKey, produtoId) {
-    if (confirm('Deseja remover este item do carrinho?')) {
+    if (confirm(I18N.confirm_remove_item)) {
         $.ajax({
             url: '/carrinho/remover',
             method: 'POST',
@@ -381,7 +389,7 @@ function removerItem(itemKey, produtoId) {
                 }
             },
             error: function() {
-                alert('Erro ao remover item');
+                alert(I18N.err_remove_item);
             }
         });
     }
@@ -400,17 +408,17 @@ function toggleAtivo(itemKey, ativo) {
             if (response && response.success) {
                 location.reload();
             } else {
-                alert((response && response.error) ? response.error : 'Erro ao atualizar item');
+                alert((response && response.error) ? response.error : I18N.err_update_item);
             }
         },
         error: function() {
-            alert('Erro ao atualizar item');
+            alert(I18N.err_update_item);
         }
     });
 }
 
 function limparCarrinho() {
-    if (!confirm('Deseja limpar o carrinho?')) return;
+    if (!confirm(I18N.confirm_clear_cart)) return;
 
     $.ajax({
         url: '/carrinho/limpar',
@@ -420,11 +428,11 @@ function limparCarrinho() {
             if (response && response.success) {
                 location.reload();
             } else {
-                alert((response && response.error) ? response.error : 'Erro ao limpar carrinho');
+                alert((response && response.error) ? response.error : I18N.err_clear_cart);
             }
         },
         error: function() {
-            alert('Erro ao limpar carrinho');
+            alert(I18N.err_clear_cart);
         }
     });
 }

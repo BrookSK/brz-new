@@ -17,38 +17,50 @@ function getStatusColor($status) {
 }
 
 function getStatusText($status) {
-    $texts = [
-        'pendente' => 'Pendente',
-        'processando' => 'Processando',
-        'enviado' => 'Enviado',
-        'entregue' => 'Entregue',
-        'cancelado' => 'Cancelado',
-        'pago' => 'Pago'
+    $statusKey = is_string($status) ? strtolower($status) : '';
+    $map = [
+        'pendente' => 'order_status.pending',
+        'processando' => 'order_status.processing',
+        'enviado' => 'order_status.shipped',
+        'entregue' => 'order_status.delivered',
+        'cancelado' => 'order_status.cancelled',
+        'pago' => 'order_status.paid',
     ];
 
-    $statusKey = is_string($status) ? strtolower($status) : '';
-    return $texts[$statusKey] ?? (is_string($status) ? ucfirst($status) : '');
+    if (isset($map[$statusKey])) {
+        $fallback = is_string($status) ? ucfirst($status) : '';
+        return __($map[$statusKey], $fallback);
+    }
+
+    return is_string($status) ? ucfirst($status) : '';
 }
 
 $badgePedido = getStatusColor($pedido['status'] ?? '');
 ?>
 
 <div class="container py-4">
+    <script>
+        window.ORDER_DETAILS_I18N = {
+            copy: <?= json_encode(__('common.copy', 'Copiar'), JSON_UNESCAPED_UNICODE) ?>,
+            copied: <?= json_encode(__('common.copied', 'Copiado'), JSON_UNESCAPED_UNICODE) ?>
+        };
+    </script>
+
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
                 <a href="/meus-pedidos" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-arrow-left"></i>
-                    Voltar
+                    <?= __('common.back', 'Voltar') ?>
                 </a>
-                <h1 class="h4 mb-0">Pedido #<?= htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['id']) ?></h1>
+                <h1 class="h4 mb-0"><?= __('user_order_details.order_title', 'Pedido #{id}', ['id' => htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['id'])]) ?></h1>
             </div>
-            <div class="text-muted small">Data: <?= !empty($pedido['created_at']) ? date('d/m/Y \à\s H:i', strtotime($pedido['created_at'])) : '-' ?></div>
+            <div class="text-muted small"><?= __('user_order_details.date', 'Data:') ?> <?= !empty($pedido['created_at']) ? date('d/m/Y \à\s H:i', strtotime($pedido['created_at'])) : '-' ?></div>
             <?php if (!empty($pedido['origem_pedido'])): ?>
                 <div class="text-muted small">
-                    Origem: <strong><?= htmlspecialchars((string) $pedido['origem_pedido']) ?></strong>
+                    <?= __('user_order_details.origin', 'Origem:') ?> <strong><?= htmlspecialchars((string) $pedido['origem_pedido']) ?></strong>
                     <?php if (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email'])): ?>
-                        <span class="ms-1">(Admin: <?= htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) ?><?= !empty($pedido['admin_criador_email']) ? ' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;' : '' ?>)</span>
+                        <span class="ms-1">(<?= __('user_order_details.admin', 'Admin:') ?> <?= htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) ?><?= !empty($pedido['admin_criador_email']) ? ' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;' : '' ?>)</span>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
@@ -56,7 +68,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
         <div class="d-flex align-items-center gap-2">
             <a href="/pedido/detalhes/<?= (int) ($pedido['id'] ?? 0) ?>/pdf" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener">
                 <i class="fas fa-file-pdf"></i>
-                Exportar PDF
+                <?= __('user_order_details.export_pdf', 'Exportar PDF') ?>
             </a>
             <span class="badge" style="background: <?= $badgePedido['bg'] ?>; border: 1px solid <?= $badgePedido['border'] ?>; color: <?= $badgePedido['color'] ?>;">
                 <?= getStatusText($pedido['status'] ?? '') ?>
@@ -75,7 +87,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                     <div class="card border-0 shadow-sm">
                         <div class="card-header">
                             <h5 class="mb-0">
-                                <i class="fas fa-truck me-2"></i> Status do Pedido
+                                <i class="fas fa-truck me-2"></i> <?= __('user_order_details.status_timeline', 'Status do Pedido') ?>
                             </h5>
                         </div>
                         <div class="card-body">
@@ -87,16 +99,16 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                                 <i class="fas fa-check-circle text-success"></i>
                                             </div>
                                             <div class="timeline-content">
-                                                <h6><?= htmlspecialchars($item['novo_status'] ?? 'Status atualizado') ?></h6>
-                                                <p class="mb-0"><?= htmlspecialchars($item['observacao'] ?? 'Sem observação') ?></p>
-                                                <small><?= date('d/m/Y H:i', strtotime($item['created_at'])) ?> - Por: <?= htmlspecialchars($item['usuario_alterou'] ?? 'Sistema') ?></small>
+                                                <h6><?= htmlspecialchars($item['novo_status'] ?? __('user_order_details.status_updated', 'Status atualizado')) ?></h6>
+                                                <p class="mb-0"><?= htmlspecialchars($item['observacao'] ?? __('user_order_details.no_notes', 'Sem observação')) ?></p>
+                                                <small><?= date('d/m/Y H:i', strtotime($item['created_at'])) ?> - <?= __('user_order_details.by', 'Por:') ?> <?= htmlspecialchars($item['usuario_alterou'] ?? __('user_order_details.system', 'Sistema')) ?></small>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <div class="alert alert-info">
                                         <i class="fas fa-info-circle me-2"></i>
-                                        Nenhum histórico de status disponível para este pedido.
+                                        <?= __('user_order_details.no_status_history', 'Nenhum histórico de status disponível para este pedido.') ?>
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -107,9 +119,9 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                     <div class="card border-0 shadow-sm">
                         <div class="card-header">
                             <h5 class="mb-0">
-                                <i class="fas fa-box me-2"></i> Itens do Pedido
+                                <i class="fas fa-box me-2"></i> <?= __('user_order_details.items_title', 'Itens do Pedido') ?>
                                 <span class="badge ms-2" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">
-                                    <?= count($pedido['items']) ?> itens
+                                    <?= __('user_order_details.items_count', '{count} itens', ['count' => count($pedido['items'])]) ?>
                                 </span>
                             </h5>
                         </div>
@@ -148,10 +160,10 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                             }
                                         ?>
                                         <img src="<?= htmlspecialchars($imgSrc) ?>" 
-                                             alt="<?= htmlspecialchars($item['nome_produto'] ?? 'Produto') ?>" 
+                                             alt="<?= htmlspecialchars($item['nome_produto'] ?? __('user_order_details.product', 'Produto')) ?>" 
                                              class="product-image" onerror="this.onerror=null;this.src='<?= htmlspecialchars(Url::absolute('/uploads/produtos/placeholder.jpg')) ?>';">
                                         <div class="product-info flex-grow-1">
-                                            <h6><?= htmlspecialchars($item['nome_produto'] ?? 'Produto sem nome') ?></h6>
+                                            <h6><?= htmlspecialchars($item['nome_produto'] ?? __('user_order_details.product_without_name', 'Produto sem nome')) ?></h6>
                                             <small class="text-muted"><?= htmlspecialchars($item['referencia'] ?? '') ?></small>
                                             <?php if (!empty($item['variacao_descricao'])): ?>
                                                 <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
@@ -169,14 +181,14 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
                                             ?>
-                                            <small class="text-muted">Subtotal: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
+                                            <small class="text-muted"><?= __('checkout.subtotal', 'Subtotal') ?>: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <div class="alert alert-warning">
                                     <i class="fas fa-exclamation-triangle me-2"></i>
-                                    Nenhum item encontrado neste pedido.
+                                    <?= __('user_order_details.no_items', 'Nenhum item encontrado neste pedido.') ?>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -188,16 +200,49 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <div class="card border-0 shadow-sm">
                                 <div class="card-header">
                                     <h5 class="mb-0">
-                                        <i class="fas fa-map-marker-alt me-2"></i> Endereço de Entrega
+                                        <i class="fas fa-map-marker-alt me-2"></i> <?= __('checkout.shipping_address', 'Endereço de Entrega') ?>
                                     </h5>
                                 </div>
                                 <div class="card-body">
+                                    <?php
+                                    $destNome = (string) ($pedido['destinatario_nome'] ?? '');
+                                    $destDoc = (string) ($pedido['destinatario_documento'] ?? '');
+                                    $destTel = (string) ($pedido['destinatario_telefone'] ?? '');
+                                    ?>
+                                    <?php if ($destNome !== '' || $destDoc !== '' || $destTel !== ''): ?>
+                                        <div class="mb-3">
+                                            <div class="fw-semibold"><?= __('checkout.recipient', 'Destinatário') ?></div>
+                                            <div class="text-muted small">
+                                                <?= htmlspecialchars($destNome !== '' ? $destNome : __('common.not_informed', 'Não informado')) ?>
+                                                <?php if ($destDoc !== ''): ?>
+                                                    <span class="ms-1">(<?= htmlspecialchars($destDoc) ?>)</span>
+                                                <?php endif; ?>
+                                                <?php if ($destTel !== ''): ?>
+                                                    <span class="ms-1">• <?= htmlspecialchars($destTel) ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php
+                                    $linha1 = trim((string) ($pedido['endereco_entrega'] ?? ''));
+                                    $num = trim((string) ($pedido['numero_entrega'] ?? ''));
+                                    $comp = trim((string) ($pedido['complemento_entrega'] ?? ''));
+                                    $bairro = trim((string) ($pedido['bairro_entrega'] ?? ''));
+                                    $cidade = trim((string) ($pedido['cidade_entrega'] ?? ''));
+                                    $estado = trim((string) ($pedido['estado_entrega'] ?? ''));
+                                    $cep = trim((string) ($pedido['cep_entrega'] ?? ''));
+                                    $linha1Fmt = $linha1;
+                                    if ($linha1Fmt !== '' && $num !== '') {
+                                        $linha1Fmt .= ', ' . $num;
+                                    }
+                                    ?>
                                     <address class="mb-0">
-                                        <?= htmlspecialchars($pedido['endereco_entrega'] ?? 'Não informado') ?>, <?= htmlspecialchars($pedido['numero_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['complemento_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['bairro_entrega'] ?? '') ?><br>
-                                        <?= htmlspecialchars($pedido['cidade_entrega'] ?? '') ?> - <?= htmlspecialchars($pedido['estado_entrega'] ?? '') ?><br>
-                                        CEP: <?= htmlspecialchars($pedido['cep_entrega'] ?? '') ?>
+                                        <?= htmlspecialchars($linha1Fmt !== '' ? $linha1Fmt : __('common.not_informed', 'Não informado')) ?><br>
+                                        <?php if ($comp !== ''): ?><?= htmlspecialchars($comp) ?><br><?php endif; ?>
+                                        <?php if ($bairro !== ''): ?><?= htmlspecialchars($bairro) ?><br><?php endif; ?>
+                                        <?= htmlspecialchars($cidade) ?><?= ($estado !== '' ? (' - ' . htmlspecialchars($estado)) : '') ?><br>
+                                        <?= ($cep !== '' ? (__('user_order_details.cep_zip', 'CEP/ZIP:') . ' ' . htmlspecialchars($cep)) : '') ?>
                                     </address>
                                 </div>
                             </div>
@@ -207,36 +252,36 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <div class="card border-0 shadow-sm">
                                 <div class="card-header">
                                     <h5 class="mb-0">
-                                        <i class="fas fa-calculator me-2"></i> Resumo do Pedido
+                                        <i class="fas fa-calculator me-2"></i> <?= __('user_order_details.summary', 'Resumo do Pedido') ?>
                                     </h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="price-row">
-                                        <span>Subtotal:</span>
+                                        <span><?= __('checkout.subtotal', 'Subtotal') ?>:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
                                         ?>
                                         <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
-                                        <span>Frete:</span>
+                                        <span><?= __('checkout.shipping', 'Frete') ?>:</span>
                                         <?php $freteVal = (float) ($pedido['valor_frete'] ?? 0); ?>
                                         <?php
                                         $freteUsd = $freteVal;
                                         ?>
-                                        <span><?= ($freteVal <= 0 ? 'Frete grátis' : ($simboloMoeda . ' ' . number_format($freteUsd, 2, ',', '.'))) ?></span>
+                                        <span><?= ($freteVal <= 0 ? __('checkout.free_shipping', 'Frete grátis') : ($simboloMoeda . ' ' . number_format($freteUsd, 2, ',', '.'))) ?></span>
                                     </div>
                                     <div class="price-row">
-                                        <span>Taxa de Serviço:</span>
+                                        <span><?= __('checkout.service_fee', 'Taxa de Serviço') ?>:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <div class="price-row">
-                                        <span>Impostos:</span>
+                                        <span><?= __('checkout.brazil_taxes', 'Impostos do Brasil') ?>:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                     <hr>
                                     <div class="price-row">
-                                        <span>Total:</span>
+                                        <span><?= __('checkout.total', 'Total') ?>:</span>
                                         <span class="text-primary"><?= $simboloMoeda ?> <?= number_format($pedido['valor_total'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
                                 </div>
@@ -248,7 +293,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                     <div class="card border-0 shadow-sm">
                         <div class="card-header">
                             <h5 class="mb-0">
-                                <i class="fas fa-credit-card me-2"></i> Pagamento
+                                <i class="fas fa-credit-card me-2"></i> <?= __('checkout.payment', 'Pagamento') ?>
                             </h5>
                         </div>
                         <div class="card-body">
@@ -259,19 +304,19 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             }
 
                             $badgeClass = 'bg-warning text-dark';
-                            $statusLabel = 'Aguardando';
+                            $statusLabel = __('checkout.payment_status.awaiting', 'Aguardando');
                             $isPago = false;
                             if (!empty($statusPagamento)) {
                                 if (in_array($statusPagamento, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
                                     $badgeClass = 'bg-success';
-                                    $statusLabel = 'Pago';
+                                    $statusLabel = __('checkout.payment_status.paid', 'Pago');
                                     $isPago = true;
                                 } elseif (in_array($statusPagamento, ['REJECTED', 'CANCELED', 'CANCELLED', 'DELETED'], true)) {
                                     $badgeClass = 'bg-danger';
-                                    $statusLabel = 'Cancelado';
+                                    $statusLabel = __('checkout.payment_status.cancelled', 'Cancelado');
                                 } elseif (in_array($statusPagamento, ['REFUNDED'], true)) {
                                     $badgeClass = 'bg-secondary';
-                                    $statusLabel = 'Estornado';
+                                    $statusLabel = __('checkout.payment_status.refunded', 'Estornado');
                                 }
                             }
 
@@ -282,7 +327,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             ?>
 
                             <p class="mb-2 text-muted">
-                                <small>Status do pagamento: <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
+                                <small><?= __('checkout.payment_status.label', 'Status do pagamento:') ?> <span class="badge" style="background: rgba(148, 163, 184, 0.18); border: 1px solid rgba(148, 163, 184, 0.35); color: rgba(15, 23, 42, 0.82);"><?= htmlspecialchars($statusLabel) ?></span></small>
                             </p>
 
                             <?php if (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
@@ -290,43 +335,43 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                 <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                                 <?php if (!empty($pixImage)): ?>
                                     <div class="text-center my-3">
-                                        <img src="data:image/png;base64,<?= $pixImage ?>" alt="QR Code PIX" style="max-width: 240px; width: 100%; height: auto;" />
+                                        <img src="data:image/png;base64,<?= $pixImage ?>" alt="<?= htmlspecialchars(__('checkout_done.pix_qr_code', 'QR Code PIX'), ENT_QUOTES, 'UTF-8') ?>" style="max-width: 240px; width: 100%; height: auto;" />
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($pixPayload)): ?>
                                     <div class="mb-2">
-                                        <strong>Copia e cola:</strong>
+                                        <strong><?= __('checkout_done.copy_and_paste', 'Copia e cola:') ?></strong>
                                         <div class="input-group">
                                             <input id="pix-payload" type="text" class="form-control" value="<?= htmlspecialchars($pixPayload) ?>" readonly onclick="this.select();" />
-                                            <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('pix-payload','pix-copied', this)">Copiar</button>
+                                            <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('pix-payload','pix-copied', this)"><?= __('common.copy', 'Copiar') ?></button>
                                         </div>
-                                        <div id="pix-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>
+                                        <div id="pix-copied" class="small text-success mt-1" style="display:none;"><?= __('common.copied_success', 'Copiado!') ?></div>
                                     </div>
                                 <?php endif; ?>
                             <?php elseif ($billingType === 'BOLETO'): ?>
                                 <?php if (!empty($bankSlipUrl) || !empty($invoiceUrl)): ?>
                                     <p class="mb-2">
-                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($bankSlipUrl ?: $invoiceUrl) ?>" target="_blank" rel="noopener">Abrir boleto</a>
+                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($bankSlipUrl ?: $invoiceUrl) ?>" target="_blank" rel="noopener"><?= __('checkout_done.open_boleto', 'Abrir boleto') ?></a>
                                     </p>
                                 <?php endif; ?>
                                 <?php if (!empty($digitableLine)): ?>
                                     <div class="mb-2">
-                                        <strong>Linha digitável:</strong>
+                                        <strong><?= __('checkout_done.digitable_line', 'Linha digitável:') ?></strong>
                                         <input type="text" class="form-control" value="<?= htmlspecialchars($digitableLine) ?>" readonly onclick="this.select();" />
                                     </div>
                                 <?php endif; ?>
                             <?php elseif (!$isPago && $billingType === 'CREDIT_CARD'): ?>
                                 <?php if (!empty($invoiceUrl)): ?>
                                     <p class="mb-2">
-                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($invoiceUrl) ?>" target="_blank" rel="noopener">Pagar com cartão</a>
+                                        <a class="btn btn-outline-primary" href="<?= htmlspecialchars($invoiceUrl) ?>" target="_blank" rel="noopener"><?= __('checkout_done.pay_by_card', 'Pagar com cartão') ?></a>
                                     </p>
                                     <div class="mb-2">
-                                        <strong>Link de pagamento:</strong>
+                                        <strong><?= __('checkout_done.payment_link', 'Link de pagamento:') ?></strong>
                                         <div class="input-group">
                                             <input id="stripe-link" type="text" class="form-control" value="<?= htmlspecialchars($invoiceUrl) ?>" readonly onclick="this.select();" />
-                                            <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('stripe-link','stripe-copied', this)">Copiar</button>
+                                            <button type="button" class="btn btn-outline-dark" onclick="copiarPixPayload('stripe-link','stripe-copied', this)"><?= __('common.copy', 'Copiar') ?></button>
                                         </div>
-                                        <div id="stripe-copied" class="small text-success mt-1" style="display:none;">Copiado!</div>
+                                        <div id="stripe-copied" class="small text-success mt-1" style="display:none;"><?= __('common.copied_success', 'Copiado!') ?></div>
                                     </div>
                                 <?php endif; ?>
                             <?php endif; ?>
@@ -340,7 +385,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             <?php if ($podeReemitir && in_array($billingType, ['PIX', 'BOLETO'], true) && !empty($pedido['id'])): ?>
                                 <form method="POST" action="/pedido/reemitir-pagamento/<?= (int) $pedido['id'] ?>" class="mt-3">
                                     <button type="submit" class="btn btn-outline-secondary">
-                                        Gerar nova cobrança
+                                        <?= __('checkout_done.regenerate_billing', 'Gerar nova cobrança') ?>
                                     </button>
                                 </form>
                             <?php endif; ?>
@@ -353,10 +398,10 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
             <!-- Action Buttons -->
             <div class="d-flex gap-2 flex-wrap mt-4">
                 <a href="/meus-pedidos" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-2"></i> Voltar
+                    <i class="fas fa-arrow-left me-2"></i> <?= __('common.back', 'Voltar') ?>
                 </a>
                 <button class="btn btn-primary" onclick="window.print()">
-                    <i class="fas fa-print me-2"></i> Imprimir
+                    <i class="fas fa-print me-2"></i> <?= __('common.print', 'Imprimir') ?>
                 </button>
             </div>
         </div>
@@ -472,8 +517,10 @@ function copiarPixPayload(inputId, msgId, btn) {
             setTimeout(() => { msg.style.display = "none"; }, 1800);
         }
         if (btn) {
-            btn.innerText = "Copiado";
-            setTimeout(() => { btn.innerText = old || "Copiar"; }, 1800);
+            const copiedTxt = (window.ORDER_DETAILS_I18N && window.ORDER_DETAILS_I18N.copied) ? window.ORDER_DETAILS_I18N.copied : 'Copiado';
+            const copyTxt = (window.ORDER_DETAILS_I18N && window.ORDER_DETAILS_I18N.copy) ? window.ORDER_DETAILS_I18N.copy : 'Copiar';
+            btn.innerText = copiedTxt;
+            setTimeout(() => { btn.innerText = old || copyTxt; }, 1800);
         }
     };
 

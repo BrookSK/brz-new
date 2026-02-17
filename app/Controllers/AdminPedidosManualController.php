@@ -41,11 +41,29 @@ class AdminPedidosManualController extends Controller {
                 }
             }
 
+            $custoCol = '';
+            foreach (['custo', 'cost', 'custo_produto', 'valor_custo'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $custoCol = $c;
+                    break;
+                }
+            }
+
+            $ncmCol = '';
+            foreach (['ncm', 'ncm_code'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $ncmCol = $c;
+                    break;
+                }
+            }
+
             $select = ['id'];
             if ($nameCol !== '') $select[] = $nameCol . ' AS name';
             if ($priceCol !== '') $select[] = $priceCol . ' AS price';
             if (in_array('sku', $cols, true)) $select[] = 'sku';
             if ($pesoCol !== '') $select[] = $pesoCol . ' AS peso';
+            if ($custoCol !== '') $select[] = $custoCol . ' AS custo';
+            if ($ncmCol !== '') $select[] = $ncmCol . ' AS ncm';
 
             $fotoCol = '';
             foreach (['foto_principal', 'capa', 'imagem', 'image'] as $c) {
@@ -246,6 +264,15 @@ class AdminPedidosManualController extends Controller {
                                     <option value="BRL">Real (BRL)</option>
                                 </select>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tipo de compra</label>
+                                <select class="form-select" name="tipo_compra" id="tipo_compra" required>
+                                    <option value="" selected>Selecione...</option>
+                                    <option value="online">Online</option>
+                                    <option value="offline">Offline</option>
+                                </select>
+                                <div class="form-text">Obrigatório para pedidos manuais.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -372,6 +399,7 @@ class AdminPedidosManualController extends Controller {
                                     <span class="text-muted">Taxa de Serviço</span>
                                     <span><span id="resumoMoedaSymbol3">$</span> <span id="resumoTaxaServico">0.00</span></span>
                                 </div>
+                                <div class="alert alert-info small mt-2 mb-0" id="pixDiscountInfo" style="display:none;"></div>
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Impostos</span>
                                     <span><span id="resumoMoedaSymbol4">$</span> <span id="resumoImpostos">0.00</span></span>
@@ -442,6 +470,7 @@ class AdminPedidosManualController extends Controller {
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG_BRL = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG_USD = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgUSD(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const PIX_DESCONTO_TAXA_SERVICO_PERCENT = ' . json_encode((float) (new \App\Services\PedidoManualService())->getPixDescontoTaxaServicoPercent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const USD_BRL_RATE = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaConversaoUSDBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
@@ -570,6 +599,45 @@ function escapeHtml(str){
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
+function updateExtraCamposProduto(tr, prod){
+    const wrap = tr ? tr.querySelector('.extraProdutoCampos') : null;
+    if (!wrap) return;
+
+    const custoInp = wrap.querySelector('.custoInp');
+    const ncmInp = wrap.querySelector('.ncmInp');
+
+    const custoAtual = prod ? Number(prod.custo || prod.cost || prod.custo_produto || prod.valor_custo || 0) : 0;
+    const ncmAtual = prod ? String(prod.ncm || prod.ncm_code || '').trim() : '';
+
+    const precisaCusto = !(isFinite(custoAtual) && custoAtual > 0);
+    const precisaNcm = (ncmAtual === '');
+
+    if (custoInp) {
+        if (precisaCusto) {
+            custoInp.style.display = '';
+            custoInp.required = true;
+        } else {
+            custoInp.style.display = 'none';
+            custoInp.required = false;
+            custoInp.value = '';
+        }
+    }
+
+    if (ncmInp) {
+        if (precisaNcm) {
+            ncmInp.style.display = '';
+            ncmInp.required = true;
+        } else {
+            ncmInp.style.display = 'none';
+            ncmInp.required = false;
+            ncmInp.value = '';
+        }
+    }
+
+    const showWrap = precisaCusto || precisaNcm;
+    wrap.style.display = showWrap ? '' : 'none';
+}
+
 function addItemRow(){
     const tbody = document.querySelector('#itensTable tbody');
     const tr = document.createElement('tr');
@@ -581,6 +649,14 @@ function addItemRow(){
                     <input type="hidden" class="produtoIdInp" name="produto_id[]" value="" required>
                     <input type="text" class="form-control form-control-sm produtoSearch" placeholder="Buscar produto..." autocomplete="off" oninput="onProdutoSearchInput(this)" onfocus="onProdutoSearchInput(this)">
                     <div class="list-group position-absolute w-100 prodResults" style="z-index: 1050; display:none; max-height: 420px; overflow:auto;"></div>
+                    <div class="row g-2 mt-2 extraProdutoCampos" style="display:none;">
+                        <div class="col-6">
+                            <input type="text" class="form-control form-control-sm custoInp" name="produto_custo[]" value="" placeholder="Custo (obrigatório)">
+                        </div>
+                        <div class="col-6">
+                            <input type="text" class="form-control form-control-sm ncmInp" name="produto_ncm[]" value="" placeholder="NCM (obrigatório)">
+                        </div>
+                    </div>
                 </div>
             </div>
         </td>
@@ -598,6 +674,37 @@ function addItemRow(){
     `;
     tbody.appendChild(tr);
     calcTotal();
+}
+
+function validateProdutosObrigatorios(){
+    const rows = document.querySelectorAll('#itensTable tbody tr');
+    for (const tr of rows) {
+        const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
+        if (!pid) continue;
+        const wrap = tr.querySelector('.extraProdutoCampos');
+        if (!wrap || wrap.style.display === 'none') continue;
+
+        const custoInp = wrap.querySelector('.custoInp');
+        if (custoInp && custoInp.required) {
+            const v = Number(String(custoInp.value || '').replace(',', '.'));
+            if (!isFinite(v) || v <= 0) {
+                custoInp.focus();
+                alert('Informe o custo do produto selecionado (maior que 0).');
+                return false;
+            }
+        }
+
+        const ncmInp = wrap.querySelector('.ncmInp');
+        if (ncmInp && ncmInp.required) {
+            const ncm = String(ncmInp.value || '').trim();
+            if (!ncm) {
+                ncmInp.focus();
+                alert('Informe o NCM do produto selecionado.');
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 function prefillRowFromExisting(tr, item){
@@ -625,6 +732,8 @@ function prefillRowFromExisting(tr, item){
     if (imgEl && prod) imgEl.src = produtoImagem(prod);
     if (valor) valor.value = formatMoney(unit);
     if (qtdEl) qtdEl.value = String(qtd > 0 ? qtd : 1);
+
+    updateExtraCamposProduto(tr, prod || null);
 
     const resultsEl = tr.querySelector('.prodResults');
     if (resultsEl) {
@@ -731,6 +840,8 @@ function selectProdutoFromSearch(btn, produtoId){
         resultsEl.innerHTML = '';
     }
 
+    updateExtraCamposProduto(tr, prod);
+
     calcTotal();
 }
 
@@ -788,13 +899,26 @@ function calcTotal(){
             const impostos = Number(data.impostos || 0);
             const total = Number(data.total || 0);
 
+            const pixPct = getPixPct();
+            const moedaSel = getSelectedMoeda();
+            const billingSel = document.getElementById('billingType');
+            const billingType = billingSel ? String(billingSel.value || '').toUpperCase() : '';
+
+            let taxaServicoShown = taxaServico;
+            let totalShown = total;
+
+            if (moedaSel === 'BRL' && billingType === 'PIX' && pixPct > 0) {
+                taxaServicoShown = Math.max(0, taxaServico * (1 - (pixPct / 100)));
+                totalShown = Math.max(0, total - (taxaServico - taxaServicoShown));
+            }
+
             const pesoBack = Number(data.peso_total || 0);
             const pesoEl = document.getElementById('resumoPeso');
             if (pesoEl) {
                 pesoEl.textContent = formatPeso(pesoBack);
             }
 
-            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServico, moeda);
+            document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServicoShown, moeda);
             document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
 
             const freteWrap = document.getElementById('resumoFreteWrap');
@@ -806,8 +930,8 @@ function calcTotal(){
                 if (rf) rf.textContent = formatForDisplay(frete, moeda);
             }
 
-            document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
-            document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
+            document.getElementById('resumoTotal').textContent = formatForDisplay(totalShown, moeda);
+            document.getElementById('resumoTotal2').textContent = formatForDisplay(totalShown, moeda);
 
             const setVal = (id, v) => {
                 const el = document.getElementById(id);
@@ -815,10 +939,22 @@ function calcTotal(){
             };
             setVal('subtotal_produtos', Number(data.subtotal || subtotal).toFixed(2));
             setVal('peso_total', Number(data.peso_total || pesoTotal).toFixed(3));
-            setVal('taxa_servico', taxaServico.toFixed(2));
+            setVal('taxa_servico', taxaServicoShown.toFixed(2));
             setVal('valor_impostos', impostos.toFixed(2));
             setVal('valor_frete', frete.toFixed(2));
-            setVal('valor_total', total.toFixed(2));
+            setVal('valor_total', totalShown.toFixed(2));
+
+            const pixBox = document.getElementById('pixDiscountInfo');
+            if (pixBox) {
+                if (moedaSel === 'BRL' && pixPct > 0) {
+                    const info = `PIX: desconto de ${pixPct.toFixed(2)}% na taxa de serviço. Taxa com desconto: ${getSymbol(moedaSel)} ${formatForDisplay(taxaServicoShown, moedaSel)}.`;
+                    pixBox.textContent = info;
+                    pixBox.style.display = '';
+                } else {
+                    pixBox.textContent = '';
+                    pixBox.style.display = 'none';
+                }
+            }
         })
         .catch(_err => {
             // fallback simples (não quebra o formulário)
@@ -840,6 +976,12 @@ function calcTotal(){
             setVal('valor_impostos', impostos.toFixed(2));
             setVal('valor_frete', frete.toFixed(2));
             setVal('valor_total', total.toFixed(2));
+
+            const pixBox = document.getElementById('pixDiscountInfo');
+            if (pixBox) {
+                pixBox.textContent = '';
+                pixBox.style.display = 'none';
+            }
         });
 }
 
@@ -854,6 +996,12 @@ function getSelectedClienteLabel(){
 function formatBRL(v){
     const n = Number(v || 0);
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function getPixPct(){
+    const p = Number(PIX_DESCONTO_TAXA_SERVICO_PERCENT || 0);
+    if (!isFinite(p) || p <= 0) return 0;
+    return Math.max(0, Math.min(100, p));
 }
 
 function gerarMensagemOrcamento(){
@@ -904,6 +1052,11 @@ function gerarMensagemOrcamento(){
     msg += `- Subtotal dos produtos: ${formatBRL(subtotal)}\n`;
     msg += `- Peso total: ${Number(pesoTotal || 0).toFixed(3)} kg\n`;
     msg += `- Taxa de serviço: ${formatBRL(taxaServico)}\n`;
+    const pixPct = getPixPct();
+    if (pixPct > 0) {
+        const taxaPix = Math.max(0, Number(taxaServico || 0) * (1 - (pixPct / 100)));
+        msg += `- PIX: desconto de ${pixPct.toFixed(2)}% na taxa de serviço (taxa com desconto: ${formatBRL(taxaPix)})\n`;
+    }
     msg += `- Impostos: ${formatBRL(impostos)}\n`;
     msg += `- Frete: ${Number(frete || 0) <= 0 ? 'Frete grátis' : formatBRL(frete)}\n`;
     msg += `- Total: ${formatBRL(total)}\n\n`;
@@ -1328,6 +1481,9 @@ document.addEventListener('DOMContentLoaded', function(){
     if (form) {
         form.addEventListener('submit', function(e){
             e.preventDefault();
+            if (!validateProdutosObrigatorios()) {
+                return false;
+            }
             try { calcTotal(); } catch (err) {}
 
             const btn = document.getElementById('btnCriarPedidoManual');
@@ -1392,6 +1548,90 @@ JS;
         exit;
     }
 
+    private function validarEAtualizarCustoENcmProdutos(array $produtoIds, array $custos, array $ncms): void {
+        try {
+            $pdo = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $custoCol = '';
+            foreach (['custo', 'cost', 'custo_produto', 'valor_custo'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $custoCol = $c;
+                    break;
+                }
+            }
+
+            $ncmCol = '';
+            foreach (['ncm', 'ncm_code'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $ncmCol = $c;
+                    break;
+                }
+            }
+
+            if ($custoCol === '' && $ncmCol === '') {
+                return;
+            }
+
+            $selCols = ['id'];
+            if ($custoCol !== '') $selCols[] = $custoCol . ' AS custo';
+            if ($ncmCol !== '') $selCols[] = $ncmCol . ' AS ncm';
+            $stmtGet = $pdo->prepare('SELECT ' . implode(', ', $selCols) . ' FROM produtos WHERE id = ? LIMIT 1');
+
+            for ($i = 0; $i < count($produtoIds); $i++) {
+                $pid = (int) ($produtoIds[$i] ?? 0);
+                if ($pid <= 0) continue;
+
+                $stmtGet->execute([$pid]);
+                $row = $stmtGet->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $custoAtual = (float) ($row['custo'] ?? 0);
+                $ncmAtual = trim((string) ($row['ncm'] ?? ''));
+
+                $needsCusto = ($custoCol !== '' && !($custoAtual > 0));
+                $needsNcm = ($ncmCol !== '' && $ncmAtual === '');
+
+                if (!$needsCusto && !$needsNcm) {
+                    continue;
+                }
+
+                $set = [];
+                $params = [':id' => $pid];
+
+                if ($needsCusto) {
+                    $custoInformado = (float) str_replace(',', '.', (string) ($custos[$i] ?? '0'));
+                    if (!($custoInformado > 0)) {
+                        throw new \Exception('Produto #' . $pid . ' sem custo cadastrado. Informe o custo (maior que 0).');
+                    }
+                    $set[] = $custoCol . ' = :custo';
+                    $params[':custo'] = $custoInformado;
+                }
+
+                if ($needsNcm) {
+                    $ncmInformado = trim((string) ($ncms[$i] ?? ''));
+                    if ($ncmInformado === '') {
+                        throw new \Exception('Produto #' . $pid . ' sem NCM cadastrado. Informe o NCM.');
+                    }
+                    $set[] = $ncmCol . ' = :ncm';
+                    $params[':ncm'] = $ncmInformado;
+                }
+
+                if (!empty($set)) {
+                    $pdo->prepare('UPDATE produtos SET ' . implode(', ', $set) . ' WHERE id = :id')->execute($params);
+                }
+            }
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
     public function salvar(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
@@ -1399,6 +1639,10 @@ JS;
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
+            $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
+            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            }
 
             $enderecoEntrega = [
                 'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
@@ -1422,10 +1666,16 @@ JS;
             $produtoIds = $request->getParam('produto_id', []);
             $qtds = $request->getParam('quantidade', []);
             $vals = $request->getParam('valor_unitario', []);
+            $custos = $request->getParam('produto_custo', []);
+            $ncms = $request->getParam('produto_ncm', []);
 
             if (!is_array($produtoIds)) $produtoIds = [];
             if (!is_array($qtds)) $qtds = [];
             if (!is_array($vals)) $vals = [];
+            if (!is_array($custos)) $custos = [];
+            if (!is_array($ncms)) $ncms = [];
+
+            $this->validarEAtualizarCustoENcmProdutos($produtoIds, $custos, $ncms);
 
             $itens = [];
             $count = max(count($produtoIds), count($qtds), count($vals));
@@ -1454,7 +1704,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
@@ -1471,6 +1721,10 @@ JS;
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
+            $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
+            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            }
 
             $enderecoEntrega = [
                 'cep' => (string) $request->getParam('endereco_entrega_cep', ''),
@@ -1494,10 +1748,16 @@ JS;
             $produtoIds = $request->getParam('produto_id', []);
             $qtds = $request->getParam('quantidade', []);
             $vals = $request->getParam('valor_unitario', []);
+            $custos = $request->getParam('produto_custo', []);
+            $ncms = $request->getParam('produto_ncm', []);
 
             if (!is_array($produtoIds)) $produtoIds = [];
             if (!is_array($qtds)) $qtds = [];
             if (!is_array($vals)) $vals = [];
+            if (!is_array($custos)) $custos = [];
+            if (!is_array($ncms)) $ncms = [];
+
+            $this->validarEAtualizarCustoENcmProdutos($produtoIds, $custos, $ncms);
 
             $itens = [];
             $count = max(count($produtoIds), count($qtds), count($vals));
@@ -1526,7 +1786,7 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega);
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);

@@ -68,7 +68,7 @@
                     <div class="col-md-6">
                         <p><strong>Subtotal:</strong> R$ <?= number_format($pedido['subtotal'], 2, ',', '.') ?></p>
                         <p><strong>Serviços:</strong> R$ <?= number_format($pedido['servicos'], 2, ',', '.') ?></p>
-                        <p><strong>Impostos:</strong> R$ <?= number_format($pedido['impostos'], 2, ',', '.') ?></p>
+                        <p><strong>Impostos do Brasil:</strong> R$ <?= number_format($pedido['impostos'], 2, ',', '.') ?></p>
                         <p><strong>Total:</strong> R$ <?= number_format($pedido['total'], 2, ',', '.') ?></p>
                     </div>
                 </div>

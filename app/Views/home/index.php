@@ -4,6 +4,13 @@
     <?php
     $layoutBanners = [];
     try {
+        $locale = class_exists('\\App\\Core\\I18n') ? (string) \App\Core\I18n::getLocaleHtml() : 'pt-BR';
+        $isEn = (stripos($locale, 'en') === 0);
+        $layoutKey = $isEn ? 'banners_en' : 'banners';
+        $layoutKeyLegacy = 'banners';
+        $layoutColKey = $isEn ? 'layout_banners_en' : 'layout_banners';
+        $layoutColKeyLegacy = 'layout_banners';
+
         $pdo = \Config\Database::getConnection();
         $raw = '';
 
@@ -28,8 +35,12 @@
                     $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
                     if ($valCol !== '') {
                         $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
-                        $stmt->execute(['layout', 'banners']);
+                        $stmt->execute(['layout', $layoutKey]);
                         $raw = (string) ($stmt->fetchColumn() ?: '');
+                        if ($raw === '' && $layoutKey !== $layoutKeyLegacy) {
+                            $stmt->execute(['layout', $layoutKeyLegacy]);
+                            $raw = (string) ($stmt->fetchColumn() ?: '');
+                        }
                         if ($raw !== '') break;
                     }
                 }
@@ -46,15 +57,20 @@
                 elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
                 if ($keyCol !== '' && $valCol !== '') {
                     $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
-                    $stmt->execute(['layout_banners']);
+                    $stmt->execute([$layoutColKey]);
                     $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw === '' && $layoutColKey !== $layoutColKeyLegacy) {
+                        $stmt->execute([$layoutColKeyLegacy]);
+                        $raw = (string) ($stmt->fetchColumn() ?: '');
+                    }
                     if ($raw !== '') break;
                 }
 
                 // schema single_row (coluna direta)
-                if (in_array('layout_banners', $cols, true)) {
+                if (in_array($layoutColKey, $cols, true) || in_array($layoutColKeyLegacy, $cols, true)) {
                     $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
-                    $stmt2 = $pdo->query('SELECT layout_banners AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $col = in_array($layoutColKey, $cols, true) ? $layoutColKey : $layoutColKeyLegacy;
+                    $stmt2 = $pdo->query('SELECT ' . $col . ' AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
                     $raw = (string) ($stmt2->fetchColumn() ?: '');
                     if ($raw !== '') break;
                 }
@@ -126,11 +142,11 @@
                     <?php if (count($layoutBanners) > 1): ?>
                         <button class="carousel-control-prev" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="prev">
                             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Anterior</span>
+                            <span class="visually-hidden"><?= __('common.previous', 'Anterior') ?></span>
                         </button>
                         <button class="carousel-control-next" type="button" data-bs-target="#homeHeroBanners" data-bs-slide="next">
                             <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Próximo</span>
+                            <span class="visually-hidden"><?= __('common.next', 'Próximo') ?></span>
                         </button>
                     <?php endif; ?>
                 </div>
@@ -143,8 +159,8 @@
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">Por que escolher a Braziliana?</h2>
-            <p class="section-subtitle" data-aos="fade-up">Oferecemos a melhor experiência de importação com tecnologia e confiança</p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.why_title', 'Por que escolher a Braziliana?') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.why_subtitle', 'Oferecemos a melhor experiência de importação com tecnologia e confiança') ?></p>
         </div>
         
         <div class="row g-4">
@@ -154,9 +170,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-shield-alt fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5>Compra Segura</h5>
+                        <h5><?= __('home.feature.secure_buy', 'Compra Segura') ?></h5>
                     </div>
-                    <p class="text-muted">Pagamento 100% seguro com proteção anti-fraude e criptografia de dados.</p>
+                    <p class="text-muted"><?= __('home.feature.secure_buy_desc', 'Pagamento 100% seguro com proteção anti-fraude e criptografia de dados.') ?></p>
                 </div>
             </div>
             
@@ -166,9 +182,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-plane fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5>Logística Completa</h5>
+                        <h5><?= __('home.feature.full_logistics', 'Logística Completa') ?></h5>
                     </div>
-                    <p class="text-muted">Do despacho nos EUA até a entrega na sua porta, cuidamos de tudo.</p>
+                    <p class="text-muted"><?= __('home.feature.full_logistics_desc', 'Do despacho nos EUA até a entrega na sua porta, cuidamos de tudo.') ?></p>
                 </div>
             </div>
             
@@ -178,9 +194,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-calculator fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5>Preços Transparentes</h5>
+                        <h5><?= __('home.feature.transparent_prices', 'Preços Transparentes') ?></h5>
                     </div>
-                    <p class="text-muted">Sem taxas escondidas. Você vê o valor final antes de comprar.</p>
+                    <p class="text-muted"><?= __('home.feature.transparent_prices_desc', 'Sem taxas escondidas. Você vê o valor final antes de comprar.') ?></p>
                 </div>
             </div>
         </div>
@@ -191,8 +207,8 @@
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">Produtos em Destaque</h2>
-            <p class="section-subtitle" data-aos="fade-up">Conheça nossos produtos mais populares</p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.featured_title', 'Produtos em Destaque') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.featured_subtitle', 'Conheça nossos produtos mais populares') ?></p>
         </div>
         
         <div class="row g-4" id="produtos-destaque">
@@ -201,7 +217,7 @@
         
         <div class="text-center mt-4">
             <a href="/produtos" class="btn btn-outline-primary btn-lg" data-aos="fade-up">
-                <i class="fas fa-th me-2"></i> Ver Todos os Produtos
+                <i class="fas fa-th me-2"></i> <?= __('home.view_all_products', 'Ver Todos os Produtos') ?>
             </a>
         </div>
     </div>
@@ -211,8 +227,8 @@
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">Como Funciona</h2>
-            <p class="section-subtitle" data-aos="fade-up">Importar nunca foi tão simples</p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.how_title', 'Como Funciona') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.how_subtitle', 'Importar nunca foi tão simples') ?></p>
         </div>
         
         <div class="row">
@@ -224,8 +240,8 @@
                             <span class="fw-bold">1</span>
                         </div>
                         <div class="timeline-content">
-                            <h5>Escolha seus Produtos</h5>
-                            <p class="text-muted">Navegue pelo nosso catálogo e selecione os produtos desejados.</p>
+                            <h5><?= __('home.step1_title', 'Escolha seus Produtos') ?></h5>
+                            <p class="text-muted"><?= __('home.step1_desc', 'Navegue pelo nosso catálogo e selecione os produtos desejados.') ?></p>
                         </div>
                     </div>
                     
@@ -235,8 +251,8 @@
                             <span class="fw-bold">2</span>
                         </div>
                         <div class="timeline-content">
-                            <h5>Pague de Forma Segura</h5>
-                            <p class="text-muted">Checkout seguro com múltiplas opções de pagamento.</p>
+                            <h5><?= __('home.step2_title', 'Pague de Forma Segura') ?></h5>
+                            <p class="text-muted"><?= __('home.step2_desc', 'Checkout seguro com múltiplas opções de pagamento.') ?></p>
                         </div>
                     </div>
                     
@@ -246,8 +262,8 @@
                             <span class="fw-bold">3</span>
                         </div>
                         <div class="timeline-content">
-                            <h5>Acompanhe o Processo</h5>
-                            <p class="text-muted">Acompanhe cada etapa desde o despacho até a entrega.</p>
+                            <h5><?= __('home.step3_title', 'Acompanhe o Processo') ?></h5>
+                            <p class="text-muted"><?= __('home.step3_desc', 'Acompanhe cada etapa desde o despacho até a entrega.') ?></p>
                         </div>
                     </div>
                     
@@ -257,8 +273,8 @@
                             <span class="fw-bold">4</span>
                         </div>
                         <div class="timeline-content">
-                            <h5>Receba em Casa</h5>
-                            <p class="text-muted">Receba seus produtos diretamente na sua porta.</p>
+                            <h5><?= __('home.step4_title', 'Receba em Casa') ?></h5>
+                            <p class="text-muted"><?= __('home.step4_desc', 'Receba seus produtos diretamente na sua porta.') ?></p>
                         </div>
                     </div>
                 </div>
@@ -271,8 +287,8 @@
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up">O que nossos clientes dizem</h2>
-            <p class="section-subtitle" data-aos="fade-up">Milhares de clientes satisfeitos</p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.testimonials_title', 'O que nossos clientes dizem') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.testimonials_subtitle', 'Milhares de clientes satisfeitos') ?></p>
         </div>
         
         <div class="row">
@@ -356,14 +372,14 @@
     <div class="container text-center">
         <div class="row">
             <div class="col-lg-8 mx-auto" data-aos="zoom-in">
-                <h2 class="mb-4">Pronto para começar a importar?</h2>
-                <p class="lead mb-4">Junte-se a milhares de clientes que economizam comprando diretamente dos EUA</p>
+                <h2 class="mb-4"><?= __('home.cta_title', 'Pronto para começar a importar?') ?></h2>
+                <p class="lead mb-4"><?= __('home.cta_subtitle', 'Junte-se a milhares de clientes que economizam comprando diretamente dos EUA') ?></p>
                 <div class="d-flex gap-3 justify-content-center">
                     <a href="/register" class="btn btn-primary btn-lg">
-                        <i class="fas fa-user-plus me-2"></i> Criar Conta Gratuita
+                        <i class="fas fa-user-plus me-2"></i> <?= __('home.cta_create_account', 'Criar Conta Gratuita') ?>
                     </a>
                     <a href="/produtos" class="btn btn-outline-primary btn-lg">
-                        <i class="fas fa-eye me-2"></i> Ver Produtos
+                        <i class="fas fa-eye me-2"></i> <?= __('home.cta_view_products', 'Ver Produtos') ?>
                     </a>
                 </div>
             </div>
@@ -373,10 +389,20 @@
 
 <script>
 $(document).ready(function() {
+    const UI = {
+        badge_last_units: <?= json_encode(__('home.badge_last_units', 'Últimas unidades'), JSON_UNESCAPED_UNICODE) ?>,
+        details: <?= json_encode(__('home.details', 'Ver Detalhes'), JSON_UNESCAPED_UNICODE) ?>,
+        no_featured: <?= json_encode(__('home.no_featured', 'Nenhum produto em destaque no momento.'), JSON_UNESCAPED_UNICODE) ?>,
+        cant_load: <?= json_encode(__('home.cant_load_featured', 'Não foi possível carregar produtos em destaque.'), JSON_UNESCAPED_UNICODE) ?>,
+        units_short: <?= json_encode(__('home.units_short', 'unid.'), JSON_UNESCAPED_UNICODE) ?>
+    };
+    const LOCALE = <?= json_encode((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocale() : 'pt-BR'), JSON_UNESCAPED_UNICODE) ?>;
+
     function formatMoney(value) {
         const num = Number(value || 0);
         try {
-            return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+            const locale = (String(LOCALE).toLowerCase() === 'en') ? 'en-US' : 'pt-BR';
+            return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
         } catch (e) {
             return num.toFixed(2);
         }
@@ -397,17 +423,17 @@ $(document).ready(function() {
                                     <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
                                          class="product-image card-img-top">
-                                    ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">Últimas unidades</span>' : ''}
+                                    ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">' + UI.badge_last_units + '</span>' : ''}
                                 </div>
                                 <div class="card-body">
                                     <h6 class="card-title">${produto.nome}</h6>
                                     <p class="text-muted small">${produto.categoria}</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="h5 mb-0 text-primary">${produto.moeda} ${formatMoney(produto.valor)}</span>
-                                        <small class="text-muted">${produto.estoque} unid.</small>
+                                        <small class="text-muted">${produto.estoque} ${UI.units_short}</small>
                                     </div>
                                     <a href="/produto/detalhes/${produto.id}" class="btn btn-outline-primary btn-sm w-100">
-                                        Ver Detalhes
+                                        ${UI.details}
                                     </a>
                                 </div>
                             </div>
@@ -416,11 +442,11 @@ $(document).ready(function() {
                 });
                 $('#produtos-destaque').html(html);
             } else {
-                $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">Nenhum produto em destaque no momento.</p></div>');
+                $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">' + UI.no_featured + '</p></div>');
             }
         },
         error: function() {
-            $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">Não foi possível carregar produtos em destaque.</p></div>');
+            $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">' + UI.cant_load + '</p></div>');
         }
     });
 });

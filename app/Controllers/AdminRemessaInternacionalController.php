@@ -28,26 +28,9 @@ class AdminRemessaInternacionalController extends Controller {
         $auth->requerPerfis(['admin', 'vendedor']);
     }
 
-    private function isPedidoPago(array $pedido): bool {
-        $pagoEm = $pedido['pago_em'] ?? null;
-        if ($pagoEm !== null && (string) $pagoEm !== '') {
-            return true;
-        }
-
+    private function isPedidoCaixaFechada(array $pedido): bool {
         $status = strtolower(trim((string) ($pedido['status'] ?? '')));
-        if (in_array($status, ['pago', 'paid', 'approved', 'aprovado', 'confirmado', 'confirmed'], true)) {
-            return true;
-        }
-
-        $stPag = $pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? ($pedido['pagamento_status'] ?? null));
-        if (is_string($stPag)) {
-            $stPag = strtoupper(trim($stPag));
-            if (in_array($stPag, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS', 'PAGO', 'APROVADO'], true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array($status, ['produto_consolidado', 'consolidado'], true);
     }
 
     private function isValidCpf(string $cpfDigits): bool {
@@ -238,7 +221,7 @@ class AdminRemessaInternacionalController extends Controller {
         $inicio = (string) $j['data_inicio'];
         $fim = (string) $j['data_fim'];
 
-        // Apenas pedidos pagos dentro do período entram na janela
+        // Apenas pedidos em Caixa Fechada dentro do período entram na janela
         $cols = [];
         try {
             $stCols = $this->connection->query('DESCRIBE pedidos');
@@ -247,13 +230,7 @@ class AdminRemessaInternacionalController extends Controller {
             $cols = [];
         }
 
-        $paidStatusWhere = "(LOWER(COALESCE(status,'')) IN ('pago','paid','approved','aprovado','confirmado','confirmed'))";
-        if (is_array($cols) && in_array('payment_status', $cols, true)) {
-            $paidStatusWhere .= " OR (UPPER(COALESCE(payment_status,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS'))";
-        }
-        if (is_array($cols) && in_array('status_pagamento', $cols, true)) {
-            $paidStatusWhere .= " OR (UPPER(COALESCE(status_pagamento,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS','PAGO','APROVADO'))";
-        }
+        $paidStatusWhere = "(LOWER(COALESCE(status,'')) IN ('produto_consolidado','consolidado'))";
 
         $dateCol = (is_array($cols) && in_array('pago_em', $cols, true)) ? 'pago_em' : ((is_array($cols) && in_array('created_at', $cols, true)) ? 'created_at' : 'id');
         $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
@@ -1586,8 +1563,8 @@ function gerarEtiqueta() {
                 exit;
             }
 
-            if (!$this->isPedidoPago($pedido)) {
-                echo json_encode(['success' => false, 'error' => 'Pedido ainda não está pago. Marque como pago antes de gerar a etiqueta internacional.']);
+            if (!$this->isPedidoCaixaFechada($pedido)) {
+                echo json_encode(['success' => false, 'error' => 'Pedido não está em Caixa Fechada. Marque como Caixa Fechada antes de gerar a etiqueta internacional.']);
                 exit;
             }
 

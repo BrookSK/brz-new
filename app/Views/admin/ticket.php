@@ -1,15 +1,15 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h1 class="h4 mb-0">Ticket #<?= (int) ($ticket['id'] ?? 0) ?></h1>
+        <h1 class="h4 mb-0"><?= __('ticket.title', 'Ticket #{id}', ['id' => (int) ($ticket['id'] ?? 0)]) ?></h1>
         <div class="text-muted small"><?= htmlspecialchars((string) ($ticket['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-        <div class="text-muted small">Cliente: <?= htmlspecialchars((string) ($ticket['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($ticket['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</div>
+        <div class="text-muted small"><?= __('admin.orders.table.customer', 'Cliente') ?>: <?= htmlspecialchars((string) ($ticket['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars((string) ($ticket['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</div>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets"><i class="fas fa-arrow-left me-1"></i><?= __('common.back', 'Voltar') ?></a>
         <?php $st = (string) ($ticket['status'] ?? 'open'); ?>
         <?php if (!empty($pedidoManual) && $st === 'open'): ?>
             <button class="btn btn-outline-primary btn-sm position-relative" id="btnContatarVendedor" type="button" data-bs-toggle="collapse" data-bs-target="#contatarVendedorBox" aria-expanded="false" aria-controls="contatarVendedorBox">
-                <i class="fas fa-user-tie me-1"></i>Contatar vendedor
+                <i class="fas fa-user-tie me-1"></i><?= __('admin.ticket.vendor_chat.contact_seller', 'Contatar vendedor') ?>
                 <?php if (!empty($vendorChatHasUnread)): ?>
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="badgeVendorUnread">!</span>
                 <?php endif; ?>
@@ -17,31 +17,31 @@
         <?php endif; ?>
         <?php if ($st === 'open'): ?>
             <button class="btn btn-outline-danger btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#fecharTicketBox" aria-expanded="false" aria-controls="fecharTicketBox">
-                <i class="fas fa-lock me-1"></i>Fechar
+                <i class="fas fa-lock me-1"></i><?= __('ticket.close', 'Fechar') ?>
             </button>
         <?php else: ?>
             <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/reabrir">
-                <button type="submit" class="btn btn-outline-success btn-sm"><i class="fas fa-unlock me-1"></i>Reabrir</button>
+                <button type="submit" class="btn btn-outline-success btn-sm"><i class="fas fa-unlock me-1"></i><?= __('admin.ticket.reopen', 'Reabrir') ?></button>
             </form>
         <?php endif; ?>
     </div>
 </div>
 
 <?php if (!empty($_GET['closure_error'])): ?>
-    <div class="alert alert-warning">Para fechar o ticket, informe o que ficou decidido entre a empresa e o cliente.</div>
+    <div class="alert alert-warning"><?= __('ticket.closure_error', 'Para fechar o ticket, informe o que ficou decidido entre a empresa e o cliente.') ?></div>
 <?php endif; ?>
 
 <?php if ($st === 'open'): ?>
     <div class="collapse mb-3" id="fecharTicketBox">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/fechar" onsubmit="return confirm('Tem certeza que deseja fechar este ticket?');">
+                <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/fechar" onsubmit="return confirm(<?= json_encode(__('ticket.confirm_close', 'Tem certeza que deseja fechar este ticket?'), JSON_UNESCAPED_UNICODE) ?>);">
                     <div class="mb-2">
-                        <label class="form-label mb-1">O que ficou decidido (obrigatório)</label>
+                        <label class="form-label mb-1"><?= __('ticket.closure_decision_label', 'O que ficou decidido (obrigatório)') ?></label>
                         <textarea class="form-control" name="closure_decision" rows="3" required></textarea>
                     </div>
                     <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-danger btn-sm">Confirmar fechamento</button>
+                        <button type="submit" class="btn btn-danger btn-sm"><?= __('ticket.closure_confirm', 'Confirmar fechamento') ?></button>
                     </div>
                 </form>
             </div>
@@ -51,7 +51,7 @@
 
 <?php if (!empty($ticket['closure_decision']) || !empty($ticket['closed_by_type']) || !empty($ticket['closed_by_user_id'])): ?>
     <div class="card border-0 shadow-sm mt-3 mb-3">
-        <div class="card-header bg-white"><div class="fw-semibold">Registro de encerramento</div></div>
+        <div class="card-header bg-white"><div class="fw-semibold"><?= __('ticket.closure_record', 'Registro de encerramento') ?></div></div>
         <div class="card-body">
             <?php if (!empty($ticket['closure_decision'])): ?>
                 <div style="white-space: pre-wrap;"><?= htmlspecialchars((string) $ticket['closure_decision'], ENT_QUOTES, 'UTF-8') ?></div>
@@ -87,9 +87,9 @@
 
                 <div class="row g-2">
                     <div class="col-md-4">
-                        <label class="form-label mb-1">Vendedor</label>
+                        <label class="form-label mb-1"><?= __('admin.ticket.vendor_chat.seller', 'Vendedor') ?></label>
                         <select class="form-select" onchange="location.href='/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>?vendedor_id=' + this.value + '#contatarVendedorBox';">
-                            <option value="">Selecione...</option>
+                            <option value=""><?= __('common.select', 'Selecione...') ?></option>
                             <?php $selVid = (int) ($selectedVendedorId ?? 0); ?>
                             <?php if (!empty($vendedores) && is_array($vendedores)): ?>
                                 <?php foreach ($vendedores as $v): ?>
@@ -101,24 +101,24 @@
                             <?php endif; ?>
                         </select>
                         <?php if (empty($vendedores)): ?>
-                            <div class="text-muted small mt-2">Nenhum vendedor encontrado (role/perfil = vendedor). Verifique o cadastro de usuários.</div>
+                            <div class="text-muted small mt-2"><?= __('admin.ticket.vendor_chat.no_seller_found', 'Nenhum vendedor encontrado (role/perfil = vendedor). Verifique o cadastro de usuários.') ?></div>
                         <?php endif; ?>
                     </div>
 
                     <div class="col-md-8">
-                        <label class="form-label mb-1">Conversa interna (suporte x vendedor)</label>
+                        <label class="form-label mb-1"><?= __('admin.ticket.vendor_chat.internal_conversation', 'Conversa interna (suporte x vendedor)') ?></label>
                         <div class="vendor-chat-box">
                             <?php if (empty($selectedVendedorId)): ?>
-                                <div class="text-muted">Selecione um vendedor para ver o histórico.</div>
+                                <div class="text-muted"><?= __('admin.ticket.vendor_chat.select_seller_to_view_history', 'Selecione um vendedor para ver o histórico.') ?></div>
                             <?php elseif (empty($vendorChatMessages)): ?>
-                                <div class="text-muted">Sem mensagens ainda com este vendedor.</div>
+                                <div class="text-muted"><?= __('admin.ticket.vendor_chat.no_messages_yet', 'Sem mensagens ainda com este vendedor.') ?></div>
                             <?php else: ?>
                                 <?php foreach ($vendorChatMessages as $vm): ?>
                                     <?php $isMe = ((string) ($vm['sender_type'] ?? '')) === 'suporte'; ?>
                                     <div class="vendor-row <?= $isMe ? 'me' : 'other' ?>">
                                         <div class="vendor-bubble <?= $isMe ? 'me' : 'other' ?>">
                                             <div class="vendor-meta">
-                                                <?= $isMe ? 'Suporte' : 'Vendedor' ?>
+                                                <?= $isMe ? __('admin.ticket.vendor_chat.support', 'Suporte') : __('admin.ticket.vendor_chat.seller', 'Vendedor') ?>
                                                 <span class="opacity-75">•</span>
                                                 <span class="opacity-75"><?= htmlspecialchars((string) ($vm['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                                             </div>
@@ -150,20 +150,20 @@
                         <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/contatar-vendedor" enctype="multipart/form-data" class="d-flex gap-2 align-items-start">
                             <input type="hidden" name="vendedor_id" value="<?= (int) ($selectedVendedorId ?? 0) ?>">
                             <div class="flex-grow-1">
-                                <label class="form-label mb-1">Mensagem</label>
-                                <textarea class="form-control" name="mensagem" rows="2" required <?= empty($selectedVendedorId) ? 'disabled' : '' ?> placeholder="Digite a mensagem..." ></textarea>
+                                <label class="form-label mb-1"><?= __('ticket.message', 'Mensagem') ?></label>
+                                <textarea class="form-control" name="mensagem" rows="2" required <?= empty($selectedVendedorId) ? 'disabled' : '' ?> placeholder="<?= htmlspecialchars(__('admin.ticket.vendor_chat.message_placeholder', 'Digite a mensagem...'), ENT_QUOTES, 'UTF-8') ?>" ></textarea>
                                 <div class="mt-2">
                                     <input class="form-control" type="file" name="documentos[]" multiple <?= empty($selectedVendedorId) ? 'disabled' : '' ?> >
-                                    <div class="form-text">Anexe documentos/arquivos (até 20MB cada).</div>
+                                    <div class="form-text"><?= __('admin.ticket.vendor_chat.attach_hint', 'Anexe documentos/arquivos (até 20MB cada).') ?></div>
                                 </div>
                             </div>
                             <div style="margin-top: 26px;">
-                                <button type="submit" class="btn btn-primary" title="Enviar" <?= empty($selectedVendedorId) ? 'disabled' : '' ?> style="height: 42px; width: 56px;">
+                                <button type="submit" class="btn btn-primary" title="<?= htmlspecialchars(__('common.send', 'Enviar'), ENT_QUOTES, 'UTF-8') ?>" <?= empty($selectedVendedorId) ? 'disabled' : '' ?> style="height: 42px; width: 56px;">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>
                             </div>
                         </form>
-                        <div class="form-text mt-2">Conversa interna: não aparece para o cliente. Não há opção de apagar mensagens.</div>
+                        <div class="form-text mt-2"><?= __('admin.ticket.vendor_chat.internal_notice', 'Conversa interna: não aparece para o cliente. Não há opção de apagar mensagens.') ?></div>
                     </div>
                 </div>
 
@@ -342,16 +342,16 @@
 
         <div class="brz-chat-header">
             <div class="brz-title">
-                <span class="badge <?= ($st === 'open' ? 'bg-success' : 'bg-secondary') ?>"><?= $st === 'open' ? 'Aberto' : 'Fechado' ?></span>
+                <span class="badge <?= ($st === 'open' ? 'bg-success' : 'bg-secondary') ?>"><?= $st === 'open' ? __('ticket.status.open', 'Aberto') : __('ticket.status.closed', 'Fechado') ?></span>
                 <?php if (!empty($ticket['pedido_id'])): ?>
-                    <div class="brz-sub">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                    <div class="brz-sub"><?= __('ticket.order', 'Pedido #{id}', ['id' => (int) ($ticket['pedido_id'] ?? 0)]) ?></div>
                 <?php endif; ?>
             </div>
         </div>
 
         <div class="brz-chat-body">
             <?php if (empty($messages)): ?>
-                <div class="text-muted">Sem mensagens ainda.</div>
+                <div class="text-muted"><?= __('ticket.empty', 'Sem mensagens ainda.') ?></div>
             <?php else: ?>
                 <?php foreach ($messages as $m): ?>
                     <?php $isAdmin = ((string) ($m['autor_tipo'] ?? '')) === 'admin'; ?>
@@ -359,9 +359,9 @@
                         <div class="brz-bubble <?= $isAdmin ? 'me' : 'other' ?>">
                             <div class="brz-meta">
                                 <?php if ($isAdmin): ?>
-                                    <?= htmlspecialchars((string) (($m['autor_nome'] ?? '') !== '' ? $m['autor_nome'] : 'Admin/Suporte'), ENT_QUOTES, 'UTF-8') ?>
+                                    <?= htmlspecialchars((string) (($m['autor_nome'] ?? '') !== '' ? $m['autor_nome'] : __('ticket.admin_support', 'Admin/Suporte')), ENT_QUOTES, 'UTF-8') ?>
                                 <?php else: ?>
-                                    Cliente
+                                    <?= __('admin.orders.table.customer', 'Cliente') ?>
                                 <?php endif; ?>
                                 <span class="opacity-75">•</span>
                                 <span class="opacity-75"><?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
@@ -374,7 +374,7 @@
                                         <?php $p = (string) ($a['file_path'] ?? ''); ?>
                                         <?php if ($p !== ''): ?>
                                             <a href="<?= htmlspecialchars($p, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <img src="<?= htmlspecialchars($p, ENT_QUOTES, 'UTF-8') ?>" alt="Anexo">
+                                                <img src="<?= htmlspecialchars($p, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars(__('ticket.attachment', 'Anexo'), ENT_QUOTES, 'UTF-8') ?>">
                                             </a>
                                         <?php endif; ?>
                                     <?php endforeach; ?>
@@ -391,22 +391,22 @@
                 <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/mensagem" enctype="multipart/form-data">
                     <div class="brz-composer">
                         <div>
-                            <label class="form-label mb-1">Mensagem</label>
+                            <label class="form-label mb-1"><?= __('ticket.message', 'Mensagem') ?></label>
                             <textarea class="form-control" name="mensagem" required></textarea>
                             <div class="mt-2">
                                 <input class="form-control" type="file" name="imagens[]" accept="image/jpeg,image/png,image/webp" multiple>
-                                <div class="form-text">Anexe imagens (JPG/PNG/WebP até 5MB).</div>
+                                <div class="form-text"><?= __('ticket.attach_hint', 'Anexe imagens (JPG/PNG/WebP até 5MB).') ?></div>
                             </div>
                         </div>
                         <div class="brz-actions">
-                            <button type="submit" class="btn btn-primary w-100" title="Enviar">
+                            <button type="submit" class="btn btn-primary w-100" title="<?= htmlspecialchars(__('common.send', 'Enviar'), ENT_QUOTES, 'UTF-8') ?>">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
                     </div>
                 </form>
             <?php else: ?>
-                <div class="alert alert-secondary mb-0">Ticket fechado.</div>
+                <div class="alert alert-secondary mb-0"><?= __('admin.ticket.closed_notice', 'Ticket fechado.') ?></div>
             <?php endif; ?>
         </div>
     </div>
@@ -416,11 +416,11 @@
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <div class="fw-semibold">Detalhes do pedido do ticket</div>
+                <div class="fw-semibold"><?= __('admin.ticket.order_details.title', 'Detalhes do pedido do ticket') ?></div>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <div class="text-muted small">Pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                    <div class="text-muted small"><?= __('ticket.order', 'Pedido #{id}', ['id' => (int) ($ticket['pedido_id'] ?? 0)]) ?></div>
                     <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/detalhes/<?= (int) ($ticket['pedido_id'] ?? 0) ?>" target="_blank" rel="noopener">
-                        <i class="fas fa-external-link-alt me-1"></i>Abrir pedido
+                        <i class="fas fa-external-link-alt me-1"></i><?= __('admin.ticket.order_details.open_order', 'Abrir pedido') ?>
                     </a>
                 </div>
             </div>
@@ -463,30 +463,30 @@
                         <table class="table table-sm align-middle mb-3 pedido-kv">
                             <tbody>
                                 <tr>
-                                    <td class="k">Código</td>
+                                    <td class="k"><?= __('admin.ticket.order_details.code', 'Código') ?></td>
                                     <td class="v muted"><?= htmlspecialchars($codigoPedido, ENT_QUOTES, 'UTF-8') ?></td>
                                 </tr>
                                 <?php if ($moedaProc !== ''): ?>
                                     <tr>
-                                        <td class="k">Moeda processada</td>
+                                        <td class="k"><?= __('admin.ticket.order_details.processed_currency', 'Moeda processada') ?></td>
                                         <td class="v muted"><?= htmlspecialchars($moedaProc, ENT_QUOTES, 'UTF-8') ?></td>
                                     </tr>
                                 <?php endif; ?>
                                 <?php if ($moedaOrig !== ''): ?>
                                     <tr>
-                                        <td class="k">Moeda original</td>
+                                        <td class="k"><?= __('admin.ticket.order_details.original_currency', 'Moeda original') ?></td>
                                         <td class="v muted"><?= htmlspecialchars($moedaOrig, ENT_QUOTES, 'UTF-8') ?></td>
                                     </tr>
                                 <?php endif; ?>
                                 <?php if (!empty($pd['status'])): ?>
                                     <tr>
-                                        <td class="k">Status</td>
+                                        <td class="k"><?= __('common.status', 'Status') ?></td>
                                         <td class="v muted"><?= htmlspecialchars((string) ($pd['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                     </tr>
                                 <?php endif; ?>
                                 <?php if ($taxaConv !== null && $taxaConv !== '' && (float) $taxaConv != 0.0): ?>
                                     <tr>
-                                        <td class="k">Taxa conversão</td>
+                                        <td class="k"><?= __('admin.ticket.order_details.exchange_rate', 'Taxa conversão') ?></td>
                                         <td class="v muted"><?= htmlspecialchars((string) $taxaConv, ENT_QUOTES, 'UTF-8') ?></td>
                                     </tr>
                                 <?php endif; ?>
@@ -496,44 +496,44 @@
 
                     <div class="pedido-totais">
                         <?php if ($subtotal !== null && $subtotal !== '' && (float) $subtotal != 0.0): ?>
-                            <div class="rowline"><div class="l">Subtotal</div><div class="r"><?= htmlspecialchars((string) $subtotal, ENT_QUOTES, 'UTF-8') ?></div></div>
+                            <div class="rowline"><div class="l"><?= __('checkout.subtotal', 'Subtotal') ?></div><div class="r"><?= htmlspecialchars((string) $subtotal, ENT_QUOTES, 'UTF-8') ?></div></div>
                         <?php endif; ?>
                         <?php if ($frete !== null && $frete !== '' && (float) $frete != 0.0): ?>
-                            <div class="rowline"><div class="l">Frete</div><div class="r"><?= htmlspecialchars((string) $frete, ENT_QUOTES, 'UTF-8') ?></div></div>
+                            <div class="rowline"><div class="l"><?= __('admin.ticket.order_details.shipping', 'Frete') ?></div><div class="r"><?= htmlspecialchars((string) $frete, ENT_QUOTES, 'UTF-8') ?></div></div>
                         <?php endif; ?>
                         <?php if ($servico !== null && $servico !== '' && (float) $servico != 0.0): ?>
-                            <div class="rowline"><div class="l">Taxas</div><div class="r"><?= htmlspecialchars((string) $servico, ENT_QUOTES, 'UTF-8') ?></div></div>
+                            <div class="rowline"><div class="l"><?= __('admin.ticket.order_details.fees', 'Taxas') ?></div><div class="r"><?= htmlspecialchars((string) $servico, ENT_QUOTES, 'UTF-8') ?></div></div>
                         <?php endif; ?>
                         <?php if ($impostos !== null && $impostos !== '' && (float) $impostos != 0.0): ?>
-                            <div class="rowline"><div class="l">Impostos</div><div class="r"><?= htmlspecialchars((string) $impostos, ENT_QUOTES, 'UTF-8') ?></div></div>
+                            <div class="rowline"><div class="l"><?= __('admin.ticket.order_details.taxes', 'Impostos') ?></div><div class="r"><?= htmlspecialchars((string) $impostos, ENT_QUOTES, 'UTF-8') ?></div></div>
                         <?php endif; ?>
                         <?php if ($total !== null && $total !== '' && (float) $total != 0.0): ?>
-                            <div class="rowline total"><div class="l">Total</div><div class="r"><?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?></div></div>
+                            <div class="rowline total"><div class="l"><?= __('common.total', 'Total') ?></div><div class="r"><?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?></div></div>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="col-lg-8">
-                    <div class="small text-muted">Itens</div>
+                    <div class="small text-muted"><?= __('admin.ticket.order_details.items', 'Itens') ?></div>
                     <?php $itens = $pd['itens'] ?? ($pd['items'] ?? []); ?>
                     <?php if (empty($itens) || !is_array($itens)): ?>
-                        <div class="text-muted">Não foi possível carregar os itens.</div>
+                        <div class="text-muted"><?= __('admin.ticket.order_details.items_load_failed', 'Não foi possível carregar os itens.') ?></div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Produto</th>
-                                        <th class="text-end">Qtd</th>
-                                        <th class="text-end">Unit</th>
-                                        <th class="text-end">Subtotal</th>
+                                        <th><?= __('admin.ticket.order_details.table.product', 'Produto') ?></th>
+                                        <th class="text-end"><?= __('admin.ticket.order_details.table.qty', 'Qtd') ?></th>
+                                        <th class="text-end"><?= __('admin.ticket.order_details.table.unit', 'Unit') ?></th>
+                                        <th class="text-end"><?= __('checkout.subtotal', 'Subtotal') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($itens as $it): ?>
                                         <tr>
                                             <td>
-                                                <?= htmlspecialchars((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Produto')), ENT_QUOTES, 'UTF-8') ?>
+                                                <?= htmlspecialchars((string) ($it['nome_produto'] ?? ($it['nome'] ?? __('admin.ticket.order_details.product_fallback', 'Produto'))), ENT_QUOTES, 'UTF-8') ?>
                                                 <?php if (!empty($it['variacao_descricao'])): ?>
                                                     <div class="text-muted small"><?= htmlspecialchars((string) $it['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                                 <?php endif; ?>
@@ -568,18 +568,18 @@
 <?php if (in_array($perfil, ['admin', 'suporte'], true)): ?>
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white">
-            <div class="fw-semibold">Arquivos do ticket</div>
+            <div class="fw-semibold"><?= __('admin.ticket.files.title', 'Arquivos do ticket') ?></div>
         </div>
         <div class="card-body">
             <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/arquivos" enctype="multipart/form-data" class="mb-3">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-9">
-                        <label class="form-label mb-1">Enviar arquivo</label>
+                        <label class="form-label mb-1"><?= __('admin.ticket.files.upload', 'Enviar arquivo') ?></label>
                         <input class="form-control" type="file" name="arquivo" required>
-                        <div class="form-text">Até 20MB. Alguns tipos perigosos são bloqueados.</div>
+                        <div class="form-text"><?= __('admin.ticket.files.upload_hint', 'Até 20MB. Alguns tipos perigosos são bloqueados.') ?></div>
                     </div>
                     <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100 mt-1" title="Enviar arquivo">
+                        <button type="submit" class="btn btn-primary w-100 mt-1" title="<?= htmlspecialchars(__('admin.ticket.files.upload', 'Enviar arquivo'), ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fas fa-upload"></i>
                         </button>
                     </div>
@@ -587,16 +587,16 @@
             </form>
 
             <?php if (empty($ticketFiles)): ?>
-                <div class="text-muted">Nenhum arquivo anexado ao ticket.</div>
+                <div class="text-muted"><?= __('admin.ticket.files.empty', 'Nenhum arquivo anexado ao ticket.') ?></div>
             <?php else: ?>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>Arquivo</th>
-                                <th>Tipo</th>
-                                <th>Tamanho</th>
-                                <th>Data</th>
+                                <th><?= __('admin.ticket.files.table.file', 'Arquivo') ?></th>
+                                <th><?= __('admin.ticket.files.table.type', 'Tipo') ?></th>
+                                <th><?= __('admin.ticket.files.table.size', 'Tamanho') ?></th>
+                                <th><?= __('admin.ticket.files.table.date', 'Data') ?></th>
                                 <th class="text-end"></th>
                             </tr>
                         </thead>
@@ -633,16 +633,16 @@
 
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-white">
-            <div class="fw-semibold">Anotações internas (somente admin)</div>
+            <div class="fw-semibold"><?= __('admin.ticket.internal_notes.title', 'Anotações internas (somente admin)') ?></div>
         </div>
         <div class="card-body">
             <form method="POST" action="/admin/tickets/<?= (int) ($ticket['id'] ?? 0) ?>/notas-internas">
                 <div class="mb-2">
-                    <textarea class="form-control" name="internal_notes" rows="4" placeholder="Detalhes internos sobre o pedido / tratativa / observações..." style="white-space: pre-wrap;" ><?= htmlspecialchars((string) ($ticket['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                    <textarea class="form-control" name="internal_notes" rows="4" placeholder="<?= htmlspecialchars(__('admin.ticket.internal_notes.placeholder', 'Detalhes internos sobre o pedido / tratativa / observações...'), ENT_QUOTES, 'UTF-8') ?>" style="white-space: pre-wrap;" ><?= htmlspecialchars((string) ($ticket['internal_notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
                 </div>
                 <div class="d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-save me-1"></i>Salvar
+                        <i class="fas fa-save me-1"></i><?= __('common.save', 'Salvar') ?>
                     </button>
                 </div>
             </form>
@@ -653,9 +653,9 @@
 <div class="card border-0 shadow-sm mt-4">
     <div class="card-header bg-white">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div class="fw-semibold">Resumo do Cliente e Compras</div>
+            <div class="fw-semibold"><?= __('admin.ticket.customer_summary.title', 'Resumo do Cliente e Compras') ?></div>
             <?php if (!empty($ticket['pedido_id'])): ?>
-                <div class="text-muted small">Relacionado ao pedido #<?= (int) ($ticket['pedido_id'] ?? 0) ?></div>
+                <div class="text-muted small"><?= __('admin.ticket.customer_summary.related_order', 'Relacionado ao pedido #{id}', ['id' => (int) ($ticket['pedido_id'] ?? 0)]) ?></div>
             <?php endif; ?>
         </div>
     </div>
@@ -663,15 +663,15 @@
         <div class="row g-3">
             <div class="col-lg-4">
                 <div class="border rounded p-3 h-100">
-                    <div class="fw-semibold mb-2">Dados do cliente</div>
+                    <div class="fw-semibold mb-2"><?= __('admin.ticket.customer_summary.customer_data', 'Dados do cliente') ?></div>
                     <?php $c = $clienteResumo ?? []; ?>
                     <div class="small text-muted">ID</div>
                     <div class="mb-2"><?= (int) ($c['id'] ?? ($ticket['usuario_id'] ?? 0)) ?></div>
 
-                    <div class="small text-muted">Nome</div>
+                    <div class="small text-muted"><?= __('common.name', 'Nome') ?></div>
                     <div class="mb-2"><?= htmlspecialchars((string) ($c['nome'] ?? ($ticket['usuario_nome'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
 
-                    <div class="small text-muted">E-mail</div>
+                    <div class="small text-muted"><?= __('common.email', 'E-mail') ?></div>
                     <div class="mb-2"><?= htmlspecialchars((string) ($c['email'] ?? ($ticket['usuario_email'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
 
                     <?php
@@ -690,17 +690,17 @@
                     ?>
 
                     <?php if ($tel !== ''): ?>
-                        <div class="small text-muted">Telefone</div>
+                        <div class="small text-muted"><?= __('common.phone', 'Telefone') ?></div>
                         <div class="mb-2"><?= htmlspecialchars($tel, ENT_QUOTES, 'UTF-8') ?></div>
                     <?php endif; ?>
 
                     <?php if ($doc !== ''): ?>
-                        <div class="small text-muted">Documento</div>
+                        <div class="small text-muted"><?= __('admin.ticket.customer_summary.document', 'Documento') ?></div>
                         <div class="mb-2"><?= htmlspecialchars($doc, ENT_QUOTES, 'UTF-8') ?></div>
                     <?php endif; ?>
 
                     <?php if ($cad !== ''): ?>
-                        <div class="small text-muted">Cadastro</div>
+                        <div class="small text-muted"><?= __('admin.ticket.customer_summary.registered_at', 'Cadastro') ?></div>
                         <div><?= htmlspecialchars($cad, ENT_QUOTES, 'UTF-8') ?></div>
                     <?php endif; ?>
                 </div>
@@ -708,19 +708,19 @@
 
             <div class="col-lg-8">
                 <div class="border rounded p-3 mb-3">
-                    <div class="fw-semibold mb-2">Compras anteriores</div>
+                    <div class="fw-semibold mb-2"><?= __('admin.ticket.customer_summary.previous_purchases', 'Compras anteriores') ?></div>
                     <?php if (empty($comprasAnteriores)): ?>
-                        <div class="text-muted">Nenhuma compra anterior encontrada.</div>
+                        <div class="text-muted"><?= __('admin.ticket.customer_summary.no_previous_purchases', 'Nenhuma compra anterior encontrada.') ?></div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Código</th>
-                                        <th>Status</th>
-                                        <th>Total</th>
-                                        <th>Data</th>
+                                        <th><?= __('admin.ticket.customer_summary.table.code', 'Código') ?></th>
+                                        <th><?= __('common.status', 'Status') ?></th>
+                                        <th><?= __('common.total', 'Total') ?></th>
+                                        <th><?= __('admin.ticket.customer_summary.table.date', 'Data') ?></th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -733,7 +733,7 @@
                                             <td><?= htmlspecialchars((string) ($p['total'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string) ($p['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-end">
-                                                <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/detalhes/<?= (int) ($p['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a>
+                                                <a class="btn btn-outline-primary btn-sm" href="/admin/pedidos/detalhes/<?= (int) ($p['id'] ?? 0) ?>" target="_blank" rel="noopener"><?= __('common.view', 'Ver') ?></a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -744,29 +744,29 @@
                 </div>
 
                 <div class="border rounded p-3 mb-3">
-                    <div class="fw-semibold mb-2">Tickets do pedido</div>
+                    <div class="fw-semibold mb-2"><?= __('admin.ticket.customer_summary.order_tickets', 'Tickets do pedido') ?></div>
                     <?php if (empty($ticketsDoPedido)): ?>
-                        <div class="text-muted">Nenhum outro ticket relacionado a este pedido.</div>
+                        <div class="text-muted"><?= __('admin.ticket.customer_summary.no_other_order_tickets', 'Nenhum outro ticket relacionado a este pedido.') ?></div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Assunto</th>
-                                        <th>Status</th>
-                                        <th>Atualizado</th>
+                                        <th><?= __('admin.tickets.table.subject', 'Assunto') ?></th>
+                                        <th><?= __('common.status', 'Status') ?></th>
+                                        <th><?= __('admin.tickets.table.updated', 'Atualizado') ?></th>
                                         <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($ticketsDoPedido as $tp): ?>
                                         <tr>
-                                            <td class="fw-semibold">#<?= (int) ($tp['id'] ?? 0) ?></td>
+                                            <td class="text-muted small">#<?= (int) ($tp['id'] ?? 0) ?></td>
                                             <td><?= htmlspecialchars((string) ($tp['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string) ($tp['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-muted small"><?= htmlspecialchars((string) ($tp['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tp['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a></td>
+                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tp['id'] ?? 0) ?>" target="_blank" rel="noopener"><?= __('common.view', 'Ver') ?></a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -776,19 +776,19 @@
                 </div>
 
                 <div class="border rounded p-3">
-                    <div class="fw-semibold mb-2">Tickets do cliente (geral)</div>
+                    <div class="fw-semibold mb-2"><?= __('admin.ticket.customer_summary.customer_tickets', 'Tickets do cliente (geral)') ?></div>
                     <?php if (empty($ticketsDoCliente)): ?>
-                        <div class="text-muted">Nenhum outro ticket do cliente.</div>
+                        <div class="text-muted"><?= __('admin.ticket.customer_summary.no_other_customer_tickets', 'Nenhum outro ticket do cliente.') ?></div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Pedido</th>
-                                        <th>Assunto</th>
-                                        <th>Status</th>
-                                        <th>Atualizado</th>
+                                        <th><?= __('admin.orders.table.order', 'Pedido') ?></th>
+                                        <th><?= __('admin.tickets.table.subject', 'Assunto') ?></th>
+                                        <th><?= __('common.status', 'Status') ?></th>
+                                        <th><?= __('admin.tickets.table.updated', 'Atualizado') ?></th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -800,7 +800,7 @@
                                             <td><?= htmlspecialchars((string) ($tc['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string) ($tc['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                             <td class="text-muted small"><?= htmlspecialchars((string) ($tc['atualizado_em'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tc['id'] ?? 0) ?>" target="_blank" rel="noopener">Ver</a></td>
+                                            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/admin/tickets/<?= (int) ($tc['id'] ?? 0) ?>" target="_blank" rel="noopener"><?= __('common.view', 'Ver') ?></a></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\CpfValidator;
 use App\Models\Carrinho;
 use App\Models\Usuario;
 use App\Models\Endereco;
@@ -292,6 +293,17 @@ class CheckoutController extends Controller {
             $v = '39';
         }
         return floatval($v);
+    }
+
+    private function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
     }
 
     private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
@@ -1457,6 +1469,7 @@ class CheckoutController extends Controller {
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
+            'pix_desconto_taxa_servico_percent' => (float) $this->getPixDescontoTaxaServicoPercent(),
             'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
             'exchange_rates' => [
@@ -1749,7 +1762,42 @@ class CheckoutController extends Controller {
 
                 if (!$reused && $formaSelecionada === 'carteira') {
                     $valorPedido = (float) ($pedidoRowPay['total'] ?? 0);
-                    $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                    $moedaPedidoWallet = strtoupper(trim((string) ($dados['moeda'] ?? ($pedidoRowPay['moeda'] ?? 'BRL'))));
+                    if (!in_array($moedaPedidoWallet, ['BRL', 'USD'], true)) {
+                        $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                    }
+                    if (!in_array($moedaPedidoWallet, ['BRL', 'USD'], true)) {
+                        $moedaPedidoWallet = 'BRL';
+                    }
+
+                    // Garantir que o pedido reflita a moeda que será debitada na carteira
+                    try {
+                        $dbUpdCur = \Config\Database::getConnection();
+                        $colsPedCur = [];
+                        try {
+                            $stColsPedCur = $dbUpdCur->query('DESCRIBE pedidos');
+                            $colsPedCur = $stColsPedCur ? ($stColsPedCur->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPedCur = [];
+                        }
+
+                        $setCur = [];
+                        $pCur = [];
+                        if (is_array($colsPedCur) && in_array('moeda', $colsPedCur, true)) {
+                            $setCur[] = 'moeda = ?';
+                            $pCur[] = $moedaPedidoWallet;
+                        }
+                        if (is_array($colsPedCur) && in_array('taxa_conversao', $colsPedCur, true)) {
+                            // Se está pagando em USD, considerar taxa 1 como padrão; BRL também.
+                            $setCur[] = 'taxa_conversao = COALESCE(taxa_conversao, 1)';
+                        }
+                        if (!empty($setCur)) {
+                            $pCur[] = (int) $pedidoId;
+                            $stUpdCur = $dbUpdCur->prepare('UPDATE pedidos SET ' . implode(', ', $setCur) . ' WHERE id = ?');
+                            $stUpdCur->execute($pCur);
+                        }
+                    } catch (\Exception $e) {
+                    }
                     $payResult = $this->debitarCarteiraParaPedido((int) ($usuario['id'] ?? 0), (int) $pedidoId, $valorPedido, $moedaPedidoWallet);
                     $gateway = 'carteira';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
@@ -1774,10 +1822,17 @@ class CheckoutController extends Controller {
                     }
                 }
 
-                // Se veio da Assessoria, vincular orçamento ao pedido (pago)
+                // Se veio da Assessoria (/assessoria), vincular orçamento ao pedido (pago)
+                // e colocar pedido em pendência de conferência.
+                $orcId = 0;
                 try {
                     $orcId = (int) ($_SESSION['checkout_assessoria_orcamento_id'] ?? 0);
-                    if ($orcId > 0) {
+                } catch (\Exception $e) {
+                    $orcId = 0;
+                }
+
+                if ($orcId > 0) {
+                    try {
                         $orcModel = new AssessoriaOrcamento();
                         $rowOrc = $orcModel->find($orcId);
                         if (is_array($rowOrc) && !empty($rowOrc['id'])) {
@@ -1788,9 +1843,41 @@ class CheckoutController extends Controller {
                                 'updated_at' => date('Y-m-d H:i:s'),
                             ]);
                         }
+                    } catch (\Exception $e) {
                     }
-                    unset($_SESSION['checkout_assessoria_orcamento_id']);
-                } catch (\Exception $e) {
+
+                    // Pedidos de Assessoria entram como pendentes de conferência (quando colunas existirem)
+                    try {
+                        $dbConf = \Config\Database::getConnection();
+                        $colsPed = [];
+                        try {
+                            $stmtColsPed = $dbConf->query('DESCRIBE pedidos');
+                            $colsPed = $stmtColsPed ? ($stmtColsPed->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPed = [];
+                        }
+
+                        $set = [];
+                        $params = [':id' => (int) $pedidoId];
+                        if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
+                            $set[] = 'origem_pedido = :origem_pedido';
+                            $params[':origem_pedido'] = 'redirecionamento';
+                        }
+                        if (is_array($colsPed) && in_array('status_conferencia', $colsPed, true)) {
+                            $set[] = 'status_conferencia = :status_conferencia';
+                            $params[':status_conferencia'] = 'pendente';
+                        }
+                        if (!empty($set)) {
+                            $st = $dbConf->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                            $st->execute($params);
+                        }
+                    } catch (\Exception $e) {
+                    }
+
+                    try {
+                        unset($_SESSION['checkout_assessoria_orcamento_id']);
+                    } catch (\Exception $e) {
+                    }
                 }
                 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
@@ -2541,34 +2628,58 @@ class CheckoutController extends Controller {
         if ($paisEntrega === '') {
             $paisEntrega = 'BR';
         }
+        $pais = $paisEntrega;
         
         // Dados pessoais
         if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-<<<<<<< HEAD
-        if ($paisEntrega === 'BR' && empty($dados['documento'])) $erros[] = 'Documento é obrigatório';
-=======
-        $pais = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
-        if ($pais === '') {
-            $pais = 'BR';
-        }
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
             }
         }
->>>>>>> fdebdf831d66d5fe381731ff252747b1d861a24a
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
         if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
         
         // Endereço
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
-        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if ($pais === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
         if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
-        if (empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+        if (in_array($pais, ['BR','US','CA'], true) && empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
+
+        // Destinatário (quando entregar para outra pessoa)
+        $entregaOutro = (string) ($dados['entrega_para_outro'] ?? '0');
+        $entregaOutro = ($entregaOutro === '1' || strtolower($entregaOutro) === 'true' || $entregaOutro === 'on');
+        if ($entregaOutro) {
+            if (empty($dados['destinatario_nome'])) {
+                $erros[] = 'Nome do destinatário é obrigatório';
+            }
+            if (empty($dados['destinatario_telefone'])) {
+                $erros[] = 'Telefone do destinatário é obrigatório';
+            }
+            if ($pais === 'BR') {
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
+                if ($docDest === '' || strlen($docDest) < 11) {
+                    $erros[] = 'CPF do destinatário é obrigatório para entregas no Brasil';
+                } elseif (strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
+                }
+            } else {
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
+                if ($docDest !== '' && strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
+                }
+            }
+        }
         
         // Pagamento
         if (empty($dados['forma_pagamento'])) $erros[] = 'Método de pagamento é obrigatório';
@@ -2620,11 +2731,11 @@ class CheckoutController extends Controller {
             'tipo' => $tipo,
             'cep' => $dados['cep'],
             'endereco' => $dados['endereco'],
-            'numero' => $dados['numero'],
+            'numero' => $dados['numero'] ?? '',
             'complemento' => $dados['complemento'] ?? '',
-            'bairro' => $dados['bairro'],
+            'bairro' => $dados['bairro'] ?? '',
             'cidade' => $dados['cidade'],
-            'estado' => $dados['estado'],
+            'estado' => $dados['estado'] ?? '',
             'pais' => (string) ($dados['pais'] ?? 'BR'),
             'principal' => false
         ];
@@ -2979,12 +3090,26 @@ class CheckoutController extends Controller {
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
 
+            // PIX: desconto configurável na taxa de serviço
+            $formaPagamentoSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+            if ($formaPagamentoSel === 'pix') {
+                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
+                if ($pct > 0) {
+                    $taxaServicoUsd = max(0.0, $taxaServicoUsd * (1.0 - ($pct / 100.0)));
+                }
+            }
+
             $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
             if ($paisEntrega === '') {
                 $paisEntrega = 'BR';
             }
             if ($paisEntrega !== 'BR') {
                 $impostosUsd = 0.0;
+            }
+
+            // Imposto de compra nos EUA (10%) embutido no subtotal dos produtos.
+            if ($paisEntrega === 'US') {
+                $subtotal = (float) $subtotal * 1.10;
             }
 
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
@@ -3092,6 +3217,17 @@ class CheckoutController extends Controller {
                         'documento' => (string) ($dados['documento'] ?? ''),
                     ] as $col => $val) {
                         if (in_array($col, $colsPed, true) && $val !== '') {
+                            $set[] = $col . ' = :' . $col;
+                            $p[$col] = $val;
+                        }
+                    }
+
+                    foreach ([
+                        'destinatario_nome' => (string) ($dados['destinatario_nome'] ?? ''),
+                        'destinatario_documento' => (string) ($dados['destinatario_documento'] ?? ''),
+                        'destinatario_telefone' => (string) ($dados['destinatario_telefone'] ?? ''),
+                    ] as $col => $val) {
+                        if (in_array($col, $colsPed, true) && trim($val) !== '') {
                             $set[] = $col . ' = :' . $col;
                             $p[$col] = $val;
                         }
@@ -3219,11 +3355,11 @@ class CheckoutController extends Controller {
                     'tipo' => 'entrega',
                     'cep' => $dados['cep'],
                     'endereco' => $dados['endereco'],
-                    'numero' => $dados['numero'],
+                    'numero' => $dados['numero'] ?? '',
                     'complemento' => $dados['complemento'] ?? '',
-                    'bairro' => $dados['bairro'],
+                    'bairro' => $dados['bairro'] ?? '',
                     'cidade' => $dados['cidade'],
-                    'estado' => $dados['estado'],
+                    'estado' => $dados['estado'] ?? '',
                     'pais' => (string) (($dados['pais'] ?? '') !== '' ? $dados['pais'] : 'BR'),
                     'principal' => $principal,
                 ];

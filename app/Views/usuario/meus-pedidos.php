@@ -9,23 +9,23 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
                 <div>
-                    <h2 class="mb-1">Meus Pedidos</h2>
-                    <p class="text-muted mb-0">Histórico completo dos seus pedidos</p>
+                    <h2 class="mb-1"><?= __('user_orders.title', 'Meus Pedidos') ?></h2>
+                    <p class="text-muted mb-0"><?= __('user_orders.subtitle', 'Histórico completo dos seus pedidos') ?></p>
                 </div>
                 <div class="d-flex gap-2 user-page-actions">
                     <div class="input-group" style="width: 250px;">
-                        <input type="text" class="form-control" placeholder="Buscar pedido..." id="buscaPedido">
+                        <input type="text" class="form-control" placeholder="<?= htmlspecialchars(__('user_orders.search_placeholder', 'Buscar pedido...'), ENT_QUOTES, 'UTF-8') ?>" id="buscaPedido">
                         <button class="btn btn-outline-secondary" type="button">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>
                     <select class="form-select" id="filtroStatus" style="width: 150px;">
-                        <option value="">Todos Status</option>
-                        <option value="pendente">Pendente</option>
-                        <option value="processando">Processando</option>
-                        <option value="enviado">Enviado</option>
-                        <option value="entregue">Entregue</option>
-                        <option value="cancelado">Cancelado</option>
+                        <option value=""><?= __('user_orders.filter.all_status', 'Todos Status') ?></option>
+                        <option value="pendente"><?= __('order_status.pending', 'Pendente') ?></option>
+                        <option value="processando"><?= __('order_status.processing', 'Processando') ?></option>
+                        <option value="enviado"><?= __('order_status.shipped', 'Enviado') ?></option>
+                        <option value="entregue"><?= __('order_status.delivered', 'Entregue') ?></option>
+                        <option value="cancelado"><?= __('order_status.cancelled', 'Cancelado') ?></option>
                     </select>
                 </div>
             </div>
@@ -38,7 +38,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="flex-grow-1">
                                     <h4 class="mb-1 fw-bold"><?= count($pedidos) ?></h4>
-                                    <p class="text-muted small mb-0">Total de Pedidos</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.total_orders', 'Total de Pedidos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-primary bg-opacity-10 rounded-circle p-3">
@@ -61,7 +61,7 @@
                                         echo count($ativos);
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Pedidos Ativos</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.active_orders', 'Pedidos Ativos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
@@ -84,7 +84,7 @@
                                         echo count($entregues);
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Pedidos Entregues</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.delivered_orders', 'Pedidos Entregues') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-info bg-opacity-10 rounded-circle p-3">
@@ -123,7 +123,7 @@
                                         }
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Total Gasto</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.total_spent', 'Total Gasto') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
@@ -144,10 +144,10 @@
                                     <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
                                         <i class="fas fa-shopping-bag text-muted fs-2"></i>
                                     </div>
-                                    <h5 class="mb-2">Nenhum pedido encontrado</h5>
-                                    <p class="text-muted mb-4">Você ainda não fez nenhuma compra.</p>
+                                    <h5 class="mb-2"><?= __('user_orders.empty_title', 'Nenhum pedido encontrado') ?></h5>
+                                    <p class="text-muted mb-4"><?= __('user_orders.empty_subtitle', 'Você ainda não fez nenhuma compra.') ?></p>
                                     <a href="/produtos" class="btn btn-primary">
-                                        <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
+                                        <i class="fas fa-shopping-cart me-2"></i> <?= __('user_orders.view_products', 'Ver Produtos') ?>
                                     </a>
                                 </div>
                             <?php else: ?>
@@ -155,12 +155,12 @@
                                     <table class="table table-hover" id="tabelaPedidos">
                                         <thead>
                                             <tr>
-                                                <th>Código</th>
-                                                <th>Data</th>
-                                                <th>Status</th>
-                                                <th>Valor</th>
-                                                <th>Itens</th>
-                                                <th>Ações</th>
+                                                <th><?= __('user_orders.table.code', 'Código') ?></th>
+                                                <th><?= __('user_orders.table.date', 'Data') ?></th>
+                                                <th><?= __('user_orders.table.status', 'Status') ?></th>
+                                                <th><?= __('user_orders.table.amount', 'Valor') ?></th>
+                                                <th><?= __('user_orders.table.items', 'Itens') ?></th>
+                                                <th><?= __('user_orders.table.actions', 'Ações') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -218,25 +218,25 @@
                                                         'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
                                                     ];
                                                     $statusLabels = [
-                                                        'pendente' => 'Pendente',
-                                                        'processando' => 'Processando',
-                                                        'enviado' => 'Enviado',
-                                                        'entregue' => 'Entregue',
-                                                        'cancelado' => 'Cancelado',
-                                                        'pago' => 'Pago',
-                                                        'paid' => 'Pago',
-                                                        'aprovado' => 'Pago',
-                                                        'approved' => 'Pago',
-                                                        'selecao' => 'Seleção',
-                                                        'cobranca' => 'Cobrança',
-                                                        'despacho' => 'Despacho',
-                                                        'transito' => 'Trânsito',
-                                                        'aduana' => 'Aduana',
-                                                        'entrega' => 'Entrega',
-                                                        'concluido' => 'Concluído'
+                                                        'pendente' => __('order_status.pending', 'Pendente'),
+                                                        'processando' => __('order_status.processing', 'Processando'),
+                                                        'enviado' => __('order_status.shipped', 'Enviado'),
+                                                        'entregue' => __('order_status.delivered', 'Entregue'),
+                                                        'cancelado' => __('order_status.cancelled', 'Cancelado'),
+                                                        'pago' => __('order_status.paid', 'Pago'),
+                                                        'paid' => __('order_status.paid', 'Pago'),
+                                                        'aprovado' => __('order_status.paid', 'Pago'),
+                                                        'approved' => __('order_status.paid', 'Pago'),
+                                                        'selecao' => __('order_status.selection', 'Seleção'),
+                                                        'cobranca' => __('order_status.billing', 'Cobrança'),
+                                                        'despacho' => __('order_status.dispatch', 'Despacho'),
+                                                        'transito' => __('order_status.in_transit', 'Trânsito'),
+                                                        'aduana' => __('order_status.customs', 'Aduana'),
+                                                        'entrega' => __('order_status.delivery', 'Entrega'),
+                                                        'concluido' => __('order_status.completed', 'Concluído')
                                                     ];
                                                     $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
-                                                    $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
+                                                    $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
                                                     ?>
                                                     <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                         <?= $label ?>
@@ -264,30 +264,30 @@
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <i class="fas fa-box text-muted me-2"></i>
-                                                        <span class="small"><?= $pedido['total_itens'] ?? 0 ?> itens</span>
+                                                        <span class="small"><?= (int) ($pedido['total_itens'] ?? 0) ?> <?= __('user_orders.items_count', 'itens') ?></span>
                                                     </div>
                                                 </td>
                                                 <td>
                                                     <div class="btn-group">
                                                         <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
                                                            class="btn btn-sm btn-outline-primary"
-                                                           title="Ver Detalhes">
+                                                           title="<?= htmlspecialchars(__('user_orders.actions.view_details', 'Ver Detalhes'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
                                                         <a class="btn btn-sm btn-outline-dark"
                                                            href="/meu-ticket/abrir/pedido/<?= (int) ($pedido['id'] ?? 0) ?>"
-                                                           title="Suporte">
+                                                           title="<?= htmlspecialchars(__('user_orders.actions.support', 'Suporte'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-life-ring"></i>
                                                         </a>
                                                         <button class="btn btn-sm btn-outline-success" 
                                                                 onclick="rastrearPedido('<?= htmlspecialchars((string)($pedido['codigo_pedido'] ?? $pedido['codigo'] ?? $pedido['codigo_rastreamento'] ?? $pedido['rastreamento'] ?? $pedido['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')"
-                                                                title="Rastrear">
+                                                                title="<?= htmlspecialchars(__('user_orders.actions.track', 'Rastrear'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-search-location"></i>
                                                         </button>
                                                         <?php if ($pedido['status'] === 'entregue'): ?>
                                                         <button class="btn btn-sm btn-outline-info" 
                                                                 onclick="recomprarPedido(<?= $pedido['id'] ?>)"
-                                                                title="Comprar Novamente">
+                                                                title="<?= htmlspecialchars(__('user_orders.actions.buy_again', 'Comprar Novamente'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-redo"></i>
                                                         </button>
                                                         <?php endif; ?>
@@ -301,7 +301,7 @@
 
                                 <!-- Pagination -->
                                 <?php if ($total_paginas > 1): ?>
-                                <nav aria-label="Navegação de páginas" class="mt-4">
+                                <nav aria-label="<?= htmlspecialchars(__('user_orders.pagination.aria', 'Navegação de páginas'), ENT_QUOTES, 'UTF-8') ?>" class="mt-4">
                                     <ul class="pagination justify-content-center">
                                         <?php if ($pagina > 1): ?>
                                         <li class="page-item">

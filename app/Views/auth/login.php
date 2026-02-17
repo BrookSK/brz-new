@@ -7,14 +7,14 @@
                 <div class="card-body p-5">
                     <div class="text-center mb-4">
                         <i class="fas fa-globe-americas fa-3x text-primary mb-3"></i>
-                        <h3 class="mb-0">Bem-vindo de Volta</h3>
-                        <p class="text-muted">Faça login para acessar sua conta</p>
+                        <h3 class="mb-0"><?= __('auth.welcome_back', 'Bem-vindo de Volta') ?></h3>
+                        <p class="text-muted"><?= __('auth.login_subtitle', 'Faça login para acessar sua conta') ?></p>
                     </div>
                     
                     <form method="POST" action="/login" id="loginForm">
                         <input type="hidden" name="redirect" value="<?= htmlspecialchars((string) ($_GET['redirect'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="mb-3">
-                            <label for="email" class="form-label">E-mail</label>
+                            <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 <input type="email" class="form-control" id="email" name="email" 
@@ -23,7 +23,7 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="senha" class="form-label">Senha</label>
+                            <label for="senha" class="form-label"><?= __('auth.password', 'Senha') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                 <input type="password" class="form-control" id="senha" name="senha" 
@@ -37,30 +37,34 @@
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="lembrar" name="lembrar">
                             <label class="form-check-label" for="lembrar">
-                                Lembrar-me
+                                <?= __('auth.remember_me', 'Lembrar-me') ?>
                             </label>
                         </div>
 
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="consentimento_legal" name="consentimento_legal">
                             <label class="form-check-label" for="consentimento_legal">
-                                Li e aceito os <a href="/termos-uso" class="text-decoration-none">Termos de Uso</a> e <a href="/politica-privacidade" class="text-decoration-none">Política de Privacidade</a>
+                                <?php
+                                    $termsLink = '<a href="/termos-uso" class="text-decoration-none">' . __('auth.terms', 'Termos de Uso') . '</a>';
+                                    $privacyLink = '<a href="/politica-privacidade" class="text-decoration-none">' . __('auth.privacy', 'Política de Privacidade') . '</a>';
+                                    echo __('auth.legal_consent', 'Li e aceito os {terms} e {privacy}', ['terms' => $termsLink, 'privacy' => $privacyLink]);
+                                ?>
                             </label>
                         </div>
                         
                         <div class="d-grid mb-3">
                             <button type="submit" class="btn btn-primary btn-lg" id="loginBtn">
-                                <i class="fas fa-sign-in-alt me-2"></i> Entrar
+                                <i class="fas fa-sign-in-alt me-2"></i> <?= __('auth.login', 'Entrar') ?>
                             </button>
                         </div>
                         
                         <div class="text-center">
                             <p class="mb-0">
-                                Não tem uma conta? 
-                                <a href="/register" class="text-decoration-none">Cadastre-se</a>
+                                <?= __('auth.no_account', 'Não tem uma conta?') ?>
+                                <a href="/register" class="text-decoration-none"><?= __('auth.sign_up', 'Cadastre-se') ?></a>
                             </p>
                             <small class="text-muted">
-                                <a href="/recuperar-senha" class="text-decoration-none">Esqueceu a senha?</a>
+                                <a href="/recuperar-senha" class="text-decoration-none"><?= __('auth.forgot_password', 'Esqueceu a senha?') ?></a>
                             </small>
                         </div>
                     </form>
@@ -71,10 +75,10 @@
             <div class="card shadow-lg mt-4">
                 <div class="card-body p-4">
                     <div class="text-center">
-                        <h5 class="mb-3">Acesso Administrativo</h5>
-                        <p class="text-muted small">Acesso restrito para administradores</p>
+                        <h5 class="mb-3"><?= __('auth.admin_access', 'Acesso Administrativo') ?></h5>
+                        <p class="text-muted small"><?= __('auth.admin_access_subtitle', 'Acesso restrito para administradores') ?></p>
                         <button class="btn btn-outline-secondary btn-sm" onclick="toggleAdminLogin()">
-                            <i class="fas fa-user-shield me-2"></i> Login Admin
+                            <i class="fas fa-user-shield me-2"></i> <?= __('auth.admin_login', 'Login Admin') ?>
                         </button>
                     </div>
                     
@@ -82,18 +86,18 @@
                         <form method="POST" action="/login">
                             <input type="hidden" name="admin_login" value="1">
                             <div class="mb-3">
-                                <label class="form-label">E-mail Admin</label>
+                                <label class="form-label"><?= __('auth.admin_email', 'E-mail Admin') ?></label>
                                 <input type="email" class="form-control" name="email" 
                                        value="admin@onsolutions.com" required>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Senha</label>
+                                <label class="form-label"><?= __('auth.password', 'Senha') ?></label>
                                 <input type="password" class="form-control" name="senha" 
                                        placeholder="••••••••" required>
                             </div>
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-dark">
-                                    <i class="fas fa-shield-alt me-2"></i> Entrar como Admin
+                                    <i class="fas fa-shield-alt me-2"></i> <?= __('auth.login_as_admin', 'Entrar como Admin') ?>
                                 </button>
                             </div>
                         </form>
@@ -106,6 +110,12 @@
 
 <script>
 $(document).ready(function() {
+    const I18N = {
+        logging_in: <?= json_encode(__('auth.logging_in', 'Entrando...'), JSON_UNESCAPED_UNICODE) ?>,
+        error_login: <?= json_encode(__('auth.error_login', 'Erro ao fazer login'), JSON_UNESCAPED_UNICODE) ?>,
+        error_connection: <?= json_encode(__('auth.error_connection', 'Erro de conexão. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>
+    };
+
     // Toggle password visibility
     $('#togglePassword').click(function() {
         const senhaField = $('#senha');
@@ -127,7 +137,7 @@ $(document).ready(function() {
         const btn = $('#loginBtn');
         const originalText = btn.html();
         
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Entrando...');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> ' + I18N.logging_in);
         
         $.ajax({
             url: '/login',
@@ -138,11 +148,11 @@ $(document).ready(function() {
                 if (response.success) {
                     window.location.href = response.redirect || '/minha-conta';
                 } else {
-                    showAlert('danger', response.error || 'Erro ao fazer login');
+                    showAlert('danger', response.error || I18N.error_login);
                 }
             },
             error: function() {
-                showAlert('danger', 'Erro de conexão. Tente novamente.');
+                showAlert('danger', I18N.error_connection);
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);

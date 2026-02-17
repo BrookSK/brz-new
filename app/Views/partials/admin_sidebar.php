@@ -17,10 +17,10 @@ function renderAdminSidebar($activePage = '') {
 
     if ($perfil === 'representante') {
         $menuItems = [
-            'rep_produtos' => ['icon' => 'fa-box', 'label' => 'Produtos', 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
+            'rep_produtos' => ['icon' => 'fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/representante/produtos', 'roles' => ['representante']],
         ];
 
-        echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">
+        echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
                 <i class="fas fa-bars"></i>
               </button>';
 
@@ -28,7 +28,7 @@ function renderAdminSidebar($activePage = '') {
             <div class="position-sticky pt-3">
                 <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/representante/produtos">
                     <div class="sidebar-brand-icon"><i class="fas fa-user-tie"></i></div>
-                    <div class="sidebar-brand-text mx-3">Representante</div>
+                    <div class="sidebar-brand-text mx-3">' . htmlspecialchars(__('admin.role.representative', 'Representante'), ENT_QUOTES, 'UTF-8') . '</div>
                 </a>
                 <ul class="nav flex-column">';
 
@@ -47,13 +47,13 @@ function renderAdminSidebar($activePage = '') {
                 <div class="nav-item">
                     <a class="nav-link" href="/">
                         <i class="fas fa-fw fa-home"></i>
-                        <span>Voltar ao Site</span>
+                        <span>' . htmlspecialchars(__('admin.back_to_site', 'Voltar ao Site'), ENT_QUOTES, 'UTF-8') . '</span>
                     </a>
                 </div>
                 <div class="nav-item">
                     <a class="nav-link" href="/logout">
                         <i class="fas fa-fw fa-sign-out-alt"></i>
-                        <span>Sair</span>
+                        <span>' . htmlspecialchars(__('common.logout', 'Sair'), ENT_QUOTES, 'UTF-8') . '</span>
                     </a>
                 </div>
             </div>
@@ -63,27 +63,29 @@ function renderAdminSidebar($activePage = '') {
     }
 
     $menuItems = [
-        'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
-        'produtos' => ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
-        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => 'Variações', 'url' => '/admin/variacoes', 'roles' => ['admin','vendedor','suporte']],
-        'lojas' => ['icon' => 'fas fa-store', 'label' => 'Lojas', 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
-        'categorias' => ['icon' => 'fas fa-tags', 'label' => 'Categorias', 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
-        'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
-        'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Pedidos (WordPress)', 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
-        'tickets' => ['icon' => 'fas fa-life-ring', 'label' => 'Tickets', 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
-        'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => 'Minhas Comissões', 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
-        'estoque' => ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
-        'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
-        'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
-        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Remessa Internacional', 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
-        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Remessa Correios', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
-        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => 'Remessa ShipStation (UPS)', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
-        'usuarios' => ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
-        'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
-        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']]
+        'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.dashboard', 'Dashboard'), 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'produtos' => ['icon' => 'fas fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
+        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => __('admin.menu.variations', 'Variações'), 'url' => '/admin/variacoes', 'roles' => ['admin','vendedor','suporte']],
+        'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
+        'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.orders_audit', 'Pedidos para conferência'), 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
+        'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => __('admin.menu.orders_wp', 'Pedidos (WordPress)'), 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
+        'tickets' => ['icon' => 'fas fa-life-ring', 'label' => __('admin.menu.tickets', 'Tickets'), 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
+        'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => __('admin.menu.my_commissions', 'Minhas Comissões'), 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
+        'estoque' => ['icon' => 'fas fa-warehouse', 'label' => __('admin.menu.inventory', 'Estoque'), 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
+        'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => __('admin.menu.purchases', 'Compras'), 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
+        'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
+        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => __('admin.menu.international_shipment', 'Remessa Internacional'), 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
+        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => __('admin.menu.post_office_shipment', 'Remessa Correios'), 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
+        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => __('admin.menu.shipstation_shipment', 'Remessa ShipStation (UPS)'), 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
+        'usuarios' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.users', 'Usuários'), 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
+        'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
+        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']]
     ];
 
     $unreadTickets = 0;
+    $pendentesConferencia = 0;
     try {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -117,8 +119,26 @@ function renderAdminSidebar($activePage = '') {
         $unreadTickets = 0;
     }
 
+    try {
+        $pdo = \Config\Database::getConnection();
+        $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+        $stT->execute(['pedidos']);
+        $hasPedidos = ((int) ($stT->fetchColumn() ?: 0) > 0);
+        if ($hasPedidos) {
+            $stC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'pedidos' AND column_name = 'status_conferencia'");
+            $stC->execute();
+            $hasCol = ((int) ($stC->fetchColumn() ?: 0) > 0);
+            if ($hasCol) {
+                $stP = $pdo->query("SELECT COUNT(*) FROM pedidos WHERE status_conferencia = 'pendente'");
+                $pendentesConferencia = (int) ($stP ? ($stP->fetchColumn() ?: 0) : 0);
+            }
+        }
+    } catch (\Exception $e) {
+        $pendentesConferencia = 0;
+    }
+
     // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
-    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="Abrir menu">
+    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
             <i class="fas fa-bars"></i>
           </button>';
 
@@ -187,8 +207,8 @@ function renderAdminSidebar($activePage = '') {
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                 ' . (!empty($adminLogo)
-                    ? '<img src="' . htmlspecialchars($adminLogo, ENT_QUOTES, 'UTF-8') . '" alt="Admin" class="admin-sidebar-logo">'
-                    : '<div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div><div class="sidebar-brand-text mx-3">Braziliana Admin</div>'
+                    ? '<img src="' . htmlspecialchars($adminLogo, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars(__('admin.brand.alt', 'Admin'), ENT_QUOTES, 'UTF-8') . '" class="admin-sidebar-logo">'
+                    : '<div class="sidebar-brand-icon"><i class="fas fa-warehouse"></i></div><div class="sidebar-brand-text mx-3">' . htmlspecialchars(__('admin.brand.name', 'Braziliana Admin'), ENT_QUOTES, 'UTF-8') . '</div>'
                 ) . '
             </a>
             <ul class="nav flex-column">';
@@ -203,6 +223,9 @@ function renderAdminSidebar($activePage = '') {
                 if ($key === 'tickets' && $unreadTickets > 0) {
                     $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $unreadTickets . '</span>';
                 }
+                if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
+                    $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $pendentesConferencia . '</span>';
+                }
                 echo '<li class="nav-item">
                     <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
                         <i class="fas fa-fw ' . $item['icon'] . '"></i>
@@ -216,13 +239,13 @@ function renderAdminSidebar($activePage = '') {
             <div class="nav-item">
                 <a class="nav-link" href="/">
                     <i class="fas fa-fw fa-home"></i>
-                    <span>Voltar ao Site</span>
+                    <span>' . htmlspecialchars(__('admin.back_to_site', 'Voltar ao Site'), ENT_QUOTES, 'UTF-8') . '</span>
                 </a>
             </div>
             <div class="nav-item">
                 <a class="nav-link" href="/logout">
                     <i class="fas fa-fw fa-sign-out-alt"></i>
-                    <span>Sair</span>
+                    <span>' . htmlspecialchars(__('common.logout', 'Sair'), ENT_QUOTES, 'UTF-8') . '</span>
                 </a>
             </div>
         </div>
