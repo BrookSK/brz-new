@@ -63,25 +63,18 @@ function wpFormatMoney($v, $currency) {
                 <thead>
                     <tr>
                         <th><?= __('admin.orders.table.id', 'ID') ?></th>
+                        <th><?= __('admin.orders_wp.table.source', 'Origem') ?></th>
                         <th><?= __('admin.orders_wp.table.date', 'Data') ?></th>
                         <th><?= __('common.status', 'Status') ?></th>
                         <th><?= __('admin.orders_wp.table.customer', 'Cliente') ?></th>
                         <th><?= __('common.total', 'Total') ?></th>
                         <th class="text-end"><?= __('common.actions', 'Ações') ?></th>
-                        <th>ID</th>
-                        <th>Origem</th>
-                        <th>Data</th>
-                        <th>Status</th>
-                        <th>Cliente</th>
-                        <th>Total</th>
-                        <th class="text-end">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pedidos)): ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted"><?= __('admin.orders_wp.empty', 'Nenhum pedido encontrado.') ?></td>
-                            <td colspan="7" class="text-center text-muted">Nenhum pedido encontrado.</td>
+                            <td colspan="7" class="text-center text-muted"><?= __('admin.orders_wp.empty', 'Nenhum pedido encontrado.') ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pedidos as $p): ?>
@@ -114,10 +107,8 @@ function wpFormatMoney($v, $currency) {
                                 </td>
                                 <td class="fw-semibold text-primary"><?= htmlspecialchars(wpFormatMoney($totalV, $curr)) ?></td>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= $id ?>">
-                                        <i class="fas fa-eye"></i> <?= __('common.view', 'Ver') ?>
                                     <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= $id ?>?<?= http_build_query(['source' => $src]) ?>">
-                                        <i class="fas fa-eye"></i> Ver
+                                        <i class="fas fa-eye"></i> <?= __('common.view', 'Ver') ?>
                                     </a>
                                 </td>
                             </tr>
