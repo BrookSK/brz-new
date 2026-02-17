@@ -70,7 +70,10 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
                 <?= __('admin.orders_wp.details.download_wexpress_label', 'Baixar etiqueta W-Express') ?>
             </a>
         <?php else: ?>
-            <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></button>
+            <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">
+                <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true" id="wxSpinner"></span>
+                <span id="wxBtnText"><?= __('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express') ?></span>
+            </button>
         <?php endif; ?>
     </div>
 </div>
@@ -89,6 +92,8 @@ window.ADMIN_ORDERS_WP_DETAILS_I18N = {
 };
 
 window.ADMIN_ORDERS_WP_DETAILS_SOURCE = <?= json_encode($source, JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_DEFAULT_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express'), JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_LOADING_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generating_wexpress_label', 'Gerando...'), JSON_UNESCAPED_UNICODE) ?>;
 
 function gerarEtiquetaWexpressWp(orderId, source) {
     if (!orderId) {
@@ -99,9 +104,11 @@ function gerarEtiquetaWexpressWp(orderId, source) {
     if (!confirm((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.confirm_generate_label : 'Deseja gerar a etiqueta da W-Express para este pedido?')) return;
 
     var btn = document.getElementById('btnGerarEtiquetaWexpress');
-    if (btn) {
-        btn.disabled = true;
-    }
+    var sp = document.getElementById('wxSpinner');
+    var tx = document.getElementById('wxBtnText');
+    if (btn) btn.disabled = true;
+    if (sp) sp.classList.remove('d-none');
+    if (tx) tx.textContent = (window.ADMIN_ORDERS_WP_DETAILS_LOADING_BTN_TEXT || 'Gerando...');
 
     fetch('/admin/pedidos-wp/wexpress/gerar/' + orderId + '?source=' + encodeURIComponent(source), {
         method: 'POST',
@@ -142,9 +149,9 @@ function gerarEtiquetaWexpressWp(orderId, source) {
         alert(errPrefix + ' ' + (e && e.message ? e.message : String(e)));
     })
     .finally(() => {
-        if (btn) {
-            btn.disabled = false;
-        }
+        if (btn) btn.disabled = false;
+        if (sp) sp.classList.add('d-none');
+        if (tx) tx.textContent = (window.ADMIN_ORDERS_WP_DETAILS_DEFAULT_BTN_TEXT || 'Gerar etiqueta W-Express');
     });
 }
 </script>
