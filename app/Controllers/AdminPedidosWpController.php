@@ -521,7 +521,17 @@ class AdminPedidosWpController extends Controller {
         $params = [];
 
         if ($busca !== '') {
-            $where[] = "(CAST(p.ID AS CHAR) LIKE :busca OR p.post_title LIKE :busca OR pm_mail.meta_value LIKE :busca OR CONCAT(COALESCE(pm_fn.meta_value,''),' ',COALESCE(pm_ln.meta_value,'')) LIKE :busca)";
+            $where[] = "(CAST(p.ID AS CHAR) LIKE :busca
+                OR p.post_title LIKE :busca
+                OR pm_mail.meta_value LIKE :busca
+                OR CONCAT(COALESCE(pm_fn.meta_value,''),' ',COALESCE(pm_ln.meta_value,'')) LIKE :busca
+                OR EXISTS (
+                    SELECT 1 FROM {$prefix}postmeta pmn
+                    WHERE pmn.post_id = p.ID
+                      AND pmn.meta_key IN ('_order_number','_order_number_formatted','_order_number_full','_order_number_display','_wc_order_number','order_number')
+                      AND CAST(pmn.meta_value AS CHAR) LIKE :busca
+                )
+            )";
             $params[':busca'] = '%' . $busca . '%';
         }
 

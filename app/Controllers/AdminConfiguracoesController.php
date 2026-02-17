@@ -57,24 +57,35 @@ class AdminConfiguracoesController extends Controller {
                 $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
                 foreach ($configuracoes as $c) {
-                    $fullKey = '';
+                    $valor = $c['valor'] ?? '';
+
+                    $categoria = '';
+                    $chave = '';
+
                     if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
-                        $cat = (string) ($c['categoria'] ?? '');
-                        $k = (string) ($c['chave'] ?? '');
-                        $fullKey = ($cat !== '' && $k !== '') ? ($cat . '_' . $k) : '';
+                        $categoria = (string) ($c['categoria'] ?? '');
+                        $chave = (string) ($c['chave'] ?? '');
                     } else {
                         $fullKey = (string) ($c['chave'] ?? '');
+                        if ($fullKey === '') {
+                            continue;
+                        }
+
+                        if (preg_match('/^(wordpress|woocommerce)_(br|red|us)_(.+)$/', $fullKey, $m)) {
+                            $categoria = $m[1] . '_' . $m[2];
+                            $chave = $m[3];
+                        } elseif (strpos($fullKey, '_') !== false) {
+                            [$categoria, $chave] = explode('_', $fullKey, 2);
+                        } else {
+                            $categoria = 'geral';
+                            $chave = $fullKey;
+                        }
                     }
 
-                    $valor = $c['valor'] ?? '';
-                    if ($fullKey === '') {
+                    $categoria = trim($categoria);
+                    $chave = trim($chave);
+                    if ($categoria === '' || $chave === '') {
                         continue;
-                    }
-                    if (strpos($fullKey, '_') !== false) {
-                        [$categoria, $chave] = explode('_', $fullKey, 2);
-                    } else {
-                        $categoria = 'geral';
-                        $chave = $fullKey;
                     }
                     if (!isset($config[$categoria])) {
                         $config[$categoria] = [];
@@ -6072,13 +6083,52 @@ HTML;
     private function getConfigTableInfo(\PDO $pdo): array {
         $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
         $table = null;
+        $cols = [];
+        $types = [];
+
+        $bestScore = -1;
         foreach ($tableCandidates as $t) {
             try {
                 $stmtTable = $pdo->prepare("SHOW TABLES LIKE ?");
                 $stmtTable->execute([$t]);
-                if ($stmtTable->fetchColumn()) {
+                if (!$stmtTable->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtD = $pdo->query('DESCRIBE ' . $t);
+                $describeRowsT = $stmtD ? ($stmtD->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                $colsT = [];
+                $typesT = [];
+                foreach ($describeRowsT as $r) {
+                    $field = (string) ($r['Field'] ?? '');
+                    if ($field === '') continue;
+                    $colsT[] = $field;
+                    $typesT[$field] = strtolower((string) ($r['Type'] ?? ''));
+                }
+
+                $hasCategoria = in_array('categoria', $colsT, true);
+                $hasChave = in_array('chave', $colsT, true);
+                $hasValor = in_array('valor', $colsT, true) || in_array('value', $colsT, true) || in_array('conteudo', $colsT, true) || in_array('content', $colsT, true) || in_array('config_value', $colsT, true);
+
+                $hasKey = false;
+                foreach (['chave','key','nome','config_key','configuracao','slug','parametro'] as $kc) {
+                    if (in_array($kc, $colsT, true)) { $hasKey = true; break; }
+                }
+
+                $score = 0;
+                if ($hasCategoria && $hasChave && $hasValor) {
+                    $score = 3;
+                } elseif ($hasKey && $hasValor) {
+                    $score = 2;
+                } elseif (in_array('id', $colsT, true)) {
+                    $score = 1;
+                }
+
+                if ($score > $bestScore) {
+                    $bestScore = $score;
                     $table = $t;
-                    break;
+                    $cols = $colsT;
+                    $types = $typesT;
                 }
             } catch (\Exception $e) {
             }
@@ -6086,19 +6136,6 @@ HTML;
 
         if (!$table) {
             throw new \Exception('Tabela de configurações não encontrada');
-        }
-
-        $stmt = $pdo->query('DESCRIBE ' . $table);
-        $describeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        $cols = [];
-        $types = [];
-        foreach ($describeRows as $r) {
-            $field = (string) ($r['Field'] ?? '');
-            if ($field === '') {
-                continue;
-            }
-            $cols[] = $field;
-            $types[$field] = strtolower((string) ($r['Type'] ?? ''));
         }
 
         $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'];
