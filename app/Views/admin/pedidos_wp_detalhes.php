@@ -245,7 +245,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                 <div><strong><?= __('common.date', 'Data') ?>:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($pedido['post_date'] ?? $pedido['created_at'] ?? 'now')))) ?></div>
                 <div><strong><?= __('common.total', 'Total') ?>:</strong> <?= htmlspecialchars(wpFormatMoney2($total, $currency)) ?></div>
                 <?php if ($source === 'red' && isset($declaracaoTotal) && is_numeric($declaracaoTotal) && (float) $declaracaoTotal > 0): ?>
-                    <div><strong>Declaração:</strong> <?= htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, $currency)) ?></div>
+                    <div><strong>Declaração:</strong> <?= htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, 'USD')) ?></div>
                 <?php endif; ?>
                 <div><strong><?= __('admin.orders_wp.details.currency', 'Moeda') ?>:</strong> <?= htmlspecialchars($currency ?: '-') ?></div>
             </div>
@@ -317,12 +317,12 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                                         <td><?= (int) ($it['quantidade'] ?? 0) ?></td>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['preco_unitario'] ?? 0), $currency)) ?></td>
                                         <?php if ($source === 'red'): ?>
-                                            <td><?= ($it['declaracao_unitario'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_unitario'] ?? 0), $currency)) : '-' ?></td>
+                                            <td><?= ($it['declaracao_unitario'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_unitario'] ?? 0), 'USD')) : '-' ?></td>
                                         <?php endif; ?>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['subtotal'] ?? 0), $currency)) ?></td>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['total'] ?? 0), $currency)) ?></td>
                                         <?php if ($source === 'red'): ?>
-                                            <td><?= ($it['declaracao_total'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_total'] ?? 0), $currency)) : '-' ?></td>
+                                            <td><?= ($it['declaracao_total'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_total'] ?? 0), 'USD')) : '-' ?></td>
                                         <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>

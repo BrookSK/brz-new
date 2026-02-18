@@ -978,16 +978,19 @@ class AdminPedidosWpController extends Controller {
                 $unit = $qtd > 0 ? round($lineTotal / $qtd, 2) : 0.0;
                 if ($unit <= 0) $unit = 1.0;
 
+                $declaredUnitUsed = false;
+
                 if ($source === 'red') {
                     $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
                     if ($declaredUnit !== null && $declaredUnit > 0) {
                         $hasDeclaredItems = true;
                         $declaredItemsTotal += ($declaredUnit * $qtd);
                         $unit = $declaredUnit;
+                        $declaredUnitUsed = true;
                     }
                 }
 
-                if ($currency === 'BRL') {
+                if ($currency === 'BRL' && !($source === 'red' && $declaredUnitUsed)) {
                     $unit = $unit * $brlToUsd;
                 }
 
@@ -1080,7 +1083,7 @@ class AdminPedidosWpController extends Controller {
 
             $declared = $hasDeclaredItems ? (float) $declaredItemsTotal : (is_numeric($meta['_order_total'] ?? null) ? (float) $meta['_order_total'] : 0.0);
             if ($declared <= 0) $declared = 1.0;
-            if ($currency === 'BRL') {
+            if ($currency === 'BRL' && !($source === 'red' && $hasDeclaredItems)) {
                 $declared = $declared * $brlToUsd;
             }
 
