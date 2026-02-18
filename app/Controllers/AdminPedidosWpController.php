@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Services\CorreiosCepService;
 use App\Services\WExpressService;
 use App\Services\WooCommerceService;
 use Config\Database;
@@ -16,7 +17,7 @@ class AdminPedidosWpController extends Controller {
         $auth->requerPerfil('admin');
 
         $viewParam = strtolower(trim((string) ($request->getParam('view') ?? 'stats')));
-        $view = in_array($viewParam, ['stats', 'missing'], true) ? $viewParam : 'stats';
+        $view = in_array($viewParam, ['stats', 'missing', 'autofill'], true) ? $viewParam : 'stats';
 
         $missingFieldParam = strtolower(trim((string) ($request->getParam('missing_field') ?? 'any')));
         $missingField = in_array($missingFieldParam, ['any', 'uf', 'cidade', 'bairro'], true) ? $missingFieldParam : 'any';
@@ -28,6 +29,7 @@ class AdminPedidosWpController extends Controller {
         $endRaw = trim((string) ($request->getParam('end') ?? ''));
         $statusRaw = trim((string) ($request->getParam('status') ?? ''));
         $hideEmpty = (string) ($request->getParam('hide_empty') ?? '') === '1';
+        $useBairroAutofill = (string) ($request->getParam('use_bairro_autofill') ?? '1') === '1';
         $top = (int) ($request->getParam('top') ?? 20);
         if ($top <= 0) $top = 20;
         if ($top > 200) $top = 200;
@@ -69,13 +71,20 @@ class AdminPedidosWpController extends Controller {
         ];
         $missingOrders = [];
         $missingTotal = 0;
+        $autofillOrders = [];
+        $autofillTotal = 0;
         $erro = '';
 
         try {
             $localPdo = Database::getConnection();
 
             $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
-            if ($view === 'missing') {
+            if ($view === 'autofill') {
+                $res = $this->fetchAutofilledOrders($localPdo, $source, $start, $end, $statusList, $limite, $offset);
+                $autofillOrders = $res['rows'] ?? [];
+                if (!is_array($autofillOrders)) $autofillOrders = [];
+                $autofillTotal = (int) ($res['total'] ?? 0);
+            } elseif ($view === 'missing') {
                 if ($source === 'all') {
                     $target = $page * $limite;
                     $merged = [];
@@ -118,7 +127,7 @@ class AdminPedidosWpController extends Controller {
                     $prefix = $wp['prefix'];
                     $wpPdo = $wp['pdo'];
 
-                    $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty);
+                    $partial = $this->fetchWpShippingStats($localPdo, $src, $wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty, $useBairroAutofill);
 
                     $stats['total'] += (int) ($partial['total'] ?? 0);
                     $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
@@ -148,6 +157,297 @@ class AdminPedidosWpController extends Controller {
         include __DIR__ . '/../Views/admin/pedidos_wp_estatisticas.php';
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    public function autofillBairro(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
+
+        $startRaw = trim((string) ($request->getParam('start') ?? ''));
+        $endRaw = trim((string) ($request->getParam('end') ?? ''));
+        $statusRaw = trim((string) ($request->getParam('status') ?? ''));
+        $limit = (int) ($request->getParam('limit') ?? 50);
+        if ($limit <= 0) $limit = 50;
+        if ($limit > 200) $limit = 200;
+
+        $start = null;
+        $end = null;
+        if ($startRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $startRaw)) {
+            $start = $startRaw . ' 00:00:00';
+        }
+        if ($endRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $endRaw)) {
+            $end = $endRaw . ' 23:59:59';
+        }
+
+        $statusList = [];
+        if ($statusRaw !== '') {
+            $parts = preg_split('/\s*,\s*/', $statusRaw) ?: [];
+            foreach ($parts as $p) {
+                $p = strtolower(trim((string) $p));
+                if ($p === '') continue;
+                if (!preg_match('/^(wc-[a-z0-9_-]+|[a-z0-9_-]+)$/', $p)) continue;
+                $statusList[] = $p;
+            }
+            $statusList = array_values(array_unique($statusList));
+        }
+
+        try {
+            $localPdo = Database::getConnection();
+            $trackingCfg = $this->getCorreiosTrackingConfig($localPdo);
+            $svc = new CorreiosCepService();
+
+            $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
+            $processed = 0;
+            $filled = 0;
+            $skipped = 0;
+            $errors = 0;
+
+            foreach ($sourcesToRun as $src) {
+                $rows = $this->fetchWpNeighborhoodMissingWithCep($localPdo, $src, $start, $end, $statusList, $limit);
+                foreach ($rows as $r) {
+                    $processed++;
+                    $wpId = (int) ($r['id'] ?? 0);
+                    $cep = (string) ($r['ship_postcode'] ?? '');
+                    $old = (string) ($r['ship_neighborhood'] ?? '');
+                    $created = (string) ($r['created_at'] ?? '');
+                    $st = (string) ($r['status'] ?? '');
+
+                    if ($wpId <= 0 || $cep === '') {
+                        $skipped++;
+                        continue;
+                    }
+
+                    if ($this->hasAutofillRecord($localPdo, $src, $wpId, 'bairro')) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $req = ['cep' => $cep];
+                    $resp = $svc->consultarPorCep($cep, $trackingCfg);
+                    if (!is_array($resp) || empty($resp['success'])) {
+                        $errors++;
+                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, (string) ($resp['error'] ?? 'Erro ao consultar CEP'));
+                        continue;
+                    }
+
+                    $bairro = trim((string) ($resp['bairro'] ?? ''));
+                    if ($bairro === '') {
+                        $skipped++;
+                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, 'CEP consultado mas bairro não encontrado');
+                        continue;
+                    }
+
+                    $filled++;
+                    $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, $bairro, $cep, $created, $st, $req, $resp, null);
+                }
+            }
+
+            $this->json([
+                'success' => true,
+                'processed' => $processed,
+                'filled' => $filled,
+                'skipped' => $skipped,
+                'errors' => $errors,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function getCorreiosTrackingConfig(\PDO $pdo): array {
+        $cols = [];
+        try {
+            $st = $pdo->query('DESCRIBE configuracoes_sistema');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $token = '';
+        $baseUrl = '';
+
+        if (in_array('entrega_correios_tracking_token', $cols, true)) {
+            $st = $pdo->query('SELECT entrega_correios_tracking_token, entrega_correios_tracking_base_url FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
+            $token = (string) ($row['entrega_correios_tracking_token'] ?? '');
+            $baseUrl = (string) ($row['entrega_correios_tracking_base_url'] ?? '');
+        } elseif (in_array('correios_tracking_token', $cols, true)) {
+            $st = $pdo->query('SELECT correios_tracking_token, correios_tracking_base_url FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
+            $token = (string) ($row['correios_tracking_token'] ?? '');
+            $baseUrl = (string) ($row['correios_tracking_base_url'] ?? '');
+        } else {
+            // fallback KV
+            try {
+                $stT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_tracking_token' LIMIT 1");
+                $stT->execute();
+                $token = (string) ($stT->fetchColumn() ?: '');
+            } catch (\Exception $e) {
+            }
+            try {
+                $stB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_tracking_base_url' LIMIT 1");
+                $stB->execute();
+                $baseUrl = (string) ($stB->fetchColumn() ?: '');
+            } catch (\Exception $e) {
+            }
+        }
+
+        $baseUrl = trim($baseUrl);
+        if ($baseUrl === '') {
+            // base do serviço CEP (produção). Homologação pode ser ajustada se necessário.
+            $baseUrl = 'https://api.correios.com.br/cep';
+        }
+
+        return ['base_url' => $baseUrl, 'token' => trim($token)];
+    }
+
+    private function fetchWpNeighborhoodMissingWithCep(\PDO $localPdo, string $source, ?string $start, ?string $end, array $statusList, int $limite): array {
+        $wp = $this->getWpPdo($localPdo, $source);
+        $prefix = $wp['prefix'];
+        $wpPdo = $wp['pdo'];
+
+        $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
+        $params = [];
+
+        if ($start !== null) {
+            $where[] = 'p.post_date >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'p.post_date <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'p.post_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $limite = (int) $limite;
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 2000) $limite = 2000;
+
+        $metaSql = "
+            SELECT
+                post_id,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_postcode','shipping_postcode') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_postcode','billing_postcode') THEN meta_value END), ''))
+                ) AS ship_postcode,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name') THEN meta_value END), ''))
+                ) AS ship_neighborhood
+            FROM {$prefix}postmeta
+            WHERE meta_key IN (
+                '_shipping_postcode','shipping_postcode','_billing_postcode','billing_postcode',
+                '_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
+                '_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
+            )
+            GROUP BY post_id
+        ";
+
+        $sql = "SELECT
+            p.ID AS id,
+            p.post_date AS created_at,
+            p.post_status AS status,
+            COALESCE(TRIM(sm.ship_postcode), '') AS ship_postcode,
+            COALESCE(TRIM(sm.ship_neighborhood), '') AS ship_neighborhood
+        FROM {$prefix}posts p
+        LEFT JOIN ({$metaSql}) sm ON sm.post_id = p.ID
+        WHERE " . implode(' AND ', $where) . "
+          AND COALESCE(TRIM(sm.ship_neighborhood), '') = ''
+          AND COALESCE(TRIM(sm.ship_postcode), '') <> ''
+        ORDER BY p.post_date DESC
+        LIMIT {$limite}";
+
+        $st = $wpPdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function hasAutofillRecord(\PDO $pdo, string $source, int $wpOrderId, string $fieldName): bool {
+        $st = $pdo->prepare('SELECT id FROM wp_pedido_endereco_autofill WHERE source = ? AND wp_order_id = ? AND field_name = ? LIMIT 1');
+        $st->execute([(string) $source, (int) $wpOrderId, (string) $fieldName]);
+        return (bool) $st->fetchColumn();
+    }
+
+    private function saveAutofillRecord(\PDO $pdo, string $source, int $wpOrderId, string $fieldName, ?string $oldValue, ?string $newValue, ?string $cep, ?string $wpCreatedAt, ?string $wpStatus, $requestJson, $responseJson, ?string $error): void {
+        $st = $pdo->prepare(
+            'INSERT INTO wp_pedido_endereco_autofill (source, wp_order_id, field_name, old_value, new_value, cep, wp_created_at, wp_status, request_json, response_json, error)\n'
+            . 'VALUES (?,?,?,?,?,?,?,?,?,?,?)\n'
+            . 'ON DUPLICATE KEY UPDATE old_value = VALUES(old_value), new_value = VALUES(new_value), cep = VALUES(cep), wp_created_at = VALUES(wp_created_at), wp_status = VALUES(wp_status), request_json = VALUES(request_json), response_json = VALUES(response_json), error = VALUES(error)'
+        );
+        $st->execute([
+            (string) $source,
+            (int) $wpOrderId,
+            (string) $fieldName,
+            $oldValue !== null ? (string) $oldValue : null,
+            $newValue !== null ? (string) $newValue : null,
+            $cep !== null ? (string) $cep : null,
+            $wpCreatedAt !== null && trim((string) $wpCreatedAt) !== '' ? (string) $wpCreatedAt : null,
+            $wpStatus !== null ? (string) $wpStatus : null,
+            $requestJson !== null ? json_encode($requestJson, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            $responseJson !== null ? json_encode($responseJson, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            $error !== null ? (string) $error : null,
+        ]);
+    }
+
+    private function fetchAutofilledOrders(\PDO $localPdo, string $source, ?string $start, ?string $end, array $statusList, int $limite, int $offset): array {
+        $where = ['field_name = :field'];
+        $params = [':field' => 'bairro'];
+
+        if ($source !== 'all') {
+            $where[] = 'source = :source';
+            $params[':source'] = $source;
+        }
+        if ($start !== null) {
+            $where[] = 'wp_created_at >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'wp_created_at <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'wp_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $limite = (int) $limite;
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 200) $limite = 200;
+        $offset = (int) $offset;
+        if ($offset < 0) $offset = 0;
+
+        $base = 'FROM wp_pedido_endereco_autofill WHERE ' . implode(' AND ', $where);
+        $sql = 'SELECT id, source, wp_order_id, field_name, old_value, new_value, cep, wp_created_at, wp_status, error, created_at ' . $base . ' ORDER BY created_at DESC LIMIT ' . $limite . ' OFFSET ' . $offset;
+        $st = $localPdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $stC = $localPdo->prepare('SELECT COUNT(*) ' . $base);
+        foreach ($params as $k => $v) $stC->bindValue($k, $v);
+        $stC->execute();
+        $total = (int) ($stC->fetchColumn() ?: 0);
+
+        return ['rows' => $rows, 'total' => $total];
     }
 
     private function fetchWpMissingOrders(\PDO $localPdo, string $source, ?string $start, ?string $end, array $statusList, string $missingField, int $limite, int $offset): array {
@@ -835,7 +1135,7 @@ class AdminPedidosWpController extends Controller {
         return ['rows' => $rows, 'total' => $total];
     }
 
-    private function fetchWpShippingStats(\PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top, array $statusList, bool $hideEmpty): array {
+    private function fetchWpShippingStats(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top, array $statusList, bool $hideEmpty, bool $useBairroAutofill): array {
         $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
         $params = [];
 
@@ -927,6 +1227,33 @@ class AdminPedidosWpController extends Controller {
         $stC->execute();
         $rowsCidade = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+        if ($useBairroAutofill) {
+            $rowsBairro = $this->fetchWpBairroRowsWithAutofill($localPdo, $source, $wpPdo, $baseFrom, $params, $start, $end, $statusList, $top);
+        } else {
+            $sqlBairro = "
+                SELECT
+                    TRIM(COALESCE(sm.ship_neighborhood, '')) AS label,
+                    COUNT(*) AS total
+                {$baseFrom}
+                GROUP BY TRIM(COALESCE(sm.ship_neighborhood, ''))
+                ORDER BY total DESC
+                LIMIT " . (int) max(1, min(2000, $top * 20));
+            $stB = $wpPdo->prepare($sqlBairro);
+            foreach ($params as $k => $v) $stB->bindValue($k, $v);
+            $stB->execute();
+            $rowsBairro = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        return [
+            'total' => $total,
+            'sp_capital_total' => $spCapitalTotal,
+            'por_uf' => $this->rowsToStatsList($rowsUf, $total, $hideEmpty),
+            'por_cidade' => $this->rowsToStatsList($rowsCidade, $total, $hideEmpty),
+            'por_bairro' => $this->rowsToStatsList($rowsBairro, $total, $hideEmpty),
+        ];
+    }
+
+    private function fetchWpBairroRowsWithAutofill(\PDO $localPdo, string $source, \PDO $wpPdo, string $baseFrom, array $params, ?string $start, ?string $end, array $statusList, int $top): array {
         $sqlBairro = "
             SELECT
                 TRIM(COALESCE(sm.ship_neighborhood, '')) AS label,
@@ -938,15 +1265,87 @@ class AdminPedidosWpController extends Controller {
         $stB = $wpPdo->prepare($sqlBairro);
         foreach ($params as $k => $v) $stB->bindValue($k, $v);
         $stB->execute();
-        $rowsBairro = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $rowsWp = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        return [
-            'total' => $total,
-            'sp_capital_total' => $spCapitalTotal,
-            'por_uf' => $this->rowsToStatsList($rowsUf, $total, $hideEmpty),
-            'por_cidade' => $this->rowsToStatsList($rowsCidade, $total, $hideEmpty),
-            'por_bairro' => $this->rowsToStatsList($rowsBairro, $total, $hideEmpty),
-        ];
+        $map = [];
+        foreach ($rowsWp as $r) {
+            if (!is_array($r)) continue;
+            $label = trim((string) ($r['label'] ?? ''));
+            $count = (int) ($r['total'] ?? 0);
+            $map[$label] = ($map[$label] ?? 0) + $count;
+        }
+
+        $autofill = $this->fetchAutofillBairroCounts($localPdo, $source, $start, $end, $statusList);
+        $filledTotal = 0;
+        foreach ($autofill as $bairro => $count) {
+            if ($bairro === '' || $count <= 0) continue;
+            $filledTotal += $count;
+            $map[$bairro] = (int) ($map[$bairro] ?? 0) + (int) $count;
+        }
+
+        if ($filledTotal > 0) {
+            $emptyKey = '';
+            $emptyCount = (int) ($map[$emptyKey] ?? 0);
+            if ($emptyCount > 0) {
+                $map[$emptyKey] = max(0, $emptyCount - $filledTotal);
+            }
+        }
+
+        $out = [];
+        foreach ($map as $label => $count) {
+            $out[] = ['label' => (string) $label, 'total' => (int) $count];
+        }
+        usort($out, function ($a, $b) {
+            $ta = (int) (is_array($a) ? ($a['total'] ?? 0) : 0);
+            $tb = (int) (is_array($b) ? ($b['total'] ?? 0) : 0);
+            if ($ta === $tb) return 0;
+            return $ta > $tb ? -1 : 1;
+        });
+        return $out;
+    }
+
+    private function fetchAutofillBairroCounts(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): array {
+        $where = ['source = :source', 'field_name = :field', "COALESCE(TRIM(new_value), '') <> ''"];
+        $params = [':source' => $source, ':field' => 'bairro'];
+
+        if ($start !== null) {
+            $where[] = 'wp_created_at >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'wp_created_at <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'wp_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $sql = 'SELECT TRIM(new_value) AS label, COUNT(DISTINCT wp_order_id) AS total'
+            . ' FROM wp_pedido_endereco_autofill'
+            . ' WHERE ' . implode(' AND ', $where)
+            . ' GROUP BY TRIM(new_value)';
+
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $label = trim((string) ($r['label'] ?? ''));
+            $count = (int) ($r['total'] ?? 0);
+            if ($label === '' || $count <= 0) continue;
+            $out[$label] = ($out[$label] ?? 0) + $count;
+        }
+        return $out;
     }
 
     private function rowsToStatsList(array $rows, int $total, bool $hideEmpty): array {

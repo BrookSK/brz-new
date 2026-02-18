@@ -2,7 +2,7 @@
 $stats = is_array($stats ?? null) ? $stats : ['total' => 0, 'sp_capital_total' => 0, 'por_uf' => [], 'por_cidade' => [], 'por_bairro' => []];
 
 $view = strtolower(trim((string) ($view ?? ($_GET['view'] ?? 'stats'))));
-if (!in_array($view, ['stats', 'missing'], true)) $view = 'stats';
+if (!in_array($view, ['stats', 'missing', 'autofill'], true)) $view = 'stats';
 
 $page = (int) ($page ?? ($_GET['page'] ?? 1));
 if ($page <= 0) $page = 1;
@@ -14,6 +14,11 @@ $missingOrders = is_array($missingOrders ?? null) ? $missingOrders : [];
 $missingTotal = (int) ($missingTotal ?? 0);
 $missingPages = $limite > 0 ? (int) ceil($missingTotal / $limite) : 1;
 if ($missingPages <= 0) $missingPages = 1;
+
+$autofillOrders = is_array($autofillOrders ?? null) ? $autofillOrders : [];
+$autofillTotal = (int) ($autofillTotal ?? 0);
+$autofillPages = $limite > 0 ? (int) ceil($autofillTotal / $limite) : 1;
+if ($autofillPages <= 0) $autofillPages = 1;
 $erro = (string) ($erro ?? '');
 
 $source = strtolower(trim((string) ($source ?? ($_GET['source'] ?? 'br'))));
@@ -24,6 +29,7 @@ $start = trim((string) ($startRaw ?? ($_GET['start'] ?? '')));
 $end = trim((string) ($endRaw ?? ($_GET['end'] ?? '')));
 $status = trim((string) ($statusRaw ?? ($_GET['status'] ?? '')));
 $hideEmpty = (string) ($hideEmpty ?? ($_GET['hide_empty'] ?? '')) === '1';
+$useBairroAutofill = (string) ($useBairroAutofill ?? ($_GET['use_bairro_autofill'] ?? '1')) === '1';
 $missingField = strtolower(trim((string) ($missingField ?? ($_GET['missing_field'] ?? 'any'))));
 if (!in_array($missingField, ['any', 'uf', 'cidade', 'bairro'], true)) $missingField = 'any';
 $top = (int) ($top ?? ($_GET['top'] ?? 20));
@@ -97,6 +103,7 @@ $tabParams = $_GET;
 unset($tabParams['view'], $tabParams['page']);
 $urlStats = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge($tabParams, ['view' => 'stats']));
 $urlMissing = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge($tabParams, ['view' => 'missing']));
+$urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge($tabParams, ['view' => 'autofill']));
 ?>
 
 <ul class="nav nav-tabs mb-3">
@@ -105,6 +112,9 @@ $urlMissing = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge($
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $view === 'missing' ? 'active' : '' ?>" href="<?= htmlspecialchars($urlMissing) ?>">Pedidos com campos vazios<?= $missingTotal > 0 ? ' (' . (int) $missingTotal . ')' : '' ?></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $view === 'autofill' ? 'active' : '' ?>" href="<?= htmlspecialchars($urlAutofill) ?>">Pedidos preenchidos automaticamente<?= $autofillTotal > 0 ? ' (' . (int) $autofillTotal . ')' : '' ?></a>
     </li>
 </ul>
 
@@ -171,11 +181,127 @@ $urlMissing = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge($
         </div>
     </div>
 
+    <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="useBairroAutofill" name="use_bairro_autofill" <?= $useBairroAutofill ? 'checked' : '' ?>>
+            <label class="form-check-label" for="useBairroAutofill">
+                Usar bairro auto-preenchido (CEP)
+            </label>
+        </div>
+    </div>
+
     <div class="col-md-12">
         <button type="submit" class="btn btn-outline-primary"><i class="fas fa-filter"></i> Filtrar</button>
         <a href="/admin/pedidos-wp/estatisticas" class="btn btn-outline-secondary">Limpar</a>
     </div>
 </form>
+
+<?php if ($view === 'autofill'): ?>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <?php
+        $p = $_GET;
+        $p['view'] = 'autofill';
+        $postUrl = '/admin/pedidos-wp/autofill-bairro?' . http_build_query($p);
+        ?>
+        <button type="button" class="btn btn-sm btn-outline-success" onclick="autofillBairro()">
+            <i class="fas fa-magic"></i> Preencher bairro (interno) via CEP
+        </button>
+        <span class="text-muted small align-self-center">Não altera nada no WordPress. Apenas grava o preenchimento no histórico interno.</span>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><strong>Histórico de preenchimento automático (bairro)</strong></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Origem</th>
+                            <th>Pedido WP</th>
+                            <th>Data pedido</th>
+                            <th>Status</th>
+                            <th>CEP</th>
+                            <th>Bairro (novo)</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($autofillOrders)): ?>
+                            <tr><td colspan="8" class="text-center text-muted">Nenhum preenchimento automático encontrado.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($autofillOrders as $r): ?>
+                                <?php
+                                $id = (int) ($r['id'] ?? 0);
+                                $src = strtolower(trim((string) ($r['source'] ?? 'br')));
+                                $wpId = (int) ($r['wp_order_id'] ?? 0);
+                                $created = (string) ($r['wp_created_at'] ?? '');
+                                $st = (string) ($r['wp_status'] ?? '');
+                                $cep = (string) ($r['cep'] ?? '');
+                                $new = (string) ($r['new_value'] ?? '');
+                                if (!in_array($src, ['br','red','us'], true)) $src = 'br';
+                                ?>
+                                <tr>
+                                    <td class="fw-semibold">#<?= (int) $id ?></td>
+                                    <td><span class="badge bg-dark"><?= htmlspecialchars(strtoupper($src)) ?></span></td>
+                                    <td class="fw-semibold">#<?= (int) $wpId ?></td>
+                                    <td><?= $created !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($created))) : '-' ?></td>
+                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($st) ?></span></td>
+                                    <td><?= htmlspecialchars($cep !== '' ? $cep : '-') ?></td>
+                                    <td><?= htmlspecialchars($new !== '' ? $new : '-') ?></td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= (int) $wpId ?>?<?= http_build_query(['source' => $src]) ?>">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if ($autofillPages > 1): ?>
+                <nav>
+                    <ul class="pagination justify-content-center mb-0">
+                        <?php
+                        $params = $_GET;
+                        for ($i = 1; $i <= $autofillPages; $i++):
+                            $params['page'] = $i;
+                            $url = '/admin/pedidos-wp/estatisticas?' . http_build_query($params);
+                            $active = ($i === (int) $page) ? 'active' : '';
+                        ?>
+                            <li class="page-item <?= $active ?>"><a class="page-link" href="<?= htmlspecialchars($url) ?>"><?= (int) $i ?></a></li>
+                        <?php endfor; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <script>
+        function autofillBairro() {
+            if (!confirm('Executar preenchimento interno de bairro via CEP para pedidos com bairro vazio?')) return;
+            const url = <?= json_encode($postUrl) ?>;
+            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        alert('Processados: ' + (data.processed ?? 0) + '\nPreenchidos: ' + (data.filled ?? 0) + '\nIgnorados: ' + (data.skipped ?? 0) + '\nErros: ' + (data.errors ?? 0));
+                        location.reload();
+                    } else {
+                        alert('Falha: ' + (data.error ?? 'Erro desconhecido'));
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Erro ao executar');
+                });
+        }
+    </script>
+
+    <?php return; ?>
+<?php endif; ?>
 
 <?php if ($view === 'missing'): ?>
     <div class="card">

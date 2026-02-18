@@ -41,6 +41,7 @@ $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
  $router->get('/admin/pedidos-wp/estatisticas', 'AdminPedidosWpController', 'estatisticas');
+ $router->post('/admin/pedidos-wp/autofill-bairro', 'AdminPedidosWpController', 'autofillBairro');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
