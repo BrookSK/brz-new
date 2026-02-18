@@ -15,6 +15,12 @@ class AdminPedidosWpController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
 
+        $viewParam = strtolower(trim((string) ($request->getParam('view') ?? 'stats')));
+        $view = in_array($viewParam, ['stats', 'missing'], true) ? $viewParam : 'stats';
+
+        $missingFieldParam = strtolower(trim((string) ($request->getParam('missing_field') ?? 'any')));
+        $missingField = in_array($missingFieldParam, ['any', 'uf', 'cidade', 'bairro'], true) ? $missingFieldParam : 'any';
+
         $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
         $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
 
@@ -25,6 +31,13 @@ class AdminPedidosWpController extends Controller {
         $top = (int) ($request->getParam('top') ?? 20);
         if ($top <= 0) $top = 20;
         if ($top > 200) $top = 200;
+
+        $page = (int) ($request->getParam('page') ?? 1);
+        if ($page <= 0) $page = 1;
+        $limite = (int) ($request->getParam('limit') ?? 50);
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 200) $limite = 200;
+        $offset = ($page - 1) * $limite;
 
         $statusList = [];
         if ($statusRaw !== '') {
@@ -54,33 +67,74 @@ class AdminPedidosWpController extends Controller {
             'por_cidade' => [],
             'por_bairro' => [],
         ];
+        $missingOrders = [];
+        $missingTotal = 0;
         $erro = '';
 
         try {
             $localPdo = Database::getConnection();
 
             $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
-            foreach ($sourcesToRun as $src) {
-                $wp = $this->getWpPdo($localPdo, $src);
-                $prefix = $wp['prefix'];
-                $wpPdo = $wp['pdo'];
+            if ($view === 'missing') {
+                if ($source === 'all') {
+                    $target = $page * $limite;
+                    $merged = [];
+                    $sumTotal = 0;
+                    foreach (self::SOURCES as $src) {
+                        $res = $this->fetchWpMissingOrders($localPdo, $src, $start, $end, $statusList, $missingField, $target, 0);
+                        $rows = $res['rows'] ?? [];
+                        if (is_array($rows)) {
+                            foreach ($rows as $r) {
+                                if (!is_array($r)) continue;
+                                $r['source'] = $src;
+                                $merged[] = $r;
+                            }
+                        }
+                        $sumTotal += (int) ($res['total'] ?? 0);
+                    }
 
-                $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty);
+                    usort($merged, function ($a, $b) {
+                        $da = strtotime((string) ($a['created_at'] ?? ''));
+                        $db = strtotime((string) ($b['created_at'] ?? ''));
+                        if ($da === $db) return 0;
+                        return $da > $db ? -1 : 1;
+                    });
 
-                $stats['total'] += (int) ($partial['total'] ?? 0);
-                $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
-                $stats['por_uf'] = $this->mergeStatsList($stats['por_uf'], $partial['por_uf'] ?? []);
-                $stats['por_cidade'] = $this->mergeStatsList($stats['por_cidade'], $partial['por_cidade'] ?? []);
-                $stats['por_bairro'] = $this->mergeStatsList($stats['por_bairro'], $partial['por_bairro'] ?? []);
-            }
+                    $missingOrders = array_slice($merged, $offset, $limite);
+                    $missingTotal = $sumTotal;
+                } else {
+                    $res = $this->fetchWpMissingOrders($localPdo, $source, $start, $end, $statusList, $missingField, $limite, $offset);
+                    $missingOrders = $res['rows'] ?? [];
+                    if (!is_array($missingOrders)) $missingOrders = [];
+                    foreach ($missingOrders as &$r) {
+                        if (is_array($r)) $r['source'] = $source;
+                    }
+                    unset($r);
+                    $missingTotal = (int) ($res['total'] ?? 0);
+                }
+            } else {
+                foreach ($sourcesToRun as $src) {
+                    $wp = $this->getWpPdo($localPdo, $src);
+                    $prefix = $wp['prefix'];
+                    $wpPdo = $wp['pdo'];
 
-            $stats['por_uf'] = $this->sortStatsList($stats['por_uf']);
-            $stats['por_cidade'] = $this->sortStatsList($stats['por_cidade']);
-            $stats['por_bairro'] = $this->sortStatsList($stats['por_bairro']);
+                    $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty);
 
-            if ($top > 0) {
-                $stats['por_cidade'] = array_slice($stats['por_cidade'], 0, $top);
-                $stats['por_bairro'] = array_slice($stats['por_bairro'], 0, $top);
+                    $stats['total'] += (int) ($partial['total'] ?? 0);
+                    $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
+                    $stats['por_uf'] = $this->mergeStatsList($stats['por_uf'], $partial['por_uf'] ?? []);
+                    $stats['por_cidade'] = $this->mergeStatsList($stats['por_cidade'], $partial['por_cidade'] ?? []);
+                    $stats['por_bairro'] = $this->mergeStatsList($stats['por_bairro'], $partial['por_bairro'] ?? []);
+                }
+
+                $stats['por_uf'] = $this->sortStatsList($stats['por_uf']);
+                $stats['por_cidade'] = $this->sortStatsList($stats['por_cidade']);
+                $stats['por_bairro'] = $this->sortStatsList($stats['por_bairro']);
+
+                if ($top > 0) {
+                    $stats['por_cidade'] = array_slice($stats['por_cidade'], 0, $top);
+                    $stats['por_bairro'] = array_slice($stats['por_bairro'], 0, $top);
+                }
             }
 
         } catch (\Exception $e) {
@@ -94,6 +148,114 @@ class AdminPedidosWpController extends Controller {
         include __DIR__ . '/../Views/admin/pedidos_wp_estatisticas.php';
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    private function fetchWpMissingOrders(\PDO $localPdo, string $source, ?string $start, ?string $end, array $statusList, string $missingField, int $limite, int $offset): array {
+        $wp = $this->getWpPdo($localPdo, $source);
+        $prefix = $wp['prefix'];
+        $wpPdo = $wp['pdo'];
+
+        $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
+        $params = [];
+
+        if ($start !== null) {
+            $where[] = 'p.post_date >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'p.post_date <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'p.post_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $limite = (int) $limite;
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 2000) $limite = 2000;
+        $offset = (int) $offset;
+        if ($offset < 0) $offset = 0;
+
+        $metaSql = "
+            SELECT
+                post_id,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_state','shipping_state') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_state','billing_state') THEN meta_value END), ''))
+                ) AS ship_state,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
+                ) AS ship_city,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name') THEN meta_value END), ''))
+                ) AS ship_neighborhood
+            FROM {$prefix}postmeta
+            WHERE meta_key IN (
+                '_shipping_state','shipping_state','_shipping_city','shipping_city','_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
+                '_billing_state','billing_state','_billing_city','billing_city','_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
+            )
+            GROUP BY post_id
+        ";
+
+        $baseFrom = "
+            FROM {$prefix}posts p
+            LEFT JOIN ({$metaSql}) sm ON sm.post_id = p.ID
+            WHERE " . implode(' AND ', $where) . "
+        ";
+
+        $missingField = strtolower(trim($missingField));
+        if (!in_array($missingField, ['any', 'uf', 'cidade', 'bairro'], true)) {
+            $missingField = 'any';
+        }
+
+        if ($missingField === 'uf') {
+            $baseFrom .= " AND COALESCE(TRIM(sm.ship_state), '') = ''\n";
+        } elseif ($missingField === 'cidade') {
+            $baseFrom .= " AND COALESCE(TRIM(sm.ship_city), '') = ''\n";
+        } elseif ($missingField === 'bairro') {
+            $baseFrom .= " AND COALESCE(TRIM(sm.ship_neighborhood), '') = ''\n";
+        } else {
+            $baseFrom .= " AND (\n"
+                . "   COALESCE(TRIM(sm.ship_state), '') = ''\n"
+                . "   OR COALESCE(TRIM(sm.ship_city), '') = ''\n"
+                . "   OR COALESCE(TRIM(sm.ship_neighborhood), '') = ''\n"
+                . ")\n";
+        }
+
+        $baseFrom .= "
+        ";
+
+        $sql = "SELECT
+            p.ID AS id,
+            p.post_date AS created_at,
+            p.post_status AS status,
+            COALESCE(TRIM(sm.ship_state), '') AS ship_state,
+            COALESCE(TRIM(sm.ship_city), '') AS ship_city,
+            COALESCE(TRIM(sm.ship_neighborhood), '') AS ship_neighborhood
+        {$baseFrom}
+        ORDER BY p.post_date DESC
+        LIMIT {$limite} OFFSET {$offset}";
+
+        $st = $wpPdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $stC = $wpPdo->prepare('SELECT COUNT(*) ' . $baseFrom);
+        foreach ($params as $k => $v) $stC->bindValue($k, $v);
+        $stC->execute();
+        $total = (int) ($stC->fetchColumn() ?: 0);
+
+        return ['rows' => $rows, 'total' => $total];
     }
 
     public function index(Request $request) {
