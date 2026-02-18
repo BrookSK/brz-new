@@ -17,6 +17,7 @@ class CorreiosCepService {
         $base = rtrim($baseUrl, '/');
         $urls = [
             $base . '/v1/enderecos?cep=' . rawurlencode($cep),
+            $base . '/v2/enderecos?cep=' . rawurlencode($cep),
             $base . '/v1/enderecos/' . rawurlencode($cep),
         ];
         $headers = [
@@ -76,6 +77,11 @@ class CorreiosCepService {
     }
 
     private function extractBairro(array $json): string {
+        // A API pode retornar:
+        // - objeto direto {bairro: ...}
+        // - lista [ {bairro: ...} ]
+        // - paginado {content: [ ... ]}
+        // - variações de chaves
         $candidates = [];
 
         // Alguns endpoints retornam o endereço diretamente no root.
@@ -91,11 +97,28 @@ class CorreiosCepService {
             $candidates[] = $e['bairroDescricao'] ?? null;
         }
 
-        // Outros retornam uma lista.
-        if (isset($json[0]) && is_array($json[0])) {
-            $candidates[] = $json[0]['bairro'] ?? null;
-            $candidates[] = $json[0]['nomeBairro'] ?? null;
-            $candidates[] = $json[0]['bairroDescricao'] ?? null;
+        // Paginado / lista por v2.
+        $lists = [];
+        if (isset($json['content']) && is_array($json['content'])) $lists[] = $json['content'];
+        if (isset($json['items']) && is_array($json['items'])) $lists[] = $json['items'];
+        if (isset($json['results']) && is_array($json['results'])) $lists[] = $json['results'];
+        if (isset($json['enderecos']) && is_array($json['enderecos'])) $lists[] = $json['enderecos'];
+        if (isset($json[0]) && is_array($json[0])) $lists[] = $json;
+
+        foreach ($lists as $arr) {
+            if (!is_array($arr)) continue;
+            foreach ($arr as $item) {
+                if (!is_array($item)) continue;
+                $candidates[] = $item['bairro'] ?? null;
+                $candidates[] = $item['nomeBairro'] ?? null;
+                $candidates[] = $item['bairroDescricao'] ?? null;
+                if (isset($item['endereco']) && is_array($item['endereco'])) {
+                    $e = $item['endereco'];
+                    $candidates[] = $e['bairro'] ?? null;
+                    $candidates[] = $e['nomeBairro'] ?? null;
+                    $candidates[] = $e['bairroDescricao'] ?? null;
+                }
+            }
         }
 
         foreach ($candidates as $v) {
