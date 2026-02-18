@@ -201,6 +201,7 @@ class AdminPedidosWpController extends Controller {
 
             $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
             $processed = 0;
+            $attempted = 0;
             $filled = 0;
             $skipped = 0;
             $skipped_no_cep = 0;
@@ -208,8 +209,11 @@ class AdminPedidosWpController extends Controller {
             $skipped_bairro_not_found = 0;
             $errors = 0;
 
+            $fetchLimit = (int) max($limit, $limit * 20);
+            if ($fetchLimit > 2000) $fetchLimit = 2000;
+
             foreach ($sourcesToRun as $src) {
-                $rows = $this->fetchWpNeighborhoodMissingWithCep($localPdo, $src, $start, $end, $statusList, $limit);
+                $rows = $this->fetchWpNeighborhoodMissingWithCep($localPdo, $src, $start, $end, $statusList, $fetchLimit);
                 foreach ($rows as $r) {
                     $processed++;
                     $wpId = (int) ($r['id'] ?? 0);
@@ -230,6 +234,11 @@ class AdminPedidosWpController extends Controller {
                         continue;
                     }
 
+                    if ($attempted >= $limit) {
+                        break;
+                    }
+                    $attempted++;
+
                     $req = ['cep' => $cep];
                     $resp = $svc->consultarPorCep($cep, $trackingCfg);
                     if (!is_array($resp) || empty($resp['success'])) {
@@ -249,11 +258,16 @@ class AdminPedidosWpController extends Controller {
                     $filled++;
                     $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, $bairro, $cep, $created, $st, $req, $resp, null);
                 }
+
+                if ($attempted >= $limit) {
+                    break;
+                }
             }
 
             $this->json([
                 'success' => true,
                 'processed' => $processed,
+                'attempted' => $attempted,
                 'filled' => $filled,
                 'skipped' => $skipped,
                 'skipped_no_cep' => $skipped_no_cep,
