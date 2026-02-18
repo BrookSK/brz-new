@@ -11,6 +11,77 @@ class AdminPedidosWpController extends Controller {
 
     private const SOURCES = ['br', 'red', 'us'];
 
+    public function estatisticas(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
+
+        $startRaw = trim((string) ($request->getParam('start') ?? ''));
+        $endRaw = trim((string) ($request->getParam('end') ?? ''));
+        $top = (int) ($request->getParam('top') ?? 20);
+        if ($top <= 0) $top = 20;
+        if ($top > 200) $top = 200;
+
+        $start = null;
+        $end = null;
+        if ($startRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $startRaw)) {
+            $start = $startRaw . ' 00:00:00';
+        }
+        if ($endRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $endRaw)) {
+            $end = $endRaw . ' 23:59:59';
+        }
+
+        $stats = [
+            'total' => 0,
+            'sp_capital_total' => 0,
+            'por_uf' => [],
+            'por_cidade' => [],
+            'por_bairro' => [],
+        ];
+        $erro = '';
+
+        try {
+            $localPdo = Database::getConnection();
+
+            $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
+            foreach ($sourcesToRun as $src) {
+                $wp = $this->getWpPdo($localPdo, $src);
+                $prefix = $wp['prefix'];
+                $wpPdo = $wp['pdo'];
+
+                $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top);
+
+                $stats['total'] += (int) ($partial['total'] ?? 0);
+                $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
+                $stats['por_uf'] = $this->mergeStatsList($stats['por_uf'], $partial['por_uf'] ?? []);
+                $stats['por_cidade'] = $this->mergeStatsList($stats['por_cidade'], $partial['por_cidade'] ?? []);
+                $stats['por_bairro'] = $this->mergeStatsList($stats['por_bairro'], $partial['por_bairro'] ?? []);
+            }
+
+            $stats['por_uf'] = $this->sortStatsList($stats['por_uf']);
+            $stats['por_cidade'] = $this->sortStatsList($stats['por_cidade']);
+            $stats['por_bairro'] = $this->sortStatsList($stats['por_bairro']);
+
+            if ($top > 0) {
+                $stats['por_cidade'] = array_slice($stats['por_cidade'], 0, $top);
+                $stats['por_bairro'] = array_slice($stats['por_bairro'], 0, $top);
+            }
+
+        } catch (\Exception $e) {
+            $erro = $e->getMessage();
+        }
+
+        $sidebarActive = 'wp-estatisticas';
+        $title = 'Estatísticas (WP) - Braziliana Admin';
+
+        ob_start();
+        include __DIR__ . '/../Views/admin/pedidos_wp_estatisticas.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -586,6 +657,144 @@ class AdminPedidosWpController extends Controller {
         $total = (int) ($stC->fetchColumn() ?: 0);
 
         return ['rows' => $rows, 'total' => $total];
+    }
+
+    private function fetchWpShippingStats(\PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top): array {
+        $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
+        $params = [];
+
+        if ($start !== null) {
+            $where[] = 'p.post_date >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'p.post_date <= :end';
+            $params[':end'] = $end;
+        }
+
+        $metaSql = "
+            SELECT
+                post_id,
+                MAX(CASE WHEN meta_key = '_shipping_state' THEN meta_value END) AS ship_state,
+                MAX(CASE WHEN meta_key = '_shipping_city' THEN meta_value END) AS ship_city,
+                MAX(CASE WHEN meta_key IN ('_shipping_neighborhood','_shipping_bairro','shipping_bairro') THEN meta_value END) AS ship_neighborhood
+            FROM {$prefix}postmeta
+            WHERE meta_key IN ('_shipping_state','_shipping_city','_shipping_neighborhood','_shipping_bairro','shipping_bairro')
+            GROUP BY post_id
+        ";
+
+        $baseFrom = "
+            FROM {$prefix}posts p
+            LEFT JOIN ({$metaSql}) sm ON sm.post_id = p.ID
+            WHERE " . implode(' AND ', $where) . "
+        ";
+
+        $stT = $wpPdo->prepare('SELECT COUNT(*) ' . $baseFrom);
+        foreach ($params as $k => $v) $stT->bindValue($k, $v);
+        $stT->execute();
+        $total = (int) ($stT->fetchColumn() ?: 0);
+
+        $stSP = $wpPdo->prepare(
+            "SELECT COUNT(*) {$baseFrom}
+             AND UPPER(TRIM(COALESCE(sm.ship_state,''))) = 'SP'
+             AND REPLACE(REPLACE(LOWER(TRIM(COALESCE(sm.ship_city,''))), 'ã','a'), 'á','a') = 'sao paulo'"
+        );
+        foreach ($params as $k => $v) $stSP->bindValue($k, $v);
+        $stSP->execute();
+        $spCapitalTotal = (int) ($stSP->fetchColumn() ?: 0);
+
+        $sqlUf = "
+            SELECT
+                UPPER(TRIM(COALESCE(sm.ship_state, ''))) AS label,
+                COUNT(*) AS total
+            {$baseFrom}
+            GROUP BY UPPER(TRIM(COALESCE(sm.ship_state, '')))
+            ORDER BY total DESC
+        ";
+        $stUf = $wpPdo->prepare($sqlUf);
+        foreach ($params as $k => $v) $stUf->bindValue($k, $v);
+        $stUf->execute();
+        $rowsUf = $stUf->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $sqlCidade = "
+            SELECT
+                TRIM(COALESCE(sm.ship_city, '')) AS label,
+                COUNT(*) AS total
+            {$baseFrom}
+            GROUP BY TRIM(COALESCE(sm.ship_city, ''))
+            ORDER BY total DESC
+            LIMIT " . (int) max(1, min(2000, $top * 20));
+        $stC = $wpPdo->prepare($sqlCidade);
+        foreach ($params as $k => $v) $stC->bindValue($k, $v);
+        $stC->execute();
+        $rowsCidade = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $sqlBairro = "
+            SELECT
+                TRIM(COALESCE(sm.ship_neighborhood, '')) AS label,
+                COUNT(*) AS total
+            {$baseFrom}
+            GROUP BY TRIM(COALESCE(sm.ship_neighborhood, ''))
+            ORDER BY total DESC
+            LIMIT " . (int) max(1, min(2000, $top * 20));
+        $stB = $wpPdo->prepare($sqlBairro);
+        foreach ($params as $k => $v) $stB->bindValue($k, $v);
+        $stB->execute();
+        $rowsBairro = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'total' => $total,
+            'sp_capital_total' => $spCapitalTotal,
+            'por_uf' => $this->rowsToStatsList($rowsUf, $total),
+            'por_cidade' => $this->rowsToStatsList($rowsCidade, $total),
+            'por_bairro' => $this->rowsToStatsList($rowsBairro, $total),
+        ];
+    }
+
+    private function rowsToStatsList(array $rows, int $total): array {
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $label = trim((string) ($r['label'] ?? ''));
+            $count = (int) ($r['total'] ?? 0);
+            if ($label === '') $label = '(vazio)';
+            if ($count <= 0) continue;
+            $pct = $total > 0 ? round(($count / $total) * 100, 2) : 0.0;
+            $out[] = ['label' => $label, 'total' => $count, 'pct' => $pct];
+        }
+        return $out;
+    }
+
+    private function mergeStatsList(array $base, array $add): array {
+        $map = [];
+        foreach ($base as $row) {
+            if (!is_array($row)) continue;
+            $label = (string) ($row['label'] ?? '');
+            if ($label === '') continue;
+            $map[$label] = (int) ($row['total'] ?? 0);
+        }
+        foreach ($add as $row) {
+            if (!is_array($row)) continue;
+            $label = (string) ($row['label'] ?? '');
+            if ($label === '') continue;
+            $map[$label] = (int) ($map[$label] ?? 0) + (int) ($row['total'] ?? 0);
+        }
+
+        $out = [];
+        foreach ($map as $label => $count) {
+            $out[] = ['label' => (string) $label, 'total' => (int) $count];
+        }
+        return $out;
+    }
+
+    private function sortStatsList(array $rows): array {
+        usort($rows, function ($a, $b) {
+            $ta = (int) (is_array($a) ? ($a['total'] ?? 0) : 0);
+            $tb = (int) (is_array($b) ? ($b['total'] ?? 0) : 0);
+            if ($ta === $tb) return 0;
+            return $ta > $tb ? -1 : 1;
+        });
+        return array_values($rows);
     }
 
     private function getWpPdo(\PDO $localPdo, string $source = 'br'): array {

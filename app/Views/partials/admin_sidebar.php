@@ -71,6 +71,7 @@ function renderAdminSidebar($activePage = '') {
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
         'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.orders_audit', 'Pedidos para conferência'), 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
         'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => __('admin.menu.orders_wp', 'Pedidos (WordPress)'), 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
+        'wp-estatisticas' => ['icon' => 'fas fa-chart-pie', 'label' => __('admin.menu.wp_orders_stats', 'Estatísticas (WP)'), 'url' => '/admin/pedidos-wp/estatisticas', 'roles' => ['admin']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => __('admin.menu.tickets', 'Tickets'), 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => __('admin.menu.my_commissions', 'Minhas Comissões'), 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => __('admin.menu.inventory', 'Estoque'), 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
