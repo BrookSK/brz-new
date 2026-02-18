@@ -1279,6 +1279,57 @@ class AdminConfiguracoesController extends Controller {
 
                                             <hr>
 
+                                            <h6 class="mb-3">Correios (Etiquetas - Provider)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Provider de etiqueta</label>
+                                                        <select class="form-select" name="entrega_correios_provider">
+                                                            <option value="sigep" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', 'sigep') === 'sigep' ? 'selected' : '') . '>SIGEP (SOAP)</option>
+                                                            <option value="prepostagem_v3" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', '') === 'prepostagem_v3' ? 'selected' : '') . '>Pré-Postagem v3 (REST)</option>
+                                                        </select>
+                                                        <small class="text-muted">Escolha como o sistema vai gerar etiquetas dos Correios (SIGEP legado ou Pré-Postagem v3).</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6"></div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Token (Pré-Postagem v3)</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_correios_prepostagem_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_token', '') . '" placeholder="Bearer token (Cartão de Postagem)">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                        <small class="text-muted">A API Pré-Postagem exige autorização via Cartão de Postagem.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">IdCorreios (opcional)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_id_correios" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_id_correios', '') . '" placeholder="IdCorreios">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Código do serviço (Pré-Postagem)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_codigo_servico" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_codigo_servico', '') . '" placeholder="Ex.: 03220">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Remetente (JSON - Pré-Postagem)</label>
+                                                <textarea class="form-control" name="entrega_correios_prepostagem_sender_json" rows="6" placeholder="{\n  \"nome\": \"Fulano\",\n  \"cpfCnpj\": \"00000000000\",\n  \"endereco\": {\n    \"cep\": \"00000000\",\n    \"logradouro\": \"Rua\",\n    \"numero\": \"123\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"Cidade\",\n    \"uf\": \"SP\"\n  }\n}">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_prepostagem_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Estrutura compatível com o schema RemetenteDTO / EnderecoRemetenteDTO da API Pré-Postagem.</small>
+                                            </div>
+
+                                            <hr>
+
                                             <h6 class="mb-3">Correios (SIGEP Web)</h6>
 
                                             <div class="row">
@@ -3908,7 +3959,7 @@ HTML;
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],

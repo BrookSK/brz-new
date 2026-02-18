@@ -4,6 +4,7 @@ namespace App\Controllers;
 use Config\Database;
 use App\Models\PedidoEcommerce;
 use App\Services\AuthService;
+use App\Services\CorreiosPrepostagemService;
 
 class AdminRemessaCorreiosController extends Controller {
     private $connection;
@@ -83,6 +84,146 @@ class AdminRemessaCorreiosController extends Controller {
             'servico' => (string) $this->getConfigEntregaValue('sigep_servico', 'PAC'),
             'servico_codigo' => (string) $this->getConfigEntregaValue('sigep_servico_codigo', ''),
         ];
+    }
+
+    private function getCorreiosProviderConfig(): array {
+        $provider = (string) $this->getConfigEntregaValue('correios_provider', 'sigep');
+        $provider = strtolower(trim($provider));
+        if ($provider !== 'prepostagem_v3') {
+            $provider = 'sigep';
+        }
+
+        return [
+            'provider' => $provider,
+            'ambiente' => (string) $this->getConfigEntregaValue('sigep_ambiente', 'homologacao'),
+            'prepostagem_token' => (string) $this->getConfigEntregaValue('correios_prepostagem_token', ''),
+            'prepostagem_id_correios' => (string) $this->getConfigEntregaValue('correios_prepostagem_id_correios', ''),
+            'prepostagem_codigo_servico' => (string) $this->getConfigEntregaValue('correios_prepostagem_codigo_servico', ''),
+            'prepostagem_sender_json' => (string) $this->getConfigEntregaValue('correios_prepostagem_sender_json', ''),
+        ];
+    }
+
+    private function getPrepostagemBaseUrl(string $ambiente): string {
+        $amb = strtolower(trim($ambiente));
+        if ($amb === 'producao' || $amb === 'production') {
+            return 'https://api.correios.com.br/prepostagem';
+        }
+        return 'https://apihom.correios.com.br/prepostagem';
+    }
+
+    private function parseJsonConfig(string $json, string $label): array {
+        $json = trim($json);
+        if ($json === '') {
+            return [];
+        }
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            throw new \Exception($label . ': JSON inválido');
+        }
+        return $decoded;
+    }
+
+    private function onlyDigits(string $v): string {
+        $v = (string) $v;
+        $v = preg_replace('/\D+/', '', $v);
+        return (string) $v;
+    }
+
+    private function buildPrepostagemPayload(array $pedido, array $cfg): array {
+        $sender = $this->parseJsonConfig((string) ($cfg['prepostagem_sender_json'] ?? ''), 'Pré-Postagem: remetente');
+        if (empty($sender)) {
+            throw new \Exception('Pré-Postagem: configure o remetente (JSON) no Admin');
+        }
+
+        $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+        $destEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
+        $destTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
+
+        $cep = $this->onlyDigits((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? '')));
+        $logradouro = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
+        $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
+        $complemento = (string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''));
+        $bairro = (string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''));
+        $cidade = (string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''));
+        $uf = (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''));
+
+        if ($destNome === '' || $cep === '' || $logradouro === '' || $numero === '' || $bairro === '' || $cidade === '' || $uf === '') {
+            throw new \Exception('Pré-Postagem: pedido sem dados completos de endereço do destinatário');
+        }
+
+        $ddd = '';
+        $telefone8 = '';
+        $digits = $this->onlyDigits($destTel);
+        if (strlen($digits) >= 10) {
+            $ddd = substr($digits, 0, 2);
+            $telefone8 = substr($digits, 2, 8);
+        }
+
+        $destinatario = [
+            'nome' => $destNome,
+            'email' => $destEmail,
+            'dddTelefone' => $ddd,
+            'telefone' => $telefone8,
+            'endereco' => [
+                'cep' => $cep,
+                'logradouro' => $logradouro,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'uf' => $uf,
+                'regiao' => '',
+                'pais' => 'BR',
+            ],
+        ];
+
+        $codigoServico = (string) ($cfg['prepostagem_codigo_servico'] ?? '');
+        if ($codigoServico === '') {
+            throw new \Exception('Pré-Postagem: informe o código do serviço nas configurações');
+        }
+
+        $pesoKg = null;
+        foreach (['peso_total', 'peso'] as $k) {
+            if (isset($pedido[$k]) && is_numeric($pedido[$k])) {
+                $pesoKg = (float) $pedido[$k];
+                break;
+            }
+        }
+        if ($pesoKg === null || $pesoKg <= 0) {
+            $pesoKg = 0.3;
+        }
+        $pesoGramas = (int) max(1, round($pesoKg * 1000));
+
+        $altura = 2;
+        $largura = 11;
+        $comprimento = 16;
+        $formato = '2';
+
+        $payload = [
+            'idCorreios' => (string) ($cfg['prepostagem_id_correios'] ?? ''),
+            'remetente' => $sender,
+            'destinatario' => $destinatario,
+            'codigoServico' => $codigoServico,
+            'itensDeclaracaoConteudo' => [
+                [
+                    'conteudo' => 'Mercadoria',
+                    'quantidade' => '1',
+                    'valor' => '1.00',
+                ],
+            ],
+            'pesoInformado' => (string) $pesoGramas,
+            'codigoFormatoObjetoInformado' => (string) $formato,
+            'alturaInformada' => (string) $altura,
+            'larguraInformada' => (string) $largura,
+            'comprimentoInformado' => (string) $comprimento,
+            'cienteObjetoNaoProibido' => '1',
+            'solicitarColeta' => 'N',
+            'observacao' => 'Pedido #' . (int) ($pedido['id'] ?? 0),
+            'pedidoExternoOrigem' => (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT))),
+            'canalExternoOrigem' => 'BRZ',
+        ];
+
+        return $payload;
     }
 
     private function solicitarEtiquetaSigep(array $cfg): string {
@@ -784,52 +925,111 @@ class AdminRemessaCorreiosController extends Controller {
             throw new \Exception('Pedido não encontrado');
         }
 
-        $cfg = $this->getSigepConfig();
+        $cfgSigep = $this->getSigepConfig();
+        $cfgProvider = $this->getCorreiosProviderConfig();
         $colsCE = $this->getColsCorreiosEtiquetas();
 
         $sigepUsed = 0;
         $sigepReq = null;
         $sigepResp = null;
         $sigepErr = null;
-        $sigepAmb = (string) ($cfg['ambiente'] ?? '');
+        $sigepAmb = (string) ($cfgSigep['ambiente'] ?? '');
         $sigepSemDv = null;
         $sigepDv = null;
 
-        if (empty($cfg['enabled'])) {
-            throw new \Exception('SIGEP está desabilitado. Habilite e configure em /admin/configuracoes > Entrega > Correios (SIGEP Web).');
-        }
-
-        $hasMin = !empty($cfg['usuario']) && !empty($cfg['senha']) && !empty($cfg['contrato']) && !empty($cfg['cartao']) && !empty($cfg['servico_codigo']);
-        if (!$hasMin) {
-            throw new \Exception('SIGEP: configuração incompleta. Preencha usuário, senha, contrato, cartão de postagem e código do serviço.');
-        }
-
-        $sigepUsed = 1;
-        $sigepReq = [
-            'ambiente' => $sigepAmb,
-            'usuario' => (string) ($cfg['usuario'] ?? ''),
-            'contrato' => (string) ($cfg['contrato'] ?? ''),
-            'cartao' => (string) ($cfg['cartao'] ?? ''),
-            'cnpj' => (string) ($cfg['cnpj'] ?? ''),
-            'servico_codigo' => (string) ($cfg['servico_codigo'] ?? ''),
-        ];
+        $prepostagemId = null;
+        $prepostagemReciboRotulo = null;
+        $prepostagemReq = null;
+        $prepostagemResp = null;
+        $prepostagemErr = null;
 
         $codigoEtiqueta = '';
-        try {
-            $raw = $this->solicitarEtiquetaSigep($cfg);
-            $sigepResp = ['raw' => $raw];
-            $packed = $this->completarEtiquetaComDv($raw);
-            $codigoEtiqueta = (string) ($packed['etiqueta'] ?? $raw);
-            $sigepSemDv = $packed['sem_dv'] ?? null;
-            $sigepDv = $packed['dv'] ?? null;
-        } catch (\Exception $e) {
-            $sigepErr = $e->getMessage();
-            throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
+        $providerUsed = (string) ($cfgProvider['provider'] ?? 'sigep');
+
+        if ($providerUsed === 'prepostagem_v3') {
+            $token = (string) ($cfgProvider['prepostagem_token'] ?? '');
+            if (trim($token) === '') {
+                throw new \Exception('Pré-Postagem: configure o token (Cartão de Postagem) no Admin');
+            }
+            $baseUrl = $this->getPrepostagemBaseUrl((string) ($cfgProvider['ambiente'] ?? 'homologacao'));
+            $svc = new CorreiosPrepostagemService($baseUrl, $token);
+
+            $payload = $this->buildPrepostagemPayload($pedido, $cfgProvider);
+            $prepostagemReq = $payload;
+
+            $r = $svc->criarPrepostagem($payload);
+            if (empty($r['success'])) {
+                $prepostagemErr = (string) ($r['error'] ?? 'Falha ao criar pré-postagem');
+                $prepostagemResp = $r['raw'] ?? $r;
+                throw new \Exception('Pré-Postagem falhou ao criar: ' . $prepostagemErr);
+            }
+            $prepostagemResp = $r['data'] ?? null;
+
+            $prepostagemId = is_array($prepostagemResp) ? ($prepostagemResp['id'] ?? null) : null;
+            $codigoEtiqueta = is_array($prepostagemResp) ? ((string) ($prepostagemResp['codigoObjeto'] ?? '')) : '';
+            $codigoEtiqueta = $this->normalizarEtiquetaCorreios($codigoEtiqueta);
+            if ($codigoEtiqueta === '') {
+                throw new \Exception('Pré-Postagem: resposta sem codigoObjeto');
+            }
+
+            // solicitar rótulo assíncrono (best-effort)
+            try {
+                $rotPayload = [
+                    'tipoRotulo' => 'P',
+                    'formatoRotulo' => 'ET',
+                    'imprimeRemetente' => 'S',
+                    'idsPrePostagem' => $prepostagemId ? [(string) $prepostagemId] : [],
+                ];
+                $rr = $svc->solicitarRotuloAssincronoPdf($rotPayload);
+                if (!empty($rr['success'])) {
+                    $d = $rr['data'] ?? [];
+                    if (is_array($d)) {
+                        foreach (['idRecibo', 'recibo', 'reciboSolicitacaoAssincronaRotulo', 'reciboSolicitacaoAssincrona'] as $k) {
+                            if (!empty($d[$k]) && is_string($d[$k])) {
+                                $prepostagemReciboRotulo = (string) $d[$k];
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        } else {
+            if (empty($cfgSigep['enabled'])) {
+                throw new \Exception('SIGEP está desabilitado. Habilite e configure em /admin/configuracoes > Entrega > Correios (SIGEP Web).');
+            }
+
+            $hasMin = !empty($cfgSigep['usuario']) && !empty($cfgSigep['senha']) && !empty($cfgSigep['contrato']) && !empty($cfgSigep['cartao']) && !empty($cfgSigep['servico_codigo']);
+            if (!$hasMin) {
+                throw new \Exception('SIGEP: configuração incompleta. Preencha usuário, senha, contrato, cartão de postagem e código do serviço.');
+            }
+
+            $sigepUsed = 1;
+            $sigepReq = [
+                'ambiente' => $sigepAmb,
+                'usuario' => (string) ($cfgSigep['usuario'] ?? ''),
+                'contrato' => (string) ($cfgSigep['contrato'] ?? ''),
+                'cartao' => (string) ($cfgSigep['cartao'] ?? ''),
+                'cnpj' => (string) ($cfgSigep['cnpj'] ?? ''),
+                'servico_codigo' => (string) ($cfgSigep['servico_codigo'] ?? ''),
+            ];
+
+            try {
+                $raw = $this->solicitarEtiquetaSigep($cfgSigep);
+                $sigepResp = ['raw' => $raw];
+                $packed = $this->completarEtiquetaComDv($raw);
+                $codigoEtiqueta = (string) ($packed['etiqueta'] ?? $raw);
+                $sigepSemDv = $packed['sem_dv'] ?? null;
+                $sigepDv = $packed['dv'] ?? null;
+            } catch (\Exception $e) {
+                $sigepErr = $e->getMessage();
+                throw new \Exception('SIGEP falhou ao gerar etiqueta: ' . $sigepErr);
+            }
         }
 
         $codigoEtiqueta = $this->normalizarEtiquetaCorreios($codigoEtiqueta);
         if (!preg_match('/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/', $codigoEtiqueta)) {
-            throw new \Exception('SIGEP retornou uma etiqueta em formato inválido: ' . $codigoEtiqueta);
+            throw new \Exception('Correios retornou uma etiqueta em formato inválido: ' . $codigoEtiqueta);
         }
 
         $cols = ['pedido_id', 'codigo_etiqueta', 'dados_remetente', 'dados_destinatario', 'status', 'created_at'];
@@ -869,6 +1069,37 @@ class AdminRemessaCorreiosController extends Controller {
         if (in_array('sigep_error', $colsCE, true)) {
             $cols[] = 'sigep_error';
             $vals[] = $sigepErr;
+            $ph[] = '?';
+        }
+
+        if (in_array('correios_provider', $colsCE, true)) {
+            $cols[] = 'correios_provider';
+            $vals[] = $providerUsed;
+            $ph[] = '?';
+        }
+        if (in_array('prepostagem_id', $colsCE, true)) {
+            $cols[] = 'prepostagem_id';
+            $vals[] = $prepostagemId;
+            $ph[] = '?';
+        }
+        if (in_array('prepostagem_last_request_json', $colsCE, true)) {
+            $cols[] = 'prepostagem_last_request_json';
+            $vals[] = $prepostagemReq !== null ? json_encode($prepostagemReq) : null;
+            $ph[] = '?';
+        }
+        if (in_array('prepostagem_last_response_json', $colsCE, true)) {
+            $cols[] = 'prepostagem_last_response_json';
+            $vals[] = $prepostagemResp !== null ? json_encode($prepostagemResp) : null;
+            $ph[] = '?';
+        }
+        if (in_array('prepostagem_error', $colsCE, true)) {
+            $cols[] = 'prepostagem_error';
+            $vals[] = $prepostagemErr;
+            $ph[] = '?';
+        }
+        if (in_array('prepostagem_recibo_rotulo', $colsCE, true)) {
+            $cols[] = 'prepostagem_recibo_rotulo';
+            $vals[] = $prepostagemReciboRotulo;
             $ph[] = '?';
         }
 
