@@ -302,11 +302,40 @@ class AdminPedidosWpController extends Controller {
 
         // fallback KV (muitos ambientes gravam em categoria/chave/valor mesmo com colunas no schema)
         if (trim($token) === '') {
+            // 1) categoria+chave
             try {
                 $stT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_tracking_token' LIMIT 1");
                 $stT->execute();
                 $token = (string) ($stT->fetchColumn() ?: '');
             } catch (\Exception $e) {
+            }
+
+            // 2) algumas instalações usam chave diferente
+            if (trim($token) === '') {
+                $tryKeys = ['entrega_correios_tracking_token', 'correios_tracking_token'];
+                foreach ($tryKeys as $k) {
+                    try {
+                        $stK = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                        $stK->execute([(string) $k]);
+                        $token = (string) ($stK->fetchColumn() ?: '');
+                        if (trim($token) !== '') break;
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+
+            // 3) fallback sem categoria (schema KV simples)
+            if (trim($token) === '') {
+                $tryKeys = ['correios_tracking_token', 'entrega_correios_tracking_token', 'entrega_correios_tracking_token'];
+                foreach ($tryKeys as $k) {
+                    try {
+                        $stK = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+                        $stK->execute([(string) $k]);
+                        $token = (string) ($stK->fetchColumn() ?: '');
+                        if (trim($token) !== '') break;
+                    } catch (\Exception $e) {
+                    }
+                }
             }
         }
         if (trim($ambiente) === '') {
