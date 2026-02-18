@@ -16,8 +16,8 @@ class CorreiosCepService {
 
         $base = rtrim($baseUrl, '/');
         $urls = [
-            $base . '/v2/enderecos?cep=' . rawurlencode($cep),
             $base . '/v2/enderecos/' . rawurlencode($cep),
+            $base . '/v2/enderecos?cep=' . rawurlencode($cep),
             $base . '/v1/enderecos/' . rawurlencode($cep),
             $base . '/v1/enderecos?cep=' . rawurlencode($cep),
         ];
@@ -54,9 +54,19 @@ class CorreiosCepService {
 
                 if (is_int($httpCode) && $httpCode >= 400) {
                     $msg = $this->extractErrorMessage($json);
+                    $errMsg = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar CEP.');
+
+                    // Alguns ambientes retornam 403 GTW-008 para determinados endpoints
+                    // mesmo com token válido para outros endpoints. Nesses casos, tentamos
+                    // os próximos URLs antes de falhar.
+                    if ((int) $httpCode === 403 && stripos($errMsg, 'GTW-008') !== false) {
+                        $lastErr = $errMsg;
+                        continue;
+                    }
+
                     return [
                         'success' => false,
-                        'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar CEP.'),
+                        'error' => $errMsg,
                         'http_code' => $httpCode,
                         'raw' => $json,
                     ];
