@@ -1274,14 +1274,88 @@ class AdminRemessaCorreiosController extends Controller {
     }
 
     private function getDadosRemetente() {
+        $nome = 'Braziliana';
+        $cnpj = '';
+        $endereco = '';
+        $cidade = '';
+        $estado = '';
+        $cep = '';
+        $telefone = '';
+
+        try {
+            $cfg = $this->getCorreiosProviderConfig();
+            $json = (string) ($cfg['prepostagem_sender_json'] ?? '');
+            $sender = $this->parseJsonConfig($json, 'Remetente');
+
+            if (isset($sender['nome']) && is_string($sender['nome']) && trim($sender['nome']) !== '') {
+                $nome = trim($sender['nome']);
+            }
+
+            if (isset($sender['cpfCnpj']) && is_string($sender['cpfCnpj'])) {
+                $cnpj = trim($sender['cpfCnpj']);
+            } elseif (isset($sender['cnpj']) && is_string($sender['cnpj'])) {
+                $cnpj = trim($sender['cnpj']);
+            }
+
+            $ddd = '';
+            if (isset($sender['dddTelefone']) && is_string($sender['dddTelefone'])) {
+                $ddd = trim($sender['dddTelefone']);
+            } elseif (isset($sender['ddd']) && is_string($sender['ddd'])) {
+                $ddd = trim($sender['ddd']);
+            }
+            $tel = '';
+            if (isset($sender['telefone']) && is_string($sender['telefone'])) {
+                $tel = trim($sender['telefone']);
+            }
+            $ddd = preg_replace('/\D+/', '', $ddd);
+            $tel = preg_replace('/\D+/', '', $tel);
+            if ($ddd !== '' && $tel !== '') {
+                $telefone = '(' . $ddd . ') ' . $tel;
+            } elseif ($tel !== '') {
+                $telefone = $tel;
+            }
+
+            if (isset($sender['endereco']) && is_array($sender['endereco'])) {
+                $e = $sender['endereco'];
+                $logradouro = isset($e['logradouro']) ? trim((string) $e['logradouro']) : '';
+                $numero = isset($e['numero']) ? trim((string) $e['numero']) : '';
+                $complemento = isset($e['complemento']) ? trim((string) $e['complemento']) : '';
+                $bairro = isset($e['bairro']) ? trim((string) $e['bairro']) : '';
+                $cidade = isset($e['cidade']) ? trim((string) $e['cidade']) : $cidade;
+                $estado = isset($e['uf']) ? trim((string) $e['uf']) : $estado;
+                $cep = isset($e['cep']) ? trim((string) $e['cep']) : $cep;
+
+                $parts = [];
+                if ($logradouro !== '') $parts[] = $logradouro;
+                if ($numero !== '') $parts[] = $numero;
+                if ($complemento !== '') $parts[] = $complemento;
+                if ($bairro !== '') $parts[] = $bairro;
+                $endereco = implode(', ', $parts);
+            }
+        } catch (\Exception $e) {
+        }
+
+        if ($endereco === '') {
+            $endereco = 'Endereço não disponível';
+        }
+        if ($cidade === '') {
+            $cidade = 'Cidade';
+        }
+        if ($estado === '') {
+            $estado = 'SP';
+        }
+        if ($cep === '') {
+            $cep = '00000-000';
+        }
+
         return [
-            'nome' => 'Braziliana',
-            'cnpj' => '00.000.000/0001-00',
-            'endereco' => 'Rua das Empresas, 123',
-            'cidade' => 'São Paulo',
-            'estado' => 'SP',
-            'cep' => '01234-567',
-            'telefone' => '(11) 1234-5678'
+            'nome' => $nome,
+            'cnpj' => $cnpj,
+            'endereco' => $endereco,
+            'cidade' => $cidade,
+            'estado' => $estado,
+            'cep' => $cep,
+            'telefone' => $telefone,
         ];
     }
 
