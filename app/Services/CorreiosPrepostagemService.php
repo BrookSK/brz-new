@@ -85,7 +85,15 @@ class CorreiosPrepostagemService {
 
             if (is_int($httpCode) && $httpCode >= 400) {
                 $msg = $this->extractErrorMessage($decoded);
-                if ($msg === '') {
+                $isGeneric = false;
+                if ($msg !== '') {
+                    $tmp = trim($msg);
+                    if (preg_match('/^[A-Za-z0-9_\\\\]+Exception\:?$/', $tmp)) {
+                        $isGeneric = true;
+                    }
+                }
+
+                if ($msg === '' || $isGeneric) {
                     $msg = 'Erro HTTP ' . $httpCode;
                     $enc = json_encode($decoded, JSON_UNESCAPED_UNICODE);
                     if (is_string($enc) && $enc !== '') {
