@@ -20,9 +20,23 @@ class AdminPedidosWpController extends Controller {
 
         $startRaw = trim((string) ($request->getParam('start') ?? ''));
         $endRaw = trim((string) ($request->getParam('end') ?? ''));
+        $statusRaw = trim((string) ($request->getParam('status') ?? ''));
+        $hideEmpty = (string) ($request->getParam('hide_empty') ?? '') === '1';
         $top = (int) ($request->getParam('top') ?? 20);
         if ($top <= 0) $top = 20;
         if ($top > 200) $top = 200;
+
+        $statusList = [];
+        if ($statusRaw !== '') {
+            $parts = preg_split('/\s*,\s*/', $statusRaw) ?: [];
+            foreach ($parts as $p) {
+                $p = strtolower(trim((string) $p));
+                if ($p === '') continue;
+                if (!preg_match('/^(wc-[a-z0-9_-]+|[a-z0-9_-]+)$/', $p)) continue;
+                $statusList[] = $p;
+            }
+            $statusList = array_values(array_unique($statusList));
+        }
 
         $start = null;
         $end = null;
@@ -51,7 +65,7 @@ class AdminPedidosWpController extends Controller {
                 $prefix = $wp['prefix'];
                 $wpPdo = $wp['pdo'];
 
-                $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top);
+                $partial = $this->fetchWpShippingStats($wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty);
 
                 $stats['total'] += (int) ($partial['total'] ?? 0);
                 $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
@@ -659,7 +673,7 @@ class AdminPedidosWpController extends Controller {
         return ['rows' => $rows, 'total' => $total];
     }
 
-    private function fetchWpShippingStats(\PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top): array {
+    private function fetchWpShippingStats(\PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top, array $statusList, bool $hideEmpty): array {
         $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
         $params = [];
 
@@ -672,14 +686,36 @@ class AdminPedidosWpController extends Controller {
             $params[':end'] = $end;
         }
 
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'p.post_status IN (' . implode(',', $placeholders) . ')';
+        }
+
         $metaSql = "
             SELECT
                 post_id,
-                MAX(CASE WHEN meta_key = '_shipping_state' THEN meta_value END) AS ship_state,
-                MAX(CASE WHEN meta_key = '_shipping_city' THEN meta_value END) AS ship_city,
-                MAX(CASE WHEN meta_key IN ('_shipping_neighborhood','_shipping_bairro','shipping_bairro') THEN meta_value END) AS ship_neighborhood
+                COALESCE(
+                    NULLIF(MAX(CASE WHEN meta_key = '_shipping_state' THEN meta_value END), ''),
+                    NULLIF(MAX(CASE WHEN meta_key = '_billing_state' THEN meta_value END), '')
+                ) AS ship_state,
+                COALESCE(
+                    NULLIF(MAX(CASE WHEN meta_key = '_shipping_city' THEN meta_value END), ''),
+                    NULLIF(MAX(CASE WHEN meta_key = '_billing_city' THEN meta_value END), '')
+                ) AS ship_city,
+                COALESCE(
+                    NULLIF(MAX(CASE WHEN meta_key IN ('_shipping_neighborhood','_shipping_bairro','shipping_bairro') THEN meta_value END), ''),
+                    NULLIF(MAX(CASE WHEN meta_key IN ('_billing_neighborhood','_billing_bairro','billing_bairro') THEN meta_value END), '')
+                ) AS ship_neighborhood
             FROM {$prefix}postmeta
-            WHERE meta_key IN ('_shipping_state','_shipping_city','_shipping_neighborhood','_shipping_bairro','shipping_bairro')
+            WHERE meta_key IN (
+                '_shipping_state','_shipping_city','_shipping_neighborhood','_shipping_bairro','shipping_bairro',
+                '_billing_state','_billing_city','_billing_neighborhood','_billing_bairro','billing_bairro'
+            )
             GROUP BY post_id
         ";
 
@@ -745,19 +781,24 @@ class AdminPedidosWpController extends Controller {
         return [
             'total' => $total,
             'sp_capital_total' => $spCapitalTotal,
-            'por_uf' => $this->rowsToStatsList($rowsUf, $total),
-            'por_cidade' => $this->rowsToStatsList($rowsCidade, $total),
-            'por_bairro' => $this->rowsToStatsList($rowsBairro, $total),
+            'por_uf' => $this->rowsToStatsList($rowsUf, $total, $hideEmpty),
+            'por_cidade' => $this->rowsToStatsList($rowsCidade, $total, $hideEmpty),
+            'por_bairro' => $this->rowsToStatsList($rowsBairro, $total, $hideEmpty),
         ];
     }
 
-    private function rowsToStatsList(array $rows, int $total): array {
+    private function rowsToStatsList(array $rows, int $total, bool $hideEmpty): array {
         $out = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             $label = trim((string) ($r['label'] ?? ''));
             $count = (int) ($r['total'] ?? 0);
-            if ($label === '') $label = '(vazio)';
+            if ($label === '') {
+                if ($hideEmpty) {
+                    continue;
+                }
+                $label = '(vazio)';
+            }
             if ($count <= 0) continue;
             $pct = $total > 0 ? round(($count / $total) * 100, 2) : 0.0;
             $out[] = ['label' => $label, 'total' => $count, 'pct' => $pct];

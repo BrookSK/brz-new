@@ -8,6 +8,8 @@ if (!in_array($source, $allowedSources, true)) $source = 'br';
 
 $start = trim((string) ($startRaw ?? ($_GET['start'] ?? '')));
 $end = trim((string) ($endRaw ?? ($_GET['end'] ?? '')));
+$status = trim((string) ($statusRaw ?? ($_GET['status'] ?? '')));
+$hideEmpty = (string) ($hideEmpty ?? ($_GET['hide_empty'] ?? '')) === '1';
 $top = (int) ($top ?? ($_GET['top'] ?? 20));
 if ($top <= 0) $top = 20;
 if ($top > 200) $top = 200;
@@ -51,9 +53,23 @@ function fmtPct($v) {
         <input type="date" class="form-control" name="end" value="<?= htmlspecialchars($end) ?>">
     </div>
 
+    <div class="col-md-4">
+        <label class="form-label">Status (WooCommerce)</label>
+        <input type="text" class="form-control" name="status" value="<?= htmlspecialchars($status) ?>" placeholder="Ex: wc-completed,wc-processing">
+    </div>
+
     <div class="col-md-2">
         <label class="form-label">Top</label>
         <input type="number" class="form-control" name="top" min="1" max="200" value="<?= (int) $top ?>">
+    </div>
+
+    <div class="col-md-3 d-flex align-items-end">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="hideEmpty" name="hide_empty" <?= $hideEmpty ? 'checked' : '' ?>>
+            <label class="form-check-label" for="hideEmpty">
+                Ocultar (vazio)
+            </label>
+        </div>
     </div>
 
     <div class="col-md-12">
