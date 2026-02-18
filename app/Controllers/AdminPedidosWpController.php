@@ -269,11 +269,21 @@ class AdminPedidosWpController extends Controller {
         $token = '';
         $ambiente = '';
 
+        $hasEntregaSigepAmbiente = in_array('entrega_sigep_ambiente', $cols, true);
+        $hasSigepAmbiente = in_array('sigep_ambiente', $cols, true);
+
         if (in_array('entrega_correios_tracking_token', $cols, true)) {
-            $st = $pdo->query('SELECT entrega_correios_tracking_token, entrega_sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $sql = 'SELECT entrega_correios_tracking_token'
+                . ($hasEntregaSigepAmbiente ? ', entrega_sigep_ambiente' : ($hasSigepAmbiente ? ', sigep_ambiente' : ''))
+                . ' FROM configuracoes_sistema ORDER BY id ASC LIMIT 1';
+            $st = $pdo->query($sql);
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['entrega_correios_tracking_token'] ?? '');
-            $ambiente = (string) ($row['entrega_sigep_ambiente'] ?? '');
+            if ($hasEntregaSigepAmbiente) {
+                $ambiente = (string) ($row['entrega_sigep_ambiente'] ?? '');
+            } elseif ($hasSigepAmbiente) {
+                $ambiente = (string) ($row['sigep_ambiente'] ?? '');
+            }
         } elseif (in_array('correios_tracking_token', $cols, true)) {
             $st = $pdo->query('SELECT correios_tracking_token, sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
