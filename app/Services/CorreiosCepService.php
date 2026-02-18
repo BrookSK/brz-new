@@ -14,7 +14,11 @@ class CorreiosCepService {
             return ['success' => false, 'error' => 'Consulta CEP Correios não configurada (base_url/token).'];
         }
 
-        $url = rtrim($baseUrl, '/') . '/v1/enderecos/' . rawurlencode($cep);
+        $base = rtrim($baseUrl, '/');
+        $urls = [
+            $base . '/v1/enderecos?cep=' . rawurlencode($cep),
+            $base . '/v1/enderecos/' . rawurlencode($cep),
+        ];
         $headers = [
             'Accept: application/json',
             'Authorization: ' . (stripos($token, 'bearer ') === 0 ? $token : ('Bearer ' . $token)),
@@ -23,42 +27,49 @@ class CorreiosCepService {
         $raw = null;
         $httpCode = null;
         try {
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            $raw = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $err = curl_error($ch);
-            curl_close($ch);
+            $lastErr = '';
+            foreach ($urls as $url) {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                $raw = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $err = curl_error($ch);
+                curl_close($ch);
 
-            if ($raw === false || $raw === null) {
-                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode];
-            }
+                if ($raw === false || $raw === null) {
+                    $lastErr = 'Falha na requisição: ' . $err;
+                    continue;
+                }
 
-            $json = json_decode($raw, true);
-            if (!is_array($json)) {
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw];
-            }
+                $json = json_decode($raw, true);
+                if (!is_array($json)) {
+                    $lastErr = 'Resposta inválida (não-JSON).';
+                    continue;
+                }
 
-            if (is_int($httpCode) && $httpCode >= 400) {
-                $msg = $this->extractErrorMessage($json);
+                if (is_int($httpCode) && $httpCode >= 400) {
+                    $msg = $this->extractErrorMessage($json);
+                    return [
+                        'success' => false,
+                        'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar CEP.'),
+                        'http_code' => $httpCode,
+                        'raw' => $json,
+                    ];
+                }
+
+                $bairro = $this->extractBairro($json);
                 return [
-                    'success' => false,
-                    'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar CEP.'),
+                    'success' => true,
                     'http_code' => $httpCode,
                     'raw' => $json,
+                    'bairro' => $bairro,
                 ];
             }
 
-            $bairro = $this->extractBairro($json);
-            return [
-                'success' => true,
-                'http_code' => $httpCode,
-                'raw' => $json,
-                'bairro' => $bairro,
-            ];
+            return ['success' => false, 'error' => $lastErr !== '' ? $lastErr : 'Falha na requisição.', 'http_code' => $httpCode, 'raw' => $raw];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw];
         }
