@@ -219,9 +219,13 @@ class AdminRemessaCorreiosController extends Controller {
             'cienteObjetoNaoProibido' => '1',
             'solicitarColeta' => 'N',
             'observacao' => 'Pedido #' . (int) ($pedido['id'] ?? 0),
-            'pedidoExternoOrigem' => (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT))),
-            'canalExternoOrigem' => 'BRZ',
         ];
+
+        $pedidoExternoOrigem = (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT)));
+        $pedidoExternoOrigem = trim($pedidoExternoOrigem);
+        if ($pedidoExternoOrigem !== '') {
+            $payload['pedidoExternoOrigem'] = $pedidoExternoOrigem;
+        }
 
         return $payload;
     }
