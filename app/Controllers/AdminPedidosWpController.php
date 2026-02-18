@@ -700,21 +700,21 @@ class AdminPedidosWpController extends Controller {
             SELECT
                 post_id,
                 COALESCE(
-                    NULLIF(MAX(CASE WHEN meta_key = '_shipping_state' THEN meta_value END), ''),
-                    NULLIF(MAX(CASE WHEN meta_key = '_billing_state' THEN meta_value END), '')
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_state','shipping_state') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_state','billing_state') THEN meta_value END), ''))
                 ) AS ship_state,
                 COALESCE(
-                    NULLIF(MAX(CASE WHEN meta_key = '_shipping_city' THEN meta_value END), ''),
-                    NULLIF(MAX(CASE WHEN meta_key = '_billing_city' THEN meta_value END), '')
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
                 ) AS ship_city,
                 COALESCE(
-                    NULLIF(MAX(CASE WHEN meta_key IN ('_shipping_neighborhood','_shipping_bairro','shipping_bairro') THEN meta_value END), ''),
-                    NULLIF(MAX(CASE WHEN meta_key IN ('_billing_neighborhood','_billing_bairro','billing_bairro') THEN meta_value END), '')
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name') THEN meta_value END), ''))
                 ) AS ship_neighborhood
             FROM {$prefix}postmeta
             WHERE meta_key IN (
-                '_shipping_state','_shipping_city','_shipping_neighborhood','_shipping_bairro','shipping_bairro',
-                '_billing_state','_billing_city','_billing_neighborhood','_billing_bairro','billing_bairro'
+                '_shipping_state','shipping_state','_shipping_city','shipping_city','_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
+                '_billing_state','billing_state','_billing_city','billing_city','_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
             )
             GROUP BY post_id
         ";

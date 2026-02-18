@@ -32,6 +32,37 @@ function fmtPct($v) {
     <div class="alert alert-danger">Erro ao carregar estatísticas: <?= htmlspecialchars($erro) ?></div>
 <?php endif; ?>
 
+<div class="mb-3">
+    <?php
+    $presetBase = [
+        'wc-enviado' => 'Enviados',
+        'wc-completed' => 'Completed',
+        'wc-comprado' => 'Comprado',
+        'wc-fatura-paga' => 'Fatura paga',
+        'wc-cancelled' => 'Cancelados',
+        'wc-refunded' => 'Reembolsados',
+    ];
+    $baseParams = $_GET;
+    unset($baseParams['status']);
+    ?>
+    <div class="d-flex flex-wrap gap-2">
+        <?php foreach ($presetBase as $st => $label): ?>
+            <?php
+            $p = $baseParams;
+            $p['status'] = $st;
+            $url = '/admin/pedidos-wp/estatisticas?' . http_build_query($p);
+            $active = strtolower(trim($status)) === strtolower(trim($st));
+            ?>
+            <a class="btn btn-sm <?= $active ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= htmlspecialchars($url) ?>"><?= htmlspecialchars($label) ?></a>
+        <?php endforeach; ?>
+        <?php
+        $pAll = $baseParams;
+        $urlAll = '/admin/pedidos-wp/estatisticas?' . http_build_query($pAll);
+        ?>
+        <a class="btn btn-sm <?= $status === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= htmlspecialchars($urlAll) ?>">Todos os status</a>
+    </div>
+</div>
+
 <form method="GET" class="row g-3 mb-4">
     <div class="col-md-3">
         <label class="form-label">Origem</label>
