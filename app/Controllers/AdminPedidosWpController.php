@@ -196,7 +196,7 @@ class AdminPedidosWpController extends Controller {
 
         try {
             $localPdo = Database::getConnection();
-            $trackingCfg = $this->getCorreiosTrackingConfig($localPdo);
+            $trackingCfg = $this->getCorreiosCepConfig($localPdo);
             $svc = new CorreiosCepService();
 
             $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
@@ -257,7 +257,7 @@ class AdminPedidosWpController extends Controller {
         }
     }
 
-    private function getCorreiosTrackingConfig(\PDO $pdo): array {
+    private function getCorreiosCepConfig(\PDO $pdo): array {
         $cols = [];
         try {
             $st = $pdo->query('DESCRIBE configuracoes_sistema');
@@ -267,18 +267,18 @@ class AdminPedidosWpController extends Controller {
         }
 
         $token = '';
-        $baseUrl = '';
+        $ambiente = '';
 
         if (in_array('entrega_correios_tracking_token', $cols, true)) {
-            $st = $pdo->query('SELECT entrega_correios_tracking_token, entrega_correios_tracking_base_url FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $st = $pdo->query('SELECT entrega_correios_tracking_token, entrega_sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['entrega_correios_tracking_token'] ?? '');
-            $baseUrl = (string) ($row['entrega_correios_tracking_base_url'] ?? '');
+            $ambiente = (string) ($row['entrega_sigep_ambiente'] ?? '');
         } elseif (in_array('correios_tracking_token', $cols, true)) {
-            $st = $pdo->query('SELECT correios_tracking_token, correios_tracking_base_url FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $st = $pdo->query('SELECT correios_tracking_token, sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['correios_tracking_token'] ?? '');
-            $baseUrl = (string) ($row['correios_tracking_base_url'] ?? '');
+            $ambiente = (string) ($row['sigep_ambiente'] ?? '');
         } else {
             // fallback KV
             try {
@@ -288,18 +288,17 @@ class AdminPedidosWpController extends Controller {
             } catch (\Exception $e) {
             }
             try {
-                $stB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_tracking_base_url' LIMIT 1");
-                $stB->execute();
-                $baseUrl = (string) ($stB->fetchColumn() ?: '');
+                $stA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'sigep_ambiente' LIMIT 1");
+                $stA->execute();
+                $ambiente = (string) ($stA->fetchColumn() ?: '');
             } catch (\Exception $e) {
             }
         }
 
-        $baseUrl = trim($baseUrl);
-        if ($baseUrl === '') {
-            // base do serviço CEP (produção). Homologação pode ser ajustada se necessário.
-            $baseUrl = 'https://api.correios.com.br/cep';
-        }
+        $amb = strtolower(trim($ambiente));
+        $baseUrl = ($amb === 'homologacao' || $amb === 'homologação' || $amb === 'homolog' || $amb === 'hml')
+            ? 'https://apihom.correios.com.br/cep'
+            : 'https://api.correios.com.br/cep';
 
         return ['base_url' => $baseUrl, 'token' => trim($token)];
     }
