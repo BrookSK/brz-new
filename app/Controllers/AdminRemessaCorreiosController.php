@@ -1295,6 +1295,42 @@ class AdminRemessaCorreiosController extends Controller {
         $cep = '00000-000';
         $telefone = '';
 
+        $cep2 = (string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''));
+        $logradouro2 = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
+        $numero2 = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
+        $complemento2 = (string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''));
+        $bairro2 = (string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''));
+        $cidade2 = (string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''));
+        $estado2 = (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''));
+        $telefone2 = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
+
+        if ($logradouro2 !== '') {
+            $parts = [];
+            $parts[] = $logradouro2;
+            if (trim($numero2) !== '') {
+                $parts[] = trim($numero2);
+            }
+            if (trim($complemento2) !== '') {
+                $parts[] = trim($complemento2);
+            }
+            if (trim($bairro2) !== '') {
+                $parts[] = trim($bairro2);
+            }
+            $endereco = implode(', ', $parts);
+        }
+        if ($cidade2 !== '') {
+            $cidade = $cidade2;
+        }
+        if ($estado2 !== '') {
+            $estado = $estado2;
+        }
+        if ($cep2 !== '') {
+            $cep = $cep2;
+        }
+        if ($telefone2 !== '') {
+            $telefone = $telefone2;
+        }
+
         if (isset($pedido['endereco']) && is_array($pedido['endereco'])) {
             $end = $pedido['endereco'];
             $endereco = (string) ($end['endereco'] ?? ($end['logradouro'] ?? $endereco));
