@@ -10,12 +10,6 @@ class WooCommerceService {
     private string $caBundlePath = '';
     private string $source;
 
-    public function __construct() {
-        $this->storeUrl = (string) $this->getConfig('woocommerce', 'store_url', '');
-        $this->consumerKey = (string) $this->getConfig('woocommerce', 'consumer_key', '');
-        $this->consumerSecret = (string) $this->getConfig('woocommerce', 'consumer_secret', '');
-        $sslVerifyRaw = $this->getConfig('woocommerce', 'ssl_verify', null);
-        $this->caBundlePath = trim((string) $this->getConfig('woocommerce', 'ca_bundle_path', ''));
     public function __construct(string $source = 'br') {
         $source = strtolower(trim($source));
         if (!in_array($source, ['br', 'red', 'us'], true)) {
@@ -24,6 +18,13 @@ class WooCommerceService {
         $this->source = $source;
 
         $cat = 'woocommerce_' . $this->source;
+
+        $sslVerifyRaw = $this->getConfig($cat, 'ssl_verify', null);
+        if ($sslVerifyRaw === null) {
+            $sslVerifyRaw = $this->getConfig('woocommerce', 'ssl_verify', null);
+        }
+        $this->caBundlePath = trim((string) (($this->getConfig($cat, 'ca_bundle_path', null) ?? $this->getConfig('woocommerce', 'ca_bundle_path', ''))));
+
         $this->storeUrl = (string) ($this->getConfig($cat, 'store_url', null) ?? $this->getConfig('woocommerce', 'store_url', ''));
         $this->consumerKey = (string) ($this->getConfig($cat, 'consumer_key', null) ?? $this->getConfig('woocommerce', 'consumer_key', ''));
         $this->consumerSecret = (string) ($this->getConfig($cat, 'consumer_secret', null) ?? $this->getConfig('woocommerce', 'consumer_secret', ''));
