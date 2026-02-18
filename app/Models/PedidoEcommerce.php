@@ -1345,6 +1345,8 @@ class PedidoEcommerce {
                 }
             }
 
+            $sumItensSubtotal = 0.0;
+
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $img = '';

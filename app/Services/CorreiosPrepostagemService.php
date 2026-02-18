@@ -84,10 +84,18 @@ class CorreiosPrepostagemService {
             }
 
             if (is_int($httpCode) && $httpCode >= 400) {
+                $msg = $this->extractErrorMessage($decoded);
+                if ($msg === '') {
+                    $msg = 'Erro HTTP ' . $httpCode;
+                    $enc = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+                    if (is_string($enc) && $enc !== '') {
+                        $msg .= ': ' . $enc;
+                    }
+                }
                 return [
                     'success' => false,
                     'http_code' => $httpCode,
-                    'error' => $this->extractErrorMessage($decoded) ?: ('Erro HTTP ' . $httpCode),
+                    'error' => $msg,
                     'raw' => $decoded,
                 ];
             }
@@ -115,6 +123,12 @@ class CorreiosPrepostagemService {
             }
         }
 
+        foreach (['exception', 'exceptionMessage', 'exceptionName', 'errorMessage'] as $k) {
+            if (isset($json[$k]) && is_string($json[$k]) && trim($json[$k]) !== '') {
+                $cands[] = trim($json[$k]);
+            }
+        }
+
         if (isset($json['msgs']) && is_array($json['msgs'])) {
             $parts = [];
             foreach ($json['msgs'] as $m) {
@@ -124,6 +138,28 @@ class CorreiosPrepostagemService {
             }
             if (!empty($parts)) {
                 $cands[] = implode(' | ', $parts);
+            }
+        }
+
+        foreach (['erros', 'errors', 'mensagens'] as $k) {
+            if (isset($json[$k]) && is_array($json[$k])) {
+                $parts = [];
+                foreach ($json[$k] as $row) {
+                    if (is_string($row) && trim($row) !== '') {
+                        $parts[] = trim($row);
+                        continue;
+                    }
+                    if (is_array($row)) {
+                        foreach (['mensagem', 'message', 'erro', 'error', 'detail', 'campo', 'field'] as $kk) {
+                            if (isset($row[$kk]) && is_string($row[$kk]) && trim($row[$kk]) !== '') {
+                                $parts[] = trim($row[$kk]);
+                            }
+                        }
+                    }
+                }
+                if (!empty($parts)) {
+                    $cands[] = implode(' | ', array_values(array_unique($parts)));
+                }
             }
         }
 
