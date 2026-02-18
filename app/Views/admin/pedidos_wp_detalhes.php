@@ -69,6 +69,10 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
             <a class="btn btn-success" href="<?= htmlspecialchars($wexpressLabelUrl) ?>" target="_blank" rel="noopener">
                 <?= __('admin.orders_wp.details.download_wexpress_label', 'Baixar etiqueta W-Express') ?>
             </a>
+            <button type="button" class="btn btn-outline-danger" id="btnRegerarEtiquetaWexpress" onclick="regerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">
+                <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true" id="wxReSpinner"></span>
+                <span id="wxReBtnText">Regerar etiqueta</span>
+            </button>
         <?php else: ?>
             <button type="button" class="btn btn-primary" id="btnGerarEtiquetaWexpress" onclick="gerarEtiquetaWexpressWp(<?= (int) (($pedido['ID'] ?? $pedido['id'] ?? 0) ?: 0) ?>)">
                 <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true" id="wxSpinner"></span>
@@ -94,6 +98,8 @@ window.ADMIN_ORDERS_WP_DETAILS_I18N = {
 window.ADMIN_ORDERS_WP_DETAILS_SOURCE = <?= json_encode($source, JSON_UNESCAPED_UNICODE) ?>;
 window.ADMIN_ORDERS_WP_DETAILS_DEFAULT_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generate_wexpress_label', 'Gerar etiqueta W-Express'), JSON_UNESCAPED_UNICODE) ?>;
 window.ADMIN_ORDERS_WP_DETAILS_LOADING_BTN_TEXT = <?= json_encode(__('admin.orders_wp.details.generating_wexpress_label', 'Gerando...'), JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_RE_DEFAULT_BTN_TEXT = <?= json_encode('Regerar etiqueta', JSON_UNESCAPED_UNICODE) ?>;
+window.ADMIN_ORDERS_WP_DETAILS_RE_LOADING_BTN_TEXT = <?= json_encode('Regerando...', JSON_UNESCAPED_UNICODE) ?>;
 
 function gerarEtiquetaWexpressWp(orderId, source) {
     if (!orderId) {
@@ -154,6 +160,64 @@ function gerarEtiquetaWexpressWp(orderId, source) {
         if (tx) tx.textContent = (window.ADMIN_ORDERS_WP_DETAILS_DEFAULT_BTN_TEXT || 'Gerar etiqueta W-Express');
     });
 }
+
+function regerarEtiquetaWexpressWp(orderId, source) {
+    if (!orderId) {
+        alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.invalid_order : 'Pedido inválido');
+        return;
+    }
+    source = (source || window.ADMIN_ORDERS_WP_DETAILS_SOURCE || 'br').toString().toLowerCase();
+    if (!confirm('Deseja regerar a etiqueta da W-Express para este pedido? Isso irá substituir a etiqueta atual.')) return;
+
+    var btn = document.getElementById('btnRegerarEtiquetaWexpress');
+    var sp = document.getElementById('wxReSpinner');
+    var tx = document.getElementById('wxReBtnText');
+    if (btn) btn.disabled = true;
+    if (sp) sp.classList.remove('d-none');
+    if (tx) tx.textContent = (window.ADMIN_ORDERS_WP_DETAILS_RE_LOADING_BTN_TEXT || 'Regerando...');
+
+    fetch('/admin/pedidos-wp/wexpress/regerar/' + orderId + '?source=' + encodeURIComponent(source), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data || !data.success) {
+            throw new Error((data && (data.error || data.message)) ? (data.error || data.message) : ((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.error_generate_label) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.error_generate_label : 'Erro ao gerar etiqueta'));
+        }
+        return data;
+    })
+    .then((data) => {
+        const labelUrl = data.label_url || '';
+        alert((window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.label_generated_success : 'Etiqueta gerada com sucesso!');
+        if (labelUrl) {
+            const w = window.open(labelUrl, '_blank');
+            if (!w) {
+                var msg = 'Popup bloqueado. Copie e abra a etiqueta em uma nova aba:\n' + labelUrl;
+                try {
+                    window.prompt(msg, labelUrl);
+                } catch (e) {
+                    alert(msg);
+                }
+            }
+            setTimeout(() => location.reload(), 800);
+        } else {
+            location.reload();
+        }
+    })
+    .catch((e) => {
+        const errPrefix = (window.ADMIN_ORDERS_WP_DETAILS_I18N && window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix) ? window.ADMIN_ORDERS_WP_DETAILS_I18N.error_prefix : 'Erro:';
+        alert(errPrefix + ' ' + (e && e.message ? e.message : String(e)));
+    })
+    .finally(() => {
+        if (btn) btn.disabled = false;
+        if (sp) sp.classList.add('d-none');
+        if (tx) tx.textContent = (window.ADMIN_ORDERS_WP_DETAILS_RE_DEFAULT_BTN_TEXT || 'Regerar etiqueta');
+    });
+}
 </script>
 
 <?php if (!$pedido): ?>
@@ -180,6 +244,9 @@ function gerarEtiquetaWexpressWp(orderId, source) {
                 <div><strong><?= __('common.status', 'Status') ?>:</strong> <?= htmlspecialchars((string) ($pedido['post_status'] ?? $pedido['status'] ?? '')) ?></div>
                 <div><strong><?= __('common.date', 'Data') ?>:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($pedido['post_date'] ?? $pedido['created_at'] ?? 'now')))) ?></div>
                 <div><strong><?= __('common.total', 'Total') ?>:</strong> <?= htmlspecialchars(wpFormatMoney2($total, $currency)) ?></div>
+                <?php if ($source === 'red' && isset($declaracaoTotal) && is_numeric($declaracaoTotal) && (float) $declaracaoTotal > 0): ?>
+                    <div><strong>Declaração:</strong> <?= htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, $currency)) ?></div>
+                <?php endif; ?>
                 <div><strong><?= __('admin.orders_wp.details.currency', 'Moeda') ?>:</strong> <?= htmlspecialchars($currency ?: '-') ?></div>
             </div>
         </div>
@@ -225,13 +292,19 @@ function gerarEtiquetaWexpressWp(orderId, source) {
                                 <th><?= __('admin.orders_wp.details.table.ncm', 'NCM') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.qty', 'Qtd') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.unit_price', 'Unitário') ?></th>
+                                <?php if ($source === 'red'): ?>
+                                    <th>Declaração (unit.)</th>
+                                <?php endif; ?>
                                 <th><?= __('checkout.subtotal', 'Subtotal') ?></th>
                                 <th><?= __('common.total', 'Total') ?></th>
+                                <?php if ($source === 'red'): ?>
+                                    <th>Declaração (total)</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($itens)): ?>
-                                <tr><td colspan="7" class="text-center text-muted"><?= __('admin.orders_wp.details.items_empty', 'Sem itens encontrados.') ?></td></tr>
+                                <tr><td colspan="<?= $source === 'red' ? '9' : '7' ?>" class="text-center text-muted"><?= __('admin.orders_wp.details.items_empty', 'Sem itens encontrados.') ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($itens as $it): ?>
                                     <tr>
@@ -243,8 +316,14 @@ function gerarEtiquetaWexpressWp(orderId, source) {
                                         <td><?= htmlspecialchars((string) ($it['ncm'] ?? '')) ?></td>
                                         <td><?= (int) ($it['quantidade'] ?? 0) ?></td>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['preco_unitario'] ?? 0), $currency)) ?></td>
+                                        <?php if ($source === 'red'): ?>
+                                            <td><?= ($it['declaracao_unitario'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_unitario'] ?? 0), $currency)) : '-' ?></td>
+                                        <?php endif; ?>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['subtotal'] ?? 0), $currency)) ?></td>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['total'] ?? 0), $currency)) ?></td>
+                                        <?php if ($source === 'red'): ?>
+                                            <td><?= ($it['declaracao_total'] ?? null) !== null ? htmlspecialchars(wpFormatMoney2((float) ($it['declaracao_total'] ?? 0), $currency)) : '-' ?></td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>

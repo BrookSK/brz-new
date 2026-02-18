@@ -12,6 +12,58 @@ class AdminPedidosWpController extends Controller {
 
     private const SOURCES = ['br', 'red', 'us'];
 
+    private function parseWpMoney($v): ?float {
+        if ($v === null) return null;
+        if (is_bool($v)) return null;
+        if (is_int($v) || is_float($v)) {
+            $f = (float) $v;
+            return $f > 0 ? $f : null;
+        }
+        $s = trim((string) $v);
+        if ($s === '') return null;
+        $s = preg_replace('/[^0-9,\.\-]/', '', $s);
+        if ($s === null) return null;
+        $s = trim($s);
+        if ($s === '') return null;
+
+        $hasComma = strpos($s, ',') !== false;
+        $hasDot = strpos($s, '.') !== false;
+        if ($hasComma && $hasDot) {
+            if (strrpos($s, ',') > strrpos($s, '.')) {
+                $s = str_replace('.', '', $s);
+                $s = str_replace(',', '.', $s);
+            } else {
+                $s = str_replace(',', '', $s);
+            }
+        } elseif ($hasComma && !$hasDot) {
+            $s = str_replace(',', '.', $s);
+        }
+
+        if (!is_numeric($s)) return null;
+        $f = (float) $s;
+        return $f > 0 ? $f : null;
+    }
+
+    private function findDeclaredUnitValueFromItemMeta(array $itemMeta): ?float {
+        $direct = $this->parseWpMoney($itemMeta['_declaration_value'] ?? null);
+        if ($direct !== null && $direct > 0) {
+            return $direct;
+        }
+        $best = null;
+        foreach ($itemMeta as $k => $v) {
+            $key = strtolower(trim((string) $k));
+            if ($key === '') continue;
+            if ($key === '_declaration_value') continue;
+            if (strpos($key, 'declar') === false) continue;
+            $money = $this->parseWpMoney($v);
+            if ($money === null) continue;
+            if ($best === null || $money > $best) {
+                $best = $money;
+            }
+        }
+        return $best;
+    }
+
     public function estatisticas(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
@@ -784,6 +836,14 @@ class AdminPedidosWpController extends Controller {
     }
 
     public function gerarEtiquetaWexpress(Request $request, int $id) {
+        $this->handleEtiquetaWexpress($request, $id, false);
+    }
+
+    public function regerarEtiquetaWexpress(Request $request, int $id) {
+        $this->handleEtiquetaWexpress($request, $id, true);
+    }
+
+    private function handleEtiquetaWexpress(Request $request, int $id, bool $forceRegenerate): void {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
@@ -818,6 +878,21 @@ class AdminPedidosWpController extends Controller {
                 $k = (string) ($r['meta_key'] ?? '');
                 if ($k === '') continue;
                 $meta[$k] = $r['meta_value'] ?? '';
+            }
+
+            if (!$forceRegenerate) {
+                $existingUrl = trim((string) ($meta['wexpress_label_url'] ?? ($meta['_wexpress_label_url'] ?? '')));
+                if ($existingUrl === '') {
+                    $existingUrl = trim((string) ($meta['wp_wexpress_label_url'] ?? ''));
+                }
+                if ($existingUrl !== '') {
+                    $this->json([
+                        'success' => true,
+                        'label_url' => $existingUrl,
+                        'message' => 'Etiqueta já gerada para este pedido',
+                    ]);
+                    return;
+                }
             }
 
             $currency = strtoupper(trim((string) ($meta['_order_currency'] ?? 'USD')));
@@ -874,6 +949,8 @@ class AdminPedidosWpController extends Controller {
             $pesoTotalKg = 0.0;
             $usdToBrl = $this->getUsdToBrlRate($localPdo);
             $brlToUsd = ($usdToBrl > 0.000001) ? (1.0 / $usdToBrl) : 1.0;
+            $declaredItemsTotal = 0.0;
+            $hasDeclaredItems = false;
 
             foreach ($orderItems as $oi) {
                 if (strtolower((string) ($oi['order_item_type'] ?? '')) !== 'line_item') {
@@ -900,6 +977,16 @@ class AdminPedidosWpController extends Controller {
                 $lineTotal = is_numeric($m['_line_total'] ?? null) ? (float) $m['_line_total'] : 0.0;
                 $unit = $qtd > 0 ? round($lineTotal / $qtd, 2) : 0.0;
                 if ($unit <= 0) $unit = 1.0;
+
+                if ($source === 'red') {
+                    $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
+                    if ($declaredUnit !== null && $declaredUnit > 0) {
+                        $hasDeclaredItems = true;
+                        $declaredItemsTotal += ($declaredUnit * $qtd);
+                        $unit = $declaredUnit;
+                    }
+                }
+
                 if ($currency === 'BRL') {
                     $unit = $unit * $brlToUsd;
                 }
@@ -991,7 +1078,7 @@ class AdminPedidosWpController extends Controller {
             $taxIdType = strlen($billingDocDigits) > 11 ? 'CNPJ' : 'CPF';
             $recipientType = ($taxIdType === 'CPF') ? 'individual' : 'business';
 
-            $declared = is_numeric($meta['_order_total'] ?? null) ? (float) $meta['_order_total'] : 0.0;
+            $declared = $hasDeclaredItems ? (float) $declaredItemsTotal : (is_numeric($meta['_order_total'] ?? null) ? (float) $meta['_order_total'] : 0.0);
             if ($declared <= 0) $declared = 1.0;
             if ($currency === 'BRL') {
                 $declared = $declared * $brlToUsd;
@@ -1095,6 +1182,7 @@ class AdminPedidosWpController extends Controller {
         $pedido = null;
         $meta = [];
         $itens = [];
+        $declaracaoTotal = 0.0;
         $erro = '';
 
         try {
@@ -1154,6 +1242,16 @@ class AdminPedidosWpController extends Controller {
                     $unit = round($lineTotal / $qtd, 2);
                 }
 
+                $declaredUnit = null;
+                $declaredItemTotal = null;
+                if ($source === 'red') {
+                    $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
+                    if ($declaredUnit !== null && $declaredUnit > 0) {
+                        $declaredItemTotal = $declaredUnit * max(1, (int) $qtd);
+                        $declaracaoTotal += $declaredItemTotal;
+                    }
+                }
+
                 $sku = '';
                 $ncm = '';
 
@@ -1195,6 +1293,8 @@ class AdminPedidosWpController extends Controller {
                     'ncm' => $ncm,
                     'quantidade' => $qtd,
                     'preco_unitario' => $unit,
+                    'declaracao_unitario' => $declaredUnit,
+                    'declaracao_total' => $declaredItemTotal,
                     'subtotal' => $lineSubtotal,
                     'total' => $lineTotal,
                 ];
