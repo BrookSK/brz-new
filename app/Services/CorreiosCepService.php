@@ -16,9 +16,10 @@ class CorreiosCepService {
 
         $base = rtrim($baseUrl, '/');
         $urls = [
-            $base . '/v1/enderecos?cep=' . rawurlencode($cep),
             $base . '/v2/enderecos?cep=' . rawurlencode($cep),
+            $base . '/v2/enderecos/' . rawurlencode($cep),
             $base . '/v1/enderecos/' . rawurlencode($cep),
+            $base . '/v1/enderecos?cep=' . rawurlencode($cep),
         ];
         $headers = [
             'Accept: application/json',
