@@ -358,25 +358,37 @@ class AdminPedidosWpController extends Controller {
 
         if (trim($cepAmbiente) === '') {
             try {
-                $stCA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_cep_ambiente' LIMIT 1");
-                $stCA->execute();
-                $cepAmbiente = (string) ($stCA->fetchColumn() ?: '');
+                $tryKeys = ['entrega_correios_cep_ambiente', 'correios_cep_ambiente'];
+                foreach ($tryKeys as $k) {
+                    $stCA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCA->execute([(string) $k]);
+                    $cepAmbiente = (string) ($stCA->fetchColumn() ?: '');
+                    if (trim($cepAmbiente) !== '') break;
+                }
             } catch (\Exception $e) {
             }
         }
         if (trim($cepBaseUrl) === '') {
             try {
-                $stCB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_cep_base_url' LIMIT 1");
-                $stCB->execute();
-                $cepBaseUrl = (string) ($stCB->fetchColumn() ?: '');
+                $tryKeys = ['entrega_correios_cep_base_url', 'correios_cep_base_url'];
+                foreach ($tryKeys as $k) {
+                    $stCB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCB->execute([(string) $k]);
+                    $cepBaseUrl = (string) ($stCB->fetchColumn() ?: '');
+                    if (trim($cepBaseUrl) !== '') break;
+                }
             } catch (\Exception $e) {
             }
         }
         if (trim($cepToken) === '') {
             try {
-                $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_cep_token' LIMIT 1");
-                $stCT->execute();
-                $cepToken = (string) ($stCT->fetchColumn() ?: '');
+                $tryKeys = ['entrega_correios_cep_token', 'correios_cep_token'];
+                foreach ($tryKeys as $k) {
+                    $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCT->execute([(string) $k]);
+                    $cepToken = (string) ($stCT->fetchColumn() ?: '');
+                    if (trim($cepToken) !== '') break;
+                }
             } catch (\Exception $e) {
             }
         }
