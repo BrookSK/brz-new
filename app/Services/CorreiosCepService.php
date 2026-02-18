@@ -14,6 +14,8 @@ class CorreiosCepService {
             return ['success' => false, 'error' => 'Consulta CEP Correios não configurada (base_url/token).'];
         }
 
+        $tokenFingerprint = substr(hash('sha256', $token), 0, 12);
+
         $base = rtrim($baseUrl, '/');
         $urls = [
             $base . '/v2/enderecos/' . rawurlencode($cep),
@@ -30,7 +32,9 @@ class CorreiosCepService {
         $httpCode = null;
         try {
             $lastErr = '';
+            $lastUrl = '';
             foreach ($urls as $url) {
+                $lastUrl = (string) $url;
                 $ch = curl_init($url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
@@ -69,6 +73,8 @@ class CorreiosCepService {
                         'error' => $errMsg,
                         'http_code' => $httpCode,
                         'raw' => $json,
+                        'request_url' => $lastUrl,
+                        'token_fingerprint' => $tokenFingerprint,
                     ];
                 }
 
@@ -78,12 +84,27 @@ class CorreiosCepService {
                     'http_code' => $httpCode,
                     'raw' => $json,
                     'bairro' => $bairro,
+                    'request_url' => $lastUrl,
+                    'token_fingerprint' => $tokenFingerprint,
                 ];
             }
 
-            return ['success' => false, 'error' => $lastErr !== '' ? $lastErr : 'Falha na requisição.', 'http_code' => $httpCode, 'raw' => $raw];
+            return [
+                'success' => false,
+                'error' => $lastErr !== '' ? $lastErr : 'Falha na requisição.',
+                'http_code' => $httpCode,
+                'raw' => $raw,
+                'request_url' => $lastUrl,
+                'token_fingerprint' => $tokenFingerprint,
+            ];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw];
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'http_code' => $httpCode,
+                'raw' => $raw,
+                'token_fingerprint' => $tokenFingerprint,
+            ];
         }
     }
 
