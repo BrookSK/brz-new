@@ -383,8 +383,8 @@ class AdminPedidosWpController extends Controller {
 
     private function saveAutofillRecord(\PDO $pdo, string $source, int $wpOrderId, string $fieldName, ?string $oldValue, ?string $newValue, ?string $cep, ?string $wpCreatedAt, ?string $wpStatus, $requestJson, $responseJson, ?string $error): void {
         $st = $pdo->prepare(
-            'INSERT INTO wp_pedido_endereco_autofill (source, wp_order_id, field_name, old_value, new_value, cep, wp_created_at, wp_status, request_json, response_json, error)\n'
-            . 'VALUES (?,?,?,?,?,?,?,?,?,?,?)\n'
+            'INSERT INTO wp_pedido_endereco_autofill (source, wp_order_id, field_name, old_value, new_value, cep, wp_created_at, wp_status, request_json, response_json, error) '
+            . 'VALUES (?,?,?,?,?,?,?,?,?,?,?) '
             . 'ON DUPLICATE KEY UPDATE old_value = VALUES(old_value), new_value = VALUES(new_value), cep = VALUES(cep), wp_created_at = VALUES(wp_created_at), wp_status = VALUES(wp_status), request_json = VALUES(request_json), response_json = VALUES(response_json), error = VALUES(error)'
         );
         $st->execute([
