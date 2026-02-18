@@ -290,7 +290,7 @@ class AdminPedidosWpController extends Controller {
                 . (in_array('entrega_correios_cep_ambiente', $cols, true) ? ', entrega_correios_cep_ambiente' : '')
                 . (in_array('entrega_correios_cep_base_url', $cols, true) ? ', entrega_correios_cep_base_url' : '')
                 . (in_array('entrega_correios_cep_token', $cols, true) ? ', entrega_correios_cep_token' : '')
-                . ' FROM configuracoes_sistema ORDER BY id ASC LIMIT 1';
+                . ' FROM configuracoes_sistema ORDER BY id DESC LIMIT 1';
             $st = $pdo->query($sql);
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['entrega_correios_tracking_token'] ?? '');
@@ -303,7 +303,7 @@ class AdminPedidosWpController extends Controller {
             $cepBaseUrl = (string) ($row['entrega_correios_cep_base_url'] ?? '');
             $cepToken = (string) ($row['entrega_correios_cep_token'] ?? '');
         } elseif (in_array('correios_tracking_token', $cols, true)) {
-            $st = $pdo->query('SELECT correios_tracking_token, sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
+            $st = $pdo->query('SELECT correios_tracking_token, sigep_ambiente FROM configuracoes_sistema ORDER BY id DESC LIMIT 1');
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['correios_tracking_token'] ?? '');
             $ambiente = (string) ($row['sigep_ambiente'] ?? '');
@@ -360,7 +360,19 @@ class AdminPedidosWpController extends Controller {
             try {
                 $tryKeys = ['entrega_correios_cep_ambiente', 'correios_cep_ambiente'];
                 foreach ($tryKeys as $k) {
-                    $stCA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? ORDER BY id DESC LIMIT 1");
+                    $stCA->execute([(string) $k]);
+                    $cepAmbiente = (string) ($stCA->fetchColumn() ?: '');
+                    if (trim($cepAmbiente) !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+        if (trim($cepAmbiente) === '') {
+            try {
+                $tryKeys = ['entrega_correios_cep_ambiente', 'correios_cep_ambiente'];
+                foreach ($tryKeys as $k) {
+                    $stCA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? ORDER BY id DESC LIMIT 1");
                     $stCA->execute([(string) $k]);
                     $cepAmbiente = (string) ($stCA->fetchColumn() ?: '');
                     if (trim($cepAmbiente) !== '') break;
@@ -372,7 +384,19 @@ class AdminPedidosWpController extends Controller {
             try {
                 $tryKeys = ['entrega_correios_cep_base_url', 'correios_cep_base_url'];
                 foreach ($tryKeys as $k) {
-                    $stCB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? ORDER BY id DESC LIMIT 1");
+                    $stCB->execute([(string) $k]);
+                    $cepBaseUrl = (string) ($stCB->fetchColumn() ?: '');
+                    if (trim($cepBaseUrl) !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+        if (trim($cepBaseUrl) === '') {
+            try {
+                $tryKeys = ['entrega_correios_cep_base_url', 'correios_cep_base_url'];
+                foreach ($tryKeys as $k) {
+                    $stCB = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? ORDER BY id DESC LIMIT 1");
                     $stCB->execute([(string) $k]);
                     $cepBaseUrl = (string) ($stCB->fetchColumn() ?: '');
                     if (trim($cepBaseUrl) !== '') break;
@@ -384,7 +408,19 @@ class AdminPedidosWpController extends Controller {
             try {
                 $tryKeys = ['entrega_correios_cep_token', 'correios_cep_token'];
                 foreach ($tryKeys as $k) {
-                    $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? LIMIT 1");
+                    $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = ? ORDER BY id DESC LIMIT 1");
+                    $stCT->execute([(string) $k]);
+                    $cepToken = (string) ($stCT->fetchColumn() ?: '');
+                    if (trim($cepToken) !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+        if (trim($cepToken) === '') {
+            try {
+                $tryKeys = ['entrega_correios_cep_token', 'correios_cep_token'];
+                foreach ($tryKeys as $k) {
+                    $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? ORDER BY id DESC LIMIT 1");
                     $stCT->execute([(string) $k]);
                     $cepToken = (string) ($stCT->fetchColumn() ?: '');
                     if (trim($cepToken) !== '') break;
