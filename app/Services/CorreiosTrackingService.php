@@ -112,6 +112,8 @@ class CorreiosTrackingService {
             $candidates = $json['eventos'];
         } elseif (isset($json['objetos'][0]['eventos']) && is_array($json['objetos'][0]['eventos'])) {
             $candidates = $json['objetos'][0]['eventos'];
+        } elseif (isset($json['objeto']['eventos']) && is_array($json['objeto']['eventos'])) {
+            $candidates = $json['objeto']['eventos'];
         } elseif (isset($json['packages'][0]['events']) && is_array($json['packages'][0]['events'])) {
             $candidates = $json['packages'][0]['events'];
         } elseif (isset($json['package']['events']) && is_array($json['package']['events'])) {
@@ -124,23 +126,55 @@ class CorreiosTrackingService {
         foreach ($candidates as $ev) {
             if (!is_array($ev)) continue;
 
-            $etapa = (string) ($ev['status'] ?? ($ev['descricao'] ?? ($ev['evento'] ?? ($ev['eventType'] ?? ($ev['eventDescription'] ?? '')))));
-            $descricao = (string) ($ev['descricao'] ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? ($ev['eventDescription'] ?? $etapa))));
+            $etapa = (string) (
+                $ev['status']
+                ?? ($ev['descricao'] ?? ($ev['evento'] ?? ($ev['eventType'] ?? ($ev['eventDescription'] ?? ($ev['descricaoEvento'] ?? '')))))
+            );
+            $descricao = (string) (
+                $ev['descricao']
+                ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? ($ev['eventDescription'] ?? ($ev['descricaoEvento'] ?? $etapa))))
+            );
 
             $local = '';
-            if (isset($ev['unidade']['nome'])) {
-                $local = (string) $ev['unidade']['nome'];
-            } elseif (isset($ev['eventLocation'])) {
-                $local = (string) $ev['eventLocation'];
-            } elseif (isset($ev['location'])) {
-                $local = (string) $ev['location'];
-            } elseif (isset($ev['local'])) {
-                $local = (string) $ev['local'];
+            // SRO Rastro v3 costuma trazer unidade.{nome,endereco.{cidade,uf}}
+            if (isset($ev['unidade']) && is_array($ev['unidade'])) {
+                $nomeUn = isset($ev['unidade']['nome']) ? (string) $ev['unidade']['nome'] : '';
+                $cidadeUf = '';
+                if (isset($ev['unidade']['endereco']) && is_array($ev['unidade']['endereco'])) {
+                    $cid = (string) ($ev['unidade']['endereco']['cidade'] ?? '');
+                    $uf = (string) ($ev['unidade']['endereco']['uf'] ?? '');
+                    if ($cid !== '' && $uf !== '') {
+                        $cidadeUf = $cid . '/' . $uf;
+                    } elseif ($cid !== '') {
+                        $cidadeUf = $cid;
+                    } elseif ($uf !== '') {
+                        $cidadeUf = $uf;
+                    }
+                }
+
+                $local = trim($nomeUn);
+                if ($cidadeUf !== '') {
+                    $local = trim($local . ' - ' . $cidadeUf);
+                }
+            }
+
+            if ($local === '') {
+                if (isset($ev['eventLocation'])) {
+                    $local = (string) $ev['eventLocation'];
+                } elseif (isset($ev['location'])) {
+                    $local = (string) $ev['location'];
+                } elseif (isset($ev['local'])) {
+                    $local = (string) $ev['local'];
+                }
             }
 
             $dataHora = '';
             if (!empty($ev['dataHora'])) {
                 $dataHora = (string) $ev['dataHora'];
+            } elseif (!empty($ev['dtHrCriado'])) {
+                $dataHora = (string) $ev['dtHrCriado'];
+            } elseif (!empty($ev['dtHr'])) {
+                $dataHora = (string) $ev['dtHr'];
             } elseif (!empty($ev['eventDate']) && !empty($ev['eventTime'])) {
                 $dataHora = (string) ($ev['eventDate'] . ' ' . $ev['eventTime']);
             } elseif (!empty($ev['eventDateTime'])) {

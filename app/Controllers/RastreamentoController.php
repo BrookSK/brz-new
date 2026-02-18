@@ -149,14 +149,23 @@ class RastreamentoController extends Controller {
         $enabled = $get('entrega', 'correios_tracking_enabled', '0');
         $token = $get('entrega', 'correios_tracking_token', '');
 
-        // Automático: URL do Packet Service baseado no ambiente (reaproveita sigep_ambiente)
+        $configuredBaseUrl = trim($get('entrega', 'correios_tracking_base_url', ''));
+
+        // Automático: URL do SRO Rastro v3 baseado no ambiente (reaproveita sigep_ambiente)
+        // Permite override por configuracao (entrega_correios_tracking_base_url)
         $amb = $get('entrega', 'sigep_ambiente', 'homologacao');
-        $baseUrl = ($amb === 'producao')
-            ? 'https://api.correios.com.br/packet/v1/packages?trackingNumber='
-            : 'https://apihom.correios.com.br/packet/v1/packages?trackingNumber=';
+        $baseUrl = $configuredBaseUrl;
+        if ($baseUrl === '') {
+            $baseUrl = ($amb === 'producao')
+                ? 'https://api.correios.com.br/srorastro/v3/v1/objetos/{codigo}'
+                : 'https://apihom.correios.com.br/srorastro/v3/v1/objetos/{codigo}';
+        }
 
         // Automático: header padrão
-        $header = 'Authorization';
+        $header = trim($get('entrega', 'correios_tracking_header', 'Authorization'));
+        if ($header === '') {
+            $header = 'Authorization';
+        }
 
         return [
             'enabled' => $enabled,
