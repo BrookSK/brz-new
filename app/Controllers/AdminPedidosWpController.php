@@ -279,6 +279,7 @@ class AdminPedidosWpController extends Controller {
         $ambiente = '';
         $cepAmbiente = '';
         $cepBaseUrl = '';
+        $cepToken = '';
 
         $hasEntregaSigepAmbiente = in_array('entrega_sigep_ambiente', $cols, true);
         $hasSigepAmbiente = in_array('sigep_ambiente', $cols, true);
@@ -288,6 +289,7 @@ class AdminPedidosWpController extends Controller {
                 . ($hasEntregaSigepAmbiente ? ', entrega_sigep_ambiente' : ($hasSigepAmbiente ? ', sigep_ambiente' : ''))
                 . (in_array('entrega_correios_cep_ambiente', $cols, true) ? ', entrega_correios_cep_ambiente' : '')
                 . (in_array('entrega_correios_cep_base_url', $cols, true) ? ', entrega_correios_cep_base_url' : '')
+                . (in_array('entrega_correios_cep_token', $cols, true) ? ', entrega_correios_cep_token' : '')
                 . ' FROM configuracoes_sistema ORDER BY id ASC LIMIT 1';
             $st = $pdo->query($sql);
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
@@ -299,6 +301,7 @@ class AdminPedidosWpController extends Controller {
             }
             $cepAmbiente = (string) ($row['entrega_correios_cep_ambiente'] ?? '');
             $cepBaseUrl = (string) ($row['entrega_correios_cep_base_url'] ?? '');
+            $cepToken = (string) ($row['entrega_correios_cep_token'] ?? '');
         } elseif (in_array('correios_tracking_token', $cols, true)) {
             $st = $pdo->query('SELECT correios_tracking_token, sigep_ambiente FROM configuracoes_sistema ORDER BY id ASC LIMIT 1');
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
@@ -369,6 +372,16 @@ class AdminPedidosWpController extends Controller {
             } catch (\Exception $e) {
             }
         }
+        if (trim($cepToken) === '') {
+            try {
+                $stCT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_cep_token' LIMIT 1");
+                $stCT->execute();
+                $cepToken = (string) ($stCT->fetchColumn() ?: '');
+            } catch (\Exception $e) {
+            }
+        }
+
+        $effectiveToken = trim($cepToken) !== '' ? trim($cepToken) : trim($token);
 
         $baseUrl = trim($cepBaseUrl);
         if ($baseUrl === '') {
@@ -379,7 +392,7 @@ class AdminPedidosWpController extends Controller {
                 : 'https://api.correios.com.br/cep';
         }
 
-        return ['base_url' => $baseUrl, 'token' => trim($token)];
+        return ['base_url' => $baseUrl, 'token' => $effectiveToken];
     }
 
     private function fetchWpNeighborhoodMissingWithCep(\PDO $localPdo, string $source, ?string $start, ?string $end, array $statusList, int $limite): array {
