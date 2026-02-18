@@ -135,6 +135,19 @@ class AdminRemessaCorreiosController extends Controller {
             throw new \Exception('Pré-Postagem: configure o remetente (JSON) no Admin');
         }
 
+        if (isset($sender['pais'])) {
+            unset($sender['pais']);
+        }
+        if (isset($sender['endereco']) && is_array($sender['endereco'])) {
+            if (isset($sender['endereco']['pais'])) {
+                unset($sender['endereco']['pais']);
+            }
+        }
+
+        if (isset($sender['canalExternoOrigem'])) {
+            unset($sender['canalExternoOrigem']);
+        }
+
         $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
         $destEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
         $destTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
@@ -173,7 +186,6 @@ class AdminRemessaCorreiosController extends Controller {
                 'cidade' => $cidade,
                 'uf' => $uf,
                 'regiao' => '',
-                'pais' => 'BR',
             ],
         ];
 
@@ -220,6 +232,10 @@ class AdminRemessaCorreiosController extends Controller {
             'solicitarColeta' => 'N',
             'observacao' => 'Pedido #' . (int) ($pedido['id'] ?? 0),
         ];
+
+        if (isset($payload['canalExternoOrigem'])) {
+            unset($payload['canalExternoOrigem']);
+        }
 
         $pedidoExternoOrigem = (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT)));
         $pedidoExternoOrigem = trim($pedidoExternoOrigem);
