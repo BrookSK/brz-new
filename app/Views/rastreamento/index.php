@@ -179,32 +179,34 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header">
-                <h5><i class="fas fa-history"></i> Histórico de Rastreamento</h5>
-            </div>
-            <div class="card-body">
-                <?php if (empty($rastreamento)): ?>
-                    <p class="text-muted">Nenhuma atualização de rastreamento encontrada.</p>
-                <?php else: ?>
-                    <div class="timeline-vertical">
-                        <?php foreach ($rastreamento as $item): ?>
-                            <div class="timeline-vertical-item">
-                                <div class="timeline-vertical-marker"></div>
-                                <div class="timeline-vertical-content">
-                                    <h6><?= htmlspecialchars($item['etapa']) ?></h6>
-                                    <p class="mb-1"><?= htmlspecialchars($item['descricao']) ?></p>
-                                    <?php if ($item['local']): ?>
-                                        <small class="text-muted"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($item['local']) ?></small><br>
-                                    <?php endif; ?>
-                                    <small class="text-muted"><i class="fas fa-clock"></i> <?= date('d/m/Y H:i', strtotime($item['data_hora'])) ?></small>
+<div class="container pb-4">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5><i class="fas fa-history"></i> Histórico de Rastreamento</h5>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($rastreamento)): ?>
+                        <p class="text-muted">Nenhuma atualização de rastreamento encontrada.</p>
+                    <?php else: ?>
+                        <div class="timeline-vertical">
+                            <?php foreach ($rastreamento as $item): ?>
+                                <div class="timeline-vertical-item">
+                                    <div class="timeline-vertical-marker"></div>
+                                    <div class="timeline-vertical-content">
+                                        <h6><?= htmlspecialchars($item['etapa']) ?></h6>
+                                        <p class="mb-1"><?= htmlspecialchars($item['descricao']) ?></p>
+                                        <?php if ($item['local']): ?>
+                                            <small class="text-muted"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($item['local']) ?></small><br>
+                                        <?php endif; ?>
+                                        <small class="text-muted"><i class="fas fa-clock"></i> <?= date('d/m/Y H:i', strtotime($item['data_hora'])) ?></small>
+                                    </div>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -264,6 +266,5 @@
     border-left: 3px solid rgba(11, 31, 58, 0.85);
 }
 </style>
-</div>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
