@@ -1406,6 +1406,13 @@ class AdminPedidosWpController extends Controller {
         $stB->execute();
         $rowsWp = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+        // Contagem real de vazios no WP no recorte atual (independente de aparecer no TOP)
+        $sqlEmptyWp = "SELECT COUNT(DISTINCT p.ID) {$baseFrom} AND TRIM(COALESCE(sm.ship_neighborhood, '')) = ''";
+        $stE = $wpPdo->prepare($sqlEmptyWp);
+        foreach ($params as $k => $v) $stE->bindValue($k, $v);
+        $stE->execute();
+        $emptyWpCount = (int) ($stE->fetchColumn() ?: 0);
+
         $map = [];
         foreach ($rowsWp as $r) {
             if (!is_array($r)) continue;
@@ -1415,6 +1422,7 @@ class AdminPedidosWpController extends Controller {
         }
 
         $autofill = $this->fetchAutofillBairroCounts($localPdo, $source, $start, $end, $statusList);
+        $filledFromEmpty = $this->fetchAutofillBairroFilledFromEmptyCount($localPdo, $source, $start, $end, $statusList);
         $filledTotal = 0;
         foreach ($autofill as $bairro => $count) {
             if ($bairro === '' || $count <= 0) continue;
@@ -1422,13 +1430,8 @@ class AdminPedidosWpController extends Controller {
             $map[$bairro] = (int) ($map[$bairro] ?? 0) + (int) $count;
         }
 
-        if ($filledTotal > 0) {
-            $emptyKey = '';
-            $emptyCount = (int) ($map[$emptyKey] ?? 0);
-            if ($emptyCount > 0) {
-                $map[$emptyKey] = max(0, $emptyCount - $filledTotal);
-            }
-        }
+        // Ajusta a estatística de vazios para refletir o autofill (apenas casos onde o bairro original era vazio)
+        $map[''] = max(0, $emptyWpCount - $filledFromEmpty);
 
         $out = [];
         foreach ($map as $label => $count) {
@@ -1441,6 +1444,41 @@ class AdminPedidosWpController extends Controller {
             return $ta > $tb ? -1 : 1;
         });
         return $out;
+    }
+
+    private function fetchAutofillBairroFilledFromEmptyCount(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): int {
+        $where = [
+            'source = :source',
+            'field_name = :field',
+            "COALESCE(TRIM(new_value), '') <> ''",
+            "COALESCE(TRIM(old_value), '') = ''",
+        ];
+        $params = [':source' => $source, ':field' => 'bairro'];
+
+        if ($start !== null) {
+            $where[] = 'wp_created_at >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'wp_created_at <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'wp_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $sql = 'SELECT COUNT(DISTINCT wp_order_id) FROM wp_pedido_endereco_autofill WHERE ' . implode(' AND ', $where);
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        return (int) ($st->fetchColumn() ?: 0);
     }
 
     private function fetchAutofillBairroCounts(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): array {
