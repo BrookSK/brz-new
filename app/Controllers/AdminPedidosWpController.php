@@ -203,6 +203,9 @@ class AdminPedidosWpController extends Controller {
             $processed = 0;
             $filled = 0;
             $skipped = 0;
+            $skipped_no_cep = 0;
+            $skipped_already_filled = 0;
+            $skipped_bairro_not_found = 0;
             $errors = 0;
 
             foreach ($sourcesToRun as $src) {
@@ -217,11 +220,13 @@ class AdminPedidosWpController extends Controller {
 
                     if ($wpId <= 0 || $cep === '') {
                         $skipped++;
+                        $skipped_no_cep++;
                         continue;
                     }
 
-                    if ($this->hasAutofillRecord($localPdo, $src, $wpId, 'bairro')) {
+                    if ($this->hasAutofillFilledRecord($localPdo, $src, $wpId, 'bairro')) {
                         $skipped++;
+                        $skipped_already_filled++;
                         continue;
                     }
 
@@ -236,6 +241,7 @@ class AdminPedidosWpController extends Controller {
                     $bairro = trim((string) ($resp['bairro'] ?? ''));
                     if ($bairro === '') {
                         $skipped++;
+                        $skipped_bairro_not_found++;
                         $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, 'CEP consultado mas bairro não encontrado');
                         continue;
                     }
@@ -250,6 +256,9 @@ class AdminPedidosWpController extends Controller {
                 'processed' => $processed,
                 'filled' => $filled,
                 'skipped' => $skipped,
+                'skipped_no_cep' => $skipped_no_cep,
+                'skipped_already_filled' => $skipped_already_filled,
+                'skipped_bairro_not_found' => $skipped_bairro_not_found,
                 'errors' => $errors,
             ]);
         } catch (\Exception $e) {
@@ -388,8 +397,8 @@ class AdminPedidosWpController extends Controller {
         return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
-    private function hasAutofillRecord(\PDO $pdo, string $source, int $wpOrderId, string $fieldName): bool {
-        $st = $pdo->prepare('SELECT id FROM wp_pedido_endereco_autofill WHERE source = ? AND wp_order_id = ? AND field_name = ? LIMIT 1');
+    private function hasAutofillFilledRecord(\PDO $pdo, string $source, int $wpOrderId, string $fieldName): bool {
+        $st = $pdo->prepare("SELECT id FROM wp_pedido_endereco_autofill WHERE source = ? AND wp_order_id = ? AND field_name = ? AND COALESCE(TRIM(new_value),'') <> '' LIMIT 1");
         $st->execute([(string) $source, (int) $wpOrderId, (string) $fieldName]);
         return (bool) $st->fetchColumn();
     }
