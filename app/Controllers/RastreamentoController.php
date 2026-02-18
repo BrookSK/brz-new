@@ -157,8 +157,8 @@ class RastreamentoController extends Controller {
         $baseUrl = $configuredBaseUrl;
         if ($baseUrl === '') {
             $baseUrl = ($amb === 'producao')
-                ? 'https://api.correios.com.br/srorastro/v3/v1/objetos/{codigo}'
-                : 'https://apihom.correios.com.br/srorastro/v3/v1/objetos/{codigo}';
+                ? 'https://api.correios.com.br/srorastro/v1/objetos/{codigo}'
+                : 'https://apihom.correios.com.br/srorastro/v1/objetos/{codigo}';
         }
 
         // Automático: header padrão
