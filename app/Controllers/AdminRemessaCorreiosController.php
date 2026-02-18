@@ -663,6 +663,9 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div></td>
                                                 <td>' . date('d/m/Y H:i', strtotime($etiqueta['data_impressao'])) . '</td>
                                                 <td>
+                                                    <button class="btn btn-sm btn-success" onclick="imprimirEtiqueta(' . $etiqueta['id'] . ')">
+                                                        <i class="fas fa-print"></i> Reimprimir
+                                                    </button>
                                                     <button class="btn btn-sm btn-primary" onclick="confirmarPostagem(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-check"></i> Confirmar Postagem
                                                     </button>
