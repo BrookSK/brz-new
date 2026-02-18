@@ -279,14 +279,18 @@ class AdminPedidosWpController extends Controller {
             $row = $st ? ($st->fetch(\PDO::FETCH_ASSOC) ?: []) : [];
             $token = (string) ($row['correios_tracking_token'] ?? '');
             $ambiente = (string) ($row['sigep_ambiente'] ?? '');
-        } else {
-            // fallback KV
+        }
+
+        // fallback KV (muitos ambientes gravam em categoria/chave/valor mesmo com colunas no schema)
+        if (trim($token) === '') {
             try {
                 $stT = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'correios_tracking_token' LIMIT 1");
                 $stT->execute();
                 $token = (string) ($stT->fetchColumn() ?: '');
             } catch (\Exception $e) {
             }
+        }
+        if (trim($ambiente) === '') {
             try {
                 $stA = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'entrega' AND chave = 'sigep_ambiente' LIMIT 1");
                 $stA->execute();
