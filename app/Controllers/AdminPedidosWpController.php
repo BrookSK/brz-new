@@ -1484,20 +1484,30 @@ class AdminPedidosWpController extends Controller {
         $rowsCidade = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         if ($useBairroAutofill) {
-            $rowsBairro = $this->fetchWpBairroRowsWithAutofill($localPdo, $source, $wpPdo, $baseFrom, $params, $start, $end, $statusList, $top);
+            $rowsBairro = $this->fetchWpBairroRowsWithAutofill($localPdo, $source, $wpPdo, $prefix, $baseFrom, $params, $start, $end, $statusList, $top);
         } else {
             $sqlBairro = "
                 SELECT
-                    TRIM(COALESCE(sm.ship_neighborhood, '')) AS label,
+                    TRIM(COALESCE(sm.ship_city, '')) AS city,
+                    TRIM(COALESCE(sm.ship_neighborhood, '')) AS bairro,
                     COUNT(*) AS total
                 {$baseFrom}
-                GROUP BY TRIM(COALESCE(sm.ship_neighborhood, ''))
+                GROUP BY TRIM(COALESCE(sm.ship_city, '')), TRIM(COALESCE(sm.ship_neighborhood, ''))
                 ORDER BY total DESC
                 LIMIT " . (int) max(1, min(2000, $top * 20));
             $stB = $wpPdo->prepare($sqlBairro);
             foreach ($params as $k => $v) $stB->bindValue($k, $v);
             $stB->execute();
-            $rowsBairro = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $rowsRaw = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $rowsBairro = [];
+            foreach ($rowsRaw as $r) {
+                if (!is_array($r)) continue;
+                $city = trim((string) ($r['city'] ?? ''));
+                $bairro = trim((string) ($r['bairro'] ?? ''));
+                $label = $this->formatBairroCidadeLabel($bairro, $city);
+                $rowsBairro[] = ['label' => $label, 'total' => (int) ($r['total'] ?? 0)];
+            }
         }
 
         return [
@@ -1509,13 +1519,14 @@ class AdminPedidosWpController extends Controller {
         ];
     }
 
-    private function fetchWpBairroRowsWithAutofill(\PDO $localPdo, string $source, \PDO $wpPdo, string $baseFrom, array $params, ?string $start, ?string $end, array $statusList, int $top): array {
+    private function fetchWpBairroRowsWithAutofill(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, string $baseFrom, array $params, ?string $start, ?string $end, array $statusList, int $top): array {
         $sqlBairro = "
             SELECT
-                TRIM(COALESCE(sm.ship_neighborhood, '')) AS label,
+                TRIM(COALESCE(sm.ship_city, '')) AS city,
+                TRIM(COALESCE(sm.ship_neighborhood, '')) AS bairro,
                 COUNT(*) AS total
             {$baseFrom}
-            GROUP BY TRIM(COALESCE(sm.ship_neighborhood, ''))
+            GROUP BY TRIM(COALESCE(sm.ship_city, '')), TRIM(COALESCE(sm.ship_neighborhood, ''))
             ORDER BY total DESC
             LIMIT " . (int) max(1, min(2000, $top * 20));
         $stB = $wpPdo->prepare($sqlBairro);
@@ -1523,32 +1534,99 @@ class AdminPedidosWpController extends Controller {
         $stB->execute();
         $rowsWp = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        // Contagem real de vazios no WP no recorte atual (independente de aparecer no TOP)
-        $sqlEmptyWp = "SELECT COUNT(DISTINCT p.ID) {$baseFrom} AND TRIM(COALESCE(sm.ship_neighborhood, '')) = ''";
+        // Contagem real de vazios no WP (bairro vazio) por cidade no recorte atual
+        $sqlEmptyWp = "
+            SELECT
+                TRIM(COALESCE(sm.ship_city, '')) AS city,
+                COUNT(DISTINCT p.ID) AS total
+            {$baseFrom}
+            AND TRIM(COALESCE(sm.ship_neighborhood, '')) = ''
+            GROUP BY TRIM(COALESCE(sm.ship_city, ''))
+        ";
         $stE = $wpPdo->prepare($sqlEmptyWp);
         foreach ($params as $k => $v) $stE->bindValue($k, $v);
         $stE->execute();
-        $emptyWpCount = (int) ($stE->fetchColumn() ?: 0);
+        $emptyRows = $stE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $emptyWpByCity = [];
+        foreach ($emptyRows as $r) {
+            if (!is_array($r)) continue;
+            $city = trim((string) ($r['city'] ?? ''));
+            $emptyWpByCity[$city] = (int) ($r['total'] ?? 0);
+        }
 
         $map = [];
         foreach ($rowsWp as $r) {
             if (!is_array($r)) continue;
-            $label = trim((string) ($r['label'] ?? ''));
+            $city = trim((string) ($r['city'] ?? ''));
+            $bairro = trim((string) ($r['bairro'] ?? ''));
+            $label = $this->formatBairroCidadeLabel($bairro, $city);
             $count = (int) ($r['total'] ?? 0);
             $map[$label] = ($map[$label] ?? 0) + $count;
         }
 
-        $autofill = $this->fetchAutofillBairroCounts($localPdo, $source, $start, $end, $statusList);
-        $filledFromEmpty = $this->fetchAutofillBairroFilledFromEmptyCount($localPdo, $source, $start, $end, $statusList);
-        $filledTotal = 0;
-        foreach ($autofill as $bairro => $count) {
-            if ($bairro === '' || $count <= 0) continue;
-            $filledTotal += $count;
-            $map[$bairro] = (int) ($map[$bairro] ?? 0) + (int) $count;
+        // Autofill: buscar pedidos preenchidos (old vazio -> new preenchido) e adicionar por cidade
+        $filledOrders = $this->fetchAutofillBairroFilledOrders($localPdo, $source, $start, $end, $statusList);
+        $filledFromEmptyByCity = [];
+
+        $orderIds = [];
+        foreach ($filledOrders as $r) {
+            if (!is_array($r)) continue;
+            $id = (int) ($r['wp_order_id'] ?? 0);
+            if ($id > 0) $orderIds[$id] = true;
+        }
+        $orderIds = array_keys($orderIds);
+
+        $citiesByOrderId = [];
+        if (!empty($orderIds)) {
+            $chunkSize = 900;
+            $cityMetaSql = "
+                SELECT
+                    post_id,
+                    COALESCE(
+                        MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
+                        MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
+                    ) AS ship_city
+                FROM {$prefix}postmeta
+                WHERE meta_key IN ('_shipping_city','shipping_city','_billing_city','billing_city')
+                  AND post_id IN (%s)
+                GROUP BY post_id
+            ";
+
+            for ($i = 0; $i < count($orderIds); $i += $chunkSize) {
+                $chunk = array_slice($orderIds, $i, $chunkSize);
+                $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                $sql = sprintf($cityMetaSql, $placeholders);
+                $stC = $wpPdo->prepare($sql);
+                $stC->execute(array_values($chunk));
+                $rowsC = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rowsC as $rc) {
+                    if (!is_array($rc)) continue;
+                    $pid = (int) ($rc['post_id'] ?? 0);
+                    $citiesByOrderId[$pid] = trim((string) ($rc['ship_city'] ?? ''));
+                }
+            }
         }
 
-        // Ajusta a estatística de vazios para refletir o autofill (apenas casos onde o bairro original era vazio)
-        $map[''] = max(0, $emptyWpCount - $filledFromEmpty);
+        foreach ($filledOrders as $r) {
+            if (!is_array($r)) continue;
+            $wpId = (int) ($r['wp_order_id'] ?? 0);
+            $bairroNew = trim((string) ($r['bairro'] ?? ''));
+            if ($wpId <= 0 || $bairroNew === '') continue;
+            $city = (string) ($citiesByOrderId[$wpId] ?? '');
+
+            $label = $this->formatBairroCidadeLabel($bairroNew, $city);
+            $map[$label] = (int) ($map[$label] ?? 0) + 1;
+
+            $cityKey = trim($city);
+            $filledFromEmptyByCity[$cityKey] = (int) ($filledFromEmptyByCity[$cityKey] ?? 0) + 1;
+        }
+
+        // Ajusta vazios por cidade
+        foreach ($emptyWpByCity as $city => $emptyCount) {
+            $filledCity = (int) ($filledFromEmptyByCity[$city] ?? 0);
+            $labelEmpty = $this->formatBairroCidadeLabel('', (string) $city);
+            $map[$labelEmpty] = max(0, (int) $emptyCount - $filledCity);
+        }
 
         $out = [];
         foreach ($map as $label => $count) {
@@ -1561,6 +1639,49 @@ class AdminPedidosWpController extends Controller {
             return $ta > $tb ? -1 : 1;
         });
         return $out;
+    }
+
+    private function formatBairroCidadeLabel(string $bairro, string $city): string {
+        $bairro = trim((string) $bairro);
+        $city = trim((string) $city);
+        if ($bairro === '') $bairro = '(vazio)';
+        if ($city === '') return $bairro;
+        return $bairro . ' - ' . $city;
+    }
+
+    private function fetchAutofillBairroFilledOrders(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): array {
+        $where = [
+            'source = :source',
+            'field_name = :field',
+            "COALESCE(TRIM(new_value), '') <> ''",
+            "COALESCE(TRIM(old_value), '') = ''",
+        ];
+        $params = [':source' => $source, ':field' => 'bairro'];
+
+        if ($start !== null) {
+            $where[] = 'wp_created_at >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'wp_created_at <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'wp_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $sql = 'SELECT wp_order_id, TRIM(new_value) AS bairro FROM wp_pedido_endereco_autofill WHERE ' . implode(' AND ', $where);
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
     private function fetchAutofillBairroFilledFromEmptyCount(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): int {
