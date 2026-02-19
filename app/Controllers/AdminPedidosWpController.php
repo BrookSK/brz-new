@@ -1931,6 +1931,8 @@ class AdminPedidosWpController extends Controller {
         $orderIds = array_keys($orderIds);
 
         $citiesByOrderId = [];
+        $bairroByOrderId = [];
+        $postInfoByOrderId = [];
         if (!empty($orderIds)) {
             $chunkSize = 900;
             $cityMetaSql = "
@@ -1939,9 +1941,17 @@ class AdminPedidosWpController extends Controller {
                     COALESCE(
                         MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
                         MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
-                    ) AS ship_city
+                    ) AS ship_city,
+                    COALESCE(
+                        MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name') THEN meta_value END), '')),
+                        MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name') THEN meta_value END), ''))
+                    ) AS ship_neighborhood
                 FROM {$prefix}postmeta
-                WHERE meta_key IN ('_shipping_city','shipping_city','_billing_city','billing_city')
+                WHERE meta_key IN (
+                    '_shipping_city','shipping_city','_billing_city','billing_city',
+                    '_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
+                    '_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
+                )
                   AND post_id IN (%s)
                 GROUP BY post_id
             ";
@@ -1957,6 +1967,21 @@ class AdminPedidosWpController extends Controller {
                     if (!is_array($rc)) continue;
                     $pid = (int) ($rc['post_id'] ?? 0);
                     $citiesByOrderId[$pid] = trim((string) ($rc['ship_city'] ?? ''));
+                    $bairroByOrderId[$pid] = trim((string) ($rc['ship_neighborhood'] ?? ''));
+                }
+
+                $sqlP = "SELECT ID, post_date, post_status FROM {$prefix}posts WHERE ID IN ({$placeholders})";
+                $stP = $wpPdo->prepare($sqlP);
+                $stP->execute(array_values($chunk));
+                $rowsP = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rowsP as $rp) {
+                    if (!is_array($rp)) continue;
+                    $pid = (int) ($rp['ID'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $postInfoByOrderId[$pid] = [
+                        'date' => (string) ($rp['post_date'] ?? ''),
+                        'status' => (string) ($rp['post_status'] ?? ''),
+                    ];
                 }
             }
         }
@@ -1969,6 +1994,38 @@ class AdminPedidosWpController extends Controller {
             $city = (string) ($citiesByOrderId[$wpId] ?? '');
             if ($bairroCityFilter !== '' && strtolower(trim((string) $city)) !== strtolower($bairroCityFilter)) {
                 continue;
+            }
+
+            // Só considera que esse pedido "saiu" do vazio se no WP ele ainda está vazio.
+            // Caso alguém tenha preenchido manualmente no WP, não subtrai do vazio para evitar contagem negativa.
+            $wpBairroAtual = (string) ($bairroByOrderId[$wpId] ?? '');
+            $wpBairroAtual = trim($wpBairroAtual);
+            if ($wpBairroAtual !== '') {
+                continue;
+            }
+
+            // Garante que o pedido ainda pertence ao recorte atual (status/data atuais no WP).
+            // Evita sobrar "(vazio)" quando o autofill foi gravado com status antigo.
+            $pi = $postInfoByOrderId[$wpId] ?? null;
+            $postDate = is_array($pi) ? (string) ($pi['date'] ?? '') : '';
+            $postStatus = is_array($pi) ? (string) ($pi['status'] ?? '') : '';
+            if ($start !== null && $postDate !== '' && $postDate < $start) {
+                continue;
+            }
+            if ($end !== null && $postDate !== '' && $postDate > $end) {
+                continue;
+            }
+            if (!empty($statusList) && $postStatus !== '') {
+                $ok = false;
+                foreach ($statusList as $st) {
+                    if ((string) $st === (string) $postStatus) {
+                        $ok = true;
+                        break;
+                    }
+                }
+                if (!$ok) {
+                    continue;
+                }
             }
 
             $label = $this->formatBairroCidadeLabel($bairroNew, $city);
