@@ -1348,6 +1348,8 @@ class AdminPedidosWpController extends Controller {
                     $m[$k] = $mr['meta_value'] ?? '';
                 }
 
+                $invoiceProductName = ($source === 'red') ? trim((string) ($m['_product_name'] ?? '')) : '';
+
                 $produtoId = (int) ($m['_product_id'] ?? 0);
                 $variacaoId = (int) ($m['_variation_id'] ?? 0);
                 $qtd = (int) ($m['_qty'] ?? 0);
@@ -1373,7 +1375,9 @@ class AdminPedidosWpController extends Controller {
                     $unit = $unit * $brlToUsd;
                 }
 
-                $desc = trim((string) ($oi['order_item_name'] ?? 'item'));
+                $desc = ($source === 'red' && $invoiceProductName !== '')
+                    ? $invoiceProductName
+                    : trim((string) ($oi['order_item_name'] ?? 'item'));
                 if ($desc === '') $desc = 'item';
 
                 $ncm = '';
@@ -1613,6 +1617,8 @@ class AdminPedidosWpController extends Controller {
                     $m[$k] = $mr['meta_value'] ?? '';
                 }
 
+                $invoiceProductName = ($source === 'red') ? trim((string) ($m['_product_name'] ?? '')) : '';
+
                 $produtoId = (int) ($m['_product_id'] ?? 0);
                 $variacaoId = (int) ($m['_variation_id'] ?? 0);
                 $qtd = (int) ($m['_qty'] ?? 0);
@@ -1668,7 +1674,7 @@ class AdminPedidosWpController extends Controller {
 
                 $itens[] = [
                     'order_item_id' => $itemId,
-                    'nome' => (string) ($oi['order_item_name'] ?? ''),
+                    'nome' => ($invoiceProductName !== '') ? $invoiceProductName : (string) ($oi['order_item_name'] ?? ''),
                     'produto_id' => $produtoId,
                     'variacao_id' => $variacaoId,
                     'sku' => $sku,
