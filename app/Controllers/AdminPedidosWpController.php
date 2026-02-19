@@ -1918,8 +1918,11 @@ class AdminPedidosWpController extends Controller {
             $map[$label] = ($map[$label] ?? 0) + $count;
         }
 
-        // Autofill: buscar pedidos preenchidos (old vazio -> new preenchido) e adicionar por cidade
-        $filledOrders = $this->fetchAutofillBairroFilledOrders($localPdo, $source, $start, $end, $statusList);
+        // Autofill: buscar pedidos preenchidos (old vazio -> new preenchido) e adicionar por cidade.
+        // IMPORTANTE: não filtra pelo recorte usando wp_created_at/wp_status do log interno,
+        // porque isso pode divergir do status/data atuais do pedido no WP.
+        // O recorte é aplicado abaixo usando post_date/post_status atuais do WP.
+        $filledOrders = $this->fetchAutofillBairroFilledOrders($localPdo, $source, null, null, []);
         $filledFromEmptyByCity = [];
 
         $orderIds = [];
