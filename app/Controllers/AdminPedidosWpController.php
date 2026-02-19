@@ -285,9 +285,8 @@ class AdminPedidosWpController extends Controller {
                     $state = strtoupper(trim((string) ($r['ship_state'] ?? '')));
                     $addr1 = trim((string) ($r['ship_address_1'] ?? ''));
 
-                    if ($wpId <= 0 || $cep === '') {
+                    if ($wpId <= 0) {
                         $skipped++;
-                        $skipped_no_cep++;
                         continue;
                     }
 
@@ -354,6 +353,9 @@ class AdminPedidosWpController extends Controller {
                         if ($state === '' || $city === '' || $addr1 === '') {
                             $skipped++;
                             $skipped_no_address++;
+                            if (trim($cepDigits) === '') {
+                                $skipped_no_cep++;
+                            }
                             $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, 'Sem endereço suficiente (UF/Cidade/Logradouro) para fallback');
                             continue;
                         }
@@ -441,6 +443,9 @@ class AdminPedidosWpController extends Controller {
                     if ($bairro === '') {
                         $skipped++;
                         $skipped_bairro_not_found++;
+                        if (trim($cepDigits) === '') {
+                            $skipped_no_cep++;
+                        }
                         $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $candidateCep !== '' ? $candidateCep : $cep, $created, $st, $req, $resp, 'Bairro não encontrado');
                         continue;
                     }
@@ -736,7 +741,6 @@ class AdminPedidosWpController extends Controller {
         LEFT JOIN ({$metaSql}) sm ON sm.post_id = p.ID
         WHERE " . implode(' AND ', $where) . "
           AND COALESCE(TRIM(sm.ship_neighborhood), '') = ''
-          AND COALESCE(TRIM(sm.ship_postcode), '') <> ''
         ORDER BY p.post_date DESC
         LIMIT {$limite}";
 
