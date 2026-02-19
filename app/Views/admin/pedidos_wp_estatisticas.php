@@ -536,3 +536,78 @@ $urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge(
         </div>
     </div>
 </div>
+
+<?php $emptyBairroDiag = is_array($emptyBairroDiag ?? null) ? $emptyBairroDiag : []; ?>
+<?php if (!empty($emptyBairroDiag)): ?>
+    <div class="card mt-3">
+        <div class="card-header"><strong>Diagnóstico dos vazios (bairro)</strong></div>
+        <div class="card-body">
+            <div class="text-muted small mb-2">
+                Lista de até 100 pedidos que ainda estão com bairro vazio no WordPress, mostrando o último resultado do autofill interno.
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Origem</th>
+                            <th>Data</th>
+                            <th>Status</th>
+                            <th>UF</th>
+                            <th>Cidade</th>
+                            <th>CEP</th>
+                            <th>Logradouro</th>
+                            <th>Último autofill</th>
+                            <th>Motivo</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($emptyBairroDiag as $r): ?>
+                            <?php
+                            $id = (int) ($r['id'] ?? 0);
+                            $src = strtolower(trim((string) ($r['source'] ?? 'br')));
+                            if (!in_array($src, ['br','red','us'], true)) $src = 'br';
+                            $created = (string) ($r['created_at'] ?? '');
+                            $st = (string) ($r['status'] ?? '');
+                            $uf = (string) ($r['ship_state'] ?? '');
+                            $cid = (string) ($r['ship_city'] ?? '');
+                            $cep = (string) ($r['ship_postcode'] ?? '');
+                            $addr1 = (string) ($r['ship_address_1'] ?? '');
+                            $afNew = (string) ($r['autofill_new_value'] ?? '');
+                            $afCep = (string) ($r['autofill_cep'] ?? '');
+                            $afErr = (string) ($r['autofill_error'] ?? '');
+                            $afAt = (string) ($r['autofill_updated_at'] ?? '');
+                            ?>
+                            <tr>
+                                <td class="fw-semibold">#<?= (int) $id ?></td>
+                                <td><span class="badge bg-dark"><?= htmlspecialchars(strtoupper($src)) ?></span></td>
+                                <td><?= $created !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($created))) : '-' ?></td>
+                                <td><span class="badge bg-secondary"><?= htmlspecialchars($st) ?></span></td>
+                                <td><?= htmlspecialchars($uf !== '' ? $uf : '-') ?></td>
+                                <td><?= htmlspecialchars($cid !== '' ? $cid : '-') ?></td>
+                                <td><?= htmlspecialchars($cep !== '' ? $cep : '-') ?></td>
+                                <td style="max-width: 280px;" class="text-truncate" title="<?= htmlspecialchars($addr1) ?>"><?= htmlspecialchars($addr1 !== '' ? $addr1 : '-') ?></td>
+                                <td>
+                                    <?php if ($afAt !== ''): ?>
+                                        <span class="text-muted small"><?= htmlspecialchars(date('d/m/Y H:i', strtotime($afAt))) ?></span>
+                                        <div class="small">CEP: <?= htmlspecialchars($afCep !== '' ? $afCep : '-') ?></div>
+                                        <div class="small">Novo: <?= htmlspecialchars($afNew !== '' ? $afNew : '-') ?></div>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="max-width: 280px;" class="text-truncate" title="<?= htmlspecialchars($afErr) ?>"><?= htmlspecialchars($afErr !== '' ? $afErr : '-') ?></td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" href="/admin/pedidos-wp/detalhes/<?= (int) $id ?>?<?= http_build_query(['source' => $src]) ?>">
+                                        <i class="fas fa-eye"></i> Ver
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>

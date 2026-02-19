@@ -127,6 +127,7 @@ class AdminPedidosWpController extends Controller {
         $missingTotal = 0;
         $autofillOrders = [];
         $autofillTotal = 0;
+        $emptyBairroDiag = [];
         $erro = '';
 
         try {
@@ -198,8 +199,29 @@ class AdminPedidosWpController extends Controller {
                     $stats['por_cidade'] = array_slice($stats['por_cidade'], 0, $top);
                     $stats['por_bairro'] = array_slice($stats['por_bairro'], 0, $top);
                 }
-            }
 
+                $diagMerged = [];
+                $diagSources = $source === 'all' ? self::SOURCES : [$source];
+                foreach ($diagSources as $src) {
+                    $wp = $this->getWpPdo($localPdo, $src);
+                    $prefix = $wp['prefix'];
+                    $wpPdo = $wp['pdo'];
+
+                    $rows = $this->fetchWpEmptyBairroDiagnostics($localPdo, $src, $wpPdo, $prefix, $start, $end, $statusList, $bairroCityFilter, 100);
+                    foreach ($rows as $r) {
+                        if (!is_array($r)) continue;
+                        $r['source'] = $src;
+                        $diagMerged[] = $r;
+                    }
+                }
+                usort($diagMerged, function ($a, $b) {
+                    $da = (string) ($a['created_at'] ?? '');
+                    $db = (string) ($b['created_at'] ?? '');
+                    if ($da === $db) return 0;
+                    return $da > $db ? -1 : 1;
+                });
+                $emptyBairroDiag = array_slice($diagMerged, 0, 100);
+            }
         } catch (\Exception $e) {
             $erro = $e->getMessage();
         }
@@ -211,6 +233,146 @@ class AdminPedidosWpController extends Controller {
         include __DIR__ . '/../Views/admin/pedidos_wp_estatisticas.php';
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    private function fetchWpEmptyBairroDiagnostics(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, ?string $start, ?string $end, array $statusList, string $bairroCityFilter, int $limite): array {
+        $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
+        $params = [];
+
+        if ($start !== null) {
+            $where[] = 'p.post_date >= :start';
+            $params[':start'] = $start;
+        }
+        if ($end !== null) {
+            $where[] = 'p.post_date <= :end';
+            $params[':end'] = $end;
+        }
+
+        if (!empty($statusList)) {
+            $placeholders = [];
+            foreach (array_values($statusList) as $i => $st) {
+                $ph = ':st' . $i;
+                $placeholders[] = $ph;
+                $params[$ph] = $st;
+            }
+            $where[] = 'p.post_status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $bairroCityFilter = trim((string) $bairroCityFilter);
+        if ($bairroCityFilter !== '') {
+            $where[] = 'LOWER(TRIM(COALESCE(sm.ship_city, \'\'))) = LOWER(:bairro_city)';
+            $params[':bairro_city'] = $bairroCityFilter;
+        }
+
+        $limite = (int) $limite;
+        if ($limite <= 0) $limite = 50;
+        if ($limite > 200) $limite = 200;
+
+        $metaSql = "
+            SELECT
+                post_id,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_state','shipping_state') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_state','billing_state') THEN meta_value END), ''))
+                ) AS ship_state,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
+                ) AS ship_city,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_postcode','shipping_postcode') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_postcode','billing_postcode') THEN meta_value END), ''))
+                ) AS ship_postcode,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_address_1','shipping_address_1') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_address_1','billing_address_1') THEN meta_value END), ''))
+                ) AS ship_address_1,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name') THEN meta_value END), ''))
+                ) AS ship_neighborhood
+            FROM {$prefix}postmeta
+            WHERE meta_key IN (
+                '_shipping_state','shipping_state','_shipping_city','shipping_city','_shipping_postcode','shipping_postcode','_shipping_address_1','shipping_address_1',
+                '_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
+                '_billing_state','billing_state','_billing_city','billing_city','_billing_postcode','billing_postcode','_billing_address_1','billing_address_1',
+                '_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
+            )
+            GROUP BY post_id
+        ";
+
+        $sql = "SELECT
+            p.ID AS id,
+            p.post_date AS created_at,
+            p.post_status AS status,
+            COALESCE(TRIM(sm.ship_state), '') AS ship_state,
+            COALESCE(TRIM(sm.ship_city), '') AS ship_city,
+            COALESCE(TRIM(sm.ship_postcode), '') AS ship_postcode,
+            COALESCE(TRIM(sm.ship_address_1), '') AS ship_address_1,
+            COALESCE(TRIM(sm.ship_neighborhood), '') AS ship_neighborhood
+        FROM {$prefix}posts p
+        LEFT JOIN ({$metaSql}) sm ON sm.post_id = p.ID
+        WHERE " . implode(' AND ', $where) . "
+          AND COALESCE(TRIM(sm.ship_neighborhood), '') = ''
+        ORDER BY p.post_date DESC
+        LIMIT {$limite}";
+
+        $st = $wpPdo->prepare($sql);
+        foreach ($params as $k => $v) $st->bindValue($k, $v);
+        $st->execute();
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $orderIds = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $id = (int) ($r['id'] ?? 0);
+            if ($id > 0) $orderIds[$id] = true;
+        }
+        $orderIds = array_keys($orderIds);
+
+        $byOrderId = [];
+        if (!empty($orderIds)) {
+            $chunkSize = 900;
+            for ($i = 0; $i < count($orderIds); $i += $chunkSize) {
+                $chunk = array_slice($orderIds, $i, $chunkSize);
+                $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+
+                $sqlA = "SELECT wp_order_id, new_value, error, cep, created_at, updated_at
+                         FROM wp_pedido_endereco_autofill
+                         WHERE source = ? AND field_name = ? AND wp_order_id IN ({$placeholders})";
+                $stA = $localPdo->prepare($sqlA);
+                $stA->execute(array_merge([(string) $source, 'bairro'], array_values($chunk)));
+                $aRows = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($aRows as $ar) {
+                    if (!is_array($ar)) continue;
+                    $oid = (int) ($ar['wp_order_id'] ?? 0);
+                    if ($oid <= 0) continue;
+                    $byOrderId[$oid] = $ar;
+                }
+            }
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $id = (int) ($r['id'] ?? 0);
+            $ar = $id > 0 ? ($byOrderId[$id] ?? null) : null;
+            $out[] = [
+                'id' => $id,
+                'created_at' => (string) ($r['created_at'] ?? ''),
+                'status' => (string) ($r['status'] ?? ''),
+                'ship_state' => (string) ($r['ship_state'] ?? ''),
+                'ship_city' => (string) ($r['ship_city'] ?? ''),
+                'ship_postcode' => (string) ($r['ship_postcode'] ?? ''),
+                'ship_address_1' => (string) ($r['ship_address_1'] ?? ''),
+                'autofill_new_value' => is_array($ar) ? (string) ($ar['new_value'] ?? '') : '',
+                'autofill_cep' => is_array($ar) ? (string) ($ar['cep'] ?? '') : '',
+                'autofill_error' => is_array($ar) ? (string) ($ar['error'] ?? '') : '',
+                'autofill_updated_at' => is_array($ar) ? (string) (($ar['updated_at'] ?? '') !== '' ? $ar['updated_at'] : ($ar['created_at'] ?? '')) : '',
+            ];
+        }
+
+        return $out;
     }
 
     public function autofillBairro(Request $request) {
