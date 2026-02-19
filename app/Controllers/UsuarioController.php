@@ -627,13 +627,17 @@ class UsuarioController extends Controller {
         
         if ($request->getMethod() === 'POST') {
             $dados = $request->getParams();
-            
-            $erros = $this->validarDadosPessoais($dados);
+
+            $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+            $usuarioAtual = $usuarioId > 0 ? $this->usuarioModel->find($usuarioId) : null;
+
+            $cpfWarning = false;
+            $erros = $this->validarDadosPessoais($dados, $usuarioAtual, $cpfWarning);
             
             if (empty($erros)) {
                 try {
                     // Obter usuário logado
-                    $usuarioId = $this->authService->getUsuarioLogado()['id'];
+                    $usuarioId = $usuarioId ?: (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
                     
                     // Verificar estrutura da tabela antes de atualizar
                     $this->verificarEstruturaTabela();
@@ -693,9 +697,14 @@ class UsuarioController extends Controller {
                         error_log('Erro ao registrar log de auditoria: ' . $e->getMessage());
                         // Continuar mesmo se o log falhar
                     }
-                    
-                    $_SESSION['message'] = 'Dados atualizados com sucesso!';
-                    $_SESSION['message_type'] = 'success';
+
+                    if ($cpfWarning) {
+                        $_SESSION['message'] = 'Dados atualizados, mas seu CPF está inválido. Atualize para continuar comprando.';
+                        $_SESSION['message_type'] = 'warning';
+                    } else {
+                        $_SESSION['message'] = 'Dados atualizados com sucesso!';
+                        $_SESSION['message_type'] = 'success';
+                    }
                     
                 } catch (\Exception $e) {
                     $_SESSION['message'] = 'Erro ao atualizar dados: ' . $e->getMessage();
@@ -1552,7 +1561,7 @@ class UsuarioController extends Controller {
         }
     }
 
-    private function validarDadosPessoais($dados) {
+    private function validarDadosPessoais($dados, $usuarioAtual = null, &$cpfWarning = false) {
         $erros = [];
         
         if (empty($dados['nome'])) {
@@ -1577,15 +1586,77 @@ class UsuarioController extends Controller {
         }
 
         $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
+        $docAtual = null;
+        if (is_array($usuarioAtual)) {
+            $docAtual = CpfValidator::onlyDigits((string) ($usuarioAtual['documento'] ?? ($usuarioAtual['cpf'] ?? '')));
+            if ($docAtual === '') {
+                $docAtual = null;
+            }
+        }
+
+        $docMudou = false;
+        if ($docAtual === null) {
+            $docMudou = ($doc !== '');
+        } else {
+            $docMudou = ($doc !== $docAtual);
+        }
+
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
-                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+                if ($docMudou) {
+                    $erros[] = 'CPF é obrigatório para residentes no Brasil';
+                } else {
+                    $cpfWarning = true;
+                }
             } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
-                $erros[] = 'CPF inválido';
+                if ($docMudou) {
+                    $erros[] = 'CPF inválido';
+                } else {
+                    $cpfWarning = true;
+                }
             }
         } else {
             if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
                 $erros[] = 'CPF inválido';
+            }
+        }
+
+        // CPF duplicado: só validar quando o usuário está tentando alterar e o CPF é válido
+        $usuarioAtualId = 0;
+        if (is_array($usuarioAtual) && !empty($usuarioAtual['id'])) {
+            $usuarioAtualId = (int) $usuarioAtual['id'];
+        }
+        if (empty($erros) && $docMudou && $doc !== '' && strlen($doc) === 11 && CpfValidator::isValid($doc)) {
+            try {
+                $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                $colsU = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                $docCol = null;
+                if (is_array($colsU)) {
+                    if (in_array('documento', $colsU, true)) {
+                        $docCol = 'documento';
+                    } elseif (in_array('cpf', $colsU, true)) {
+                        $docCol = 'cpf';
+                    }
+                }
+
+                if ($docCol) {
+                    $sql = 'SELECT id FROM usuarios WHERE ' . $docCol . ' = :doc';
+                    if ($usuarioAtualId > 0) {
+                        $sql .= ' AND id != :id';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stDup = $this->usuarioModel->getConnection()->prepare($sql);
+                    $stDup->bindValue(':doc', $doc);
+                    if ($usuarioAtualId > 0) {
+                        $stDup->bindValue(':id', $usuarioAtualId, \PDO::PARAM_INT);
+                    }
+                    $stDup->execute();
+                    $dupId = (int) ($stDup->fetchColumn() ?: 0);
+                    if ($dupId > 0) {
+                        $erros[] = 'CPF já cadastrado';
+                    }
+                }
+            } catch (\Exception $e) {
             }
         }
 
