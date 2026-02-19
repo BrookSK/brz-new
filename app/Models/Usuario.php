@@ -50,6 +50,11 @@ class Usuario extends Model {
     }
 
     public function findByDocumento($documento) {
+        $documento = preg_replace('/\D+/', '', (string) $documento);
+        if ($documento === '') {
+            return false;
+        }
+
         $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE documento = :documento");
         $stmt->bindParam(':documento', $documento);
         $stmt->execute();
@@ -269,6 +274,12 @@ class Usuario extends Model {
                 $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
             }
         }
+
+        if (array_key_exists('documento', $data)) {
+            $doc = preg_replace('/\D+/', '', (string) $data['documento']);
+            $data['documento'] = $doc === '' ? null : $doc;
+        }
+
         $id = parent::create($data);
 
         try {

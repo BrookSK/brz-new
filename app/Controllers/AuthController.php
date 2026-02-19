@@ -490,7 +490,14 @@ class AuthController extends Controller {
                         }
                     }
                 } catch (\Exception $e) {
-                    $erros[] = 'Erro ao criar conta: ' . $e->getMessage();
+                    $msg = (string) $e->getMessage();
+                    if (stripos($msg, 'Duplicate entry') !== false && stripos($msg, 'documento') !== false) {
+                        $erros[] = 'CPF já cadastrado';
+                    } elseif (stripos($msg, 'Duplicate entry') !== false && stripos($msg, 'email') !== false) {
+                        $erros[] = 'E-mail já cadastrado';
+                    } else {
+                        $erros[] = 'Erro ao criar conta: ' . $msg;
+                    }
                 }
             }
 

@@ -2832,6 +2832,11 @@ class CheckoutController extends Controller {
                 ];
             }
 
+            $usuario['documento'] = preg_replace('/\D+/', '', (string) ($usuario['documento'] ?? ''));
+            if (($usuario['documento'] ?? '') === '') {
+                $usuario['documento'] = null;
+            }
+
             if (empty($usuario['email'])) {
                 throw new \Exception('E-mail é obrigatório para criar pedido');
             }
@@ -2888,7 +2893,7 @@ class CheckoutController extends Controller {
                     $usuario['nome'] ?? 'Cliente',
                     $usuario['email'],
                     password_hash((string) $senhaPlano, PASSWORD_DEFAULT),
-                    $usuario['documento'] ?? ('DOC' . time())
+                    $usuario['documento']
                 ]);
                 $usuarioId = $db->lastInsertId();
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
@@ -2973,7 +2978,7 @@ class CheckoutController extends Controller {
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
-                    $usuario['documento'] ?? ('DOC' . time()),
+                    $usuario['documento'],
                     $usuario['telefone'] ?? '',
                     $usuario['email']
                 ]);
