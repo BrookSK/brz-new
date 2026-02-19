@@ -366,7 +366,21 @@ function atualizarQuantidade(itemKey, produtoId, quantidade) {
                 alert(response.error);
             }
         },
-        error: function() {
+        error: function(jqXHR) {
+            const resp = jqXHR && jqXHR.responseJSON ? jqXHR.responseJSON : null;
+            if (resp && resp.error) {
+                alert(resp.error);
+                return;
+            }
+            try {
+                const txt = (jqXHR && jqXHR.responseText) ? jqXHR.responseText : '';
+                const parsed = txt ? JSON.parse(txt) : null;
+                if (parsed && parsed.error) {
+                    alert(parsed.error);
+                    return;
+                }
+            } catch (e) {
+            }
             alert(I18N.err_update_cart);
         }
     });

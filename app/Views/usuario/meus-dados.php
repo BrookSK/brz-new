@@ -557,16 +557,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const cep = e.target.value.replace(/\D/g, '');
             if (cep.length === 8) {
-                fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                fetch('/api/cep/' + encodeURIComponent(cep))
                     .then(response => response.json())
                     .then(data => {
-                        if (!data.erro) {
-                            document.getElementById('endereco').value = data.logradouro || '';
-                            document.getElementById('bairro').value = data.bairro || '';
-                            document.getElementById('cidade').value = data.localidade || '';
-                            document.getElementById('estado').value = data.uf || '';
-                            document.getElementById('numero').focus();
+                        if (!data || !data.success || !data.endereco) {
+                            return;
                         }
+                        const end = data.endereco;
+                        document.getElementById('endereco').value = end.logradouro || '';
+                        document.getElementById('bairro').value = end.bairro || '';
+                        document.getElementById('cidade').value = end.localidade || '';
+                        document.getElementById('estado').value = end.uf || '';
+                        document.getElementById('numero').focus();
                     })
                     .catch(error => {
                         console.error('Erro ao buscar CEP:', error);

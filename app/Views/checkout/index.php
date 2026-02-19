@@ -1082,6 +1082,56 @@ document.addEventListener('DOMContentLoaded', function(){
     }
     atualizarEnderecoPorPais();
 
+    const cepInput = document.getElementById('cep');
+    if (cepInput) {
+        cepInput.addEventListener('input', function(e) {
+            const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+            if (pais !== 'BR') {
+                return;
+            }
+            let value = (e.target.value || '').toString().replace(/\D/g, '');
+            if (value.length <= 8) {
+                value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
+            }
+            e.target.value = value;
+        });
+
+        cepInput.addEventListener('blur', function(e) {
+            const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
+            if (pais !== 'BR') {
+                return;
+            }
+
+            const cep = (e.target.value || '').toString().replace(/\D/g, '');
+            if (cep.length !== 8) {
+                return;
+            }
+
+            fetch('/api/cep/' + encodeURIComponent(cep))
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || !data.success || !data.endereco) {
+                        return;
+                    }
+                    const end = data.endereco;
+                    const elEndereco = document.getElementById('endereco');
+                    const elBairro = document.getElementById('bairro');
+                    const elCidade = document.getElementById('cidade');
+                    const elEstado = document.getElementById('estado');
+                    if (elEndereco && (end.logradouro || '')) elEndereco.value = end.logradouro || '';
+                    if (elBairro) elBairro.value = end.bairro || '';
+                    if (elCidade) elCidade.value = end.localidade || '';
+                    if (elEstado) elEstado.value = end.uf || '';
+
+                    const numero = document.getElementById('numero');
+                    if (numero) {
+                        numero.focus();
+                    }
+                })
+                .catch(() => {});
+        });
+    }
+
     function syncDestinatarioRules() {
         const cb = document.getElementById('entrega_para_outro');
         const box = document.getElementById('destinatario-box');

@@ -524,6 +524,13 @@ class AuthController extends Controller {
         
         if (empty($dados['nome'])) {
             $erros[] = 'Nome é obrigatório';
+        } else {
+            $nome = trim((string) $dados['nome']);
+            $parts = preg_split('/\s+/', $nome) ?: [];
+            $parts = array_values(array_filter($parts, static fn($p) => is_string($p) && mb_strlen(trim($p)) >= 2));
+            if (count($parts) < 2) {
+                $erros[] = 'Informe nome e sobrenome';
+            }
         }
         
         if (empty($dados['email'])) {
@@ -569,6 +576,21 @@ class AuthController extends Controller {
 
         if (empty($dados['data_nascimento'])) {
             $erros[] = 'Data de nascimento é obrigatória';
+        } else {
+            $rawBirth = trim((string) ($dados['data_nascimento'] ?? ''));
+            $birth = \DateTime::createFromFormat('Y-m-d', $rawBirth);
+            if (!$birth) {
+                $birth = \DateTime::createFromFormat('d/m/Y', $rawBirth);
+            }
+            if (!$birth) {
+                $erros[] = 'Data de nascimento inválida';
+            } else {
+                $birth->setTime(0, 0, 0);
+                $today = new \DateTime('today');
+                if ($birth > $today) {
+                    $erros[] = 'Data de nascimento não pode ser no futuro';
+                }
+            }
         }
 
         if (empty($dados['pais_residencia'])) {

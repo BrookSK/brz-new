@@ -127,6 +127,11 @@ class RegisterUser {
             if (!$birthDate) {
                 $errors['birth_date'] = 'Data de nascimento inválida';
             } else {
+                $birthDate->setTime(0, 0, 0);
+                $today = new \DateTime('today');
+                if ($birthDate > $today) {
+                    $errors['birth_date'] = 'Data de nascimento não pode ser no futuro';
+                }
                 $now = new \DateTime();
                 $age = $now->diff($birthDate)->y;
                 if ($age < 13 || $age > 120) {

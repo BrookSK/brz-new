@@ -364,6 +364,12 @@ class User {
         if (!$date) {
             throw new \InvalidArgumentException('Data de nascimento inválida');
         }
+
+        $date->setTime(0, 0, 0);
+        $today = new \DateTime('today');
+        if ($date > $today) {
+            throw new \InvalidArgumentException('Data de nascimento não pode ser no futuro');
+        }
         
         $now = new \DateTime();
         $age = $now->diff($date)->y;

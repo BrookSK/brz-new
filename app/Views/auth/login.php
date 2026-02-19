@@ -88,7 +88,7 @@
                             <div class="mb-3">
                                 <label class="form-label"><?= __('auth.admin_email', 'E-mail Admin') ?></label>
                                 <input type="email" class="form-control" name="email" 
-                                       value="admin@onsolutions.com" required>
+                                       value="" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label"><?= __('auth.password', 'Senha') ?></label>
