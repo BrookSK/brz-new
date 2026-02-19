@@ -80,6 +80,7 @@ class AdminPedidosWpController extends Controller {
         $startRaw = trim((string) ($request->getParam('start') ?? ''));
         $endRaw = trim((string) ($request->getParam('end') ?? ''));
         $statusRaw = trim((string) ($request->getParam('status') ?? ''));
+        $bairroCityFilter = trim((string) ($request->getParam('bairro_city') ?? ''));
         $hideEmpty = (string) ($request->getParam('hide_empty') ?? '') === '1';
         $useBairroAutofill = (string) ($request->getParam('use_bairro_autofill') ?? '1') === '1';
         $top = (int) ($request->getParam('top') ?? 20);
@@ -179,7 +180,7 @@ class AdminPedidosWpController extends Controller {
                     $prefix = $wp['prefix'];
                     $wpPdo = $wp['pdo'];
 
-                    $partial = $this->fetchWpShippingStats($localPdo, $src, $wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty, $useBairroAutofill);
+                    $partial = $this->fetchWpShippingStats($localPdo, $src, $wpPdo, $prefix, $start, $end, $top, $statusList, $hideEmpty, $useBairroAutofill, $bairroCityFilter);
 
                     $stats['total'] += (int) ($partial['total'] ?? 0);
                     $stats['sp_capital_total'] += (int) ($partial['sp_capital_total'] ?? 0);
@@ -1391,7 +1392,7 @@ class AdminPedidosWpController extends Controller {
         return ['rows' => $rows, 'total' => $total];
     }
 
-    private function fetchWpShippingStats(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top, array $statusList, bool $hideEmpty, bool $useBairroAutofill): array {
+    private function fetchWpShippingStats(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, ?string $start, ?string $end, int $top, array $statusList, bool $hideEmpty, bool $useBairroAutofill, string $bairroCityFilter = ''): array {
         $where = ["p.post_type = 'shop_order'", "p.post_status <> 'trash'"];
         $params = [];
 
@@ -1484,19 +1485,27 @@ class AdminPedidosWpController extends Controller {
         $rowsCidade = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         if ($useBairroAutofill) {
-            $rowsBairro = $this->fetchWpBairroRowsWithAutofill($localPdo, $source, $wpPdo, $prefix, $baseFrom, $params, $start, $end, $statusList, $top);
+            $rowsBairro = $this->fetchWpBairroRowsWithAutofill($localPdo, $source, $wpPdo, $prefix, $baseFrom, $params, $start, $end, $statusList, $top, $bairroCityFilter);
         } else {
+            $bairroCityFilter = trim((string) $bairroCityFilter);
+            $bairroCityClause = '';
+            if ($bairroCityFilter !== '') {
+                $bairroCityClause = ' AND LOWER(TRIM(COALESCE(sm.ship_city, \'\'))) = LOWER(:bairro_city)';
+            }
+
             $sqlBairro = "
                 SELECT
                     TRIM(COALESCE(sm.ship_city, '')) AS city,
                     TRIM(COALESCE(sm.ship_neighborhood, '')) AS bairro,
                     COUNT(*) AS total
                 {$baseFrom}
+                {$bairroCityClause}
                 GROUP BY TRIM(COALESCE(sm.ship_city, '')), TRIM(COALESCE(sm.ship_neighborhood, ''))
                 ORDER BY total DESC
                 LIMIT " . (int) max(1, min(2000, $top * 20));
             $stB = $wpPdo->prepare($sqlBairro);
             foreach ($params as $k => $v) $stB->bindValue($k, $v);
+            if ($bairroCityFilter !== '') $stB->bindValue(':bairro_city', $bairroCityFilter);
             $stB->execute();
             $rowsRaw = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -1519,18 +1528,25 @@ class AdminPedidosWpController extends Controller {
         ];
     }
 
-    private function fetchWpBairroRowsWithAutofill(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, string $baseFrom, array $params, ?string $start, ?string $end, array $statusList, int $top): array {
+    private function fetchWpBairroRowsWithAutofill(\PDO $localPdo, string $source, \PDO $wpPdo, string $prefix, string $baseFrom, array $params, ?string $start, ?string $end, array $statusList, int $top, string $bairroCityFilter = ''): array {
+        $bairroCityFilter = trim((string) $bairroCityFilter);
+        $bairroCityClause = '';
+        if ($bairroCityFilter !== '') {
+            $bairroCityClause = ' AND LOWER(TRIM(COALESCE(sm.ship_city, \'\'))) = LOWER(:bairro_city)';
+        }
         $sqlBairro = "
             SELECT
                 TRIM(COALESCE(sm.ship_city, '')) AS city,
                 TRIM(COALESCE(sm.ship_neighborhood, '')) AS bairro,
                 COUNT(*) AS total
             {$baseFrom}
+            {$bairroCityClause}
             GROUP BY TRIM(COALESCE(sm.ship_city, '')), TRIM(COALESCE(sm.ship_neighborhood, ''))
             ORDER BY total DESC
             LIMIT " . (int) max(1, min(2000, $top * 20));
         $stB = $wpPdo->prepare($sqlBairro);
         foreach ($params as $k => $v) $stB->bindValue($k, $v);
+        if ($bairroCityFilter !== '') $stB->bindValue(':bairro_city', $bairroCityFilter);
         $stB->execute();
         $rowsWp = $stB->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -1541,10 +1557,12 @@ class AdminPedidosWpController extends Controller {
                 COUNT(DISTINCT p.ID) AS total
             {$baseFrom}
             AND TRIM(COALESCE(sm.ship_neighborhood, '')) = ''
+            {$bairroCityClause}
             GROUP BY TRIM(COALESCE(sm.ship_city, ''))
         ";
         $stE = $wpPdo->prepare($sqlEmptyWp);
         foreach ($params as $k => $v) $stE->bindValue($k, $v);
+        if ($bairroCityFilter !== '') $stE->bindValue(':bairro_city', $bairroCityFilter);
         $stE->execute();
         $emptyRows = $stE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         $emptyWpByCity = [];
@@ -1613,6 +1631,9 @@ class AdminPedidosWpController extends Controller {
             $bairroNew = trim((string) ($r['bairro'] ?? ''));
             if ($wpId <= 0 || $bairroNew === '') continue;
             $city = (string) ($citiesByOrderId[$wpId] ?? '');
+            if ($bairroCityFilter !== '' && strtolower(trim((string) $city)) !== strtolower($bairroCityFilter)) {
+                continue;
+            }
 
             $label = $this->formatBairroCidadeLabel($bairroNew, $city);
             $map[$label] = (int) ($map[$label] ?? 0) + 1;

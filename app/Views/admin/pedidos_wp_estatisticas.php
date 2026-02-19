@@ -28,6 +28,7 @@ if (!in_array($source, $allowedSources, true)) $source = 'br';
 $start = trim((string) ($startRaw ?? ($_GET['start'] ?? '')));
 $end = trim((string) ($endRaw ?? ($_GET['end'] ?? '')));
 $status = trim((string) ($statusRaw ?? ($_GET['status'] ?? '')));
+$bairroCity = trim((string) ($bairroCity ?? ($_GET['bairro_city'] ?? '')));
 $hideEmpty = (string) ($hideEmpty ?? ($_GET['hide_empty'] ?? '')) === '1';
 $useBairroAutofill = (string) ($useBairroAutofill ?? ($_GET['use_bairro_autofill'] ?? '1')) === '1';
 $missingField = strtolower(trim((string) ($missingField ?? ($_GET['missing_field'] ?? 'any'))));
@@ -153,6 +154,14 @@ $urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge(
                 <?php endforeach; ?>
             </select>
         <?php endif; ?>
+
+    <?php if ($view === 'stats'): ?>
+        <div class="col-md-4">
+            <label class="form-label">Cidade (para bairros)</label>
+            <input type="text" class="form-control" name="bairro_city" value="<?= htmlspecialchars($bairroCity) ?>" placeholder="Ex: Sao paulo">
+            <div class="text-muted small mt-1">Opcional. Afeta apenas o card "Por Bairro".</div>
+        </div>
+    <?php endif; ?>
     </div>
 
     <?php if ($view === 'missing'): ?>
