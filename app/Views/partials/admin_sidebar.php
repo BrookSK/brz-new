@@ -7,10 +7,71 @@ function renderAdminSidebar($activePage = '') {
             session_start();
         }
         $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
+        if ($perfil === '') {
+            $perfil = (string) ($_SESSION['usuario_role'] ?? '');
+        }
+
+        if ($perfil === '') {
+            $adminUid = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($adminUid > 0) {
+                try {
+                    $pdo = \Config\Database::getConnection();
+                    $cols = [];
+                    try {
+                        $stCols = $pdo->query('DESCRIBE usuarios');
+                        $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Throwable $e) {
+                        $cols = [];
+                    }
+
+                    $perfilCol = '';
+                    if (in_array('perfil', $cols, true)) $perfilCol = 'perfil';
+                    elseif (in_array('role', $cols, true)) $perfilCol = 'role';
+
+                    $roleCol = '';
+                    if (in_array('role', $cols, true)) $roleCol = 'role';
+                    elseif (in_array('perfil', $cols, true)) $roleCol = 'perfil';
+
+                    if ($perfilCol !== '' || $roleCol !== '') {
+                        $fields = [];
+                        if ($perfilCol !== '') $fields[] = $perfilCol . ' AS perfil';
+                        if ($roleCol !== '' && $roleCol !== $perfilCol) $fields[] = $roleCol . ' AS role';
+                        $sql = 'SELECT ' . implode(', ', $fields) . ' FROM usuarios WHERE id = ? LIMIT 1';
+                        $stU = $pdo->prepare($sql);
+                        $stU->execute([$adminUid]);
+                        $row = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $perfilDb = (string) ($row['perfil'] ?? '');
+                        $roleDb = (string) ($row['role'] ?? '');
+
+                        if ($perfilDb !== '') {
+                            $_SESSION['usuario_perfil'] = $perfilDb;
+                        }
+                        if ($roleDb !== '') {
+                            $_SESSION['usuario_role'] = $roleDb;
+                        }
+
+                        if ($perfilDb !== '') {
+                            $perfil = $perfilDb;
+                        } elseif ($roleDb !== '') {
+                            $perfil = $roleDb;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+        }
     } catch (\Exception $e) {
         $perfil = '';
     }
+
     $perfil = strtolower(trim($perfil));
+    if ($perfil === 'administrator' || $perfil === 'administrador') {
+        $perfil = 'admin';
+    } elseif ($perfil === 'seller') {
+        $perfil = 'vendedor';
+    } elseif ($perfil === 'support') {
+        $perfil = 'suporte';
+    }
     if ($perfil === '') {
         $perfil = 'cliente';
     }

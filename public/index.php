@@ -28,6 +28,37 @@ if (PHP_VERSION_ID >= 70300) {
 
 session_start();
 
+// Renovar o cookie da sessão (sliding expiration) para manter o login ativo por 7 dias após a última atividade
+try {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $name = session_name();
+        $id = session_id();
+        if ($name && $id) {
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie($name, $id, [
+                    'expires' => time() + $sessionLifetime,
+                    'path' => $cookieParams['path'] ?? '/',
+                    'domain' => $cookieParams['domain'] ?? '',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie(
+                    $name,
+                    $id,
+                    time() + $sessionLifetime,
+                    ($cookieParams['path'] ?? '/') . '; samesite=Lax',
+                    $cookieParams['domain'] ?? '',
+                    $secure,
+                    true
+                );
+            }
+        }
+    }
+} catch (\Throwable $e) {
+}
+
 // Autoload manual temporário (até executar composer install)
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
