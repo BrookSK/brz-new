@@ -1735,10 +1735,15 @@ class AdminPedidosWpController extends Controller {
         $stE->execute();
         $emptyRows = $stE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         $emptyWpByCity = [];
+        $emptyWpCityLabelByKey = [];
         foreach ($emptyRows as $r) {
             if (!is_array($r)) continue;
             $city = trim((string) ($r['city'] ?? ''));
-            $emptyWpByCity[$city] = (int) ($r['total'] ?? 0);
+            $key = $this->normalizeCityKey($city);
+            $emptyWpByCity[$key] = (int) ($r['total'] ?? 0);
+            if (!isset($emptyWpCityLabelByKey[$key])) {
+                $emptyWpCityLabelByKey[$key] = $city;
+            }
         }
 
         $map = [];
@@ -1807,14 +1812,15 @@ class AdminPedidosWpController extends Controller {
             $label = $this->formatBairroCidadeLabel($bairroNew, $city);
             $map[$label] = (int) ($map[$label] ?? 0) + 1;
 
-            $cityKey = trim($city);
+            $cityKey = $this->normalizeCityKey((string) $city);
             $filledFromEmptyByCity[$cityKey] = (int) ($filledFromEmptyByCity[$cityKey] ?? 0) + 1;
         }
 
         // Ajusta vazios por cidade
-        foreach ($emptyWpByCity as $city => $emptyCount) {
-            $filledCity = (int) ($filledFromEmptyByCity[$city] ?? 0);
-            $labelEmpty = $this->formatBairroCidadeLabel('', (string) $city);
+        foreach ($emptyWpByCity as $cityKey => $emptyCount) {
+            $filledCity = (int) ($filledFromEmptyByCity[$cityKey] ?? 0);
+            $cityLabel = (string) ($emptyWpCityLabelByKey[$cityKey] ?? '');
+            $labelEmpty = $this->formatBairroCidadeLabel('', $cityLabel);
             $map[$labelEmpty] = max(0, (int) $emptyCount - $filledCity);
         }
 
@@ -1837,6 +1843,23 @@ class AdminPedidosWpController extends Controller {
         if ($bairro === '') $bairro = '(vazio)';
         if ($city === '') return $bairro;
         return $bairro . ' - ' . $city;
+    }
+
+    private function normalizeCityKey(string $city): string {
+        $city = trim((string) $city);
+        if ($city === '') return '';
+        $city = strtolower($city);
+        if (function_exists('iconv')) {
+            $x = @iconv('UTF-8', 'ASCII//TRANSLIT', $city);
+            if (is_string($x) && $x !== '') {
+                $city = $x;
+            }
+        }
+        $city = preg_replace('/[^a-z0-9\s]/', ' ', $city);
+        if ($city === null) $city = '';
+        $city = preg_replace('/\s+/', ' ', $city);
+        if ($city === null) $city = '';
+        return trim($city);
     }
 
     private function fetchAutofillBairroFilledOrders(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): array {
