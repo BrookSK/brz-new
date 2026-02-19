@@ -296,7 +296,20 @@ $urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge(
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.success) {
-                        alert('Processados: ' + (data.processed ?? 0) + '\nPreenchidos: ' + (data.filled ?? 0) + '\nIgnorados: ' + (data.skipped ?? 0) + '\nErros: ' + (data.errors ?? 0));
+                        const lines = [];
+                        lines.push('Processados: ' + (data.processed ?? 0));
+                        lines.push('Tentados: ' + (data.attempted ?? 0));
+                        lines.push('Preenchidos: ' + (data.filled ?? 0));
+                        lines.push('Ignorados: ' + (data.skipped ?? 0));
+                        lines.push('  - Sem CEP: ' + (data.skipped_no_cep ?? 0));
+                        lines.push('  - Já preenchidos: ' + (data.skipped_already_filled ?? 0));
+                        lines.push('  - Bairro não encontrado: ' + (data.skipped_bairro_not_found ?? 0));
+                        lines.push('  - Fora do Brasil: ' + (data.skipped_outside_br ?? 0));
+                        lines.push('  - Sem endereço p/ fallback: ' + (data.skipped_no_address ?? 0));
+                        lines.push('  - Endereço ambíguo: ' + (data.skipped_ambiguous_address ?? 0));
+                        lines.push('Fallback por endereço usado: ' + (data.fallback_used ?? 0));
+                        lines.push('Erros: ' + (data.errors ?? 0));
+                        alert(lines.join('\n'));
                         location.reload();
                     } else {
                         alert('Falha: ' + (data.error ?? 'Erro desconhecido'));

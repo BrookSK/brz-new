@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\CorreiosCepService;
+use App\Services\ViaCepService;
 use App\Services\WExpressService;
 use App\Services\WooCommerceService;
 use Config\Database;
@@ -251,6 +252,7 @@ class AdminPedidosWpController extends Controller {
             $localPdo = Database::getConnection();
             $trackingCfg = $this->getCorreiosCepConfig($localPdo);
             $svc = new CorreiosCepService();
+            $viaCep = new ViaCepService();
 
             $sourcesToRun = $source === 'all' ? self::SOURCES : [$source];
             $processed = 0;
@@ -260,6 +262,10 @@ class AdminPedidosWpController extends Controller {
             $skipped_no_cep = 0;
             $skipped_already_filled = 0;
             $skipped_bairro_not_found = 0;
+            $skipped_outside_br = 0;
+            $skipped_no_address = 0;
+            $skipped_ambiguous_address = 0;
+            $fallback_used = 0;
             $errors = 0;
 
             $fetchLimit = (int) max($limit, $limit * 20);
@@ -274,10 +280,22 @@ class AdminPedidosWpController extends Controller {
                     $old = (string) ($r['ship_neighborhood'] ?? '');
                     $created = (string) ($r['created_at'] ?? '');
                     $st = (string) ($r['status'] ?? '');
+                    $country = strtoupper(trim((string) ($r['ship_country'] ?? '')));
+                    $city = trim((string) ($r['ship_city'] ?? ''));
+                    $state = strtoupper(trim((string) ($r['ship_state'] ?? '')));
+                    $addr1 = trim((string) ($r['ship_address_1'] ?? ''));
 
                     if ($wpId <= 0 || $cep === '') {
                         $skipped++;
                         $skipped_no_cep++;
+                        continue;
+                    }
+
+                    // Se não for Brasil, não tenta autofill por CEP (evita dados errados)
+                    if ($country !== '' && $country !== 'BR') {
+                        $skipped++;
+                        $skipped_outside_br++;
+                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, ['country' => $country], null, 'Endereço fora do Brasil');
                         continue;
                     }
 
@@ -292,24 +310,143 @@ class AdminPedidosWpController extends Controller {
                     }
                     $attempted++;
 
-                    $req = ['cep' => $cep];
-                    $resp = $svc->consultarPorCep($cep, $trackingCfg);
-                    if (!is_array($resp) || empty($resp['success'])) {
-                        $errors++;
-                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, (string) ($resp['error'] ?? 'Erro ao consultar CEP'));
-                        continue;
+                    $cepDigits = preg_replace('/\D+/', '', (string) $cep);
+                    $isCepValid = $cepDigits !== '' && strlen($cepDigits) === 8;
+                    $candidateCep = $cepDigits;
+
+                    // Validação opcional do CEP via ViaCEP: se a UF/cidade não batem, trata como CEP suspeito
+                    if ($isCepValid && $state !== '' && $city !== '') {
+                        $v = $viaCep->consultarPorCep($cepDigits);
+                        if (!empty($v['success']) && is_array($v['data'] ?? null)) {
+                            $vUf = strtoupper(trim((string) ($v['data']['uf'] ?? '')));
+                            $vCity = strtolower(trim((string) ($v['data']['localidade'] ?? '')));
+                            $wantCity = strtolower($city);
+                            if ($vUf !== '' && $vUf !== $state) {
+                                $isCepValid = false;
+                            } elseif ($vCity !== '' && $wantCity !== '' && $vCity !== $wantCity) {
+                                $isCepValid = false;
+                            }
+                        }
                     }
 
-                    $bairro = trim((string) ($resp['bairro'] ?? ''));
+                    $req = [
+                        'cep' => $cep,
+                        'cep_digits' => $cepDigits,
+                        'country' => $country,
+                        'state' => $state,
+                        'city' => $city,
+                        'address_1' => $addr1,
+                        'cep_valid' => $isCepValid,
+                    ];
+
+                    $bairro = '';
+                    $resp = null;
+
+                    if ($isCepValid) {
+                        $resp = $svc->consultarPorCep($candidateCep, $trackingCfg);
+                        if (is_array($resp) && !empty($resp['success'])) {
+                            $bairro = trim((string) ($resp['bairro'] ?? ''));
+                        }
+                    }
+
+                    // Fallback: buscar por endereço quando CEP é inválido/suspeito ou quando Correios não retornou bairro
+                    if ($bairro === '') {
+                        if ($state === '' || $city === '' || $addr1 === '') {
+                            $skipped++;
+                            $skipped_no_address++;
+                            $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, 'Sem endereço suficiente (UF/Cidade/Logradouro) para fallback');
+                            continue;
+                        }
+
+                        $fallback_used++;
+                        $fb = $viaCep->consultarPorEndereco($state, $city, $addr1);
+                        if (empty($fb['success'])) {
+                            $errors++;
+                            $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, array_merge($req, ['fallback' => 'viacep_endereco']), $fb, (string) ($fb['error'] ?? 'Fallback por endereço falhou'));
+                            continue;
+                        }
+
+                        $list = $fb['data'] ?? [];
+                        if (!is_array($list) || empty($list)) {
+                            $skipped++;
+                            $skipped_bairro_not_found++;
+                            $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, array_merge($req, ['fallback' => 'viacep_endereco']), $fb, 'Fallback por endereço não retornou resultados');
+                            continue;
+                        }
+
+                        $picked = $viaCep->pickBestEnderecoCandidate($addr1, $list);
+                        if (empty($picked['success'])) {
+                            $skipped++;
+                            $skipped_bairro_not_found++;
+                            $this->saveAutofillRecord(
+                                $localPdo,
+                                $src,
+                                $wpId,
+                                'bairro',
+                                $old,
+                                null,
+                                $cep,
+                                $created,
+                                $st,
+                                array_merge($req, ['fallback' => 'viacep_endereco', 'pick' => $picked]),
+                                $fb,
+                                (string) ($picked['error'] ?? 'Não foi possível escolher candidato do ViaCEP')
+                            );
+                            continue;
+                        }
+
+                        if (!empty($picked['ambiguous'])) {
+                            $skipped++;
+                            $skipped_ambiguous_address++;
+                            $this->saveAutofillRecord(
+                                $localPdo,
+                                $src,
+                                $wpId,
+                                'bairro',
+                                $old,
+                                null,
+                                $cep,
+                                $created,
+                                $st,
+                                array_merge($req, ['fallback' => 'viacep_endereco', 'pick' => $picked]),
+                                $fb,
+                                'Fallback por endereço ambíguo (múltiplos logradouros possíveis)'
+                            );
+                            continue;
+                        }
+
+                        $chosen = $picked['candidate'] ?? null;
+                        if (!is_array($chosen)) {
+                            $errors++;
+                            $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, array_merge($req, ['fallback' => 'viacep_endereco', 'pick' => $picked]), $fb, 'Fallback por endereço retornou candidato inválido');
+                            continue;
+                        }
+
+                        $fbBairro = trim((string) ($chosen['bairro'] ?? ''));
+                        $fbCep = preg_replace('/\D+/', '', (string) ($chosen['cep'] ?? ''));
+
+                        if ($fbBairro !== '') {
+                            $bairro = $fbBairro;
+                            $resp = ['success' => true, 'bairro' => $bairro, 'source' => 'viacep_endereco', 'raw' => $chosen, 'pick' => $picked];
+                            $candidateCep = $fbCep !== '' ? $fbCep : $candidateCep;
+                        } elseif ($fbCep !== '' && strlen($fbCep) === 8) {
+                            $candidateCep = $fbCep;
+                            $resp = $svc->consultarPorCep($candidateCep, $trackingCfg);
+                            if (is_array($resp) && !empty($resp['success'])) {
+                                $bairro = trim((string) ($resp['bairro'] ?? ''));
+                            }
+                        }
+                    }
+
                     if ($bairro === '') {
                         $skipped++;
                         $skipped_bairro_not_found++;
-                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $cep, $created, $st, $req, $resp, 'CEP consultado mas bairro não encontrado');
+                        $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, null, $candidateCep !== '' ? $candidateCep : $cep, $created, $st, $req, $resp, 'Bairro não encontrado');
                         continue;
                     }
 
                     $filled++;
-                    $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, $bairro, $cep, $created, $st, $req, $resp, null);
+                    $this->saveAutofillRecord($localPdo, $src, $wpId, 'bairro', $old, $bairro, $candidateCep !== '' ? $candidateCep : $cep, $created, $st, $req, $resp, null);
                 }
 
                 if ($attempted >= $limit) {
@@ -326,6 +463,10 @@ class AdminPedidosWpController extends Controller {
                 'skipped_no_cep' => $skipped_no_cep,
                 'skipped_already_filled' => $skipped_already_filled,
                 'skipped_bairro_not_found' => $skipped_bairro_not_found,
+                'skipped_outside_br' => $skipped_outside_br,
+                'skipped_no_address' => $skipped_no_address,
+                'skipped_ambiguous_address' => $skipped_ambiguous_address,
+                'fallback_used' => $fallback_used,
                 'errors' => $errors,
             ]);
         } catch (\Exception $e) {
@@ -545,6 +686,22 @@ class AdminPedidosWpController extends Controller {
             SELECT
                 post_id,
                 COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_country','shipping_country') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_country','billing_country') THEN meta_value END), ''))
+                ) AS ship_country,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_state','shipping_state') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_state','billing_state') THEN meta_value END), ''))
+                ) AS ship_state,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_city','shipping_city') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_city','billing_city') THEN meta_value END), ''))
+                ) AS ship_city,
+                COALESCE(
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_address_1','shipping_address_1') THEN meta_value END), '')),
+                    MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_address_1','billing_address_1') THEN meta_value END), ''))
+                ) AS ship_address_1,
+                COALESCE(
                     MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_shipping_postcode','shipping_postcode') THEN meta_value END), '')),
                     MAX(NULLIF(TRIM(CASE WHEN meta_key IN ('_billing_postcode','billing_postcode') THEN meta_value END), ''))
                 ) AS ship_postcode,
@@ -554,6 +711,10 @@ class AdminPedidosWpController extends Controller {
                 ) AS ship_neighborhood
             FROM {$prefix}postmeta
             WHERE meta_key IN (
+                '_shipping_country','shipping_country','_billing_country','billing_country',
+                '_shipping_state','shipping_state','_billing_state','billing_state',
+                '_shipping_city','shipping_city','_billing_city','billing_city',
+                '_shipping_address_1','shipping_address_1','_billing_address_1','billing_address_1',
                 '_shipping_postcode','shipping_postcode','_billing_postcode','billing_postcode',
                 '_shipping_neighborhood','shipping_neighborhood','_shipping_bairro','shipping_bairro','shipping_bairro_name','_shipping_bairro_name',
                 '_billing_neighborhood','billing_neighborhood','_billing_bairro','billing_bairro','billing_bairro_name','_billing_bairro_name'
@@ -565,6 +726,10 @@ class AdminPedidosWpController extends Controller {
             p.ID AS id,
             p.post_date AS created_at,
             p.post_status AS status,
+            COALESCE(TRIM(sm.ship_country), '') AS ship_country,
+            COALESCE(TRIM(sm.ship_state), '') AS ship_state,
+            COALESCE(TRIM(sm.ship_city), '') AS ship_city,
+            COALESCE(TRIM(sm.ship_address_1), '') AS ship_address_1,
             COALESCE(TRIM(sm.ship_postcode), '') AS ship_postcode,
             COALESCE(TRIM(sm.ship_neighborhood), '') AS ship_neighborhood
         FROM {$prefix}posts p
