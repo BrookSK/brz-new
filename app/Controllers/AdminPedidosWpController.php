@@ -2036,11 +2036,16 @@ class AdminPedidosWpController extends Controller {
             }
         }
 
+        $seenFilled = [];
         foreach ($filledOrders as $r) {
             if (!is_array($r)) continue;
             $wpId = (int) ($r['wp_order_id'] ?? 0);
             $bairroNew = trim((string) ($r['bairro'] ?? ''));
             if ($wpId <= 0 || $bairroNew === '') continue;
+            if (isset($seenFilled[$wpId])) {
+                continue;
+            }
+            $seenFilled[$wpId] = true;
             $city = (string) ($citiesByOrderId[$wpId] ?? '');
             if ($bairroCityFilter !== '' && strtolower(trim((string) $city)) !== strtolower($bairroCityFilter)) {
                 continue;
@@ -2136,7 +2141,6 @@ class AdminPedidosWpController extends Controller {
             'LOWER(source) = LOWER(:source)',
             'field_name = :field',
             "COALESCE(TRIM(new_value), '') <> ''",
-            "COALESCE(TRIM(old_value), '') = ''",
         ];
         $params = [':source' => $source, ':field' => 'bairro'];
 
@@ -2159,7 +2163,7 @@ class AdminPedidosWpController extends Controller {
             $where[] = 'wp_status IN (' . implode(',', $placeholders) . ')';
         }
 
-        $sql = 'SELECT wp_order_id, TRIM(new_value) AS bairro FROM wp_pedido_endereco_autofill WHERE ' . implode(' AND ', $where);
+        $sql = 'SELECT wp_order_id, TRIM(new_value) AS bairro, COALESCE(updated_at, created_at) AS ts FROM wp_pedido_endereco_autofill WHERE ' . implode(' AND ', $where) . ' ORDER BY ts DESC';
         $st = $pdo->prepare($sql);
         foreach ($params as $k => $v) $st->bindValue($k, $v);
         $st->execute();
