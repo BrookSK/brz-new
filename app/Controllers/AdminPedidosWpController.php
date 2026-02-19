@@ -2037,6 +2037,8 @@ class AdminPedidosWpController extends Controller {
         }
 
         $seenFilled = [];
+        $bairroCityKeyFilter = $bairroCityFilter !== '' ? $this->normalizeCityKey($bairroCityFilter) : '';
+
         foreach ($filledOrders as $r) {
             if (!is_array($r)) continue;
             $wpId = (int) ($r['wp_order_id'] ?? 0);
@@ -2047,7 +2049,7 @@ class AdminPedidosWpController extends Controller {
             }
             $seenFilled[$wpId] = true;
             $city = (string) ($citiesByOrderId[$wpId] ?? '');
-            if ($bairroCityFilter !== '' && strtolower(trim((string) $city)) !== strtolower($bairroCityFilter)) {
+            if ($bairroCityKeyFilter !== '' && $this->normalizeCityKey((string) $city) !== $bairroCityKeyFilter) {
                 continue;
             }
 
