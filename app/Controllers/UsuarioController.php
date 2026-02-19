@@ -1346,36 +1346,50 @@ class UsuarioController extends Controller {
         }
         
         $dadosAtualizacao = [];
-        
-        // Mapeamento de campos do formulário para colunas do banco
+
+        // Mapeamento flexível (compatibilidade com diferentes schemas)
         $mapeamento = [
-            'nome' => 'nome',
-            'email' => 'email',
-            'telefone' => 'telefone',
-            'documento' => 'documento',
-            'cep' => 'cep',
-            'endereco' => 'endereco',
-            'numero' => 'numero',
-            'complemento' => 'complemento',
-            'bairro' => 'bairro',
-            'cidade' => 'cidade',
-            'estado' => 'estado',
-            'data_nascimento' => 'data_nascimento',
-            'pais_residencia' => 'pais_residencia',
-            'notificacoes_email' => 'notificacoes_email',
-            'notificacoes_sms' => 'notificacoes_sms',
-            'idioma' => 'idioma'
+            'nome' => ['nome', 'name'],
+            'email' => ['email'],
+            'telefone' => ['telefone', 'phone'],
+            'documento' => ['documento', 'cpf'],
+            'cep' => ['cep', 'zip_code'],
+            'endereco' => ['endereco', 'address'],
+            'numero' => ['numero', 'number'],
+            'complemento' => ['complemento'],
+            'bairro' => ['bairro', 'neighborhood'],
+            'cidade' => ['cidade', 'city'],
+            'estado' => ['estado', 'state'],
+            'data_nascimento' => ['data_nascimento', 'birth_date'],
+            'pais_residencia' => ['pais_residencia', 'country_of_residence'],
+            'notificacoes_email' => ['notificacoes_email'],
+            'notificacoes_sms' => ['notificacoes_sms'],
+            'idioma' => ['idioma']
         ];
-        
-        // Adicionar apenas campos que existem na tabela
-        foreach ($mapeamento as $campoForm => $colunaBanco) {
-            if (in_array($colunaBanco, $colunas)) {
-                if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
-                    $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
-                } else {
-                    $dadosAtualizacao[$colunaBanco] = $dados[$campoForm] ?? '';
+
+        foreach ($mapeamento as $campoForm => $colunasBanco) {
+            $colunaBanco = null;
+            foreach ($colunasBanco as $c) {
+                if (in_array($c, $colunas, true)) {
+                    $colunaBanco = $c;
+                    break;
                 }
             }
+            if ($colunaBanco === null) {
+                continue;
+            }
+
+            if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
+                $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
+                continue;
+            }
+
+            $val = $dados[$campoForm] ?? null;
+            if ($campoForm === 'documento') {
+                $doc = preg_replace('/\D+/', '', (string) ($val ?? ''));
+                $val = $doc === '' ? null : $doc;
+            }
+            $dadosAtualizacao[$colunaBanco] = $val;
         }
         
         // Adicionar campos obrigatórios se existirem
