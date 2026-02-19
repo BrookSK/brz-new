@@ -129,6 +129,7 @@ class AdminPedidosWpController extends Controller {
         $autofillOrders = [];
         $autofillTotal = 0;
         $emptyBairroDiag = [];
+        $debugBairroInfo = null;
         $erro = '';
 
         try {
@@ -225,6 +226,51 @@ class AdminPedidosWpController extends Controller {
             }
         } catch (\Exception $e) {
             $erro = $e->getMessage();
+        }
+
+        if ($debugBairro) {
+            $debugBairroInfo = [
+                'requested_source' => $source,
+                'requested_source_normalized' => strtolower(trim((string) $source)),
+                'use_bairro_autofill' => $useBairroAutofill,
+                'bairro_city_filter' => $bairroCityFilter,
+                'start' => $start,
+                'end' => $end,
+                'status' => $statusRaw,
+                'view' => $view,
+            ];
+
+            if (!isset($localPdo) || !($localPdo instanceof \PDO)) {
+                $debugBairroInfo['error'] = 'localPdo não disponível (falha ao conectar no banco local?)';
+            } else {
+                try {
+                    $stDbg = $localPdo->prepare(
+                        "SELECT source, field_name,
+                                SUM(CASE WHEN COALESCE(TRIM(new_value),'')<>'' AND COALESCE(TRIM(old_value),'')='' THEN 1 ELSE 0 END) AS filled_from_empty,
+                                COUNT(*) AS total
+                         FROM wp_pedido_endereco_autofill
+                         WHERE field_name = 'bairro'
+                         GROUP BY source, field_name
+                         ORDER BY total DESC"
+                    );
+                    $stDbg->execute();
+                    $debugBairroInfo['autofill_sources'] = $stDbg->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    $stDbg2 = $localPdo->prepare(
+                        "SELECT
+                            SUM(CASE WHEN COALESCE(TRIM(new_value),'')<>'' AND COALESCE(TRIM(old_value),'')='' THEN 1 ELSE 0 END) AS filled_from_empty,
+                            COUNT(*) AS total
+                         FROM wp_pedido_endereco_autofill
+                         WHERE LOWER(source) = LOWER(:source)
+                           AND field_name = 'bairro'"
+                    );
+                    $stDbg2->bindValue(':source', $source);
+                    $stDbg2->execute();
+                    $debugBairroInfo['autofill_for_requested_source'] = $stDbg2->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $debugBairroInfo['error'] = $e->getMessage();
+                }
+            }
         }
 
         $sidebarActive = 'wp-estatisticas';
