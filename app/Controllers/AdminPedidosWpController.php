@@ -1348,7 +1348,7 @@ class AdminPedidosWpController extends Controller {
                     $m[$k] = $mr['meta_value'] ?? '';
                 }
 
-                $invoiceProductName = ($source === 'red') ? trim((string) ($m['_product_name'] ?? '')) : '';
+                $invoiceProductName = trim((string) ($m['_product_name'] ?? ''));
 
                 $produtoId = (int) ($m['_product_id'] ?? 0);
                 $variacaoId = (int) ($m['_variation_id'] ?? 0);
@@ -1361,21 +1361,19 @@ class AdminPedidosWpController extends Controller {
 
                 $declaredUnitUsed = false;
 
-                if ($source === 'red') {
-                    $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
-                    if ($declaredUnit !== null && $declaredUnit > 0) {
-                        $hasDeclaredItems = true;
-                        $declaredItemsTotal += ($declaredUnit * $qtd);
-                        $unit = $declaredUnit;
-                        $declaredUnitUsed = true;
-                    }
+                $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
+                if ($declaredUnit !== null && $declaredUnit > 0) {
+                    $hasDeclaredItems = true;
+                    $declaredItemsTotal += ($declaredUnit * $qtd);
+                    $unit = $declaredUnit;
+                    $declaredUnitUsed = true;
                 }
 
-                if ($currency === 'BRL' && !($source === 'red' && $declaredUnitUsed)) {
+                if ($currency === 'BRL' && !$declaredUnitUsed) {
                     $unit = $unit * $brlToUsd;
                 }
 
-                $desc = ($source === 'red' && $invoiceProductName !== '')
+                $desc = $invoiceProductName !== ''
                     ? $invoiceProductName
                     : trim((string) ($oi['order_item_name'] ?? 'item'));
                 if ($desc === '') $desc = 'item';
@@ -1466,7 +1464,7 @@ class AdminPedidosWpController extends Controller {
 
             $declared = $hasDeclaredItems ? (float) $declaredItemsTotal : (is_numeric($meta['_order_total'] ?? null) ? (float) $meta['_order_total'] : 0.0);
             if ($declared <= 0) $declared = 1.0;
-            if ($currency === 'BRL' && !($source === 'red' && $hasDeclaredItems)) {
+            if ($currency === 'BRL' && !$hasDeclaredItems) {
                 $declared = $declared * $brlToUsd;
             }
 
@@ -1617,7 +1615,7 @@ class AdminPedidosWpController extends Controller {
                     $m[$k] = $mr['meta_value'] ?? '';
                 }
 
-                $invoiceProductName = ($source === 'red') ? trim((string) ($m['_product_name'] ?? '')) : '';
+                $invoiceProductName = trim((string) ($m['_product_name'] ?? ''));
 
                 $produtoId = (int) ($m['_product_id'] ?? 0);
                 $variacaoId = (int) ($m['_variation_id'] ?? 0);
@@ -1630,14 +1628,13 @@ class AdminPedidosWpController extends Controller {
                     $unit = round($lineTotal / $qtd, 2);
                 }
 
-                $declaredUnit = null;
+                $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
                 $declaredItemTotal = null;
-                if ($source === 'red') {
-                    $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
-                    if ($declaredUnit !== null && $declaredUnit > 0) {
-                        $declaredItemTotal = $declaredUnit * max(1, (int) $qtd);
-                        $declaracaoTotal += $declaredItemTotal;
-                    }
+                if ($declaredUnit !== null && $declaredUnit > 0) {
+                    $declaredItemTotal = $declaredUnit * max(1, (int) $qtd);
+                    $declaracaoTotal += $declaredItemTotal;
+                } else {
+                    $declaredUnit = null;
                 }
 
                 $sku = '';
