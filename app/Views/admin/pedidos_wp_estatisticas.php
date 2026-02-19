@@ -31,6 +31,8 @@ $status = trim((string) ($statusRaw ?? ($_GET['status'] ?? '')));
 $bairroCity = trim((string) ($bairroCity ?? ($_GET['bairro_city'] ?? '')));
 $hideEmpty = (string) ($hideEmpty ?? ($_GET['hide_empty'] ?? '')) === '1';
 $useBairroAutofill = (string) ($useBairroAutofill ?? ($_GET['use_bairro_autofill'] ?? '1')) === '1';
+$debugBairro = (string) ($debugBairro ?? ($_GET['debug_bairro'] ?? '')) === '1';
+$debugBairroInfo = $debugBairroInfo ?? null;
 $missingField = strtolower(trim((string) ($missingField ?? ($_GET['missing_field'] ?? 'any'))));
 if (!in_array($missingField, ['any', 'uf', 'cidade', 'bairro'], true)) $missingField = 'any';
 $top = (int) ($top ?? ($_GET['top'] ?? 20));
@@ -66,6 +68,25 @@ function fmtPct($v) {
 
 <?php if ($erro !== ''): ?>
     <div class="alert alert-danger">Erro ao carregar estatísticas: <?= htmlspecialchars($erro) ?></div>
+<?php endif; ?>
+
+<?php if ($debugBairro): ?>
+    <?php
+    $dbgParams = $_GET;
+    unset($dbgParams['debug_bairro']);
+    $dbgOffUrl = '/admin/pedidos-wp/estatisticas?' . http_build_query($dbgParams);
+    ?>
+    <div class="alert alert-warning">
+        <div class="d-flex justify-content-between align-items-center">
+            <strong>Debug bairro</strong>
+            <a class="btn btn-sm btn-outline-dark" href="<?= htmlspecialchars($dbgOffUrl) ?>">Desligar</a>
+        </div>
+        <pre class="mb-0 mt-2" style="max-height: 360px; overflow: auto;"><?php
+            $x = $debugBairroInfo;
+            if (!is_array($x)) $x = ['debugBairroInfo' => $x];
+            echo htmlspecialchars(json_encode($x, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        ?></pre>
+    </div>
 <?php endif; ?>
 
 <div class="mb-3">

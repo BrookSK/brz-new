@@ -84,6 +84,7 @@ class AdminPedidosWpController extends Controller {
         $bairroCityFilter = trim((string) ($request->getParam('bairro_city') ?? ''));
         $hideEmpty = (string) ($request->getParam('hide_empty') ?? '') === '1';
         $useBairroAutofill = (string) ($request->getParam('use_bairro_autofill') ?? '1') === '1';
+        $debugBairro = (string) ($request->getParam('debug_bairro') ?? '') === '1';
         $top = (int) ($request->getParam('top') ?? 20);
         if ($top <= 0) $top = 20;
         if ($top > 200) $top = 200;
@@ -2086,7 +2087,7 @@ class AdminPedidosWpController extends Controller {
 
     private function fetchAutofillBairroFilledOrders(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): array {
         $where = [
-            'source = :source',
+            'LOWER(source) = LOWER(:source)',
             'field_name = :field',
             "COALESCE(TRIM(new_value), '') <> ''",
             "COALESCE(TRIM(old_value), '') = ''",
@@ -2121,7 +2122,7 @@ class AdminPedidosWpController extends Controller {
 
     private function fetchAutofillBairroFilledFromEmptyCount(\PDO $pdo, string $source, ?string $start, ?string $end, array $statusList): int {
         $where = [
-            'source = :source',
+            'LOWER(source) = LOWER(:source)',
             'field_name = :field',
             "COALESCE(TRIM(new_value), '') <> ''",
             "COALESCE(TRIM(old_value), '') = ''",
