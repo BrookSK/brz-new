@@ -133,7 +133,18 @@ class RepresentantePainelController extends Controller {
             session_start();
         }
 
-        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+        $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
+        if ($perfil === '') {
+            $perfil = (string) ($_SESSION['usuario_role'] ?? '');
+        }
+        $perfil = strtolower(trim($perfil));
+        if ($perfil === 'administrator' || $perfil === 'administrador') {
+            $perfil = 'admin';
+        } elseif ($perfil === 'seller') {
+            $perfil = 'vendedor';
+        } elseif ($perfil === 'support') {
+            $perfil = 'suporte';
+        }
         if ($perfil !== 'representante') {
             $this->redirect('/minha-conta');
         }
