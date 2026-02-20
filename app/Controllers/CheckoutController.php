@@ -2205,7 +2205,8 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT] Excecao: ' . $e->getMessage());
             $this->debugLog('[CHECKOUT] Stack: ' . $e->getTraceAsString());
             $msgUser = $this->formatarErroParaUsuario($e->getMessage());
-            $this->json(['error' => 'Erro ao processar pedido: ' . $msgUser], 500);
+            $http = (stripos($msgUser, 'Estoque insuficiente') !== false) ? 400 : 500;
+            $this->json(['error' => 'Erro ao processar pedido: ' . $msgUser], $http);
         }
         
         $this->debugLog('[CHECKOUT] processar() - FIM');
@@ -2396,6 +2397,16 @@ class CheckoutController extends Controller {
     private function salvarItensPedido($pedidoId, $carrinho) {
         $db = \Config\Database::getConnection();
 
+        $startedTx = false;
+        try {
+            if (!$db->inTransaction()) {
+                $db->beginTransaction();
+                $startedTx = true;
+            }
+        } catch (\Throwable $e) {
+            $startedTx = false;
+        }
+
         $itensTable = $this->pickPedidoItensTable($db, (int) $pedidoId);
 
         // Descobrir colunas disponíveis na tabela de itens (compatibilidade entre schemas)
@@ -2407,8 +2418,58 @@ class CheckoutController extends Controller {
             $colsItens = [];
         }
         
-        foreach ($carrinho as $item) {
-            $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
+        // Detectar colunas de estoque
+        $prodCols = [];
+        try {
+            $st = $db->query('DESCRIBE produtos');
+            $prodCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Throwable $e) {
+            $prodCols = [];
+        }
+        $prodStockCol = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($prodCols) && in_array($c, $prodCols, true)) {
+                $prodStockCol = $c;
+                break;
+            }
+        }
+
+        $hasProdutoVariacoes = false;
+        try {
+            $st = $db->query("SHOW TABLES LIKE 'produto_variacoes'");
+            $hasProdutoVariacoes = (bool) ($st && $st->fetch());
+        } catch (\Throwable $e) {
+            $hasProdutoVariacoes = false;
+        }
+        $varCols = [];
+        if ($hasProdutoVariacoes) {
+            try {
+                $st = $db->query('DESCRIBE produto_variacoes');
+                $varCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $varCols = [];
+            }
+        }
+        $varStockCol = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($varCols) && in_array($c, $varCols, true)) {
+                $varStockCol = $c;
+                break;
+            }
+        }
+
+        $stmtStockProduto = null;
+        if (!empty($prodStockCol)) {
+            $stmtStockProduto = $db->prepare('UPDATE produtos SET ' . $prodStockCol . ' = ' . $prodStockCol . ' - ? WHERE id = ? AND ' . $prodStockCol . ' >= ?');
+        }
+        $stmtStockVariacao = null;
+        if (!empty($varStockCol)) {
+            $stmtStockVariacao = $db->prepare('UPDATE produto_variacoes SET ' . $varStockCol . ' = ' . $varStockCol . ' - ? WHERE id = ? AND ' . $varStockCol . ' >= ?');
+        }
+
+        try {
+            foreach ($carrinho as $item) {
+                $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
             
             // Validar se o produto existe antes de inserir
             $produtoId = $item['produto_id'] ?? $item['id'] ?? null;
@@ -2523,25 +2584,40 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
-            $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
-            $stmt = $db->prepare($sql);
-            $stmt->execute($vals);
+                $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+                $stmt = $db->prepare($sql);
+                $stmt->execute($vals);
             
-            $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
+                $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
 
-            if ($produtoVariacaoId !== null) {
-                try {
-                    $stmtStock = $db->prepare('UPDATE produto_variacoes SET stock = stock - ? WHERE id = ? AND stock >= ?');
-                    $stmtStock->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
-                } catch (\Exception $e) {
-                }
-            } else {
-                try {
-                    $stmtStock = $db->prepare('UPDATE produtos SET stock = stock - ? WHERE id = ? AND stock >= ?');
-                    $stmtStock->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
-                } catch (\Exception $e) {
+                // Baixa de estoque atômica: se não afetar linha, não havia estoque suficiente.
+                if ($produtoVariacaoId !== null) {
+                    if (!$stmtStockVariacao) {
+                        throw new \Exception('Estoque insuficiente');
+                    }
+                    $stmtStockVariacao->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
+                    if ((int) $stmtStockVariacao->rowCount() <= 0) {
+                        throw new \Exception('Estoque insuficiente');
+                    }
+                } else {
+                    if (!$stmtStockProduto) {
+                        throw new \Exception('Estoque insuficiente');
+                    }
+                    $stmtStockProduto->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
+                    if ((int) $stmtStockProduto->rowCount() <= 0) {
+                        throw new \Exception('Estoque insuficiente');
+                    }
                 }
             }
+
+            if ($startedTx && $db->inTransaction()) {
+                $db->commit();
+            }
+        } catch (\Exception $e) {
+            if ($startedTx && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
         }
     }
     
