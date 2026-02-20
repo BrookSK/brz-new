@@ -6,6 +6,95 @@ class Usuario extends Model {
 
     private static ?array $cachedUserColumns = null;
 
+    private function ensureRememberTokensTable(): void {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute(['remember_tokens']);
+            $exists = (bool) $stmt->fetchColumn();
+            if ($exists) {
+                return;
+            }
+
+            $this->connection->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                token_hash VARCHAR(64) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_token_hash (token_hash),
+                INDEX idx_usuario_id (usuario_id),
+                INDEX idx_expires_at (expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function setRememberToken(int $usuarioId, string $token, int $ttlSeconds): bool {
+        $usuarioId = (int) $usuarioId;
+        $token = trim((string) $token);
+        if ($usuarioId <= 0 || $token === '' || $ttlSeconds <= 0) {
+            return false;
+        }
+
+        $this->ensureRememberTokensTable();
+
+        $hash = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', time() + (int) $ttlSeconds);
+        $createdAt = date('Y-m-d H:i:s');
+
+        try {
+            $stDel = $this->connection->prepare('DELETE FROM remember_tokens WHERE usuario_id = ?');
+            $stDel->execute([$usuarioId]);
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $st = $this->connection->prepare('INSERT INTO remember_tokens (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)');
+            $st->execute([$usuarioId, $hash, $expiresAt, $createdAt]);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function clearRememberTokens(int $usuarioId): void {
+        $usuarioId = (int) $usuarioId;
+        if ($usuarioId <= 0) {
+            return;
+        }
+        $this->ensureRememberTokensTable();
+        try {
+            $st = $this->connection->prepare('DELETE FROM remember_tokens WHERE usuario_id = ?');
+            $st->execute([$usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function findByRememberToken(string $token): ?array {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return null;
+        }
+        $this->ensureRememberTokensTable();
+        $hash = hash('sha256', $token);
+        try {
+            $st = $this->connection->prepare('SELECT usuario_id FROM remember_tokens WHERE token_hash = ? AND expires_at >= NOW() ORDER BY id DESC LIMIT 1');
+            $st->execute([$hash]);
+            $uid = $st->fetchColumn();
+            if ($uid === false || $uid === null) {
+                return null;
+            }
+            $uid = (int) $uid;
+            if ($uid <= 0) {
+                return null;
+            }
+            $u = $this->find($uid);
+            return is_array($u) ? $u : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function __construct() {
         parent::__construct();
     }

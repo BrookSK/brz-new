@@ -89,17 +89,40 @@ class AuthService {
     }
     
     public function logout() {
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $uid = (int) ($_SESSION['usuario_id'] ?? 0);
+        try {
+            if ($uid > 0) {
+                $this->usuarioModel->clearRememberTokens($uid);
+            }
+        } catch (\Exception $e) {
+        }
+
         session_destroy();
-        
-        // Limpar cookie de remember
+
         if (isset($_COOKIE['remember_token'])) {
-            setcookie('remember_token', '', time() - 3600, '/');
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('remember_token', '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie('remember_token', '', time() - 3600, '/; samesite=Lax', '', $secure, true);
+            }
         }
     }
     
     public function criarSessao($usuario) {
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
@@ -119,6 +142,30 @@ class AuthService {
         $_SESSION['usuario_avatar'] = $avatarUrl;
         $_SESSION['logado'] = true;
         $_SESSION['ultimo_acesso'] = time();
+
+        try {
+            $uid = (int) ($usuario['id'] ?? 0);
+            if ($uid > 0) {
+                $token = bin2hex(random_bytes(32));
+                $ttl = 60 * 60 * 24 * 7;
+                $ok = $this->usuarioModel->setRememberToken($uid, $token, $ttl);
+                if ($ok) {
+                    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('remember_token', $token, [
+                            'expires' => time() + $ttl,
+                            'path' => '/',
+                            'secure' => $secure,
+                            'httponly' => true,
+                            'samesite' => 'Lax',
+                        ]);
+                    } else {
+                        setcookie('remember_token', $token, time() + $ttl, '/; samesite=Lax', '', $secure, true);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
         
         // Gerar CSRF token
         if (!isset($_SESSION['csrf_token'])) {

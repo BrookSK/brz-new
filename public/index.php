@@ -5,7 +5,23 @@ ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
 ini_set('session.cookie_lifetime', (string) $sessionLifetime);
 
 $cookieParams = session_get_cookie_params();
-$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+$xfp = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+$xfs = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''));
+$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || $xfp === 'https'
+    || $xfs === 'on';
+
+// Evitar perda de sessão ao alternar http/https (cookie Secure não é enviado em http)
+try {
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+    $isLocal = stripos($host, 'localhost') !== false || preg_match('/^\d+\.\d+\.\d+\.\d+(?::\d+)?$/', $host);
+    if (!$secure && !$isLocal && (stripos($uri, '/admin') === 0 || stripos($uri, '/loginadmin') === 0)) {
+        header('Location: https://' . $host . $uri);
+        exit;
+    }
+} catch (\Throwable $e) {
+}
 
 if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params([
@@ -27,6 +43,33 @@ if (PHP_VERSION_ID >= 70300) {
 }
 
 session_start();
+
+// Login persistente: se a sessão foi perdida no servidor, restaurar a partir do remember_token
+try {
+    $isLogged = !empty($_SESSION['logado']);
+    $remember = isset($_COOKIE['remember_token']) ? trim((string) $_COOKIE['remember_token']) : '';
+    if (!$isLogged && $remember !== '') {
+        $userModel = new \App\Models\Usuario();
+        $u = $userModel->findByRememberToken($remember);
+        if (is_array($u) && !empty($u['id'])) {
+            $auth = new \App\Services\AuthService();
+            $auth->criarSessao($u);
+        } else {
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('remember_token', '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie('remember_token', '', time() - 3600, '/; samesite=Lax', '', $secure, true);
+            }
+        }
+    }
+} catch (\Throwable $e) {
+}
 
 // Renovar o cookie da sessão (sliding expiration) para manter o login ativo por 7 dias após a última atividade
 try {
