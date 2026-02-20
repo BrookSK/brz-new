@@ -14,7 +14,7 @@ class CorreiosTokenService {
         $senha = trim((string) $this->getEntregaConfigValue('correios_token_senha', (string) ($cfg['senha'] ?? '')));
         $cartao = (string) ($cfg['cartao'] ?? '');
         $contrato = (string) ($cfg['contrato'] ?? '');
-        $ambiente = (string) ($cfg['ambiente'] ?? 'homologacao');
+        $ambiente = $this->resolveTokenAmbiente((string) ($cfg['ambiente'] ?? 'homologacao'));
 
         if (trim($usuario) === '' || trim($senha) === '' || trim($cartao) === '') {
             return ['success' => false, 'error' => 'Configuração incompleta para gerar token (usuario/senha do Meu Correios + cartão de postagem).'];
@@ -66,6 +66,26 @@ class CorreiosTokenService {
         ];
     }
 
+    private function resolveTokenAmbiente(string $fallback): string {
+        $override = strtolower(trim((string) $this->getEntregaConfigValue('correios_token_ambiente', '')));
+        if ($override === 'producao' || $override === 'homologacao') {
+            return $override;
+        }
+
+        $trackingBaseUrl = strtolower(trim((string) $this->getEntregaConfigValue('correios_tracking_base_url', '')));
+        if ($trackingBaseUrl !== '') {
+            if (strpos($trackingBaseUrl, 'api.correios.com.br') !== false) {
+                return 'producao';
+            }
+            if (strpos($trackingBaseUrl, 'apihom.correios.com.br') !== false) {
+                return 'homologacao';
+            }
+        }
+
+        $fallback = strtolower(trim($fallback));
+        return ($fallback === 'producao' || $fallback === 'homologacao') ? $fallback : 'homologacao';
+    }
+
     private function requestNewTokenCartaoPostagem(string $usuario, string $senha, string $cartao, string $contrato, string $ambiente): array {
         $isProd = (strtolower(trim($ambiente)) === 'producao');
         $bases = $isProd
@@ -92,6 +112,7 @@ class CorreiosTokenService {
         $httpCode = null;
         $lastErr = '';
         $lastMeta = [];
+        $attemptErrors = [];
 
         foreach ($bases as $base) {
             $url = rtrim($base, '/') . '/v1/autentica/cartaopostagem';
@@ -126,21 +147,34 @@ class CorreiosTokenService {
                 $json = json_decode((string) $raw, true);
                 if (!is_array($json)) {
                     $snippet = substr(trim((string) $raw), 0, 400);
-                    $lastErr = 'Resposta inválida (não-JSON) ao solicitar token.'
+                    if ($snippet === '') {
+                        $snippet = '<empty>';
+                    }
+                    if ($contentType === '') {
+                        $contentType = 'n/a';
+                    }
+                    $errMsg = 'Resposta inválida (não-JSON) ao solicitar token.'
                         . (is_int($httpCode) ? (' HTTP ' . $httpCode) : '')
-                        . ($contentType !== '' ? (' CT=' . $contentType) : '')
-                        . ($snippet !== '' ? (' BODY=' . $snippet) : '')
+                        . ' CT=' . $contentType
+                        . ' BODY=' . $snippet
                         . ' URL=' . $url;
+                    $attemptErrors[] = $errMsg;
+                    if ($lastErr === '') {
+                        $lastErr = $errMsg;
+                    }
                     continue;
                 }
 
                 if (is_int($httpCode) && $httpCode >= 400) {
                     $msg = $this->extractErrorMessage($json);
-                    $lastErr = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.');
+                    $errMsg = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.');
                     if ((int) $httpCode === 401) {
-                        $lastErr .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
+                        $errMsg .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
                     }
                     $lastMeta['raw'] = $json;
+                    $attemptErrors[] = $errMsg . ' URL=' . $url;
+                    // Preferir erro em JSON (mais confiável) ao invés de sobrescrever por tentativas seguintes
+                    $lastErr = $errMsg;
                     continue;
                 }
 
@@ -162,7 +196,11 @@ class CorreiosTokenService {
                     'raw' => $json,
                 ];
             } catch (\Exception $e) {
-                $lastErr = $e->getMessage();
+                $errMsg = $e->getMessage();
+                $attemptErrors[] = $errMsg . ' URL=' . $url;
+                if ($lastErr === '') {
+                    $lastErr = $errMsg;
+                }
                 $lastMeta['request_url'] = $url;
                 continue;
             }
@@ -170,7 +208,8 @@ class CorreiosTokenService {
 
         return array_merge([
             'success' => false,
-            'error' => $lastErr !== '' ? $lastErr : 'Falha ao solicitar token.',
+            'error' => ($lastErr !== '' ? $lastErr : 'Falha ao solicitar token.'),
+            'attempt_errors' => $attemptErrors,
         ], $lastMeta);
     }
 

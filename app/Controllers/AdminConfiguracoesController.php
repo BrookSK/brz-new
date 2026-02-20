@@ -1443,7 +1443,7 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
                                                         <label class="form-label">Usuário (Meu Correios - Token)</label>
-                                                        <input type="text" class="form-control" name="entrega_correios_token_usuario" value="' . $this->getConfigValue($config, 'entrega', 'correios_token_usuario', '') . '" placeholder="Usuário do Meu Correios">
+                                                        <input type="text" class="form-control" name="entrega_correios_token_usuario" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_usuario', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Usuário do Meu Correios">
                                                         <small class="text-muted">Usado para gerar automaticamente o token (Authorization: Basic). Se vazio, o sistema tenta reutilizar o usuário do SIGEP.</small>
                                                     </div>
                                                 </div>
@@ -1451,7 +1451,7 @@ class AdminConfiguracoesController extends Controller {
                                                     <div class="mb-3">
                                                         <label class="form-label">Senha / Código de acesso (Meu Correios - Token)</label>
                                                         <div class="input-group">
-                                                            <input type="password" class="form-control" name="entrega_correios_token_senha" value="' . $this->getConfigValue($config, 'entrega', 'correios_token_senha', '') . '" placeholder="Senha/Código de acesso do Meu Correios">
+                                                            <input type="password" class="form-control" name="entrega_correios_token_senha" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_senha', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Senha/Código de acesso do Meu Correios">
                                                             <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
@@ -1459,6 +1459,21 @@ class AdminConfiguracoesController extends Controller {
                                                         <small class="text-muted">Muitas vezes esta credencial é diferente da senha do SIGEP. Necessária para auto-renovar token.</small>
                                                     </div>
                                                 </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente (Token)</label>
+                                                        <select class="form-select" name="entrega_correios_token_ambiente">
+                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === '' ? 'selected' : '') . '>Seguir SIGEP</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                        <small class="text-muted">Força onde o sistema vai gerar o token (api/apihom). Se vazio, segue o ambiente do SIGEP ou a Base URL do rastreio.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-8"></div>
                                             </div>
 
                                             <div class="mb-3">
@@ -4013,7 +4028,7 @@ HTML;
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
