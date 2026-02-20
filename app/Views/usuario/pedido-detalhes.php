@@ -131,7 +131,17 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             ?>
                             <?php if ($trk !== ''): ?>
                                 <div class="alert alert-light border mb-3">
-                                    <div><strong><?= __('user_order_details.tracking_code', 'Código de rastreio:') ?></strong> <?= htmlspecialchars($trk) ?></div>
+                                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+                                        <div>
+                                            <strong><?= __('user_order_details.tracking_code', 'Código de rastreio:') ?></strong> <?= htmlspecialchars($trk) ?>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <a class="btn btn-sm btn-primary" href="/rastreamento?codigo=<?= rawurlencode($trk) ?>" target="_blank" rel="noopener">
+                                                <i class="fas fa-route me-1"></i>
+                                                <?= __('user_order_details.track_order', 'Acompanhar rastreio') ?>
+                                            </a>
+                                        </div>
+                                    </div>
                                     <?php if ($trkFonte !== ''): ?>
                                         <div class="small text-muted"><?= __('user_order_details.tracking_source', 'Fonte:') ?> <?= htmlspecialchars($trkFonte) ?></div>
                                     <?php endif; ?>
