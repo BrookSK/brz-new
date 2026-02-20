@@ -12,14 +12,15 @@ class CorreiosTokenService {
             return ['success' => false, 'error' => 'SIGEP está desabilitado.'];
         }
 
-        $usuario = (string) ($cfg['usuario'] ?? '');
-        $senha = (string) ($cfg['senha'] ?? '');
+        // Credenciais do token (Meu Correios) podem ser diferentes do SIGEP
+        $usuario = (string) $this->getEntregaConfigValue('correios_token_usuario', (string) ($cfg['usuario'] ?? ''));
+        $senha = (string) $this->getEntregaConfigValue('correios_token_senha', (string) ($cfg['senha'] ?? ''));
         $cartao = (string) ($cfg['cartao'] ?? '');
         $contrato = (string) ($cfg['contrato'] ?? '');
         $ambiente = (string) ($cfg['ambiente'] ?? 'homologacao');
 
         if (trim($usuario) === '' || trim($senha) === '' || trim($cartao) === '') {
-            return ['success' => false, 'error' => 'SIGEP: configuração incompleta (usuario/senha/cartao de postagem).'];
+            return ['success' => false, 'error' => 'Configuração incompleta para gerar token (usuario/senha do Meu Correios + cartão de postagem).'];
         }
 
         $existingToken = (string) $this->getEntregaConfigValue('correios_token', '');
@@ -134,6 +135,9 @@ class CorreiosTokenService {
                 if (is_int($httpCode) && $httpCode >= 400) {
                     $msg = $this->extractErrorMessage($json);
                     $lastErr = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.');
+                    if ((int) $httpCode === 401) {
+                        $lastErr .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
+                    }
                     $lastMeta['raw'] = $json;
                     continue;
                 }
