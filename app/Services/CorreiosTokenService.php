@@ -40,6 +40,16 @@ class CorreiosTokenService {
 
         $resp = $this->requestNewTokenCartaoPostagem($usuario, $senha, $cartao, $contrato, $ambiente);
         if (empty($resp['success'])) {
+            $errMsg = (string) ($resp['error'] ?? '');
+            // Fallback: quando a autorização é por contrato e não por cartão
+            if ($contrato !== '' && stripos($errMsg, 'TOK-003') !== false) {
+                $resp2 = $this->requestNewTokenContrato($usuario, $senha, $contrato, $ambiente);
+                if (!empty($resp2['success'])) {
+                    $resp = $resp2;
+                }
+            }
+        }
+        if (empty($resp['success'])) {
             return $resp;
         }
 
@@ -208,6 +218,161 @@ class CorreiosTokenService {
                     $lastMeta['raw'] = $json;
                     $attemptErrors[] = $errMsg . ' URL=' . $url;
                     // Preferir erro em JSON (mais confiável) ao invés de sobrescrever por tentativas seguintes
+                    $lastErr = $errMsg;
+                    continue;
+                }
+
+                $token = (string) ($json['token'] ?? '');
+                $expiraEm = (string) ($json['expiraEm'] ?? '');
+
+                if (trim($token) === '') {
+                    $lastErr = 'Resposta sem token.';
+                    $lastMeta['raw'] = $json;
+                    continue;
+                }
+
+                return [
+                    'success' => true,
+                    'token' => $token,
+                    'expiraEm' => $expiraEm,
+                    'http_code' => $httpCode,
+                    'request_url' => $url,
+                    'raw' => $json,
+                ];
+            } catch (\Exception $e) {
+                $errMsg = $e->getMessage();
+                $attemptErrors[] = $errMsg . ' URL=' . $url;
+                if ($lastErr === '') {
+                    $lastErr = $errMsg;
+                }
+                $lastMeta['request_url'] = $url;
+                continue;
+            }
+        }
+
+        return array_merge([
+            'success' => false,
+            'error' => ($lastErr !== '' ? $lastErr : 'Falha ao solicitar token.'),
+            'attempt_errors' => $attemptErrors,
+        ], $lastMeta);
+    }
+
+    private function requestNewTokenContrato(string $usuario, string $senha, string $contrato, string $ambiente): array {
+        $isProd = (strtolower(trim($ambiente)) === 'producao');
+        $bases = $isProd
+            ? ['https://api.correios.com.br/token', 'https://apihom.correios.com.br/token']
+            : ['https://apihom.correios.com.br/token', 'https://api.correios.com.br/token'];
+
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ];
+
+        $contrato = preg_replace('/\D+/', '', (string) $contrato);
+        $payload = [
+            'numero' => $contrato,
+            'dr' => 0,
+        ];
+
+        $raw = null;
+        $httpCode = null;
+        $lastErr = '';
+        $lastMeta = [];
+        $attemptErrors = [];
+
+        foreach ($bases as $base) {
+            $url = rtrim($base, '/') . '/v1/autentica/contrato';
+            try {
+                $respHeaders = [];
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                curl_setopt($ch, CURLOPT_USERPWD, $usuario . ':' . $senha);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+                curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$respHeaders) {
+                    $len = strlen($line);
+                    $line = trim($line);
+                    if ($line === '' || strpos($line, ':') === false) {
+                        return $len;
+                    }
+                    [$k, $v] = explode(':', $line, 2);
+                    $k = strtolower(trim($k));
+                    $v = trim($v);
+                    if ($k !== '') {
+                        if (!isset($respHeaders[$k])) {
+                            $respHeaders[$k] = $v;
+                        }
+                    }
+                    return $len;
+                });
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+                $raw = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $contentType = (string) (curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '');
+                $err = curl_error($ch);
+                curl_close($ch);
+
+                $lastMeta = [
+                    'request_url' => $url,
+                    'http_code' => $httpCode,
+                    'content_type' => $contentType,
+                ];
+
+                if ($raw === false || $raw === null) {
+                    $lastErr = 'Falha na requisição de token: ' . $err;
+                    continue;
+                }
+
+                $json = json_decode((string) $raw, true);
+                if (!is_array($json)) {
+                    $snippet = substr(trim((string) $raw), 0, 400);
+                    if ($snippet === '') {
+                        $snippet = '<empty>';
+                    }
+                    if ($contentType === '') {
+                        $contentType = 'n/a';
+                    }
+                    $hdrSnippet = '';
+                    if (is_array($respHeaders) && !empty($respHeaders)) {
+                        $allow = ['www-authenticate', 'server', 'date', 'x-request-id', 'x-correlation-id'];
+                        $parts = [];
+                        foreach ($allow as $hk) {
+                            if (isset($respHeaders[$hk]) && $respHeaders[$hk] !== '') {
+                                $parts[] = $hk . '=' . $respHeaders[$hk];
+                            }
+                        }
+                        if (!empty($parts)) {
+                            $hdrSnippet = ' HDR=' . implode(';', $parts);
+                        }
+                    }
+                    $errMsg = 'Resposta inválida (não-JSON) ao solicitar token.'
+                        . (is_int($httpCode) ? (' HTTP ' . $httpCode) : '')
+                        . ' CT=' . $contentType
+                        . ' BODY=' . $snippet
+                        . $hdrSnippet
+                        . ' URL=' . $url;
+                    $attemptErrors[] = $errMsg;
+                    if ($lastErr === '') {
+                        $lastErr = $errMsg;
+                    }
+                    continue;
+                }
+
+                if (is_int($httpCode) && $httpCode >= 400) {
+                    $msg = $this->extractErrorMessage($json);
+                    $errMsg = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.');
+                    if ((int) $httpCode === 401) {
+                        $errMsg .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
+                    }
+                    $lastMeta['raw'] = $json;
+                    $attemptErrors[] = $errMsg . ' URL=' . $url;
                     $lastErr = $errMsg;
                     continue;
                 }
