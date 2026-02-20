@@ -1581,6 +1581,8 @@ class PedidoEcommerce {
         if ($pedidoId <= 0) return [];
 
         $eventos = [];
+        $pedidoCreatedGlobal = null;
+        $pedidoUpdatedGlobal = null;
         $pushEvento = function ($status, $createdAt, $observacao = '', $usuario = 'Sistema') use (&$eventos) {
             $st = trim((string) $status);
             $dt = $createdAt;
@@ -1727,6 +1729,8 @@ class PedidoEcommerce {
 
             $pedidoCreated = $getTs($pr, ['created_at']);
             $pedidoUpdated = $getTs($pr, ['updated_at']);
+            $pedidoCreatedGlobal = $pedidoCreated;
+            $pedidoUpdatedGlobal = $pedidoUpdated;
             if ($pedidoCreated) {
                 $pushEvento('pedido_criado', $pedidoCreated, '', 'Sistema');
             }
@@ -1747,10 +1751,10 @@ class PedidoEcommerce {
 
         try {
             $labelTables = [
-                ['table' => 'shipstation_etiquetas', 'status' => 'etiqueta_gerada', 'cols' => ['created_at','updated_at'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
-                ['table' => 'stamps_etiquetas', 'status' => 'etiqueta_gerada', 'cols' => ['created_at','updated_at'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
-                ['table' => 'correios_etiquetas', 'status' => 'etiqueta_gerada', 'cols' => ['created_at','updated_at','data_criacao','data_hora'], 'extra' => ['codigo_etiqueta' => 'codigo_etiqueta']],
-                ['table' => 'remessa_janela_pedidos', 'status' => 'wexpress', 'cols' => ['created_at','updated_at','data_criacao','data_hora'], 'extra' => ['wexpress_status' => 'wexpress_status', 'wexpress_tracking_number' => 'wexpress_tracking_number', 'courier_tracking_number' => 'courier_tracking_number']],
+                ['table' => 'shipstation_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','generated_at','created','data_hora','data_criacao','data'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
+                ['table' => 'stamps_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','generated_at','created','data_hora','data_criacao','data'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
+                ['table' => 'correios_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','gerado_em','data_criacao','data_hora','data'], 'extra' => ['codigo_etiqueta' => 'codigo_etiqueta']],
+                ['table' => 'remessa_janela_pedidos', 'status' => 'em_transporte', 'cols' => ['updated_at','created_at','gerado_em','data_criacao','data_hora','data'], 'extra' => ['wexpress_status' => 'wexpress_status', 'wexpress_tracking_number' => 'wexpress_tracking_number', 'courier_tracking_number' => 'courier_tracking_number']],
             ];
 
             foreach ($labelTables as $lt) {
@@ -1766,7 +1770,7 @@ class PedidoEcommerce {
                 if (!$colPedido) {
                     continue;
                 }
-                $dtCol = $this->pickColumn($colsT, (array) ($lt['cols'] ?? ['created_at','updated_at']));
+                $dtCol = $this->pickColumn($colsT, (array) ($lt['cols'] ?? ['updated_at','created_at']));
                 $fields = [];
                 $fields[] = $dtCol ? ($dtCol . ' AS dt') : 'NULL AS dt';
                 foreach ((array) ($lt['extra'] ?? []) as $alias => $col) {
@@ -1779,6 +1783,9 @@ class PedidoEcommerce {
                 $st->execute([$pedidoId]);
                 $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
                 $dt = $row['dt'] ?? null;
+                if (($dt === null || $dt === '') && ($pedidoUpdatedGlobal || $pedidoCreatedGlobal)) {
+                    $dt = $pedidoUpdatedGlobal ?: $pedidoCreatedGlobal;
+                }
                 $obsParts = [];
                 foreach (['tracking_number','codigo_etiqueta','wexpress_tracking_number','courier_tracking_number','wexpress_status'] as $k) {
                     $v = trim((string) ($row[$k] ?? ''));
@@ -1786,8 +1793,11 @@ class PedidoEcommerce {
                         $obsParts[] = $v;
                     }
                 }
-                $obs = !empty($obsParts) ? implode(' - ', $obsParts) : '';
-                $pushEvento((string) ($lt['status'] ?? 'etiqueta_gerada'), $dt, $obs, 'Sistema');
+                $obs = '';
+                if (!empty($obsParts)) {
+                    $obs = 'Código: ' . $obsParts[0];
+                }
+                $pushEvento((string) ($lt['status'] ?? 'enviado'), $dt, $obs, 'Sistema');
             }
         } catch (\Exception $e) {
         }

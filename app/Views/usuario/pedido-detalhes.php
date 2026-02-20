@@ -27,8 +27,7 @@ function getStatusText($status) {
         'pago' => 'order_status.paid',
 
         'pedido_criado' => 'order_status.created',
-        'etiqueta_gerada' => 'order_status.label_generated',
-        'wexpress' => 'order_status.wexpress',
+        'em_transporte' => 'order_status.in_transit',
 
         'aguardando_processamento' => 'order_status.awaiting_processing',
         'consolidado' => 'order_status.consolidated',
