@@ -265,6 +265,30 @@ function renderAdminSidebar($activePage = '') {
         $adminLogo = '';
     }
 
+    // Normalizar valores inválidos e garantir fallback quando o arquivo não existir
+    $adminLogo = is_string($adminLogo) ? trim($adminLogo) : '';
+    $adminLogoLower = strtolower($adminLogo);
+    if ($adminLogo === '' || $adminLogoLower === '0' || $adminLogoLower === 'null' || $adminLogoLower === 'none' || $adminLogoLower === 'false' || $adminLogoLower === 'undefined') {
+        $adminLogo = '';
+    } else {
+        // Se for um caminho local (ex.: /uploads/...), validar existência do arquivo para evitar mostrar logo removida
+        $isHttp = (stripos($adminLogo, 'http://') === 0 || stripos($adminLogo, 'https://') === 0);
+        $isData = (stripos($adminLogo, 'data:') === 0);
+        if (!$isHttp && !$isData) {
+            $docRoot = (string) ($_SERVER['DOCUMENT_ROOT'] ?? '');
+            if ($docRoot !== '') {
+                $logoPath = $adminLogo;
+                if (($logoPath[0] ?? '') !== '/') {
+                    $logoPath = '/' . ltrim($logoPath, '/');
+                }
+                $candidatePath = rtrim($docRoot, '/\\') . str_replace('/', DIRECTORY_SEPARATOR, $logoPath);
+                if (!@file_exists($candidatePath)) {
+                    $adminLogo = '';
+                }
+            }
+        }
+    }
+
     echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
