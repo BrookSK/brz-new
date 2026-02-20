@@ -130,6 +130,69 @@ class AdminRemessaCorreiosController extends Controller {
         return (string) $v;
     }
 
+    private function isValidCpf(string $cpf): bool {
+        $cpf = $this->onlyDigits($cpf);
+        if (strlen($cpf) !== 11) return false;
+        if (preg_match('/^(\d)\1{10}$/', $cpf)) return false;
+
+        $sum = 0;
+        for ($i = 0, $w = 10; $i < 9; $i++, $w--) {
+            $sum += ((int) $cpf[$i]) * $w;
+        }
+        $d1 = 11 - ($sum % 11);
+        if ($d1 >= 10) $d1 = 0;
+        if ($d1 !== (int) $cpf[9]) return false;
+
+        $sum = 0;
+        for ($i = 0, $w = 11; $i < 10; $i++, $w--) {
+            $sum += ((int) $cpf[$i]) * $w;
+        }
+        $d2 = 11 - ($sum % 11);
+        if ($d2 >= 10) $d2 = 0;
+        return $d2 === (int) $cpf[10];
+    }
+
+    private function isValidCnpj(string $cnpj): bool {
+        $cnpj = $this->onlyDigits($cnpj);
+        if (strlen($cnpj) !== 14) return false;
+        if (preg_match('/^(\d)\1{13}$/', $cnpj)) return false;
+
+        $calc = function(string $c, array $w): int {
+            $sum = 0;
+            for ($i = 0; $i < count($w); $i++) {
+                $sum += ((int) $c[$i]) * $w[$i];
+            }
+            $r = $sum % 11;
+            return ($r < 2) ? 0 : (11 - $r);
+        };
+
+        $w1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+        $d1 = $calc($cnpj, $w1);
+        if ($d1 !== (int) $cnpj[12]) return false;
+
+        $w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+        $d2 = $calc($cnpj, $w2);
+        return $d2 === (int) $cnpj[13];
+    }
+
+    private function isValidCpfCnpj(string $doc): bool {
+        $d = $this->onlyDigits($doc);
+        if ($d === '') return false;
+        if (strlen($d) === 11) return $this->isValidCpf($d);
+        if (strlen($d) === 14) return $this->isValidCnpj($d);
+        return false;
+    }
+
+    private function pickFirstNonEmpty(array $row, array $keys): string {
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $row)) {
+                $v = trim((string) ($row[$k] ?? ''));
+                if ($v !== '') return $v;
+            }
+        }
+        return '';
+    }
+
     private function buildPrepostagemPayload(array $pedido, array $cfg): array {
         $sender = $this->parseJsonConfig((string) ($cfg['prepostagem_sender_json'] ?? ''), 'Pré-Postagem: remetente');
         if (empty($sender)) {
@@ -152,6 +215,15 @@ class AdminRemessaCorreiosController extends Controller {
         $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
         $destEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
         $destTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
+
+        $destDoc = $this->pickFirstNonEmpty($pedido, ['cliente_cpf_cnpj', 'cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        if ($destDoc === '' && isset($pedido['cliente']) && is_array($pedido['cliente'])) {
+            $destDoc = $this->pickFirstNonEmpty((array) $pedido['cliente'], ['cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        }
+        $destDocDigits = $this->onlyDigits($destDoc);
+        if ($destDocDigits === '' || !$this->isValidCpfCnpj($destDocDigits)) {
+            throw new \Exception('Pré-Postagem: CPF/CNPJ do destinatário inválido ou ausente');
+        }
 
         $cep = $this->onlyDigits((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? '')));
         $logradouro = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
@@ -176,6 +248,7 @@ class AdminRemessaCorreiosController extends Controller {
         $destinatario = [
             'nome' => $destNome,
             'email' => $destEmail,
+            'cpfCnpj' => $destDocDigits,
             'dddTelefone' => $ddd,
             'telefone' => $telefone8,
             'endereco' => [
@@ -195,6 +268,66 @@ class AdminRemessaCorreiosController extends Controller {
             throw new \Exception('Pré-Postagem: informe o código do serviço nas configurações');
         }
 
+        $idCorreios = trim((string) ($cfg['prepostagem_id_correios'] ?? ''));
+        if ($idCorreios === '') {
+            throw new \Exception('Pré-Postagem: informe o idCorreios nas configurações');
+        }
+
+        $items = [];
+        if (isset($pedido['items']) && is_array($pedido['items'])) {
+            $items = $pedido['items'];
+        } elseif (isset($pedido['itens']) && is_array($pedido['itens'])) {
+            $items = $pedido['itens'];
+        }
+        if (empty($items)) {
+            throw new \Exception('Pré-Postagem: pedido sem itens');
+        }
+
+        $itensDeclaracao = [];
+        $idx = 0;
+        foreach ($items as $it) {
+            if (!is_array($it)) {
+                continue;
+            }
+            $idx++;
+            $qtd = (int) ($it['quantidade'] ?? ($it['qty'] ?? 0));
+            if ($qtd <= 0) {
+                throw new \Exception('Pré-Postagem: item #' . $idx . ' com quantidade inválida');
+            }
+
+            $nomeItem = trim((string) ($it['nome'] ?? ($it['nome_produto'] ?? ($it['produto_nome'] ?? ''))));
+            if ($nomeItem === '') {
+                $nomeItem = 'Item ' . $idx;
+            }
+
+            $ncm = $this->onlyDigits((string) ($it['ncm'] ?? ($it['codigo_ncm'] ?? '')));
+            if ($ncm === '' || strlen($ncm) < 8) {
+                throw new \Exception('Pré-Postagem: item #' . $idx . ' sem NCM');
+            }
+
+            $valor = null;
+            foreach (['valor', 'preco_unitario', 'price', 'preco', 'valor_unitario'] as $k) {
+                if (isset($it[$k]) && is_numeric($it[$k])) {
+                    $valor = (float) $it[$k];
+                    break;
+                }
+            }
+            if ($valor === null || $valor <= 0) {
+                throw new \Exception('Pré-Postagem: item #' . $idx . ' com valor inválido');
+            }
+
+            $itensDeclaracao[] = [
+                'conteudo' => substr($nomeItem, 0, 60),
+                'quantidade' => (string) $qtd,
+                'valor' => number_format($valor, 2, '.', ''),
+                'ncm' => $ncm,
+            ];
+        }
+
+        if (empty($itensDeclaracao)) {
+            throw new \Exception('Pré-Postagem: pedido sem itens válidos para declaração de conteúdo');
+        }
+
         $pesoKg = null;
         foreach (['peso_total', 'peso'] as $k) {
             if (isset($pedido[$k]) && is_numeric($pedido[$k])) {
@@ -203,27 +336,53 @@ class AdminRemessaCorreiosController extends Controller {
             }
         }
         if ($pesoKg === null || $pesoKg <= 0) {
-            $pesoKg = 0.3;
+            throw new \Exception('Pré-Postagem: pedido com peso inválido (peso_total/peso)');
         }
-        $pesoGramas = (int) max(1, round($pesoKg * 1000));
+        $pesoGramas = (int) round($pesoKg * 1000);
+        if ($pesoGramas <= 0) {
+            throw new \Exception('Pré-Postagem: pedido com peso inválido');
+        }
 
-        $altura = 2;
-        $largura = 11;
-        $comprimento = 16;
+        $altura = null;
+        $largura = null;
+        $comprimento = null;
+        foreach (['altura', 'altura_cm', 'altura_pacote', 'package_height'] as $k) {
+            if (isset($pedido[$k]) && is_numeric($pedido[$k])) {
+                $altura = (float) $pedido[$k];
+                break;
+            }
+        }
+        foreach (['largura', 'largura_cm', 'largura_pacote', 'package_width'] as $k) {
+            if (isset($pedido[$k]) && is_numeric($pedido[$k])) {
+                $largura = (float) $pedido[$k];
+                break;
+            }
+        }
+        foreach (['comprimento', 'comprimento_cm', 'comprimento_pacote', 'package_length'] as $k) {
+            if (isset($pedido[$k]) && is_numeric($pedido[$k])) {
+                $comprimento = (float) $pedido[$k];
+                break;
+            }
+        }
+        if ($altura === null || $largura === null || $comprimento === null || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
+            throw new \Exception('Pré-Postagem: pedido com dimensões inválidas (altura/largura/comprimento)');
+        }
+
+        $altura = (int) round($altura);
+        $largura = (int) round($largura);
+        $comprimento = (int) round($comprimento);
+        if ($altura <= 0 || $largura <= 0 || $comprimento <= 0) {
+            throw new \Exception('Pré-Postagem: pedido com dimensões inválidas');
+        }
+
         $formato = '2';
 
         $payload = [
-            'idCorreios' => (string) ($cfg['prepostagem_id_correios'] ?? ''),
+            'idCorreios' => $idCorreios,
             'remetente' => $sender,
             'destinatario' => $destinatario,
             'codigoServico' => $codigoServico,
-            'itensDeclaracaoConteudo' => [
-                [
-                    'conteudo' => 'Mercadoria',
-                    'quantidade' => '1',
-                    'valor' => '1.00',
-                ],
-            ],
+            'itensDeclaracaoConteudo' => $itensDeclaracao,
             'pesoInformado' => (string) $pesoGramas,
             'codigoFormatoObjetoInformado' => (string) $formato,
             'alturaInformada' => (string) $altura,
