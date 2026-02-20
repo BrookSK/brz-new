@@ -3838,6 +3838,18 @@ HTML;
             $set = [$statusCol . ' = ?'];
             $params = [$novoStatus];
 
+            $statusAnterior = null;
+            try {
+                $stPrev = $pdo->prepare('SELECT ' . $statusCol . ' FROM pedidos WHERE id = ? LIMIT 1');
+                $stPrev->execute([(int) $id]);
+                $tmpPrev = $stPrev->fetchColumn();
+                if ($tmpPrev !== false && $tmpPrev !== null) {
+                    $statusAnterior = (string) $tmpPrev;
+                }
+            } catch (\Exception $e) {
+                $statusAnterior = null;
+            }
+
             // Se marcou como pago/aprovado, manter colunas relacionadas consistentes.
             // Isso impacta diretamente a tela de comissões (que pode filtrar por payment_status).
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
@@ -3872,6 +3884,73 @@ HTML;
             $params[] = $id;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
+
+            // Persistir histórico de status para exibição ao usuário (se a tabela existir)
+            try {
+                $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT->execute(['pedido_status_history']);
+                $temHist = ((int) ($stT->fetchColumn() ?: 0) > 0);
+                if ($temHist) {
+                    $stC = $pdo->query('DESCRIBE pedido_status_history');
+                    $colsH = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    if (is_array($colsH)) {
+                        $colUser = in_array('alterado_por', $colsH, true) ? 'alterado_por' : (in_array('usuario_id', $colsH, true) ? 'usuario_id' : 'alterado_por');
+                        $hasStatusAnterior = in_array('status_anterior', $colsH, true);
+                        $hasStatusNovo = in_array('status_novo', $colsH, true);
+                        $hasObs = in_array('observacao', $colsH, true);
+                        $hasCreatedAt = in_array('created_at', $colsH, true);
+                        if ($hasStatusNovo) {
+                            $uid = null;
+                            try {
+                                if (session_status() === PHP_SESSION_NONE) {
+                                    session_start();
+                                }
+                                $uSess = (int) ($_SESSION['usuario_id'] ?? 0);
+                                if ($uSess > 0) {
+                                    $uid = $uSess;
+                                }
+                            } catch (\Exception $e) {
+                                $uid = null;
+                            }
+
+                            $fields = ['pedido_id'];
+                            $vals = ['?'];
+                            $bind = [(int) $id];
+
+                            if ($hasStatusAnterior) {
+                                $fields[] = 'status_anterior';
+                                $vals[] = '?';
+                                $bind[] = $statusAnterior;
+                            }
+                            $fields[] = 'status_novo';
+                            $vals[] = '?';
+                            $bind[] = (string) $novoStatus;
+
+                            if ($hasObs) {
+                                $fields[] = 'observacao';
+                                $vals[] = '?';
+                                $bind[] = (string) ($observacao ?? '');
+                            }
+
+                            if (!empty($colUser)) {
+                                $fields[] = $colUser;
+                                $vals[] = '?';
+                                $bind[] = $uid;
+                            }
+
+                            if ($hasCreatedAt) {
+                                $fields[] = 'created_at';
+                                $vals[] = 'NOW()';
+                            }
+
+                            $sqlH = 'INSERT INTO pedido_status_history (' . implode(', ', $fields) . ') VALUES (' . implode(', ', $vals) . ')';
+                            $stH = $pdo->prepare($sqlH);
+                            $stH->execute($bind);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
 
             if ((string) $novoStatus === 'cancelado' && $estornar) {
                 try {

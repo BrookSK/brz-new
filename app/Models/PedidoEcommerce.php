@@ -741,6 +741,100 @@ class PedidoEcommerce {
         try {
             $colsPedido = $this->getTableColumns('pedidos');
 
+            // Tracking / etiqueta
+            try {
+                $pedido['tracking_code'] = $pedido['tracking_code'] ?? null;
+                $pedido['tracking_source'] = $pedido['tracking_source'] ?? null;
+                $pedido['tracking_label_url'] = $pedido['tracking_label_url'] ?? null;
+
+                $colTracking = $this->pickColumn($colsPedido, ['tracking_code', 'codigo_rastreio', 'rastreamento', 'tracking']);
+                $trk = '';
+                if ($colTracking && array_key_exists($colTracking, $pedido)) {
+                    $trk = trim((string) ($pedido[$colTracking] ?? ''));
+                }
+
+                $trkFonte = '';
+                $trkUrl = '';
+
+                if ($trk !== '') {
+                    $trkFonte = 'Pedido';
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('shipstation_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier_code FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'ShipStation' . (!empty($row['carrier_code']) ? (' (' . trim((string) $row['carrier_code']) . ')') : '');
+                                $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('stamps_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier FROM stamps_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Stamps' . (!empty($row['carrier']) ? (' (' . trim((string) $row['carrier']) . ')') : '');
+                                $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('correios_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $t = trim((string) ($st->fetchColumn() ?: ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Correios';
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('remessa_janela_pedidos')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT courier_tracking_number, wexpress_tracking_number, wexpress_status FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $courier = trim((string) ($row['courier_tracking_number'] ?? ''));
+                            $wx = trim((string) ($row['wexpress_tracking_number'] ?? ''));
+                            $wxStatus = trim((string) ($row['wexpress_status'] ?? ''));
+                            if ($courier !== '' || $wx !== '') {
+                                $trk = $courier !== '' ? $courier : $wx;
+                                $trkFonte = 'W-Express' . ($wxStatus !== '' ? (' (' . $wxStatus . ')') : '');
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk !== '') {
+                    $pedido['tracking_code'] = $trk;
+                    $pedido['tracking_source'] = $trkFonte !== '' ? $trkFonte : null;
+                    $pedido['tracking_label_url'] = $trkUrl !== '' ? $trkUrl : null;
+                }
+            } catch (\Exception $e) {
+            }
+
             $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
             $moeda = trim($moeda);
             if ($moeda === '') {
@@ -1506,10 +1600,96 @@ class PedidoEcommerce {
                 ORDER BY psh.created_at DESC
             ");
             $stmt->execute([':id' => $pedidoId]);
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (!empty($rows)) {
+                return $rows;
+            }
         } catch (\Exception $e) {
-            return [];
+            // fallback
         }
+
+        // Fallback: tabela rastreamento (quando existir)
+        try {
+            if ($this->tableExists('rastreamento')) {
+                $colsR = $this->getTableColumns('rastreamento');
+                if (is_array($colsR) && !empty($colsR)) {
+                    $colPedido = $this->pickColumn($colsR, ['pedido_id', 'order_id']);
+                    $colEtapa = $this->pickColumn($colsR, ['novo_status', 'etapa', 'status', 'status_novo']);
+                    $colDesc = $this->pickColumn($colsR, ['observacao', 'descricao', 'description', 'mensagem', 'message']);
+                    $colLocal = $this->pickColumn($colsR, ['local', 'location']);
+                    $colData = $this->pickColumn($colsR, ['created_at', 'data_hora', 'data', 'date']);
+
+                    if ($colPedido) {
+                        $select = [];
+                        if ($colEtapa) $select[] = $colEtapa . ' AS etapa';
+                        if ($colDesc) $select[] = $colDesc . ' AS descricao';
+                        if ($colLocal) $select[] = $colLocal . ' AS local';
+                        if ($colData) $select[] = $colData . ' AS created_at';
+                        if (empty($select)) {
+                            $select[] = '*';
+                        }
+
+                        $orderBy = $colData ? (' ORDER BY ' . $colData . ' DESC') : ' ORDER BY id DESC';
+                        $st = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM rastreamento WHERE ' . $colPedido . ' = ?' . $orderBy);
+                        $st->execute([$pedidoId]);
+                        $rrows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        $out = [];
+                        foreach ($rrows as $r) {
+                            $etapa = trim((string) ($r['etapa'] ?? ($r[$colEtapa] ?? '')));
+                            $desc = trim((string) ($r['descricao'] ?? ($r[$colDesc] ?? '')));
+                            $local = trim((string) ($r['local'] ?? ($r[$colLocal] ?? '')));
+                            $dt = $r['created_at'] ?? ($colData ? ($r[$colData] ?? null) : null);
+
+                            $obs = $desc;
+                            if ($local !== '') {
+                                $obs = ($obs !== '' ? ($obs . ' - ' . $local) : $local);
+                            }
+
+                            $out[] = [
+                                'status_novo' => $etapa,
+                                'novo_status' => $etapa,
+                                'observacao' => $obs,
+                                'created_at' => $dt,
+                                'usuario_alterou' => 'Sistema',
+                            ];
+                        }
+
+                        if (!empty($out)) {
+                            return $out;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Último fallback: status atual do pedido
+        try {
+            $colsP = $this->getTableColumns('pedidos');
+            $colStatus = $this->pickColumn($colsP, ['status', 'status_pedido', 'pedido_status']);
+            $colCreated = $this->pickColumn($colsP, ['created_at', 'data_criacao', 'data_pedido']);
+            if ($colStatus) {
+                $select = [$colStatus . ' AS st'];
+                if ($colCreated) $select[] = $colCreated . ' AS created_at';
+                $st = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                $st->execute([$pedidoId]);
+                $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $stVal = trim((string) ($row['st'] ?? ''));
+                if ($stVal !== '') {
+                    return [[
+                        'status_novo' => $stVal,
+                        'novo_status' => $stVal,
+                        'observacao' => '',
+                        'created_at' => $row['created_at'] ?? null,
+                        'usuario_alterou' => 'Sistema',
+                    ]];
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return [];
     }
 
     public function atualizarStatus(int $pedidoId, string $novoStatus, ?string $observacao = null, $usuarioId = null): bool {

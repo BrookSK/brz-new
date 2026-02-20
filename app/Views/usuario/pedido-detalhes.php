@@ -91,6 +91,22 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                             </h5>
                         </div>
                         <div class="card-body">
+                            <?php
+                            $trk = trim((string) ($pedido['tracking_code'] ?? ''));
+                            $trkFonte = trim((string) ($pedido['tracking_source'] ?? ''));
+                            $trkUrl = trim((string) ($pedido['tracking_label_url'] ?? ''));
+                            ?>
+                            <?php if ($trk !== ''): ?>
+                                <div class="alert alert-light border mb-3">
+                                    <div><strong><?= __('user_order_details.tracking_code', 'Código de rastreio:') ?></strong> <?= htmlspecialchars($trk) ?></div>
+                                    <?php if ($trkFonte !== ''): ?>
+                                        <div class="small text-muted"><?= __('user_order_details.tracking_source', 'Fonte:') ?> <?= htmlspecialchars($trkFonte) ?></div>
+                                    <?php endif; ?>
+                                    <?php if ($trkUrl !== ''): ?>
+                                        <div class="small mt-1"><a href="<?= htmlspecialchars($trkUrl) ?>" target="_blank" rel="noopener"><?= __('user_order_details.view_label', 'Ver etiqueta') ?></a></div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                             <div class="timeline">
                                 <?php if (!empty($historico)): ?>
                                     <?php foreach ($historico as $index => $item): ?>
