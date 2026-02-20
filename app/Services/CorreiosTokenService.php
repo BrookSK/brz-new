@@ -8,9 +8,6 @@ class CorreiosTokenService {
 
     public function getValidTokenFromSigep(string $finalidade = 'geral'): array {
         $cfg = $this->loadSigepCreds();
-        if (empty($cfg['enabled'])) {
-            return ['success' => false, 'error' => 'SIGEP está desabilitado.'];
-        }
 
         // Credenciais do token (Meu Correios) podem ser diferentes do SIGEP
         $usuario = (string) $this->getEntregaConfigValue('correios_token_usuario', (string) ($cfg['usuario'] ?? ''));
