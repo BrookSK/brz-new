@@ -1422,6 +1422,22 @@ JS;
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
             $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
+            $colsUsuarios = [];
+            try {
+                $stmtColsU = $pdo->query('DESCRIBE usuarios');
+                $colsUsuarios = $stmtColsU ? ($stmtColsU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsUsuarios = [];
+            }
+            $colUserName = $pickCol($colsUsuarios, ['name', 'nome', 'full_name', 'nome_completo']);
+            if (!$colUserName) {
+                $colUserName = 'name';
+            }
+            $colUserEmail = $pickCol($colsUsuarios, ['email', 'mail']);
+            if (!$colUserEmail) {
+                $colUserEmail = 'email';
+            }
+
             // Fallback de taxa USD->BRL para exibição, quando o pedido não tiver taxa_conversao persistida
             $rateUSDBRL = 5.5;
             try {
@@ -1435,7 +1451,7 @@ JS;
             } catch (\Exception $e) {
             }
             
-            $sql = "SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $params = [];
 
             if ($temDeletedAt) {
@@ -1443,7 +1459,21 @@ JS;
             }
             
             if (!empty($busca)) {
-                $sql .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
+                $searchParts = [];
+                $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
+                $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
+                $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
+                if ($colNumero) {
+                    $searchParts[] = 'p.' . $colNumero . ' LIKE :busca';
+                }
+                if (in_array('codigo_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.codigo_pedido LIKE :busca';
+                }
+                if (in_array('numero_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.numero_pedido LIKE :busca';
+                }
+
+                $sql .= ' AND (' . implode(' OR ', $searchParts) . ')';
                 $params[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
@@ -1559,7 +1589,21 @@ JS;
                 $sqlTotal .= " AND p.deleted_at IS NULL";
             }
             if (!empty($busca)) {
-                $sqlTotal .= " AND (p.id LIKE :busca OR u.name LIKE :busca OR u.email LIKE :busca)";
+                $searchParts = [];
+                $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
+                $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
+                $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
+                if ($colNumero) {
+                    $searchParts[] = 'p.' . $colNumero . ' LIKE :busca';
+                }
+                if (in_array('codigo_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.codigo_pedido LIKE :busca';
+                }
+                if (in_array('numero_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.numero_pedido LIKE :busca';
+                }
+
+                $sqlTotal .= ' AND (' . implode(' OR ', $searchParts) . ')';
                 $paramsTotal[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
