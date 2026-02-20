@@ -43,6 +43,45 @@ class CorreiosTrackingService {
 
             if (is_int($httpCode) && $httpCode >= 400) {
                 $msg = $this->extractErrorMessage($json);
+
+                // Token expirado: tentar renovar automaticamente uma vez
+                if (stripos($msg, 'GTW-007') !== false) {
+                    try {
+                        $tokSvc = new CorreiosTokenService();
+                        $rTok = $tokSvc->getValidTokenFromSigep('tracking');
+                        if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                            $token2 = (string) $rTok['token'];
+                            $headers2 = $this->buildHeaders($headerName, $token2);
+
+                            $ch2 = curl_init($url);
+                            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 15);
+                            curl_setopt($ch2, CURLOPT_TIMEOUT, 30);
+                            curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers2);
+                            $raw2 = curl_exec($ch2);
+                            $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                            $err2 = curl_error($ch2);
+                            curl_close($ch2);
+
+                            if ($raw2 === false || $raw2 === null) {
+                                return ['success' => false, 'error' => 'Falha na requisição: ' . $err2, 'http_code' => $httpCode2];
+                            }
+                            $json2 = json_decode($raw2, true);
+                            if (is_array($json2) && is_int($httpCode2) && $httpCode2 < 400) {
+                                $eventos2 = $this->extractEventos($json2);
+                                return [
+                                    'success' => true,
+                                    'codigo' => $codigo,
+                                    'http_code' => $httpCode2,
+                                    'eventos' => $eventos2,
+                                    'raw' => $json2,
+                                ];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
                 return [
                     'success' => false,
                     'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar rastreamento.'),

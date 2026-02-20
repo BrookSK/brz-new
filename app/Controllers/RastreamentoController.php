@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Models\Pedido;
 use App\Services\CorreiosTrackingService;
+use App\Services\CorreiosTokenService;
 use Config\Database;
 
 class RastreamentoController extends Controller {
@@ -148,6 +149,18 @@ class RastreamentoController extends Controller {
 
         $enabled = $get('entrega', 'correios_tracking_enabled', '0');
         $token = $get('entrega', 'correios_tracking_token', '');
+
+        // Auto-refresh token usando credenciais já cadastradas no SIGEP
+        try {
+            if ($enabled === '1') {
+                $tokSvc = new CorreiosTokenService();
+                $r = $tokSvc->getValidTokenFromSigep('tracking');
+                if (!empty($r['success']) && !empty($r['token'])) {
+                    $token = (string) $r['token'];
+                }
+            }
+        } catch (\Exception $e) {
+        }
 
         $configuredBaseUrl = trim($get('entrega', 'correios_tracking_base_url', ''));
 

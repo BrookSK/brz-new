@@ -23,16 +23,21 @@ class CorreiosCepService {
             $base . '/v1/enderecos/' . rawurlencode($cep),
             $base . '/v1/enderecos?cep=' . rawurlencode($cep),
         ];
-        $headers = [
-            'Accept: application/json',
-            'Authorization: ' . (stripos($token, 'bearer ') === 0 ? $token : ('Bearer ' . $token)),
-        ];
+        $makeHeaders = function (string $tok): array {
+            return [
+                'Accept: application/json',
+                'Authorization: ' . (stripos($tok, 'bearer ') === 0 ? $tok : ('Bearer ' . $tok)),
+            ];
+        };
+
+        $headers = $makeHeaders($token);
 
         $raw = null;
         $httpCode = null;
         try {
             $lastErr = '';
             $lastUrl = '';
+            $didRefresh = false;
             foreach ($urls as $url) {
                 $lastUrl = (string) $url;
                 $ch = curl_init($url);
@@ -59,6 +64,47 @@ class CorreiosCepService {
                 if (is_int($httpCode) && $httpCode >= 400) {
                     $msg = $this->extractErrorMessage($json);
                     $errMsg = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar CEP.');
+
+                    // Token expirado: tentar renovar automaticamente uma vez
+                    if (!$didRefresh && stripos($errMsg, 'GTW-007') !== false) {
+                        $didRefresh = true;
+                        try {
+                            $tokSvc = new CorreiosTokenService();
+                            $rTok = $tokSvc->getValidTokenFromSigep('cep');
+                            if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                                $token = (string) $rTok['token'];
+                                $headers = $makeHeaders($token);
+                                // tentar novamente o mesmo endpoint com o token renovado
+                                $ch2 = curl_init($url);
+                                curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+                                curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 15);
+                                curl_setopt($ch2, CURLOPT_TIMEOUT, 30);
+                                curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers);
+                                $raw2 = curl_exec($ch2);
+                                $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                                $err2 = curl_error($ch2);
+                                curl_close($ch2);
+
+                                if ($raw2 === false || $raw2 === null) {
+                                    $lastErr = 'Falha na requisição: ' . $err2;
+                                    continue;
+                                }
+                                $json2 = json_decode($raw2, true);
+                                if (is_array($json2) && is_int($httpCode2) && $httpCode2 < 400) {
+                                    $bairro = $this->extractBairro($json2);
+                                    return [
+                                        'success' => true,
+                                        'http_code' => $httpCode2,
+                                        'raw' => $json2,
+                                        'bairro' => $bairro,
+                                        'request_url' => $lastUrl,
+                                        'token_fingerprint' => substr(hash('sha256', $token), 0, 12),
+                                    ];
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
 
                     // Alguns ambientes retornam 403 GTW-008 para determinados endpoints
                     // mesmo com token válido para outros endpoints. Nesses casos, tentamos

@@ -5,6 +5,7 @@ use Config\Database;
 use App\Models\PedidoEcommerce;
 use App\Services\AuthService;
 use App\Services\CorreiosPrepostagemService;
+use App\Services\CorreiosTokenService;
 
 class AdminRemessaCorreiosController extends Controller {
     private $connection;
@@ -972,6 +973,16 @@ class AdminRemessaCorreiosController extends Controller {
         if ($providerUsed === 'prepostagem_v3') {
             $token = (string) ($cfgProvider['prepostagem_token'] ?? '');
             if (trim($token) === '') {
+                try {
+                    $tokSvc = new CorreiosTokenService();
+                    $rTok = $tokSvc->getValidTokenFromSigep('prepostagem');
+                    if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                        $token = (string) $rTok['token'];
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if (trim($token) === '') {
                 throw new \Exception('Pré-Postagem: configure o token (Cartão de Postagem) no Admin');
             }
             $baseUrl = $this->getPrepostagemBaseUrl((string) ($cfgProvider['ambiente'] ?? 'homologacao'));
@@ -981,6 +992,18 @@ class AdminRemessaCorreiosController extends Controller {
             $prepostagemReq = $payload;
 
             $r = $svc->criarPrepostagem($payload);
+            if (empty($r['success']) && stripos((string) ($r['error'] ?? ''), 'GTW-007') !== false) {
+                try {
+                    $tokSvc = new CorreiosTokenService();
+                    $rTok = $tokSvc->getValidTokenFromSigep('prepostagem');
+                    if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                        $token = (string) $rTok['token'];
+                        $svc = new CorreiosPrepostagemService($baseUrl, $token);
+                        $r = $svc->criarPrepostagem($payload);
+                    }
+                } catch (\Exception $e) {
+                }
+            }
             if (empty($r['success'])) {
                 $prepostagemErr = (string) ($r['error'] ?? 'Falha ao criar pré-postagem');
                 $prepostagemResp = $r['raw'] ?? $r;
