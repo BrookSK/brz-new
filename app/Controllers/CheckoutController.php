@@ -27,6 +27,281 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
+        $db = \Config\Database::getConnection();
+
+        $produtoCols = [];
+        try {
+            $st = $db->query('DESCRIBE produtos');
+            $produtoCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Throwable $e) {
+            $produtoCols = [];
+        }
+
+        $produtoColAtivo = null;
+        foreach (['active', 'ativo'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColAtivo = $c;
+                break;
+            }
+        }
+
+        $produtoColStatus = null;
+        if (is_array($produtoCols) && in_array('status', $produtoCols, true)) {
+            $produtoColStatus = 'status';
+        }
+
+        $produtoColStock = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColStock = $c;
+                break;
+            }
+        }
+
+        $hasProdutoVariacoes = false;
+        try {
+            $st = $db->query("SHOW TABLES LIKE 'produto_variacoes'");
+            $hasProdutoVariacoes = (bool) ($st && $st->fetch());
+        } catch (\Throwable $e) {
+            $hasProdutoVariacoes = false;
+        }
+
+        $variacaoCols = [];
+        if ($hasProdutoVariacoes) {
+            try {
+                $st = $db->query('DESCRIBE produto_variacoes');
+                $variacaoCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $variacaoCols = [];
+            }
+        }
+
+        $variacaoColAtivo = null;
+        foreach (['active', 'ativo'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColAtivo = $c;
+                break;
+            }
+        }
+
+        $variacaoColStatus = null;
+        if (is_array($variacaoCols) && in_array('status', $variacaoCols, true)) {
+            $variacaoColStatus = 'status';
+        }
+
+        $variacaoColStock = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColStock = $c;
+                break;
+            }
+        }
+
+        $erros = [];
+
+        $stProduto = null;
+        try {
+            $select = ['id', 'nome', 'name', 'sku'];
+            if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
+            if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
+            if (!empty($produtoColStock)) $select[] = $produtoColStock;
+            $select = array_values(array_unique($select));
+            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = ? LIMIT 1');
+        } catch (\Throwable $e) {
+            $stProduto = null;
+        }
+
+        $stVariacao = null;
+        if ($hasProdutoVariacoes) {
+            try {
+                $select = ['id', 'produto_id'];
+                if (!empty($variacaoColAtivo)) $select[] = $variacaoColAtivo;
+                if (!empty($variacaoColStatus)) $select[] = $variacaoColStatus;
+                if (!empty($variacaoColStock)) $select[] = $variacaoColStock;
+                $select = array_values(array_unique($select));
+                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produto_variacoes WHERE id = ? LIMIT 1');
+            } catch (\Throwable $e) {
+                $stVariacao = null;
+            }
+        }
+
+        foreach ($carrinho as $item) {
+            $produtoId = (int) ($item['produto_id'] ?? ($item['id'] ?? 0));
+            if ($produtoId <= 0) {
+                continue;
+            }
+            $qtd = (int) ($item['quantidade'] ?? 1);
+            if ($qtd < 1) $qtd = 1;
+
+            $produtoVariacaoId = null;
+            if (isset($item['produto_variacao_id']) && $item['produto_variacao_id'] !== '' && $item['produto_variacao_id'] !== null) {
+                $pv = (int) $item['produto_variacao_id'];
+                if ($pv > 0) {
+                    $produtoVariacaoId = $pv;
+                }
+            }
+
+            $produtoRow = null;
+            if ($stProduto) {
+                try {
+                    $stProduto->execute([$produtoId]);
+                    $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $produtoRow = null;
+                }
+            }
+
+            if (!$produtoRow || empty($produtoRow['id'])) {
+                $erros[] = [
+                    'produto_id' => $produtoId,
+                    'produto_variacao_id' => $produtoVariacaoId,
+                    'motivo' => 'Produto não encontrado',
+                    'quantidade_solicitada' => $qtd,
+                ];
+                continue;
+            }
+
+            $nomeProduto = (string) ($item['nome'] ?? ($item['name'] ?? ($produtoRow['nome'] ?? ($produtoRow['name'] ?? ''))));
+            if (trim($nomeProduto) === '') {
+                $nomeProduto = 'Produto #' . $produtoId;
+            }
+
+            if (!empty($produtoColAtivo)) {
+                $ativo = (int) ($produtoRow[$produtoColAtivo] ?? 0);
+                if ($ativo !== 1) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Produto inativo',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+            }
+
+            if (!empty($produtoColStatus)) {
+                $st = strtolower(trim((string) ($produtoRow[$produtoColStatus] ?? '')));
+                if ($st !== '' && !in_array($st, ['published', 'ativo', 'active'], true)) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Produto indisponível',
+                        'status' => $st,
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+            }
+
+            if ($produtoVariacaoId !== null) {
+                if (!$hasProdutoVariacoes || !$stVariacao) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação não disponível',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                $varRow = null;
+                try {
+                    $stVariacao->execute([(int) $produtoVariacaoId]);
+                    $varRow = $stVariacao->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $varRow = null;
+                }
+
+                if (!$varRow || empty($varRow['id'])) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação não encontrada',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                if (isset($varRow['produto_id']) && (int) $varRow['produto_id'] !== $produtoId) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação inválida para este produto',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                if (!empty($variacaoColAtivo)) {
+                    $ativoV = (int) ($varRow[$variacaoColAtivo] ?? 0);
+                    if ($ativoV !== 1) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => $produtoVariacaoId,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Variação inativa',
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+
+                if (!empty($variacaoColStatus)) {
+                    $stV = strtolower(trim((string) ($varRow[$variacaoColStatus] ?? '')));
+                    if ($stV !== '' && !in_array($stV, ['published', 'ativo', 'active'], true)) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => $produtoVariacaoId,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Variação indisponível',
+                            'status' => $stV,
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+
+                if (!empty($variacaoColStock)) {
+                    $stockV = (int) ($varRow[$variacaoColStock] ?? 0);
+                    if ($stockV < $qtd) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => $produtoVariacaoId,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Estoque insuficiente (variação)',
+                            'estoque_disponivel' => $stockV,
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+            } else {
+                if (!empty($produtoColStock)) {
+                    $stock = (int) ($produtoRow[$produtoColStock] ?? 0);
+                    if ($stock < $qtd) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => null,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Estoque insuficiente',
+                            'estoque_disponivel' => $stock,
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+            }
+        }
+
+        return $erros;
+    }
+
     private function garantirCarteiraUsuario(
         \PDO $db,
         int $usuarioId
@@ -1679,6 +1954,23 @@ class CheckoutController extends Controller {
                 return;
             }
         } catch (\Exception $e) {
+        }
+
+        // Revalidar disponibilidade do carrinho no momento da finalização (status/ativo/estoque)
+        try {
+            $itensIndisponiveis = $this->validarDisponibilidadeCarrinhoNoBanco((array) $carrinho);
+            if (!empty($itensIndisponiveis)) {
+                $this->json([
+                    'error' => 'Alguns produtos do seu carrinho não estão mais disponíveis. Atualize o carrinho e tente novamente.',
+                    'itens_indisponiveis' => $itensIndisponiveis,
+                ], 400);
+                return;
+            }
+        } catch (\Throwable $e) {
+            $this->json([
+                'error' => 'Não foi possível validar a disponibilidade do carrinho. Tente novamente.',
+            ], 500);
+            return;
         }
         
         try {

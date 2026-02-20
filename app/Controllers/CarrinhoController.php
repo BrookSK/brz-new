@@ -567,8 +567,13 @@ class CarrinhoController extends Controller {
         }
 
         $itemKey = ((string) $produtoId) . ':' . ((string) ($pvId ?? 0));
-        
-        $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+
+        $precoBase = (float) ($produto['preco'] ?? ($produto['valor'] ?? 0));
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? ($produto['preco_promo'] ?? ($produto['sale_price'] ?? 0)));
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
         if ($pvId !== null && $pvId > 0) {
             $infoVar = $this->getVariacaoInfo($pvId);
             if ($infoVar) {

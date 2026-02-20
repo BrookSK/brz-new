@@ -218,24 +218,68 @@ class Carrinho extends Model {
         if (!$produto || $produto['estoque'] < $quantidade) {
             return false;
         }
+
+        // Definir preço unitário efetivo (promo quando válida; variação override tem prioridade)
+        $precoBase = (float) ($produto['valor'] ?? 0);
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? 0);
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $precoUnitario = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
+        if ($produtoVariacaoId !== null && (int) $produtoVariacaoId > 0) {
+            try {
+                if ($this->tableExists('produto_variacoes')) {
+                    $stCols = $this->connection->query('DESCRIBE produto_variacoes');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                    $hasAtivo = is_array($cols) && in_array('ativo', $cols, true);
+                    $select = 'id, produto_id, price_override, stock' . ($hasAtivo ? ', ativo' : '');
+                    $sql = 'SELECT ' . $select . ' FROM produto_variacoes WHERE id = ? LIMIT 1';
+                    $stVar = $this->connection->prepare($sql);
+                    $stVar->execute([(int) $produtoVariacaoId]);
+                    $var = $stVar->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+                    if (!$var || empty($var['id'])) {
+                        return false;
+                    }
+                    if (isset($var['produto_id']) && (int) $var['produto_id'] !== (int) $produtoId) {
+                        return false;
+                    }
+                    if ($hasAtivo && isset($var['ativo']) && (int) $var['ativo'] !== 1) {
+                        return false;
+                    }
+                    $stockVar = (int) ($var['stock'] ?? 0);
+                    if ($stockVar < (int) $quantidade) {
+                        return false;
+                    }
+                    $override = $var['price_override'] ?? null;
+                    if ($override !== null && $override !== '' && (float) $override > 0) {
+                        $precoUnitario = (float) $override;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // fallback: mantém preço do produto
+            }
+        }
         
         if ($itemExistente) {
             // Atualizar quantidade
             $novaQuantidade = $itemExistente['quantidade'] + $quantidade;
-            $novoSubtotal = $novaQuantidade * $produto['valor'];
+            $novoSubtotal = $novaQuantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
                 UPDATE carrinho_items 
-                SET quantidade = :quantidade, subtotal = :subtotal 
+                SET quantidade = :quantidade, valor_unitario = :valor_unitario, subtotal = :subtotal 
                 WHERE id = :id
             ");
             $stmt->bindParam(':quantidade', $novaQuantidade);
+            $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $novoSubtotal);
             $stmt->bindParam(':id', $itemExistente['id']);
             $stmt->execute();
         } else {
             // Inserir novo item
-            $subtotal = $quantidade * $produto['valor'];
+            $subtotal = $quantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
                 INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, valor_unitario, subtotal) 
@@ -246,7 +290,7 @@ class Carrinho extends Model {
             $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
             $stmt->bindValue(':variacao_descricao', $variacaoDescricao);
             $stmt->bindParam(':quantidade', $quantidade);
-            $stmt->bindParam(':valor_unitario', $produto['valor']);
+            $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $subtotal);
             $stmt->execute();
         }

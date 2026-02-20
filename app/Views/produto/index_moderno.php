@@ -96,14 +96,20 @@
                         
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="price-section">
+                                <?php
+                                    $precoBase = (float) ($produto['price'] ?? 0);
+                                    $precoPromo = (float) ($produto['sale_price'] ?? 0);
+                                    $temPromo = ($precoPromo > 0 && $precoPromo < $precoBase);
+                                    $precoExibir = $temPromo ? $precoPromo : $precoBase;
+                                ?>
                                 <span class="h4 text-primary fw-bold mb-0 product-price" 
-                                      data-original-price="<?= $produto['price'] ?>">
-                                    <?= number_format($produto['price'], 2, ',', '.') ?>
+                                      data-original-price="<?= $precoExibir ?>">
+                                    <?= number_format($precoExibir, 2, ',', '.') ?>
                                 </span>
-                                <?php if ($produto['sale_price'] > 0): ?>
-                                    <small class="text-decoration-line-through text-muted product-sale-price"
-                                          data-original-sale-price="<?= $produto['sale_price'] ?>">
-                                        <?= number_format($produto['sale_price'], 2, ',', '.') ?>
+                                <?php if ($temPromo): ?>
+                                    <small class="text-decoration-line-through text-muted product-original-price"
+                                          data-original-original-price="<?= $precoBase ?>">
+                                        <?= number_format($precoBase, 2, ',', '.') ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
@@ -130,7 +136,7 @@
                             <button class="btn btn-primary btn-sm btn-adicionar-modern" 
                                     data-produto-id="<?= $produto['id'] ?>"
                                     data-produto-nome="<?= htmlspecialchars($produto['name']) ?>"
-                                    data-produto-preco="<?= $produto['price'] ?>"
+                                    data-produto-preco="<?= $precoExibir ?>"
                                     data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
                                     <?= $produto['stock'] > 0 ? '' : 'disabled' ?>>
                                 <i class="fas fa-cart-plus me-2"></i>
@@ -241,10 +247,10 @@ function updateProductPrices(currency) {
         }
     });
     
-    // Atualizar preços promocionais
-    const salePrices = document.querySelectorAll('.product-sale-price');
-    salePrices.forEach((element, index) => {
-        const originalValue = parseFloat(element.getAttribute('data-original-sale-price'));
+    // Atualizar preços originais (riscados) quando houver promoção
+    const originalPrices = document.querySelectorAll('.product-original-price');
+    originalPrices.forEach((element, index) => {
+        const originalValue = parseFloat(element.getAttribute('data-original-original-price'));
         
         if (!isNaN(originalValue)) {
             let convertedPrice;

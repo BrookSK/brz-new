@@ -218,17 +218,25 @@ class ApiController extends Controller {
         }
 
         $carrinho = $this->getCarrinhoSessionItems();
+
+        $precoBase = (float) ($produto['valor'] ?? ($produto['preco'] ?? 0));
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? ($produto['sale_price'] ?? 0));
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $precoEfetivo = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
         $itemKey = $produtoId;
         if (isset($carrinho[$itemKey])) {
             $carrinho[$itemKey]['quantidade'] += (int) $quantidade;
-            $carrinho[$itemKey]['subtotal'] = $carrinho[$itemKey]['quantidade'] * $produto['valor'];
+            $carrinho[$itemKey]['preco_unitario'] = $precoEfetivo;
+            $carrinho[$itemKey]['subtotal'] = $carrinho[$itemKey]['quantidade'] * $precoEfetivo;
         } else {
             $carrinho[$itemKey] = [
                 'produto_id' => $produtoId,
                 'nome' => $produto['nome'],
-                'preco_unitario' => $produto['valor'],
+                'preco_unitario' => $precoEfetivo,
                 'quantidade' => (int) $quantidade,
-                'subtotal' => ((int) $quantidade) * $produto['valor']
+                'subtotal' => ((int) $quantidade) * $precoEfetivo
             ];
         }
         $this->setCarrinhoSessionItems($carrinho);
