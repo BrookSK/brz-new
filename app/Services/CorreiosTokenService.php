@@ -10,8 +10,8 @@ class CorreiosTokenService {
         $cfg = $this->loadSigepCreds();
 
         // Credenciais do token (Meu Correios) podem ser diferentes do SIGEP
-        $usuario = (string) $this->getEntregaConfigValue('correios_token_usuario', (string) ($cfg['usuario'] ?? ''));
-        $senha = (string) $this->getEntregaConfigValue('correios_token_senha', (string) ($cfg['senha'] ?? ''));
+        $usuario = trim((string) $this->getEntregaConfigValue('correios_token_usuario', (string) ($cfg['usuario'] ?? '')));
+        $senha = trim((string) $this->getEntregaConfigValue('correios_token_senha', (string) ($cfg['senha'] ?? '')));
         $cartao = (string) ($cfg['cartao'] ?? '');
         $contrato = (string) ($cfg['contrato'] ?? '');
         $ambiente = (string) ($cfg['ambiente'] ?? 'homologacao');
@@ -72,15 +72,17 @@ class CorreiosTokenService {
             ? ['https://api.correios.com.br/token', 'https://apihom.correios.com.br/token']
             : ['https://apihom.correios.com.br/token', 'https://api.correios.com.br/token'];
 
-        $basic = base64_encode($usuario . ':' . $senha);
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json',
-            'Authorization: Basic ' . $basic,
         ];
+
+        $cartao = preg_replace('/\D+/', '', (string) $cartao);
+        $contrato = preg_replace('/\D+/', '', (string) $contrato);
 
         $payload = [
             'numero' => $cartao,
+            'dr' => 0,
         ];
         if (trim($contrato) !== '') {
             $payload['contrato'] = $contrato;
@@ -100,6 +102,8 @@ class CorreiosTokenService {
                 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
                 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
                 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                curl_setopt($ch, CURLOPT_USERPWD, $usuario . ':' . $senha);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
                 $raw = curl_exec($ch);
@@ -125,7 +129,8 @@ class CorreiosTokenService {
                     $lastErr = 'Resposta inválida (não-JSON) ao solicitar token.'
                         . (is_int($httpCode) ? (' HTTP ' . $httpCode) : '')
                         . ($contentType !== '' ? (' CT=' . $contentType) : '')
-                        . ($snippet !== '' ? (' BODY=' . $snippet) : '');
+                        . ($snippet !== '' ? (' BODY=' . $snippet) : '')
+                        . ' URL=' . $url;
                     continue;
                 }
 
