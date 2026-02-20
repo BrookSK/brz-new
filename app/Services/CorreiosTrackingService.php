@@ -78,7 +78,14 @@ class CorreiosTrackingService {
                                 ];
                             }
                         }
+                        if (empty($rTok['success'])) {
+                            $refreshErr = (string) ($rTok['error'] ?? 'Falha ao renovar token');
+                            if ($refreshErr !== '') {
+                                $msg = trim($msg) . ' (Auto-renovação falhou: ' . $refreshErr . ')';
+                            }
+                        }
                     } catch (\Exception $e) {
+                        $msg = trim($msg) . ' (Auto-renovação falhou: ' . $e->getMessage() . ')';
                     }
                 }
 
