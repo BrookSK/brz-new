@@ -1088,7 +1088,10 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
-            $tipoCompraView = 'offline';
+            $tipoCompraView = strtolower(trim((string) $request->getParam('tipo_compra', 'todos')));
+            if (!in_array($tipoCompraView, ['offline', 'online', 'todos'], true)) {
+                $tipoCompraView = 'todos';
+            }
 
             $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
             $reabertos = null;
@@ -1116,8 +1119,10 @@ class AdminComprasController extends Controller {
             if ($temTipoCompraEmLista) {
                 if ($tipoCompraView === 'offline') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
-                } else {
+                } elseif ($tipoCompraView === 'online') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                } else {
+                    $whereTipoCompra = '';
                 }
             }
 
@@ -1305,7 +1310,7 @@ class AdminComprasController extends Controller {
             $lojaIdFilter = 0;
             $semLoja = false;
             $statusView = 'pendente';
-            $tipoCompraView = 'offline';
+            $tipoCompraView = 'todos';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
@@ -1361,6 +1366,11 @@ class AdminComprasController extends Controller {
                 </div>';
 
                 $this->renderFlashIfAny();
+
+                echo '<div class="alert alert-info mb-3">'
+                    . '<div><strong>Importante:</strong> as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.</div>'
+                    . '<div class="small text-muted mt-1">Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.</div>'
+                    . '</div>';
 
                 $qsLoja = '';
                 if ($semLoja) {

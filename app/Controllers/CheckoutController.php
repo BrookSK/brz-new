@@ -59,6 +59,14 @@ class CheckoutController extends Controller {
             }
         }
 
+        $produtoColControla = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColControla = $c;
+                break;
+            }
+        }
+
         $hasProdutoVariacoes = false;
         try {
             $st = $db->query("SHOW TABLES LIKE 'produto_variacoes'");
@@ -106,6 +114,7 @@ class CheckoutController extends Controller {
             if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
             if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
             if (!empty($produtoColStock)) $select[] = $produtoColStock;
+            if (!empty($produtoColControla)) $select[] = $produtoColControla;
             $select = array_values(array_unique($select));
             $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = ? LIMIT 1');
         } catch (\Throwable $e) {
@@ -278,22 +287,27 @@ class CheckoutController extends Controller {
                             'estoque_disponivel' => $stockV,
                             'quantidade_solicitada' => $qtd,
                         ];
-                        continue;
                     }
                 }
             } else {
-                if (!empty($produtoColStock)) {
-                    $stock = (int) ($produtoRow[$produtoColStock] ?? 0);
-                    if ($stock < $qtd) {
-                        $erros[] = [
-                            'produto_id' => $produtoId,
-                            'produto_variacao_id' => null,
-                            'nome' => $nomeProduto,
-                            'motivo' => 'Estoque insuficiente',
-                            'estoque_disponivel' => $stock,
-                            'quantidade_solicitada' => $qtd,
-                        ];
-                        continue;
+                if (!empty($produtoColStock) && isset($produtoRow[$produtoColStock])) {
+                    $controla = true;
+                    if (!empty($produtoColControla) && array_key_exists($produtoColControla, $produtoRow)) {
+                        $raw = $produtoRow[$produtoColControla];
+                        $controla = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
+                    }
+                    if ($controla) {
+                        $stock = (int) $produtoRow[$produtoColStock];
+                        if ($stock < $qtd) {
+                            $erros[] = [
+                                'produto_id' => $produtoId,
+                                'produto_variacao_id' => null,
+                                'nome' => $nomeProduto,
+                                'motivo' => 'Estoque insuficiente',
+                                'estoque_disponivel' => $stock,
+                                'quantidade_solicitada' => $qtd,
+                            ];
+                        }
                     }
                 }
             }
@@ -302,329 +316,17 @@ class CheckoutController extends Controller {
         return $erros;
     }
 
-    private function garantirCarteiraUsuario(
-        \PDO $db,
-        int $usuarioId
-    ): void {
-        if ($usuarioId <= 0) {
-            return;
-        }
-
-        try {
-            $db->exec("
-                CREATE TABLE IF NOT EXISTS `carteiras` (
-                    `id` int(11) NOT NULL AUTO_INCREMENT,
-                    `usuario_id` int(11) NOT NULL,
-                    `saldo_usd` decimal(10,2) DEFAULT 0.00,
-                    `saldo_brl` decimal(10,2) DEFAULT 0.00,
-                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    UNIQUE KEY `uk_usuario_id` (`usuario_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            ");
-        } catch (\Exception $e) {
-        }
-
-        try {
-            $stmt = $db->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
-            $stmt->execute([(int) $usuarioId]);
-        } catch (\Exception $e) {
-        }
-    }
-
-    private function garantirTabelaTransacoesCarteira(\PDO $db): void {
-        try {
-            $db->exec("
-                CREATE TABLE IF NOT EXISTS `transacoes_carteira` (
-                    `id` int(11) NOT NULL AUTO_INCREMENT,
-                    `usuario_id` int(11) NOT NULL,
-                    `tipo` enum('credito','debito','conversao') NOT NULL,
-                    `valor_usd` decimal(10,2) DEFAULT 0.00,
-                    `valor_brl` decimal(10,2) DEFAULT 0.00,
-                    `taxa_conversao` decimal(10,6) DEFAULT 1.000000,
-                    `descricao` text,
-                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    KEY `idx_usuario_id` (`usuario_id`),
-                    KEY `idx_tipo` (`tipo`),
-                    KEY `idx_created_at` (`created_at`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            ");
-        } catch (\Exception $e) {
-        }
-    }
-
-    private function debitarCarteiraParaPedido(
-        int $usuarioId,
-        int $pedidoId,
-        float $valor,
-        string $moeda
-    ): array {
-        $usuarioId = (int) $usuarioId;
-        $pedidoId = (int) $pedidoId;
-        $valor = (float) $valor;
-        $moeda = strtoupper(trim((string) $moeda));
-
-        if ($usuarioId <= 0) {
-            throw new \Exception('Usuário inválido para pagamento via carteira');
-        }
-        if ($pedidoId <= 0) {
-            throw new \Exception('Pedido inválido para pagamento via carteira');
-        }
-        if ($valor <= 0) {
-            throw new \Exception('Valor inválido para pagamento via carteira');
-        }
-        if (!in_array($moeda, ['BRL', 'USD'], true)) {
-            throw new \Exception('Moeda inválida para carteira');
-        }
-
-        $db = \Config\Database::getConnection();
-
-        $this->garantirCarteiraUsuario($db, $usuarioId);
-        $this->garantirTabelaTransacoesCarteira($db);
-
-        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
-        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
-
-        $db->beginTransaction();
-        try {
-            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
-            $stmt->execute([$usuarioId]);
-            $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
-
-            $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
-            if ($saldoAtual + 0.00001 < $valor) {
-                throw new \Exception('Saldo insuficiente na carteira');
-            }
-
-            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
-            $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
-
-            try {
-                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
-                $stmtTx->execute([
-                    ':uid' => $usuarioId,
-                    ':valor' => $valor,
-                    ':desc' => 'Pagamento do Pedido #' . $pedidoId,
-                ]);
-            } catch (\Exception $e) {
-            }
-
-            $db->commit();
-
-            return [
-                'success' => true,
-                'status' => 'PAID',
-                'paid_at' => date('Y-m-d H:i:s'),
-                'billingType' => 'WALLET',
-                'payment_id' => 'WALLET_' . $pedidoId,
-            ];
-        } catch (\Exception $e) {
-            $db->rollBack();
-            throw $e;
-        }
-    }
-
-    private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
-        if (empty($missing)) {
-            return $missing;
-        }
-        if (!is_array($selectedAddress) || empty($selectedAddress)) {
-            return $missing;
-        }
-
-        $addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
-        $hasAll = true;
-        foreach ($addrFields as $f) {
-            $v = trim((string) ($selectedAddress[$f] ?? ''));
-            if ($v === '') {
-                $hasAll = false;
-                break;
-            }
-        }
-        if (!$hasAll) {
-            return $missing;
-        }
-
-        // Se o endereço selecionado já tem os campos, não considerar esses campos como pendentes no perfil.
-        return array_values(array_filter($missing, function ($it) use ($addrFields) {
-            return !in_array((string) $it, $addrFields, true);
-        }));
-    }
-
-    private function tableExists(string $table): bool {
-        try {
-            $db = \Config\Database::getConnection();
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute([$table]);
-            return (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
-        $temPedidoItens = false;
-        $temPedidoItems = false;
-        try {
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute(['pedido_itens']);
-            $temPedidoItens = (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            $temPedidoItens = false;
-        }
-        try {
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute(['pedido_items']);
-            $temPedidoItems = (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            $temPedidoItems = false;
-        }
-
-        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
-        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
-        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
-
-        // Se ambos existirem, preferir a tabela que já possui itens desse pedido
-        if ($pedidoId > 0) {
-            $c1 = 0;
-            $c2 = 0;
-            try {
-                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
-                $st->execute([$pedidoId]);
-                $c1 = (int) ($st->fetchColumn() ?: 0);
-            } catch (\Throwable $e) {
-                $c1 = 0;
-            }
-            try {
-                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
-                $st->execute([$pedidoId]);
-                $c2 = (int) ($st->fetchColumn() ?: 0);
-            } catch (\Throwable $e) {
-                $c2 = 0;
-            }
-            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
-        }
-
-        return 'pedido_itens';
-    }
-
-    private function formatarErroParaUsuario(string $mensagem): string {
-        $m = trim($mensagem);
-
-        // Extrair erro do Asaas quando vier como JSON
-        if (stripos($m, 'Erro Asaas HTTP') !== false) {
-            $jsonPos = strpos($m, '{');
-            if ($jsonPos !== false) {
-                $jsonStr = substr($m, $jsonPos);
-                $decoded = json_decode($jsonStr, true);
-                if (is_array($decoded) && !empty($decoded['errors']) && is_array($decoded['errors'])) {
-                    $first = $decoded['errors'][0] ?? null;
-                    if (is_array($first)) {
-                        $desc = (string) ($first['description'] ?? '');
-                        if ($desc !== '') {
-                            return $desc;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Remover prefixos técnicos em cadeia
-        $prefixes = [
-            'Erro ao processar pedido:',
-            'Erro ao processar pagamento:',
-        ];
-        foreach ($prefixes as $p) {
-            if (stripos($m, $p) === 0) {
-                $m = trim(substr($m, strlen($p)));
-            }
-        }
-
-        return $m !== '' ? $m : 'Não foi possível processar o pagamento. Tente novamente.';
-    }
-
-    private function getConfigValue(string $chave, $default = null) {
-        try {
-            $db = \Config\Database::getConnection();
-            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-            $stmt->execute([$chave]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
-            }
-        } catch (\Exception $e) {
-        }
-        return $default;
-    }
-
-    private function getTaxaServicoPorKg(): float {
-        $v = $this->getConfigValue('taxa_servico_usd_por_kg', null);
-        if ($v === null || $v === '') {
-            $v = $this->getConfigValue('entrega_taxa_servico_kg', null);
-        }
-        if ($v === null || $v === '') {
-            $v = '39';
-        }
-        return floatval($v);
-    }
-
-    private function getPixDescontoTaxaServicoPercent(): float {
-        $v = $this->getConfigValue('pagamentos_pix_desconto_taxa_servico_percent', null);
-        if ($v === null || $v === '') {
-            return 0.0;
-        }
-        $p = (float) str_replace(',', '.', (string) $v);
-        if ($p < 0) $p = 0.0;
-        if ($p > 100) $p = 100.0;
-        return $p;
-    }
-
-    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
-        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
-        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
-        if (!$calcularAutomatico) {
-            return 0.0;
-        }
-
-        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
-        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
-            return 0.0;
-        }
-
-        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
-        if ($fretePorKg <= 0) {
-            return 0.0;
-        }
-
-        $pesoArredondado = ceil($pesoTotal);
-        return $fretePorKg * $pesoArredondado;
-    }
-
-    private function debugLog(string $message): void {
-        $enabled = false;
-        if (isset($_ENV['APP_DEBUG'])) {
-            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
-        } elseif (isset($_SERVER['APP_DEBUG'])) {
-            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
-        }
-
-        if ($enabled) {
-            error_log($message);
-        }
-    }
-
     private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
         $uid = (int) ($usuario['id'] ?? 0);
         $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
         $items = [];
         foreach ($carrinho as $it) {
-            $pid = (int) ($it['produto_id'] ?? ($it['id'] ?? 0));
-            $qtd = (int) ($it['quantidade'] ?? 1);
+            $produtoId = (int) ($it['produto_id'] ?? ($it['id'] ?? 0));
+            $qtd = (int) ($it['quantidade'] ?? ($it['qty'] ?? 1));
+            if ($produtoId <= 0 || $qtd <= 0) continue;
             $vid = (int) ($it['produto_variacao_id'] ?? 0);
             $vu = (float) ($it['preco_unitario'] ?? ($it['price'] ?? ($it['preco'] ?? 0)));
-            $items[] = [$pid, $vid, $qtd, round($vu, 2)];
+            $items[] = [$produtoId, $vid, $qtd, round($vu, 2)];
         }
         sort($items);
         $payload = json_encode([
@@ -2458,6 +2160,14 @@ class CheckoutController extends Controller {
             }
         }
 
+        $prodControlaCol = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($prodCols) && in_array($c, $prodCols, true)) {
+                $prodControlaCol = $c;
+                break;
+            }
+        }
+
         $stmtStockProduto = null;
         if (!empty($prodStockCol)) {
             $stmtStockProduto = $db->prepare('UPDATE produtos SET ' . $prodStockCol . ' = ' . $prodStockCol . ' - ? WHERE id = ? AND ' . $prodStockCol . ' >= ?');
@@ -2466,6 +2176,36 @@ class CheckoutController extends Controller {
         if (!empty($varStockCol)) {
             $stmtStockVariacao = $db->prepare('UPDATE produto_variacoes SET ' . $varStockCol . ' = ' . $varStockCol . ' - ? WHERE id = ? AND ' . $varStockCol . ' >= ?');
         }
+
+        $temListaCompras = false;
+        $colsLista = [];
+        try {
+            $st = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $st->execute(['lista_compras']);
+            $temListaCompras = ((int) ($st->fetchColumn() ?: 0) > 0);
+        } catch (\Throwable $e) {
+            $temListaCompras = false;
+        }
+        if ($temListaCompras) {
+            try {
+                $st = $db->query('DESCRIBE lista_compras');
+                $colsLista = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $colsLista = [];
+            }
+        }
+        $listaTemPedidoId = $temListaCompras && is_array($colsLista) && in_array('pedido_id', $colsLista, true);
+        $listaTemProdutoId = $temListaCompras && is_array($colsLista) && in_array('produto_id', $colsLista, true);
+        $listaTemStatus = $temListaCompras && is_array($colsLista) && in_array('status', $colsLista, true);
+        $listaTemTipo = $temListaCompras && is_array($colsLista) && in_array('tipo_compra', $colsLista, true);
+        $listaQtdCol = '';
+        if ($temListaCompras && is_array($colsLista) && in_array('quantidade_faltante', $colsLista, true)) {
+            $listaQtdCol = 'quantidade_faltante';
+        } elseif ($temListaCompras && is_array($colsLista) && in_array('quantidade_necessaria', $colsLista, true)) {
+            $listaQtdCol = 'quantidade_necessaria';
+        }
+
+        $criouPendenciaLista = false;
 
         try {
             foreach ($carrinho as $item) {
@@ -2492,7 +2232,11 @@ class CheckoutController extends Controller {
             // Buscar dados do produto para persistir no pedido
             $produtoRow = null;
             try {
-                $stmtP = $db->prepare('SELECT id, name, nome, sku, url_original FROM produtos WHERE id = ? LIMIT 1');
+                $select = ['id', 'name', 'nome', 'sku', 'url_original'];
+                if (!empty($prodControlaCol)) {
+                    $select[] = $prodControlaCol;
+                }
+                $stmtP = $db->prepare('SELECT ' . implode(', ', array_values(array_unique($select))) . ' FROM produtos WHERE id = ? LIMIT 1');
                 $stmtP->execute([$produtoId]);
                 $produtoRow = $stmtP->fetch(\PDO::FETCH_ASSOC);
             } catch (\Exception $e) {
@@ -2590,23 +2334,126 @@ class CheckoutController extends Controller {
             
                 $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
 
-                // Baixa de estoque atômica: se não afetar linha, não havia estoque suficiente.
-                if ($produtoVariacaoId !== null) {
-                    if (!$stmtStockVariacao) {
-                        throw new \Exception('Estoque insuficiente');
-                    }
-                    $stmtStockVariacao->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
-                    if ((int) $stmtStockVariacao->rowCount() <= 0) {
-                        throw new \Exception('Estoque insuficiente');
+                $controlaEstoque = !empty($prodStockCol);
+                if (!empty($prodControlaCol) && is_array($produtoRow) && array_key_exists($prodControlaCol, $produtoRow)) {
+                    $raw = $produtoRow[$prodControlaCol];
+                    $controlaEstoque = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
+                }
+
+                if ($controlaEstoque) {
+                    if ($produtoVariacaoId !== null) {
+                        if (!$stmtStockVariacao) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                        $stmtStockVariacao->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
+                        if ((int) $stmtStockVariacao->rowCount() <= 0) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                    } else {
+                        if (!$stmtStockProduto) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                        $stmtStockProduto->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
+                        if ((int) $stmtStockProduto->rowCount() <= 0) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
                     }
                 } else {
-                    if (!$stmtStockProduto) {
-                        throw new \Exception('Estoque insuficiente');
+                    if ($temListaCompras && $listaTemPedidoId && $listaTemProdutoId && $listaQtdCol !== '') {
+                        try {
+                            $faltante = (int) $quantidade;
+
+                            // Considerar estoque cadastrado para registrar apenas o faltante (quando houver coluna)
+                            if ($produtoVariacaoId !== null && !empty($varStockCol)) {
+                                try {
+                                    $stS = $db->prepare('SELECT ' . $varStockCol . ' FROM produto_variacoes WHERE id = ? LIMIT 1');
+                                    $stS->execute([(int) $produtoVariacaoId]);
+                                    $stockAtual = (int) ($stS->fetchColumn() ?: 0);
+                                    $faltante = max(0, ((int) $quantidade) - $stockAtual);
+                                } catch (\Exception $e) {
+                                }
+                            } elseif ($produtoVariacaoId === null && !empty($prodStockCol)) {
+                                try {
+                                    $stS = $db->prepare('SELECT ' . $prodStockCol . ' FROM produtos WHERE id = ? LIMIT 1');
+                                    $stS->execute([(int) $produtoId]);
+                                    $stockAtual = (int) ($stS->fetchColumn() ?: 0);
+                                    $faltante = max(0, ((int) $quantidade) - $stockAtual);
+                                } catch (\Exception $e) {
+                                }
+                            }
+
+                            if ($faltante <= 0) {
+                                continue;
+                            }
+
+                            $sqlFind = 'SELECT id, ' . $listaQtdCol . ' AS qtd FROM lista_compras WHERE pedido_id = ? AND produto_id = ?';
+                            $params = [(int) $pedidoId, (int) $produtoId];
+                            if ($listaTemStatus) {
+                                $sqlFind .= " AND status = 'pendente'";
+                            }
+                            if ($listaTemTipo) {
+                                $sqlFind .= ' AND (tipo_compra = ? OR tipo_compra IS NULL OR tipo_compra = \"\")';
+                                $params[] = 'online';
+                            }
+                            $sqlFind .= ' ORDER BY id DESC LIMIT 1';
+                            $stFind = $db->prepare($sqlFind);
+                            $stFind->execute($params);
+                            $ex = $stFind->fetch(\PDO::FETCH_ASSOC);
+                            if (is_array($ex) && !empty($ex['id'])) {
+                                $newQtd = ((int) ($ex['qtd'] ?? 0)) + (int) $faltante;
+                                $stUpd = $db->prepare('UPDATE lista_compras SET ' . $listaQtdCol . ' = ? WHERE id = ?');
+                                $stUpd->execute([$newQtd, (int) $ex['id']]);
+                                $criouPendenciaLista = true;
+                            } else {
+                                $colsIns = ['produto_id', 'pedido_id', $listaQtdCol];
+                                $valsIns = [':produto_id', ':pedido_id', ':q'];
+                                $pIns = [':produto_id' => (int) $produtoId, ':pedido_id' => (int) $pedidoId, ':q' => (int) $faltante];
+                                if ($listaTemStatus) {
+                                    $colsIns[] = 'status';
+                                    $valsIns[] = "'pendente'";
+                                }
+                                if ($listaTemTipo) {
+                                    $colsIns[] = 'tipo_compra';
+                                    $valsIns[] = ':tipo_compra';
+                                    $pIns[':tipo_compra'] = 'online';
+                                }
+                                $sqlIns = 'INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')';
+                                $stIns = $db->prepare($sqlIns);
+                                $stIns->execute($pIns);
+                                $criouPendenciaLista = true;
+                            }
+                        } catch (\Exception $e) {
+                        }
                     }
-                    $stmtStockProduto->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
-                    if ((int) $stmtStockProduto->rowCount() <= 0) {
-                        throw new \Exception('Estoque insuficiente');
+                }
+            }
+
+            // Se gerou pendência na lista de compras, marcar pedido como pendente de conferência (quando colunas existirem)
+            if ($criouPendenciaLista) {
+                try {
+                    $colsPed = [];
+                    try {
+                        $st = $db->query('DESCRIBE pedidos');
+                        $colsPed = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsPed = [];
                     }
+
+                    $set = [];
+                    $params = [':id' => (int) $pedidoId];
+                    if (is_array($colsPed) && in_array('status_conferencia', $colsPed, true)) {
+                        $set[] = 'status_conferencia = :sc';
+                        $params[':sc'] = 'pendente';
+                    }
+                    if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
+                        $set[] = 'origem_pedido = :op';
+                        $params[':op'] = 'online';
+                    }
+                    if (!empty($set)) {
+                        $st = $db->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                        $st->execute($params);
+                    }
+                } catch (\Exception $e) {
                 }
             }
 
