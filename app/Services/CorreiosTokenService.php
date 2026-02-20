@@ -69,11 +69,10 @@ class CorreiosTokenService {
     }
 
     private function requestNewTokenCartaoPostagem(string $usuario, string $senha, string $cartao, string $contrato, string $ambiente): array {
-        $base = (strtolower(trim($ambiente)) === 'producao')
-            ? 'https://api.correios.com.br/token'
-            : 'https://apihom.correios.com.br/token';
-
-        $url = rtrim($base, '/') . '/v1/autentica/cartaopostagem';
+        $isProd = (strtolower(trim($ambiente)) === 'producao');
+        $bases = $isProd
+            ? ['https://api.correios.com.br/token', 'https://apihom.correios.com.br/token']
+            : ['https://apihom.correios.com.br/token', 'https://api.correios.com.br/token'];
 
         $basic = base64_encode($usuario . ':' . $senha);
         $headers = [
@@ -91,56 +90,82 @@ class CorreiosTokenService {
 
         $raw = null;
         $httpCode = null;
-        try {
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        $lastErr = '';
+        $lastMeta = [];
 
-            $raw = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $err = curl_error($ch);
-            curl_close($ch);
+        foreach ($bases as $base) {
+            $url = rtrim($base, '/') . '/v1/autentica/cartaopostagem';
+            try {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
-            if ($raw === false || $raw === null) {
-                return ['success' => false, 'error' => 'Falha na requisição de token: ' . $err, 'http_code' => $httpCode];
-            }
+                $raw = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $contentType = (string) (curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '');
+                $err = curl_error($ch);
+                curl_close($ch);
 
-            $json = json_decode((string) $raw, true);
-            if (!is_array($json)) {
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON) ao solicitar token.', 'http_code' => $httpCode, 'raw' => $raw];
-            }
-
-            if (is_int($httpCode) && $httpCode >= 400) {
-                $msg = $this->extractErrorMessage($json);
-                return [
-                    'success' => false,
-                    'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.'),
+                $lastMeta = [
+                    'request_url' => $url,
                     'http_code' => $httpCode,
+                    'content_type' => $contentType,
+                ];
+
+                if ($raw === false || $raw === null) {
+                    $lastErr = 'Falha na requisição de token: ' . $err;
+                    continue;
+                }
+
+                $json = json_decode((string) $raw, true);
+                if (!is_array($json)) {
+                    $snippet = substr(trim((string) $raw), 0, 400);
+                    $lastErr = 'Resposta inválida (não-JSON) ao solicitar token.'
+                        . (is_int($httpCode) ? (' HTTP ' . $httpCode) : '')
+                        . ($contentType !== '' ? (' CT=' . $contentType) : '')
+                        . ($snippet !== '' ? (' BODY=' . $snippet) : '');
+                    continue;
+                }
+
+                if (is_int($httpCode) && $httpCode >= 400) {
+                    $msg = $this->extractErrorMessage($json);
+                    $lastErr = $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao solicitar token.');
+                    $lastMeta['raw'] = $json;
+                    continue;
+                }
+
+                $token = (string) ($json['token'] ?? '');
+                $expiraEm = (string) ($json['expiraEm'] ?? '');
+
+                if (trim($token) === '') {
+                    $lastErr = 'Resposta sem token.';
+                    $lastMeta['raw'] = $json;
+                    continue;
+                }
+
+                return [
+                    'success' => true,
+                    'token' => $token,
+                    'expiraEm' => $expiraEm,
+                    'http_code' => $httpCode,
+                    'request_url' => $url,
                     'raw' => $json,
                 ];
+            } catch (\Exception $e) {
+                $lastErr = $e->getMessage();
+                $lastMeta['request_url'] = $url;
+                continue;
             }
-
-            $token = (string) ($json['token'] ?? '');
-            $expiraEm = (string) ($json['expiraEm'] ?? '');
-
-            if (trim($token) === '') {
-                return ['success' => false, 'error' => 'Resposta sem token.', 'http_code' => $httpCode, 'raw' => $json];
-            }
-
-            return [
-                'success' => true,
-                'token' => $token,
-                'expiraEm' => $expiraEm,
-                'http_code' => $httpCode,
-                'raw' => $json,
-            ];
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw];
         }
+
+        return array_merge([
+            'success' => false,
+            'error' => $lastErr !== '' ? $lastErr : 'Falha ao solicitar token.',
+        ], $lastMeta);
     }
 
     private function loadSigepCreds(): array {
