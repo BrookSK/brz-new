@@ -1459,7 +1459,15 @@ JS;
             }
             
             if (!empty($busca)) {
+                $buscaRaw = trim((string) $busca);
+                $buscaDigits = preg_replace('/\D+/', '', $buscaRaw);
+                $buscaInt = ($buscaDigits !== '') ? (int) $buscaDigits : 0;
+
                 $searchParts = [];
+                if ($buscaInt > 0) {
+                    $searchParts[] = 'p.id = :busca_int';
+                    $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca_int_like';
+                }
                 $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
                 $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
                 $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
@@ -1475,6 +1483,10 @@ JS;
 
                 $sql .= ' AND (' . implode(' OR ', $searchParts) . ')';
                 $params[':busca'] = "%{$busca}%";
+                if ($buscaInt > 0) {
+                    $params[':busca_int'] = $buscaInt;
+                    $params[':busca_int_like'] = "%{$buscaInt}%";
+                }
             }
             if (!empty($status)) {
                 $sql .= " AND p.status = :status";
@@ -1589,7 +1601,15 @@ JS;
                 $sqlTotal .= " AND p.deleted_at IS NULL";
             }
             if (!empty($busca)) {
+                $buscaRaw = trim((string) $busca);
+                $buscaDigits = preg_replace('/\D+/', '', $buscaRaw);
+                $buscaInt = ($buscaDigits !== '') ? (int) $buscaDigits : 0;
+
                 $searchParts = [];
+                if ($buscaInt > 0) {
+                    $searchParts[] = 'p.id = :busca_int';
+                    $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca_int_like';
+                }
                 $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
                 $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
                 $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
@@ -1605,6 +1625,10 @@ JS;
 
                 $sqlTotal .= ' AND (' . implode(' OR ', $searchParts) . ')';
                 $paramsTotal[':busca'] = "%{$busca}%";
+                if ($buscaInt > 0) {
+                    $paramsTotal[':busca_int'] = $buscaInt;
+                    $paramsTotal[':busca_int_like'] = "%{$buscaInt}%";
+                }
             }
             if (!empty($status)) {
                 $sqlTotal .= " AND p.status = :status";
