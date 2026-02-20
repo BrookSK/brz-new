@@ -25,6 +25,19 @@ function getStatusText($status) {
         'entregue' => 'order_status.delivered',
         'cancelado' => 'order_status.cancelled',
         'pago' => 'order_status.paid',
+
+        'pedido_criado' => 'order_status.created',
+        'etiqueta_gerada' => 'order_status.label_generated',
+        'wexpress' => 'order_status.wexpress',
+
+        'aguardando_processamento' => 'order_status.awaiting_processing',
+        'consolidado' => 'order_status.consolidated',
+        'produto_consolidado' => 'order_status.product_consolidated',
+        'rascunho_etiqueta' => 'order_status.label_draft',
+        'etiqueta_efetivada' => 'order_status.label_effective',
+        'aguardando_lib_alfandegaria' => 'order_status.awaiting_customs_release',
+        'finalizacao_embalagem' => 'order_status.packaging_finalization',
+        'entrega_finalizada' => 'order_status.delivery_completed',
     ];
 
     if (isset($map[$statusKey])) {
@@ -35,7 +48,28 @@ function getStatusText($status) {
     return is_string($status) ? ucfirst($status) : '';
 }
 
+function formatStatusLabel($status) {
+    $raw = is_string($status) ? trim($status) : '';
+    if ($raw === '') {
+        return '';
+    }
+
+    $txt = getStatusText($raw);
+    if (is_string($txt) && $txt !== '' && $txt !== $raw && $txt !== ucfirst($raw)) {
+        return $txt;
+    }
+
+    $pretty = str_replace(['_', '-'], ' ', strtolower($raw));
+    $pretty = preg_replace('/\s+/', ' ', $pretty);
+    $pretty = trim((string) $pretty);
+    if ($pretty === '') {
+        return $raw;
+    }
+    return ucwords($pretty);
+}
+
 $badgePedido = getStatusColor($pedido['status'] ?? '');
+$badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
 ?>
 
 <div class="container py-4">
@@ -71,7 +105,7 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                 <?= __('user_order_details.export_pdf', 'Exportar PDF') ?>
             </a>
             <span class="badge" style="background: <?= $badgePedido['bg'] ?>; border: 1px solid <?= $badgePedido['border'] ?>; color: <?= $badgePedido['color'] ?>;">
-                <?= getStatusText($pedido['status'] ?? '') ?>
+                <?= htmlspecialchars($badgePedidoLabel !== '' ? $badgePedidoLabel : getStatusText($pedido['status'] ?? '')) ?>
             </span>
         </div>
     </div>
@@ -115,9 +149,25 @@ $badgePedido = getStatusColor($pedido['status'] ?? '');
                                                 <i class="fas fa-check-circle text-success"></i>
                                             </div>
                                             <div class="timeline-content">
-                                                <h6><?= htmlspecialchars($item['novo_status'] ?? __('user_order_details.status_updated', 'Status atualizado')) ?></h6>
+                                                <?php
+                                                $rawSt = $item['novo_status'] ?? ($item['status_novo'] ?? ($item['etapa'] ?? ($item['status'] ?? '')));
+                                                $labelSt = formatStatusLabel((string) $rawSt);
+                                                if ($labelSt === '') {
+                                                    $labelSt = __('user_order_details.status_updated', 'Status atualizado');
+                                                }
+
+                                                $dtRaw = (string) ($item['created_at'] ?? '');
+                                                $dtOut = '-';
+                                                if (trim($dtRaw) !== '') {
+                                                    $ts = strtotime($dtRaw);
+                                                    if ($ts !== false) {
+                                                        $dtOut = date('d/m/Y H:i', $ts);
+                                                    }
+                                                }
+                                                ?>
+                                                <h6><?= htmlspecialchars($labelSt) ?></h6>
                                                 <p class="mb-0"><?= htmlspecialchars($item['observacao'] ?? __('user_order_details.no_notes', 'Sem observação')) ?></p>
-                                                <small><?= date('d/m/Y H:i', strtotime($item['created_at'])) ?> - <?= __('user_order_details.by', 'Por:') ?> <?= htmlspecialchars($item['usuario_alterou'] ?? __('user_order_details.system', 'Sistema')) ?></small>
+                                                <small><?= htmlspecialchars($dtOut) ?> - <?= __('user_order_details.by', 'Por:') ?> <?= htmlspecialchars($item['usuario_alterou'] ?? __('user_order_details.system', 'Sistema')) ?></small>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
