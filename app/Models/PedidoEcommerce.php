@@ -1794,7 +1794,7 @@ class PedidoEcommerce {
                     }
                 }
                 $obs = '';
-                if (!empty($obsParts)) {
+                if ($t !== 'remessa_janela_pedidos' && !empty($obsParts)) {
                     $obs = 'Código: ' . $obsParts[0];
                 }
                 $pushEvento((string) ($lt['status'] ?? 'enviado'), $dt, $obs, 'Sistema');
