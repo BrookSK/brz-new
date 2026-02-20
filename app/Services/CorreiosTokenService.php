@@ -117,6 +117,7 @@ class CorreiosTokenService {
         foreach ($bases as $base) {
             $url = rtrim($base, '/') . '/v1/autentica/cartaopostagem';
             try {
+                $respHeaders = [];
                 $ch = curl_init($url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
@@ -125,6 +126,25 @@ class CorreiosTokenService {
                 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
                 curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
                 curl_setopt($ch, CURLOPT_USERPWD, $usuario . ':' . $senha);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+                curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$respHeaders) {
+                    $len = strlen($line);
+                    $line = trim($line);
+                    if ($line === '' || strpos($line, ':') === false) {
+                        return $len;
+                    }
+                    [$k, $v] = explode(':', $line, 2);
+                    $k = strtolower(trim($k));
+                    $v = trim($v);
+                    if ($k !== '') {
+                        if (!isset($respHeaders[$k])) {
+                            $respHeaders[$k] = $v;
+                        }
+                    }
+                    return $len;
+                });
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
                 $raw = curl_exec($ch);
@@ -153,10 +173,24 @@ class CorreiosTokenService {
                     if ($contentType === '') {
                         $contentType = 'n/a';
                     }
+                    $hdrSnippet = '';
+                    if (is_array($respHeaders) && !empty($respHeaders)) {
+                        $allow = ['www-authenticate', 'server', 'date', 'x-request-id', 'x-correlation-id'];
+                        $parts = [];
+                        foreach ($allow as $hk) {
+                            if (isset($respHeaders[$hk]) && $respHeaders[$hk] !== '') {
+                                $parts[] = $hk . '=' . $respHeaders[$hk];
+                            }
+                        }
+                        if (!empty($parts)) {
+                            $hdrSnippet = ' HDR=' . implode(';', $parts);
+                        }
+                    }
                     $errMsg = 'Resposta inválida (não-JSON) ao solicitar token.'
                         . (is_int($httpCode) ? (' HTTP ' . $httpCode) : '')
                         . ' CT=' . $contentType
                         . ' BODY=' . $snippet
+                        . $hdrSnippet
                         . ' URL=' . $url;
                     $attemptErrors[] = $errMsg;
                     if ($lastErr === '') {
