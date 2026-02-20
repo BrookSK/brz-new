@@ -15,6 +15,7 @@ class CorreiosTokenService {
         $cartao = (string) ($cfg['cartao'] ?? '');
         $contrato = (string) ($cfg['contrato'] ?? '');
         $ambiente = $this->resolveTokenAmbiente((string) ($cfg['ambiente'] ?? 'homologacao'));
+        $dr = (int) $this->getEntregaConfigValue('correios_token_dr', (string) ($cfg['dr'] ?? '0'));
 
         if (trim($usuario) === '' || trim($senha) === '' || trim($cartao) === '') {
             return ['success' => false, 'error' => 'Configuração incompleta para gerar token (usuario/senha do Meu Correios + cartão de postagem).'];
@@ -38,12 +39,12 @@ class CorreiosTokenService {
             }
         }
 
-        $resp = $this->requestNewTokenCartaoPostagem($usuario, $senha, $cartao, $contrato, $ambiente);
+        $resp = $this->requestNewTokenCartaoPostagem($usuario, $senha, $cartao, $contrato, $dr, $ambiente);
         if (empty($resp['success'])) {
             $errMsg = (string) ($resp['error'] ?? '');
             // Fallback: quando a autorização é por contrato e não por cartão
             if ($contrato !== '' && stripos($errMsg, 'TOK-003') !== false) {
-                $resp2 = $this->requestNewTokenContrato($usuario, $senha, $contrato, $ambiente);
+                $resp2 = $this->requestNewTokenContrato($usuario, $senha, $contrato, $dr, $ambiente);
                 if (!empty($resp2['success'])) {
                     $resp = $resp2;
                 }
@@ -96,7 +97,7 @@ class CorreiosTokenService {
         return ($fallback === 'producao' || $fallback === 'homologacao') ? $fallback : 'homologacao';
     }
 
-    private function requestNewTokenCartaoPostagem(string $usuario, string $senha, string $cartao, string $contrato, string $ambiente): array {
+    private function requestNewTokenCartaoPostagem(string $usuario, string $senha, string $cartao, string $contrato, int $dr, string $ambiente): array {
         $isProd = (strtolower(trim($ambiente)) === 'producao');
         $bases = $isProd
             ? ['https://api.correios.com.br/token', 'https://apihom.correios.com.br/token']
@@ -112,7 +113,7 @@ class CorreiosTokenService {
 
         $payload = [
             'numero' => $cartao,
-            'dr' => 0,
+            'dr' => $dr,
         ];
         if (trim($contrato) !== '') {
             $payload['contrato'] = $contrato;
@@ -215,6 +216,69 @@ class CorreiosTokenService {
                     if ((int) $httpCode === 401) {
                         $errMsg .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
                     }
+
+                    // Portal às vezes funciona porque não envia contrato junto.
+                    // Se o contrato estiver divergente do cartão, a API retorna TOK-003.
+                    if (stripos($errMsg, 'TOK-003') !== false && isset($payload['contrato'])) {
+                        try {
+                            $payload2 = $payload;
+                            unset($payload2['contrato']);
+
+                            $respHeaders2 = [];
+                            $ch2 = curl_init($url);
+                            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 15);
+                            curl_setopt($ch2, CURLOPT_TIMEOUT, 30);
+                            curl_setopt($ch2, CURLOPT_CUSTOMREQUEST, 'POST');
+                            curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers);
+                            curl_setopt($ch2, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                            curl_setopt($ch2, CURLOPT_USERPWD, $usuario . ':' . $senha);
+                            curl_setopt($ch2, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+                            curl_setopt($ch2, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+                            curl_setopt($ch2, CURLOPT_ENCODING, '');
+                            curl_setopt($ch2, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$respHeaders2) {
+                                $len = strlen($line);
+                                $line = trim($line);
+                                if ($line === '' || strpos($line, ':') === false) {
+                                    return $len;
+                                }
+                                [$k, $v] = explode(':', $line, 2);
+                                $k = strtolower(trim($k));
+                                $v = trim($v);
+                                if ($k !== '' && !isset($respHeaders2[$k])) {
+                                    $respHeaders2[$k] = $v;
+                                }
+                                return $len;
+                            });
+                            curl_setopt($ch2, CURLOPT_POSTFIELDS, json_encode($payload2));
+
+                            $raw2 = curl_exec($ch2);
+                            $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                            $contentType2 = (string) (curl_getinfo($ch2, CURLINFO_CONTENT_TYPE) ?: '');
+                            $err2 = curl_error($ch2);
+                            curl_close($ch2);
+
+                            if ($raw2 !== false && $raw2 !== null) {
+                                $json2 = json_decode((string) $raw2, true);
+                                if (is_array($json2) && is_int($httpCode2) && $httpCode2 < 400) {
+                                    $token2 = (string) ($json2['token'] ?? '');
+                                    $exp2 = (string) ($json2['expiraEm'] ?? '');
+                                    if (trim($token2) !== '') {
+                                        return [
+                                            'success' => true,
+                                            'token' => $token2,
+                                            'expiraEm' => $exp2,
+                                            'http_code' => $httpCode2,
+                                            'request_url' => $url,
+                                            'raw' => $json2,
+                                        ];
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     $lastMeta['raw'] = $json;
                     $attemptErrors[] = $errMsg . ' URL=' . $url;
                     // Preferir erro em JSON (mais confiável) ao invés de sobrescrever por tentativas seguintes
@@ -257,7 +321,7 @@ class CorreiosTokenService {
         ], $lastMeta);
     }
 
-    private function requestNewTokenContrato(string $usuario, string $senha, string $contrato, string $ambiente): array {
+    private function requestNewTokenContrato(string $usuario, string $senha, string $contrato, int $dr, string $ambiente): array {
         $isProd = (strtolower(trim($ambiente)) === 'producao');
         $bases = $isProd
             ? ['https://api.correios.com.br/token', 'https://apihom.correios.com.br/token']
@@ -271,7 +335,7 @@ class CorreiosTokenService {
         $contrato = preg_replace('/\D+/', '', (string) $contrato);
         $payload = [
             'numero' => $contrato,
-            'dr' => 0,
+            'dr' => $dr,
         ];
 
         $raw = null;
