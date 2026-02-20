@@ -113,8 +113,10 @@ class CorreiosTokenService {
 
         $payload = [
             'numero' => $cartao,
-            'dr' => $dr,
         ];
+        if ($dr > 0) {
+            $payload['dr'] = $dr;
+        }
         if (trim($contrato) !== '') {
             $payload['contrato'] = $contrato;
         }
@@ -217,12 +219,22 @@ class CorreiosTokenService {
                         $errMsg .= ' (Credenciais Basic inválidas. Verifique usuário/senha do Meu Correios nas configurações.)';
                     }
 
-                    // Portal às vezes funciona porque não envia contrato junto.
-                    // Se o contrato estiver divergente do cartão, a API retorna TOK-003.
-                    if (stripos($errMsg, 'TOK-003') !== false && isset($payload['contrato'])) {
+                    // Portal às vezes funciona porque não envia contrato e/ou dr.
+                    // Se contrato/dr estiver divergente, a API pode retornar TOK-003.
+                    if (stripos($errMsg, 'TOK-003') !== false) {
                         try {
                             $payload2 = $payload;
-                            unset($payload2['contrato']);
+                            if (isset($payload2['contrato'])) {
+                                unset($payload2['contrato']);
+                            }
+                            if (isset($payload2['dr'])) {
+                                unset($payload2['dr']);
+                            }
+
+                            // Se não mudou nada, não vale tentar
+                            if ($payload2 === $payload) {
+                                throw new \Exception('no-variant');
+                            }
 
                             $respHeaders2 = [];
                             $ch2 = curl_init($url);
@@ -335,8 +347,10 @@ class CorreiosTokenService {
         $contrato = preg_replace('/\D+/', '', (string) $contrato);
         $payload = [
             'numero' => $contrato,
-            'dr' => $dr,
         ];
+        if ($dr > 0) {
+            $payload['dr'] = $dr;
+        }
 
         $raw = null;
         $httpCode = null;
