@@ -518,7 +518,7 @@ class PedidoManualService {
         $pesoTotal = 0.0;
 
         $colsProdutos = $this->getCols('produtos');
-        $prodPesoCol = $this->pickFirstExistingColumn($colsProdutos, ['peso', 'weight']);
+        $prodPesoCol = $this->pickFirstExistingColumn($colsProdutos, ['peso', 'weight', 'peso_kg', 'weight_kg', 'pesoKg', 'weightKg']);
         $prodPriceCol = $this->pickFirstExistingColumn($colsProdutos, ['price', 'valor', 'preco']);
 
         $select = ['id'];
@@ -729,6 +729,13 @@ class PedidoManualService {
         if ($resumoTotal <= 0) {
             $valorFrete = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
             $resumo = $this->calcularResumoPadrao($moeda, $itens, $valorFrete);
+        }
+
+        $valorFreteValidacao = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
+        $resumoValidacao = $this->calcularResumoPadrao($moeda, $itens, $valorFreteValidacao);
+        $pesoTotalReal = (float) ($resumoValidacao['peso_total'] ?? 0.0);
+        if ($pesoTotalReal > 30.0) {
+            throw new \Exception('Peso excede o limite de 30kg para pedido manual (peso total: ' . rtrim(rtrim(number_format($pesoTotalReal, 3, '.', ''), '0'), '.') . 'kg).');
         }
 
         $subtotalItens = 0.0;
