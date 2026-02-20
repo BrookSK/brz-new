@@ -163,7 +163,12 @@ class AuthService {
     
     public function requerAutenticacao() {
         if (!$this->estaLogado()) {
-            header('Location: /login');
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            if (stripos($uri, '/admin') === 0) {
+                header('Location: /loginadmin');
+            } else {
+                header('Location: /login');
+            }
             exit;
         }
     }
@@ -179,7 +184,10 @@ class AuthService {
         if ($perfilNeed === '' || ($perfilAtual !== $perfilNeed && $roleAtual !== $perfilNeed)) {
             $_SESSION['message'] = 'Acesso negado. Permissão de ' . $perfil . ' necessária.';
             $_SESSION['message_type'] = 'danger';
-            $target = $this->estaLogado() ? '/admin' : '/login';
+            // Evitar loop (/admin/dashboard -> /admin -> /admin/dashboard ...)
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $target = $isAdminUri ? '/' : '/login';
             header('Location: ' . $target);
             exit;
         }
@@ -204,7 +212,10 @@ class AuthService {
         if (!in_array($perfilAtual, $perfisNorm, true) && !in_array($roleAtual, $perfisNorm, true)) {
             $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
             $_SESSION['message_type'] = 'danger';
-            $target = $this->estaLogado() ? '/admin' : '/login';
+            // Evitar loop (/admin/dashboard -> /admin -> /admin/dashboard ...)
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $target = $isAdminUri ? '/' : '/login';
             header('Location: ' . $target);
             exit;
         }

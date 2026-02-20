@@ -128,6 +128,20 @@ $router->get('/admin', function($request) {
         $perfil = 'cliente';
     }
 
+    // Bloquear acesso ao admin para usuários sem permissão
+    $adminAllowed = ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante'];
+    if (!in_array($perfil, $adminAllowed, true)) {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
+        $_SESSION['message_type'] = 'danger';
+
+        $isLogged = !empty($_SESSION['logado']);
+        header('Location: ' . ($isLogged ? '/' : '/loginadmin'));
+        exit;
+    }
+
     if ($perfil === 'representante') {
         header('Location: /meu-painel');
         exit;
