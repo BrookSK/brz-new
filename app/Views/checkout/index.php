@@ -50,6 +50,17 @@
                             <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados"><?= __('checkout.complete_registration', 'Completar cadastro') ?></a></div>
                         </div>
 
+                        <?php if (empty($usuario) || empty($usuario['id'])): ?>
+                            <div class="alert alert-info">
+                                <div><strong><?= __('checkout.have_account_title', 'Já tem conta?') ?></strong> <?= __('checkout.have_account_hint', 'Faça login para finalizar mais rápido.') ?></div>
+                                <div class="mt-2 d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-primary" href="/login?redirect=<?= urlencode('/checkout') ?>"><?= __('auth.login', 'Fazer login') ?></a>
+                                    <a class="btn btn-sm btn-primary" href="/register?redirect=<?= urlencode('/checkout') ?>"><?= __('auth.create_account', 'Criar conta') ?></a>
+                                </div>
+                                <div class="small mt-2 text-muted"><?= __('checkout.auto_account_note', 'Se você continuar preenchendo os dados, o sistema cria sua conta automaticamente no final do checkout.') ?></div>
+                            </div>
+                        <?php endif; ?>
+
                         <!-- Campo oculto para moeda -->
                         <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
                         
