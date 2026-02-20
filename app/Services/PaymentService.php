@@ -947,7 +947,9 @@ class PaymentService {
 
             $this->atualizarPagamentoPedidoPorPedidoId((int) $pedidoId, 'carteira', 'refunded', 'refunded');
 
-            $db->commit();
+            if ($db->inTransaction()) {
+                $db->commit();
+            }
             return [
                 'success' => true,
                 'gateway' => 'carteira',
@@ -959,8 +961,86 @@ class PaymentService {
                 'status' => 'refunded',
             ];
         } catch (\Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function devolverEstoquePorPedido(\PDO $db, int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        try {
+            // Detectar tabela de itens
+            $itensTable = '';
+            foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+                try {
+                    $st = $db->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+                    $st->execute([$t]);
+                    if ((int) ($st->fetchColumn() ?: 0) > 0) {
+                        $itensTable = $t;
+                        break;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if ($itensTable === '') {
+                return;
+            }
+
+            $itens = [];
+            try {
+                $stItens = $db->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                $stItens->execute([(int) $pedidoId]);
+                $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $itens = [];
+            }
+            if (empty($itens)) {
+                return;
+            }
+
+            // Detectar coluna de estoque em produtos
+            $cols = [];
+            try {
+                $stCols = $db->query('DESCRIBE produtos');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $stockCol = '';
+            if (is_array($cols) && in_array('stock', $cols, true)) {
+                $stockCol = 'stock';
+            } elseif (is_array($cols) && in_array('estoque', $cols, true)) {
+                $stockCol = 'estoque';
+            }
+            if ($stockCol === '') {
+                return;
+            }
+
+            $setUpdatedAt = (is_array($cols) && in_array('updated_at', $cols, true));
+            $sqlUpd = 'UPDATE produtos SET ' . $stockCol . ' = ' . $stockCol . ' + :qtd';
+            if ($setUpdatedAt) {
+                $sqlUpd .= ', updated_at = NOW()';
+            }
+            $sqlUpd .= ' WHERE id = :pid';
+            $stUpd = $db->prepare($sqlUpd);
+            foreach ($itens as $it) {
+                $pid = (int) ($it['produto_id'] ?? 0);
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($pid <= 0 || $qtd <= 0) {
+                    continue;
+                }
+                try {
+                    $stUpd->execute([':qtd' => $qtd, ':pid' => $pid]);
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+            return;
         }
     }
 
@@ -2221,6 +2301,104 @@ class PaymentService {
             return ['status' => 'ignored'];
         }
 
+        // Disputa / Chargeback (Stripe)
+        // Referências comuns:
+        // - charge.dispute.created
+        // - charge.dispute.funds_withdrawn
+        // - charge.dispute.closed
+        // - charge.dispute.funds_reinstated
+        if (str_starts_with($eventType, 'charge.dispute.')) {
+            $disputeStatus = strtolower(trim((string) ($obj['status'] ?? '')));
+            $reason = (string) ($obj['reason'] ?? '');
+
+            // Resolver charge_id, payment_intent e/ou metadata (pedido)
+            $chargeId = trim((string) ($obj['charge'] ?? ($obj['charge_id'] ?? '')));
+            $paymentIntentId = trim((string) ($obj['payment_intent'] ?? ''));
+
+            $internal = 'dispute';
+            if (in_array($disputeStatus, ['lost'], true)) {
+                $internal = 'chargeback';
+            } elseif (in_array($disputeStatus, ['won'], true)) {
+                // disputa encerrada a favor do lojista
+                $internal = 'approved';
+            } elseif (in_array($eventType, ['charge.dispute.funds_withdrawn'], true)) {
+                $internal = 'chargeback';
+            }
+
+            // Tenta localizar e atualizar pedido
+            try {
+                $db = \Config\Database::getConnection();
+                $colsP = [];
+                try {
+                    $stmtColsP = $db->query('DESCRIBE pedidos');
+                    $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsP = [];
+                }
+
+                $pedidoId = 0;
+                if (is_array($colsP) && in_array('payment_id', $colsP, true) && in_array('payment_gateway', $colsP, true)) {
+                    // Algumas implementações salvam payment_intent em payment_id
+                    if ($paymentIntentId !== '') {
+                        $st = $db->prepare('SELECT id FROM pedidos WHERE payment_gateway = ? AND payment_id = ? LIMIT 1');
+                        $st->execute(['stripe', $paymentIntentId]);
+                        $pedidoId = (int) ($st->fetchColumn() ?: 0);
+                    }
+                }
+
+                // Fallback: tentar na tabela pagamentos por charge_id/payment_intent
+                if ($pedidoId <= 0) {
+                    try {
+                        $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                        $colsPg = $stmtColsPg ? ($stmtColsPg->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                            $transacaoCol = null;
+                            foreach (['codigo_transacao', 'transaction_id', 'transacao', 'payment_id', 'charge_id'] as $c) {
+                                if (in_array($c, $colsPg, true)) {
+                                    $transacaoCol = $c;
+                                    break;
+                                }
+                            }
+                            if ($transacaoCol && ($chargeId !== '' || $paymentIntentId !== '')) {
+                                $needle = $paymentIntentId !== '' ? $paymentIntentId : $chargeId;
+                                $st = $db->prepare('SELECT pedido_id FROM pagamentos WHERE ' . $transacaoCol . ' = ? LIMIT 1');
+                                $st->execute([$needle]);
+                                $pedidoId = (int) ($st->fetchColumn() ?: 0);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $pedidoId = 0;
+                    }
+                }
+
+                if ($pedidoId > 0) {
+                    // Atualiza apenas payment_status (e efeitos financeiros quando aplicável)
+                    $gatewayStatus = $disputeStatus !== '' ? strtoupper($disputeStatus) : strtoupper($eventType);
+                    $this->atualizarPagamentoPedidoPorPedidoId((int) $pedidoId, 'stripe', $internal, $gatewayStatus);
+                    return [
+                        'status' => 'processed',
+                        'event' => $eventType,
+                        'internal' => $internal,
+                        'pedido_id' => (int) $pedidoId,
+                        'charge_id' => $chargeId,
+                        'payment_intent' => $paymentIntentId,
+                        'reason' => $reason,
+                    ];
+                }
+            } catch (\Exception $e) {
+                // não falhar webhook
+            }
+
+            return [
+                'status' => 'ignored',
+                'event' => $eventType,
+                'internal' => $internal,
+                'charge_id' => $chargeId,
+                'payment_intent' => $paymentIntentId,
+                'reason' => $reason,
+            ];
+        }
+
         // Webhook via Checkout Session (link hospedado)
         if ($eventType === 'checkout.session.completed') {
             $pi = (string) ($obj['payment_intent'] ?? '');
@@ -2377,6 +2555,7 @@ class PaymentService {
             if ($paymentStatusInterno === 'refunded') {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->devolverEstoquePorPedido($db, (int) $pedidoId);
             }
 
             try {
@@ -2697,6 +2876,7 @@ class PaymentService {
             if ($paymentStatusInterno === 'refunded') {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->devolverEstoquePorPedido($db, (int) $pedidoId);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
@@ -3187,8 +3367,24 @@ class PaymentService {
         $paymentId = (string) ($norm['payment_intent_id'] ?? '');
         $source = (string) ($norm['source'] ?? '');
         $session = $norm['session'] ?? null;
+
+        // Fallback: algumas versões da API podem não retornar payment_intent no expand.
+        if ($paymentId === '' && str_starts_with($storedPaymentId, 'cs_')) {
+            try {
+                $s = $this->stripeRequest('GET', '/v1/checkout/sessions/' . rawurlencode($storedPaymentId), null);
+                $pi = (string) ($s['payment_intent']['id'] ?? ($s['payment_intent'] ?? ''));
+                $pi = trim($pi);
+                if ($pi !== '') {
+                    $paymentId = $pi;
+                    $source = 'checkout_session';
+                    $session = is_array($s) ? $s : null;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
         if ($paymentId === '') {
-            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id'];
+            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id: ' . $storedPaymentId];
         }
         if ($source === 'checkout_session') {
             $this->atualizarPedidoStripeComPaymentIntent($pedidoId, $paymentId, is_array($session) ? $session : null);
