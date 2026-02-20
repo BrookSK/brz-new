@@ -12,6 +12,28 @@ class CorreiosTrackingService {
         $baseUrl = trim((string) ($config['base_url'] ?? ''));
         $token = trim((string) ($config['token'] ?? ''));
         $headerName = trim((string) ($config['header'] ?? 'Authorization'));
+
+        if ($token === '') {
+            try {
+                $tokSvc = new CorreiosTokenService();
+                $rTok = $tokSvc->getValidTokenFromSigep('tracking');
+                if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                    $token = (string) $rTok['token'];
+                } else {
+                    $refreshErr = (string) ($rTok['error'] ?? 'Falha ao renovar token');
+                    if ($baseUrl === '') {
+                        return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url).'];
+                    }
+                    return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (token vazio). Auto-renovação falhou: ' . $refreshErr];
+                }
+            } catch (\Exception $e) {
+                if ($baseUrl === '') {
+                    return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url).'];
+                }
+                return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (token vazio). Auto-renovação falhou: ' . $e->getMessage()];
+            }
+        }
+
         if ($baseUrl === '' || $token === '') {
             return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url/token).'];
         }
