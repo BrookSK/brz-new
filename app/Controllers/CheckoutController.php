@@ -316,6 +316,19 @@ class CheckoutController extends Controller {
         return $erros;
     }
 
+    private function debugLog(string $message): void {
+        $enabled = false;
+        if (isset($_ENV['APP_DEBUG'])) {
+            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+        }
+
+        if ($enabled) {
+            error_log($message);
+        }
+    }
+
     private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
         $uid = (int) ($usuario['id'] ?? 0);
         $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
