@@ -329,6 +329,294 @@ class CheckoutController extends Controller {
         }
     }
 
+    private function formatarErroParaUsuario(string $mensagem): string {
+        $m = trim($mensagem);
+
+        if (stripos($m, 'Erro Asaas HTTP') !== false) {
+            $jsonPos = strpos($m, '{');
+            if ($jsonPos !== false) {
+                $jsonStr = substr($m, $jsonPos);
+                $decoded = json_decode($jsonStr, true);
+                if (is_array($decoded) && !empty($decoded['errors']) && is_array($decoded['errors'])) {
+                    $first = $decoded['errors'][0] ?? null;
+                    if (is_array($first)) {
+                        $desc = (string) ($first['description'] ?? '');
+                        if ($desc !== '') {
+                            return $desc;
+                        }
+                    }
+                }
+            }
+        }
+
+        $prefixes = [
+            'Erro ao processar pedido:',
+            'Erro ao processar pagamento:',
+        ];
+        foreach ($prefixes as $p) {
+            if (stripos($m, $p) === 0) {
+                $m = trim(substr($m, strlen($p)));
+            }
+        }
+
+        return $m !== '' ? $m : 'Não foi possível processar o pagamento. Tente novamente.';
+    }
+
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function getTaxaServicoPorKg(): float {
+        $v = $this->getConfigValue('taxa_servico_usd_por_kg', null);
+        if ($v === null || $v === '') {
+            $v = $this->getConfigValue('entrega_taxa_servico_kg', null);
+        }
+        if ($v === null || $v === '') {
+            $v = '39';
+        }
+        return floatval($v);
+    }
+
+    private function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
+    }
+
+    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
+        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
+        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
+        if (!$calcularAutomatico) {
+            return 0.0;
+        }
+
+        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
+        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
+            return 0.0;
+        }
+
+        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
+        if ($fretePorKg <= 0) {
+            return 0.0;
+        }
+
+        $pesoArredondado = ceil($pesoTotal);
+        return $fretePorKg * $pesoArredondado;
+    }
+
+    private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
+        if (empty($missing)) {
+            return $missing;
+        }
+        if (!is_array($selectedAddress) || empty($selectedAddress)) {
+            return $missing;
+        }
+
+        $addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+        $hasAll = true;
+        foreach ($addrFields as $f) {
+            $v = trim((string) ($selectedAddress[$f] ?? ''));
+            if ($v === '') {
+                $hasAll = false;
+                break;
+            }
+        }
+        if (!$hasAll) {
+            return $missing;
+        }
+
+        return array_values(array_filter($missing, function ($it) use ($addrFields) {
+            return !in_array((string) $it, $addrFields, true);
+        }));
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
+        $temPedidoItens = false;
+        $temPedidoItems = false;
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_itens']);
+            $temPedidoItens = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItens = false;
+        }
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_items']);
+            $temPedidoItems = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItems = false;
+        }
+
+        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
+        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+
+        if ($pedidoId > 0) {
+            $c1 = 0;
+            $c2 = 0;
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c1 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c1 = 0;
+            }
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c2 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c2 = 0;
+            }
+            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+        }
+
+        return 'pedido_itens';
+    }
+
+    private function garantirCarteiraUsuario(\PDO $db, int $usuarioId): void {
+        if ($usuarioId <= 0) {
+            return;
+        }
+
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `carteiras` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `saldo_usd` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `uk_usuario_id` (`usuario_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $stmt = $db->prepare('INSERT IGNORE INTO carteiras (usuario_id, saldo_usd, saldo_brl) VALUES (?, 0, 0)');
+            $stmt->execute([(int) $usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function garantirTabelaTransacoesCarteira(\PDO $db): void {
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS `transacoes_carteira` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `tipo` enum('credito','debito','conversao') NOT NULL,
+                    `valor_usd` decimal(10,2) DEFAULT 0.00,
+                    `valor_brl` decimal(10,2) DEFAULT 0.00,
+                    `taxa_conversao` decimal(10,6) DEFAULT 1.000000,
+                    `descricao` text,
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_usuario_id` (`usuario_id`),
+                    KEY `idx_tipo` (`tipo`),
+                    KEY `idx_created_at` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function debitarCarteiraParaPedido(int $usuarioId, int $pedidoId, float $valor, string $moeda): array {
+        $usuarioId = (int) $usuarioId;
+        $pedidoId = (int) $pedidoId;
+        $valor = (float) $valor;
+        $moeda = strtoupper(trim((string) $moeda));
+
+        if ($usuarioId <= 0) {
+            throw new \Exception('Usuário inválido para pagamento via carteira');
+        }
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido para pagamento via carteira');
+        }
+        if ($valor <= 0) {
+            throw new \Exception('Valor inválido para pagamento via carteira');
+        }
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            throw new \Exception('Moeda inválida para carteira');
+        }
+
+        $db = \Config\Database::getConnection();
+
+        $this->garantirCarteiraUsuario($db, $usuarioId);
+        $this->garantirTabelaTransacoesCarteira($db);
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+            $stmt->execute([$usuarioId]);
+            $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
+            if ($saldoAtual + 0.00001 < $valor) {
+                throw new \Exception('Saldo insuficiente na carteira');
+            }
+
+            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+            $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
+
+            try {
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor' => $valor,
+                    ':desc' => 'Pagamento do Pedido #' . $pedidoId,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            $db->commit();
+
+            return [
+                'success' => true,
+                'status' => 'PAID',
+                'paid_at' => date('Y-m-d H:i:s'),
+                'billingType' => 'WALLET',
+                'payment_id' => 'WALLET_' . $pedidoId,
+            ];
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
     private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
         $uid = (int) ($usuario['id'] ?? 0);
         $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
