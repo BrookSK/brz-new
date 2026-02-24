@@ -1569,6 +1569,8 @@ class AdminPedidosWpController extends Controller {
         $meta = [];
         $itens = [];
         $declaracaoTotal = 0.0;
+        $pesoTotalItensKg = 0.0;
+        $qtdTotalItens = 0;
         $erro = '';
 
         try {
@@ -1628,6 +1630,10 @@ class AdminPedidosWpController extends Controller {
                 $lineTotal = (float) ($m['_line_total'] ?? 0);
                 $lineSubtotal = (float) ($m['_line_subtotal'] ?? 0);
 
+                if ($qtd > 0) {
+                    $qtdTotalItens += (int) $qtd;
+                }
+
                 $unit = 0.0;
                 if ($qtd > 0) {
                     $unit = round($lineTotal / $qtd, 2);
@@ -1684,6 +1690,10 @@ class AdminPedidosWpController extends Controller {
                             }
                         }
                     }
+                }
+
+                if ($pesoKg !== null && $pesoKg > 0 && $qtd > 0) {
+                    $pesoTotalItensKg += ((float) $pesoKg * (int) $qtd);
                 }
 
                 $itens[] = [

@@ -43,6 +43,10 @@ $shipSuite = wpVal($meta, 'suite');
 if ($shipSuite === '') $shipSuite = wpVal($meta, '_shipping_suite');
 if ($shipSuite === '') $shipSuite = wpVal($meta, 'shipping_suite');
 
+$pesoTotalItensKg = is_numeric($pesoTotalItensKg ?? null) ? (float) $pesoTotalItensKg : 0.0;
+$declaracaoTotal = is_numeric($declaracaoTotal ?? null) ? (float) $declaracaoTotal : 0.0;
+$qtdTotalItens = is_numeric($qtdTotalItens ?? null) ? (int) $qtdTotalItens : 0;
+
 $tracking = wpVal($meta, '_tracking_code');
 if ($tracking === '') $tracking = wpVal($meta, 'tracking_code');
 
@@ -85,6 +89,26 @@ if (!in_array($source, ['br','red','us'], true)) $source = 'br';
 <?php if ($erro !== ''): ?>
     <div class="alert alert-danger"><?= __('admin.orders_wp.details.error_load_details_prefix', 'Erro ao carregar detalhes do pedido:') ?> <?= htmlspecialchars($erro) ?></div>
 <?php endif; ?>
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Itens gerais do pedido</strong></div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small">Peso total dos itens (kg)</div>
+                <div class="fw-semibold"><?= $pesoTotalItensKg > 0 ? htmlspecialchars(number_format((float) $pesoTotalItensKg, 3, ',', '.')) : '-' ?></div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">Declaração total</div>
+                <div class="fw-semibold"><?= $declaracaoTotal > 0 ? htmlspecialchars(wpFormatMoney2((float) $declaracaoTotal, 'USD')) : '-' ?></div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">Quantidade total de itens</div>
+                <div class="fw-semibold"><?= (int) $qtdTotalItens ?></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 window.ADMIN_ORDERS_WP_DETAILS_I18N = {
