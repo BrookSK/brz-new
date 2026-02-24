@@ -1468,6 +1468,8 @@ class AdminPedidosWpController extends Controller {
                 $declared = $declared * $brlToUsd;
             }
 
+            $freteDeclarado = round(max(0.01, $pesoTotalKg * 1.80), 2);
+
             $externalShippingId = (string) $orderId;
             $payload = [
                 'shipment_purpose' => 'personal',
@@ -1479,7 +1481,7 @@ class AdminPedidosWpController extends Controller {
                 'weight_unit' => 'g',
                 'currency' => 'USD',
                 'declared_value' => round((float) $declared, 2),
-                'freight_value' => 0.01,
+                'freight_value' => (float) $freteDeclarado,
                 'insurance_value' => 0,
                 'invoice_number' => (string) $orderId,
                 'packages' => [[

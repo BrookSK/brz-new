@@ -1781,6 +1781,8 @@ function gerarEtiqueta() {
         }
         $pesoTotal = max(0.001, (float) $pesoTotal);
 
+        $freteDeclarado = round(max(0.01, $pesoTotal * 1.80), 2);
+
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
             'width' => 10,
@@ -1812,7 +1814,7 @@ function gerarEtiqueta() {
             'weight_unit' => 'g',
             'currency' => 'USD',
             'declared_value' => round((float) $declared, 2),
-            'freight_value' => 0.01,
+            'freight_value' => (float) $freteDeclarado,
             'insurance_value' => 0,
             'invoice_number' => $invoiceNumber,
             'packages' => $packages,
