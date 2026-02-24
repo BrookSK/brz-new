@@ -1600,6 +1600,9 @@ class AdminPedidosWpController extends Controller {
 
             $stIM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id = ?");
 
+            $stSku = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_sku' LIMIT 1");
+            $stW = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_weight' LIMIT 1");
+
             foreach ($orderItems as $oi) {
                 if (strtolower((string) ($oi['order_item_type'] ?? '')) !== 'line_item') {
                     continue;
@@ -1641,6 +1644,7 @@ class AdminPedidosWpController extends Controller {
 
                 $sku = '';
                 $ncm = '';
+                $pesoKg = null;
 
                 $ncmCandidatesItem = ['_ncm', 'ncm', 'tariff_code', '_tariff_code', 'invoice_ncm', '_invoice_ncm', 'ncm_code', '_ncm_code'];
                 foreach ($ncmCandidatesItem as $nk) {
@@ -1653,9 +1657,20 @@ class AdminPedidosWpController extends Controller {
 
                 $prodLookupId = $variacaoId > 0 ? $variacaoId : $produtoId;
                 if ($prodLookupId > 0) {
-                    $stSku = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_sku' LIMIT 1");
                     $stSku->execute([(int) $prodLookupId]);
                     $sku = (string) ($stSku->fetchColumn() ?: '');
+
+                    $stW->execute([(int) $prodLookupId]);
+                    $w = str_replace(',', '.', (string) ($stW->fetchColumn() ?: ''));
+                    if (is_numeric($w) && (float) $w > 0) {
+                        $pesoKg = (float) $w;
+                    } elseif ($variacaoId > 0 && $produtoId > 0) {
+                        $stW->execute([(int) $produtoId]);
+                        $w2 = str_replace(',', '.', (string) ($stW->fetchColumn() ?: ''));
+                        if (is_numeric($w2) && (float) $w2 > 0) {
+                            $pesoKg = (float) $w2;
+                        }
+                    }
 
                     if ($ncm === '') {
                         $ncmKeys = ['_ncm', 'ncm', '_woo_ncm', '_product_ncm', '_ncm_code'];
@@ -1678,6 +1693,7 @@ class AdminPedidosWpController extends Controller {
                     'variacao_id' => $variacaoId,
                     'sku' => $sku,
                     'ncm' => $ncm,
+                    'peso_kg' => $pesoKg,
                     'quantidade' => $qtd,
                     'preco_unitario' => $unit,
                     'declaracao_unitario' => $declaredUnit,

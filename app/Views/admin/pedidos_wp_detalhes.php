@@ -290,6 +290,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                                 <th><?= __('admin.orders_wp.details.table.product', 'Produto') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.sku', 'SKU') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.ncm', 'NCM') ?></th>
+                                <th>Peso (kg)</th>
                                 <th><?= __('admin.orders_wp.details.table.qty', 'Qtd') ?></th>
                                 <th><?= __('admin.orders_wp.details.table.unit_price', 'Unitário') ?></th>
                                 <?php if ($source === 'red'): ?>
@@ -304,7 +305,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                         </thead>
                         <tbody>
                             <?php if (empty($itens)): ?>
-                                <tr><td colspan="<?= $source === 'red' ? '9' : '7' ?>" class="text-center text-muted"><?= __('admin.orders_wp.details.items_empty', 'Sem itens encontrados.') ?></td></tr>
+                                <tr><td colspan="<?= $source === 'red' ? '10' : '8' ?>" class="text-center text-muted"><?= __('admin.orders_wp.details.items_empty', 'Sem itens encontrados.') ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($itens as $it): ?>
                                     <tr>
@@ -314,6 +315,7 @@ function regerarEtiquetaWexpressWp(orderId, source) {
                                         </td>
                                         <td><?= htmlspecialchars((string) ($it['sku'] ?? '')) ?></td>
                                         <td><?= htmlspecialchars((string) ($it['ncm'] ?? '')) ?></td>
+                                        <td><?= ($it['peso_kg'] ?? null) !== null ? htmlspecialchars(number_format((float) ($it['peso_kg'] ?? 0), 3, ',', '.')) : '-' ?></td>
                                         <td><?= (int) ($it['quantidade'] ?? 0) ?></td>
                                         <td><?= htmlspecialchars(wpFormatMoney2((float) ($it['preco_unitario'] ?? 0), $currency)) ?></td>
                                         <?php if ($source === 'red'): ?>
