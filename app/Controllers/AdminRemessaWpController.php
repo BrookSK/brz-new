@@ -468,6 +468,20 @@ class AdminRemessaWpController extends Controller {
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $perfilAtual = '';
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $perfilAtual = (string) ($_SESSION['usuario_perfil'] ?? '');
+            if ($perfilAtual === '') {
+                $perfilAtual = (string) ($_SESSION['usuario_role'] ?? '');
+            }
+        } catch (\Exception $e) {
+            $perfilAtual = '';
+        }
+        $perfilAtual = strtolower(trim($perfilAtual));
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -807,7 +821,7 @@ class AdminRemessaWpController extends Controller {
                     <td class="text-nowrap">'
                         . ($labelUrl !== '' ? ('<a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($labelUrl) . '">Etiqueta</a> ') : '')
                         . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $oid . '?source=' . urlencode($source) . '">Detalhes</a> '
-                        . '<a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $oid . '?source=' . urlencode($source) . '">Pedido</a>'
+                        . ($perfilAtual !== 'conferente' ? (' <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $oid . '?source=' . urlencode($source) . '">Pedido</a>') : '')
                     . '</td>
                 </tr>';
             }
