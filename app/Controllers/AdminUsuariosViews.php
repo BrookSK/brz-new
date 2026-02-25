@@ -24,6 +24,9 @@ class AdminUsuariosViews {
         } elseif ($perfil === 'vendedor') {
             $perfilLabel = 'Vendedor';
             $perfilBadge = 'bg-primary';
+        } elseif ($perfil === 'conferente') {
+            $perfilLabel = 'Conferente';
+            $perfilBadge = 'bg-warning text-dark';
         } elseif ($perfil === 'suporte') {
             $perfilLabel = 'Suporte';
             $perfilBadge = 'bg-info';

@@ -468,6 +468,14 @@ $router->post('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/
 $router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-download', 'AdminRemessaInternacionalController', 'baixarEtiquetaWexpress');
 $router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaInternacionalController', 'fecharJanela');
 
+// Rotas de Remessa WP
+$router->get('/admin/remessa-wp', 'AdminRemessaWpController', 'index');
+$router->get('/admin/remessa-wp/janela/{id}', 'AdminRemessaWpController', 'verJanela');
+$router->get('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaWpController', 'detalhesPedidoJanela');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/confirmar-recebimento', 'AdminRemessaWpController', 'confirmarRecebimento');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/medicamento', 'AdminRemessaWpController', 'salvarMedicamento');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/documento/{tipo}', 'AdminRemessaWpController', 'uploadDocumento');
+
 // Rotas de Remessa Correios
 $router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');
 $router->post('/admin/remessa-correios/gerar-etiqueta/{id}', 'AdminRemessaCorreiosController', 'gerarEtiqueta');

@@ -278,8 +278,8 @@ class AuthService {
         if ($perfil === '' && $role === '') {
             return false;
         }
-        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)
-            || in_array($role, ['admin', 'vendedor', 'suporte', 'redirecionador'], true);
+        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true)
+            || in_array($role, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true);
     }
     
     public function requerPermissao($acao) {
