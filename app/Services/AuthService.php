@@ -211,10 +211,26 @@ class AuthService {
     public function requerAutenticacao() {
         if (!$this->estaLogado()) {
             $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
-            if (stripos($uri, '/admin') === 0) {
-                header('Location: /loginadmin');
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $isLoginUri = (stripos($uri, '/login') === 0 || stripos($uri, '/loginadmin') === 0);
+
+            if ($uri !== '' && $uri[0] === '/' && !$isLoginUri) {
+                $_SESSION['redirect_after_login'] = $uri;
+            }
+
+            $redirectParam = '';
+            if (isset($_SESSION['redirect_after_login']) && is_string($_SESSION['redirect_after_login'])) {
+                $redirectParam = rawurlencode($_SESSION['redirect_after_login']);
+            }
+
+            if ($isAdminUri) {
+                header('Location: /loginadmin' . ($redirectParam !== '' ? ('?redirect=' . $redirectParam) : ''));
             } else {
-                header('Location: /login');
+                header('Location: /login' . ($redirectParam !== '' ? ('?redirect=' . $redirectParam) : ''));
             }
             exit;
         }

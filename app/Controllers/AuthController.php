@@ -14,6 +14,23 @@ class AuthController extends Controller {
         $this->authService = new AuthService();
         $this->usuarioModel = new Usuario();
     }
+
+    private function normalizeInternalRedirect(string $candidate): string {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            return '';
+        }
+        if ($candidate[0] !== '/') {
+            return '';
+        }
+        if (strpos($candidate, '//') === 0) {
+            return '';
+        }
+        if (stripos($candidate, 'http://') === 0 || stripos($candidate, 'https://') === 0) {
+            return '';
+        }
+        return $candidate;
+    }
     
     public function login(Request $request) {
         $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
@@ -24,6 +41,14 @@ class AuthController extends Controller {
             }
         }
 
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        if ($redirectTo === '' && isset($_SESSION['redirect_after_login']) && is_string($_SESSION['redirect_after_login'])) {
+            $redirectTo = (string) $_SESSION['redirect_after_login'];
+        }
+        $redirectTo = $this->normalizeInternalRedirect($redirectTo);
+
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
             $perfil = strtolower(trim((string) ($usuario['perfil'] ?? '')));
@@ -32,6 +57,9 @@ class AuthController extends Controller {
             }
             if ($this->authService->podeAcessarPainelAdmin()) {
                 $this->redirect('/admin/dashboard');
+            }
+            if (isset($_SESSION['redirect_after_login'])) {
+                unset($_SESSION['redirect_after_login']);
             }
             $this->redirect($redirectTo !== '' ? $redirectTo : '/minha-conta');
             return;
@@ -45,6 +73,10 @@ class AuthController extends Controller {
             if ($redirectTo === '') {
                 $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
             }
+            if ($redirectTo === '' && isset($_SESSION['redirect_after_login']) && is_string($_SESSION['redirect_after_login'])) {
+                $redirectTo = (string) $_SESSION['redirect_after_login'];
+            }
+            $redirectTo = $this->normalizeInternalRedirect((string) $redirectTo);
             $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
             
             try {
@@ -64,6 +96,9 @@ class AuthController extends Controller {
                         $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
                         $adminTarget = '/admin/dashboard';
+                        if (isset($_SESSION['redirect_after_login'])) {
+                            unset($_SESSION['redirect_after_login']);
+                        }
                         if ($isAjax) {
                             header('Content-Type: application/json; charset=utf-8');
                             echo json_encode(['success' => true, 'redirect' => $adminTarget]);
@@ -138,6 +173,9 @@ class AuthController extends Controller {
 
                         $_SESSION['message'] = 'Bem-vendo de volta, ' . $usuario['nome'] . '!';
                         $_SESSION['message_type'] = 'success';
+                        if (isset($_SESSION['redirect_after_login'])) {
+                            unset($_SESSION['redirect_after_login']);
+                        }
                         if ($isAjax) {
                             header('Content-Type: application/json; charset=utf-8');
                             echo json_encode(['success' => true, 'redirect' => $target]);
@@ -175,9 +213,27 @@ class AuthController extends Controller {
     public function loginAdmin(Request $request) {
         $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
+        $redirectTo = (string) ($request->getParam('redirect', '') ?? '');
+        if ($redirectTo === '') {
+            try {
+                $redirectTo = (string) ($_GET['redirect'] ?? '');
+            } catch (\Exception $e) {
+            }
+        }
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        if ($redirectTo === '' && isset($_SESSION['redirect_after_login']) && is_string($_SESSION['redirect_after_login'])) {
+            $redirectTo = (string) $_SESSION['redirect_after_login'];
+        }
+        $redirectTo = $this->normalizeInternalRedirect($redirectTo);
+
         if ($this->authService->estaLogado()) {
             $usuario = $this->authService->getUsuarioLogado();
             if ($this->authService->podeAcessarPainelAdmin()) {
+                if (isset($_SESSION['redirect_after_login'])) {
+                    unset($_SESSION['redirect_after_login']);
+                }
                 if ($isAjax) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
@@ -226,13 +282,18 @@ class AuthController extends Controller {
                     $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '! Acesso administrativo.';
                     $_SESSION['message_type'] = 'success';
 
+                    $adminTarget = $redirectTo !== '' ? $redirectTo : '/admin/dashboard';
+                    if (isset($_SESSION['redirect_after_login'])) {
+                        unset($_SESSION['redirect_after_login']);
+                    }
+
                     if ($isAjax) {
                         header('Content-Type: application/json; charset=utf-8');
-                        echo json_encode(['success' => true, 'redirect' => '/admin/dashboard']);
+                        echo json_encode(['success' => true, 'redirect' => $adminTarget]);
                         return;
                     }
 
-                    $this->redirect('/admin/dashboard');
+                    $this->redirect($adminTarget);
                     return;
                 } else {
                     $_SESSION['message'] = 'E-mail ou senha incorretos';
