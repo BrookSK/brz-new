@@ -820,43 +820,47 @@ function regerarEtiquetasMassa() {
             // Zona (Grupo de Triagem do Container): package(_package_order_id) -> _container_id -> container _triage_group
             try {
                 // 1) encontra o package e já tenta ler _container_id em uma query só
-                $stPkg = $wpPdo->prepare("\
-                    SELECT pm.post_id\
-                    FROM {$prefix}postmeta pm\
-                    INNER JOIN {$prefix}posts p ON p.ID = pm.post_id\
-                    WHERE pm.meta_key IN ('_package_order_id','_package_order','package_order_id','package_order')\
-                      AND (pm.meta_value = ? OR pm.meta_value LIKE ?)\
-                    ORDER BY pm.post_id DESC\
-                    LIMIT 1\
-                ");
+                $stPkg = $wpPdo->prepare(
+                    "SELECT pm.post_id
+                     FROM {$prefix}postmeta pm
+                     INNER JOIN {$prefix}posts p ON p.ID = pm.post_id
+                     WHERE pm.meta_key IN ('_package_order_id','_package_order','package_order_id','package_order')
+                       AND (pm.meta_value = ? OR pm.meta_value LIKE ?)
+                     ORDER BY pm.post_id DESC
+                     LIMIT 1"
+                );
                 $stPkg->execute([(string) $pedidoId, '%' . (string) $pedidoId . '%']);
                 $packageId = (int) ($stPkg->fetchColumn() ?: 0);
 
                 // fallback: alguns installs salvam o vínculo com outra meta_key
                 if ($packageId <= 0) {
-                    $stPkg2 = $wpPdo->prepare("\
-                        SELECT pm.post_id\
-                        FROM {$prefix}postmeta pm\
-                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key LIKE '%container%'\
-                        WHERE pm.meta_key LIKE '%order%'\
-                          AND pm.meta_value LIKE ?\
-                        ORDER BY pm.post_id DESC\
-                        LIMIT 1\
-                    ");
+                    $stPkg2 = $wpPdo->prepare(
+                        "SELECT pm.post_id
+                         FROM {$prefix}postmeta pm
+                         INNER JOIN {$prefix}postmeta pmc
+                           ON pmc.post_id = pm.post_id
+                          AND pmc.meta_key LIKE '%container%'
+                         WHERE pm.meta_key LIKE '%order%'
+                           AND pm.meta_value LIKE ?
+                         ORDER BY pm.post_id DESC
+                         LIMIT 1"
+                    );
                     $stPkg2->execute(['%' . (string) $pedidoId . '%']);
                     $packageId = (int) ($stPkg2->fetchColumn() ?: 0);
                 }
 
                 // fallback final: procura qualquer meta_value contendo o order_id em um post que tenha container_id
                 if ($packageId <= 0) {
-                    $stPkg3 = $wpPdo->prepare("\
-                        SELECT pm.post_id, pm.meta_key\
-                        FROM {$prefix}postmeta pm\
-                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key LIKE '%container%'\
-                        WHERE pm.meta_value LIKE ?\
-                        ORDER BY pm.post_id DESC\
-                        LIMIT 1\
-                    ");
+                    $stPkg3 = $wpPdo->prepare(
+                        "SELECT pm.post_id, pm.meta_key
+                         FROM {$prefix}postmeta pm
+                         INNER JOIN {$prefix}postmeta pmc
+                           ON pmc.post_id = pm.post_id
+                          AND pmc.meta_key LIKE '%container%'
+                         WHERE pm.meta_value LIKE ?
+                         ORDER BY pm.post_id DESC
+                         LIMIT 1"
+                    );
                     $stPkg3->execute(['%' . (string) $pedidoId . '%']);
                     $rowPkg3 = $stPkg3->fetch(\PDO::FETCH_ASSOC) ?: null;
                     if ($rowPkg3) {
