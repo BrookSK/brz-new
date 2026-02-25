@@ -475,6 +475,8 @@ $router->get('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}', 'AdminReme
 $router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/confirmar-recebimento', 'AdminRemessaWpController', 'confirmarRecebimento');
 $router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/medicamento', 'AdminRemessaWpController', 'salvarMedicamento');
 $router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/documento/{tipo}', 'AdminRemessaWpController', 'uploadDocumento');
+$router->post('/admin/remessa-wp/janela-teste/criar', 'AdminRemessaWpController', 'criarJanelaTeste');
+$router->post('/admin/remessa-wp/janela/{id}/adicionar-pedido', 'AdminRemessaWpController', 'adicionarPedidoManual');
 
 // Rotas de Remessa Correios
 $router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');

@@ -154,7 +154,7 @@ class AdminRemessaWpController extends Controller {
         $now = $this->now();
         $nowStr = $now->format('Y-m-d H:i:s');
 
-        $stAll = $this->connection->prepare('SELECT id, data_fim, status FROM remessa_wp_janelas WHERE source = ? ORDER BY data_inicio ASC');
+        $stAll = $this->connection->prepare('SELECT id, data_fim, status FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio ASC');
         $stAll->execute([$source]);
         $all = $stAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         foreach ($all as $j) {
@@ -166,12 +166,12 @@ class AdminRemessaWpController extends Controller {
             }
         }
 
-        $st = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND data_inicio <= ? AND data_fim >= ? ORDER BY id ASC');
+        $st = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') AND data_inicio <= ? AND data_fim >= ? ORDER BY id ASC');
         $st->execute([$source, $nowStr, $nowStr]);
         $current = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
 
         if (!$current) {
-            $stLast = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? ORDER BY data_inicio DESC LIMIT 1');
+            $stLast = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio DESC LIMIT 1');
             $stLast->execute([$source]);
             $last = $stLast->fetch(\PDO::FETCH_ASSOC) ?: null;
 
@@ -309,8 +309,11 @@ class AdminRemessaWpController extends Controller {
     public function index($request) {
         $this->requireAccess();
 
-        $source = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
-        if (!in_array($source, self::SOURCES, true)) $source = 'br';
+        $sourceRaw = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
+        $source = $sourceRaw;
+        if ($source !== 'all' && !in_array($source, self::SOURCES, true)) {
+            $source = 'br';
+        }
 
         if (!$this->tableExists('remessa_wp_janelas') || !$this->tableExists('remessa_wp_janela_pedidos')) {
             echo '<div class="alert alert-danger">Tabelas de Remessa WP não encontradas. Rode a migration: database/migrations/047_create_remessa_wp_janelas.sql</div>';
@@ -318,15 +321,41 @@ class AdminRemessaWpController extends Controller {
         }
 
         $errorMsg = null;
+        $janelasAbertas = [];
+        $janelasFinalizadas = [];
+        $janelasManuais = [];
+
         try {
-            $janelaAtual = $this->ensureJanelaAtual($source);
-            $janelasAbertas = $this->getJanelasByStatus($source, ['aberta']);
-            $janelasFinalizadas = $this->getJanelasByStatus($source, ['finalizada']);
+            if ($source === 'all') {
+                foreach (self::SOURCES as $src) {
+                    try {
+                        $this->ensureJanelaAtual($src);
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $stA = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'aberta' ORDER BY data_inicio DESC");
+                $stA->execute();
+                $janelasAbertas = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $stF = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'finalizada' ORDER BY data_inicio DESC");
+                $stF->execute();
+                $janelasFinalizadas = $stF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE tipo = 'manual' ORDER BY id DESC");
+                $stM->execute();
+                $janelasManuais = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } else {
+                $this->ensureJanelaAtual($source);
+                $janelasAbertas = $this->getJanelasByStatus($source, ['aberta']);
+                $janelasFinalizadas = $this->getJanelasByStatus($source, ['finalizada']);
+
+                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' ORDER BY id DESC");
+                $stM->execute([$source]);
+                $janelasManuais = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
         } catch (\Exception $e) {
             $errorMsg = $e->getMessage();
-            $janelaAtual = [];
-            $janelasAbertas = [];
-            $janelasFinalizadas = [];
         }
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -355,11 +384,15 @@ class AdminRemessaWpController extends Controller {
                 <div class="d-flex gap-2">
                     <form method="GET" action="/admin/remessa-wp" class="d-flex gap-2">
                         <select class="form-select" name="source" style="max-width: 160px;">
+                            <option value="all"' . ($source === 'all' ? ' selected' : '') . '>Todos</option>
                             <option value="br"' . ($source === 'br' ? ' selected' : '') . '>BR</option>
                             <option value="red"' . ($source === 'red' ? ' selected' : '') . '>RED</option>
                             <option value="us"' . ($source === 'us' ? ' selected' : '') . '>US</option>
                         </select>
                         <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+                    </form>
+                    <form method="POST" action="/admin/remessa-wp/janela-teste/criar?source=' . urlencode($source) . '" class="d-inline">
+                        <button type="submit" class="btn btn-warning"><i class="fas fa-flask me-1"></i>Janela de testes</button>
                     </form>
                     <button type="button" class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                 </div>
@@ -380,9 +413,14 @@ class AdminRemessaWpController extends Controller {
         } else {
             echo '<div class="list-group">';
             foreach ($janelasAbertas as $j) {
-                echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($source) . '">
+                $jSource = strtolower(trim((string) ($j['source'] ?? $source)));
+                if (!in_array($jSource, self::SOURCES, true)) {
+                    $jSource = 'br';
+                }
+                $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
+                echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
                     <div class="d-flex justify-content-between">
-                        <div><strong>Janela #' . (int) $j['id'] . '</strong> <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <div><strong>Janela #' . (int) $j['id'] . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
                         <span class="badge bg-success">Aberta</span>
                     </div>
                 </a>';
@@ -390,7 +428,7 @@ class AdminRemessaWpController extends Controller {
             echo '</div>';
         }
 
-        echo '    </div>
+        echo '        </div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -403,9 +441,14 @@ class AdminRemessaWpController extends Controller {
         } else {
             echo '<div class="list-group">';
             foreach (array_slice($janelasFinalizadas, 0, 10) as $j) {
-                echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($source) . '">
+                $jSource = strtolower(trim((string) ($j['source'] ?? $source)));
+                if (!in_array($jSource, self::SOURCES, true)) {
+                    $jSource = 'br';
+                }
+                $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
+                echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
                     <div class="d-flex justify-content-between">
-                        <div><strong>Janela #' . (int) $j['id'] . '</strong> <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <div><strong>Janela #' . (int) $j['id'] . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
                         <span class="badge bg-secondary">Finalizada</span>
                     </div>
                 </a>';
@@ -413,12 +456,49 @@ class AdminRemessaWpController extends Controller {
             echo '</div>';
         }
 
-        echo '    </div>
+        echo '        </div>
                 </div>
             </div>
         </div>';
 
-        echo '</main></div></div>
+        echo '<div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><strong>Janelas Manuais</strong> <span class="text-muted small">(testes / inclusão manual)</span></div>
+                    <div class="card-body">';
+
+        if (!$janelasManuais) {
+            echo '<div class="text-muted">Nenhuma janela manual criada.</div>';
+        } else {
+            echo '<div class="list-group">';
+            foreach ($janelasManuais as $j) {
+                $title = trim((string) ($j['titulo'] ?? ''));
+                if ($title === '') {
+                    $title = 'Janela manual #' . (int) $j['id'];
+                }
+                $jSource = strtolower(trim((string) ($j['source'] ?? $source)));
+                if (!in_array($jSource, self::SOURCES, true)) {
+                    $jSource = 'br';
+                }
+                $srcBadge = ($source === 'all') ? (' <span class="badge bg-light text-dark">' . htmlspecialchars(strtoupper($jSource)) . '</span>') : '';
+                echo '<a class="list-group-item list-group-item-action" href="/admin/remessa-wp/janela/' . (int) $j['id'] . '?source=' . urlencode($jSource) . '">
+                    <div class="d-flex justify-content-between">
+                        <div><strong>' . htmlspecialchars($title) . '</strong>' . $srcBadge . ' <span class="text-muted">(' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $j['data_fim']))) . ')</span></div>
+                        <span class="badge bg-warning text-dark">Manual</span>
+                    </div>
+                </a>';
+            }
+            echo '</div>';
+        }
+
+        echo '        </div>
+                </div>
+            </div>
+        </div>';
+
+        echo '</main>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>';
@@ -437,14 +517,18 @@ class AdminRemessaWpController extends Controller {
             exit;
         }
 
-        $this->syncPedidosParaJanela($janelaId, $source);
-
         $stJ = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE id = ? AND source = ? LIMIT 1');
         $stJ->execute([$janelaId, $source]);
         $janela = $stJ->fetch(\PDO::FETCH_ASSOC) ?: null;
         if (!$janela) {
             header('Location: /admin/remessa-wp?source=' . urlencode($source));
             exit;
+        }
+
+        $tipoJanela = strtolower(trim((string) ($janela['tipo'] ?? 'auto')));
+        if ($tipoJanela === '') $tipoJanela = 'auto';
+        if ($tipoJanela !== 'manual') {
+            $this->syncPedidosParaJanela($janelaId, $source);
         }
 
         $st = $this->connection->prepare('SELECT * FROM remessa_wp_janela_pedidos WHERE janela_id = ? AND source = ? ORDER BY created_at DESC');
@@ -459,28 +543,35 @@ class AdminRemessaWpController extends Controller {
 
         $orders = [];
         if ($orderIds) {
-            $wp = $this->getWpPdo($this->connection, $source);
-            $prefix = $wp['prefix'];
-            $wpPdo = $wp['pdo'];
+            try {
+                $wp = $this->getWpPdo($this->connection, $source);
+                $prefix = $wp['prefix'];
+                $wpPdo = $wp['pdo'];
 
-            $ph = implode(',', array_fill(0, count($orderIds), '?'));
-            $sql = "SELECT ID, post_date, post_status, post_title FROM {$prefix}posts WHERE ID IN ({$ph})";
-            $stO = $wpPdo->prepare($sql);
-            $stO->execute($orderIds);
-            $rows = $stO->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            foreach ($rows as $r) {
-                $orders[(int) $r['ID']] = $r;
+                $ph = implode(',', array_fill(0, count($orderIds), '?'));
+                $sql = "SELECT ID, post_date, post_status, post_title FROM {$prefix}posts WHERE ID IN ({$ph})";
+                $stO = $wpPdo->prepare($sql);
+                $stO->execute($orderIds);
+                $rows = $stO->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $orders[(int) $r['ID']] = $r;
+                }
+            } catch (\Exception $e) {
             }
         }
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        $tituloJanela = trim((string) ($janela['titulo'] ?? ''));
+        $tituloLabel = $tituloJanela !== '' ? $tituloJanela : ('Janela #' . (int) $janelaId);
+        $badge = ($tipoJanela === 'manual') ? '<span class="badge bg-warning text-dark">Manual</span>' : '<span class="badge bg-success">Automática</span>';
 
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa WP - Janela #' . (int) $janelaId . '</title>
+    <title>Remessa WP - ' . htmlspecialchars($tituloLabel) . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
 
@@ -494,7 +585,7 @@ class AdminRemessaWpController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h4 mb-0">Janela #' . (int) $janelaId . '</h1>
+                    <h1 class="h4 mb-0">' . htmlspecialchars($tituloLabel) . ' ' . $badge . '</h1>
                     <div class="text-muted small">' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . '</div>
                 </div>
                 <div class="d-flex gap-2">
@@ -502,9 +593,29 @@ class AdminRemessaWpController extends Controller {
                     <button class="btn btn-outline-primary" type="button" onclick="location.reload()">Atualizar</button>
                     <button class="btn btn-danger" type="button" onclick="regerarEtiquetasMassa()">Regerar etiquetas (já geradas)</button>
                 </div>
-            </div>
+            </div>';
 
-            <div class="card">
+        if ($tipoJanela === 'manual') {
+            echo '<div class="card mb-3">
+                <div class="card-header"><strong>Adicionar pedido (manual)</strong></div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/adicionar-pedido?source=' . urlencode($source) . '" class="row g-2 align-items-end">
+                        <div class="col-sm-4">
+                            <label class="form-label">Order ID (WP)</label>
+                            <input type="number" class="form-control" name="order_id" min="1" required>
+                        </div>
+                        <div class="col-sm-3">
+                            <button type="submit" class="btn btn-primary">Adicionar</button>
+                        </div>
+                        <div class="col-sm-5">
+                            <div class="text-muted small">Aceita pedidos fora do status <code>wc-invoice-fechado</code> e fora do período (para testes).</div>
+                        </div>
+                    </form>
+                </div>
+            </div>';
+        }
+
+        echo '<div class="card">
                 <div class="card-header"><strong>Pedidos</strong></div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -599,6 +710,7 @@ function regerarEtiquetasMassa() {
 </script>
 </body>
 </html>';
+
         exit;
     }
 
@@ -615,14 +727,18 @@ function regerarEtiquetasMassa() {
             exit;
         }
 
-        $this->syncPedidosParaJanela($janelaId, $source);
-
         $stJ = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE id = ? AND source = ? LIMIT 1');
         $stJ->execute([$janelaId, $source]);
         $janela = $stJ->fetch(\PDO::FETCH_ASSOC) ?: null;
         if (!$janela) {
             header('Location: /admin/remessa-wp?source=' . urlencode($source));
             exit;
+        }
+
+        $tipoJanela = strtolower(trim((string) ($janela['tipo'] ?? 'auto')));
+        if ($tipoJanela === '') $tipoJanela = 'auto';
+        if ($tipoJanela !== 'manual') {
+            $this->syncPedidosParaJanela($janelaId, $source);
         }
 
         $stL = $this->connection->prepare('SELECT * FROM remessa_wp_janela_pedidos WHERE janela_id = ? AND source = ? AND order_id = ? LIMIT 1');
@@ -992,6 +1108,136 @@ function regerarEtiquetasMassa() {
         }
 
         header('Location: /admin/remessa-wp/janela/' . $janelaId . '/pedido/' . $pedidoId . '?source=' . urlencode($source));
+        exit;
+    }
+
+    public function criarJanelaTeste($request) {
+        $this->requireAccess();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $source = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
+        if (!in_array($source, self::SOURCES, true)) $source = 'br';
+
+        try {
+            if (!$this->tableExists('remessa_wp_janelas')) {
+                throw new \RuntimeException('Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql');
+            }
+
+            $titulo = 'Janela de testes';
+            $start = new \DateTime('now');
+            $start->setTime(0, 0, 0);
+            $end = (clone $start);
+            $end->modify('+365 days');
+            $end->setTime(23, 59, 59);
+
+            $stFind = $this->connection->prepare("SELECT id FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = ? AND status = 'aberta' ORDER BY id DESC LIMIT 1");
+            $stFind->execute([$source, $titulo]);
+            $id = (int) ($stFind->fetchColumn() ?: 0);
+
+            if ($id <= 0) {
+                $stIns = $this->connection->prepare("INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, tipo, titulo, created_at, updated_at) VALUES (?, ?, ?, 'aberta', 'manual', ?, NOW(), NOW())");
+                $stIns->execute([$source, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $titulo]);
+                $id = (int) $this->connection->lastInsertId();
+            }
+
+            $_SESSION['message'] = 'Janela de testes pronta.';
+            $_SESSION['message_type'] = 'success';
+            header('Location: /admin/remessa-wp/janela/' . $id . '?source=' . urlencode($source));
+            exit;
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao criar janela de testes: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/remessa-wp?source=' . urlencode($source));
+            exit;
+        }
+    }
+
+    public function adicionarPedidoManual($request, $id) {
+        $this->requireAccess();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $source = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
+        if (!in_array($source, self::SOURCES, true)) $source = 'br';
+
+        $janelaId = (int) $id;
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        if ($janelaId <= 0 || $orderId <= 0) {
+            header('Location: /admin/remessa-wp?source=' . urlencode($source));
+            exit;
+        }
+
+        try {
+            $stJ = $this->connection->prepare('SELECT tipo FROM remessa_wp_janelas WHERE id = ? AND source = ? LIMIT 1');
+            $stJ->execute([$janelaId, $source]);
+            $tipo = strtolower(trim((string) ($stJ->fetchColumn() ?: '')));
+            if ($tipo !== 'manual') {
+                throw new \RuntimeException('Só é permitido adicionar pedido manualmente em janelas manuais.');
+            }
+
+            $stIns = $this->connection->prepare('INSERT IGNORE INTO remessa_wp_janela_pedidos (janela_id, source, order_id, created_at) VALUES (?, ?, ?, NOW())');
+            $stIns->execute([$janelaId, $source, $orderId]);
+
+            // Preencher campos de etiqueta se já existir no WP
+            $wp = $this->getWpPdo($this->connection, $source);
+            $prefix = $wp['prefix'];
+            $wpPdo = $wp['pdo'];
+
+            $stMeta = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('wexpress_shipping_id','wexpress_tracking_number','courier_tracking_number','wexpress_status','wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url')");
+            $stMeta->execute([$orderId]);
+            $rows = $stMeta->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $m = [];
+            foreach ($rows as $r) {
+                $k = (string) ($r['meta_key'] ?? '');
+                if ($k === '') continue;
+                $m[$k] = (string) ($r['meta_value'] ?? '');
+            }
+
+            $shipId = trim((string) ($m['wexpress_shipping_id'] ?? ''));
+            $trk = trim((string) ($m['wexpress_tracking_number'] ?? ''));
+            $courier = trim((string) ($m['courier_tracking_number'] ?? ''));
+            $status = trim((string) ($m['wexpress_status'] ?? ''));
+            $label = trim((string) ($m['wexpress_label_url'] ?? ($m['_wexpress_label_url'] ?? ($m['wp_wexpress_label_url'] ?? ''))));
+            $hasLabel = ($shipId !== '' || $label !== '' || $status === 'LABEL_CREATED');
+
+            $stUp = $this->connection->prepare(
+                'UPDATE remessa_wp_janela_pedidos
+                 SET etiqueta_gerada = ?,
+                     etiqueta_gerada_em = IF(?, COALESCE(etiqueta_gerada_em, NOW()), etiqueta_gerada_em),
+                     wexpress_shipping_id = ?,
+                     wexpress_tracking_number = ?,
+                     courier_tracking_number = ?,
+                     wexpress_status = ?,
+                     wexpress_label_url = ?,
+                     wexpress_updated_at = NOW()
+                 WHERE janela_id = ? AND source = ? AND order_id = ?'
+            );
+            $stUp->execute([
+                $hasLabel ? 1 : 0,
+                $hasLabel ? 1 : 0,
+                $shipId !== '' ? $shipId : null,
+                $trk !== '' ? $trk : null,
+                $courier !== '' ? $courier : null,
+                $status !== '' ? $status : null,
+                $label !== '' ? $label : null,
+                $janelaId,
+                $source,
+                $orderId,
+            ]);
+
+            $_SESSION['message'] = 'Pedido adicionado na janela de testes.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao adicionar pedido: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/remessa-wp/janela/' . $janelaId . '?source=' . urlencode($source));
         exit;
     }
 }
