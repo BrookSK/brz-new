@@ -26,6 +26,7 @@ $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', '
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
+$router->get('/admin/pedidos/export-xlsx', 'AdminPedidosController', 'exportXlsx');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
