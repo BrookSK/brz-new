@@ -56,6 +56,22 @@ class AdminRemessaWpController extends Controller {
         return in_array($source, self::SOURCES, true) ? $source : 'br';
     }
 
+    private function formatTriageGroup(string $val): string {
+        $v = trim($val);
+        if ($v === '') return '';
+        $digits = preg_replace('/\D+/', '', $v);
+        if ($digits === '') return $v;
+
+        $map = [
+            '1' => '1 - São Paulo/SP',
+            '2' => '2 - Valinhos/SP',
+            '3' => '3 - Rio de Janeiro/RJ',
+            '4' => '4 - Curitiba/PR',
+            '5' => '5 - Curitiba/PR',
+        ];
+        return $map[$digits] ?? $v;
+    }
+
     private function getWpPdo(\PDO $localPdo, string $source = 'br'): array {
         $source = strtolower(trim($source));
         if (!in_array($source, self::SOURCES, true)) {
@@ -1060,7 +1076,7 @@ function regerarEtiquetasMassa() {
         $cel = trim((string) ($wpMeta['_billing_phone'] ?? ''));
         $suite = $wpSuite;
 
-        $zona = $wpZona;
+        $zona = $this->formatTriageGroup($wpZona);
         $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
         $aceitaSubst = $aceitaSubstRaw;
         if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
