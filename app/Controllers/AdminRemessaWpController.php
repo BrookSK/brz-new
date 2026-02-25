@@ -1233,7 +1233,71 @@ function regerarEtiquetasMassa() {
         }
 
         if ($pdfMode) {
-            ob_start();
+            $safeFile = preg_replace('/[^A-Za-z0-9 _\-#]/', '', $invoiceTitle);
+            $safeFile = trim((string) $safeFile);
+            if ($safeFile === '') {
+                $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
+            }
+
+            $itensPdf = [];
+            foreach ($wpItems as $it) {
+                if (!is_array($it)) continue;
+                $qtd = (int) ($it['qty'] ?? 0);
+                if ($qtd <= 0) $qtd = 1;
+                $itensPdf[] = [
+                    'nome_produto' => (string) ($it['description'] ?? 'Item'),
+                    'quantidade' => $qtd,
+                    'preco_unitario' => (float) ($it['unit'] ?? 0),
+                    'subtotal' => (float) ($it['total'] ?? 0),
+                ];
+            }
+
+            $pedidoPdf = [
+                'id' => (int) $pedidoId,
+                'codigo_pedido' => (string) $pedidoId,
+                'created_at' => (string) ($wpOrder['post_date'] ?? ''),
+                'cliente_nome' => $nomeClientePdf,
+                'cliente_email' => (string) ($wpMeta['_billing_email'] ?? ''),
+                'cliente_telefone' => (string) ($wpMeta['_billing_phone'] ?? ''),
+                'subtotal' => (float) ($wpTotals['subtotal'] ?? 0),
+                'frete' => (float) ($wpTotals['shipping'] ?? 0),
+                'total' => (float) ($wpTotals['total'] ?? 0),
+                'moeda' => (string) ($wpTotals['currency'] ?? ($wpMeta['_order_currency'] ?? 'BRL')),
+                'status' => (string) ($wpOrder['post_status'] ?? ''),
+                'pagamento_gateway' => (string) ($wpMeta['_payment_method'] ?? ''),
+                'pagamento_status' => (string) ($wpOrder['post_status'] ?? ''),
+                'pagamento_transacao' => (string) ($wpMeta['mercado_pago_payment_ids'] ?? ($wpMeta['mp_payment_id'] ?? ($wpMeta['_transaction_id'] ?? ''))),
+            ];
+
+            $html = '';
+            try {
+                $svc = new \App\Services\PdfPedidoService();
+                $html = $svc->renderPedidoHtml($pedidoPdf, $itensPdf, null);
+            } catch (\Throwable $e) {
+                $html = '<html><head><meta charset="UTF-8"></head><body>Erro ao gerar invoice: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</body></html>';
+            }
+
+            if (class_exists('Dompdf\\Dompdf')) {
+                $dompdf = new \Dompdf\Dompdf([
+                    'isRemoteEnabled' => true,
+                    'isHtml5ParserEnabled' => true,
+                ]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $safeFile . '.pdf"');
+                header('X-Content-Type-Options: nosniff');
+                echo $dompdf->output();
+                exit;
+            }
+
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<div style="padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;margin:12px;font-family:Arial;">'
+                . '<strong>PDF indisponível:</strong> a biblioteca <code>dompdf/dompdf</code> não está instalada no servidor ainda. Rode <code>composer install</code>.'
+                . '</div>';
+            echo $html;
+            exit;
         }
 
         echo '<!DOCTYPE html>
@@ -1761,38 +1825,6 @@ function regerarEtiquetasMassa() {
             </div>';
 
         echo '</main></div></div>';
-
-        if ($pdfMode) {
-            $html = (string) ob_get_clean();
-
-            $safeFile = preg_replace('/[^A-Za-z0-9 _\-#]/', '', $invoiceTitle);
-            $safeFile = trim((string) $safeFile);
-            if ($safeFile === '') {
-                $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
-            }
-
-            if (class_exists('Dompdf\\Dompdf')) {
-                $dompdf = new \Dompdf\Dompdf([
-                    'isRemoteEnabled' => true,
-                    'isHtml5ParserEnabled' => true,
-                ]);
-                $dompdf->loadHtml($html, 'UTF-8');
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->render();
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: attachment; filename="' . $safeFile . '.pdf"');
-                header('X-Content-Type-Options: nosniff');
-                echo $dompdf->output();
-                exit;
-            }
-
-            header('Content-Type: text/html; charset=utf-8');
-            echo '<div style="padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;margin:12px;font-family:Arial;">'
-                . '<strong>PDF indisponível:</strong> a biblioteca <code>dompdf/dompdf</code> não está instalada no servidor ainda. Rode <code>composer install</code>.'
-                . '</div>';
-            echo $html;
-            exit;
-        }
 
         echo '\n<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>'
             . ($printMode ? ('<script>(function(){try{document.title=' . json_encode($invoiceTitle, JSON_UNESCAPED_UNICODE) . ';window.focus();setTimeout(function(){window.print();},200);window.addEventListener("afterprint",function(){try{window.close();}catch(e){}});}catch(e){}})();</script>') : '')
