@@ -959,6 +959,9 @@ function regerarEtiquetasMassa() {
         $source = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
         if (!in_array($source, self::SOURCES, true)) $source = 'br';
 
+        $printMode = (string) ($request->getParam('print') ?? ($_GET['print'] ?? ''));
+        $printMode = $printMode === '1';
+
         $janelaId = (int) $janelaId;
         $pedidoId = (int) $pedidoId;
         if ($janelaId <= 0 || $pedidoId <= 0) {
@@ -1147,6 +1150,7 @@ function regerarEtiquetasMassa() {
                 $qty = (int) ($m['_qty'] ?? 0);
                 if ($qty <= 0) $qty = 1;
 
+                $lineSubtotal = is_numeric($m['_line_subtotal'] ?? null) ? (float) $m['_line_subtotal'] : null;
                 $lineTotal = is_numeric($m['_line_total'] ?? null) ? (float) $m['_line_total'] : 0.0;
                 $unit = $qty > 0 ? round($lineTotal / $qty, 2) : 0.0;
 
@@ -1176,6 +1180,7 @@ function regerarEtiquetasMassa() {
                     'qty' => $qty,
                     'unit' => $unit,
                     'total' => $lineTotal,
+                    'subtotal' => $lineSubtotal,
                     'image_url' => $imageUrl,
                 ];
             }
@@ -1187,6 +1192,22 @@ function regerarEtiquetasMassa() {
                 'total' => is_numeric($wpMeta['_order_total'] ?? null) ? (float) $wpMeta['_order_total'] : null,
                 'currency' => trim((string) ($wpMeta['_order_currency'] ?? '')),
             ];
+
+            if ($wpTotals['subtotal'] === null) {
+                $sumSubtotal = 0.0;
+                $sumTotal = 0.0;
+                foreach ($wpItems as $it) {
+                    $sumTotal += (float) ($it['total'] ?? 0);
+                    if (array_key_exists('subtotal', $it) && $it['subtotal'] !== null) {
+                        $sumSubtotal += (float) $it['subtotal'];
+                    }
+                }
+                if ($sumSubtotal > 0) {
+                    $wpTotals['subtotal'] = $sumSubtotal;
+                } elseif ($sumTotal > 0) {
+                    $wpTotals['subtotal'] = $sumTotal;
+                }
+            }
         } catch (\Exception $e) {
         }
 
@@ -1201,10 +1222,22 @@ function regerarEtiquetasMassa() {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
+        echo '<style>
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .card { break-inside: avoid; }
+  details { display: block !important; }
+  details > summary { display: none !important; }
+}
+</style>';
         echo '</head>
 <body>
 <div class="container-fluid"><div class="row">';
-        renderAdminSidebar('remessa-wp');
+
+        if (!$printMode) {
+            renderAdminSidebar('remessa-wp');
+        }
 
         $recebido = ((int) ($link['recebido_confirmado'] ?? 0)) === 1;
         $recebidoEm = (string) ($link['recebido_confirmado_em'] ?? '');
@@ -1224,15 +1257,17 @@ function regerarEtiquetasMassa() {
             }
         }
 
-        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        $mainColClass = $printMode ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
+        echo '<main class="' . $mainColClass . '">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
                     <h1 class="h4 mb-0">Pedido #' . (int) $pedidoId . '</h1>
                     <div class="text-muted small">Janela #' . (int) $janelaId . ' (' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . ')</div>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 no-print">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">Voltar</a>
                     <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">Abrir pedido</a>
+                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&print=1">Baixar Invoice (PDF)</a>
                 </div>
             </div>';
 
@@ -1471,13 +1506,16 @@ function regerarEtiquetasMassa() {
 
         $curr = trim((string) ($wpTotals['currency'] ?? ''));
         $currLabel = $curr !== '' ? (' (' . $curr . ')') : '';
+        $currencyPrefix = ($curr === 'BRL') ? 'R$ ' : (($curr === 'USD') ? 'US$ ' : '');
+        $creditAmount = (isset($wpTotals['total']) && $wpTotals['total'] !== null) ? ($currencyPrefix . number_format((float) $wpTotals['total'], 2, ',', '.')) : '';
+        $creditAmountLabel = $creditAmount !== '' ? (' (' . $creditAmount . ')') : '';
         echo '<div class="row g-3">'
             . '<div class="col-lg-6">'
                 . '<div class="border rounded p-3 h-100">'
                     . '<div class="mb-2"><strong>Pagamento</strong></div>'
                     . '<div class="small">'
                         . '<div><strong>Valor pago:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Data:</strong> ' . htmlspecialchars($paidDate !== '' ? $paidDate : '-') . '</div>'
+                        . '<div><strong>Data de crédito:</strong> ' . htmlspecialchars($paidDate !== '' ? $paidDate : '-') . htmlspecialchars($creditAmountLabel) . '</div>'
                         . '<div><strong>Método:</strong> ' . htmlspecialchars($paymentMethod !== '' ? $paymentMethod : '-') . '</div>'
                     . '</div>'
                 . '</div>'
@@ -1486,11 +1524,190 @@ function regerarEtiquetasMassa() {
                 . '<div class="border rounded p-3 h-100">'
                     . '<div class="mb-2"><strong>Totais</strong></div>'
                     . '<div class="small">'
-                        . '<div><strong>Subtotal:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Subda pauta:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Frete:</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Total do pedido:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
                     . '</div>'
+                . '</div>'
+            . '</div>'
+        . '</div>';
+
+        $formatUsefulValue = function ($val) use ($printMode) {
+            if ($val === null) {
+                return '-';
+            }
+            if (is_bool($val)) {
+                return $val ? 'true' : 'false';
+            }
+            if (is_array($val) || is_object($val)) {
+                $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            $s = trim((string) $val);
+            if ($s === '') {
+                return '-';
+            }
+
+            $safe = htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+            if ($printMode) {
+                return '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">' . $safe . '</pre>';
+            }
+            if (mb_strlen($s) <= 260) {
+                return $safe;
+            }
+
+            $short = htmlspecialchars(mb_substr($s, 0, 240) . '...', ENT_QUOTES, 'UTF-8');
+            return '<details><summary style="cursor:pointer;">' . $short . '</summary><pre class="mt-2" style="white-space:pre-wrap;word-break:break-word;">' . $safe . '</pre></details>';
+        };
+
+        $metaGet = function (string $key) use ($wpMeta) {
+            return array_key_exists($key, $wpMeta) ? $wpMeta[$key] : null;
+        };
+
+        $useful = [];
+        $useful['Chave do Pedido'] = $metaGet('_order_key');
+        $useful['Usuário do Cliente'] = $metaGet('_customer_user');
+        $useful['Método de Pagamento'] = $metaGet('_payment_method');
+        $useful['Título do Método de Pagamento'] = $metaGet('_payment_method_title');
+        $useful['Endereço IP do Cliente'] = $metaGet('_customer_ip_address');
+        $useful['Agente do Usuário do Cliente'] = $metaGet('_customer_user_agent');
+        $useful['Criado Via'] = $metaGet('_created_via');
+        $useful['Hash do Carrinho'] = $metaGet('_cart_hash');
+        $useful['Permissões de Download'] = $metaGet('_download_permissions_granted');
+        $useful['Vendas Registradas'] = $metaGet('_recorded_sales');
+        $useful['Contagens de Uso de Cupons Registradas'] = $metaGet('_recorded_coupon_usage_counts');
+        $useful['Email de Novo Pedido Enviado'] = $metaGet('_new_order_email_sent');
+        $useful['Estoque do Pedido Reduzido'] = $metaGet('_order_stock_reduced');
+        $useful['Moeda do Pedido'] = $metaGet('_order_currency');
+        $useful['Desconto do Carrinho'] = $metaGet('_cart_discount');
+        $useful['Imposto do Desconto do Carrinho'] = $metaGet('_cart_discount_tax');
+        $useful['Frete do Pedido'] = $metaGet('_order_shipping');
+        $useful['Imposto do Frete do Pedido'] = $metaGet('_order_shipping_tax');
+        $useful['Imposto do Pedido'] = $metaGet('_order_tax');
+        $useful['Total do Pedido'] = $metaGet('_order_total');
+        $useful['Versão do Pedido'] = $metaGet('_order_version');
+        $useful['Preços Incluem Imposto'] = $metaGet('_prices_include_tax');
+
+        $useful['Primeiro Nome de Cobrança'] = $metaGet('_billing_first_name');
+        $useful['Sobrenome de Cobrança'] = $metaGet('_billing_last_name');
+        $useful['Endereço de Cobrança 1'] = $metaGet('_billing_address_1');
+        $useful['Billing Address 2'] = $metaGet('_billing_address_2');
+        $useful['Cidade de Cobrança'] = $metaGet('_billing_city');
+        $useful['Estado de Cobrança'] = $metaGet('_billing_state');
+        $useful['CEP de Cobrança'] = $metaGet('_billing_postcode');
+        $useful['País de Cobrança'] = $metaGet('_billing_country');
+        $useful['Email de Cobrança'] = $metaGet('_billing_email');
+        $useful['Telefone de Cobrança'] = $metaGet('_billing_phone');
+        $useful['CPF de Cobrança'] = $metaGet('_billing_cpf');
+        $useful['Data de Nascimento de Cobrança'] = $metaGet('_billing_birthdate');
+        $useful['Número de Cobrança'] = $metaGet('_billing_number');
+        $useful['Bairro de Cobrança'] = $metaGet('_billing_neighborhood');
+
+        $useful['Endereço de Entrega 1'] = $metaGet('_shipping_address_1');
+        $useful['Shipping Address 2'] = $metaGet('_shipping_address_2');
+        $useful['Cidade de Entrega'] = $metaGet('_shipping_city');
+        $useful['Estado de Entrega'] = $metaGet('_shipping_state');
+        $useful['CEP de Entrega'] = $metaGet('_shipping_postcode');
+        $useful['Bairro de Entrega'] = $metaGet('_shipping_neighborhood');
+        $useful['Número de Entrega'] = $metaGet('_shipping_number');
+
+        // Mercado Pago / Pix (quando existir)
+        $useful['Used Gateway'] = $metaGet('used_gateway');
+        $useful['Mercado Pago Payment IDs'] = $metaGet('mercado_pago_payment_ids');
+        $useful['Mp Transaction Amount'] = $metaGet('mp_transaction_amount');
+        $useful['Mp Pix Qr Code'] = $metaGet('mp_pix_qr_code');
+        $useful['Checkout Pix Date Expiration'] = $metaGet('checkout_pix_date_expiration');
+        $useful['Data Paga'] = $metaGet('data_paga');
+        $useful['Data Concluída'] = $metaGet('data_concluida');
+
+        // Complementos úteis também aparecem em paidDate / date paid, então deixamos explícito
+        $useful['Data de crédito (calculada)'] = $paidDate;
+
+        $mpExtras = [];
+        $attributionExtras = [];
+        $wccsExtras = [];
+        $trpExtras = [];
+        $tpulExtras = [];
+        $checkoutExtras = [];
+
+        foreach ($wpMeta as $k => $v) {
+            $ks = strtolower((string) $k);
+            if ($ks === '') continue;
+
+            if (strpos($ks, 'mp ') === 0 || strpos($ks, 'mp_') === 0 || strpos($ks, 'mercado') !== false || strpos($ks, 'pix') !== false) {
+                $mpExtras[$k] = $v;
+                continue;
+            }
+
+            // Atribuição / UTM / Referrer
+            if (strpos($ks, 'utm_') !== false || strpos($ks, 'attribution') !== false || strpos($ks, 'referrer') !== false || strpos($ks, 'landing') !== false || strpos($ks, 'session') !== false) {
+                $attributionExtras[$k] = $v;
+                continue;
+            }
+
+            // WCCS (câmbio / moeda)
+            if (strpos($ks, 'wccs') !== false || strpos($ks, 'currency_ratio') !== false || strpos($ks, 'base_currency') !== false) {
+                $wccsExtras[$k] = $v;
+                continue;
+            }
+
+            // TRP / idioma
+            if (strpos($ks, 'trp') !== false || strpos($ks, 'language') !== false || strpos($ks, 'idioma') !== false) {
+                $trpExtras[$k] = $v;
+                continue;
+            }
+
+            // TPUL / visitor
+            if (strpos($ks, 'tpul') !== false || strpos($ks, 'visitor') !== false) {
+                $tpulExtras[$k] = $v;
+                continue;
+            }
+
+            // Checkout / gateway
+            if (strpos($ks, 'checkout') !== false || strpos($ks, 'gateway') !== false || strpos($ks, 'used gateway') !== false || strpos($ks, 'blocks payment') !== false) {
+                $checkoutExtras[$k] = $v;
+                continue;
+            }
+        }
+
+        echo '<hr>';
+        echo '<div class="card">'
+            . '<div class="card-header"><strong>Informações Úteis</strong></div>'
+            . '<div class="card-body">'
+                . '<div class="table-responsive">'
+                    . '<table class="table table-sm align-middle">'
+                        . '<thead><tr><th style="width: 320px;">Campo</th><th>Valor</th></tr></thead>'
+                        . '<tbody>';
+
+        foreach ($useful as $label => $val) {
+            echo '<tr>'
+                . '<td><strong>' . htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8') . '</strong></td>'
+                . '<td>' . $formatUsefulValue($val) . '</td>'
+            . '</tr>';
+        }
+
+        $renderExtras = function (string $title, array $items) use ($formatUsefulValue) {
+            if (empty($items)) {
+                return;
+            }
+            echo '<tr><td colspan="2" class="text-muted small">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+            foreach ($items as $k => $v) {
+                echo '<tr>'
+                    . '<td><strong>' . htmlspecialchars((string) $k, ENT_QUOTES, 'UTF-8') . '</strong></td>'
+                    . '<td>' . $formatUsefulValue($v) . '</td>'
+                . '</tr>';
+            }
+        };
+
+        $renderExtras('Metas adicionais (Pix/Mercado Pago)', $mpExtras);
+        $renderExtras('Metas adicionais (Atribuição / UTM / Sessão)', $attributionExtras);
+        $renderExtras('Metas adicionais (WCCS / Câmbio)', $wccsExtras);
+        $renderExtras('Metas adicionais (TRP / Idioma)', $trpExtras);
+        $renderExtras('Metas adicionais (TPUL / Visitor)', $tpulExtras);
+        $renderExtras('Metas adicionais (Checkout / Gateway)', $checkoutExtras);
+
+        echo '           </tbody></table>'
                 . '</div>'
             . '</div>'
         . '</div>';
@@ -1518,8 +1735,9 @@ function regerarEtiquetasMassa() {
             </div>';
 
         echo '</main></div></div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>'
+            . ($printMode ? '<script>(function(){try{window.focus();setTimeout(function(){window.print();},200);window.addEventListener("afterprint",function(){try{window.close();}catch(e){}});}catch(e){}})();</script>' : '')
+            . '</body>
 </html>';
         exit;
     }
