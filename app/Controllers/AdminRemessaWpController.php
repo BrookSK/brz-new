@@ -1239,43 +1239,372 @@ function regerarEtiquetasMassa() {
                 $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
             }
 
-            $itensPdf = [];
-            foreach ($wpItems as $it) {
-                if (!is_array($it)) continue;
-                $qtd = (int) ($it['qty'] ?? 0);
-                if ($qtd <= 0) $qtd = 1;
-                $itensPdf[] = [
-                    'nome_produto' => (string) ($it['description'] ?? 'Item'),
-                    'quantidade' => $qtd,
-                    'preco_unitario' => (float) ($it['unit'] ?? 0),
-                    'subtotal' => (float) ($it['total'] ?? 0),
-                ];
+            $currency = (string) ($wpTotals['currency'] ?? ($wpMeta['_order_currency'] ?? 'BRL'));
+            $fmtMoney = function (?float $v) use ($currency): string {
+                if ($v === null) return '-';
+                $val = (float) $v;
+                if (strtoupper($currency) === 'BRL') {
+                    return 'R$ ' . number_format($val, 2, ',', '.');
+                }
+                return strtoupper($currency) . ' ' . number_format($val, 2, '.', ',');
+            };
+
+            $safeText = function ($v): string {
+                return htmlspecialchars(trim((string) $v), ENT_QUOTES, 'UTF-8');
+            };
+
+            $paidDate = trim((string) ($wpMeta['_paid_date'] ?? ($wpMeta['_date_paid'] ?? '')));
+            if ($paidDate !== '' && ctype_digit($paidDate)) {
+                $paidDate = date('d/m/Y H:i', (int) $paidDate);
+            } elseif ($paidDate !== '') {
+                $ts = strtotime($paidDate);
+                if ($ts) $paidDate = date('d/m/Y H:i', $ts);
             }
 
-            $pedidoPdf = [
-                'id' => (int) $pedidoId,
-                'codigo_pedido' => (string) $pedidoId,
-                'created_at' => (string) ($wpOrder['post_date'] ?? ''),
-                'cliente_nome' => $nomeClientePdf,
-                'cliente_email' => (string) ($wpMeta['_billing_email'] ?? ''),
-                'cliente_telefone' => (string) ($wpMeta['_billing_phone'] ?? ''),
-                'subtotal' => (float) ($wpTotals['subtotal'] ?? 0),
-                'frete' => (float) ($wpTotals['shipping'] ?? 0),
-                'total' => (float) ($wpTotals['total'] ?? 0),
-                'moeda' => (string) ($wpTotals['currency'] ?? ($wpMeta['_order_currency'] ?? 'BRL')),
-                'status' => (string) ($wpOrder['post_status'] ?? ''),
-                'pagamento_gateway' => (string) ($wpMeta['_payment_method'] ?? ''),
-                'pagamento_status' => (string) ($wpOrder['post_status'] ?? ''),
-                'pagamento_transacao' => (string) ($wpMeta['mercado_pago_payment_ids'] ?? ($wpMeta['mp_payment_id'] ?? ($wpMeta['_transaction_id'] ?? ''))),
+            $orderDate = trim((string) ($wpOrder['post_date'] ?? ''));
+            $emitDate = $orderDate !== '' ? date('d/m/Y H:i', strtotime($orderDate)) : date('d/m/Y H:i');
+
+            $cpf = trim((string) ($wpMeta['_billing_cpf'] ?? ($wpMeta['_billing_cnpj'] ?? '')));
+            $cnpj = trim((string) ($wpMeta['_billing_cnpj'] ?? ''));
+            $email = trim((string) ($wpMeta['_billing_email'] ?? ''));
+            $cel = trim((string) ($wpMeta['_billing_phone'] ?? ''));
+            $ipCliente = trim((string) ($wpMeta['_customer_ip_address'] ?? ($wpMeta['_customer_user_ip'] ?? '')));
+
+            $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
+            $aceitaSubst = $aceitaSubstRaw;
+            if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
+            if ($aceitaSubstRaw === 'no') $aceitaSubst = 'Não';
+
+            $trkWx = trim((string) ($link['courier_tracking_number'] ?? ($link['wexpress_tracking_number'] ?? '')));
+            $zona = $this->formatTriageGroup($wpZona);
+
+            $paymentMethodTitle = trim((string) ($wpMeta['_payment_method_title'] ?? ($wpMeta['_payment_method'] ?? '')));
+
+            $findWxFrete = function ($data): ?float {
+                if ($data === null) return null;
+                if (is_string($data)) {
+                    $data = json_decode($data, true);
+                }
+                if (!is_array($data)) return null;
+
+                $candidates = [];
+                $walk = function ($node, string $path) use (&$walk, &$candidates) {
+                    if (is_array($node)) {
+                        foreach ($node as $k => $v) {
+                            $kk = strtolower((string) $k);
+                            $p = $path === '' ? $kk : ($path . '.' . $kk);
+                            if (is_scalar($v)) {
+                                $sv = (string) $v;
+                                $sv2 = str_replace(',', '.', $sv);
+                                if (is_numeric($sv2)) {
+                                    if (strpos($kk, 'shipping') !== false || strpos($kk, 'frete') !== false || strpos($kk, 'freight') !== false) {
+                                        if (strpos($kk, 'tax') === false) {
+                                            $candidates[] = (float) $sv2;
+                                        }
+                                    }
+                                    if ((strpos($kk, 'price') !== false || strpos($kk, 'cost') !== false || strpos($kk, 'amount') !== false)
+                                        && (strpos($p, 'shipping') !== false || strpos($p, 'frete') !== false || strpos($p, 'freight') !== false)
+                                    ) {
+                                        $candidates[] = (float) $sv2;
+                                    }
+                                }
+                            }
+                            $walk($v, $p);
+                        }
+                    }
+                };
+                $walk($data, '');
+                if (!$candidates) return null;
+                $best = null;
+                foreach ($candidates as $v) {
+                    if ($v <= 0) continue;
+                    if ($best === null || $v < $best) {
+                        $best = $v;
+                    }
+                }
+                return $best;
+            };
+
+            $wxFrete = $findWxFrete($link['wexpress_last_response_json'] ?? null);
+            $freteFinal = $wxFrete !== null ? $wxFrete : (isset($wpTotals['shipping']) ? (float) $wpTotals['shipping'] : 0.0);
+
+            $subTotal = isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? (float) $wpTotals['subtotal'] : null;
+            $discount = isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? (float) $wpTotals['discount'] : null;
+            $total = isset($wpTotals['total']) && $wpTotals['total'] !== null ? (float) $wpTotals['total'] : null;
+
+            $billingName = trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? '')));
+            $shippingName = trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? '')));
+            if ($shippingName === '') $shippingName = $billingName;
+
+            $b = [
+                'name' => $billingName,
+                'company' => (string) ($wpMeta['_billing_company'] ?? ''),
+                'address1' => (string) ($wpMeta['_billing_address_1'] ?? ''),
+                'address2' => (string) ($wpMeta['_billing_address_2'] ?? ''),
+                'number' => (string) ($wpMeta['_billing_number'] ?? ''),
+                'neighborhood' => (string) ($wpMeta['_billing_neighborhood'] ?? ''),
+                'city' => (string) ($wpMeta['_billing_city'] ?? ''),
+                'state' => (string) ($wpMeta['_billing_state'] ?? ''),
+                'postcode' => (string) ($wpMeta['_billing_postcode'] ?? ''),
+                'country' => (string) ($wpMeta['_billing_country'] ?? ''),
+            ];
+            $s = [
+                'name' => $shippingName,
+                'company' => (string) ($wpMeta['_shipping_company'] ?? ''),
+                'address1' => (string) ($wpMeta['_shipping_address_1'] ?? ''),
+                'address2' => (string) ($wpMeta['_shipping_address_2'] ?? ''),
+                'number' => (string) ($wpMeta['_shipping_number'] ?? ''),
+                'suite' => (string) ($wpSuite ?? ''),
+                'neighborhood' => (string) ($wpMeta['_shipping_neighborhood'] ?? ''),
+                'city' => (string) ($wpMeta['_shipping_city'] ?? ''),
+                'state' => (string) ($wpMeta['_shipping_state'] ?? ''),
+                'postcode' => (string) ($wpMeta['_shipping_postcode'] ?? ''),
+                'country' => (string) ($wpMeta['_shipping_country'] ?? ''),
             ];
 
-            $html = '';
-            try {
-                $svc = new \App\Services\PdfPedidoService();
-                $html = $svc->renderPedidoHtml($pedidoPdf, $itensPdf, null);
-            } catch (\Throwable $e) {
-                $html = '<html><head><meta charset="UTF-8"></head><body>Erro ao gerar invoice: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</body></html>';
+            $useful = [];
+            $metaGet = function (string $key) use ($wpMeta) {
+                return array_key_exists($key, $wpMeta) ? $wpMeta[$key] : null;
+            };
+            $useful['Chave do Pedido'] = $metaGet('_order_key');
+            $useful['Usuário do Cliente'] = $metaGet('_customer_user');
+            $useful['Método de Pagamento'] = $metaGet('_payment_method');
+            $useful['Título do Método de Pagamento'] = $metaGet('_payment_method_title');
+            $useful['Endereço IP do Cliente'] = $metaGet('_customer_ip_address');
+            $useful['Agente do Usuário do Cliente'] = $metaGet('_customer_user_agent');
+            $useful['Criado Via'] = $metaGet('_created_via');
+            $useful['Hash do Carrinho'] = $metaGet('_cart_hash');
+            $useful['Permissões de Download'] = $metaGet('_download_permissions_granted');
+            $useful['Vendas Registradas'] = $metaGet('_recorded_sales');
+            $useful['Contagens de Uso de Cupons Registradas'] = $metaGet('_recorded_coupon_usage_counts');
+            $useful['Email de Novo Pedido Enviado'] = $metaGet('_new_order_email_sent');
+            $useful['Estoque do Pedido Reduzido'] = $metaGet('_order_stock_reduced');
+            $useful['Moeda do Pedido'] = $metaGet('_order_currency');
+            $useful['Desconto do Carrinho'] = $metaGet('_cart_discount');
+            $useful['Imposto do Desconto do Carrinho'] = $metaGet('_cart_discount_tax');
+            $useful['Frete do Pedido'] = $metaGet('_order_shipping');
+            $useful['Imposto do Frete do Pedido'] = $metaGet('_order_shipping_tax');
+            $useful['Imposto do Pedido'] = $metaGet('_order_tax');
+            $useful['Total do Pedido'] = $metaGet('_order_total');
+            $useful['Versão do Pedido'] = $metaGet('_order_version');
+            $useful['Preços Incluem Imposto'] = $metaGet('_prices_include_tax');
+            $useful['Primeiro Nome de Cobrança'] = $metaGet('_billing_first_name');
+            $useful['Sobrenome de Cobrança'] = $metaGet('_billing_last_name');
+            $useful['Endereço de Cobrança 1'] = $metaGet('_billing_address_1');
+            $useful['Billing Address 2'] = $metaGet('_billing_address_2');
+            $useful['Cidade de Cobrança'] = $metaGet('_billing_city');
+            $useful['Estado de Cobrança'] = $metaGet('_billing_state');
+            $useful['CEP de Cobrança'] = $metaGet('_billing_postcode');
+            $useful['País de Cobrança'] = $metaGet('_billing_country');
+            $useful['Email de Cobrança'] = $metaGet('_billing_email');
+            $useful['Telefone de Cobrança'] = $metaGet('_billing_phone');
+            $useful['CPF de Cobrança'] = $metaGet('_billing_cpf');
+            $useful['Data de Nascimento de Cobrança'] = $metaGet('_billing_birthdate');
+            $useful['Número de Cobrança'] = $metaGet('_billing_number');
+            $useful['Bairro de Cobrança'] = $metaGet('_billing_neighborhood');
+            $useful['Endereço de Entrega 1'] = $metaGet('_shipping_address_1');
+            $useful['Shipping Address 2'] = $metaGet('_shipping_address_2');
+            $useful['Cidade de Entrega'] = $metaGet('_shipping_city');
+            $useful['Estado de Entrega'] = $metaGet('_shipping_state');
+            $useful['CEP de Entrega'] = $metaGet('_shipping_postcode');
+            $useful['Bairro de Entrega'] = $metaGet('_shipping_neighborhood');
+            $useful['Número de Entrega'] = $metaGet('_shipping_number');
+
+            $cats = [
+                'Metas adicionais (Pix/Mercado Pago)' => [],
+                'Metas adicionais (Atribuição / UTM / Sessão)' => [],
+                'Metas adicionais (WCCS / Câmbio)' => [],
+                'Metas adicionais (TRP / Idioma)' => [],
+                'Metas adicionais (TPUL / Visitor)' => [],
+                'Metas adicionais (Checkout / Gateway)' => [],
+            ];
+            foreach ($wpMeta as $k => $v) {
+                $ks = strtolower((string) $k);
+                if ($ks === '') continue;
+                if (strpos($ks, 'mp ') === 0 || strpos($ks, 'mp_') === 0 || strpos($ks, 'mercado') !== false || strpos($ks, 'pix') !== false) {
+                    $cats['Metas adicionais (Pix/Mercado Pago)'][$k] = $v;
+                    continue;
+                }
+                if (strpos($ks, 'utm_') !== false || strpos($ks, 'attribution') !== false || strpos($ks, 'referrer') !== false || strpos($ks, 'landing') !== false || strpos($ks, 'session') !== false) {
+                    $cats['Metas adicionais (Atribuição / UTM / Sessão)'][$k] = $v;
+                    continue;
+                }
+                if (strpos($ks, 'wccs') !== false || strpos($ks, 'currency_ratio') !== false || strpos($ks, 'base_currency') !== false) {
+                    $cats['Metas adicionais (WCCS / Câmbio)'][$k] = $v;
+                    continue;
+                }
+                if (strpos($ks, 'trp') !== false || strpos($ks, 'language') !== false || strpos($ks, 'idioma') !== false) {
+                    $cats['Metas adicionais (TRP / Idioma)'][$k] = $v;
+                    continue;
+                }
+                if (strpos($ks, 'tpul') !== false || strpos($ks, 'visitor') !== false) {
+                    $cats['Metas adicionais (TPUL / Visitor)'][$k] = $v;
+                    continue;
+                }
+                if (strpos($ks, 'checkout') !== false || strpos($ks, 'gateway') !== false || strpos($ks, 'used gateway') !== false || strpos($ks, 'blocks payment') !== false) {
+                    $cats['Metas adicionais (Checkout / Gateway)'][$k] = $v;
+                    continue;
+                }
             }
+
+            $formatUseful = function ($val) use ($safeText): string {
+                if ($val === null) return '-';
+                if (is_bool($val)) return $val ? 'true' : 'false';
+                if (is_array($val) || is_object($val)) {
+                    $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                }
+                $s = trim((string) $val);
+                if ($s === '') return '-';
+                return $safeText($s);
+            };
+
+            $rowsItems = '';
+            $idx = 1;
+            foreach ($wpItems as $it) {
+                if (!is_array($it)) continue;
+                $decl = trim((string) ($it['declaration_name'] ?? ''));
+                if ($decl === '') $decl = trim((string) ($it['description'] ?? ''));
+                $img = trim((string) ($it['image_url'] ?? ''));
+                $qtd = (int) ($it['qty'] ?? 0);
+                if ($qtd <= 0) $qtd = 1;
+                $unit = isset($it['unit']) ? (float) $it['unit'] : 0.0;
+                $tot = isset($it['total']) ? (float) $it['total'] : 0.0;
+                $rowsItems .= '<tr>'
+                    . '<td style="text-align:center;">' . $idx . '</td>'
+                    . '<td style="text-align:center;">' . ($img !== '' ? ('<img src="' . $safeText($img) . '" style="width:54px;height:54px;object-fit:contain;" />') : '-') . '</td>'
+                    . '<td>' . $safeText($decl) . '</td>'
+                    . '<td style="text-align:center;">' . $qtd . '</td>'
+                    . '<td style="text-align:right;">' . $safeText($fmtMoney($unit)) . '</td>'
+                    . '<td style="text-align:right;">' . $safeText($fmtMoney($tot)) . '</td>'
+                . '</tr>';
+                $idx++;
+            }
+            if ($rowsItems === '') {
+                $rowsItems = '<tr><td colspan="6" style="text-align:center;padding:12px;">Nenhum item</td></tr>';
+            }
+
+            $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+                . '<style>'
+                . '@page { margin: 22px 26px; }'
+                . 'body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; font-size: 11px; color: #111827; }'
+                . '.title { font-size: 16px; font-weight: 900; }'
+                . '.sub { font-size: 10px; color: #374151; margin-top: 2px; }'
+                . '.section { border: 1px solid #111827; padding: 10px; margin-top: 10px; }'
+                . '.section-h { font-weight: 900; margin-bottom: 6px; }'
+                . '.grid { width: 100%; border-collapse: collapse; }'
+                . '.grid td { vertical-align: top; }'
+                . '.kv { width: 100%; border-collapse: collapse; }'
+                . '.kv td { padding: 2px 0; }'
+                . '.kv td:first-child { width: 140px; color: #374151; }'
+                . '.items { width: 100%; border-collapse: collapse; margin-top: 8px; }'
+                . '.items th, .items td { border: 1px solid #111827; padding: 6px 7px; }'
+                . '.items th { background: #f3f4f6; text-align: left; }'
+                . '.totals { width: 100%; border-collapse: collapse; margin-top: 8px; }'
+                . '.totals td { padding: 3px 0; }'
+                . '.totals .label { color:#374151; }'
+                . '.totals .value { text-align:right; }'
+                . '.totals .grand { font-weight: 900; font-size: 13px; border-top: 2px solid #111827; padding-top: 6px; }'
+                . '.muted { color:#6b7280; }'
+                . '</style></head><body>'
+                . '<div class="title">' . $safeText($invoiceTitle) . '</div>'
+                . '<div class="sub">Data de emissão: <strong>' . $safeText($emitDate) . '</strong></div>'
+
+                . '<table class="grid" style="margin-top:10px;"><tr>'
+                . '<td style="width:50%;padding-right:8px;">'
+                . '<div class="section"><div class="section-h">Dados do Cliente</div>'
+                . '<table class="kv">'
+                . '<tr><td>Nome:</td><td><strong>' . $safeText($nomeClientePdf) . '</strong></td></tr>'
+                . '<tr><td>Suíte:</td><td>' . $safeText($wpSuite) . '</td></tr>'
+                . '<tr><td>E-mail:</td><td>' . $safeText($email) . '</td></tr>'
+                . '<tr><td>CPF:</td><td>' . $safeText($cpf) . '</td></tr>'
+                . '<tr><td>CNPJ:</td><td>' . $safeText($cnpj) . '</td></tr>'
+                . '<tr><td>Celular:</td><td>' . $safeText($cel) . '</td></tr>'
+                . '<tr><td>IP:</td><td>' . $safeText($ipCliente) . '</td></tr>'
+                . '<tr><td>Zona:</td><td>' . $safeText($zona) . '</td></tr>'
+                . '<tr><td>Aceita substituição:</td><td>' . $safeText($aceitaSubst) . '</td></tr>'
+                . '<tr><td>Cód. rastreio:</td><td>' . $safeText($trkWx) . '</td></tr>'
+                . '</table></div>'
+                . '</td>'
+                . '<td style="width:50%;">'
+                . '<div class="section"><div class="section-h">Endereço de Cobrança</div>'
+                . '<table class="kv">'
+                . '<tr><td>Nome:</td><td><strong>' . $safeText($b['name']) . '</strong></td></tr>'
+                . '<tr><td>Empresa:</td><td>' . $safeText($b['company']) . '</td></tr>'
+                . '<tr><td>Rua:</td><td>' . $safeText($b['address1']) . '</td></tr>'
+                . '<tr><td>Complemento:</td><td>' . $safeText($b['address2']) . '</td></tr>'
+                . '<tr><td>Número:</td><td>' . $safeText($b['number']) . '</td></tr>'
+                . '<tr><td>Bairro:</td><td>' . $safeText($b['neighborhood']) . '</td></tr>'
+                . '<tr><td>Cidade:</td><td>' . $safeText($b['city']) . '</td></tr>'
+                . '<tr><td>Estado:</td><td>' . $safeText($b['state']) . '</td></tr>'
+                . '<tr><td>CEP:</td><td>' . $safeText($b['postcode']) . '</td></tr>'
+                . '<tr><td>País:</td><td>' . $safeText($b['country']) . '</td></tr>'
+                . '</table></div>'
+                . '</td>'
+                . '</tr></table>'
+
+                . '<div class="section"><div class="section-h">Endereço de Entrega</div>'
+                . '<table class="kv">'
+                . '<tr><td>Nome:</td><td><strong>' . $safeText($s['name']) . '</strong></td></tr>'
+                . '<tr><td>Empresa:</td><td>' . $safeText($s['company']) . '</td></tr>'
+                . '<tr><td>Rua:</td><td>' . $safeText($s['address1']) . '</td></tr>'
+                . '<tr><td>Complemento:</td><td>' . $safeText($s['address2']) . '</td></tr>'
+                . '<tr><td>Número:</td><td>' . $safeText($s['number']) . '</td></tr>'
+                . '<tr><td>Suíte:</td><td>' . $safeText($s['suite']) . '</td></tr>'
+                . '<tr><td>Bairro:</td><td>' . $safeText($s['neighborhood']) . '</td></tr>'
+                . '<tr><td>Cidade:</td><td>' . $safeText($s['city']) . '</td></tr>'
+                . '<tr><td>Estado:</td><td>' . $safeText($s['state']) . '</td></tr>'
+                . '<tr><td>CEP:</td><td>' . $safeText($s['postcode']) . '</td></tr>'
+                . '<tr><td>País:</td><td>' . $safeText($s['country']) . '</td></tr>'
+                . '</table></div>'
+
+                . '<div class="section"><div class="section-h">Itens do Pedido</div>'
+                . '<table class="items">'
+                . '<thead><tr>'
+                . '<th style="width:32px;text-align:center;">#</th>'
+                . '<th style="width:66px;text-align:center;">Imagem</th>'
+                . '<th>Declaração</th>'
+                . '<th style="width:52px;text-align:center;">Qtd</th>'
+                . '<th style="width:110px;text-align:right;">Preço unit.</th>'
+                . '<th style="width:110px;text-align:right;">Total</th>'
+                . '</tr></thead><tbody>' . $rowsItems . '</tbody></table>'
+                . '</div>'
+
+                . '<table class="grid" style="margin-top:10px;"><tr>'
+                . '<td style="width:50%;padding-right:8px;">'
+                . '<div class="section"><div class="section-h">Pagamento</div>'
+                . '<table class="kv">'
+                . '<tr><td>Valor pago:</td><td><strong>' . $safeText($fmtMoney($total)) . '</strong></td></tr>'
+                . '<tr><td>Data de crédito:</td><td>' . $safeText($paidDate) . '</td></tr>'
+                . '<tr><td>Método:</td><td>' . $safeText($paymentMethodTitle) . '</td></tr>'
+                . '</table></div>'
+                . '</td>'
+                . '<td style="width:50%;">'
+                . '<div class="section"><div class="section-h">Totais</div>'
+                . '<table class="totals">'
+                . '<tr><td class="label">Subtotal:</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
+                . '<tr><td class="label">Frete (WExpress):</td><td class="value">' . $safeText($fmtMoney($freteFinal)) . '</td></tr>'
+                . '<tr><td class="label">Descontos/Subsídios:</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
+                . '<tr><td class="label grand">Total do pedido:</td><td class="value grand">' . $safeText($fmtMoney($total)) . '</td></tr>'
+                . '</table></div>'
+                . '</td>'
+                . '</tr></table>'
+
+                . '<div class="section"><div class="section-h">Informações Úteis</div>'
+                . '<table class="kv">';
+
+            foreach ($useful as $k => $v) {
+                $html .= '<tr><td>' . $safeText($k) . ':</td><td>' . $formatUseful($v) . '</td></tr>';
+            }
+            foreach ($cats as $title => $items) {
+                if (!$items) continue;
+                $html .= '<tr><td colspan="2" class="muted" style="padding-top:8px;"><strong>' . $safeText($title) . '</strong></td></tr>';
+                foreach ($items as $k => $v) {
+                    $html .= '<tr><td>' . $safeText($k) . ':</td><td>' . $formatUseful($v) . '</td></tr>';
+                }
+            }
+
+            $html .= '</table></div>'
+                . '</body></html>';
 
             if (class_exists('Dompdf\\Dompdf')) {
                 $dompdf = new \Dompdf\Dompdf([
