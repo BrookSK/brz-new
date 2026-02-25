@@ -831,6 +831,21 @@ function regerarEtiquetasMassa() {
                 ");
                 $stPkg->execute([(string) $pedidoId, '%' . (string) $pedidoId . '%']);
                 $packageId = (int) ($stPkg->fetchColumn() ?: 0);
+
+                // fallback: alguns installs salvam o vínculo com outra meta_key
+                if ($packageId <= 0) {
+                    $stPkg2 = $wpPdo->prepare("\
+                        SELECT pm.post_id\
+                        FROM {$prefix}postmeta pm\
+                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key IN ('_container_id','container_id','_container')\
+                        WHERE pm.meta_key LIKE '%order%'\
+                          AND pm.meta_value LIKE ?\
+                        ORDER BY pm.post_id DESC\
+                        LIMIT 1\
+                    ");
+                    $stPkg2->execute(['%' . (string) $pedidoId . '%']);
+                    $packageId = (int) ($stPkg2->fetchColumn() ?: 0);
+                }
                 $wpZonaDebug['package_id'] = $packageId;
 
                 // 2) pega o container_id do package
