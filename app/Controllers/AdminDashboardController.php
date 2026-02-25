@@ -37,9 +37,9 @@ class AdminDashboardController extends Controller {
     
     public function index(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente']);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
             
             // Estatísticas
             $stats = [];

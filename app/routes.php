@@ -129,7 +129,7 @@ $router->get('/admin', function($request) {
     }
 
     // Bloquear acesso ao admin para usuários sem permissão
-    $adminAllowed = ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante'];
+    $adminAllowed = ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante', 'conferente'];
     if (!in_array($perfil, $adminAllowed, true)) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -148,7 +148,7 @@ $router->get('/admin', function($request) {
     }
 
     $menuItems = [
-        ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador','conferente']],
         ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],

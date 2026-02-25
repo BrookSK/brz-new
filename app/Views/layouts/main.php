@@ -1016,7 +1016,7 @@
                                 <?php endif; ?>
                                 <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> <?= __('nav.my_orders', 'Meus Pedidos') ?></a></li>
                                 <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> <?= __('nav.my_data', 'Meus Dados') ?></a></li>
-                                <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)): ?>
+                                <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true)): ?>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> <?= __('nav.admin_panel', 'Painel Admin') ?></a></li>
                                 <?php endif; ?>
