@@ -760,6 +760,9 @@ function regerarEtiquetasMassa() {
         }
 
         $wpOrder = null;
+        $wpMeta = [];
+        $wpItems = [];
+        $wpTotals = [];
         try {
             $wp = $this->getWpPdo($this->connection, $source);
             $prefix = $wp['prefix'];
@@ -767,6 +770,80 @@ function regerarEtiquetasMassa() {
             $stO = $wpPdo->prepare("SELECT ID, post_date, post_status, post_title FROM {$prefix}posts WHERE ID = ? AND post_type = 'shop_order' LIMIT 1");
             $stO->execute([$pedidoId]);
             $wpOrder = $stO->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+            $stM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}postmeta WHERE post_id = ?");
+            $stM->execute([$pedidoId]);
+            $rowsMeta = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rowsMeta as $r) {
+                $k = (string) ($r['meta_key'] ?? '');
+                if ($k === '') continue;
+                $wpMeta[$k] = $r['meta_value'] ?? '';
+            }
+
+            $stI = $wpPdo->prepare("SELECT order_item_id, order_item_name, order_item_type FROM {$prefix}woocommerce_order_items WHERE order_id = ? ORDER BY order_item_id ASC");
+            $stI->execute([$pedidoId]);
+            $orderItems = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $stIM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id = ?");
+            foreach ($orderItems as $oi) {
+                if (strtolower((string) ($oi['order_item_type'] ?? '')) !== 'line_item') continue;
+                $itemId = (int) ($oi['order_item_id'] ?? 0);
+                if ($itemId <= 0) continue;
+
+                $stIM->execute([$itemId]);
+                $metaItemRows = $stIM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $m = [];
+                foreach ($metaItemRows as $mr) {
+                    $k = (string) ($mr['meta_key'] ?? '');
+                    if ($k === '') continue;
+                    $m[$k] = $mr['meta_value'] ?? '';
+                }
+
+                $productId = (int) ($m['_product_id'] ?? 0);
+                $variationId = (int) ($m['_variation_id'] ?? 0);
+                $qty = (int) ($m['_qty'] ?? 0);
+                if ($qty <= 0) $qty = 1;
+
+                $lineTotal = is_numeric($m['_line_total'] ?? null) ? (float) $m['_line_total'] : 0.0;
+                $unit = $qty > 0 ? round($lineTotal / $qty, 2) : 0.0;
+
+                $declName = trim((string) ($m['_product_name'] ?? ''));
+                $desc = $declName !== '' ? $declName : trim((string) ($oi['order_item_name'] ?? ''));
+                if ($desc === '') $desc = 'item';
+
+                $imageUrl = '';
+                $lookupId = $variationId > 0 ? $variationId : $productId;
+                if ($lookupId > 0) {
+                    try {
+                        $stThumb = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_thumbnail_id' LIMIT 1");
+                        $stThumb->execute([(int) $lookupId]);
+                        $thumbId = (int) ($stThumb->fetchColumn() ?: 0);
+                        if ($thumbId > 0) {
+                            $stGuid = $wpPdo->prepare("SELECT guid FROM {$prefix}posts WHERE ID = ? LIMIT 1");
+                            $stGuid->execute([$thumbId]);
+                            $imageUrl = trim((string) ($stGuid->fetchColumn() ?: ''));
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $wpItems[] = [
+                    'description' => $desc,
+                    'declaration_name' => $declName,
+                    'qty' => $qty,
+                    'unit' => $unit,
+                    'total' => $lineTotal,
+                    'image_url' => $imageUrl,
+                ];
+            }
+
+            $wpTotals = [
+                'subtotal' => is_numeric($wpMeta['_order_subtotal'] ?? null) ? (float) $wpMeta['_order_subtotal'] : null,
+                'shipping' => is_numeric($wpMeta['_order_shipping'] ?? null) ? (float) $wpMeta['_order_shipping'] : (is_numeric($wpMeta['_order_shipping_tax'] ?? null) ? (float) $wpMeta['_order_shipping_tax'] : null),
+                'discount' => is_numeric($wpMeta['_cart_discount'] ?? null) ? (float) $wpMeta['_cart_discount'] : (is_numeric($wpMeta['_discount_total'] ?? null) ? (float) $wpMeta['_discount_total'] : null),
+                'total' => is_numeric($wpMeta['_order_total'] ?? null) ? (float) $wpMeta['_order_total'] : null,
+                'currency' => trim((string) ($wpMeta['_order_currency'] ?? '')),
+            ];
         } catch (\Exception $e) {
         }
 
@@ -826,6 +903,11 @@ function regerarEtiquetasMassa() {
         $dateWp = (string) ($wpOrder['post_date'] ?? '');
         echo '<div><strong>Status WP:</strong> ' . htmlspecialchars($statusWp !== '' ? $statusWp : '-') . '</div>';
         echo '<div><strong>Data:</strong> ' . ($dateWp !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($dateWp))) : '-') . '</div>';
+
+        $trkWx = trim((string) ($link['courier_tracking_number'] ?? ($link['wexpress_tracking_number'] ?? '')));
+        if ($trkWx !== '') {
+            echo '<div class="mt-2"><strong>Tracking W-Express:</strong> ' . htmlspecialchars($trkWx) . '</div>';
+        }
 
         echo '<div class="mt-2"><strong>Etiqueta:</strong> ' . ($etq ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</div>';
 
@@ -905,6 +987,166 @@ function regerarEtiquetasMassa() {
                     </div>
                 </div>
                 <div class="col-12">
+                    <div class="card">
+                        <div class="card-header"><strong>Pedido (WordPress)</strong></div>
+                        <div class="card-body">';
+
+        $nomeCliente = trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? '')));
+        if ($nomeCliente === '') {
+            $nomeCliente = trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? '')));
+        }
+
+        $ipCliente = trim((string) ($wpMeta['_customer_ip_address'] ?? ($wpMeta['_customer_user_ip'] ?? '')));
+        $email = trim((string) ($wpMeta['_billing_email'] ?? ''));
+        $cpf = trim((string) ($wpMeta['_billing_cpf'] ?? ($wpMeta['_billing_cnpj'] ?? '')));
+        $cel = trim((string) ($wpMeta['_billing_phone'] ?? ''));
+        $suite = trim((string) ($wpMeta['suite'] ?? ($wpMeta['_shipping_suite'] ?? ($wpMeta['shipping_suite'] ?? ''))));
+
+        $zona = trim((string) ($wpMeta['zona'] ?? ($wpMeta['_zona'] ?? ($wpMeta['zone'] ?? ''))));
+        $zonaPegasus = trim((string) ($wpMeta['zona_pegasus'] ?? ($wpMeta['_zona_pegasus'] ?? ($wpMeta['pegasus_zone'] ?? ''))));
+        $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
+        $aceitaSubst = $aceitaSubstRaw;
+        if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
+        if ($aceitaSubstRaw === 'no') $aceitaSubst = 'Não';
+        $codigoRastreio = $trkWx;
+
+        $paidDate = trim((string) ($wpMeta['_paid_date'] ?? ($wpMeta['_date_paid'] ?? '')));
+        if ($paidDate !== '' && ctype_digit($paidDate)) {
+            $paidDate = date('d/m/Y H:i', (int) $paidDate);
+        } elseif ($paidDate !== '') {
+            $ts = strtotime($paidDate);
+            if ($ts) $paidDate = date('d/m/Y H:i', $ts);
+        }
+        $paymentMethod = trim((string) ($wpMeta['_payment_method_title'] ?? ($wpMeta['_payment_method'] ?? '')));
+
+        echo '<div class="row g-3">'
+            . '<div class="col-lg-4">'
+                . '<div class="border rounded p-3 h-100">'
+                    . '<div class="mb-2"><strong>Informações do Cliente</strong></div>'
+                    . '<div class="small">'
+                        . '<div><strong>Nome:</strong> ' . htmlspecialchars($nomeCliente !== '' ? $nomeCliente : '-') . '</div>'
+                        . '<div><strong>Suite:</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
+                        . '<div><strong>E-mail:</strong> ' . htmlspecialchars($email !== '' ? $email : '-') . '</div>'
+                        . '<div><strong>CPF/CNPJ:</strong> ' . htmlspecialchars($cpf !== '' ? $cpf : '-') . '</div>'
+                        . '<div><strong>Celular:</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
+                        . '<div><strong>IP:</strong> ' . htmlspecialchars($ipCliente !== '' ? $ipCliente : '-') . '</div>'
+                        . '<div><strong>Zona:</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
+                        . '<div><strong>Zona Pegasus:</strong> ' . htmlspecialchars($zonaPegasus !== '' ? $zonaPegasus : '-') . '</div>'
+                        . '<div><strong>Aceitar substituição:</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
+                        . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+            . '<div class="col-lg-4">'
+                . '<div class="border rounded p-3 h-100">'
+                    . '<div class="mb-2"><strong>Endereço de Cobrança</strong></div>'
+                    . '<div class="small">'
+                        . '<div><strong>Nome:</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>Empresa:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_company'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Rua:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_1'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Complemento:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_address_2'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Número:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_number'] ?? ($wpMeta['billing_number'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>Bairro:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_neighborhood'] ?? ($wpMeta['_billing_bairro'] ?? ($wpMeta['billing_bairro'] ?? '')))) ?: '-') . '</div>'
+                        . '<div><strong>Cidade:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_city'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Estado:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_state'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>CEP:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_postcode'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>País:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_billing_country'] ?? '')) ?: '-') . '</div>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+            . '<div class="col-lg-4">'
+                . '<div class="border rounded p-3 h-100">'
+                    . '<div class="mb-2"><strong>Endereço de Entrega</strong></div>'
+                    . '<div class="small">'
+                        . '<div><strong>Nome:</strong> ' . htmlspecialchars(trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>Empresa:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_company'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Rua:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_1'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Complemento:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_address_2'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Número:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_number'] ?? ($wpMeta['shipping_number'] ?? ''))) ?: '-') . '</div>'
+                        . '<div><strong>Suite:</strong> ' . htmlspecialchars($suite !== '' ? $suite : '-') . '</div>'
+                        . '<div><strong>Bairro:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_neighborhood'] ?? ($wpMeta['_shipping_bairro'] ?? ($wpMeta['shipping_bairro'] ?? '')))) ?: '-') . '</div>'
+                        . '<div><strong>Cidade:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_city'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>Estado:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_state'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>CEP:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_postcode'] ?? '')) ?: '-') . '</div>'
+                        . '<div><strong>País:</strong> ' . htmlspecialchars(trim((string) ($wpMeta['_shipping_country'] ?? '')) ?: '-') . '</div>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+        . '</div>';
+
+        echo '<hr>';
+
+        echo '<div class="row g-3">'
+            . '<div class="col-12">'
+                . '<div class="table-responsive">'
+                    . '<table class="table table-sm align-middle">'
+                        . '<thead><tr>'
+                            . '<th style="width:60px;">Imagem</th>'
+                            . '<th>Descrição</th>'
+                            . '<th>Declaração</th>'
+                            . '<th class="text-end">Qtd</th>'
+                            . '<th class="text-end">Preço Unit.</th>'
+                            . '<th class="text-end">Total</th>'
+                        . '</tr></thead><tbody>';
+
+        if (!$wpItems) {
+            echo '<tr><td colspan="6" class="text-muted">Itens não encontrados no WordPress.</td></tr>';
+        } else {
+            foreach ($wpItems as $it) {
+                $img = trim((string) ($it['image_url'] ?? ''));
+                $desc = (string) ($it['description'] ?? '');
+                $decl = (string) ($it['declaration_name'] ?? '');
+                $qty = (int) ($it['qty'] ?? 0);
+                $unit = (float) ($it['unit'] ?? 0);
+                $tot = (float) ($it['total'] ?? 0);
+
+                $imgHtml = $img !== '' ? ('<img src="' . htmlspecialchars($img) . '" style="max-width:48px;max-height:48px;object-fit:contain;">') : '<span class="text-muted">-</span>';
+                echo '<tr>'
+                    . '<td>' . $imgHtml . '</td>'
+                    . '<td>' . htmlspecialchars($desc !== '' ? $desc : '-') . '</td>'
+                    . '<td>' . htmlspecialchars($decl !== '' ? $decl : '-') . '</td>'
+                    . '<td class="text-end">' . (int) $qty . '</td>'
+                    . '<td class="text-end">' . htmlspecialchars(number_format($unit, 2, ',', '.')) . '</td>'
+                    . '<td class="text-end">' . htmlspecialchars(number_format($tot, 2, ',', '.')) . '</td>'
+                . '</tr>';
+            }
+        }
+
+        echo '         </tbody></table>'
+                . '</div>'
+            . '</div>'
+        . '</div>';
+
+        echo '<hr>';
+
+        $curr = trim((string) ($wpTotals['currency'] ?? ''));
+        $currLabel = $curr !== '' ? (' (' . $curr . ')') : '';
+        echo '<div class="row g-3">'
+            . '<div class="col-lg-6">'
+                . '<div class="border rounded p-3 h-100">'
+                    . '<div class="mb-2"><strong>Pagamento</strong></div>'
+                    . '<div class="small">'
+                        . '<div><strong>Valor pago:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Data:</strong> ' . htmlspecialchars($paidDate !== '' ? $paidDate : '-') . '</div>'
+                        . '<div><strong>Método:</strong> ' . htmlspecialchars($paymentMethod !== '' ? $paymentMethod : '-') . '</div>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+            . '<div class="col-lg-6">'
+                . '<div class="border rounded p-3 h-100">'
+                    . '<div class="mb-2"><strong>Totais</strong></div>'
+                    . '<div class="small">'
+                        . '<div><strong>Subtotal:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Frete:</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Total do pedido:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+        . '</div>';
+
+        echo '           </div>
+                    </div>
                     <div class="card">
                         <div class="card-header"><strong>Recebimento</strong></div>
                         <div class="card-body">';
