@@ -1298,6 +1298,11 @@ function regerarEtiquetasMassa() {
 
             $paymentMethodTitle = trim((string) ($wpMeta['_payment_method_title'] ?? ($wpMeta['_payment_method'] ?? '')));
 
+            $fmtUsd = function (?float $v): string {
+                if ($v === null) return '-';
+                return 'USD ' . number_format((float) $v, 2, '.', ',');
+            };
+
             $findWxFrete = function ($data): ?float {
                 if ($data === null) return null;
                 if (is_string($data)) {
@@ -1387,6 +1392,48 @@ function regerarEtiquetasMassa() {
             $wxFrete = $findWxFrete($link['wexpress_last_response_json'] ?? null);
             if ($wxFrete === null || $wxFrete <= 0) {
                 $wxFrete = $findWxFrete($link['wexpress_last_request_json'] ?? null);
+            }
+
+            $calcWxFromPayload = function ($data): ?float {
+                if ($data === null) return null;
+                if (is_string($data)) {
+                    $data = json_decode($data, true);
+                }
+                if (!is_array($data)) return null;
+
+                $freight = null;
+                if (isset($data['freight_value'])) {
+                    $sv = str_replace(',', '.', (string) $data['freight_value']);
+                    if (is_numeric($sv) && (float) $sv > 0) {
+                        $freight = (float) $sv;
+                    }
+                }
+
+                if ($freight !== null && $freight > 0) return $freight;
+
+                $weightKg = null;
+                try {
+                    // payload padrão: packages[0].weight_value em gramas
+                    if (isset($data['packages']) && is_array($data['packages']) && !empty($data['packages'][0]) && is_array($data['packages'][0])) {
+                        $w = $data['packages'][0]['weight_value'] ?? null;
+                        $sv = str_replace(',', '.', (string) $w);
+                        if (is_numeric($sv) && (float) $sv > 0) {
+                            $weightKg = ((float) $sv) / 1000.0;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+
+                if ($weightKg === null || $weightKg <= 0) return null;
+
+                // regra informada: 5.80 USD por kg
+                return round($weightKg * 5.80, 2);
+            };
+
+            // Prioridade: valor da etiqueta (payload enviado) -> heurística -> frete Woo
+            $wxFreteUsd = $calcWxFromPayload($link['wexpress_last_request_json'] ?? null);
+            if ($wxFreteUsd === null || $wxFreteUsd <= 0) {
+                $wxFreteUsd = $wxFrete;
             }
 
             $freteFinal = $wxFrete !== null ? $wxFrete : (isset($wpTotals['shipping']) ? (float) $wpTotals['shipping'] : 0.0);
@@ -1712,27 +1759,27 @@ function regerarEtiquetasMassa() {
                 . '</tr></thead><tbody>' . $rowsItems . '</tbody></table>'
                 . '</div>'
 
-                . '<div class="section"><div class="section-h">Documentos / Uploads</div>'
-                . '<table class="kv">'
-                . '<tr><td>Medicamento?</td><td><strong>' . ($medicamentoFlag ? 'Sim' : 'Não') . '</strong></td></tr>'
-                . (($source === 'red')
-                    ? ('<tr><td>Redirecionamento?</td><td><strong>Sim</strong></td></tr>')
-                    : ('<tr><td>Redirecionamento?</td><td><strong>Não</strong></td></tr>'))
-                . (($medicamentoFlag)
-                    ? ('<tr><td>Doc. medicamento:</td><td>'
-                        . (!empty($docsByTipo['medicamento']['file_path'])
-                            ? ('Enviado - ' . $safeText((string) ($docsByTipo['medicamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['medicamento']['file_path'] ?? '')) . '</span>')
-                            : '<span class="muted">Pendente</span>')
-                        . '</td></tr>')
+                . (($medicamentoFlag || $source === 'red')
+                    ? ('<div class="section"><div class="section-h">Documentos / Uploads</div>'
+                        . '<table class="kv">'
+                        . ($medicamentoFlag
+                            ? ('<tr><td>Medicamento?</td><td><strong>Sim</strong></td></tr>'
+                                . '<tr><td>Doc. medicamento:</td><td>'
+                                    . (!empty($docsByTipo['medicamento']['file_path'])
+                                        ? ('Enviado - ' . $safeText((string) ($docsByTipo['medicamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['medicamento']['file_path'] ?? '')) . '</span>')
+                                        : '<span class="muted">Pendente</span>')
+                                . '</td></tr>')
+                            : '')
+                        . (($source === 'red')
+                            ? ('<tr><td>Redirecionamento?</td><td><strong>Sim</strong></td></tr>'
+                                . '<tr><td>Comp. pagamento:</td><td>'
+                                    . (!empty($docsByTipo['pagamento']['file_path'])
+                                        ? ('Enviado - ' . $safeText((string) ($docsByTipo['pagamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['pagamento']['file_path'] ?? '')) . '</span>')
+                                        : '<span class="muted">Pendente</span>')
+                                . '</td></tr>')
+                            : '')
+                        . '</table></div>')
                     : '')
-                . (($source === 'red')
-                    ? ('<tr><td>Comp. pagamento:</td><td>'
-                        . (!empty($docsByTipo['pagamento']['file_path'])
-                            ? ('Enviado - ' . $safeText((string) ($docsByTipo['pagamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['pagamento']['file_path'] ?? '')) . '</span>')
-                            : '<span class="muted">Pendente</span>')
-                        . '</td></tr>')
-                    : '')
-                . '</table></div>'
 
                 . '<table class="grid" style="margin-top:10px;"><tr>'
                 . '<td style="width:50%;padding-right:8px;">'
@@ -1747,7 +1794,7 @@ function regerarEtiquetasMassa() {
                 . '<div class="section"><div class="section-h">Totais</div>'
                 . '<table class="totals">'
                 . '<tr><td class="label">Subtotal:</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
-                . '<tr><td class="label">Frete (WExpress):</td><td class="value">' . $safeText($fmtMoney($freteFinal)) . '</td></tr>'
+                . '<tr><td class="label">Frete (WExpress - USD):</td><td class="value">' . $safeText($fmtUsd($wxFreteUsd)) . '</td></tr>'
                 . '<tr><td class="label">Descontos/Subsídios:</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
                 . '<tr><td class="label grand">Total do pedido:</td><td class="value grand">' . $safeText($fmtMoney($total)) . '</td></tr>'
                 . '</table></div>'
@@ -2082,6 +2129,45 @@ function regerarEtiquetasMassa() {
         }
         $wxFreteUi = ($wxFreteUi !== null && $wxFreteUi > 0) ? $wxFreteUi : null;
 
+        $calcWxFromPayloadUi = function ($data): ?float {
+            if ($data === null) return null;
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+            if (!is_array($data)) return null;
+
+            $freight = null;
+            if (isset($data['freight_value'])) {
+                $sv = str_replace(',', '.', (string) $data['freight_value']);
+                if (is_numeric($sv) && (float) $sv > 0) {
+                    $freight = (float) $sv;
+                }
+            }
+            if ($freight !== null && $freight > 0) return $freight;
+
+            $weightKg = null;
+            try {
+                if (isset($data['packages']) && is_array($data['packages']) && !empty($data['packages'][0]) && is_array($data['packages'][0])) {
+                    $w = $data['packages'][0]['weight_value'] ?? null;
+                    $sv = str_replace(',', '.', (string) $w);
+                    if (is_numeric($sv) && (float) $sv > 0) {
+                        $weightKg = ((float) $sv) / 1000.0;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            if ($weightKg === null || $weightKg <= 0) return null;
+
+            return round($weightKg * 5.80, 2);
+        };
+
+        $wxFreteUsdUi = $calcWxFromPayloadUi($link['wexpress_last_request_json'] ?? null);
+        if ($wxFreteUsdUi === null || $wxFreteUsdUi <= 0) {
+            $wxFreteUsdUi = $wxFreteUi;
+        }
+        $wxFreteUsdUi = ($wxFreteUsdUi !== null && $wxFreteUsdUi > 0) ? (float) $wxFreteUsdUi : null;
+
         echo '<div class="row g-3">'
             . '<div class="col-lg-4">'
                 . '<div class="border rounded p-3 h-100">'
@@ -2203,7 +2289,7 @@ function regerarEtiquetasMassa() {
                     . '<div class="mb-2"><strong>Totais</strong></div>'
                     . '<div class="small">'
                         . '<div><strong>Subda pauta:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Frete (WExpress):</strong> ' . htmlspecialchars($wxFreteUi !== null ? number_format((float) $wxFreteUi, 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Frete (WExpress - USD):</strong> ' . htmlspecialchars($wxFreteUsdUi !== null ? ('USD ' . number_format((float) $wxFreteUsdUi, 2, '.', ',')) : '-') . '</div>'
                         . '<div><strong>Frete (WooCommerce):</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Total do pedido:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
