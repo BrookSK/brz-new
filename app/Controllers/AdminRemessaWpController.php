@@ -788,6 +788,7 @@ function regerarEtiquetasMassa() {
         $wpTotals = [];
         $wpSuite = '';
         $wpZona = '';
+        $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => ''];
         try {
             $wp = $this->getWpPdo($this->connection, $source);
             $prefix = $wp['prefix'];
@@ -818,27 +819,30 @@ function regerarEtiquetasMassa() {
 
             // Zona (Grupo de Triagem do Container): package(_package_order_id) -> _container_id -> container _triage_group
             try {
-                // 1) encontra o post_id do package pelo meta _package_order_id
+                // 1) encontra o package e já tenta ler _container_id em uma query só
                 $stPkg = $wpPdo->prepare("\
                     SELECT pm.post_id\
                     FROM {$prefix}postmeta pm\
                     INNER JOIN {$prefix}posts p ON p.ID = pm.post_id\
-                    WHERE pm.meta_key = '_package_order_id'\
+                    WHERE pm.meta_key IN ('_package_order_id','_package_order')\
                       AND (pm.meta_value = ? OR pm.meta_value LIKE ?)\
                     ORDER BY pm.post_id DESC\
                     LIMIT 1\
                 ");
                 $stPkg->execute([(string) $pedidoId, '%' . (string) $pedidoId . '%']);
                 $packageId = (int) ($stPkg->fetchColumn() ?: 0);
+                $wpZonaDebug['package_id'] = $packageId;
 
                 // 2) pega o container_id do package
                 $containerId = 0;
+                $containerVal = '';
                 if ($packageId > 0) {
                     $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_container_id','container_id','_container') ORDER BY meta_key ASC LIMIT 1");
                     $stCont->execute([$packageId]);
                     $containerVal = (string) ($stCont->fetchColumn() ?: '');
                     $containerDigits = preg_replace('/\D+/', '', $containerVal);
                     $containerId = (int) ($containerDigits !== '' ? $containerDigits : 0);
+                    $wpZonaDebug['container_id'] = $containerId;
                 }
 
                 // 3) lê o grupo do container
@@ -846,6 +850,30 @@ function regerarEtiquetasMassa() {
                     $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_triage_group','triage_group','_private_group','private_group') ORDER BY meta_key ASC LIMIT 1");
                     $stTriage->execute([$containerId]);
                     $wpZona = trim((string) ($stTriage->fetchColumn() ?: ''));
+                    $wpZonaDebug['zona_raw'] = $wpZona;
+                }
+
+                // fallback: tentar achar container pelo tracking code Correios do PACKAGE (container meta _tracking_codes)
+                if ($wpZona === '') {
+                    $trkCorreios = '';
+                    if ($packageId > 0) {
+                        $stTrk = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_correios_tracking_code','correios_tracking_code','_tracking_code','tracking_code') ORDER BY meta_key ASC LIMIT 1");
+                        $stTrk->execute([$packageId]);
+                        $trkCorreios = trim((string) ($stTrk->fetchColumn() ?: ''));
+                    }
+
+                    if ($trkCorreios !== '') {
+                        $stC = $wpPdo->prepare("SELECT post_id FROM {$prefix}postmeta WHERE meta_key = '_tracking_codes' AND meta_value LIKE ? ORDER BY post_id DESC LIMIT 1");
+                        $stC->execute(['%' . $trkCorreios . '%']);
+                        $cid = (int) ($stC->fetchColumn() ?: 0);
+                        if ($cid > 0) {
+                            $stTriage2 = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_triage_group','triage_group') ORDER BY meta_key ASC LIMIT 1");
+                            $stTriage2->execute([$cid]);
+                            $wpZona = trim((string) ($stTriage2->fetchColumn() ?: ''));
+                            $wpZonaDebug['container_id'] = $cid;
+                            $wpZonaDebug['zona_raw'] = $wpZona;
+                        }
+                    }
                 }
             } catch (\Exception $e) {
             }
@@ -1085,6 +1113,8 @@ function regerarEtiquetasMassa() {
         if ($aceitaSubstRaw === 'no') $aceitaSubst = 'Não';
         $codigoRastreio = $trkWx;
 
+        $debugZona = ((string) ($_GET['debug_zona'] ?? '')) === '1';
+
         $paidDate = trim((string) ($wpMeta['_paid_date'] ?? ($wpMeta['_date_paid'] ?? '')));
         if ($paidDate !== '' && ctype_digit($paidDate)) {
             $paidDate = date('d/m/Y H:i', (int) $paidDate);
@@ -1106,6 +1136,7 @@ function regerarEtiquetasMassa() {
                         . '<div><strong>Celular:</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
                         . '<div><strong>IP:</strong> ' . htmlspecialchars($ipCliente !== '' ? $ipCliente : '-') . '</div>'
                         . '<div><strong>Zona:</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
+                        . ($debugZona ? ('<div class="text-muted" style="font-size:12px;">debug_zona: package_id=' . (int) ($wpZonaDebug['package_id'] ?? 0) . ' container_id=' . (int) ($wpZonaDebug['container_id'] ?? 0) . ' zona_raw=' . htmlspecialchars((string) ($wpZonaDebug['zona_raw'] ?? '')) . '</div>') : '')
                         . '<div><strong>Aceitar substituição:</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
                         . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
                     . '</div>'
