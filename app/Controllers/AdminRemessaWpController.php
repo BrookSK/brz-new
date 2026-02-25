@@ -1003,6 +1003,7 @@ function regerarEtiquetasMassa() {
         $wpItems = [];
         $wpTotals = [];
         $wpSuite = '';
+        $wpPesoTotalKg = 0.0;
         $wpZona = '';
         $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => '', 'package_meta_key' => ''];
         try {
@@ -1165,6 +1166,42 @@ function regerarEtiquetasMassa() {
 
                 $imageUrl = '';
                 $lookupId = $variationId > 0 ? $variationId : $productId;
+
+                $weightKgUnit = null;
+                $weightLookup = $lookupId > 0 ? $lookupId : $productId;
+                if ($weightLookup > 0) {
+                    try {
+                        $stW = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_weight' LIMIT 1");
+                        $stW->execute([(int) $weightLookup]);
+                        $wRaw = trim((string) ($stW->fetchColumn() ?: ''));
+                        if ($wRaw !== '') {
+                            $wRaw = str_replace(',', '.', $wRaw);
+                            if (is_numeric($wRaw)) {
+                                $w = (float) $wRaw;
+                                if ($w > 0) {
+                                    $weightKgUnit = $w;
+                                }
+                            }
+                        }
+
+                        // fallback: se variação não tiver peso, tenta o produto pai
+                        if (($weightKgUnit === null || $weightKgUnit <= 0) && $productId > 0 && $weightLookup !== $productId) {
+                            $stW->execute([(int) $productId]);
+                            $wRaw2 = trim((string) ($stW->fetchColumn() ?: ''));
+                            if ($wRaw2 !== '') {
+                                $wRaw2 = str_replace(',', '.', $wRaw2);
+                                if (is_numeric($wRaw2)) {
+                                    $w2 = (float) $wRaw2;
+                                    if ($w2 > 0) {
+                                        $weightKgUnit = $w2;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+
                 if ($lookupId > 0) {
                     try {
                         $stThumb = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_thumbnail_id' LIMIT 1");
@@ -1187,7 +1224,12 @@ function regerarEtiquetasMassa() {
                     'total' => $lineTotal,
                     'subtotal' => $lineSubtotal,
                     'image_url' => $imageUrl,
+                    'weight_kg' => $weightKgUnit,
                 ];
+
+                if ($weightKgUnit !== null && $weightKgUnit > 0) {
+                    $wpPesoTotalKg += ((float) $weightKgUnit) * (float) $qty;
+                }
             }
 
             $wpTotals = [
@@ -1436,6 +1478,10 @@ function regerarEtiquetasMassa() {
                 $wxFreteUsd = $wxFrete;
             }
 
+            if (($wxFreteUsd === null || $wxFreteUsd <= 0) && $wpPesoTotalKg > 0) {
+                $wxFreteUsd = round($wpPesoTotalKg * 5.80, 2);
+            }
+
             $freteFinal = $wxFrete !== null ? $wxFrete : (isset($wpTotals['shipping']) ? (float) $wpTotals['shipping'] : 0.0);
             if ($freteFinal <= 0 && isset($wpTotals['shipping']) && (float) $wpTotals['shipping'] > 0) {
                 $freteFinal = (float) $wpTotals['shipping'];
@@ -1654,6 +1700,7 @@ function regerarEtiquetasMassa() {
                 if ($decl === '') $decl = trim((string) ($it['description'] ?? ''));
                 $img = trim((string) ($it['image_url'] ?? ''));
                 $imgData = $img !== '' ? ($embedImage($img) ?? '') : '';
+                $wkg = isset($it['weight_kg']) && $it['weight_kg'] !== null ? (float) $it['weight_kg'] : null;
                 $qtd = (int) ($it['qty'] ?? 0);
                 if ($qtd <= 0) $qtd = 1;
                 $unit = isset($it['unit']) ? (float) $it['unit'] : 0.0;
@@ -1662,6 +1709,7 @@ function regerarEtiquetasMassa() {
                     . '<td style="text-align:center;">' . $idx . '</td>'
                     . '<td style="text-align:center;">' . ($imgData !== '' ? ('<img src="' . $imgData . '" style="width:54px;height:54px;object-fit:contain;" />') : '-') . '</td>'
                     . '<td>' . $safeText($decl) . '</td>'
+                    . '<td style="text-align:right;">' . ($wkg !== null && $wkg > 0 ? $safeText(number_format($wkg, 3, ',', '.')) : '-') . '</td>'
                     . '<td style="text-align:center;">' . $qtd . '</td>'
                     . '<td style="text-align:right;">' . $safeText($fmtMoney($unit)) . '</td>'
                     . '<td style="text-align:right;">' . $safeText($fmtMoney($tot)) . '</td>'
@@ -1753,6 +1801,7 @@ function regerarEtiquetasMassa() {
                 . '<th style="width:32px;text-align:center;">#</th>'
                 . '<th style="width:66px;text-align:center;">Imagem</th>'
                 . '<th>Declaração</th>'
+                . '<th style="width:70px;text-align:right;">Peso (kg)</th>'
                 . '<th style="width:52px;text-align:center;">Qtd</th>'
                 . '<th style="width:110px;text-align:right;">Preço unit.</th>'
                 . '<th style="width:110px;text-align:right;">Total</th>'
@@ -1795,6 +1844,7 @@ function regerarEtiquetasMassa() {
                 . '<table class="totals">'
                 . '<tr><td class="label">Subtotal:</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
                 . '<tr><td class="label">Frete (WExpress - USD):</td><td class="value">' . $safeText($fmtUsd($wxFreteUsd)) . '</td></tr>'
+                . '<tr><td class="label">Peso total (kg):</td><td class="value">' . $safeText($wpPesoTotalKg > 0 ? number_format($wpPesoTotalKg, 3, ',', '.') : '-') . '</td></tr>'
                 . '<tr><td class="label">Descontos/Subsídios:</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
                 . '<tr><td class="label grand">Total do pedido:</td><td class="value grand">' . $safeText($fmtMoney($total)) . '</td></tr>'
                 . '</table></div>'
@@ -2231,7 +2281,6 @@ function regerarEtiquetasMassa() {
                     . '<table class="table table-sm align-middle">'
                         . '<thead><tr>'
                             . '<th style="width:60px;">Imagem</th>'
-                            . '<th>Descrição</th>'
                             . '<th>Declaração</th>'
                             . '<th class="text-end">Qtd</th>'
                             . '<th class="text-end">Preço Unit.</th>'
@@ -2239,12 +2288,15 @@ function regerarEtiquetasMassa() {
                         . '</tr></thead><tbody>';
 
         if (!$wpItems) {
-            echo '<tr><td colspan="6" class="text-muted">Itens não encontrados no WordPress.</td></tr>';
+            echo '<tr><td colspan="5" class="text-muted">Itens não encontrados no WordPress.</td></tr>';
         } else {
             foreach ($wpItems as $it) {
                 $img = trim((string) ($it['image_url'] ?? ''));
                 $desc = (string) ($it['description'] ?? '');
                 $decl = (string) ($it['declaration_name'] ?? '');
+                if (trim($decl) === '') {
+                    $decl = $desc;
+                }
                 $qty = (int) ($it['qty'] ?? 0);
                 $unit = (float) ($it['unit'] ?? 0);
                 $tot = (float) ($it['total'] ?? 0);
@@ -2252,7 +2304,6 @@ function regerarEtiquetasMassa() {
                 $imgHtml = $img !== '' ? ('<img src="' . htmlspecialchars($img) . '" style="max-width:48px;max-height:48px;object-fit:contain;">') : '<span class="text-muted">-</span>';
                 echo '<tr>'
                     . '<td>' . $imgHtml . '</td>'
-                    . '<td>' . htmlspecialchars($desc !== '' ? $desc : '-') . '</td>'
                     . '<td>' . htmlspecialchars($decl !== '' ? $decl : '-') . '</td>'
                     . '<td class="text-end">' . (int) $qty . '</td>'
                     . '<td class="text-end">' . htmlspecialchars(number_format($unit, 2, ',', '.')) . '</td>'
