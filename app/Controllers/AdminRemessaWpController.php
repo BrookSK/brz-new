@@ -171,9 +171,25 @@ class AdminRemessaWpController extends Controller {
             }
         }
 
-        $st = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') AND data_inicio <= ? AND data_fim >= ? ORDER BY id ASC');
+        $st = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = 'auto') AND status = 'aberta' AND data_inicio <= ? AND data_fim >= ? ORDER BY id ASC");
         $st->execute([$source, $nowStr, $nowStr]);
         $current = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+        // Se existir janela automática antiga com período incorreto (ex.: 13 dias), fecha e recria no padrão 3 dias.
+        if ($current) {
+            try {
+                $di = new \DateTime((string) ($current['data_inicio'] ?? ''));
+                $df = new \DateTime((string) ($current['data_fim'] ?? ''));
+                $diffDays = (int) $di->diff($df)->days;
+                // Janela de 3 dias: diffDays = 2 (ex.: 25 até 27)
+                if ($diffDays > 2) {
+                    $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
+                    $stUp->execute([(int) ($current['id'] ?? 0)]);
+                    $current = null;
+                }
+            } catch (\Exception $e) {
+            }
+        }
 
         if (!$current) {
             $stLast = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio DESC LIMIT 1');
@@ -185,6 +201,19 @@ class AdminRemessaWpController extends Controller {
                 $start->modify('+1 second');
             } else {
                 $start = new \DateTime($now->format('Y-m-d 00:00:00'));
+            }
+
+            // Se a última janela automática tiver período incorreto (legado 13 dias), reinicia o ciclo a partir de hoje.
+            if ($last) {
+                try {
+                    $di = new \DateTime((string) ($last['data_inicio'] ?? ''));
+                    $df = new \DateTime((string) ($last['data_fim'] ?? ''));
+                    $diffDays = (int) $di->diff($df)->days;
+                    if ($diffDays > 2) {
+                        $start = new \DateTime($now->format('Y-m-d 00:00:00'));
+                    }
+                } catch (\Exception $e) {
+                }
             }
 
             while (true) {
@@ -339,11 +368,11 @@ class AdminRemessaWpController extends Controller {
                     }
                 }
 
-                $stA = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'aberta' ORDER BY data_inicio DESC");
+                $stA = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'aberta' AND (tipo IS NULL OR tipo = 'auto') ORDER BY data_inicio DESC");
                 $stA->execute();
                 $janelasAbertas = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-                $stF = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'finalizada' ORDER BY data_inicio DESC");
+                $stF = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'finalizada' AND (tipo IS NULL OR tipo = 'auto') ORDER BY data_inicio DESC");
                 $stF->execute();
                 $janelasFinalizadas = $stF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -741,6 +770,8 @@ function regerarEtiquetasMassa() {
         $wpMeta = [];
         $wpItems = [];
         $wpTotals = [];
+        $wpSuite = '';
+        $wpZona = '';
         try {
             $wp = $this->getWpPdo($this->connection, $source);
             $prefix = $wp['prefix'];
@@ -756,6 +787,44 @@ function regerarEtiquetasMassa() {
                 $k = (string) ($r['meta_key'] ?? '');
                 if ($k === '') continue;
                 $wpMeta[$k] = $r['meta_value'] ?? '';
+            }
+
+            // Suite do cliente: usermeta 'suite' do user_id do pedido (_customer_user)
+            $customerUserId = (int) ($wpMeta['_customer_user'] ?? 0);
+            if ($customerUserId > 0) {
+                try {
+                    $stSuite = $wpPdo->prepare("SELECT meta_value FROM {$prefix}usermeta WHERE user_id = ? AND meta_key = 'suite' LIMIT 1");
+                    $stSuite->execute([$customerUserId]);
+                    $wpSuite = trim((string) ($stSuite->fetchColumn() ?: ''));
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Zona (Grupo de Triagem do Container): package(_package_order_id) -> _container_id -> container _triage_group
+            try {
+                $stPkg = $wpPdo->prepare("\
+                    SELECT p.ID\
+                    FROM {$prefix}posts p\
+                    INNER JOIN {$prefix}postmeta pm ON pm.post_id = p.ID\
+                    WHERE p.post_type = 'package'\
+                      AND pm.meta_key = '_package_order_id'\
+                      AND pm.meta_value = ?\
+                    ORDER BY p.ID DESC\
+                    LIMIT 1\
+                ");
+                $stPkg->execute([(string) $pedidoId]);
+                $packageId = (int) ($stPkg->fetchColumn() ?: 0);
+                if ($packageId > 0) {
+                    $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_container_id' LIMIT 1");
+                    $stCont->execute([$packageId]);
+                    $containerId = (int) ($stCont->fetchColumn() ?: 0);
+                    if ($containerId > 0) {
+                        $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_triage_group' LIMIT 1");
+                        $stTriage->execute([$containerId]);
+                        $wpZona = trim((string) ($stTriage->fetchColumn() ?: ''));
+                    }
+                }
+            } catch (\Exception $e) {
             }
 
             $stI = $wpPdo->prepare("SELECT order_item_id, order_item_name, order_item_type FROM {$prefix}woocommerce_order_items WHERE order_id = ? ORDER BY order_item_id ASC");
@@ -984,10 +1053,9 @@ function regerarEtiquetasMassa() {
         $email = trim((string) ($wpMeta['_billing_email'] ?? ''));
         $cpf = trim((string) ($wpMeta['_billing_cpf'] ?? ($wpMeta['_billing_cnpj'] ?? '')));
         $cel = trim((string) ($wpMeta['_billing_phone'] ?? ''));
-        $suite = trim((string) ($wpMeta['suite'] ?? ($wpMeta['_shipping_suite'] ?? ($wpMeta['shipping_suite'] ?? ''))));
+        $suite = $wpSuite;
 
-        $zona = trim((string) ($wpMeta['zona'] ?? ($wpMeta['_zona'] ?? ($wpMeta['zone'] ?? ''))));
-        $zonaPegasus = trim((string) ($wpMeta['zona_pegasus'] ?? ($wpMeta['_zona_pegasus'] ?? ($wpMeta['pegasus_zone'] ?? ''))));
+        $zona = $wpZona;
         $aceitaSubstRaw = strtolower(trim((string) ($wpMeta['_accept_product_replacement'] ?? '')));
         $aceitaSubst = $aceitaSubstRaw;
         if ($aceitaSubstRaw === 'yes') $aceitaSubst = 'Sim';
@@ -1015,7 +1083,6 @@ function regerarEtiquetasMassa() {
                         . '<div><strong>Celular:</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
                         . '<div><strong>IP:</strong> ' . htmlspecialchars($ipCliente !== '' ? $ipCliente : '-') . '</div>'
                         . '<div><strong>Zona:</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
-                        . '<div><strong>Zona Pegasus:</strong> ' . htmlspecialchars($zonaPegasus !== '' ? $zonaPegasus : '-') . '</div>'
                         . '<div><strong>Aceitar substituição:</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
                         . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
                     . '</div>'
