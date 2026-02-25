@@ -2216,6 +2216,9 @@ function regerarEtiquetasMassa() {
         if ($wxFreteUsdUi === null || $wxFreteUsdUi <= 0) {
             $wxFreteUsdUi = $wxFreteUi;
         }
+        if (($wxFreteUsdUi === null || $wxFreteUsdUi <= 0) && $wpPesoTotalKg > 0) {
+            $wxFreteUsdUi = round($wpPesoTotalKg * 5.80, 2);
+        }
         $wxFreteUsdUi = ($wxFreteUsdUi !== null && $wxFreteUsdUi > 0) ? (float) $wxFreteUsdUi : null;
 
         echo '<div class="row g-3">'
