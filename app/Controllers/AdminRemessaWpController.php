@@ -741,6 +741,7 @@ class AdminRemessaWpController extends Controller {
         $tituloJanela = trim((string) ($janela['titulo'] ?? ''));
         $tituloLabel = $tituloJanela !== '' ? $tituloJanela : ('Janela #' . (int) $janelaId);
         $badge = ($tipoJanela === 'manual') ? '<span class="badge bg-warning text-dark">Manual</span>' : '<span class="badge bg-success">Automática</span>';
+        $totalPedidosJanela = is_array($links) ? count($links) : 0;
 
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
@@ -761,7 +762,7 @@ class AdminRemessaWpController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h4 mb-0">' . htmlspecialchars($tituloLabel) . ' ' . $badge . '</h1>
+                    <h1 class="h4 mb-0">' . htmlspecialchars($tituloLabel) . ' ' . $badge . ' <span class="badge bg-light text-dark">Pedidos: ' . (int) $totalPedidosJanela . '</span></h1>
                     <div class="text-muted small">' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . '</div>
                 </div>
                 <div class="d-flex gap-2">
