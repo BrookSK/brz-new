@@ -1006,6 +1006,8 @@ function regerarEtiquetasMassa() {
         $wpPesoTotalKg = 0.0;
         $wpZona = '';
         $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => '', 'package_meta_key' => ''];
+        $wpPdo = null;
+        $prefix = '';
         try {
             $wp = $this->getWpPdo($this->connection, $source);
             $prefix = $wp['prefix'];
@@ -1468,8 +1470,8 @@ function regerarEtiquetasMassa() {
 
                 if ($weightKg === null || $weightKg <= 0) return null;
 
-                // regra informada: 5.80 USD por kg
-                return round($weightKg * 5.80, 2);
+                // regra do crédito WExpress: 1.80 USD por kg
+                return round($weightKg * 1.80, 2);
             };
 
             // Prioridade: valor da etiqueta (payload enviado) -> heurística -> frete Woo
@@ -1479,7 +1481,7 @@ function regerarEtiquetasMassa() {
             }
 
             if (($wxFreteUsd === null || $wxFreteUsd <= 0) && $wpPesoTotalKg > 0) {
-                $wxFreteUsd = round($wpPesoTotalKg * 5.80, 2);
+                $wxFreteUsd = round($wpPesoTotalKg * 1.80, 2);
             }
 
             $freteFinal = $wxFrete !== null ? $wxFrete : (isset($wpTotals['shipping']) ? (float) $wpTotals['shipping'] : 0.0);
@@ -1973,8 +1975,53 @@ function regerarEtiquetasMassa() {
         echo '<div class="mt-2"><strong>Etiqueta:</strong> ' . ($etq ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</div>';
 
         $labelUrl = trim((string) ($link['wexpress_label_url'] ?? ''));
-        if ($labelUrl !== '') {
-            echo '<div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($labelUrl) . '">Abrir etiqueta</a></div>';
+
+        // Preferir a URL mais recente do WordPress (metas), pois o cache local pode ficar antigo em regerações.
+        $wpShipId = '';
+        $wpLabelUrl = '';
+        if ($wpPdo instanceof \PDO && $prefix !== '') {
+            try {
+                $stL = $wpPdo->prepare(
+                    "SELECT meta_key, meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url','wexpress_shipping_id')"
+                );
+                $stL->execute([(int) $pedidoId]);
+                $rowsL = $stL->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $m = [];
+                foreach ($rowsL as $r) {
+                    $k = (string) ($r['meta_key'] ?? '');
+                    if ($k === '') continue;
+                    $m[$k] = (string) ($r['meta_value'] ?? '');
+                }
+                $wpShipId = trim((string) ($m['wexpress_shipping_id'] ?? ''));
+                $wpLabelUrl = trim((string) ($m['wexpress_label_url'] ?? ($m['_wexpress_label_url'] ?? ($m['wp_wexpress_label_url'] ?? ''))));
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $finalLabelUrl = $wpLabelUrl !== '' ? $wpLabelUrl : $labelUrl;
+        if ($finalLabelUrl === '' && $wpShipId !== '') {
+            $finalLabelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wpShipId);
+        }
+        if ($finalLabelUrl === '') {
+            $shipLocal = trim((string) ($link['wexpress_shipping_id'] ?? ''));
+            if ($shipLocal !== '') {
+                $finalLabelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($shipLocal);
+            }
+        }
+
+        if ($finalLabelUrl !== '' && $finalLabelUrl !== $labelUrl) {
+            try {
+                $stUpLbl = $this->connection->prepare('UPDATE remessa_wp_janela_pedidos SET wexpress_label_url = ?, wexpress_shipping_id = COALESCE(NULLIF(?,\'\'), wexpress_shipping_id), wexpress_updated_at = NOW() WHERE janela_id = ? AND source = ? AND order_id = ?');
+                $stUpLbl->execute([$finalLabelUrl, $wpShipId, (int) $janelaId, $source, (int) $pedidoId]);
+                $link['wexpress_label_url'] = $finalLabelUrl;
+                if ($wpShipId !== '') {
+                    $link['wexpress_shipping_id'] = $wpShipId;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        if ($finalLabelUrl !== '') {
+            echo '<div class="mt-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($finalLabelUrl) . '">Abrir etiqueta</a></div>';
         }
 
         if ($this->tableExists('remessa_wp_pedido_documentos')) {
@@ -2209,7 +2256,7 @@ function regerarEtiquetasMassa() {
 
             if ($weightKg === null || $weightKg <= 0) return null;
 
-            return round($weightKg * 5.80, 2);
+            return round($weightKg * 1.80, 2);
         };
 
         $wxFreteUsdUi = $calcWxFromPayloadUi($link['wexpress_last_request_json'] ?? null);
@@ -2217,7 +2264,7 @@ function regerarEtiquetasMassa() {
             $wxFreteUsdUi = $wxFreteUi;
         }
         if (($wxFreteUsdUi === null || $wxFreteUsdUi <= 0) && $wpPesoTotalKg > 0) {
-            $wxFreteUsdUi = round($wpPesoTotalKg * 5.80, 2);
+            $wxFreteUsdUi = round($wpPesoTotalKg * 1.80, 2);
         }
         $wxFreteUsdUi = ($wxFreteUsdUi !== null && $wxFreteUsdUi > 0) ? (float) $wxFreteUsdUi : null;
 
