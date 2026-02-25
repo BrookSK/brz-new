@@ -175,93 +175,72 @@ class AdminRemessaWpController extends Controller {
         $now = $this->now();
         $nowStr = $now->format('Y-m-d H:i:s');
 
-        $stAll = $this->connection->prepare('SELECT id, data_fim, status FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio ASC');
+        $stAll = $this->connection->prepare('SELECT id, data_inicio, data_fim, status FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio ASC');
         $stAll->execute([$source]);
         $all = $stAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Fecha janelas automáticas fora do padrão (13 dias) e normaliza status por data.
         foreach ($all as $j) {
+            $dataIni = new \DateTime((string) $j['data_inicio']);
             $dataFim = new \DateTime((string) $j['data_fim']);
             $status = (string) ($j['status'] ?? 'aberta');
-            if ($status === 'aberta' && $dataFim < $now) {
+
+            $diffDays = (int) $dataIni->diff($dataFim)->days;
+            if ($diffDays !== 12 && $status !== 'finalizada') {
                 $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
                 $stUp->execute([(int) $j['id']]);
+                continue;
+            }
+
+            // normaliza status baseado nas datas
+            if ($dataFim < $now) {
+                if ($status !== 'finalizada') {
+                    $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
+                    $stUp->execute([(int) $j['id']]);
+                }
+            } elseif ($dataIni <= $now && $dataFim >= $now) {
+                if ($status !== 'aberta') {
+                    $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'aberta', updated_at = NOW() WHERE id = ?");
+                    $stUp->execute([(int) $j['id']]);
+                }
             }
         }
 
+        // Mantém apenas 1 janela aberta vigente (a que cobre o "agora").
         $st = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = 'auto') AND status = 'aberta' AND data_inicio <= ? AND data_fim >= ? ORDER BY id ASC");
         $st->execute([$source, $nowStr, $nowStr]);
-        $current = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
-
-        // Se existir janela automática antiga com período incorreto (ex.: 13 dias), fecha e recria no padrão 3 dias.
-        if ($current) {
-            try {
-                $di = new \DateTime((string) ($current['data_inicio'] ?? ''));
-                $df = new \DateTime((string) ($current['data_fim'] ?? ''));
-                $diffDays = (int) $di->diff($df)->days;
-                // Janela de 3 dias: diffDays = 2 (ex.: 25 até 27)
-                if ($diffDays > 2) {
-                    $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
-                    $stUp->execute([(int) ($current['id'] ?? 0)]);
-                    $current = null;
-                }
-            } catch (\Exception $e) {
+        $currRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $current = $currRows[0] ?? null;
+        if (count($currRows) > 1) {
+            foreach (array_slice($currRows, 1) as $extra) {
+                $stUp = $this->connection->prepare("UPDATE remessa_wp_janelas SET status = 'finalizada', updated_at = NOW() WHERE id = ?");
+                $stUp->execute([(int) ($extra['id'] ?? 0)]);
             }
         }
 
         if (!$current) {
-            $stLast = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') ORDER BY data_inicio DESC LIMIT 1');
-            $stLast->execute([$source]);
-            $last = $stLast->fetch(\PDO::FETCH_ASSOC) ?: null;
+            // Cria a janela vigente ancorada no dia de hoje.
+            $start = new \DateTime($now->format('Y-m-d 00:00:00'));
+            $end = (clone $start);
+            $end->modify('+12 days');
+            $end->setTime(23, 59, 59);
 
-            if ($last) {
-                $start = new \DateTime((string) $last['data_fim']);
-                $start->modify('+1 second');
-            } else {
-                $start = new \DateTime($now->format('Y-m-d 00:00:00'));
+            $stExists = $this->connection->prepare('SELECT id FROM remessa_wp_janelas WHERE source = ? AND (tipo IS NULL OR tipo = \'auto\') AND data_inicio = ? AND data_fim = ? LIMIT 1');
+            $stExists->execute([$source, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s')]);
+            $existingId = (int) ($stExists->fetchColumn() ?: 0);
+            if ($existingId <= 0) {
+                $stIns = $this->connection->prepare('INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, \'aberta\', NOW(), NOW())');
+                $stIns->execute([
+                    $source,
+                    $start->format('Y-m-d H:i:s'),
+                    $end->format('Y-m-d H:i:s'),
+                ]);
+                $existingId = (int) $this->connection->lastInsertId();
             }
 
-            // Se a última janela automática tiver período incorreto (legado 13 dias), reinicia o ciclo a partir de hoje.
-            if ($last) {
-                try {
-                    $di = new \DateTime((string) ($last['data_inicio'] ?? ''));
-                    $df = new \DateTime((string) ($last['data_fim'] ?? ''));
-                    $diffDays = (int) $di->diff($df)->days;
-                    if ($diffDays > 2) {
-                        $start = new \DateTime($now->format('Y-m-d 00:00:00'));
-                    }
-                } catch (\Exception $e) {
-                }
-            }
-
-            while (true) {
-                $end = (clone $start);
-                $end->modify('+2 days');
-                $end->setTime(23, 59, 59);
-
-                $status = ($end < $now) ? 'finalizada' : 'aberta';
-
-                $stExists = $this->connection->prepare('SELECT id FROM remessa_wp_janelas WHERE source = ? AND data_inicio = ? AND data_fim = ? LIMIT 1');
-                $stExists->execute([$source, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s')]);
-                $existingId = (int) ($stExists->fetchColumn() ?: 0);
-                if ($existingId <= 0) {
-                    $stIns = $this->connection->prepare('INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())');
-                    $stIns->execute([
-                        $source,
-                        $start->format('Y-m-d H:i:s'),
-                        $end->format('Y-m-d H:i:s'),
-                        $status,
-                    ]);
-                }
-
-                if ($start <= $now && $end >= $now) {
-                    break;
-                }
-
-                $start = (clone $end);
-                $start->modify('+1 second');
-            }
-
-            $st->execute([$source, $nowStr, $nowStr]);
-            $current = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+            $stOne = $this->connection->prepare('SELECT * FROM remessa_wp_janelas WHERE id = ? LIMIT 1');
+            $stOne->execute([$existingId]);
+            $current = $stOne->fetch(\PDO::FETCH_ASSOC) ?: null;
         }
 
         if ($current && !empty($current['id'])) {
@@ -284,7 +263,16 @@ class AdminRemessaWpController extends Controller {
         $prefix = $wp['prefix'];
         $wpPdo = $wp['pdo'];
 
-        $stO = $wpPdo->prepare("SELECT ID FROM {$prefix}posts WHERE post_type = 'shop_order' AND post_status = 'wc-invoice-fechado' AND post_date >= ? AND post_date <= ?");
+        // Pedidos que tiveram etiqueta gerada no período: usa post_modified como proxy da data de geração.
+        $stO = $wpPdo->prepare("\
+            SELECT DISTINCT p.ID
+            FROM {$prefix}posts p
+            INNER JOIN {$prefix}postmeta pm ON pm.post_id = p.ID
+            WHERE p.post_type = 'shop_order'
+              AND p.post_modified >= ? AND p.post_modified <= ?
+              AND pm.meta_key IN ('wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url','wexpress_shipping_id')
+              AND TRIM(COALESCE(pm.meta_value,'')) <> ''
+        ");
         $stO->execute([$inicio, $fim]);
         $ids = $stO->fetchAll(\PDO::FETCH_COLUMN) ?: [];
         if (!$ids) return;
@@ -359,10 +347,10 @@ class AdminRemessaWpController extends Controller {
     public function index($request) {
         $this->requireAccess();
 
-        $sourceRaw = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
+        $sourceRaw = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'all'))));
         $source = $sourceRaw;
         if ($source !== 'all' && !in_array($source, self::SOURCES, true)) {
-            $source = 'br';
+            $source = 'all';
         }
 
         if (!$this->tableExists('remessa_wp_janelas') || !$this->tableExists('remessa_wp_janela_pedidos')) {
@@ -455,7 +443,7 @@ class AdminRemessaWpController extends Controller {
         echo '<div class="row mb-4">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header"><strong>Janelas Abertas (3 dias)</strong></div>
+                    <div class="card-header"><strong>Janelas Abertas (13 dias)</strong></div>
                     <div class="card-body">';
 
         if (!$janelasAbertas) {
@@ -590,6 +578,8 @@ class AdminRemessaWpController extends Controller {
         }));
 
         $orders = [];
+        $ordersMeta = [];
+        $ordersQty = [];
         if ($orderIds) {
             try {
                 $wp = $this->getWpPdo($this->connection, $source);
@@ -603,6 +593,46 @@ class AdminRemessaWpController extends Controller {
                 $rows = $stO->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 foreach ($rows as $r) {
                     $orders[(int) $r['ID']] = $r;
+                }
+
+                // meta (nome e postcode)
+                $metaKeys = [
+                    '_billing_first_name', '_billing_last_name',
+                    '_shipping_first_name', '_shipping_last_name',
+                    '_shipping_postcode', '_billing_postcode',
+                ];
+                $phK = implode(',', array_fill(0, count($metaKeys), '?'));
+                $sqlM = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$ph}) AND meta_key IN ({$phK})";
+                $stM = $wpPdo->prepare($sqlM);
+                $stM->execute(array_merge($orderIds, $metaKeys));
+                $rowsM = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rowsM as $rm) {
+                    $oid = (int) ($rm['post_id'] ?? 0);
+                    $k = (string) ($rm['meta_key'] ?? '');
+                    if ($oid <= 0 || $k === '') continue;
+                    if (!isset($ordersMeta[$oid])) $ordersMeta[$oid] = [];
+                    $ordersMeta[$oid][$k] = (string) ($rm['meta_value'] ?? '');
+                }
+
+                // quantidade total (soma de _qty)
+                $sqlQ = "\
+                    SELECT oi.order_id AS order_id, SUM(CAST(oim.meta_value AS DECIMAL(18,2))) AS qty\
+                    FROM {$prefix}woocommerce_order_items oi\
+                    INNER JOIN {$prefix}woocommerce_order_itemmeta oim\
+                        ON oim.order_item_id = oi.order_item_id\
+                       AND oim.meta_key = '_qty'\
+                    WHERE oi.order_item_type = 'line_item'\
+                      AND oi.order_id IN ({$ph})\
+                    GROUP BY oi.order_id\
+                ";
+                $stQ = $wpPdo->prepare($sqlQ);
+                $stQ->execute($orderIds);
+                $rowsQ = $stQ->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rowsQ as $rq) {
+                    $oid = (int) ($rq['order_id'] ?? 0);
+                    if ($oid <= 0) continue;
+                    $q = (float) ($rq['qty'] ?? 0);
+                    $ordersQty[$oid] = (int) round($q);
                 }
             } catch (\Exception $e) {
             }
@@ -655,33 +685,45 @@ class AdminRemessaWpController extends Controller {
                                 <tr>
                                     <th>Pedido</th>
                                     <th>Data</th>
-                                    <th>Status</th>
+                                    <th>Cliente</th>
+                                    <th>ZIP/CEP</th>
+                                    <th>Qtd</th>
                                     <th>Etiqueta</th>
-                                    <th>Tracking</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>';
 
         if (!$links) {
-            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
+            echo '<tr><td colspan="7" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
         } else {
             foreach ($links as $lnk) {
                 $oid = (int) ($lnk['order_id'] ?? 0);
                 $o = $orders[$oid] ?? [];
-                $status = (string) ($o['post_status'] ?? '');
                 $date = (string) ($o['post_date'] ?? '');
 
+                $m = $ordersMeta[$oid] ?? [];
+                $nome = trim((string) (($m['_shipping_first_name'] ?? '') . ' ' . ($m['_shipping_last_name'] ?? '')));
+                if ($nome === '') {
+                    $nome = trim((string) (($m['_billing_first_name'] ?? '') . ' ' . ($m['_billing_last_name'] ?? '')));
+                }
+                $zip = trim((string) ($m['_shipping_postcode'] ?? ''));
+                if ($zip === '') {
+                    $zip = trim((string) ($m['_billing_postcode'] ?? ''));
+                }
+
+                $qtd = (int) ($ordersQty[$oid] ?? 0);
+
                 $etq = ((int) ($lnk['etiqueta_gerada'] ?? 0)) === 1;
-                $trk = (string) ($lnk['courier_tracking_number'] ?? ($lnk['wexpress_tracking_number'] ?? ''));
                 $labelUrl = (string) ($lnk['wexpress_label_url'] ?? '');
 
                 echo '<tr>
                     <td><strong>#' . (int) $oid . '</strong></td>
                     <td>' . ($date !== '' ? htmlspecialchars(date('d/m/Y H:i', strtotime($date))) : '-') . '</td>
-                    <td><span class="badge bg-light text-dark">' . htmlspecialchars($status !== '' ? $status : '-') . '</span></td>
+                    <td>' . htmlspecialchars($nome !== '' ? $nome : '-') . '</td>
+                    <td>' . htmlspecialchars($zip !== '' ? $zip : '-') . '</td>
+                    <td>' . ($qtd > 0 ? (int) $qtd : '-') . '</td>
                     <td>' . ($etq ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>') . '</td>
-                    <td>' . ($trk !== '' ? htmlspecialchars($trk) : '-') . '</td>
                     <td class="text-nowrap">'
                         . ($labelUrl !== '' ? ('<a class="btn btn-sm btn-outline-primary" target="_blank" href="' . htmlspecialchars($labelUrl) . '">Etiqueta</a> ') : '')
                         . '<a class="btn btn-sm btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $oid . '?source=' . urlencode($source) . '">Detalhes</a> '
@@ -1666,13 +1708,12 @@ function regerarEtiquetasMassa() {
                 $titulo = 'Primeira remessa';
                 $start = new \DateTime('now');
                 $start->setTime(0, 0, 0);
-                $end = (clone $start);
-                $end->modify('+3650 days');
+                $end = new \DateTime('now');
                 $end->setTime(23, 59, 59);
 
                 $janelaId = 0;
                 try {
-                    $stFind = $this->connection->prepare("SELECT id FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = ? AND status = 'aberta' ORDER BY id DESC LIMIT 1");
+                    $stFind = $this->connection->prepare("SELECT id FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = ? ORDER BY id DESC LIMIT 1");
                     $stFind->execute([$src, $titulo]);
                     $janelaId = (int) ($stFind->fetchColumn() ?: 0);
                 } catch (\Exception $e) {
@@ -1680,9 +1721,13 @@ function regerarEtiquetasMassa() {
                 }
 
                 if ($janelaId <= 0) {
-                    $stIns = $this->connection->prepare("INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, tipo, titulo, created_at, updated_at) VALUES (?, ?, ?, 'aberta', 'manual', ?, NOW(), NOW())");
+                    $stIns = $this->connection->prepare("INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, tipo, titulo, created_at, updated_at) VALUES (?, ?, ?, 'finalizada', 'manual', ?, NOW(), NOW())");
                     $stIns->execute([$src, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $titulo]);
                     $janelaId = (int) $this->connection->lastInsertId();
+                } else {
+                    // mantém data coerente e fecha a janela (bucket histórico)
+                    $stUpJ = $this->connection->prepare("UPDATE remessa_wp_janelas SET data_inicio = ?, data_fim = ?, status = 'finalizada', updated_at = NOW() WHERE id = ?");
+                    $stUpJ->execute([$start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $janelaId]);
                 }
 
                 $lastJanelaId = $janelaId;
