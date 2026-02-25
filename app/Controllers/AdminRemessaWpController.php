@@ -51,6 +51,11 @@ class AdminRemessaWpController extends Controller {
         return in_array($tipo, $allowed, true) ? $tipo : null;
     }
 
+    private function normalizeSource(string $source): string {
+        $source = strtolower(trim($source));
+        return in_array($source, self::SOURCES, true) ? $source : 'br';
+    }
+
     private function getWpPdo(\PDO $localPdo, string $source = 'br'): array {
         $source = strtolower(trim($source));
         if (!in_array($source, self::SOURCES, true)) {
@@ -390,6 +395,9 @@ class AdminRemessaWpController extends Controller {
                             <option value="us"' . ($source === 'us' ? ' selected' : '') . '>US</option>
                         </select>
                         <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+                    </form>
+                    <form method="POST" action="/admin/remessa-wp/primeira-remessa/popular?source=' . urlencode($source) . '" class="d-inline" onsubmit="return confirm(' . "\"Adicionar TODOS os pedidos já etiquetados na janela 'Primeira remessa'?\"" . ')">
+                        <button type="submit" class="btn btn-outline-dark"><i class="fas fa-layer-group me-1"></i>Primeira remessa</button>
                     </form>
                     <form method="POST" action="/admin/remessa-wp/janela-teste/criar?source=' . urlencode($source) . '" class="d-inline">
                         <button type="submit" class="btn btn-warning"><i class="fas fa-flask me-1"></i>Janela de testes</button>
@@ -1238,6 +1246,172 @@ function regerarEtiquetasMassa() {
         }
 
         header('Location: /admin/remessa-wp/janela/' . $janelaId . '?source=' . urlencode($source));
+        exit;
+    }
+
+    public function popularPrimeiraRemessa($request) {
+        $this->requireAccess();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $sourceRaw = strtolower(trim((string) ($request->getParam('source') ?? ($_GET['source'] ?? 'br'))));
+        $sources = [];
+        if ($sourceRaw === 'all') {
+            $sources = self::SOURCES;
+        } else {
+            $sources = [$this->normalizeSource($sourceRaw)];
+        }
+
+        try {
+            if (!$this->tableExists('remessa_wp_janelas') || !$this->tableExists('remessa_wp_janela_pedidos')) {
+                throw new \RuntimeException('Tabelas de Remessa WP não encontradas. Rode a migration 047_create_remessa_wp_janelas.sql');
+            }
+
+            $totalAdded = 0;
+            $lastJanelaId = 0;
+
+            foreach ($sources as $src) {
+                $src = $this->normalizeSource($src);
+
+                $titulo = 'Primeira remessa';
+                $start = new \DateTime('now');
+                $start->setTime(0, 0, 0);
+                $end = (clone $start);
+                $end->modify('+3650 days');
+                $end->setTime(23, 59, 59);
+
+                $janelaId = 0;
+                try {
+                    $stFind = $this->connection->prepare("SELECT id FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = ? AND status = 'aberta' ORDER BY id DESC LIMIT 1");
+                    $stFind->execute([$src, $titulo]);
+                    $janelaId = (int) ($stFind->fetchColumn() ?: 0);
+                } catch (\Exception $e) {
+                    $janelaId = 0;
+                }
+
+                if ($janelaId <= 0) {
+                    $stIns = $this->connection->prepare("INSERT INTO remessa_wp_janelas (source, data_inicio, data_fim, status, tipo, titulo, created_at, updated_at) VALUES (?, ?, ?, 'aberta', 'manual', ?, NOW(), NOW())");
+                    $stIns->execute([$src, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $titulo]);
+                    $janelaId = (int) $this->connection->lastInsertId();
+                }
+
+                $lastJanelaId = $janelaId;
+
+                $wp = $this->getWpPdo($this->connection, $src);
+                $prefix = $wp['prefix'];
+                $wpPdo = $wp['pdo'];
+
+                // pedidos com etiqueta (por meta)
+                $metaKeys = [
+                    'wexpress_shipping_id',
+                    'wexpress_label_url',
+                    'wp_wexpress_label_url',
+                    '_wexpress_label_url',
+                ];
+
+                $ph = implode(',', array_fill(0, count($metaKeys), '?'));
+                $sqlIds = "
+                    SELECT DISTINCT pm.post_id
+                    FROM {$prefix}postmeta pm
+                    INNER JOIN {$prefix}posts p ON p.ID = pm.post_id
+                    WHERE p.post_type = 'shop_order'
+                      AND pm.meta_key IN ({$ph})
+                      AND TRIM(COALESCE(pm.meta_value,'')) <> ''
+                ";
+                $stIds = $wpPdo->prepare($sqlIds);
+                $stIds->execute($metaKeys);
+                $orderIds = $stIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                $orderIds = array_values(array_filter(array_map('intval', $orderIds), function ($v) { return $v > 0; }));
+
+                if (!$orderIds) {
+                    continue;
+                }
+
+                $stInsLink = $this->connection->prepare('INSERT IGNORE INTO remessa_wp_janela_pedidos (janela_id, source, order_id, created_at) VALUES (?, ?, ?, NOW())');
+                foreach ($orderIds as $oid) {
+                    $stInsLink->execute([$janelaId, $src, (int) $oid]);
+                }
+
+                // carregar metas (em lote) para preencher campos no banco local
+                $chunkSize = 800;
+                $keysFetch = ['wexpress_shipping_id','wexpress_tracking_number','courier_tracking_number','wexpress_status','wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url'];
+
+                $stUp = $this->connection->prepare(
+                    'UPDATE remessa_wp_janela_pedidos
+                     SET
+                        etiqueta_gerada = ?,
+                        etiqueta_gerada_em = IF(?, COALESCE(etiqueta_gerada_em, NOW()), etiqueta_gerada_em),
+                        wexpress_shipping_id = ?,
+                        wexpress_tracking_number = ?,
+                        courier_tracking_number = ?,
+                        wexpress_status = ?,
+                        wexpress_label_url = ?,
+                        wexpress_updated_at = NOW()
+                     WHERE janela_id = ? AND source = ? AND order_id = ?'
+                );
+
+                for ($i = 0; $i < count($orderIds); $i += $chunkSize) {
+                    $chunk = array_slice($orderIds, $i, $chunkSize);
+                    $phIds = implode(',', array_fill(0, count($chunk), '?'));
+                    $phKeys = implode(',', array_fill(0, count($keysFetch), '?'));
+                    $sqlMeta = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$phIds}) AND meta_key IN ({$phKeys})";
+                    $stMeta = $wpPdo->prepare($sqlMeta);
+                    $stMeta->execute(array_merge(array_map('intval', $chunk), $keysFetch));
+                    $rows = $stMeta->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    $byOrder = [];
+                    foreach ($rows as $r) {
+                        $oid = (int) ($r['post_id'] ?? 0);
+                        if ($oid <= 0) continue;
+                        $k = (string) ($r['meta_key'] ?? '');
+                        if ($k === '') continue;
+                        $byOrder[$oid][$k] = (string) ($r['meta_value'] ?? '');
+                    }
+
+                    foreach ($chunk as $oid) {
+                        $m = $byOrder[(int) $oid] ?? [];
+                        $shipId = trim((string) ($m['wexpress_shipping_id'] ?? ''));
+                        $trk = trim((string) ($m['wexpress_tracking_number'] ?? ''));
+                        $courier = trim((string) ($m['courier_tracking_number'] ?? ''));
+                        $status = trim((string) ($m['wexpress_status'] ?? ''));
+                        $label = trim((string) ($m['wexpress_label_url'] ?? ($m['_wexpress_label_url'] ?? ($m['wp_wexpress_label_url'] ?? ''))));
+
+                        $hasLabel = ($shipId !== '' || $label !== '' || $status === 'LABEL_CREATED');
+                        if ($hasLabel) {
+                            $totalAdded++;
+                        }
+
+                        $stUp->execute([
+                            $hasLabel ? 1 : 0,
+                            $hasLabel ? 1 : 0,
+                            $shipId !== '' ? $shipId : null,
+                            $trk !== '' ? $trk : null,
+                            $courier !== '' ? $courier : null,
+                            $status !== '' ? $status : null,
+                            $label !== '' ? $label : null,
+                            $janelaId,
+                            $src,
+                            (int) $oid,
+                        ]);
+                    }
+                }
+            }
+
+            $_SESSION['message'] = 'Primeira remessa populada. Pedidos adicionados/atualizados: ' . (int) $totalAdded;
+            $_SESSION['message_type'] = 'success';
+
+            if (count($sources) === 1 && $lastJanelaId > 0) {
+                header('Location: /admin/remessa-wp/janela/' . $lastJanelaId . '?source=' . urlencode($sources[0]));
+                exit;
+            }
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao popular primeira remessa: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/remessa-wp?source=' . urlencode($sourceRaw));
         exit;
     }
 }
