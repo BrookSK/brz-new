@@ -95,15 +95,15 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="cep" class="form-label"><?= __('auth.zip', 'CEP') ?></label>
+                            <div class="col-md-6 mb-3" id="field-cep">
+                                <label for="cep" class="form-label" id="label-cep"><?= __('auth.zip', 'CEP') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-dot"></i></span>
                                     <input type="text" class="form-control" id="cep" name="cep" placeholder="00000-000" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="endereco" class="form-label"><?= __('auth.address', 'Endereço') ?></label>
+                                <label for="endereco" class="form-label" id="label-endereco"><?= __('auth.address', 'Endereço') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map"></i></span>
                                     <input type="text" class="form-control" id="endereco" name="endereco" placeholder="<?= htmlspecialchars(__('auth.address_placeholder', 'Rua, Avenida, etc.'), ENT_QUOTES, 'UTF-8') ?>" required>
@@ -112,15 +112,15 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="numero" class="form-label"><?= __('auth.number_label', 'Número') ?></label>
+                            <div class="col-md-4 mb-3" id="field-numero">
+                                <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
                                     <input type="text" class="form-control" id="numero" name="numero" placeholder="123" required>
                                 </div>
                             </div>
                             <div class="col-md-8 mb-3">
-                                <label for="complemento" class="form-label"><?= __('auth.complement', 'Complemento') ?></label>
+                                <label for="complemento" class="form-label" id="label-complemento"><?= __('auth.complement', 'Complemento') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-building"></i></span>
                                     <input type="text" class="form-control" id="complemento" name="complemento" placeholder="<?= htmlspecialchars(__('auth.complement_placeholder', 'Apto, Casa, etc.'), ENT_QUOTES, 'UTF-8') ?>">
@@ -129,22 +129,22 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="bairro" class="form-label"><?= __('auth.neighborhood', 'Bairro') ?></label>
+                            <div class="col-md-4 mb-3" id="field-bairro">
+                                <label for="bairro" class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
                                     <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro">
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?></label>
+                                <label for="cidade" class="form-label" id="label-cidade"><?= __('auth.city', 'Cidade') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-city"></i></span>
                                     <input type="text" class="form-control" id="cidade" name="cidade" placeholder="São Paulo" required>
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="estado" class="form-label"><?= __('auth.state', 'Estado') ?></label>
+                                <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map-pin"></i></span>
                                     <input type="text" class="form-control" id="estado" name="estado" placeholder="SP" required>
@@ -222,6 +222,17 @@ $(document).ready(function() {
         cpf_required: <?= json_encode(__('auth.document_required', 'CPF *'), JSON_UNESCAPED_UNICODE) ?>,
         cpf: <?= json_encode(__('auth.document', 'CPF'), JSON_UNESCAPED_UNICODE) ?>,
         doc_hint: <?= json_encode(__('auth.document_br_required_hint', 'Obrigatório apenas para residentes no Brasil.'), JSON_UNESCAPED_UNICODE) ?>,
+        address_br: <?= json_encode(__('auth.address', 'Endereço'), JSON_UNESCAPED_UNICODE) ?>,
+        complement_br: <?= json_encode(__('auth.complement', 'Complemento'), JSON_UNESCAPED_UNICODE) ?>,
+        city_br: <?= json_encode(__('auth.city', 'Cidade'), JSON_UNESCAPED_UNICODE) ?>,
+        state_br: <?= json_encode(__('auth.state', 'Estado'), JSON_UNESCAPED_UNICODE) ?>,
+        zip_br: <?= json_encode(__('auth.zip', 'CEP'), JSON_UNESCAPED_UNICODE) ?>,
+        number_br: <?= json_encode(__('auth.number_label', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+        neighborhood_br: <?= json_encode(__('auth.neighborhood', 'Bairro'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_1: <?= json_encode(__('auth.address_line_1', 'Address line 1'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_2_optional: <?= json_encode(__('auth.address_line_2_optional', 'Address line 2 (optional)'), JSON_UNESCAPED_UNICODE) ?>,
+        city_en: <?= json_encode(__('auth.city_en', 'City'), JSON_UNESCAPED_UNICODE) ?>,
+        state_en: <?= json_encode(__('auth.state_en', 'State'), JSON_UNESCAPED_UNICODE) ?>,
         passwords_dont_match: <?= json_encode(__('auth.passwords_dont_match', 'As senhas não coincidem'), JSON_UNESCAPED_UNICODE) ?>,
         password_too_short: <?= json_encode(__('auth.password_too_short', 'A senha deve ter no mínimo 6 caracteres'), JSON_UNESCAPED_UNICODE) ?>,
         creating: <?= json_encode(__('auth.creating_account', 'Criando conta...'), JSON_UNESCAPED_UNICODE) ?>,
@@ -263,6 +274,32 @@ $(document).ready(function() {
         if ($bairro.length) {
             $bairro.prop('required', br);
         }
+    }
+
+    function syncEnderecoRules() {
+        const br = isBrazil();
+
+        $('#label-endereco').text(br ? I18N.address_br : I18N.address_line_1);
+        $('#label-complemento').text(br ? I18N.complement_br : I18N.address_line_2_optional);
+        $('#label-cidade').text(br ? I18N.city_br : I18N.city_en);
+        $('#label-estado').text(br ? I18N.state_br : I18N.state_en);
+        $('#label-cep').text(I18N.zip_br);
+        $('#label-numero').text(I18N.number_br);
+        $('#label-bairro').text(I18N.neighborhood_br);
+
+        $('#cep').prop('required', true);
+        $('#numero').prop('required', br);
+
+        $('#field-cep').toggle(true);
+        $('#field-numero').toggle(br);
+        $('#field-bairro').toggle(br);
+
+        if (!br) {
+            $('#numero').val('');
+            $('#bairro').val('');
+        }
+
+        syncBairroRules();
     }
 
     // Toggle password visibility
@@ -387,11 +424,11 @@ $(document).ready(function() {
 
     $('#pais_residencia').on('change', function() {
         syncDocumentoRules();
-        syncBairroRules();
+        syncEnderecoRules();
     });
 
     syncDocumentoRules();
-    syncBairroRules();
+    syncEnderecoRules();
 });
 
 function showAlert(type, message) {
