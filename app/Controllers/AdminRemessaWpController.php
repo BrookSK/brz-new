@@ -1305,6 +1305,34 @@ function regerarEtiquetasMassa() {
                 }
                 if (!is_array($data)) return null;
 
+                // atalhos comuns (estrutura conhecida do wexpress_last_response_json: {create:..., get:{freight_value:...}})
+                try {
+                    $tryPaths = [
+                        ['get', 'freight_value'],
+                        ['get', 'freight'],
+                        ['freight_value_returned'],
+                        ['freight_value_sent'],
+                        ['freight_value'],
+                    ];
+                    foreach ($tryPaths as $path) {
+                        $node = $data;
+                        foreach ($path as $k) {
+                            if (!is_array($node) || !array_key_exists($k, $node)) {
+                                $node = null;
+                                break;
+                            }
+                            $node = $node[$k];
+                        }
+                        if ($node !== null) {
+                            $sv = str_replace(',', '.', (string) $node);
+                            if (is_numeric($sv) && (float) $sv > 0) {
+                                return (float) $sv;
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+
                 $candidates = [];
                 $walk = function ($node, string $path) use (&$walk, &$candidates) {
                     if (is_array($node)) {
@@ -1499,6 +1527,78 @@ function regerarEtiquetasMassa() {
                 return '<div style="white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;">' . $safe . '</div>';
             };
 
+            $embedImage = function (string $url): ?string {
+                $url = trim($url);
+                if ($url === '') return null;
+                if (!preg_match('#^https?://#i', $url)) return null;
+
+                $ctx = stream_context_create([
+                    'http' => [
+                        'timeout' => 12,
+                        'follow_location' => 1,
+                        'user_agent' => 'brz-new/1.0',
+                    ],
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                    ],
+                ]);
+
+                $raw = @file_get_contents($url, false, $ctx);
+                if ($raw === false || $raw === '') return null;
+
+                $mime = null;
+                if (function_exists('finfo_open')) {
+                    $fi = @finfo_open(FILEINFO_MIME_TYPE);
+                    if ($fi) {
+                        $mime = @finfo_buffer($fi, $raw);
+                        @finfo_close($fi);
+                    }
+                }
+                $mime = is_string($mime) ? trim($mime) : '';
+
+                $allow = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+                if ($mime !== '' && array_key_exists($mime, $allow)) {
+                    return 'data:' . $mime . ';base64,' . base64_encode($raw);
+                }
+
+                // Tentar converter WEBP -> PNG quando possível
+                if ($mime === 'image/webp' || preg_match('/\.webp(\?|$)/i', $url)) {
+                    try {
+                        if (class_exists('Imagick')) {
+                            $im = new \Imagick();
+                            $im->readImageBlob($raw);
+                            $im->setImageFormat('png');
+                            $png = $im->getImagesBlob();
+                            $im->clear();
+                            $im->destroy();
+                            if (is_string($png) && $png !== '') {
+                                return 'data:image/png;base64,' . base64_encode($png);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                    }
+
+                    try {
+                        if (function_exists('imagecreatefromstring') && function_exists('imagepng')) {
+                            $img = @imagecreatefromstring($raw);
+                            if ($img !== false) {
+                                ob_start();
+                                imagepng($img);
+                                $png = (string) ob_get_clean();
+                                imagedestroy($img);
+                                if ($png !== '') {
+                                    return 'data:image/png;base64,' . base64_encode($png);
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+
+                return null;
+            };
+
             $rowsItems = '';
             $idx = 1;
             foreach ($wpItems as $it) {
@@ -1506,13 +1606,14 @@ function regerarEtiquetasMassa() {
                 $decl = trim((string) ($it['declaration_name'] ?? ''));
                 if ($decl === '') $decl = trim((string) ($it['description'] ?? ''));
                 $img = trim((string) ($it['image_url'] ?? ''));
+                $imgData = $img !== '' ? ($embedImage($img) ?? '') : '';
                 $qtd = (int) ($it['qty'] ?? 0);
                 if ($qtd <= 0) $qtd = 1;
                 $unit = isset($it['unit']) ? (float) $it['unit'] : 0.0;
                 $tot = isset($it['total']) ? (float) $it['total'] : 0.0;
                 $rowsItems .= '<tr>'
                     . '<td style="text-align:center;">' . $idx . '</td>'
-                    . '<td style="text-align:center;">' . ($img !== '' ? ('<img src="' . $safeText($img) . '" style="width:54px;height:54px;object-fit:contain;" />') : '-') . '</td>'
+                    . '<td style="text-align:center;">' . ($imgData !== '' ? ('<img src="' . $imgData . '" style="width:54px;height:54px;object-fit:contain;" />') : '-') . '</td>'
                     . '<td>' . $safeText($decl) . '</td>'
                     . '<td style="text-align:center;">' . $qtd . '</td>'
                     . '<td style="text-align:right;">' . $safeText($fmtMoney($unit)) . '</td>'
@@ -1527,16 +1628,16 @@ function regerarEtiquetasMassa() {
             $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
                 . '<style>'
                 . '@page { margin: 22px 26px; }'
-                . 'body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; font-size: 11px; color: #111827; }'
-                . '.title { font-size: 16px; font-weight: 900; }'
-                . '.sub { font-size: 10px; color: #374151; margin-top: 2px; }'
+                . 'body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; }'
+                . '.title { font-size: 20px; font-weight: 900; }'
+                . '.sub { font-size: 11px; color: #374151; margin-top: 3px; }'
                 . '.section { border: 1px solid #111827; padding: 10px; margin-top: 10px; }'
-                . '.section-h { font-weight: 900; margin-bottom: 6px; }'
+                . '.section-h { font-weight: 900; margin-bottom: 7px; font-size: 14px; }'
                 . '.grid { width: 100%; border-collapse: collapse; }'
                 . '.grid td { vertical-align: top; }'
                 . '.kv { width: 100%; border-collapse: collapse; }'
                 . '.kv td { padding: 2px 0; vertical-align: top; word-break: break-all; overflow-wrap:anywhere; }'
-                . '.kv td:first-child { width: 140px; color: #374151; }'
+                . '.kv td:first-child { width: 150px; color: #374151; }'
                 . '.items { width: 100%; border-collapse: collapse; margin-top: 8px; }'
                 . '.items th, .items td { border: 1px solid #111827; padding: 6px 7px; }'
                 . '.items th { background: #f3f4f6; text-align: left; }'
@@ -1889,6 +1990,98 @@ function regerarEtiquetasMassa() {
         }
         $paymentMethod = trim((string) ($wpMeta['_payment_method_title'] ?? ($wpMeta['_payment_method'] ?? '')));
 
+        $findWxFreteUi = function ($data): ?float {
+            if ($data === null) return null;
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+            if (!is_array($data)) return null;
+
+            try {
+                $tryPaths = [
+                    ['get', 'freight_value'],
+                    ['get', 'freight'],
+                    ['freight_value_returned'],
+                    ['freight_value_sent'],
+                    ['freight_value'],
+                ];
+                foreach ($tryPaths as $path) {
+                    $node = $data;
+                    foreach ($path as $k) {
+                        if (!is_array($node) || !array_key_exists($k, $node)) {
+                            $node = null;
+                            break;
+                        }
+                        $node = $node[$k];
+                    }
+                    if ($node !== null) {
+                        $sv = str_replace(',', '.', (string) $node);
+                        if (is_numeric($sv) && (float) $sv > 0) {
+                            return (float) $sv;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            $candidates = [];
+            $walk = function ($node, string $path) use (&$walk, &$candidates) {
+                if (is_array($node)) {
+                    foreach ($node as $k => $v) {
+                        $kk = strtolower((string) $k);
+                        $p = $path === '' ? $kk : ($path . '.' . $kk);
+                        if (is_string($v)) {
+                            $vv = trim($v);
+                            if ($vv !== '' && (($vv[0] ?? '') === '{' || ($vv[0] ?? '') === '[')) {
+                                $decoded = json_decode($vv, true);
+                                if (is_array($decoded)) {
+                                    $walk($decoded, $p);
+                                    continue;
+                                }
+                            }
+                        }
+                        if (is_scalar($v)) {
+                            $sv = (string) $v;
+                            $sv2 = str_replace(',', '.', $sv);
+                            if (is_numeric($sv2)) {
+                                if (strpos($kk, 'shipping') !== false || strpos($kk, 'frete') !== false || strpos($kk, 'freight') !== false) {
+                                    if (strpos($kk, 'tax') === false) {
+                                        $candidates[] = (float) $sv2;
+                                    }
+                                }
+                                if ((strpos($kk, 'price') !== false || strpos($kk, 'cost') !== false || strpos($kk, 'amount') !== false)
+                                    && (strpos($p, 'shipping') !== false || strpos($p, 'frete') !== false || strpos($p, 'freight') !== false)
+                                ) {
+                                    $candidates[] = (float) $sv2;
+                                }
+                                if ($kk === 'value' && (strpos($p, 'shipping') !== false || strpos($p, 'frete') !== false || strpos($p, 'freight') !== false)) {
+                                    $candidates[] = (float) $sv2;
+                                }
+                            }
+                        }
+                        $walk($v, $p);
+                    }
+                }
+            };
+            $walk($data, '');
+            if (!$candidates) return null;
+
+            $best = null;
+            foreach ($candidates as $v) {
+                if ($v <= 0) continue;
+                if ($best === null || $v > $best) {
+                    $best = $v;
+                }
+            }
+            return $best;
+        };
+
+        $wxFreteUi = $findWxFreteUi($link['wexpress_last_response_json'] ?? null);
+        if ($wxFreteUi === null || $wxFreteUi <= 0) {
+            $wxFreteUi = $findWxFreteUi($link['wexpress_last_request_json'] ?? null);
+        }
+        $wxFreteUi = ($wxFreteUi !== null && $wxFreteUi > 0) ? $wxFreteUi : null;
+
         echo '<div class="row g-3">'
             . '<div class="col-lg-4">'
                 . '<div class="border rounded p-3 h-100">'
@@ -2010,7 +2203,8 @@ function regerarEtiquetasMassa() {
                     . '<div class="mb-2"><strong>Totais</strong></div>'
                     . '<div class="small">'
                         . '<div><strong>Subda pauta:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
-                        . '<div><strong>Frete:</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Frete (WExpress):</strong> ' . htmlspecialchars($wxFreteUi !== null ? number_format((float) $wxFreteUi, 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Frete (WooCommerce):</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Total do pedido:</strong> ' . htmlspecialchars(isset($wpTotals['total']) && $wpTotals['total'] !== null ? number_format((float) $wpTotals['total'], 2, ',', '.') : '-') . $currLabel . '</div>'
                     . '</div>'
