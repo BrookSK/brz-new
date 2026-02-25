@@ -8,6 +8,8 @@ use App\Services\PaymentService;
 use App\Services\AuthService;
 use App\Services\SupportTicketNotificationService;
 use App\Services\CpfValidator;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class AdminPedidosController extends Controller {
 
@@ -196,6 +198,228 @@ class AdminPedidosController extends Controller {
         }
 
         return $out;
+    }
+
+    public function exportXlsx(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $busca = (string) ($request->getParam('busca', '') ?? '');
+        $status = (string) ($request->getParam('status', '') ?? '');
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $colsPedidos = [];
+            try {
+                $stmtColsP = $pdo->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsPedidos = [];
+            }
+
+            $pickCol = function (array $cols, array $candidates): ?string {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $cols, true)) {
+                        return $c;
+                    }
+                }
+                return null;
+            };
+
+            $colsUsuarios = [];
+            try {
+                $stmtColsU = $pdo->query('DESCRIBE usuarios');
+                $colsUsuarios = $stmtColsU ? ($stmtColsU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsUsuarios = [];
+            }
+
+            $colUserName = $pickCol($colsUsuarios, ['name', 'nome', 'full_name', 'nome_completo']) ?: 'name';
+            $colUserEmail = $pickCol($colsUsuarios, ['email', 'mail']) ?: 'email';
+            $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
+            $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
+
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
+            $params = [];
+            if ($temDeletedAt) {
+                $sql .= " AND p.deleted_at IS NULL";
+            }
+
+            if (trim($busca) !== '') {
+                $buscaRaw = trim($busca);
+                $buscaDigits = preg_replace('/\D+/', '', $buscaRaw);
+                $buscaInt = ($buscaDigits !== '') ? (int) $buscaDigits : 0;
+
+                $searchParts = [];
+                if ($buscaInt > 0) {
+                    $searchParts[] = 'p.id = :busca_int';
+                    $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca_int_like';
+                }
+                $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
+                $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
+                $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
+                if ($colNumero) {
+                    $searchParts[] = 'p.' . $colNumero . ' LIKE :busca';
+                }
+                if (in_array('codigo_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.codigo_pedido LIKE :busca';
+                }
+                if (in_array('numero_pedido', $colsPedidos, true)) {
+                    $searchParts[] = 'p.numero_pedido LIKE :busca';
+                }
+                $sql .= ' AND (' . implode(' OR ', $searchParts) . ')';
+                $params[':busca'] = "%{$busca}%";
+                if ($buscaInt > 0) {
+                    $params[':busca_int'] = $buscaInt;
+                    $params[':busca_int_like'] = "%{$buscaInt}%";
+                }
+            }
+
+            if (trim($status) !== '') {
+                $sql .= ' AND p.status = :status';
+                $params[':status'] = $status;
+            }
+
+            $sql .= ' ORDER BY p.created_at DESC';
+            $st = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                $st->bindValue($k, $v);
+            }
+            $st->execute();
+            $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Items (tolerant schema)
+            $itens = [];
+            $pedidoIds = [];
+            foreach ($pedidos as $p) {
+                if (isset($p['id'])) {
+                    $pedidoIds[] = (int) $p['id'];
+                }
+            }
+            $pedidoIds = array_values(array_filter($pedidoIds, static fn($v) => $v > 0));
+
+            $itensTable = null;
+            if ($this->tableExistsPdo($pdo, 'pedido_itens')) {
+                $itensTable = 'pedido_itens';
+            } elseif ($this->tableExistsPdo($pdo, 'pedido_items')) {
+                $itensTable = 'pedido_items';
+            }
+
+            if ($itensTable && !empty($pedidoIds)) {
+                $colsItens = $this->getTableColumnsPdo($pdo, $itensTable);
+                $colPedidoId = $pickCol($colsItens, ['pedido_id']);
+                $colProdutoId = $pickCol($colsItens, ['produto_id', 'product_id']);
+                $colProdutoNome = $pickCol($colsItens, ['produto_nome', 'product_name', 'nome_produto', 'produto']);
+                $colQtd = $pickCol($colsItens, ['quantidade', 'qty']);
+                $colPreco = $pickCol($colsItens, ['preco', 'price', 'valor_unitario', 'unit_price']);
+                $colSubtotal = $pickCol($colsItens, ['subtotal', 'valor_total', 'total', 'line_total']);
+
+                if ($colPedidoId) {
+                    $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                    $select = ['pi.' . $colPedidoId . ' AS pedido_id'];
+                    if ($colProdutoId) $select[] = 'pi.' . $colProdutoId . ' AS produto_id';
+                    if ($colProdutoNome) $select[] = 'pi.' . $colProdutoNome . ' AS produto';
+                    if ($colQtd) $select[] = 'pi.' . $colQtd . ' AS quantidade';
+                    if ($colPreco) $select[] = 'pi.' . $colPreco . ' AS preco_unitario';
+                    if ($colSubtotal) $select[] = 'pi.' . $colSubtotal . ' AS subtotal';
+
+                    $sqlItens = 'SELECT ' . implode(', ', $select) . ' FROM ' . $itensTable . ' pi WHERE pi.' . $colPedidoId . ' IN (' . $in . ')';
+                    $stI = $pdo->prepare($sqlItens);
+                    $stI->execute($pedidoIds);
+                    $itens = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $spreadsheet->getProperties()
+                ->setCreator('Braziliana')
+                ->setTitle('Pedidos - Exportação');
+
+            // Sheet 1: Pedidos
+            $sheetPedidos = $spreadsheet->getActiveSheet();
+            $sheetPedidos->setTitle('Pedidos');
+            $headersPedidos = [
+                'ID',
+                'Número',
+                'Status',
+                'Data',
+                'Cliente',
+                'Email',
+                'Moeda',
+                'Total'
+            ];
+            $sheetPedidos->fromArray($headersPedidos, null, 'A1');
+            $row = 2;
+            foreach ($pedidos as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $numero = '';
+                if (isset($p['numero_pedido'])) {
+                    $numero = (string) $p['numero_pedido'];
+                } elseif ($colNumero && isset($p[$colNumero])) {
+                    $numero = (string) $p[$colNumero];
+                } elseif (isset($p['codigo_pedido'])) {
+                    $numero = (string) $p['codigo_pedido'];
+                }
+                $createdAt = (string) ($p['created_at'] ?? ($p['data_criacao'] ?? ($p['data_pedido'] ?? '')));
+                $total = null;
+                foreach (['total', 'valor_total', 'amount', 'valor'] as $c) {
+                    if (array_key_exists($c, $p)) {
+                        $total = (float) ($p[$c] ?? 0);
+                        break;
+                    }
+                }
+                if ($total === null) {
+                    $total = 0.0;
+                }
+                $moeda = strtoupper(trim((string) ($p['moeda'] ?? ($p['currency'] ?? 'BRL'))));
+                if ($moeda === '') $moeda = 'BRL';
+
+                $sheetPedidos->fromArray([
+                    $pid,
+                    $numero,
+                    (string) ($p['status'] ?? ''),
+                    $createdAt,
+                    (string) ($p['cliente_nome'] ?? ''),
+                    (string) ($p['cliente_email'] ?? ''),
+                    $moeda,
+                    $total
+                ], null, 'A' . $row);
+                $row++;
+            }
+
+            // Sheet 2: Itens
+            $sheetItens = $spreadsheet->createSheet();
+            $sheetItens->setTitle('Itens');
+            $headersItens = ['Pedido ID', 'Produto ID', 'Produto', 'Quantidade', 'Preço Unitário', 'Subtotal'];
+            $sheetItens->fromArray($headersItens, null, 'A1');
+            $row = 2;
+            foreach ($itens as $it) {
+                $sheetItens->fromArray([
+                    (int) ($it['pedido_id'] ?? 0),
+                    (string) ($it['produto_id'] ?? ''),
+                    (string) ($it['produto'] ?? ''),
+                    (string) ($it['quantidade'] ?? ''),
+                    (string) ($it['preco_unitario'] ?? ''),
+                    (string) ($it['subtotal'] ?? '')
+                ], null, 'A' . $row);
+                $row++;
+            }
+
+            $filename = 'pedidos_' . date('Y-m-d_His') . '.xlsx';
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Cache-Control: max-age=0');
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo 'Erro ao exportar: ' . $e->getMessage();
+            exit;
+        }
     }
 
     public function importarPedidosModelo(Request $request) {
@@ -1684,6 +1908,18 @@ JS;
         
         // Renderizar menu lateral usando o partial
         renderAdminSidebar('pedidos');
+
+        $exportUrl = '/admin/pedidos/export-xlsx';
+        $exportQuery = [];
+        if (trim((string) $busca) !== '') {
+            $exportQuery['busca'] = (string) $busca;
+        }
+        if (trim((string) $status) !== '') {
+            $exportQuery['status'] = (string) $status;
+        }
+        if (!empty($exportQuery)) {
+            $exportUrl .= '?' . http_build_query($exportQuery);
+        }
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -1698,9 +1934,9 @@ JS;
                         <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger me-2">
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
-                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
-                            <i class="fas fa-download me-1"></i>Exportar
-                        </button>
+                        <a class="btn btn-success me-2" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
+                            <i class="fas fa-download me-1"></i>Exportar XLSX
+                        </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
