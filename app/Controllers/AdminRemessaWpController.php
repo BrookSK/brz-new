@@ -824,11 +824,11 @@ function regerarEtiquetasMassa() {
                     FROM {$prefix}postmeta pm\
                     INNER JOIN {$prefix}posts p ON p.ID = pm.post_id\
                     WHERE pm.meta_key = '_package_order_id'\
-                      AND pm.meta_value = ?\
+                      AND (pm.meta_value = ? OR pm.meta_value LIKE ?)\
                     ORDER BY pm.post_id DESC\
                     LIMIT 1\
                 ");
-                $stPkg->execute([(string) $pedidoId]);
+                $stPkg->execute([(string) $pedidoId, '%' . (string) $pedidoId . '%']);
                 $packageId = (int) ($stPkg->fetchColumn() ?: 0);
 
                 // 2) pega o container_id do package
@@ -836,7 +836,9 @@ function regerarEtiquetasMassa() {
                 if ($packageId > 0) {
                     $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_container_id','container_id','_container') ORDER BY meta_key ASC LIMIT 1");
                     $stCont->execute([$packageId]);
-                    $containerId = (int) ($stCont->fetchColumn() ?: 0);
+                    $containerVal = (string) ($stCont->fetchColumn() ?: '');
+                    $containerDigits = preg_replace('/\D+/', '', $containerVal);
+                    $containerId = (int) ($containerDigits !== '' ? $containerDigits : 0);
                 }
 
                 // 3) lê o grupo do container
