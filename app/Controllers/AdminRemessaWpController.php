@@ -1213,12 +1213,26 @@ function regerarEtiquetasMassa() {
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $nomeClientePdf = '';
+        try {
+            $nomeClientePdf = trim((string) (($wpMeta['_shipping_first_name'] ?? '') . ' ' . ($wpMeta['_shipping_last_name'] ?? '')));
+            if ($nomeClientePdf === '') {
+                $nomeClientePdf = trim((string) (($wpMeta['_billing_first_name'] ?? '') . ' ' . ($wpMeta['_billing_last_name'] ?? '')));
+            }
+        } catch (\Exception $e) {
+            $nomeClientePdf = '';
+        }
+        $invoiceTitle = 'Invoice - Pedido #' . (int) $pedidoId;
+        if ($nomeClientePdf !== '') {
+            $invoiceTitle .= ' - ' . $nomeClientePdf;
+        }
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remessa WP - Pedido #' . (int) $pedidoId . '</title>
+    <title>' . htmlspecialchars($invoiceTitle, ENT_QUOTES, 'UTF-8') . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
@@ -1258,10 +1272,11 @@ function regerarEtiquetasMassa() {
         }
 
         $mainColClass = $printMode ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
+        $topTitle = $printMode ? $invoiceTitle : ('Pedido #' . (int) $pedidoId);
         echo '<main class="' . $mainColClass . '">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
-                    <h1 class="h4 mb-0">Pedido #' . (int) $pedidoId . '</h1>
+                    <h1 class="h4 mb-0">' . htmlspecialchars($topTitle, ENT_QUOTES, 'UTF-8') . '</h1>
                     <div class="text-muted small">Janela #' . (int) $janelaId . ' (' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_inicio']))) . ' a ' . htmlspecialchars(date('d/m/Y', strtotime((string) $janela['data_fim']))) . ')</div>
                 </div>
                 <div class="d-flex gap-2 no-print">
@@ -1737,7 +1752,7 @@ function regerarEtiquetasMassa() {
 
         echo '</main></div></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>'
-            . ($printMode ? '<script>(function(){try{window.focus();setTimeout(function(){window.print();},200);window.addEventListener("afterprint",function(){try{window.close();}catch(e){}});}catch(e){}})();</script>' : '')
+            . ($printMode ? ('<script>(function(){try{document.title=' . json_encode($invoiceTitle, JSON_UNESCAPED_UNICODE) . ';window.focus();setTimeout(function(){window.print();},200);window.addEventListener("afterprint",function(){try{window.close();}catch(e){}});}catch(e){}})();</script>') : '')
             . '</body>
 </html>';
         exit;
