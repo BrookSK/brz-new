@@ -962,6 +962,9 @@ function regerarEtiquetasMassa() {
         $printMode = (string) ($request->getParam('print') ?? ($_GET['print'] ?? ''));
         $printMode = $printMode === '1';
 
+        $downloadMode = (string) ($request->getParam('download') ?? ($_GET['download'] ?? ''));
+        $downloadMode = $downloadMode === '1';
+
         $janelaId = (int) $janelaId;
         $pedidoId = (int) $pedidoId;
         if ($janelaId <= 0 || $pedidoId <= 0) {
@@ -1227,6 +1230,18 @@ function regerarEtiquetasMassa() {
             $invoiceTitle .= ' - ' . $nomeClientePdf;
         }
 
+        if ($downloadMode) {
+            $safeFile = preg_replace('/[^A-Za-z0-9 _\-#]/', '', $invoiceTitle);
+            $safeFile = trim((string) $safeFile);
+            if ($safeFile === '') {
+                $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
+            }
+            $filename = $safeFile . '.html';
+            header('Content-Type: text/html; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('X-Content-Type-Options: nosniff');
+        }
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1271,7 +1286,7 @@ function regerarEtiquetasMassa() {
             }
         }
 
-        $mainColClass = $printMode ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
+        $mainColClass = ($printMode || $downloadMode) ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
         $topTitle = $printMode ? $invoiceTitle : ('Pedido #' . (int) $pedidoId);
         echo '<main class="' . $mainColClass . '">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -1282,7 +1297,7 @@ function regerarEtiquetasMassa() {
                 <div class="d-flex gap-2 no-print">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">Voltar</a>
                     <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">Abrir pedido</a>
-                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&print=1">Baixar Invoice (PDF)</a>
+                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&download=1">Baixar Invoice</a>
                     ' . ($recebido ? '' : ('<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" style="display:inline;" onsubmit="return confirm(\"Confirmar recebimento deste pedido?\")">'
                         . '<button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Confirmar recebimento</button>'
                     . '</form>')) . '
