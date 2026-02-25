@@ -264,15 +264,15 @@ class AdminRemessaWpController extends Controller {
         $wpPdo = $wp['pdo'];
 
         // Pedidos que tiveram etiqueta gerada no período: usa post_modified como proxy da data de geração.
-        $stO = $wpPdo->prepare("\
-            SELECT DISTINCT p.ID
-            FROM {$prefix}posts p
-            INNER JOIN {$prefix}postmeta pm ON pm.post_id = p.ID
-            WHERE p.post_type = 'shop_order'
-              AND p.post_modified >= ? AND p.post_modified <= ?
-              AND pm.meta_key IN ('wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url','wexpress_shipping_id')
-              AND TRIM(COALESCE(pm.meta_value,'')) <> ''
-        ");
+        $stO = $wpPdo->prepare(
+            "SELECT DISTINCT p.ID
+             FROM {$prefix}posts p
+             INNER JOIN {$prefix}postmeta pm ON pm.post_id = p.ID
+             WHERE p.post_type = 'shop_order'
+               AND p.post_modified >= ? AND p.post_modified <= ?
+               AND pm.meta_key IN ('wexpress_label_url','_wexpress_label_url','wp_wexpress_label_url','wexpress_shipping_id')
+               AND TRIM(COALESCE(pm.meta_value,'')) <> ''"
+        );
         $stO->execute([$inicio, $fim]);
         $ids = $stO->fetchAll(\PDO::FETCH_COLUMN) ?: [];
         if (!$ids) return;
@@ -615,16 +615,14 @@ class AdminRemessaWpController extends Controller {
                 }
 
                 // quantidade total (soma de _qty)
-                $sqlQ = "\
-                    SELECT oi.order_id AS order_id, SUM(CAST(oim.meta_value AS DECIMAL(18,2))) AS qty\
-                    FROM {$prefix}woocommerce_order_items oi\
-                    INNER JOIN {$prefix}woocommerce_order_itemmeta oim\
-                        ON oim.order_item_id = oi.order_item_id\
-                       AND oim.meta_key = '_qty'\
-                    WHERE oi.order_item_type = 'line_item'\
-                      AND oi.order_id IN ({$ph})\
-                    GROUP BY oi.order_id\
-                ";
+                $sqlQ = "SELECT oi.order_id AS order_id, SUM(CAST(oim.meta_value AS DECIMAL(18,2))) AS qty
+                    FROM {$prefix}woocommerce_order_items oi
+                    INNER JOIN {$prefix}woocommerce_order_itemmeta oim
+                        ON oim.order_item_id = oi.order_item_id
+                       AND oim.meta_key = '_qty'
+                    WHERE oi.order_item_type = 'line_item'
+                      AND oi.order_id IN ({$ph})
+                    GROUP BY oi.order_id";
                 $stQ = $wpPdo->prepare($sqlQ);
                 $stQ->execute($orderIds);
                 $rowsQ = $stQ->fetchAll(\PDO::FETCH_ASSOC) ?: [];
