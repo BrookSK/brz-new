@@ -102,6 +102,10 @@ try {
 } catch (\Throwable $e) {
 }
 
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
+
 // Autoload manual temporário (até executar composer install)
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
