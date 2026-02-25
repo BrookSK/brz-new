@@ -802,27 +802,32 @@ function regerarEtiquetasMassa() {
 
             // Zona (Grupo de Triagem do Container): package(_package_order_id) -> _container_id -> container _triage_group
             try {
+                // 1) encontra o post_id do package pelo meta _package_order_id
                 $stPkg = $wpPdo->prepare("\
-                    SELECT p.ID\
-                    FROM {$prefix}posts p\
-                    INNER JOIN {$prefix}postmeta pm ON pm.post_id = p.ID\
-                    WHERE p.post_type = 'package'\
-                      AND pm.meta_key = '_package_order_id'\
+                    SELECT pm.post_id\
+                    FROM {$prefix}postmeta pm\
+                    INNER JOIN {$prefix}posts p ON p.ID = pm.post_id\
+                    WHERE pm.meta_key = '_package_order_id'\
                       AND pm.meta_value = ?\
-                    ORDER BY p.ID DESC\
+                    ORDER BY pm.post_id DESC\
                     LIMIT 1\
                 ");
                 $stPkg->execute([(string) $pedidoId]);
                 $packageId = (int) ($stPkg->fetchColumn() ?: 0);
+
+                // 2) pega o container_id do package
+                $containerId = 0;
                 if ($packageId > 0) {
-                    $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_container_id' LIMIT 1");
+                    $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_container_id','container_id','_container') ORDER BY meta_key ASC LIMIT 1");
                     $stCont->execute([$packageId]);
                     $containerId = (int) ($stCont->fetchColumn() ?: 0);
-                    if ($containerId > 0) {
-                        $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_triage_group' LIMIT 1");
-                        $stTriage->execute([$containerId]);
-                        $wpZona = trim((string) ($stTriage->fetchColumn() ?: ''));
-                    }
+                }
+
+                // 3) lê o triage group do container
+                if ($containerId > 0) {
+                    $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_triage_group' LIMIT 1");
+                    $stTriage->execute([$containerId]);
+                    $wpZona = trim((string) ($stTriage->fetchColumn() ?: ''));
                 }
             } catch (\Exception $e) {
             }
