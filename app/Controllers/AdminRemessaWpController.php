@@ -823,9 +823,9 @@ function regerarEtiquetasMassa() {
                     $containerId = (int) ($stCont->fetchColumn() ?: 0);
                 }
 
-                // 3) lê o triage group do container
+                // 3) lê o grupo do container
                 if ($containerId > 0) {
-                    $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_triage_group' LIMIT 1");
+                    $stTriage = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_triage_group','triage_group','_private_group','private_group') ORDER BY meta_key ASC LIMIT 1");
                     $stTriage->execute([$containerId]);
                     $wpZona = trim((string) ($stTriage->fetchColumn() ?: ''));
                 }
