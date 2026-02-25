@@ -1268,6 +1268,9 @@ function regerarEtiquetasMassa() {
                     <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">Voltar</a>
                     <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">Abrir pedido</a>
                     <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&print=1">Baixar Invoice (PDF)</a>
+                    ' . ($recebido ? '' : ('<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" style="display:inline;" onsubmit="return confirm(\"Confirmar recebimento deste pedido?\")">'
+                        . '<button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Confirmar recebimento</button>'
+                    . '</form>')) . '
                 </div>
             </div>';
 
@@ -1724,9 +1727,7 @@ function regerarEtiquetasMassa() {
                     . ($recebidoEm !== '' ? ('<div class="small">Em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($recebidoEm))) . '</strong></div>') : '')
                 . '</div>';
         } else {
-            echo '<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" onsubmit="return confirm(\"Confirmar recebimento deste pedido?\")">
-                    <button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Confirmar recebimento</button>
-                  </form>';
+            echo '<div class="text-muted">Use o botão <strong>Confirmar recebimento</strong> no topo desta tela.</div>';
         }
 
         echo '           </div>
