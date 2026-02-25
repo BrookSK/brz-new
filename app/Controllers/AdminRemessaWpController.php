@@ -965,6 +965,8 @@ function regerarEtiquetasMassa() {
         $downloadMode = (string) ($request->getParam('download') ?? ($_GET['download'] ?? ''));
         $downloadMode = $downloadMode === '1';
 
+        $pdfMode = $downloadMode;
+
         $janelaId = (int) $janelaId;
         $pedidoId = (int) $pedidoId;
         if ($janelaId <= 0 || $pedidoId <= 0) {
@@ -1230,16 +1232,8 @@ function regerarEtiquetasMassa() {
             $invoiceTitle .= ' - ' . $nomeClientePdf;
         }
 
-        if ($downloadMode) {
-            $safeFile = preg_replace('/[^A-Za-z0-9 _\-#]/', '', $invoiceTitle);
-            $safeFile = trim((string) $safeFile);
-            if ($safeFile === '') {
-                $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
-            }
-            $filename = $safeFile . '.html';
-            header('Content-Type: text/html; charset=utf-8');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            header('X-Content-Type-Options: nosniff');
+        if ($pdfMode) {
+            ob_start();
         }
 
         echo '<!DOCTYPE html>
@@ -1252,6 +1246,7 @@ function regerarEtiquetasMassa() {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
         echo '<style>
+  .no-print { display: ' . ($pdfMode ? 'none' : 'initial') . '; }
 @media print {
   .no-print { display: none !important; }
   body { background: #fff !important; }
@@ -1286,8 +1281,8 @@ function regerarEtiquetasMassa() {
             }
         }
 
-        $mainColClass = ($printMode || $downloadMode) ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
-        $topTitle = $printMode ? $invoiceTitle : ('Pedido #' . (int) $pedidoId);
+        $mainColClass = ($printMode || $pdfMode) ? 'col-12 px-4' : 'col-md-9 ms-sm-auto col-lg-10 px-md-4';
+        $topTitle = ($printMode || $pdfMode) ? $invoiceTitle : ('Pedido #' . (int) $pedidoId);
         echo '<main class="' . $mainColClass . '">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
@@ -1297,7 +1292,7 @@ function regerarEtiquetasMassa() {
                 <div class="d-flex gap-2 no-print">
                     <a class="btn btn-outline-secondary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '?source=' . urlencode($source) . '">Voltar</a>
                     <a class="btn btn-outline-secondary" href="/admin/pedidos-wp/detalhes/' . (int) $pedidoId . '?source=' . urlencode($source) . '">Abrir pedido</a>
-                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&download=1">Baixar Invoice</a>
+                    <a class="btn btn-primary" href="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '?source=' . urlencode($source) . '&download=1">Baixar Invoice (PDF)</a>
                     ' . ($recebido ? '' : ('<form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/pedido/' . (int) $pedidoId . '/confirmar-recebimento?source=' . urlencode($source) . '" style="display:inline;" onsubmit="return confirm(\"Confirmar recebimento deste pedido?\")">'
                         . '<button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Confirmar recebimento</button>'
                     . '</form>')) . '
@@ -1765,11 +1760,43 @@ function regerarEtiquetasMassa() {
                 </div>
             </div>';
 
-        echo '</main></div></div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>'
+        echo '</main></div></div>';
+
+        if ($pdfMode) {
+            $html = (string) ob_get_clean();
+
+            $safeFile = preg_replace('/[^A-Za-z0-9 _\-#]/', '', $invoiceTitle);
+            $safeFile = trim((string) $safeFile);
+            if ($safeFile === '') {
+                $safeFile = 'Invoice - Pedido #' . (int) $pedidoId;
+            }
+
+            if (class_exists('Dompdf\\Dompdf')) {
+                $dompdf = new \Dompdf\Dompdf([
+                    'isRemoteEnabled' => true,
+                    'isHtml5ParserEnabled' => true,
+                ]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $safeFile . '.pdf"');
+                header('X-Content-Type-Options: nosniff');
+                echo $dompdf->output();
+                exit;
+            }
+
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<div style="padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;margin:12px;font-family:Arial;">'
+                . '<strong>PDF indisponível:</strong> a biblioteca <code>dompdf/dompdf</code> não está instalada no servidor ainda. Rode <code>composer install</code>.'
+                . '</div>';
+            echo $html;
+            exit;
+        }
+
+        echo '\n<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>'
             . ($printMode ? ('<script>(function(){try{document.title=' . json_encode($invoiceTitle, JSON_UNESCAPED_UNICODE) . ';window.focus();setTimeout(function(){window.print();},200);window.addEventListener("afterprint",function(){try{window.close();}catch(e){}});}catch(e){}})();</script>') : '')
-            . '</body>
-</html>';
+            . '</body>\n</html>';
         exit;
     }
 
