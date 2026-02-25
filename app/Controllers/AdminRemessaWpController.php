@@ -47,7 +47,7 @@ class AdminRemessaWpController extends Controller {
 
     private function normalizeDocTipo(string $tipo): ?string {
         $tipo = strtolower(trim($tipo));
-        $allowed = ['compra', 'pagamento', 'medicamento'];
+        $allowed = ['pagamento', 'medicamento'];
         return in_array($tipo, $allowed, true) ? $tipo : null;
     }
 
@@ -189,7 +189,7 @@ class AdminRemessaWpController extends Controller {
 
             while (true) {
                 $end = (clone $start);
-                $end->modify('+12 days');
+                $end->modify('+2 days');
                 $end->setTime(23, 59, 59);
 
                 $status = ($end < $now) ? 'finalizada' : 'aberta';
@@ -328,7 +328,7 @@ class AdminRemessaWpController extends Controller {
         $errorMsg = null;
         $janelasAbertas = [];
         $janelasFinalizadas = [];
-        $janelasManuais = [];
+        $janelasPrimeiraRemessa = [];
 
         try {
             if ($source === 'all') {
@@ -347,17 +347,17 @@ class AdminRemessaWpController extends Controller {
                 $stF->execute();
                 $janelasFinalizadas = $stF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE tipo = 'manual' ORDER BY id DESC");
+                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE tipo = 'manual' AND titulo = 'Primeira remessa' ORDER BY id DESC");
                 $stM->execute();
-                $janelasManuais = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $janelasPrimeiraRemessa = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             } else {
                 $this->ensureJanelaAtual($source);
                 $janelasAbertas = $this->getJanelasByStatus($source, ['aberta']);
                 $janelasFinalizadas = $this->getJanelasByStatus($source, ['finalizada']);
 
-                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' ORDER BY id DESC");
+                $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = 'Primeira remessa' ORDER BY id DESC");
                 $stM->execute([$source]);
-                $janelasManuais = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $janelasPrimeiraRemessa = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             }
         } catch (\Exception $e) {
             $errorMsg = $e->getMessage();
@@ -399,9 +399,6 @@ class AdminRemessaWpController extends Controller {
                     <form method="POST" action="/admin/remessa-wp/primeira-remessa/popular?source=' . urlencode($source) . '" class="d-inline" onsubmit="return confirm(' . "\"Adicionar TODOS os pedidos já etiquetados na janela 'Primeira remessa'?\"" . ')">
                         <button type="submit" class="btn btn-outline-dark"><i class="fas fa-layer-group me-1"></i>Primeira remessa</button>
                     </form>
-                    <form method="POST" action="/admin/remessa-wp/janela-teste/criar?source=' . urlencode($source) . '" class="d-inline">
-                        <button type="submit" class="btn btn-warning"><i class="fas fa-flask me-1"></i>Janela de testes</button>
-                    </form>
                     <button type="button" class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                 </div>
             </div>';
@@ -413,7 +410,7 @@ class AdminRemessaWpController extends Controller {
         echo '<div class="row mb-4">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header"><strong>Janelas Abertas (13 dias)</strong></div>
+                    <div class="card-header"><strong>Janelas Abertas (3 dias)</strong></div>
                     <div class="card-body">';
 
         if (!$janelasAbertas) {
@@ -472,18 +469,16 @@ class AdminRemessaWpController extends Controller {
         echo '<div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header"><strong>Janelas Manuais</strong> <span class="text-muted small">(testes / inclusão manual)</span></div>
+                    <div class="card-header"><strong>Primeira remessa</strong></div>
                     <div class="card-body">';
 
-        if (!$janelasManuais) {
-            echo '<div class="text-muted">Nenhuma janela manual criada.</div>';
+        if (!$janelasPrimeiraRemessa) {
+            echo '<div class="text-muted">Nenhuma janela encontrada. Use o botão <strong>Primeira remessa</strong> acima para criar/popular.</div>';
         } else {
             echo '<div class="list-group">';
-            foreach ($janelasManuais as $j) {
-                $title = trim((string) ($j['titulo'] ?? ''));
-                if ($title === '') {
-                    $title = 'Janela manual #' . (int) $j['id'];
-                }
+            foreach ($janelasPrimeiraRemessa as $j) {
+                $title = trim((string) ($j['titulo'] ?? 'Primeira remessa'));
+                if ($title === '') $title = 'Primeira remessa';
                 $jSource = strtolower(trim((string) ($j['source'] ?? $source)));
                 if (!in_array($jSource, self::SOURCES, true)) {
                     $jSource = 'br';
@@ -604,23 +599,6 @@ class AdminRemessaWpController extends Controller {
             </div>';
 
         if ($tipoJanela === 'manual') {
-            echo '<div class="card mb-3">
-                <div class="card-header"><strong>Adicionar pedido (manual)</strong></div>
-                <div class="card-body">
-                    <form method="POST" action="/admin/remessa-wp/janela/' . (int) $janelaId . '/adicionar-pedido?source=' . urlencode($source) . '" class="row g-2 align-items-end">
-                        <div class="col-sm-4">
-                            <label class="form-label">Order ID (WP)</label>
-                            <input type="number" class="form-control" name="order_id" min="1" required>
-                        </div>
-                        <div class="col-sm-3">
-                            <button type="submit" class="btn btn-primary">Adicionar</button>
-                        </div>
-                        <div class="col-sm-5">
-                            <div class="text-muted small">Aceita pedidos fora do status <code>wc-invoice-fechado</code> e fora do período (para testes).</div>
-                        </div>
-                    </form>
-                </div>
-            </div>';
         }
 
         echo '<div class="card">
@@ -945,16 +923,22 @@ function regerarEtiquetasMassa() {
         if (!$this->tableExists('remessa_wp_pedido_documentos')) {
             echo '<div class="alert alert-warning mb-0">Tabela de documentos não encontrada. Rode a migration: database/migrations/048_add_docs_to_remessa_wp.sql</div>';
         } else {
-            $requirements = [
-                'compra' => ['label' => 'Comprovante de compra', 'required' => true],
-                'pagamento' => ['label' => 'Comprovante de pagamento', 'required' => true],
-            ];
+            $requirements = [];
+            if ($source === 'red') {
+                $requirements['pagamento'] = ['label' => 'Comprovante de pagamento', 'required' => true];
+            } else {
+                echo '<div class="alert alert-info">Para pedidos ' . htmlspecialchars(strtoupper($source)) . ', o comprovante de pagamento é exibido nas informações do pedido (WordPress) e não exige upload.</div>';
+            }
             if ($medicamento) {
                 $requirements['medicamento'] = ['label' => 'Documento de medicamento', 'required' => true];
             }
 
             if (!$etq) {
                 echo '<div class="alert alert-secondary">Uploads bloqueados até gerar etiqueta.</div>';
+            }
+
+            if (!$requirements) {
+                echo '<div class="text-muted">Nenhum documento obrigatório para este pedido.</div>';
             }
 
             foreach ($requirements as $tipo => $cfg) {
@@ -1273,6 +1257,10 @@ function regerarEtiquetasMassa() {
             }
             if (((int) ($lnk['etiqueta_gerada'] ?? 0)) !== 1) {
                 throw new \RuntimeException('Uploads bloqueados até gerar etiqueta.');
+            }
+
+            if ($tipoNorm === 'pagamento' && $source !== 'red') {
+                throw new \RuntimeException('Comprovante de pagamento só é exigido para pedidos do redirecionamento (RED).');
             }
 
             $isMed = ((int) ($lnk['medicamento'] ?? 0)) === 1;
