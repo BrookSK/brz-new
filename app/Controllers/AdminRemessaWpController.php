@@ -1264,6 +1264,24 @@ function regerarEtiquetasMassa() {
             $orderDate = trim((string) ($wpOrder['post_date'] ?? ''));
             $emitDate = $orderDate !== '' ? date('d/m/Y H:i', strtotime($orderDate)) : date('d/m/Y H:i');
 
+            $statusWp = trim((string) ($wpOrder['post_status'] ?? ''));
+            $medicamentoFlag = ((int) ($link['medicamento'] ?? 0)) === 1;
+
+            $docsByTipo = [];
+            if ($this->tableExists('remessa_wp_pedido_documentos')) {
+                try {
+                    $stD = $this->connection->prepare('SELECT * FROM remessa_wp_pedido_documentos WHERE janela_id = ? AND source = ? AND order_id = ?');
+                    $stD->execute([$janelaId, $source, $pedidoId]);
+                    $docs = $stD->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($docs as $d) {
+                        $t = strtolower(trim((string) ($d['tipo'] ?? '')));
+                        if ($t === '') continue;
+                        $docsByTipo[$t] = $d;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
             $cpf = trim((string) ($wpMeta['_billing_cpf'] ?? ($wpMeta['_billing_cnpj'] ?? '')));
             $cnpj = trim((string) ($wpMeta['_billing_cnpj'] ?? ''));
             $email = trim((string) ($wpMeta['_billing_email'] ?? ''));
@@ -1293,6 +1311,16 @@ function regerarEtiquetasMassa() {
                         foreach ($node as $k => $v) {
                             $kk = strtolower((string) $k);
                             $p = $path === '' ? $kk : ($path . '.' . $kk);
+                            if (is_string($v)) {
+                                $vv = trim($v);
+                                if ($vv !== '' && (($vv[0] ?? '') === '{' || ($vv[0] ?? '') === '[')) {
+                                    $decoded = json_decode($vv, true);
+                                    if (is_array($decoded)) {
+                                        $walk($decoded, $p);
+                                        continue;
+                                    }
+                                }
+                            }
                             if (is_scalar($v)) {
                                 $sv = (string) $v;
                                 $sv2 = str_replace(',', '.', $sv);
@@ -1307,6 +1335,9 @@ function regerarEtiquetasMassa() {
                                     ) {
                                         $candidates[] = (float) $sv2;
                                     }
+                                    if ($kk === 'value' && (strpos($p, 'shipping') !== false || strpos($p, 'frete') !== false || strpos($p, 'freight') !== false)) {
+                                        $candidates[] = (float) $sv2;
+                                    }
                                 }
                             }
                             $walk($v, $p);
@@ -1318,7 +1349,7 @@ function regerarEtiquetasMassa() {
                 $best = null;
                 foreach ($candidates as $v) {
                     if ($v <= 0) continue;
-                    if ($best === null || $v < $best) {
+                    if ($best === null || $v > $best) {
                         $best = $v;
                     }
                 }
@@ -1326,7 +1357,14 @@ function regerarEtiquetasMassa() {
             };
 
             $wxFrete = $findWxFrete($link['wexpress_last_response_json'] ?? null);
+            if ($wxFrete === null || $wxFrete <= 0) {
+                $wxFrete = $findWxFrete($link['wexpress_last_request_json'] ?? null);
+            }
+
             $freteFinal = $wxFrete !== null ? $wxFrete : (isset($wpTotals['shipping']) ? (float) $wpTotals['shipping'] : 0.0);
+            if ($freteFinal <= 0 && isset($wpTotals['shipping']) && (float) $wpTotals['shipping'] > 0) {
+                $freteFinal = (float) $wpTotals['shipping'];
+            }
 
             $subTotal = isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? (float) $wpTotals['subtotal'] : null;
             $discount = isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? (float) $wpTotals['discount'] : null;
@@ -1455,7 +1493,10 @@ function regerarEtiquetasMassa() {
                 }
                 $s = trim((string) $val);
                 if ($s === '') return '-';
-                return $safeText($s);
+                $safe = htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+                $safe = str_replace(["\r\n", "\r", "\n"], "\n", $safe);
+                $safe = nl2br($safe, false);
+                return '<div style="white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;">' . $safe . '</div>';
             };
 
             $rowsItems = '';
@@ -1494,7 +1535,7 @@ function regerarEtiquetasMassa() {
                 . '.grid { width: 100%; border-collapse: collapse; }'
                 . '.grid td { vertical-align: top; }'
                 . '.kv { width: 100%; border-collapse: collapse; }'
-                . '.kv td { padding: 2px 0; }'
+                . '.kv td { padding: 2px 0; vertical-align: top; word-break: break-all; overflow-wrap:anywhere; }'
                 . '.kv td:first-child { width: 140px; color: #374151; }'
                 . '.items { width: 100%; border-collapse: collapse; margin-top: 8px; }'
                 . '.items th, .items td { border: 1px solid #111827; padding: 6px 7px; }'
@@ -1521,6 +1562,7 @@ function regerarEtiquetasMassa() {
                 . '<tr><td>Celular:</td><td>' . $safeText($cel) . '</td></tr>'
                 . '<tr><td>IP:</td><td>' . $safeText($ipCliente) . '</td></tr>'
                 . '<tr><td>Zona:</td><td>' . $safeText($zona) . '</td></tr>'
+                . '<tr><td>Status WP:</td><td>' . $safeText($statusWp !== '' ? $statusWp : '-') . '</td></tr>'
                 . '<tr><td>Aceita substituição:</td><td>' . $safeText($aceitaSubst) . '</td></tr>'
                 . '<tr><td>Cód. rastreio:</td><td>' . $safeText($trkWx) . '</td></tr>'
                 . '</table></div>'
@@ -1568,6 +1610,28 @@ function regerarEtiquetasMassa() {
                 . '<th style="width:110px;text-align:right;">Total</th>'
                 . '</tr></thead><tbody>' . $rowsItems . '</tbody></table>'
                 . '</div>'
+
+                . '<div class="section"><div class="section-h">Documentos / Uploads</div>'
+                . '<table class="kv">'
+                . '<tr><td>Medicamento?</td><td><strong>' . ($medicamentoFlag ? 'Sim' : 'Não') . '</strong></td></tr>'
+                . (($source === 'red')
+                    ? ('<tr><td>Redirecionamento?</td><td><strong>Sim</strong></td></tr>')
+                    : ('<tr><td>Redirecionamento?</td><td><strong>Não</strong></td></tr>'))
+                . (($medicamentoFlag)
+                    ? ('<tr><td>Doc. medicamento:</td><td>'
+                        . (!empty($docsByTipo['medicamento']['file_path'])
+                            ? ('Enviado - ' . $safeText((string) ($docsByTipo['medicamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['medicamento']['file_path'] ?? '')) . '</span>')
+                            : '<span class="muted">Pendente</span>')
+                        . '</td></tr>')
+                    : '')
+                . (($source === 'red')
+                    ? ('<tr><td>Comp. pagamento:</td><td>'
+                        . (!empty($docsByTipo['pagamento']['file_path'])
+                            ? ('Enviado - ' . $safeText((string) ($docsByTipo['pagamento']['original_name'] ?? '')) . '<br><span class="muted">' . $safeText((string) ($docsByTipo['pagamento']['file_path'] ?? '')) . '</span>')
+                            : '<span class="muted">Pendente</span>')
+                        . '</td></tr>')
+                    : '')
+                . '</table></div>'
 
                 . '<table class="grid" style="margin-top:10px;"><tr>'
                 . '<td style="width:50%;padding-right:8px;">'
