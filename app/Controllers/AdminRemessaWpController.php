@@ -372,11 +372,42 @@ class AdminRemessaWpController extends Controller {
                     }
                 }
 
-                $stA = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'aberta' AND (tipo IS NULL OR tipo = 'auto') ORDER BY data_inicio DESC");
+                // Corrigir janela manual "Primeira remessa" caso esteja com datas antigas absurdas
+                try {
+                    $startFix = new \DateTime('now');
+                    $startFix->setTime(0, 0, 0);
+                    $endFix = new \DateTime('now');
+                    $endFix->setTime(23, 59, 59);
+                    $stFix = $this->connection->prepare(
+                        "UPDATE remessa_wp_janelas
+                         SET data_inicio = ?, data_fim = ?, status = 'finalizada', updated_at = NOW()
+                         WHERE tipo = 'manual'
+                           AND titulo = 'Primeira remessa'
+                           AND (TIMESTAMPDIFF(DAY, data_inicio, data_fim) > 40 OR data_fim > DATE_ADD(NOW(), INTERVAL 40 DAY))"
+                    );
+                    $stFix->execute([$startFix->format('Y-m-d H:i:s'), $endFix->format('Y-m-d H:i:s')]);
+                } catch (\Exception $e) {
+                }
+
+                $stA = $this->connection->prepare(
+                    "SELECT *
+                     FROM remessa_wp_janelas
+                     WHERE status = 'aberta'
+                       AND (tipo IS NULL OR tipo = 'auto')
+                       AND TIMESTAMPDIFF(DAY, data_inicio, data_fim) = 12
+                     ORDER BY data_inicio DESC"
+                );
                 $stA->execute();
                 $janelasAbertas = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-                $stF = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE status = 'finalizada' AND (tipo IS NULL OR tipo = 'auto') ORDER BY data_inicio DESC");
+                $stF = $this->connection->prepare(
+                    "SELECT *
+                     FROM remessa_wp_janelas
+                     WHERE status = 'finalizada'
+                       AND (tipo IS NULL OR tipo = 'auto')
+                       AND TIMESTAMPDIFF(DAY, data_inicio, data_fim) = 12
+                     ORDER BY data_inicio DESC"
+                );
                 $stF->execute();
                 $janelasFinalizadas = $stF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -385,8 +416,47 @@ class AdminRemessaWpController extends Controller {
                 $janelasPrimeiraRemessa = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             } else {
                 $this->ensureJanelaAtual($source);
+
+                // Corrigir janela manual "Primeira remessa" caso esteja com datas antigas absurdas
+                try {
+                    $startFix = new \DateTime('now');
+                    $startFix->setTime(0, 0, 0);
+                    $endFix = new \DateTime('now');
+                    $endFix->setTime(23, 59, 59);
+                    $stFix = $this->connection->prepare(
+                        "UPDATE remessa_wp_janelas
+                         SET data_inicio = ?, data_fim = ?, status = 'finalizada', updated_at = NOW()
+                         WHERE source = ?
+                           AND tipo = 'manual'
+                           AND titulo = 'Primeira remessa'
+                           AND (TIMESTAMPDIFF(DAY, data_inicio, data_fim) > 40 OR data_fim > DATE_ADD(NOW(), INTERVAL 40 DAY))"
+                    );
+                    $stFix->execute([$startFix->format('Y-m-d H:i:s'), $endFix->format('Y-m-d H:i:s'), $source]);
+                } catch (\Exception $e) {
+                }
+
                 $janelasAbertas = $this->getJanelasByStatus($source, ['aberta']);
                 $janelasFinalizadas = $this->getJanelasByStatus($source, ['finalizada']);
+
+                // filtra legadas (não-13-dias)
+                $janelasAbertas = array_values(array_filter($janelasAbertas, function ($j) {
+                    try {
+                        $di = new \DateTime((string) ($j['data_inicio'] ?? ''));
+                        $df = new \DateTime((string) ($j['data_fim'] ?? ''));
+                        return ((int) $di->diff($df)->days) === 12;
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                }));
+                $janelasFinalizadas = array_values(array_filter($janelasFinalizadas, function ($j) {
+                    try {
+                        $di = new \DateTime((string) ($j['data_inicio'] ?? ''));
+                        $df = new \DateTime((string) ($j['data_fim'] ?? ''));
+                        return ((int) $di->diff($df)->days) === 12;
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                }));
 
                 $stM = $this->connection->prepare("SELECT * FROM remessa_wp_janelas WHERE source = ? AND tipo = 'manual' AND titulo = 'Primeira remessa' ORDER BY id DESC");
                 $stM->execute([$source]);
