@@ -724,6 +724,20 @@ class AdminRemessaWpController extends Controller {
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $perfilAtual = '';
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $perfilAtual = (string) ($_SESSION['usuario_perfil'] ?? '');
+            if ($perfilAtual === '') {
+                $perfilAtual = (string) ($_SESSION['usuario_role'] ?? '');
+            }
+        } catch (\Exception $e) {
+            $perfilAtual = '';
+        }
+        $perfilAtual = strtolower(trim($perfilAtual));
+
         $tituloJanela = trim((string) ($janela['titulo'] ?? ''));
         $tituloLabel = $tituloJanela !== '' ? $tituloJanela : ('Janela #' . (int) $janelaId);
         $badge = ($tipoJanela === 'manual') ? '<span class="badge bg-warning text-dark">Manual</span>' : '<span class="badge bg-success">Automática</span>';
