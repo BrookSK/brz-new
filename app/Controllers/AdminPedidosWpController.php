@@ -1530,6 +1530,18 @@ class AdminPedidosWpController extends Controller {
                 return;
             }
 
+            $shippingDetails = null;
+            try {
+                $shippingDetails = $svcWx->getShipping($wxShipId);
+            } catch (\Throwable $e) {
+                $shippingDetails = ['error' => $e->getMessage()];
+            }
+
+            $freightSent = (float) ($payload['freight_value'] ?? 0);
+            $insuranceSent = (float) ($payload['insurance_value'] ?? 0);
+            $freightReturned = is_array($shippingDetails) && isset($shippingDetails['freight_value']) ? (float) $shippingDetails['freight_value'] : null;
+            $insuranceReturned = is_array($shippingDetails) && isset($shippingDetails['insurance_value']) ? (float) $shippingDetails['insurance_value'] : null;
+
             $labelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId);
 
             try {
@@ -1538,6 +1550,8 @@ class AdminPedidosWpController extends Controller {
                 $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_status', $wxStatus);
                 if ($wxTrack !== '') $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_tracking_number', $wxTrack);
                 if ($wxCourier !== '') $this->savePedidoMeta($localPdo, $orderId, 'wp_courier_tracking_number', $wxCourier);
+                $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_last_request_json', json_encode($payload));
+                $this->savePedidoMeta($localPdo, $orderId, 'wp_wexpress_last_response_json', json_encode(['create' => $resp, 'get' => $shippingDetails]));
             } catch (\Throwable $e) {
             }
 
@@ -1548,6 +1562,8 @@ class AdminPedidosWpController extends Controller {
                 'wexpress_status' => $wxStatus,
                 'wexpress_tracking_number' => $wxTrack,
                 'courier_tracking_number' => $wxCourier,
+                'wexpress_last_request_json' => json_encode($payload),
+                'wexpress_last_response_json' => json_encode(['create' => $resp, 'get' => $shippingDetails]),
             ]);
 
             $this->json([
@@ -1557,6 +1573,10 @@ class AdminPedidosWpController extends Controller {
                 'wexpress_tracking_number' => $wxTrack,
                 'courier_tracking_number' => $wxCourier,
                 'label_url' => $labelUrl,
+                'freight_value_sent' => $freightSent,
+                'insurance_value_sent' => $insuranceSent,
+                'freight_value_returned' => $freightReturned,
+                'insurance_value_returned' => $insuranceReturned,
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
