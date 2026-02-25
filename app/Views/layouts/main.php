@@ -1018,7 +1018,7 @@
                                 <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> <?= __('nav.my_data', 'Meus Dados') ?></a></li>
                                 <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true)): ?>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> <?= __('nav.admin_panel', 'Painel Admin') ?></a></li>
+                                    <li><a class="dropdown-item text-primary" href="<?= ($usuarioPerfil === 'conferente') ? '/admin/remessa-wp' : '/admin/dashboard' ?>"><i class="fas fa-cog"></i> <?= __('nav.admin_panel', 'Painel Admin') ?></a></li>
                                 <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> <?= __('nav.logout', 'Sair') ?></a></li>

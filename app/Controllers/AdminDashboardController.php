@@ -37,7 +37,7 @@ class AdminDashboardController extends Controller {
     
     public function index(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
         try {
             $pdo = \Config\Database::getConnection();
             

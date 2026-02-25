@@ -142,13 +142,18 @@ $router->get('/admin', function($request) {
         exit;
     }
 
+    if ($perfil === 'conferente') {
+        header('Location: /admin/remessa-wp');
+        exit;
+    }
+
     if ($perfil === 'representante') {
         header('Location: /meu-painel');
         exit;
     }
 
     $menuItems = [
-        ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador','conferente']],
+        ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
