@@ -824,7 +824,7 @@ function regerarEtiquetasMassa() {
                     SELECT pm.post_id\
                     FROM {$prefix}postmeta pm\
                     INNER JOIN {$prefix}posts p ON p.ID = pm.post_id\
-                    WHERE pm.meta_key IN ('_package_order_id','_package_order')\
+                    WHERE pm.meta_key IN ('_package_order_id','_package_order','package_order_id','package_order')\
                       AND (pm.meta_value = ? OR pm.meta_value LIKE ?)\
                     ORDER BY pm.post_id DESC\
                     LIMIT 1\
@@ -837,7 +837,7 @@ function regerarEtiquetasMassa() {
                     $stPkg2 = $wpPdo->prepare("\
                         SELECT pm.post_id\
                         FROM {$prefix}postmeta pm\
-                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key IN ('_container_id','container_id','_container')\
+                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key LIKE '%container%'\
                         WHERE pm.meta_key LIKE '%order%'\
                           AND pm.meta_value LIKE ?\
                         ORDER BY pm.post_id DESC\
@@ -852,7 +852,7 @@ function regerarEtiquetasMassa() {
                     $stPkg3 = $wpPdo->prepare("\
                         SELECT pm.post_id, pm.meta_key\
                         FROM {$prefix}postmeta pm\
-                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key IN ('_container_id','container_id','_container')\
+                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key LIKE '%container%'\
                         WHERE pm.meta_value LIKE ?\
                         ORDER BY pm.post_id DESC\
                         LIMIT 1\
@@ -870,7 +870,7 @@ function regerarEtiquetasMassa() {
                 $containerId = 0;
                 $containerVal = '';
                 if ($packageId > 0) {
-                    $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key IN ('_container_id','container_id','_container') ORDER BY meta_key ASC LIMIT 1");
+                    $stCont = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key LIKE '%container%' ORDER BY meta_key ASC LIMIT 1");
                     $stCont->execute([$packageId]);
                     $containerVal = (string) ($stCont->fetchColumn() ?: '');
                     $containerDigits = preg_replace('/\D+/', '', $containerVal);
