@@ -820,14 +820,69 @@ function regerarEtiquetasMassa() {
         return;
     }
 
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const fmt = (d) => pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear() + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    const startedAt = new Date();
+
+    let box = document.getElementById("wx-regerar-progress");
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "wx-regerar-progress";
+        box.style.position = "fixed";
+        box.style.right = "16px";
+        box.style.bottom = "16px";
+        box.style.width = "360px";
+        box.style.zIndex = "9999";
+        box.style.background = "#fff";
+        box.style.border = "1px solid rgba(0,0,0,.15)";
+        box.style.borderRadius = "8px";
+        box.style.boxShadow = "0 10px 24px rgba(0,0,0,.15)";
+        box.style.padding = "12px";
+        box.innerHTML = "<div style=\"display:flex;justify-content:space-between;align-items:center;gap:8px;\">" +
+            "<div style=\"font-weight:600;\">Regerando etiquetas</div>" +
+            "<button type=\"button\" id=\"wx-regerar-close\" class=\"btn btn-sm btn-outline-secondary\">Ocultar</button>" +
+        "</div>" +
+        "<div class=\"mt-2\" style=\"font-size:12px;\">" +
+            "<div><strong>Início:</strong> <span id=\"wx-regerar-start\"></span></div>" +
+            "<div><strong>Última atualização:</strong> <span id=\"wx-regerar-last\">-</span></div>" +
+            "<div><strong>Pedido atual:</strong> <span id=\"wx-regerar-current\">-</span></div>" +
+            "<div><strong>Progresso:</strong> <span id=\"wx-regerar-count\">0/0</span></div>" +
+        "</div>" +
+        "<div class=\"progress mt-2\" style=\"height:10px;\"><div id=\"wx-regerar-bar\" class=\"progress-bar\" role=\"progressbar\" style=\"width:0%\"></div></div>" +
+        "<div class=\"mt-2\" style=\"font-size:12px;color:#6c757d;\">Não feche a página enquanto estiver processando.</div>";
+        document.body.appendChild(box);
+        document.getElementById("wx-regerar-close").onclick = () => { box.style.display = "none"; };
+    } else {
+        box.style.display = "block";
+    }
+
+    const elStart = document.getElementById("wx-regerar-start");
+    const elLast = document.getElementById("wx-regerar-last");
+    const elCurrent = document.getElementById("wx-regerar-current");
+    const elCount = document.getElementById("wx-regerar-count");
+    const elBar = document.getElementById("wx-regerar-bar");
+    if (elStart) elStart.textContent = fmt(startedAt);
+
     let idx = 0;
+    const total = targets.length;
+    const updateUi = () => {
+        const done = Math.min(idx, total);
+        if (elCount) elCount.textContent = done + "/" + total;
+        if (elBar) elBar.style.width = (total ? Math.round((done / total) * 100) : 0) + "%";
+        if (elLast) elLast.textContent = fmt(new Date());
+    };
+
     const runNext = () => {
         if (idx >= targets.length) {
+            updateUi();
+            if (elCurrent) elCurrent.textContent = "Concluído";
             alert("Concluído. Recarregando...");
             location.reload();
             return;
         }
         const id = targets[idx++];
+        if (elCurrent) elCurrent.textContent = "#" + id;
+        updateUi();
         fetch("/admin/pedidos-wp/wexpress/regerar/" + id + "?source=" + encodeURIComponent(source), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -838,10 +893,12 @@ function regerarEtiquetasMassa() {
             if (!ok || !data || !data.success) {
                 console.warn("Erro ao regerar etiqueta do pedido", id, data);
             }
+            updateUi();
             setTimeout(runNext, 350);
         })
         .catch(err => {
             console.warn("Erro ao regerar etiqueta do pedido", id, err);
+            updateUi();
             setTimeout(runNext, 350);
         });
     };
