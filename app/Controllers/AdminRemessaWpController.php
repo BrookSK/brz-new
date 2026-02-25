@@ -788,7 +788,7 @@ function regerarEtiquetasMassa() {
         $wpTotals = [];
         $wpSuite = '';
         $wpZona = '';
-        $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => ''];
+        $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => '', 'package_meta_key' => ''];
         try {
             $wp = $this->getWpPdo($this->connection, $source);
             $prefix = $wp['prefix'];
@@ -845,6 +845,24 @@ function regerarEtiquetasMassa() {
                     ");
                     $stPkg2->execute(['%' . (string) $pedidoId . '%']);
                     $packageId = (int) ($stPkg2->fetchColumn() ?: 0);
+                }
+
+                // fallback final: procura qualquer meta_value contendo o order_id em um post que tenha container_id
+                if ($packageId <= 0) {
+                    $stPkg3 = $wpPdo->prepare("\
+                        SELECT pm.post_id, pm.meta_key\
+                        FROM {$prefix}postmeta pm\
+                        INNER JOIN {$prefix}postmeta pmc ON pmc.post_id = pm.post_id AND pmc.meta_key IN ('_container_id','container_id','_container')\
+                        WHERE pm.meta_value LIKE ?\
+                        ORDER BY pm.post_id DESC\
+                        LIMIT 1\
+                    ");
+                    $stPkg3->execute(['%' . (string) $pedidoId . '%']);
+                    $rowPkg3 = $stPkg3->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    if ($rowPkg3) {
+                        $packageId = (int) ($rowPkg3['post_id'] ?? 0);
+                        $wpZonaDebug['package_meta_key'] = (string) ($rowPkg3['meta_key'] ?? '');
+                    }
                 }
                 $wpZonaDebug['package_id'] = $packageId;
 
@@ -1151,7 +1169,7 @@ function regerarEtiquetasMassa() {
                         . '<div><strong>Celular:</strong> ' . htmlspecialchars($cel !== '' ? $cel : '-') . '</div>'
                         . '<div><strong>IP:</strong> ' . htmlspecialchars($ipCliente !== '' ? $ipCliente : '-') . '</div>'
                         . '<div><strong>Zona:</strong> ' . htmlspecialchars($zona !== '' ? $zona : '-') . '</div>'
-                        . ($debugZona ? ('<div class="text-muted" style="font-size:12px;">debug_zona: package_id=' . (int) ($wpZonaDebug['package_id'] ?? 0) . ' container_id=' . (int) ($wpZonaDebug['container_id'] ?? 0) . ' zona_raw=' . htmlspecialchars((string) ($wpZonaDebug['zona_raw'] ?? '')) . '</div>') : '')
+                        . ($debugZona ? ('<div class="text-muted" style="font-size:12px;">debug_zona: package_id=' . (int) ($wpZonaDebug['package_id'] ?? 0) . ' package_meta_key=' . htmlspecialchars((string) ($wpZonaDebug['package_meta_key'] ?? '')) . ' container_id=' . (int) ($wpZonaDebug['container_id'] ?? 0) . ' zona_raw=' . htmlspecialchars((string) ($wpZonaDebug['zona_raw'] ?? '')) . '</div>') : '')
                         . '<div><strong>Aceitar substituição:</strong> ' . htmlspecialchars($aceitaSubst !== '' ? $aceitaSubst : '-') . '</div>'
                         . '<div><strong>Código de rastreio:</strong> ' . htmlspecialchars($codigoRastreio !== '' ? $codigoRastreio : '-') . '</div>'
                     . '</div>'
