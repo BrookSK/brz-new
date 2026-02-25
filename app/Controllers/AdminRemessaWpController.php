@@ -670,6 +670,8 @@ class AdminRemessaWpController extends Controller {
                     '_billing_first_name', '_billing_last_name',
                     '_shipping_first_name', '_shipping_last_name',
                     '_shipping_postcode', '_billing_postcode',
+                    'wexpress_shipping_id',
+                    'wexpress_label_url', '_wexpress_label_url', 'wp_wexpress_label_url',
                 ];
                 $phK = implode(',', array_fill(0, count($metaKeys), '?'));
                 $sqlM = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$ph}) AND meta_key IN ({$phK})";
@@ -783,7 +785,17 @@ class AdminRemessaWpController extends Controller {
                 $qtd = (int) ($ordersQty[$oid] ?? 0);
 
                 $etq = ((int) ($lnk['etiqueta_gerada'] ?? 0)) === 1;
-                $labelUrl = (string) ($lnk['wexpress_label_url'] ?? '');
+
+                // Etiqueta: preferir a URL mais recente do WordPress (meta), pois a remessa pode ter cache antigo
+                $labelUrl = '';
+                $shipId = trim((string) ($m['wexpress_shipping_id'] ?? ''));
+                $labelUrl = trim((string) ($m['wexpress_label_url'] ?? ($m['_wexpress_label_url'] ?? ($m['wp_wexpress_label_url'] ?? ''))));
+                if ($labelUrl === '' && $shipId !== '') {
+                    $labelUrl = 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($shipId);
+                }
+                if ($labelUrl === '') {
+                    $labelUrl = (string) ($lnk['wexpress_label_url'] ?? '');
+                }
 
                 echo '<tr>
                     <td><strong>#' . (int) $oid . '</strong></td>
