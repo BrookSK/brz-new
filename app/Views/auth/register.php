@@ -116,7 +116,7 @@
                                 <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
-                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123" required>
+                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123">
                                 </div>
                             </div>
                             <div class="col-md-8 mb-3">
@@ -289,6 +289,11 @@ $(document).ready(function() {
 
         $('#cep').prop('required', true);
         $('#numero').prop('required', br);
+        if (br) {
+            $('#numero').attr('required', 'required');
+        } else {
+            $('#numero').removeAttr('required');
+        }
 
         $('#field-cep').toggle(true);
         $('#field-numero').toggle(br);
