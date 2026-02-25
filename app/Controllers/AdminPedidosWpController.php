@@ -1470,7 +1470,12 @@ class AdminPedidosWpController extends Controller {
 
             $freteDeclarado = round(max(0.01, $pesoTotalKg * 1.80), 2);
 
-            $externalShippingId = (string) $orderId;
+            // Importante: na regeração, alguns provedores tratam external_shipping_id como idempotente
+            // e retornam o shipment antigo (mantendo freight_value antigo, ex. 0.01). Para forçar
+            // recálculo/criação, use um external_shipping_id único.
+            $externalShippingId = $forceRegenerate
+                ? ((string) $orderId . '-re-' . date('YmdHis'))
+                : (string) $orderId;
             $payload = [
                 'shipment_purpose' => 'personal',
                 'external_shipping_id' => $externalShippingId,
