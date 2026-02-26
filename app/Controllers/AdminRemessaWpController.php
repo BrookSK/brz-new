@@ -1004,6 +1004,7 @@ function regerarEtiquetasMassa() {
         $wpTotals = [];
         $wpSuite = '';
         $wpPesoTotalKg = 0.0;
+        $wpServiceFee = 0.0;
         $wpZona = '';
         $wpZonaDebug = ['package_id' => 0, 'container_id' => 0, 'zona_raw' => '', 'package_meta_key' => ''];
         $wpPdo = null;
@@ -1140,7 +1141,8 @@ function regerarEtiquetasMassa() {
 
             $stIM = $wpPdo->prepare("SELECT meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id = ?");
             foreach ($orderItems as $oi) {
-                if (strtolower((string) ($oi['order_item_type'] ?? '')) !== 'line_item') continue;
+                $oiType = strtolower((string) ($oi['order_item_type'] ?? ''));
+                if ($oiType !== 'line_item' && $oiType !== 'fee') continue;
                 $itemId = (int) ($oi['order_item_id'] ?? 0);
                 if ($itemId <= 0) continue;
 
@@ -1151,6 +1153,18 @@ function regerarEtiquetasMassa() {
                     $k = (string) ($mr['meta_key'] ?? '');
                     if ($k === '') continue;
                     $m[$k] = $mr['meta_value'] ?? '';
+                }
+
+                if ($oiType === 'fee') {
+                    $feeName = trim((string) ($oi['order_item_name'] ?? ''));
+                    $feeTotal = is_numeric($m['_line_total'] ?? null) ? (float) $m['_line_total'] : null;
+                    if ($feeTotal !== null && $feeTotal != 0.0) {
+                        $nm = mb_strtolower($feeName);
+                        if (strpos($nm, 'taxa') !== false && (strpos($nm, 'servi') !== false || strpos($nm, 'kg') !== false)) {
+                            $wpServiceFee += (float) $feeTotal;
+                        }
+                    }
+                    continue;
                 }
 
                 $productId = (int) ($m['_product_id'] ?? 0);
@@ -1240,6 +1254,7 @@ function regerarEtiquetasMassa() {
                 'discount' => is_numeric($wpMeta['_cart_discount'] ?? null) ? (float) $wpMeta['_cart_discount'] : (is_numeric($wpMeta['_discount_total'] ?? null) ? (float) $wpMeta['_discount_total'] : null),
                 'total' => is_numeric($wpMeta['_order_total'] ?? null) ? (float) $wpMeta['_order_total'] : null,
                 'currency' => trim((string) ($wpMeta['_order_currency'] ?? '')),
+                'service_fee' => $wpServiceFee,
             ];
 
             if ($wpTotals['subtotal'] === null) {
@@ -1719,7 +1734,7 @@ function regerarEtiquetasMassa() {
                 $idx++;
             }
             if ($rowsItems === '') {
-                $rowsItems = '<tr><td colspan="6" style="text-align:center;padding:12px;">Nenhum item</td></tr>';
+                $rowsItems = '<tr><td colspan="7" style="text-align:center;padding:12px;">Nenhum item</td></tr>';
             }
 
             $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
@@ -1845,6 +1860,7 @@ function regerarEtiquetasMassa() {
                 . '<div class="section"><div class="section-h">Totais</div>'
                 . '<table class="totals">'
                 . '<tr><td class="label">Subtotal:</td><td class="value">' . $safeText($fmtMoney($subTotal)) . '</td></tr>'
+                . '<tr><td class="label">Taxa de serviço:</td><td class="value">' . $safeText($fmtMoney(isset($wpTotals['service_fee']) ? (float) $wpTotals['service_fee'] : null)) . '</td></tr>'
                 . '<tr><td class="label">Frete (WExpress - USD):</td><td class="value">' . $safeText($fmtUsd($wxFreteUsd)) . '</td></tr>'
                 . '<tr><td class="label">Peso total (kg):</td><td class="value">' . $safeText($wpPesoTotalKg > 0 ? number_format($wpPesoTotalKg, 3, ',', '.') : '-') . '</td></tr>'
                 . '<tr><td class="label">Descontos/Subsídios:</td><td class="value">' . $safeText($fmtMoney($discount)) . '</td></tr>'
@@ -2390,6 +2406,7 @@ function regerarEtiquetasMassa() {
                     . '<div class="mb-2"><strong>Totais</strong></div>'
                     . '<div class="small">'
                         . '<div><strong>Subda pauta:</strong> ' . htmlspecialchars(isset($wpTotals['subtotal']) && $wpTotals['subtotal'] !== null ? number_format((float) $wpTotals['subtotal'], 2, ',', '.') : '-') . $currLabel . '</div>'
+                        . '<div><strong>Taxa de serviço:</strong> ' . htmlspecialchars(isset($wpTotals['service_fee']) && (float) $wpTotals['service_fee'] != 0.0 ? number_format((float) $wpTotals['service_fee'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Frete (WExpress - USD):</strong> ' . htmlspecialchars($wxFreteUsdUi !== null ? ('USD ' . number_format((float) $wxFreteUsdUi, 2, '.', ',')) : '-') . '</div>'
                         . '<div><strong>Frete (WooCommerce):</strong> ' . htmlspecialchars(isset($wpTotals['shipping']) && $wpTotals['shipping'] !== null ? number_format((float) $wpTotals['shipping'], 2, ',', '.') : '-') . $currLabel . '</div>'
                         . '<div><strong>Descontos/Subsídios:</strong> ' . htmlspecialchars(isset($wpTotals['discount']) && $wpTotals['discount'] !== null ? number_format((float) $wpTotals['discount'], 2, ',', '.') : '-') . $currLabel . '</div>'
