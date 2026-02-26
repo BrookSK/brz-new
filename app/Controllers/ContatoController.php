@@ -12,7 +12,7 @@ class ContatoController extends Controller {
             $assunto = trim((string) $request->getParam('assunto', ''));
             $mensagem = trim((string) $request->getParam('mensagem', ''));
 
-            if ($nome === '' || $email === '' || $assunto === '' || $mensagem === '') {
+            if ($nome === '' || $email === '' || $telefone === '' || $assunto === '' || $mensagem === '') {
                 return $this->json(['success' => false, 'error' => 'Preencha os campos obrigatórios.'], 400);
             }
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

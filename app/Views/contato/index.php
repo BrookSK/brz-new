@@ -64,7 +64,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="tel" class="form-control" id="telefone" name="telefone">
+                                <input type="tel" class="form-control" id="telefone" name="telefone" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="assunto" class="form-label">Assunto</label>
@@ -121,6 +121,13 @@
 <script>
 $(document).ready(function() {
     $('#contactForm').on('submit', function(e) {
+        if (!this.checkValidity()) {
+            e.preventDefault();
+            if (typeof this.reportValidity === 'function') {
+                this.reportValidity();
+            }
+            return;
+        }
         e.preventDefault();
         
         const btn = $('#contactBtn');
