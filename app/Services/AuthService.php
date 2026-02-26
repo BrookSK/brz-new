@@ -127,6 +127,13 @@ class AuthService {
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
         $_SESSION['usuario_email'] = $usuario['email'];
+        $docSess = '';
+        if (isset($usuario['documento'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['documento']);
+        } elseif (isset($usuario['cpf'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['cpf']);
+        }
+        $_SESSION['usuario_documento'] = $docSess;
         $perfil = (string) ($usuario['perfil'] ?? '');
         $role = (string) ($usuario['role'] ?? '');
         $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
@@ -192,6 +199,7 @@ class AuthService {
             'id' => $_SESSION['usuario_id'],
             'nome' => $_SESSION['usuario_nome'],
             'email' => $_SESSION['usuario_email'],
+            'documento' => $_SESSION['usuario_documento'] ?? '',
             'perfil' => $_SESSION['usuario_perfil'],
             'role' => $_SESSION['usuario_role'] ?? $_SESSION['usuario_perfil'],
             'avatar' => $_SESSION['usuario_avatar'] ?? null

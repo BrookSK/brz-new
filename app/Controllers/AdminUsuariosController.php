@@ -551,7 +551,7 @@ class AdminUsuariosController extends Controller {
                                         <p><strong>Nome:</strong> ' . htmlspecialchars($usuario['nome']) . '</p>
                                         <p><strong>Email:</strong> ' . htmlspecialchars($usuario['email']) . '</p>
                                         <p><strong>Telefone:</strong> ' . htmlspecialchars($usuario['telefone'] ?? 'N/A') . '</p>
-                                        <p><strong>CPF:</strong> ' . htmlspecialchars($usuario['cpf'] ?? 'N/A') . '</p>
+                                        <p><strong>CPF:</strong> ' . htmlspecialchars($usuario['cpf'] ?? ($usuario['documento'] ?? 'N/A')) . '</p>
                                         ' . (!empty($usuario['suite']) ? '<p><strong>Suite:</strong> ' . (int) $usuario['suite'] . '</p>' : '') . '
                                     </div>
                                     <div class="col-md-6">
