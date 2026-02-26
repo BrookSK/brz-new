@@ -12,6 +12,19 @@ class AdminRelatoriosController extends Controller {
         $this->connection = Database::getConnection();
     }
 
+    private function bootDompdf(): bool {
+        try {
+            $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
+            if (!file_exists($autoload)) {
+                return false;
+            }
+            require_once $autoload;
+            return class_exists('Dompdf\\Dompdf');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private function getConfigNumber(string $categoria, string $chave, float $default = 0.0): float {
         $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
         $table = null;
@@ -1115,11 +1128,25 @@ class AdminRelatoriosController extends Controller {
         // Para manter simples e confiável: CSV é montado diretamente reexecutando a consulta mínima.
         // Para PDF, retornamos HTML imprimível.
 
-        // Chamar financeiro() para montar dados (capturar HTML) quando PDF
+        // PDF: renderizar HTML via dompdf quando disponível
         if ($format === 'pdf') {
             ob_start();
             $this->financeiro($request);
-            $html = ob_get_clean();
+            $html = (string) ob_get_clean();
+
+            if ($this->bootDompdf()) {
+                $options = new \Dompdf\Options();
+                $options->set('isRemoteEnabled', true);
+                $dompdf = new \Dompdf\Dompdf($options);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'landscape');
+                $dompdf->render();
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="relatorio_financeiro_' . date('Y-m-d') . '.pdf"');
+                echo $dompdf->output();
+                exit;
+            }
+
             header('Content-Type: text/html; charset=utf-8');
             header('Content-Disposition: inline; filename="relatorio_financeiro_' . date('Y-m-d') . '.html"');
             echo $html;
@@ -1895,10 +1922,6 @@ class AdminRelatoriosController extends Controller {
     }
 
     private function gerarArquivoPDF($dados, $tipo) {
-        // Configurações do PDF
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="relatorio_' . $tipo . '_' . date('Y-m-d') . '.pdf"');
-
         // Iniciar buffer de saída
         ob_start();
 
@@ -2043,17 +2066,24 @@ class AdminRelatoriosController extends Controller {
 </body>
 </html>';
 
-        // Converter HTML para PDF usando a biblioteca DOMPDF (se disponível)
-        // Por enquanto, vamos apenas exibir o HTML que pode ser salvo como PDF pelo navegador
         $html = ob_get_clean();
-        
-        // Se tiver a biblioteca mPDF, usaríamos:
-        // require_once 'vendor/autoload.php';
-        // $mpdf = new \Mpdf\Mpdf();
-        // $mpdf->WriteHTML($html);
-        // $mpdf->Output();
-        
-        // Por enquanto, apenas exibir o HTML
+
+        if ($this->bootDompdf()) {
+            $options = new \Dompdf\Options();
+            $options->set('isRemoteEnabled', true);
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="relatorio_' . $tipo . '_' . date('Y-m-d') . '.pdf"');
+            echo $dompdf->output();
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        header('Content-Disposition: inline; filename="relatorio_' . $tipo . '_' . date('Y-m-d') . '.html"');
         echo $html;
+        exit;
     }
 }
