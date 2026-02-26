@@ -333,6 +333,10 @@ class AuthController extends Controller {
             return;
         }
 
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
         if ($request->getMethod() === 'POST') {
             $email = trim((string) ($request->getParam('email') ?? ''));
             if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
