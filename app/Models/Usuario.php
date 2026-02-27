@@ -450,7 +450,7 @@ class Usuario extends Model {
             ];
             
             foreach ($mapeamentoColunas as $campoForm => $colunaBanco) {
-                if (in_array($colunaBanco, $colunas) && isset($data[$colunaBanco])) {
+                if (in_array($colunaBanco, $colunas) && array_key_exists($colunaBanco, $data)) {
                     $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
                     $params[$colunaBanco] = $data[$colunaBanco];
                 }
