@@ -212,22 +212,30 @@
 
                     $splitProdutoStatus = '';
                     $splitTaxaStatus = '';
+                    $splitImpostoStatus = '';
                     $splitPagoParcial = false;
                     if ($hasSplit) {
                         $pProduto = (isset($splitPagamentos['produto']) && is_array($splitPagamentos['produto'])) ? $splitPagamentos['produto'] : null;
                         $pTaxa = (isset($splitPagamentos['taxa_servico']) && is_array($splitPagamentos['taxa_servico'])) ? $splitPagamentos['taxa_servico'] : ((isset($splitPagamentos['taxa']) && is_array($splitPagamentos['taxa'])) ? $splitPagamentos['taxa'] : null);
+                        $pImposto = (isset($splitPagamentos['imposto']) && is_array($splitPagamentos['imposto'])) ? $splitPagamentos['imposto'] : null;
                         $splitProdutoStatus = strtoupper(trim((string) (is_array($pProduto) ? ($pProduto['status'] ?? '') : '')));
                         $splitTaxaStatus = strtoupper(trim((string) (is_array($pTaxa) ? ($pTaxa['status'] ?? '') : '')));
+                        $splitImpostoStatus = strtoupper(trim((string) (is_array($pImposto) ? ($pImposto['status'] ?? '') : '')));
                         $produtoOk = ($splitProdutoStatus !== '' && in_array($splitProdutoStatus, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true));
                         $taxaOk = ($splitTaxaStatus !== '' && in_array($splitTaxaStatus, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true));
-                        $splitPagoParcial = (($produtoOk xor $taxaOk) === true);
+                        $hasImposto = (!empty($pImposto) || $splitImpostoStatus !== '');
+                        $impostoOk = (!$hasImposto) ? true : ($splitImpostoStatus !== '' && in_array($splitImpostoStatus, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true));
+
+                        $totalOk = ($produtoOk ? 1 : 0) + ($taxaOk ? 1 : 0) + ($impostoOk ? 1 : 0);
+                        $totalNeed = 2 + ($hasImposto ? 1 : 0);
+                        $splitPagoParcial = ($totalOk > 0 && $totalOk < $totalNeed);
                     }
                     ?>
 
                     <?php if (!$isPago && $hasSplit && $splitPagoParcial): ?>
                         <div class="alert alert-warning" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">
                             <strong><?= __('checkout_done.partial_payment_title', 'Pagamento parcial detectado') ?>.</strong>
-                            <?= __('checkout_done.partial_payment_desc', 'Seu pedido continuará como pendente até que os 2 pagamentos sejam concluídos (produtos e taxa de serviço). Se você pagar apenas um deles, o pedido não será confirmado.', []) ?>
+                            <?= __('checkout_done.partial_payment_desc', 'Seu pedido continuará como pendente até que todos os pagamentos sejam concluídos (produtos, taxa de serviço e, se houver, impostos). Se você pagar apenas parte deles, o pedido não será confirmado.', []) ?>
                         </div>
                     <?php endif; ?>
 
@@ -235,6 +243,7 @@
                         <?php
                         $pProduto = $splitPagamentos['produto'] ?? null;
                         $pTaxa = $splitPagamentos['taxa_servico'] ?? ($splitPagamentos['taxa'] ?? null);
+                        $pImposto = $splitPagamentos['imposto'] ?? null;
 
                         $renderSplitBox = function (string $titulo, ?array $row) {
                             if (empty($row)) {
@@ -277,6 +286,9 @@
 
                         <?php $renderSplitBox('Pagamento 1: Produtos (Mercado Pago)', is_array($pProduto) ? $pProduto : null); ?>
                         <?php $renderSplitBox('Pagamento 2: Taxa de serviço (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
+                        <?php if (is_array($pImposto) && (float) ($pImposto['valor'] ?? 0) > 0): ?>
+                            <?php $renderSplitBox('Pagamento 3: Impostos (Mercado Pago - split)', is_array($pImposto) ? $pImposto : null); ?>
+                        <?php endif; ?>
 
                     <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>

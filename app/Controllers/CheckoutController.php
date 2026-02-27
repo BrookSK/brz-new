@@ -2462,6 +2462,32 @@ class CheckoutController extends Controller {
                             $totalBrl = (float) (($pedidoNorm['total'] ?? null) !== null ? $pedidoNorm['total'] : ($pedidoRowPay['total'] ?? 0));
                             $taxaServico = (float) ($pedidoNorm['taxa_servico'] ?? 0);
                             if ($taxaServico < 0) $taxaServico = 0.0;
+                            $valorImposto = 0.0;
+                            try {
+                                $colsPed = [];
+                                $dbCols = \Config\Database::getConnection();
+                                $stCols = $dbCols->query('DESCRIBE pedidos');
+                                $colsPed = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                $colImp = '';
+                                if (is_array($colsPed)) {
+                                    foreach (['valor_impostos', 'impostos'] as $c) {
+                                        if (in_array($c, $colsPed, true)) {
+                                            $colImp = $c;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if ($colImp !== '') {
+                                    $stImp = $dbCols->prepare('SELECT ' . $colImp . ' AS impostos FROM pedidos WHERE id = ? LIMIT 1');
+                                    $stImp->execute([(int) $pedidoId]);
+                                    $rowImp = $stImp->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                    $valorImposto = (float) ($rowImp['impostos'] ?? 0);
+                                }
+                            } catch (\Exception $e) {
+                                $valorImposto = 0.0;
+                            }
+                            if ($valorImposto < 0) $valorImposto = 0.0;
+                            $valorImposto = round((float) $valorImposto, 2);
                             $valorProduto = round(max(0.0, $totalBrl - $taxaServico), 2);
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
 
@@ -2481,7 +2507,8 @@ class CheckoutController extends Controller {
                             $mp = null;
                             if ($valorProduto > 0) {
                                 if ($formaSelecionada === 'pix') {
-                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
+                                    $valorMp = round((float) ($valorProduto + $valorImposto), 2);
+                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorMp, (string) $descricaoProduto, $payer, (float) $valorImposto);
                                     if (empty($mp['success'])) {
                                         throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar PIX Mercado Pago (produto)'));
                                     }
@@ -2514,6 +2541,15 @@ class CheckoutController extends Controller {
                                 'moeda' => 'BRL',
                                 'produto' => $mp,
                                 'taxa' => $taxa,
+                                'imposto' => [
+                                    'success' => true,
+                                    'gateway' => 'mercadopago',
+                                    'metodo' => $formaSelecionada,
+                                    'moeda' => 'BRL',
+                                    'valor' => (float) $valorImposto,
+                                    'payment_id' => (string) (is_array($mp) ? ($mp['payment_id'] ?? '') : ''),
+                                    'status' => 'pending',
+                                ],
                             ];
                         } else {
                             // Fluxo legado (AppMax total) - cartao_credito permanece aqui por enquanto.

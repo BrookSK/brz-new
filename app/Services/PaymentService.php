@@ -51,8 +51,19 @@ class PaymentService {
                 PRIMARY KEY (`id`),
                 KEY `idx_pp_pedido` (`pedido_id`),
                 KEY `idx_pp_pedido_comp` (`pedido_id`, `componente`),
-                UNIQUE KEY `uk_pp_gateway_payment` (`gateway`, `payment_id`)
+                UNIQUE KEY `uk_pp_gateway_payment_comp` (`gateway`, `payment_id`, `componente`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            // Migração best-effort: versões antigas tinham UNIQUE(gateway,payment_id)
+            // e isso impede múltiplos componentes (ex.: produto+imposto) no mesmo payment_id.
+            try {
+                $db->exec('ALTER TABLE pedido_pagamentos DROP INDEX uk_pp_gateway_payment');
+            } catch (\Exception $e) {
+            }
+            try {
+                $db->exec('ALTER TABLE pedido_pagamentos ADD UNIQUE KEY uk_pp_gateway_payment_comp (gateway, payment_id, componente)');
+            } catch (\Exception $e) {
+            }
         } catch (\Exception $e) {
         }
 
@@ -132,7 +143,7 @@ class PaymentService {
         return is_array($decoded) ? $decoded : [];
     }
 
-    public function createMercadoPagoPixPaymentProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = []): array {
+    public function createMercadoPagoPixPaymentProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], float $applicationFeeBrl = 0.0): array {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) {
             return ['success' => false, 'error' => 'Pedido inválido'];
@@ -146,6 +157,11 @@ class PaymentService {
         $valorBrl = (float) $valorBrl;
         if ($valorBrl <= 0) {
             return ['success' => false, 'error' => 'Valor inválido'];
+        }
+
+        $applicationFeeBrl = (float) $applicationFeeBrl;
+        if ($applicationFeeBrl < 0) {
+            $applicationFeeBrl = 0.0;
         }
 
         $base = Url::base();
@@ -171,6 +187,11 @@ class PaymentService {
             ],
         ];
 
+        if ($applicationFeeBrl > 0) {
+            // Marketplace split (checkout transparente): comissão do marketplace/integrador.
+            $payload['application_fee'] = (float) $applicationFeeBrl;
+        }
+
         try {
             $idemKey = substr(hash('sha256', 'pix-produto|' . (string) $pedidoId . '|' . (string) round($valorBrl, 2) . '|' . (string) $descricao), 0, 32);
             $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload, ['X-Idempotency-Key: ' . $idemKey]);
@@ -194,8 +215,23 @@ class PaymentService {
                 'status' => 'pending',
                 'pix_encoded_image' => $qrBase64,
                 'pix_payload' => $qrPayload,
-                'metadata' => json_encode(['raw' => $resp], JSON_UNESCAPED_UNICODE),
+                'metadata' => json_encode(['raw' => $resp, 'application_fee' => $applicationFeeBrl], JSON_UNESCAPED_UNICODE),
             ]);
+
+            if ($applicationFeeBrl > 0) {
+                $this->upsertPedidoPagamento([
+                    'pedido_id' => $pedidoId,
+                    'componente' => 'imposto',
+                    'gateway' => 'mercadopago',
+                    'metodo' => 'pix',
+                    'moeda' => 'BRL',
+                    'valor' => (float) $applicationFeeBrl,
+                    'payment_id' => $paymentId,
+                    'status' => 'pending',
+                    'gateway_status' => 'APPLICATION_FEE',
+                    'metadata' => json_encode(['raw' => $resp, 'application_fee' => $applicationFeeBrl], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
 
             return [
                 'success' => true,
@@ -322,6 +358,10 @@ class PaymentService {
 
         $pedidoId = (ctype_digit($externalRef) ? (int) $externalRef : 0);
         if ($pedidoId > 0) {
+            // Atualiza todos os componentes vinculados a esse payment_id (produto e, se existir, imposto)
+            $this->atualizarSplitPorGatewayPaymentId($paymentId, 'mercadopago', $internal, $statusDetail !== '' ? $statusDetail : strtoupper($status));
+
+            // Se ainda não existe registro, criar pelo menos o componente produto.
             $this->upsertPedidoPagamento([
                 'pedido_id' => $pedidoId,
                 'componente' => 'produto',
@@ -382,8 +422,8 @@ class PaymentService {
             $existingId = 0;
             try {
                 if (in_array('payment_id', $cols, true) && !empty($data['payment_id'])) {
-                    $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid LIMIT 1');
-                    $st->execute([':g' => $gateway, ':pid' => (string) $data['payment_id']]);
+                    $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid AND componente = :c LIMIT 1');
+                    $st->execute([':g' => $gateway, ':pid' => (string) $data['payment_id'], ':c' => $componente]);
                     $existingId = (int) ($st->fetchColumn() ?: 0);
                 }
                 if ($existingId <= 0) {
@@ -464,6 +504,7 @@ class PaymentService {
 
             $produto = $stMap['produto'] ?? null;
             $taxa = $stMap['taxa_servico'] ?? ($stMap['taxa'] ?? null);
+            $imposto = $stMap['imposto'] ?? null;
 
             // Se ainda não temos os dois, não mexer (split incompleto)
             if ($produto === null || $taxa === null) {
@@ -472,7 +513,8 @@ class PaymentService {
 
             $produtoOk = ($produto === 'approved');
             $taxaOk = ($taxa === 'approved');
-            $statusAgregado = ($produtoOk && $taxaOk) ? 'approved' : 'pending';
+            $impostoOk = ($imposto === null ? true : ($imposto === 'approved'));
+            $statusAgregado = ($produtoOk && $taxaOk && $impostoOk) ? 'approved' : 'pending';
 
             $db = \Config\Database::getConnection();
             $colsP = [];
@@ -532,26 +574,34 @@ class PaymentService {
             $this->garantirTabelaPedidoPagamentos();
             $db = \Config\Database::getConnection();
 
-            $stFind = $db->prepare('SELECT id, pedido_id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid LIMIT 1');
+            $stFind = $db->prepare('SELECT id, pedido_id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid');
             $stFind->execute([':g' => $gateway, ':pid' => $paymentId]);
-            $row = $stFind->fetch(\PDO::FETCH_ASSOC) ?: [];
-            $id = (int) ($row['id'] ?? 0);
-            $pedidoId = (int) ($row['pedido_id'] ?? 0);
-            if ($id <= 0 || $pedidoId <= 0) {
+            $rows = $stFind->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($rows)) {
                 return false;
             }
 
-            $set = ['status = :st'];
-            $params = [':st' => $paymentStatusInterno, ':id' => $id];
-            if ($gatewayStatus !== '') {
-                $set[] = 'gateway_status = :gst';
-                $params[':gst'] = $gatewayStatus;
+            $pedidoId = 0;
+            foreach ($rows as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $pedidoId = (int) ($r['pedido_id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $set = ['status = :st'];
+                $params = [':st' => $paymentStatusInterno, ':id' => $id];
+                if ($gatewayStatus !== '') {
+                    $set[] = 'gateway_status = :gst';
+                    $params[':gst'] = $gatewayStatus;
+                }
+                $sql = 'UPDATE pedido_pagamentos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $stUp = $db->prepare($sql);
+                $stUp->execute($params);
             }
-            $sql = 'UPDATE pedido_pagamentos SET ' . implode(', ', $set) . ' WHERE id = :id';
-            $stUp = $db->prepare($sql);
-            $stUp->execute($params);
 
-            $this->recalcularStatusPagamentoPedidoSplit($pedidoId);
+            if ($pedidoId > 0) {
+                $this->recalcularStatusPagamentoPedidoSplit($pedidoId);
+            }
             return true;
         } catch (\Exception $e) {
             return false;
