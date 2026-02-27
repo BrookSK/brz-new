@@ -2588,7 +2588,28 @@ class CheckoutController extends Controller {
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
                 // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
                 if (!$reused && ($formaSelecionada === 'carteira' || strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL')) {
+                    // Limpar carrinho no DB (usuário logado) e na sessão (fallback)
+                    try {
+                        $uid = (int) ($usuario['id'] ?? 0);
+                        if ($uid > 0) {
+                            $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                            if ($cartId > 0) {
+                                $this->carrinhoModel->limparCarrinho($cartId);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                    }
+
+                    try {
+                        if (session_status() === PHP_SESSION_NONE) {
+                            session_start();
+                        }
+                    } catch (\Throwable $e) {
+                    }
+
                     unset($_SESSION['carrinho']);
+                    unset($_SESSION['carrinho_itens_ativos']);
                     $this->debugLog('[CHECKOUT] Carrinho limpo');
                 }
                 
