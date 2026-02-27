@@ -233,7 +233,16 @@ class CheckoutController extends Controller {
 
         $stProduto = null;
         try {
-            $select = ['`' . $produtoPkCol . '` AS id', 'nome', 'name', 'sku'];
+            $select = ['`' . $produtoPkCol . '` AS id'];
+            if (is_array($produtoCols) && in_array('nome', $produtoCols, true)) {
+                $select[] = 'nome';
+            }
+            if (is_array($produtoCols) && in_array('name', $produtoCols, true)) {
+                $select[] = 'name';
+            }
+            if (is_array($produtoCols) && in_array('sku', $produtoCols, true)) {
+                $select[] = 'sku';
+            }
             if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
             if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
             if (!empty($produtoColStock)) $select[] = $produtoColStock;
