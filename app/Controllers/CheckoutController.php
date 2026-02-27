@@ -103,6 +103,13 @@ class CheckoutController extends Controller {
     private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
         $db = \Config\Database::getConnection();
 
+        $dbName = null;
+        try {
+            $dbName = $db->query('SELECT DATABASE()')->fetchColumn();
+        } catch (\Throwable $e) {
+            $dbName = null;
+        }
+
         $produtoCols = [];
         try {
             $st = $db->query('DESCRIBE produtos');
@@ -266,8 +273,11 @@ class CheckoutController extends Controller {
             }
         }
 
-        foreach ($carrinho as $item) {
+        foreach ($carrinho as $cartKey => $item) {
             $produtoId = (int) ($item['produto_id'] ?? ($item['id'] ?? 0));
+            if ($produtoId <= 0 && (is_int($cartKey) || (is_string($cartKey) && ctype_digit($cartKey)))) {
+                $produtoId = (int) $cartKey;
+            }
             if ($produtoId <= 0) {
                 continue;
             }
@@ -331,6 +341,7 @@ class CheckoutController extends Controller {
                     'produto_id' => $produtoId,
                     'produto_variacao_id' => $produtoVariacaoId,
                     'lookup_cols' => $produtoLookupCols,
+                    'db' => ($dbName !== false ? $dbName : null),
                     'motivo' => 'Produto não encontrado',
                     'quantidade_solicitada' => $qtd,
                 ];
