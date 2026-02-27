@@ -43,108 +43,24 @@
                                 return (string) $s;
                             };
 
-                            $statusLabels = [
-                                'pendente' => __('order_status.pending', 'Pendente'),
-                                'processando' => __('order_status.processing', 'Processando'),
-                                'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
-                                'entregue' => __('order_status.delivered', 'Entregue'),
-                                'cancelado' => __('order_status.cancelled', 'Cancelado'),
-                                'pago' => __('order_status.paid', 'Pago'),
-                                'paid' => __('order_status.paid', 'Pago'),
-                                'aprovado' => __('order_status.paid', 'Pago'),
-                                'approved' => __('order_status.paid', 'Pago'),
-                                'selecao' => __('order_status.selection', 'Seleção'),
-                                'cobranca' => __('order_status.billing', 'Cobrança'),
-                                'despacho' => __('order_status.dispatch', 'Despacho'),
-                                'transito' => __('order_status.in_transit', 'Trânsito'),
-                                'aduana' => __('order_status.customs', 'Aduana'),
-                                'entrega' => __('order_status.delivery', 'Entrega'),
-                                'concluido' => __('order_status.completed', 'Concluído'),
-                                'pedido_criado' => __('order_status.created', 'Pedido criado'),
-                                'em_transporte' => __('order_status.in_transit', 'Em transporte'),
-                                'aguardando_processamento' => __('order_status.awaiting_processing', 'Aguardando processamento'),
-                                'consolidado' => __('order_status.consolidated', 'Consolidado'),
-                                'produto_consolidado' => __('order_status.product_consolidated', 'Produto consolidado'),
-                                'rascunho_etiqueta' => __('order_status.label_draft', 'Rascunho etiqueta'),
-                                'etiqueta_efetivada' => __('order_status.label_effective', 'Etiqueta efetivada'),
-                                'etiqueta_gerada' => __('order_status.label_generated', 'Etiqueta gerada'),
-                                'aguardando_lib_alfandegaria' => __('order_status.awaiting_customs_release', 'Aguardando lib. alfandegária'),
-                                'aguardando_liberacao_aduaneira' => __('order_status.awaiting_customs_release', 'Aguardando Liberação Aduaneira'),
-                                'finalizacao_embalagem' => __('order_status.packaging_finalization', 'Finalização embalagem'),
-                                'entrega_finalizada' => __('order_status.delivery_completed', 'Entrega finalizada'),
-                                'enviado_ao_destinatario' => __('order_status.shipped_to_recipient', 'Enviado ao destinatário'),
-                                'caixa_fechada' => __('order_status.closed_box', 'Caixa fechada'),
-                            ];
-
                             $presentStatusMap = [];
                             foreach (($pedidos ?? []) as $p) {
-                                $st = (string) ($p['status'] ?? '');
-                                if ($st === '') {
-                                    $st = (string) ($p['payment_status'] ?? ($p['status_pagamento'] ?? ''));
+                                $stRaw = (string) ($p['status'] ?? '');
+                                if ($stRaw === '') {
+                                    $stRaw = (string) ($p['payment_status'] ?? ($p['status_pagamento'] ?? ''));
                                 }
-                                $st = $normalizeStatusKey($st);
-                                if ($st !== '') {
-                                    $presentStatusMap[$st] = true;
+                                $stKey = $normalizeStatusKey($stRaw);
+                                if ($stKey !== '') {
+                                    $presentStatusMap[$stKey] = true;
                                 }
                             }
 
-                            $statusOrder = [
-                                'pendente',
-                                'processando',
-                                'pedido_criado',
-                                'pago',
-                                'paid',
-                                'aprovado',
-                                'approved',
-                                'aguardando_processamento',
-                                'consolidado',
-                                'produto_consolidado',
-                                'rascunho_etiqueta',
-                                'etiqueta_efetivada',
-                                'aguardando_lib_alfandegaria',
-                                'aguardando_liberacao_aduaneira',
-                                'finalizacao_embalagem',
-                                'enviado',
-                                'enviado_ao_destinatario',
-                                'em_transporte',
-                                'caixa_fechada',
-                                'selecao',
-                                'cobranca',
-                                'despacho',
-                                'transito',
-                                'aduana',
-                                'entrega',
-                                'entrega_finalizada',
-                                'entregue',
-                                'concluido',
-                                'cancelado',
+                            $statusOptions = array_keys($presentStatusMap);
+                            sort($statusOptions);
+
+                            $statusLabels = [
+                                'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
                             ];
-
-                            $statusOptions = [];
-                            $added = [];
-
-                            foreach ($statusOrder as $s) {
-                                if (isset($statusLabels[$s]) && !isset($added[$s])) {
-                                    $statusOptions[] = $s;
-                                    $added[$s] = true;
-                                }
-                            }
-
-                            foreach ($statusLabels as $k => $lbl) {
-                                if (!isset($added[$k])) {
-                                    $statusOptions[] = $k;
-                                    $added[$k] = true;
-                                }
-                            }
-
-                            $unknown = [];
-                            foreach (array_keys($presentStatusMap) as $k) {
-                                if (!isset($added[$k])) {
-                                    $unknown[] = $k;
-                                }
-                            }
-                            sort($unknown);
-                            $statusOptions = array_merge($statusOptions, $unknown);
 
                             foreach ($statusOptions as $key) {
                                 $label = $statusLabels[$key] ?? ucfirst(str_replace('_', ' ', (string) $key));
@@ -349,27 +265,7 @@
                                                         'aguardando_lib_alfandegaria' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
                                                     ];
                                                     $statusLabels = [
-                                                        'pendente' => __('order_status.pending', 'Pendente'),
-                                                        'processando' => __('order_status.processing', 'Processando'),
                                                         'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
-                                                        'entregue' => __('order_status.delivered', 'Entregue'),
-                                                        'cancelado' => __('order_status.cancelled', 'Cancelado'),
-                                                        'pago' => __('order_status.paid', 'Pago'),
-                                                        'paid' => __('order_status.paid', 'Pago'),
-                                                        'aprovado' => __('order_status.paid', 'Pago'),
-                                                        'approved' => __('order_status.paid', 'Pago'),
-                                                        'selecao' => __('order_status.selection', 'Seleção'),
-                                                        'cobranca' => __('order_status.billing', 'Cobrança'),
-                                                        'despacho' => __('order_status.dispatch', 'Despacho'),
-                                                        'transito' => __('order_status.in_transit', 'Trânsito'),
-                                                        'aduana' => __('order_status.customs', 'Aduana'),
-                                                        'entrega' => __('order_status.delivery', 'Entrega'),
-                                                        'concluido' => __('order_status.completed', 'Concluído'),
-                                                        'etiqueta_gerada' => __('order_status.label_generated', 'Etiqueta gerada'),
-                                                        'enviado_ao_destinatario' => __('order_status.shipped_to_recipient', 'Enviado ao destinatário'),
-                                                        'caixa_fechada' => __('order_status.closed_box', 'Caixa fechada'),
-                                                        'aguardando_liberacao_aduaneira' => __('order_status.awaiting_customs_release', 'Aguardando Liberação Aduaneira'),
-                                                        'aguardando_lib_alfandegaria' => __('order_status.awaiting_customs_release', 'Aguardando lib. alfandegária'),
                                                     ];
                                                     $badge = $statusColors[$statusPedidoKey] ?? $statusColors['selecao'];
                                                     $label = $statusLabels[$statusPedidoKey] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
