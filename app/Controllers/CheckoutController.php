@@ -140,6 +140,11 @@ class CheckoutController extends Controller {
             }
         }
 
+        $produtoPkCol = 'id';
+        if (is_array($produtoCols) && !in_array('id', $produtoCols, true) && in_array('produto_id', $produtoCols, true)) {
+            $produtoPkCol = 'produto_id';
+        }
+
         $variacoesTable = null;
         $hasProdutoVariacoes = false;
         foreach (['produto_variacoes', 'produto_variations', 'product_variacoes', 'product_variations', 'variacoes_produto', 'variations'] as $t) {
@@ -194,17 +199,30 @@ class CheckoutController extends Controller {
             }
         }
 
+        $variacaoPkCol = 'id';
+        if (is_array($variacaoCols) && !in_array('id', $variacaoCols, true) && in_array('variacao_id', $variacaoCols, true)) {
+            $variacaoPkCol = 'variacao_id';
+        }
+
+        $variacaoProdutoFkCol = null;
+        foreach (['produto_id', 'product_id'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoProdutoFkCol = $c;
+                break;
+            }
+        }
+
         $erros = [];
 
         $stProduto = null;
         try {
-            $select = ['id', 'nome', 'name', 'sku'];
+            $select = ['`' . $produtoPkCol . '` AS id', 'nome', 'name', 'sku'];
             if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
             if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
             if (!empty($produtoColStock)) $select[] = $produtoColStock;
             if (!empty($produtoColControla)) $select[] = $produtoColControla;
             $select = array_values(array_unique($select));
-            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE id = ? LIMIT 1');
+            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE `' . $produtoPkCol . '` = ? LIMIT 1');
         } catch (\Throwable $e) {
             $stProduto = null;
         }
@@ -212,13 +230,16 @@ class CheckoutController extends Controller {
         $stVariacao = null;
         if ($hasProdutoVariacoes && $variacoesTable) {
             try {
-                $select = ['id', 'produto_id'];
+                $select = ['`' . $variacaoPkCol . '` AS id'];
+                if (!empty($variacaoProdutoFkCol)) {
+                    $select[] = '`' . $variacaoProdutoFkCol . '` AS produto_id';
+                }
                 if (!empty($variacaoColAtivo)) $select[] = $variacaoColAtivo;
                 if (!empty($variacaoColStatus)) $select[] = $variacaoColStatus;
                 if (!empty($variacaoColStock)) $select[] = $variacaoColStock;
                 if (!empty($variacaoColControla)) $select[] = $variacaoColControla;
                 $select = array_values(array_unique($select));
-                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $variacoesTable . ' WHERE id = ? LIMIT 1');
+                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $variacoesTable . ' WHERE `' . $variacaoPkCol . '` = ? LIMIT 1');
             } catch (\Throwable $e) {
                 $stVariacao = null;
             }
