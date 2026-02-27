@@ -1965,6 +1965,52 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
 
+                                            <div class="row mt-3">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="mb-0">💙 Mercado Pago</h6>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="mercadopago_enabled" name="pagamentos_mercadopago_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'mercadopago_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <label class="form-check-label" for="mercadopago_enabled">Ativo</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Access Token</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_mercadopago_access_token" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_access_token', '') . '" placeholder="APP_USR-...">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <small class="text-muted">Use o Access Token da conta/app do Mercado Pago.</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Public Key (opcional)</label>
+                                                                        <input type="text" class="form-control" name="pagamentos_mercadopago_public_key" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_public_key', '') . '" placeholder="APP_USR-...">
+                                                                        <small class="text-muted">Obrigatória apenas se você for usar SDK/JS do MP no frontend.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Webhook URL</label>
+                                                                        <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/mercadopago', ENT_QUOTES, 'UTF-8') . '" readonly>
+                                                                        <small class="text-muted">Configure esta URL no painel do Mercado Pago para receber notificações.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="row">
                                                 <div class="col-12">
                                                     <h6 class="mb-3">Webhook - Pedido Manual</h6>
