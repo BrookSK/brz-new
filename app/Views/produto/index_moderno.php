@@ -338,6 +338,11 @@ function mostrarAlerta(tipo, mensagem) {
 
 // Função para atualizar badge
 function atualizarBadge(totalItens) {
+    if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+        window.updateCartBadge(totalItens);
+        return;
+    }
+
     const badges = document.querySelectorAll('.cart-badge');
     badges.forEach(badge => {
         if (totalItens > 0) {

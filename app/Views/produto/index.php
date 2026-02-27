@@ -313,6 +313,11 @@ function mostrarAlerta(tipo, mensagem) {
 
 // Função para atualizar badge
 function atualizarBadge(totalItens) {
+    if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+        window.updateCartBadge(totalItens);
+        return;
+    }
+
     console.log('🏷️ Atualizando badge:', totalItens);
     
     var badges = document.querySelectorAll('.cart-badge');

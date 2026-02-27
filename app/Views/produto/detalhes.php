@@ -1015,28 +1015,18 @@ function inicializarDetalhesProduto() {
     });
     
     function updateCartBadge(totalItens) {
-        const n = Number(totalItens || 0);
-
-        // Navbar badge
-        let $badges = $('.cart-badge');
-        if ($badges.length === 0) {
-            // Criar badge se não existir (quando estava 0 na renderização inicial)
-            const $cartLink = $('a.nav-link.position-relative[href="/carrinho"]').first();
-            if ($cartLink && $cartLink.length) {
-                $cartLink.append('<span class="cart-badge"></span>');
-            }
-            const $floatBtn = $('.floating-cart button');
-            if ($floatBtn && $floatBtn.length) {
-                $floatBtn.append('<span class="cart-badge"></span>');
-            }
-            $badges = $('.cart-badge');
+        if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+            window.updateCartBadge(totalItens);
+            return;
         }
 
+        const n = Number(totalItens || 0);
+        const $badges = $('.cart-badge');
         $badges.each(function() {
             const $b = $(this);
             if (n > 0) {
                 $b.text(String(n));
-                $b.css('display', 'flex');
+                $b.css('display', 'inline-flex');
             } else {
                 $b.css('display', 'none');
             }

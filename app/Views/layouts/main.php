@@ -543,14 +543,16 @@
             right: -8px;
             background: var(--danger-color);
             color: white;
-            border-radius: 50%;
-            width: 20px;
+            border-radius: 999px;
+            min-width: 20px;
             height: 20px;
-            display: flex;
+            padding: 0 6px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
         }
         
         .stats-card {
@@ -617,6 +619,7 @@
             border: none;
             color: white;
             font-size: 1.5rem;
+            position: relative;
             box-shadow: 0 5px 20px rgba(37, 99, 235, 0.4);
             transition: background-color 0.2s ease, box-shadow 0.2s ease;
         }
@@ -1471,6 +1474,42 @@
         console.log('jQuery carregado:', typeof $ !== 'undefined');
         console.log('Swal carregado:', typeof Swal !== 'undefined');
         console.log('CurrencyConverter carregado:', typeof window.CurrencyConverter !== 'undefined');
+    </script>
+
+    <script>
+        window.updateCartBadge = function(totalItens) {
+            try {
+                const n = Number(totalItens || 0);
+
+                const ensureBadge = function(parent) {
+                    if (!parent) return null;
+                    let badge = parent.querySelector('.cart-badge');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'cart-badge';
+                        parent.appendChild(badge);
+                    }
+                    return badge;
+                };
+
+                const navLink = document.querySelector('a.nav-link.position-relative[href="/carrinho"]');
+                const navBadge = ensureBadge(navLink);
+
+                const floatBtn = document.querySelector('.floating-cart button');
+                const floatBadge = ensureBadge(floatBtn);
+
+                [navBadge, floatBadge].forEach(function(b) {
+                    if (!b) return;
+                    if (n > 0) {
+                        b.textContent = String(n);
+                        b.style.display = 'inline-flex';
+                    } else {
+                        b.style.display = 'none';
+                    }
+                });
+            } catch (e) {
+            }
+        };
     </script>
     
     <!-- Incluir Mini Carrinho DEPOIS dos scripts principais -->
