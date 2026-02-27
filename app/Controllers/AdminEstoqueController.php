@@ -1017,11 +1017,16 @@ class AdminEstoqueController extends Controller {
             // Esta tela é apenas para listagem. A entrada é feita em /admin/estoque/entrada.
 
             $schemaProdutos = $this->getProdutosSchema();
+            $nameCol = $schemaProdutos['nameCol'] ?? null;
+            $skuCol = $schemaProdutos['skuCol'] ?? null;
             $imgCol = $schemaProdutos['imgCol'] ?? null;
             $imgSelect = "'' AS imagem_raw";
             if (is_string($imgCol) && $imgCol !== '') {
                 $imgSelect = 'p.' . $imgCol . ' AS imagem_raw';
             }
+
+            $nameExpr = (is_string($nameCol) && $nameCol !== '') ? ('p.' . $nameCol) : "CAST(p.id AS CHAR)";
+            $skuExpr = (is_string($skuCol) && $skuCol !== '') ? ('p.' . $skuCol) : "''";
 
             // Buscar status geral do estoque (apenas itens com quantidade no galpão)
             // Regra: Reservado = reservas reais (estoque_reservas ativa) + demanda pendente (lista_compras pendente)
@@ -1035,7 +1040,7 @@ class AdminEstoqueController extends Controller {
                         FROM lista_compras
                         WHERE status = 'pendente'
                         GROUP BY produto_id
-                    ) res_lc ON res_lc.produto_id = v.produto_id
+                    ) res_lc ON res_lc.produto_id = p.id
                 ";
                 $reservadoSelectExpr = 'COALESCE(res_lc.reservado, 0)';
             }
@@ -1047,21 +1052,35 @@ class AdminEstoqueController extends Controller {
                         FROM estoque_reservas
                         WHERE status = 'ativa'
                         GROUP BY produto_id
-                    ) res_er ON res_er.produto_id = v.produto_id
+                    ) res_er ON res_er.produto_id = p.id
                 ";
                 $reservadoSelectExpr = '(' . $reservadoSelectExpr . ' + COALESCE(res_er.reservado, 0))';
             }
 
             $stmt = $this->connection->prepare("
                 SELECT
-                    v.*, 
+                    p.id as produto_id,
+                    {$nameExpr} as produto_nome,
+                    {$skuExpr} as sku,
+                    e.total as quantidade_estoque,
+                    CASE
+                        WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                        WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                        ELSE 'normal'
+                    END as status_estoque,
                     loc.localizacao,
                     loc.data_compra_mais_recente,
                     loc.validade_mais_proxima,
                     {$reservadoSelectExpr} as reservado,
                     {$imgSelect}
-                FROM vw_status_geral_estoque v
-                JOIN produtos p ON p.id = v.produto_id
+                FROM (
+                    SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
+                    FROM estoque_interno
+                    WHERE quantidade > 0
+                    GROUP BY produto_id
+                ) e
+                JOIN produtos p ON p.id = e.produto_id
+                LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 {$reservaJoin}
                 JOIN (
                     SELECT
@@ -1076,8 +1095,8 @@ class AdminEstoqueController extends Controller {
                     FROM estoque_interno e
                     WHERE e.quantidade > 0
                     GROUP BY e.produto_id
-                ) loc ON loc.produto_id = v.produto_id
-                ORDER BY v.produto_nome
+                ) loc ON loc.produto_id = p.id
+                ORDER BY produto_nome
             ");
             $stmt->execute();
             $status_geral = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -1089,9 +1108,21 @@ class AdminEstoqueController extends Controller {
                     SUM(CASE WHEN status_estoque = 'baixo' THEN 1 ELSE 0 END) as baixos,
                     SUM(CASE WHEN status_estoque = 'normal' THEN 1 ELSE 0 END) as normais
                 FROM (
-                    SELECT v.*
-                    FROM vw_status_geral_estoque v
-                    JOIN (SELECT DISTINCT produto_id FROM estoque_interno WHERE quantidade > 0) e ON e.produto_id = v.produto_id
+                    SELECT
+                        p.id as produto_id,
+                        CASE
+                            WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                            WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                            ELSE 'normal'
+                        END as status_estoque
+                    FROM (
+                        SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
+                        FROM estoque_interno
+                        WHERE quantidade > 0
+                        GROUP BY produto_id
+                    ) e
+                    JOIN produtos p ON p.id = e.produto_id
+                    LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 ) t
             ");
             $stmt->execute();
