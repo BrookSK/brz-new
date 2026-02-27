@@ -827,6 +827,9 @@ class AdminComprasController extends Controller {
     }
 
     public function removerItem($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
 
@@ -854,8 +857,23 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja);
             $stmt->execute($params);
 
-            $_SESSION['message'] = 'Item removido da lista.';
-            $_SESSION['message_type'] = 'success';
+            $affected = (int) $stmt->rowCount();
+
+            // Se nenhum registro foi afetado e o filtro por loja pode estar divergente do registro na lista,
+            // tentar remover todas as pendências do produto (independente de loja).
+            if ($affected === 0 && $lojaId > 0) {
+                $stmt2 = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id");
+                $stmt2->execute([':produto_id' => $produtoId]);
+                $affected = (int) $stmt2->rowCount();
+            }
+
+            if ($affected > 0) {
+                $_SESSION['message'] = 'Item removido da lista.';
+                $_SESSION['message_type'] = 'success';
+            } else {
+                $_SESSION['message'] = 'Nenhum item pendente encontrado para remover.';
+                $_SESSION['message_type'] = 'warning';
+            }
             header('Location: /admin/estoque/compras');
             exit;
         } catch (\Exception $e) {
