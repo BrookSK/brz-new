@@ -32,7 +32,7 @@
                             <option value=""><?= __('common.all', 'Todos') ?></option>
                             <option value="pago"><?= __('admin.orders.status.paid', 'Pago') ?></option>
                             <option value="processando"><?= __('admin.orders.status.processing', 'Processando') ?></option>
-                            <option value="enviado"><?= __('admin.orders.status.shipped', 'Enviado') ?></option>
+                            <option value="enviado"><?= __('admin.orders.status.shipped', 'Etiqueta gerada') ?></option>
                             <option value="entregue"><?= __('admin.orders.status.delivered', 'Entregue') ?></option>
                         </select>
                     </div>

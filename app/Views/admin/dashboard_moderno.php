@@ -267,7 +267,7 @@ function getStatusLabel($status) {
         'consolidado' => __('admin.order_status.consolidated', 'Consolidado'),
         'rascunho_etiqueta' => __('admin.order_status.label_draft', 'Rascunho Etiqueta'),
         'etiqueta_efetivada' => __('admin.order_status.label_effective', 'Etiqueta Efetivada'),
-        'enviado' => __('admin.order_status.shipped', 'Enviado'),
+        'enviado' => __('admin.order_status.shipped', 'Etiqueta gerada'),
         'aguardando_lib_alfandegaria' => __('admin.order_status.awaiting_customs_release', 'Aguardando Liberação'),
         'finalizacao_embalagem' => __('admin.order_status.packaging_finalization', 'Finalização Embalagem'),
         'entrega_finalizada' => __('admin.order_status.delivery_completed', 'Entrega Finalizada')
@@ -283,7 +283,7 @@ window.ADMIN_DASHBOARD_I18N = {
     order_status_selection: <?= json_encode(__('admin.order_status.consolidated', 'Consolidado'), JSON_UNESCAPED_UNICODE) ?>,
     order_status_billing: <?= json_encode(__('admin.order_status.label_draft', 'Rascunho Etiqueta'), JSON_UNESCAPED_UNICODE) ?>,
     order_status_label_effective: <?= json_encode(__('admin.order_status.label_effective', 'Etiqueta Efetivada'), JSON_UNESCAPED_UNICODE) ?>,
-    order_status_shipped: <?= json_encode(__('admin.order_status.shipped', 'Enviado'), JSON_UNESCAPED_UNICODE) ?>,
+    order_status_shipped: <?= json_encode(__('admin.order_status.shipped', 'Etiqueta gerada'), JSON_UNESCAPED_UNICODE) ?>,
     order_status_customs: <?= json_encode(__('admin.order_status.awaiting_customs_release', 'Aguardando Liberação'), JSON_UNESCAPED_UNICODE) ?>,
     order_status_dispatch: <?= json_encode(__('admin.order_status.packaging_finalization', 'Finalização Embalagem'), JSON_UNESCAPED_UNICODE) ?>,
     order_status_completed: <?= json_encode(__('admin.order_status.delivery_completed', 'Entrega Finalizada'), JSON_UNESCAPED_UNICODE) ?>,
@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'consolidado': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_selection) ? window.ADMIN_DASHBOARD_I18N.order_status_selection : 'Consolidado',
             'rascunho_etiqueta': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_billing) ? window.ADMIN_DASHBOARD_I18N.order_status_billing : 'Rascunho Etiqueta',
             'etiqueta_efetivada': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_label_effective) ? window.ADMIN_DASHBOARD_I18N.order_status_label_effective : 'Etiqueta Efetivada',
-            'enviado': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_shipped) ? window.ADMIN_DASHBOARD_I18N.order_status_shipped : 'Enviado',
+            'enviado': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_shipped) ? window.ADMIN_DASHBOARD_I18N.order_status_shipped : 'Etiqueta gerada',
             'aguardando_lib_alfandegaria': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_customs) ? window.ADMIN_DASHBOARD_I18N.order_status_customs : 'Aguardando Liberação',
             'finalizacao_embalagem': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_dispatch) ? window.ADMIN_DASHBOARD_I18N.order_status_dispatch : 'Finalização Embalagem',
             'entrega_finalizada': (window.ADMIN_DASHBOARD_I18N && window.ADMIN_DASHBOARD_I18N.order_status_completed) ? window.ADMIN_DASHBOARD_I18N.order_status_completed : 'Entrega Finalizada'

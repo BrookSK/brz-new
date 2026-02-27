@@ -22,10 +22,31 @@
                     <select class="form-select" id="filtroStatus" style="width: 150px;">
                         <option value=""><?= __('user_orders.filter.all_status', 'Todos Status') ?></option>
                         <?php
+                            $normalizeStatusKey = function($st) {
+                                $s = is_string($st) ? $st : '';
+                                $s = trim($s);
+                                if ($s === '') return '';
+                                if (function_exists('mb_strtolower')) {
+                                    $s = mb_strtolower($s, 'UTF-8');
+                                } else {
+                                    $s = strtolower($s);
+                                }
+                                if (function_exists('iconv')) {
+                                    $t = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
+                                    if ($t !== false && is_string($t) && $t !== '') {
+                                        $s = $t;
+                                    }
+                                }
+                                $s = preg_replace('/[^a-z0-9]+/', '_', $s);
+                                $s = preg_replace('/_+/', '_', $s);
+                                $s = trim($s, '_');
+                                return (string) $s;
+                            };
+
                             $statusLabels = [
                                 'pendente' => __('order_status.pending', 'Pendente'),
                                 'processando' => __('order_status.processing', 'Processando'),
-                                'enviado' => __('order_status.shipped', 'Enviado'),
+                                'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
                                 'entregue' => __('order_status.delivered', 'Entregue'),
                                 'cancelado' => __('order_status.cancelled', 'Cancelado'),
                                 'pago' => __('order_status.paid', 'Pago'),
@@ -46,9 +67,13 @@
                                 'produto_consolidado' => __('order_status.product_consolidated', 'Produto consolidado'),
                                 'rascunho_etiqueta' => __('order_status.label_draft', 'Rascunho etiqueta'),
                                 'etiqueta_efetivada' => __('order_status.label_effective', 'Etiqueta efetivada'),
+                                'etiqueta_gerada' => __('order_status.label_generated', 'Etiqueta gerada'),
                                 'aguardando_lib_alfandegaria' => __('order_status.awaiting_customs_release', 'Aguardando lib. alfandegária'),
+                                'aguardando_liberacao_aduaneira' => __('order_status.awaiting_customs_release', 'Aguardando Liberação Aduaneira'),
                                 'finalizacao_embalagem' => __('order_status.packaging_finalization', 'Finalização embalagem'),
                                 'entrega_finalizada' => __('order_status.delivery_completed', 'Entrega finalizada'),
+                                'enviado_ao_destinatario' => __('order_status.shipped_to_recipient', 'Enviado ao destinatário'),
+                                'caixa_fechada' => __('order_status.closed_box', 'Caixa fechada'),
                             ];
 
                             $presentStatusMap = [];
@@ -57,7 +82,7 @@
                                 if ($st === '') {
                                     $st = (string) ($p['payment_status'] ?? ($p['status_pagamento'] ?? ''));
                                 }
-                                $st = strtolower(trim($st));
+                                $st = $normalizeStatusKey($st);
                                 if ($st !== '') {
                                     $presentStatusMap[$st] = true;
                                 }
@@ -66,30 +91,60 @@
                             $statusOrder = [
                                 'pendente',
                                 'processando',
+                                'pedido_criado',
                                 'pago',
                                 'paid',
                                 'aprovado',
                                 'approved',
+                                'aguardando_processamento',
+                                'consolidado',
+                                'produto_consolidado',
+                                'rascunho_etiqueta',
+                                'etiqueta_efetivada',
+                                'aguardando_lib_alfandegaria',
+                                'aguardando_liberacao_aduaneira',
+                                'finalizacao_embalagem',
                                 'enviado',
+                                'enviado_ao_destinatario',
                                 'em_transporte',
+                                'caixa_fechada',
+                                'selecao',
+                                'cobranca',
+                                'despacho',
                                 'transito',
                                 'aduana',
                                 'entrega',
+                                'entrega_finalizada',
                                 'entregue',
                                 'concluido',
                                 'cancelado',
                             ];
 
                             $statusOptions = [];
+                            $added = [];
+
                             foreach ($statusOrder as $s) {
-                                if (isset($presentStatusMap[$s])) {
+                                if (isset($statusLabels[$s]) && !isset($added[$s])) {
                                     $statusOptions[] = $s;
-                                    unset($presentStatusMap[$s]);
+                                    $added[$s] = true;
                                 }
                             }
-                            $remaining = array_keys($presentStatusMap);
-                            sort($remaining);
-                            $statusOptions = array_merge($statusOptions, $remaining);
+
+                            foreach ($statusLabels as $k => $lbl) {
+                                if (!isset($added[$k])) {
+                                    $statusOptions[] = $k;
+                                    $added[$k] = true;
+                                }
+                            }
+
+                            $unknown = [];
+                            foreach (array_keys($presentStatusMap) as $k) {
+                                if (!isset($added[$k])) {
+                                    $unknown[] = $k;
+                                }
+                            }
+                            sort($unknown);
+                            $statusOptions = array_merge($statusOptions, $unknown);
 
                             foreach ($statusOptions as $key) {
                                 $label = $statusLabels[$key] ?? ucfirst(str_replace('_', ' ', (string) $key));
@@ -246,7 +301,7 @@
                                                 if ($statusPedido === '') {
                                                     $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
                                                 }
-                                                $statusPedidoKey = strtolower(trim($statusPedido));
+                                                $statusPedidoKey = $normalizeStatusKey($statusPedido);
                                                 $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
                                                 $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
                                             ?>
@@ -286,12 +341,17 @@
                                                         'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
                                                         'aduana' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
                                                         'entrega' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                        'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
+                                                        'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'etiqueta_gerada' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'enviado_ao_destinatario' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'caixa_fechada' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
+                                                        'aguardando_liberacao_aduaneira' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                        'aguardando_lib_alfandegaria' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
                                                     ];
                                                     $statusLabels = [
                                                         'pendente' => __('order_status.pending', 'Pendente'),
                                                         'processando' => __('order_status.processing', 'Processando'),
-                                                        'enviado' => __('order_status.shipped', 'Enviado'),
+                                                        'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
                                                         'entregue' => __('order_status.delivered', 'Entregue'),
                                                         'cancelado' => __('order_status.cancelled', 'Cancelado'),
                                                         'pago' => __('order_status.paid', 'Pago'),
@@ -304,7 +364,12 @@
                                                         'transito' => __('order_status.in_transit', 'Trânsito'),
                                                         'aduana' => __('order_status.customs', 'Aduana'),
                                                         'entrega' => __('order_status.delivery', 'Entrega'),
-                                                        'concluido' => __('order_status.completed', 'Concluído')
+                                                        'concluido' => __('order_status.completed', 'Concluído'),
+                                                        'etiqueta_gerada' => __('order_status.label_generated', 'Etiqueta gerada'),
+                                                        'enviado_ao_destinatario' => __('order_status.shipped_to_recipient', 'Enviado ao destinatário'),
+                                                        'caixa_fechada' => __('order_status.closed_box', 'Caixa fechada'),
+                                                        'aguardando_liberacao_aduaneira' => __('order_status.awaiting_customs_release', 'Aguardando Liberação Aduaneira'),
+                                                        'aguardando_lib_alfandegaria' => __('order_status.awaiting_customs_release', 'Aguardando lib. alfandegária'),
                                                     ];
                                                     $badge = $statusColors[$statusPedidoKey] ?? $statusColors['selecao'];
                                                     $label = $statusLabels[$statusPedidoKey] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
@@ -509,17 +574,33 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const normalizeStatusKey = function(st) {
+        try {
+            let s = String(st || '').trim().toLowerCase();
+            if (!s) return '';
+            if (s.normalize) {
+                s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            }
+            s = s.replace(/[^a-z0-9]+/g, '_');
+            s = s.replace(/_+/g, '_');
+            s = s.replace(/^_+|_+$/g, '');
+            return s;
+        } catch (e) {
+            return String(st || '').trim().toLowerCase();
+        }
+    };
+
     // Filtro por status
     const filtroStatus = document.getElementById('filtroStatus');
     const tabelaPedidos = document.getElementById('tabelaPedidos');
     
     if (filtroStatus && tabelaPedidos) {
         filtroStatus.addEventListener('change', function() {
-            const status = String(this.value || '').toLowerCase().trim();
+            const status = normalizeStatusKey(this.value);
             const rows = tabelaPedidos.querySelectorAll('tbody tr');
             
             rows.forEach(row => {
-                const rowStatus = String(row.dataset.status || '').toLowerCase().trim();
+                const rowStatus = normalizeStatusKey(row.dataset.status);
                 if (status === '' || rowStatus === status) {
                     row.style.display = '';
                 } else {
