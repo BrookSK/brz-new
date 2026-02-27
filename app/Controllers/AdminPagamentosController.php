@@ -7,6 +7,60 @@ use App\Services\PaymentService;
 
 class AdminPagamentosController extends Controller {
 
+    private function tableExistsPdo(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getConfigValueFromKeyValueTable(\PDO $pdo, string $table, string $categoria, string $chave): ?string {
+        try {
+            $cols = $this->getTableColumnsPdo($pdo, $table);
+            if (empty($cols)) {
+                return null;
+            }
+            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $st = $pdo->prepare('SELECT valor FROM ' . $table . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                $st->execute([(string) $categoria, (string) $chave]);
+                $v = $st->fetchColumn();
+                return ($v !== false && $v !== null) ? (string) $v : null;
+            }
+            if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $fullKey = $categoria . '_' . $chave;
+                $st = $pdo->prepare('SELECT valor FROM ' . $table . ' WHERE chave = ? LIMIT 1');
+                $st->execute([(string) $fullKey]);
+                $v = $st->fetchColumn();
+                return ($v !== false && $v !== null) ? (string) $v : null;
+            }
+        } catch (\Exception $e) {
+        }
+        return null;
+    }
+
+    private function saveConfigValueToKeyValueTable(\PDO $pdo, string $table, string $categoria, string $chave, ?string $valor): void {
+        $cols = $this->getTableColumnsPdo($pdo, $table);
+        if (empty($cols)) {
+            return;
+        }
+        $valor = $valor === null ? '' : (string) $valor;
+
+        if (in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+            $st = $pdo->prepare('INSERT INTO ' . $table . ' (categoria, chave, valor) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+            $st->execute([(string) $categoria, (string) $chave, (string) $valor]);
+            return;
+        }
+        if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+            $fullKey = $categoria . '_' . $chave;
+            $st = $pdo->prepare('INSERT INTO ' . $table . ' (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+            $st->execute([(string) $fullKey, (string) $valor]);
+            return;
+        }
+    }
+
     private function getTableColumnsPdo(\PDO $pdo, string $table): array {
         try {
             $stmt = $pdo->query('DESCRIBE ' . $table);
@@ -228,13 +282,14 @@ class AdminPagamentosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
-                    <div>
+                    <div class="d-flex gap-2">
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar Relatório
                         </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
+                        <a class="btn btn-outline-primary" href="/admin/pagamentos/configuracoes"><i class="fas fa-cog"></i> Configurações</a>
                     </div>
                 </div>';
 
@@ -1314,16 +1369,54 @@ class AdminPagamentosController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            
-            // Buscar configurações de pagamento
-            $stmt = $pdo->query("SELECT * FROM configuracoes WHERE categoria = 'pagamento'");
-            $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Organizar configurações por chave
+            $pdo = \Config\Database::getConnection();
+
             $config = [];
-            foreach ($configuracoes as $c) {
-                $config[$c['chave']] = $c['valor'];
+            $keys = [
+                'stripe_public_key',
+                'stripe_secret_key',
+                'stripe_webhook_secret',
+                'stripe_enabled',
+                'mercadopago_access_token',
+                'mercadopago_public_key',
+                'mercadopago_enabled',
+                'pix_key',
+                'pix_key_type',
+                'pix_enabled',
+                'default_currency',
+                'default_payment_method',
+            ];
+
+            if ($this->tableExistsPdo($pdo, 'configuracoes_sistema')) {
+                foreach ($keys as $k) {
+                    $v = $this->getConfigValueFromKeyValueTable($pdo, 'configuracoes_sistema', 'pagamentos', (string) $k);
+                    if ($v !== null) {
+                        $config[$k] = $v;
+                    }
+                }
+            }
+
+            if ($this->tableExistsPdo($pdo, 'configuracoes')) {
+                foreach ($keys as $k) {
+                    if (array_key_exists($k, $config)) {
+                        continue;
+                    }
+                    $v = $this->getConfigValueFromKeyValueTable($pdo, 'configuracoes', 'pagamentos', (string) $k);
+                    if ($v === null) {
+                        try {
+                            $st = $pdo->prepare("SELECT valor FROM configuracoes WHERE categoria = 'pagamento' AND chave = ? LIMIT 1");
+                            $st->execute([(string) $k]);
+                            $vv = $st->fetchColumn();
+                            if ($vv !== false && $vv !== null) {
+                                $v = (string) $vv;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                    if ($v !== null) {
+                        $config[$k] = $v;
+                    }
+                }
             }
             
         } catch (\Exception $e) {
@@ -1491,5 +1584,69 @@ class AdminPagamentosController extends Controller {
 </body>
 </html>';
         exit;
+    }
+
+    public function salvarConfiguracoes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $dados = $request->getParams();
+        $keys = [
+            'stripe_public_key',
+            'stripe_secret_key',
+            'stripe_webhook_secret',
+            'stripe_enabled',
+            'mercadopago_access_token',
+            'mercadopago_public_key',
+            'mercadopago_enabled',
+            'pix_key',
+            'pix_key_type',
+            'pix_enabled',
+            'default_currency',
+            'default_payment_method',
+        ];
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            if (!$pdo->inTransaction()) {
+                $pdo->beginTransaction();
+            }
+
+            $table = null;
+            if ($this->tableExistsPdo($pdo, 'configuracoes_sistema')) {
+                $table = 'configuracoes_sistema';
+            } elseif ($this->tableExistsPdo($pdo, 'configuracoes')) {
+                $table = 'configuracoes';
+            }
+            if ($table === null) {
+                throw new \Exception('Tabela de configurações não encontrada');
+            }
+
+            foreach ($keys as $k) {
+                $val = $dados[$k] ?? '';
+                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled'], true)) {
+                    $val = !empty($dados[$k]) ? '1' : '0';
+                }
+                $this->saveConfigValueToKeyValueTable($pdo, $table, 'pagamentos', (string) $k, is_string($val) ? $val : (string) $val);
+            }
+
+            if ($pdo->inTransaction()) {
+                $pdo->commit();
+            }
+
+            header('Location: /admin/pagamentos/configuracoes');
+            exit;
+        } catch (\Exception $e) {
+            try {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
     }
 }

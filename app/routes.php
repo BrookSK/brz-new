@@ -378,6 +378,9 @@ $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController'
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');
 $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', 'confirmarPagamento');
 
+$router->get('/admin/pagamentos/configuracoes', 'AdminPagamentosController', 'configuracoes');
+$router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosController', 'salvarConfiguracoes');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');
