@@ -3305,13 +3305,15 @@ HTML;
 
         if (!empty($fotoCapaUrl)) {
             echo '<div class="col-6 col-md-3 mb-2">
-                    <a href="' . $fotoCapaUrl . '" target="_blank">
+                    <a id="capaLink" href="' . $fotoCapaUrl . '" target="_blank">
                         <img id="capaImg" data-placeholder="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
                     </a>
                 </div>';
         } else {
             echo '<div class="col-6 col-md-3 mb-2">
-                    <img id="capaImg" data-placeholder="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    <a id="capaLink" href="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" target="_blank">
+                        <img id="capaImg" data-placeholder="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    </a>
                 </div>';
         }
 
@@ -3670,8 +3672,10 @@ HTML;
                         const data = await postFormData(url, fd);
                         if (data && data.url) {
                             capaImg.src = data.url;
-                            const parentLink = capaImg.closest('a');
+                            const parentLink = document.getElementById('capaLink') || capaImg.closest('a');
                             if (parentLink) parentLink.href = data.url;
+                            const btnRemoverCapa = document.getElementById('btnRemoverCapa');
+                            if (btnRemoverCapa) btnRemoverCapa.disabled = false;
                         }
                         capaFile.value = '';
                     } catch (e) {
@@ -3704,7 +3708,7 @@ HTML;
 
                         const placeholder = capaImg.getAttribute('data-placeholder') || '/uploads/produtos/placeholder.jpg';
                         capaImg.src = placeholder;
-                        const parentLink = capaImg.closest('a');
+                        const parentLink = document.getElementById('capaLink') || capaImg.closest('a');
                         if (parentLink) {
                             parentLink.href = placeholder;
                         }
