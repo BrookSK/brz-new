@@ -2480,9 +2480,16 @@ class CheckoutController extends Controller {
 
                             $mp = null;
                             if ($valorProduto > 0) {
-                                $mp = $this->paymentService->createMercadoPagoCheckoutPreferenceProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
-                                if (empty($mp['success'])) {
-                                    throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar pagamento Mercado Pago (produto)'));
+                                if ($formaSelecionada === 'pix') {
+                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
+                                    if (empty($mp['success'])) {
+                                        throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar PIX Mercado Pago (produto)'));
+                                    }
+                                } else {
+                                    $mp = $this->paymentService->createMercadoPagoCheckoutPreferenceProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
+                                    if (empty($mp['success'])) {
+                                        throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar pagamento Mercado Pago (produto)'));
+                                    }
                                 }
                             }
 

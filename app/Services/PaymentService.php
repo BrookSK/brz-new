@@ -119,6 +119,83 @@ class PaymentService {
         return is_array($decoded) ? $decoded : [];
     }
 
+    public function createMercadoPagoPixPaymentProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = []): array {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if (!$this->isMercadoPagoEnabled()) {
+            return ['success' => false, 'error' => 'Mercado Pago está desabilitado.'];
+        }
+        if (empty($this->mercadoPagoAccessToken)) {
+            return ['success' => false, 'error' => 'Mercado Pago não configurado (access token ausente).'];
+        }
+        $valorBrl = (float) $valorBrl;
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+
+        $base = Url::base();
+        $notificationUrl = rtrim($base, '/') . '/webhook/mercadopago';
+
+        $payerEmail = '';
+        if (!empty($payer['email']) && is_string($payer['email'])) {
+            $payerEmail = trim((string) $payer['email']);
+        }
+        if ($payerEmail === '') {
+            // Mercado Pago normalmente exige payer.email
+            $payerEmail = 'cliente@brazilianashop.com';
+        }
+
+        $payload = [
+            'transaction_amount' => (float) $valorBrl,
+            'description' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produto)'),
+            'payment_method_id' => 'pix',
+            'external_reference' => (string) $pedidoId,
+            'notification_url' => $notificationUrl,
+            'payer' => [
+                'email' => $payerEmail,
+            ],
+        ];
+
+        try {
+            $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload);
+            $paymentId = (string) ($resp['id'] ?? '');
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Mercado Pago: resposta inválida ao criar pagamento PIX.'];
+            }
+
+            $qrPayload = (string) ($resp['point_of_interaction']['transaction_data']['qr_code'] ?? '');
+            $qrBase64 = (string) ($resp['point_of_interaction']['transaction_data']['qr_code_base64'] ?? '');
+
+            // Persistir registro split como pending
+            $this->upsertPedidoPagamento([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'mercadopago',
+                'metodo' => 'pix',
+                'moeda' => 'BRL',
+                'valor' => (float) $valorBrl,
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'pix_encoded_image' => $qrBase64,
+                'pix_payload' => $qrPayload,
+                'metadata' => json_encode(['raw' => $resp], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'pix' => [
+                    'encodedImage' => $qrBase64,
+                    'payload' => $qrPayload,
+                ],
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     public function createMercadoPagoCheckoutPreferenceProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], ?string $successUrl = null, ?string $failureUrl = null, ?string $pendingUrl = null): array {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) {
