@@ -215,6 +215,7 @@ class CheckoutController extends Controller {
         $erros = [];
 
         $stProduto = null;
+        $stProdutoAlt = null;
         try {
             $select = ['`' . $produtoPkCol . '` AS id', 'nome', 'name', 'sku'];
             if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
@@ -223,8 +224,18 @@ class CheckoutController extends Controller {
             if (!empty($produtoColControla)) $select[] = $produtoColControla;
             $select = array_values(array_unique($select));
             $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE `' . $produtoPkCol . '` = ? LIMIT 1');
+
+            // Fallback: algumas instalações armazenam o ID "real" do produto em outra coluna (ex: produto_id)
+            // mesmo quando a tabela também possui coluna id.
+            if ($produtoPkCol !== 'produto_id' && is_array($produtoCols) && in_array('produto_id', $produtoCols, true)) {
+                $selectAlt = $select;
+                // garantir que o alias id exista mesmo no select alternativo
+                $selectAlt[0] = '`produto_id` AS id';
+                $stProdutoAlt = $db->prepare('SELECT ' . implode(', ', $selectAlt) . ' FROM produtos WHERE `produto_id` = ? LIMIT 1');
+            }
         } catch (\Throwable $e) {
             $stProduto = null;
+            $stProdutoAlt = null;
         }
 
         $stVariacao = null;
@@ -269,6 +280,15 @@ class CheckoutController extends Controller {
                 try {
                     $stProduto->execute([$produtoId]);
                     $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $produtoRow = null;
+                }
+            }
+
+            if ((!$produtoRow || empty($produtoRow['id'])) && $stProdutoAlt) {
+                try {
+                    $stProdutoAlt->execute([$produtoId]);
+                    $produtoRow = $stProdutoAlt->fetch(\PDO::FETCH_ASSOC) ?: null;
                 } catch (\Throwable $e) {
                     $produtoRow = null;
                 }
@@ -2139,6 +2159,17 @@ class CheckoutController extends Controller {
         // Se algum item (principalmente temporário da assessoria) expirou e foi removido do banco, bloquear checkout
         try {
             $db = \Config\Database::getConnection();
+
+            $produtoPkCandidates = ['id'];
+            try {
+                $stCols = $db->query('DESCRIBE produtos');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (is_array($cols) && in_array('produto_id', $cols, true) && !in_array('produto_id', $produtoPkCandidates, true)) {
+                    $produtoPkCandidates[] = 'produto_id';
+                }
+            } catch (\Throwable $e) {
+            }
+
             $removedExpired = false;
             foreach ($carrinho as $k => $item) {
                 $pid = $item['produto_id'] ?? null;
@@ -2146,9 +2177,15 @@ class CheckoutController extends Controller {
                     continue;
                 }
                 try {
-                    $stmtP = $db->prepare('SELECT id FROM produtos WHERE id = ? LIMIT 1');
-                    $stmtP->execute([(int) $pid]);
-                    $exists = $stmtP->fetchColumn();
+                    $exists = false;
+                    foreach ($produtoPkCandidates as $pkCol) {
+                        $stmtP = $db->prepare('SELECT 1 FROM produtos WHERE ' . $pkCol . ' = ? LIMIT 1');
+                        $stmtP->execute([(int) $pid]);
+                        $exists = (bool) $stmtP->fetchColumn();
+                        if ($exists) {
+                            break;
+                        }
+                    }
                     if (!$exists) {
                         unset($_SESSION['carrinho'][$k]);
                         $removedExpired = true;
