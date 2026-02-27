@@ -8,6 +8,56 @@ use Config\Database;
 class AdminConfiguracoesController extends Controller {
     
     public function index(Request $request) {
+        try {
+            $dbg = (string) ($request->getParam('__debug_admin_config') ?? '');
+            if ($dbg === '1') {
+                header('Content-Type: text/plain; charset=UTF-8');
+                $out = [];
+                $out[] = 'debug=AdminConfiguracoesController@index';
+                $out[] = '__FILE__=' . (string) __FILE__;
+                $out[] = 'realpath(__FILE__)=' . (string) (realpath(__FILE__) ?: '');
+                $out[] = 'php_version=' . (string) PHP_VERSION;
+                $out[] = 'sapi=' . (string) (php_sapi_name() ?: '');
+                $out[] = 'cwd=' . (string) (getcwd() ?: '');
+                $out[] = 'document_root=' . (string) ($_SERVER['DOCUMENT_ROOT'] ?? '');
+                $out[] = 'request_uri=' . (string) ($_SERVER['REQUEST_URI'] ?? '');
+
+                if (function_exists('opcache_get_status')) {
+                    $st = @opcache_get_status(false);
+                    $enabled = (is_array($st) && isset($st['opcache_enabled'])) ? (bool) $st['opcache_enabled'] : null;
+                    $out[] = 'opcache_get_status=available';
+                    $out[] = 'opcache_enabled=' . ($enabled === null ? 'null' : ($enabled ? '1' : '0'));
+
+                    if (is_array($st) && isset($st['scripts']) && is_array($st['scripts'])) {
+                        $needle = (string) (realpath(__FILE__) ?: __FILE__);
+                        $keys = array_keys($st['scripts']);
+                        $foundKey = '';
+                        foreach ($keys as $k) {
+                            if (!is_string($k)) continue;
+                            if ($k === $needle || str_replace('\\', '/', $k) === str_replace('\\', '/', $needle)) {
+                                $foundKey = $k;
+                                break;
+                            }
+                        }
+                        $out[] = 'opcache_script_entry_found=' . ($foundKey !== '' ? '1' : '0');
+                        if ($foundKey !== '') {
+                            $entry = $st['scripts'][$foundKey];
+                            if (is_array($entry)) {
+                                $out[] = 'opcache_script_timestamp=' . (string) ($entry['timestamp'] ?? '');
+                                $out[] = 'opcache_script_last_used_timestamp=' . (string) ($entry['last_used_timestamp'] ?? '');
+                            }
+                        }
+                    }
+                } else {
+                    $out[] = 'opcache_get_status=unavailable';
+                }
+
+                echo implode("\n", $out);
+                exit;
+            }
+        } catch (\Exception $e) {
+        }
+
         $auth = new AuthService();
         $auth->requerPerfil('admin');
         try {
@@ -150,6 +200,7 @@ class AdminConfiguracoesController extends Controller {
             $clubeFaixas = [];
         }
 
+        echo "<!-- DEBUG_ADMIN_CONFIG controller=" . basename(__FILE__) . " ts=" . date('c') . " -->\n";
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
