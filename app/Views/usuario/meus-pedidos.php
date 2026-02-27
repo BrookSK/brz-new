@@ -21,11 +21,81 @@
                     </div>
                     <select class="form-select" id="filtroStatus" style="width: 150px;">
                         <option value=""><?= __('user_orders.filter.all_status', 'Todos Status') ?></option>
-                        <option value="pendente"><?= __('order_status.pending', 'Pendente') ?></option>
-                        <option value="processando"><?= __('order_status.processing', 'Processando') ?></option>
-                        <option value="enviado"><?= __('order_status.shipped', 'Enviado') ?></option>
-                        <option value="entregue"><?= __('order_status.delivered', 'Entregue') ?></option>
-                        <option value="cancelado"><?= __('order_status.cancelled', 'Cancelado') ?></option>
+                        <?php
+                            $statusLabels = [
+                                'pendente' => __('order_status.pending', 'Pendente'),
+                                'processando' => __('order_status.processing', 'Processando'),
+                                'enviado' => __('order_status.shipped', 'Enviado'),
+                                'entregue' => __('order_status.delivered', 'Entregue'),
+                                'cancelado' => __('order_status.cancelled', 'Cancelado'),
+                                'pago' => __('order_status.paid', 'Pago'),
+                                'paid' => __('order_status.paid', 'Pago'),
+                                'aprovado' => __('order_status.paid', 'Pago'),
+                                'approved' => __('order_status.paid', 'Pago'),
+                                'selecao' => __('order_status.selection', 'Seleção'),
+                                'cobranca' => __('order_status.billing', 'Cobrança'),
+                                'despacho' => __('order_status.dispatch', 'Despacho'),
+                                'transito' => __('order_status.in_transit', 'Trânsito'),
+                                'aduana' => __('order_status.customs', 'Aduana'),
+                                'entrega' => __('order_status.delivery', 'Entrega'),
+                                'concluido' => __('order_status.completed', 'Concluído'),
+                                'pedido_criado' => __('order_status.created', 'Pedido criado'),
+                                'em_transporte' => __('order_status.in_transit', 'Em transporte'),
+                                'aguardando_processamento' => __('order_status.awaiting_processing', 'Aguardando processamento'),
+                                'consolidado' => __('order_status.consolidated', 'Consolidado'),
+                                'produto_consolidado' => __('order_status.product_consolidated', 'Produto consolidado'),
+                                'rascunho_etiqueta' => __('order_status.label_draft', 'Rascunho etiqueta'),
+                                'etiqueta_efetivada' => __('order_status.label_effective', 'Etiqueta efetivada'),
+                                'aguardando_lib_alfandegaria' => __('order_status.awaiting_customs_release', 'Aguardando lib. alfandegária'),
+                                'finalizacao_embalagem' => __('order_status.packaging_finalization', 'Finalização embalagem'),
+                                'entrega_finalizada' => __('order_status.delivery_completed', 'Entrega finalizada'),
+                            ];
+
+                            $presentStatusMap = [];
+                            foreach (($pedidos ?? []) as $p) {
+                                $st = (string) ($p['status'] ?? '');
+                                if ($st === '') {
+                                    $st = (string) ($p['payment_status'] ?? ($p['status_pagamento'] ?? ''));
+                                }
+                                $st = strtolower(trim($st));
+                                if ($st !== '') {
+                                    $presentStatusMap[$st] = true;
+                                }
+                            }
+
+                            $statusOrder = [
+                                'pendente',
+                                'processando',
+                                'pago',
+                                'paid',
+                                'aprovado',
+                                'approved',
+                                'enviado',
+                                'em_transporte',
+                                'transito',
+                                'aduana',
+                                'entrega',
+                                'entregue',
+                                'concluido',
+                                'cancelado',
+                            ];
+
+                            $statusOptions = [];
+                            foreach ($statusOrder as $s) {
+                                if (isset($presentStatusMap[$s])) {
+                                    $statusOptions[] = $s;
+                                    unset($presentStatusMap[$s]);
+                                }
+                            }
+                            $remaining = array_keys($presentStatusMap);
+                            sort($remaining);
+                            $statusOptions = array_merge($statusOptions, $remaining);
+
+                            foreach ($statusOptions as $key) {
+                                $label = $statusLabels[$key] ?? ucfirst(str_replace('_', ' ', (string) $key));
+                                echo '<option value="' . htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') . '">' . $label . '</option>';
+                            }
+                        ?>
                     </select>
                 </div>
             </div>
@@ -176,10 +246,11 @@
                                                 if ($statusPedido === '') {
                                                     $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
                                                 }
+                                                $statusPedidoKey = strtolower(trim($statusPedido));
                                                 $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
                                                 $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
                                             ?>
-                                            <tr data-status="<?= htmlspecialchars($statusPedido) ?>">
+                                            <tr data-status="<?= htmlspecialchars($statusPedidoKey) ?>">
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
@@ -235,8 +306,8 @@
                                                         'entrega' => __('order_status.delivery', 'Entrega'),
                                                         'concluido' => __('order_status.completed', 'Concluído')
                                                     ];
-                                                    $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
-                                                    $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
+                                                    $badge = $statusColors[$statusPedidoKey] ?? $statusColors['selecao'];
+                                                    $label = $statusLabels[$statusPedidoKey] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
                                                     ?>
                                                     <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                         <?= $label ?>
@@ -444,11 +515,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (filtroStatus && tabelaPedidos) {
         filtroStatus.addEventListener('change', function() {
-            const status = this.value;
+            const status = String(this.value || '').toLowerCase().trim();
             const rows = tabelaPedidos.querySelectorAll('tbody tr');
             
             rows.forEach(row => {
-                if (status === '' || row.dataset.status === status) {
+                const rowStatus = String(row.dataset.status || '').toLowerCase().trim();
+                if (status === '' || rowStatus === status) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
