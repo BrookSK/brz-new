@@ -253,6 +253,29 @@ class CheckoutController extends Controller {
                 }
             }
 
+            // Fallback: alguns carrinhos armazenam o ID da variação no campo produto_id.
+            // Se o produto não existir, tentar tratar o produto_id como variação.
+            if ((!$produtoRow || empty($produtoRow['id'])) && $produtoVariacaoId === null && $hasProdutoVariacoes && $stVariacao) {
+                try {
+                    $stVariacao->execute([$produtoId]);
+                    $varAsProduct = $stVariacao->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    if (is_array($varAsProduct) && !empty($varAsProduct['id']) && !empty($varAsProduct['produto_id'])) {
+                        $produtoVariacaoId = (int) $varAsProduct['id'];
+                        $produtoId = (int) $varAsProduct['produto_id'];
+
+                        if ($stProduto) {
+                            try {
+                                $stProduto->execute([$produtoId]);
+                                $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
+                            } catch (\Throwable $e) {
+                                $produtoRow = null;
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
             if (!$produtoRow || empty($produtoRow['id'])) {
                 $erros[] = [
                     'produto_id' => $produtoId,
