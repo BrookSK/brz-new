@@ -250,8 +250,15 @@ class CheckoutController extends Controller {
             }
 
             if (!empty($produtoColAtivo)) {
-                $ativo = (int) ($produtoRow[$produtoColAtivo] ?? 0);
-                if ($ativo !== 1) {
+                $rawAtivo = $produtoRow[$produtoColAtivo] ?? 0;
+                $ativoOk = false;
+                if (is_numeric($rawAtivo)) {
+                    $ativoOk = ((int) $rawAtivo) === 1;
+                } else {
+                    $s = strtolower(trim((string) $rawAtivo));
+                    $ativoOk = in_array($s, ['1', 'true', 'yes', 'sim', 'ativo', 'active'], true);
+                }
+                if (!$ativoOk) {
                     $erros[] = [
                         'produto_id' => $produtoId,
                         'produto_variacao_id' => $produtoVariacaoId,
@@ -265,7 +272,15 @@ class CheckoutController extends Controller {
 
             if (!empty($produtoColStatus)) {
                 $st = strtolower(trim((string) ($produtoRow[$produtoColStatus] ?? '')));
-                if ($st !== '' && !in_array($st, ['published', 'ativo', 'active'], true)) {
+                $statusOk = true;
+                if ($st !== '') {
+                    if (is_numeric($st)) {
+                        $statusOk = ((int) $st) === 1;
+                    } else {
+                        $statusOk = in_array($st, ['published', 'ativo', 'active', 'enabled', 'instock', 'in_stock', 'available', 'disponivel'], true);
+                    }
+                }
+                if (!$statusOk) {
                     $erros[] = [
                         'produto_id' => $produtoId,
                         'produto_variacao_id' => $produtoVariacaoId,
@@ -321,8 +336,15 @@ class CheckoutController extends Controller {
                 }
 
                 if (!empty($variacaoColAtivo)) {
-                    $ativoV = (int) ($varRow[$variacaoColAtivo] ?? 0);
-                    if ($ativoV !== 1) {
+                    $rawAtivoV = $varRow[$variacaoColAtivo] ?? 0;
+                    $ativoVOk = false;
+                    if (is_numeric($rawAtivoV)) {
+                        $ativoVOk = ((int) $rawAtivoV) === 1;
+                    } else {
+                        $s = strtolower(trim((string) $rawAtivoV));
+                        $ativoVOk = in_array($s, ['1', 'true', 'yes', 'sim', 'ativo', 'active'], true);
+                    }
+                    if (!$ativoVOk) {
                         $erros[] = [
                             'produto_id' => $produtoId,
                             'produto_variacao_id' => $produtoVariacaoId,
@@ -336,7 +358,15 @@ class CheckoutController extends Controller {
 
                 if (!empty($variacaoColStatus)) {
                     $stV = strtolower(trim((string) ($varRow[$variacaoColStatus] ?? '')));
-                    if ($stV !== '' && !in_array($stV, ['published', 'ativo', 'active'], true)) {
+                    $statusVOk = true;
+                    if ($stV !== '') {
+                        if (is_numeric($stV)) {
+                            $statusVOk = ((int) $stV) === 1;
+                        } else {
+                            $statusVOk = in_array($stV, ['published', 'ativo', 'active', 'enabled', 'instock', 'in_stock', 'available', 'disponivel'], true);
+                        }
+                    }
+                    if (!$statusVOk) {
                         $erros[] = [
                             'produto_id' => $produtoId,
                             'produto_variacao_id' => $produtoVariacaoId,
