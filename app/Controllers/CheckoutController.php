@@ -145,6 +145,16 @@ class CheckoutController extends Controller {
             $produtoPkCol = 'produto_id';
         }
 
+        $produtoLookupCols = [];
+        foreach (['id', 'produto_id', 'product_id', 'wp_product_id', 'woocommerce_product_id'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoLookupCols[] = $c;
+            }
+        }
+        if (empty($produtoLookupCols)) {
+            $produtoLookupCols = [$produtoPkCol];
+        }
+
         $variacoesTable = null;
         $hasProdutoVariacoes = false;
         foreach (['produto_variacoes', 'produto_variations', 'product_variacoes', 'product_variations', 'variacoes_produto', 'variations'] as $t) {
@@ -215,7 +225,6 @@ class CheckoutController extends Controller {
         $erros = [];
 
         $stProduto = null;
-        $stProdutoAlt = null;
         try {
             $select = ['`' . $produtoPkCol . '` AS id', 'nome', 'name', 'sku'];
             if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
@@ -223,19 +232,20 @@ class CheckoutController extends Controller {
             if (!empty($produtoColStock)) $select[] = $produtoColStock;
             if (!empty($produtoColControla)) $select[] = $produtoColControla;
             $select = array_values(array_unique($select));
-            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE `' . $produtoPkCol . '` = ? LIMIT 1');
 
-            // Fallback: algumas instalações armazenam o ID "real" do produto em outra coluna (ex: produto_id)
-            // mesmo quando a tabela também possui coluna id.
-            if ($produtoPkCol !== 'produto_id' && is_array($produtoCols) && in_array('produto_id', $produtoCols, true)) {
-                $selectAlt = $select;
-                // garantir que o alias id exista mesmo no select alternativo
-                $selectAlt[0] = '`produto_id` AS id';
-                $stProdutoAlt = $db->prepare('SELECT ' . implode(', ', $selectAlt) . ' FROM produtos WHERE `produto_id` = ? LIMIT 1');
+            $whereParts = [];
+            foreach ($produtoLookupCols as $c) {
+                if (preg_match('/^[a-zA-Z0-9_]+$/', (string) $c)) {
+                    $whereParts[] = '`' . $c . '` = ?';
+                }
             }
+            if (empty($whereParts)) {
+                $whereParts[] = '`' . $produtoPkCol . '` = ?';
+            }
+
+            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE (' . implode(' OR ', $whereParts) . ') LIMIT 1');
         } catch (\Throwable $e) {
             $stProduto = null;
-            $stProdutoAlt = null;
         }
 
         $stVariacao = null;
@@ -278,17 +288,12 @@ class CheckoutController extends Controller {
             $produtoRow = null;
             if ($stProduto) {
                 try {
-                    $stProduto->execute([$produtoId]);
+                    $params = array_fill(0, count($produtoLookupCols), $produtoId);
+                    if (empty($params)) {
+                        $params = [$produtoId];
+                    }
+                    $stProduto->execute($params);
                     $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
-                } catch (\Throwable $e) {
-                    $produtoRow = null;
-                }
-            }
-
-            if ((!$produtoRow || empty($produtoRow['id'])) && $stProdutoAlt) {
-                try {
-                    $stProdutoAlt->execute([$produtoId]);
-                    $produtoRow = $stProdutoAlt->fetch(\PDO::FETCH_ASSOC) ?: null;
                 } catch (\Throwable $e) {
                     $produtoRow = null;
                 }
@@ -318,9 +323,14 @@ class CheckoutController extends Controller {
             }
 
             if (!$produtoRow || empty($produtoRow['id'])) {
+                try {
+                    $this->debugLog('[CHECKOUT] Produto não encontrado no banco. produto_id=' . $produtoId . ' lookup_cols=' . json_encode($produtoLookupCols));
+                } catch (\Throwable $e) {
+                }
                 $erros[] = [
                     'produto_id' => $produtoId,
                     'produto_variacao_id' => $produtoVariacaoId,
+                    'lookup_cols' => $produtoLookupCols,
                     'motivo' => 'Produto não encontrado',
                     'quantidade_solicitada' => $qtd,
                 ];
