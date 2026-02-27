@@ -1015,12 +1015,32 @@ function inicializarDetalhesProduto() {
     });
     
     function updateCartBadge(totalItens) {
-        const badge = $('.navbar-nav .badge');
-        if (totalItens > 0) {
-            badge.text(totalItens).show();
-        } else {
-            badge.hide();
+        const n = Number(totalItens || 0);
+
+        // Navbar badge
+        let $badges = $('.cart-badge');
+        if ($badges.length === 0) {
+            // Criar badge se não existir (quando estava 0 na renderização inicial)
+            const $cartLink = $('a[href="/carrinho"]').first();
+            if ($cartLink && $cartLink.length) {
+                $cartLink.append('<span class="cart-badge" style="display:none;"></span>');
+            }
+            const $floatBtn = $('.floating-cart button');
+            if ($floatBtn && $floatBtn.length) {
+                $floatBtn.append('<span class="cart-badge" style="display:none;"></span>');
+            }
+            $badges = $('.cart-badge');
         }
+
+        $badges.each(function() {
+            const $b = $(this);
+            if (n > 0) {
+                $b.text(String(n));
+                $b.css('display', 'inline-block');
+            } else {
+                $b.css('display', 'none');
+            }
+        });
     }
     
     if (variacoesState.enabled) {
