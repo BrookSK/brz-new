@@ -814,6 +814,22 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
 
+            $affected = (int) $stmt->rowCount();
+
+            // fallback: se nenhum registro foi marcado como comprado e o filtro por loja pode estar divergente,
+            // tentar novamente sem restringir por loja.
+            if ($affected === 0 && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                $sql2 = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+                $params2 = [];
+                if ($produtoId > 0) {
+                    $sql2 .= ' AND lc.produto_id = :produto_id';
+                    $params2[':produto_id'] = $produtoId;
+                }
+                $stmt2 = $this->connection->prepare($sql2);
+                $stmt2->execute($params2);
+                $affected = (int) $stmt2->rowCount();
+            }
+
             $_SESSION['message'] = 'Itens reabertos.';
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/estoque/compras?status=pendente&somente_reabertos=1' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
@@ -2331,10 +2347,21 @@ class AdminComprasController extends Controller {
     }
 
     public function concluirCompras($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
         $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+        $redirectParams = ['status' => 'pendente'];
+        if ($semLoja) {
+            $redirectParams['sem_loja'] = '1';
+        } elseif ($lojaId > 0) {
+            $redirectParams['loja_id'] = (string) $lojaId;
+        }
+        $redirectUrl = '/admin/estoque/compras' . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
 
         $modo = (string) $request->getParam('modo', 'total');
         $modo = in_array($modo, ['total', 'parcial'], true) ? $modo : 'total';
@@ -2347,7 +2374,7 @@ class AdminComprasController extends Controller {
                 if ($quantidadeComprada <= 0) {
                     $_SESSION['message'] = 'Informe a quantidade comprada para concluir parcialmente.';
                     $_SESSION['message_type'] = 'warning';
-                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    header('Location: ' . $redirectUrl);
                     exit;
                 }
 
@@ -2372,6 +2399,18 @@ class AdminComprasController extends Controller {
                 $stmtSel->execute($params);
                 $rows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+                // fallback: se filtro de loja não retornou nada, tentar sem loja
+                if (empty($rows) && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                    $stmtSel2 = $this->connection->prepare(
+                        "SELECT id, quantidade_faltante, quantidade_necessaria\n"
+                        . " FROM lista_compras lc\n"
+                        . " WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id\n"
+                        . " ORDER BY lc.id ASC"
+                    );
+                    $stmtSel2->execute([':produto_id' => $produtoId]);
+                    $rows = $stmtSel2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+
                 $totalNeed = 0;
                 foreach ($rows as $r) {
                     $qf = (int) ($r['quantidade_faltante'] ?? 0);
@@ -2382,7 +2421,7 @@ class AdminComprasController extends Controller {
                 if ($quantidadeComprada > $totalNeed) {
                     $_SESSION['message'] = 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque';
                     $_SESSION['message_type'] = 'warning';
-                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    header('Location: ' . $redirectUrl);
                     exit;
                 }
 
@@ -2411,7 +2450,7 @@ class AdminComprasController extends Controller {
 
                 $_SESSION['message'] = 'Compra parcial registrada. O restante continua pendente.';
                 $_SESSION['message_type'] = 'success';
-                header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                header('Location: ' . $redirectUrl);
                 exit;
             }
 
@@ -2434,9 +2473,30 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
 
-            $_SESSION['message'] = 'Compras concluídas.';
-            $_SESSION['message_type'] = 'success';
-            header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+            $affected = (int) $stmt->rowCount();
+
+            // fallback: se nenhum registro foi marcado como comprado e o filtro por loja pode estar divergente,
+            // tentar novamente sem restringir por loja.
+            if ($affected === 0 && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                $sql2 = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+                $params2 = [];
+                if ($produtoId > 0) {
+                    $sql2 .= ' AND lc.produto_id = :produto_id';
+                    $params2[':produto_id'] = $produtoId;
+                }
+                $stmt2 = $this->connection->prepare($sql2);
+                $stmt2->execute($params2);
+                $affected = (int) $stmt2->rowCount();
+            }
+
+            if ($affected > 0) {
+                $_SESSION['message'] = 'Compras concluídas.';
+                $_SESSION['message_type'] = 'success';
+            } else {
+                $_SESSION['message'] = 'Nenhum item pendente encontrado para concluir.';
+                $_SESSION['message_type'] = 'warning';
+            }
+            header('Location: ' . $redirectUrl);
             exit;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao concluir compras.';
