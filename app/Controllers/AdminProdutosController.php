@@ -3400,7 +3400,10 @@ HTML;
             }
 
             echo '          <div class="col-12">
-                                <button type="submit" class="btn btn-outline-primary w-100" formaction="/admin/produtos/' . (int) $id . '/variacoes/atributos" formmethod="POST" formnovalidate>Salvar atributos/opções</button>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-outline-secondary" id="btnDesmarcarOpcoes"><i class="fas fa-eraser"></i> Desmarcar todas as opções</button>
+                                    <button type="submit" class="btn btn-outline-primary" formaction="/admin/produtos/' . (int) $id . '/variacoes/atributos" formmethod="POST" formnovalidate>Salvar atributos/opções</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3711,6 +3714,18 @@ HTML;
                         alert(e.message || 'Erro ao enviar fotos');
                     } finally {
                         btnGaleria.disabled = false;
+                    }
+                });
+            }
+
+            const btnDesmarcarOpcoes = document.getElementById('btnDesmarcarOpcoes');
+            if (btnDesmarcarOpcoes) {
+                btnDesmarcarOpcoes.addEventListener('click', function() {
+                    try {
+                        document.querySelectorAll('input[type="checkbox"][name^="opcoes["]').forEach((el) => {
+                            el.checked = false;
+                        });
+                    } catch (e) {
                     }
                 });
             }
