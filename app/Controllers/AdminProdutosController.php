@@ -3722,8 +3722,17 @@ HTML;
             if (btnDesmarcarOpcoes) {
                 btnDesmarcarOpcoes.addEventListener('click', function() {
                     try {
-                        document.querySelectorAll('input[type="checkbox"][name^="opcoes["]').forEach((el) => {
-                            el.checked = false;
+                        const form = btnDesmarcarOpcoes.closest('form') || document;
+                        const checks = form.querySelectorAll('input[type="checkbox"]');
+                        checks.forEach((el) => {
+                            const name = (el.getAttribute('name') || '');
+                            const id = (el.getAttribute('id') || '');
+                            const isTipo = (name === 'tipo_ids[]') || (id.startsWith('tipo_'));
+                            const isOpcao = name.startsWith('opcoes[');
+                            const isVariacaoAtiva = name.startsWith('variacao_ativo[');
+                            if (isTipo || isOpcao || isVariacaoAtiva) {
+                                el.checked = false;
+                            }
                         });
                     } catch (e) {
                     }
