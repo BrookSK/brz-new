@@ -1920,6 +1920,9 @@ class CheckoutController extends Controller {
             $this->redirect('/produtos');
             return;
         }
+
+        // Obter dados do formulário (precisamos disso para validar perfil considerando endereço selecionado)
+        $dados = $request->getParams();
         
         // Se está logado, exigir perfil completo + termos aceitos previamente
         if (!empty($usuario) && !empty($usuario['id'])) {
@@ -1928,6 +1931,40 @@ class CheckoutController extends Controller {
                 if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
                     $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
                     $termosOk = $this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+
+                    // Se existe endereço selecionado/preenchido no checkout e ele está completo,
+                    // não bloquear o checkout por pendências de endereço no perfil do usuário.
+                    if (!empty($faltando)) {
+                        $selectedAddress = null;
+
+                        $enderecoSel = (int) ($dados['endereco_selecionado'] ?? 0);
+                        if ($enderecoSel > 0) {
+                            try {
+                                $addr = $this->enderecoModel->find($enderecoSel);
+                                if (is_array($addr) && !empty($addr)) {
+                                    $uidAddr = (int) ($addr['usuario_id'] ?? 0);
+                                    if ($uidAddr === (int) $usuario['id']) {
+                                        $selectedAddress = $addr;
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        if ($selectedAddress === null) {
+                            $selectedAddress = [
+                                'cep' => (string) ($dados['cep'] ?? ''),
+                                'endereco' => (string) ($dados['endereco'] ?? ''),
+                                'numero' => (string) ($dados['numero'] ?? ''),
+                                'bairro' => (string) ($dados['bairro'] ?? ''),
+                                'cidade' => (string) ($dados['cidade'] ?? ''),
+                                'estado' => (string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')),
+                            ];
+                        }
+
+                        $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $selectedAddress);
+                    }
+
                     if (!$termosOk || !empty($faltando)) {
                         $parts = [];
                         if (!$termosOk) {
@@ -1945,9 +1982,6 @@ class CheckoutController extends Controller {
             } catch (\Exception $e) {
             }
         }
-        
-        // Obter dados do formulário
-        $dados = $request->getParams();
         
         // Resto do processamento do pedido...
         $this->debugLog('[CHECKOUT] processar() chamado - INICIO');
