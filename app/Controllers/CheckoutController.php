@@ -140,18 +140,25 @@ class CheckoutController extends Controller {
             }
         }
 
+        $variacoesTable = null;
         $hasProdutoVariacoes = false;
-        try {
-            $st = $db->query("SHOW TABLES LIKE 'produto_variacoes'");
-            $hasProdutoVariacoes = (bool) ($st && $st->fetch());
-        } catch (\Throwable $e) {
-            $hasProdutoVariacoes = false;
+        foreach (['produto_variacoes', 'produto_variations', 'product_variacoes', 'product_variations', 'variacoes_produto', 'variations'] as $t) {
+            try {
+                $st = $db->query("SHOW TABLES LIKE " . $db->quote($t));
+                $exists = (bool) ($st && $st->fetch());
+                if ($exists) {
+                    $variacoesTable = $t;
+                    $hasProdutoVariacoes = true;
+                    break;
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
         $variacaoCols = [];
-        if ($hasProdutoVariacoes) {
+        if ($hasProdutoVariacoes && $variacoesTable) {
             try {
-                $st = $db->query('DESCRIBE produto_variacoes');
+                $st = $db->query('DESCRIBE ' . $variacoesTable);
                 $variacaoCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
             } catch (\Throwable $e) {
                 $variacaoCols = [];
@@ -203,14 +210,15 @@ class CheckoutController extends Controller {
         }
 
         $stVariacao = null;
-        if ($hasProdutoVariacoes) {
+        if ($hasProdutoVariacoes && $variacoesTable) {
             try {
                 $select = ['id', 'produto_id'];
                 if (!empty($variacaoColAtivo)) $select[] = $variacaoColAtivo;
                 if (!empty($variacaoColStatus)) $select[] = $variacaoColStatus;
                 if (!empty($variacaoColStock)) $select[] = $variacaoColStock;
+                if (!empty($variacaoColControla)) $select[] = $variacaoColControla;
                 $select = array_values(array_unique($select));
-                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produto_variacoes WHERE id = ? LIMIT 1');
+                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $variacoesTable . ' WHERE id = ? LIMIT 1');
             } catch (\Throwable $e) {
                 $stVariacao = null;
             }
