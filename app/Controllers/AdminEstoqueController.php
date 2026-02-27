@@ -594,6 +594,46 @@ class AdminEstoqueController extends Controller {
         ];
     }
 
+    private function getProdutosStockCol(): ?string {
+        $schema = $this->getProdutosSchema();
+        $cols = $schema['cols'] ?? [];
+        if (!is_array($cols) || empty($cols)) {
+            return null;
+        }
+
+        foreach (['estoque', 'estoque_atual', 'saldo', 'quantidade', 'qty', 'stock_quantity', 'stock'] as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    private function syncProdutoEstoqueFromInterno(int $produtoId): void {
+        if ($produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_interno')) {
+            return;
+        }
+
+        $stockCol = $this->getProdutosStockCol();
+        if (!$stockCol) {
+            return;
+        }
+
+        try {
+            $stmtTotal = $this->connection->prepare('SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM estoque_interno WHERE produto_id = :produto_id');
+            $stmtTotal->execute([':produto_id' => $produtoId]);
+            $total = (int) (($stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+
+            $stmtUpd = $this->connection->prepare('UPDATE produtos SET `' . $stockCol . '` = :total WHERE id = :id LIMIT 1');
+            $stmtUpd->execute([':total' => $total, ':id' => $produtoId]);
+        } catch (\Exception $e) {
+        }
+    }
+
     private function resolveProdutoImagem(array $produto, ?string $imgCol): ?string {
         if (!$imgCol) {
             return null;
@@ -1640,6 +1680,8 @@ class AdminEstoqueController extends Controller {
 
                 $this->ajustarListaComprasAposEntrada($produtoId, $quantidade);
 
+                $this->syncProdutoEstoqueFromInterno($produtoId);
+
                 $this->connection->commit();
 
                 $this->setFlash('Quantidade atualizada com sucesso (sem duplicar localização).', 'success');
@@ -1732,6 +1774,8 @@ class AdminEstoqueController extends Controller {
             ]);
 
             $this->ajustarListaComprasAposEntrada($produtoId, $quantidade);
+
+            $this->syncProdutoEstoqueFromInterno($produtoId);
 
             $this->connection->commit();
 
@@ -2450,6 +2494,8 @@ class AdminEstoqueController extends Controller {
                 }
             }
 
+            $this->syncProdutoEstoqueFromInterno($produtoId);
+
             $this->connection->commit();
 
             if ($changedAny) {
@@ -2561,6 +2607,8 @@ class AdminEstoqueController extends Controller {
                 }
                 $this->setFlash($msg, 'warning');
             }
+
+            $this->syncProdutoEstoqueFromInterno($produtoId);
 
             $this->connection->commit();
 
