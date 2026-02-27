@@ -63,7 +63,7 @@ class PaymentService {
         return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
     }
 
-    private function mercadoPagoRequest(string $method, string $path, ?array $body = null): array {
+    private function mercadoPagoRequest(string $method, string $path, ?array $body = null, array $extraHeaders = []): array {
         if (!$this->isMercadoPagoEnabled()) {
             throw new \Exception('Mercado Pago está desativado');
         }
@@ -78,6 +78,19 @@ class PaymentService {
             'Content-Type: application/json',
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
+
+        if (!empty($extraHeaders)) {
+            foreach ($extraHeaders as $h) {
+                if (!is_string($h)) {
+                    continue;
+                }
+                $h = trim($h);
+                if ($h === '') {
+                    continue;
+                }
+                $headers[] = $h;
+            }
+        }
         $payload = $body !== null ? json_encode($body) : null;
 
         if (function_exists('curl_init')) {
@@ -159,7 +172,8 @@ class PaymentService {
         ];
 
         try {
-            $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload);
+            $idemKey = substr(hash('sha256', 'pix-produto|' . (string) $pedidoId . '|' . (string) round($valorBrl, 2) . '|' . (string) $descricao), 0, 32);
+            $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload, ['X-Idempotency-Key: ' . $idemKey]);
             $paymentId = (string) ($resp['id'] ?? '');
             if ($paymentId === '') {
                 return ['success' => false, 'error' => 'Mercado Pago: resposta inválida ao criar pagamento PIX.'];
