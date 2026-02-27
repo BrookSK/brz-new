@@ -92,7 +92,7 @@ function fmtPct($v) {
 <div class="mb-3">
     <?php
     $presetBase = [
-        'wc-enviado' => 'Enviados',
+        'wc-enviado' => 'Etiqueta gerada',
         'wc-completed' => 'Completed',
         'wc-comprado' => 'Comprado',
         'wc-fatura-paga' => 'Fatura paga',

@@ -6,7 +6,7 @@ function getOrderStatusLabel($status) {
         'pendente' => __('admin.orders.status.pending', 'Pendente'),
         'pago' => __('admin.orders.status.paid', 'Pago'),
         'processando' => __('admin.orders.status.processing', 'Processando'),
-        'enviado' => __('admin.orders.status.shipped', 'Enviado'),
+        'enviado' => __('admin.orders.status.shipped', 'Etiqueta gerada'),
         'entregue' => __('admin.orders.status.delivered', 'Entregue'),
         'cancelado' => __('admin.orders.status.cancelled', 'Cancelado')
     ];
@@ -47,7 +47,7 @@ function getOrderStatusLabel($status) {
                         <option value="pendente" <?= $status == 'pendente' ? 'selected' : '' ?>><?= __('admin.orders.status.pending', 'Pendente') ?></option>
                         <option value="pago" <?= $status == 'pago' ? 'selected' : '' ?>><?= __('admin.orders.status.paid', 'Pago') ?></option>
                         <option value="processando" <?= $status == 'processando' ? 'selected' : '' ?>><?= __('admin.orders.status.processing', 'Processando') ?></option>
-                        <option value="enviado" <?= $status == 'enviado' ? 'selected' : '' ?>><?= __('admin.orders.status.shipped', 'Enviado') ?></option>
+                        <option value="enviado" <?= $status == 'enviado' ? 'selected' : '' ?>><?= __('admin.orders.status.shipped', 'Etiqueta gerada') ?></option>
                         <option value="entregue" <?= $status == 'entregue' ? 'selected' : '' ?>><?= __('admin.orders.status.delivered', 'Entregue') ?></option>
                         <option value="cancelado" <?= $status == 'cancelado' ? 'selected' : '' ?>><?= __('admin.orders.status.cancelled', 'Cancelado') ?></option>
                     </select>
