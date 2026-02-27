@@ -11,6 +11,19 @@ class AdminPedidosManualController extends Controller {
     public function novo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
+
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        $formToken = '';
+        try {
+            $formToken = bin2hex(random_bytes(16));
+        } catch (\Throwable $e) {
+            $formToken = bin2hex((string) microtime(true));
+        }
+        $_SESSION['pedido_manual_form_token'] = $formToken;
+
         $usuarioModel = new Usuario();
         $usuarios = [];
         try {
@@ -237,6 +250,7 @@ class AdminPedidosManualController extends Controller {
         }
 
         echo '<form method="POST" action="/admin/pedidos/novo-manual/salvar" id="formPedidoManual">
+                <input type="hidden" name="pedido_manual_token" value="' . htmlspecialchars((string) $formToken, ENT_QUOTES, 'UTF-8') . '">
                 <div class="card mb-4">
                     <div class="card-header"><strong>Cliente</strong></div>
                     <div class="card-body">
@@ -1578,7 +1592,12 @@ document.addEventListener('DOMContentLoaded', function(){
             try { calcTotal(); } catch (err) {}
 
             const btn = document.getElementById('btnCriarPedidoManual');
-            if (btn) btn.disabled = true;
+            let btnOriginalHtml = '';
+            if (btn) {
+                btnOriginalHtml = String(btn.innerHTML || '');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Criando...';
+            }
 
             if (createBox) {
                 createBox.style.display = 'block';
@@ -1617,7 +1636,12 @@ document.addEventListener('DOMContentLoaded', function(){
                     }
                 })
                 .finally(() => {
-                    if (btn) btn.disabled = false;
+                    if (btn) {
+                        btn.disabled = false;
+                        if (btnOriginalHtml !== '') {
+                            btn.innerHTML = btnOriginalHtml;
+                        }
+                    }
                 });
         });
     }
@@ -1727,6 +1751,20 @@ JS;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
         try {
+            if (session_status() === PHP_SESSION_NONE) {
+                @session_start();
+            }
+            $token = (string) $request->getParam('pedido_manual_token', '');
+            $expected = (string) ($_SESSION['pedido_manual_form_token'] ?? '');
+            if ($token === '' || $expected === '' || !hash_equals($expected, $token)) {
+                $usedId = (int) (($_SESSION['pedido_manual_form_token_used'][$token] ?? 0));
+                if ($usedId > 0) {
+                    header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $usedId);
+                    exit;
+                }
+                throw new \Exception('Formulário expirado. Recarregue a página e tente novamente.');
+            }
+
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
@@ -1796,6 +1834,10 @@ JS;
 
             $svc = new PedidoManualService();
             $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
+
+            $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
+            $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
+            unset($_SESSION['pedido_manual_form_token']);
 
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
@@ -1809,6 +1851,20 @@ JS;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
         try {
+            if (session_status() === PHP_SESSION_NONE) {
+                @session_start();
+            }
+            $token = (string) $request->getParam('pedido_manual_token', '');
+            $expected = (string) ($_SESSION['pedido_manual_form_token'] ?? '');
+            if ($token === '' || $expected === '' || !hash_equals($expected, $token)) {
+                $usedId = (int) (($_SESSION['pedido_manual_form_token_used'][$token] ?? 0));
+                if ($usedId > 0) {
+                    $this->json(['success' => true, 'pedido_id' => (int) $usedId]);
+                    return;
+                }
+                throw new \Exception('Formulário expirado. Recarregue a página e tente novamente.');
+            }
+
             $clienteId = (int) $request->getParam('cliente_id');
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
@@ -1878,6 +1934,10 @@ JS;
 
             $svc = new PedidoManualService();
             $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
+
+            $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
+            $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
+            unset($_SESSION['pedido_manual_form_token']);
             $this->json(['success' => true, 'pedido_id' => (int) $pedidoId]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
