@@ -193,6 +193,24 @@
 
         .navbar .cart-badge {
             background: var(--danger-color) !important;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .navbar .nav-link.position-relative .cart-badge {
+            position: absolute;
+            top: -6px;
+            right: -10px;
+            transform: none;
         }
 
         .site-footer {
