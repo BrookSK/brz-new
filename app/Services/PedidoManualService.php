@@ -260,10 +260,219 @@ class PedidoManualService {
         }
 
         if ($moeda === 'BRL') {
-            return $this->gerarLinkPagamentoAppMaxPedidoManual($pedidoId, $billingType);
+            return $this->gerarLinkPagamentoSplitBrlPedidoManual($pedidoId, $billingType);
         }
 
         return $this->gerarLinkPagamentoStripePedidoManual($pedidoId);
+    }
+
+    private function gerarLinkPagamentoSplitBrlPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido');
+        }
+
+        $billingType = strtoupper(trim($billingType));
+        if (!in_array($billingType, ['BOLETO', 'PIX', 'CREDIT_CARD'], true)) {
+            $billingType = 'BOLETO';
+        }
+
+        // AppMax no fluxo atual não gera link de cartão sem dados do cartão.
+        if ($billingType === 'CREDIT_CARD') {
+            throw new \Exception('Para pedido manual BRL no split, selecione PIX ou BOLETO (a taxa é cobrada via AppMax).');
+        }
+
+        $colsPedidos = $this->getCols('pedidos');
+        if (empty($colsPedidos)) {
+            throw new \Exception('Tabela pedidos não encontrada');
+        }
+
+        $colTotal = $this->pickFirstExistingColumn($colsPedidos, ['total', 'valor_total', 'valor_total_brl']);
+        $colMoeda = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
+        $usuarioCol = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
+        $codigoCol = $this->pickFirstExistingColumn($colsPedidos, ['codigo_pedido', 'numero_pedido']);
+        $colTaxa = $this->pickFirstExistingColumn($colsPedidos, ['taxa_servico', 'servicos']);
+
+        if ($colTotal === '' || $usuarioCol === '') {
+            throw new \Exception('Tabela pedidos incompatível (sem total/usuario_id)');
+        }
+
+        $selectCols = ['id'];
+        $selectCols[] = $usuarioCol . ' AS usuario_id';
+        $selectCols[] = $colTotal . ' AS total';
+        if ($colMoeda !== '') $selectCols[] = $colMoeda . ' AS moeda';
+        if ($codigoCol !== '') $selectCols[] = $codigoCol . ' AS codigo_pedido';
+        if ($colTaxa !== '') $selectCols[] = $colTaxa . ' AS taxa_servico';
+
+        $stmt = $this->db->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stmt->execute([$pedidoId]);
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($pedido)) {
+            throw new \Exception('Pedido não encontrado');
+        }
+
+        $moeda = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+        if ($moeda === '') $moeda = 'BRL';
+        if ($moeda !== 'BRL') {
+            throw new \Exception('Split BRL só pode ser usado em pedidos BRL');
+        }
+
+        $clienteId = (int) ($pedido['usuario_id'] ?? 0);
+        if ($clienteId <= 0) {
+            throw new \Exception('Pedido sem cliente vinculado');
+        }
+
+        $total = (float) ($pedido['total'] ?? 0);
+        if ($total <= 0) {
+            throw new \Exception('Total inválido para cobrança');
+        }
+
+        $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
+        if ($taxaServico < 0) $taxaServico = 0.0;
+        $valorProduto = round(max(0.0, $total - $taxaServico), 2);
+        $valorTaxa = round(max(0.0, $taxaServico), 2);
+        if ($valorProduto <= 0 && $valorTaxa <= 0) {
+            throw new \Exception('Valores inválidos para split');
+        }
+
+        $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedidoId);
+        if ($codigoPedido === '') $codigoPedido = (string) $pedidoId;
+
+        // Buscar dados do cliente (para payer/descrição)
+        $colsUsuarios = $this->getCols('usuarios');
+        $uNomeCol = $this->pickFirstExistingColumn($colsUsuarios, ['nome', 'name']);
+        $uEmailCol = $this->pickFirstExistingColumn($colsUsuarios, ['email']);
+        $uTelefoneCol = $this->pickFirstExistingColumn($colsUsuarios, ['telefone', 'phone', 'celular']);
+        $uDocumentoCol = $this->pickFirstExistingColumn($colsUsuarios, ['documento', 'cpf', 'cnpj']);
+
+        $uSelect = ['id'];
+        if ($uNomeCol !== '') $uSelect[] = $uNomeCol . ' AS nome';
+        if ($uEmailCol !== '') $uSelect[] = $uEmailCol . ' AS email';
+        if ($uTelefoneCol !== '') $uSelect[] = $uTelefoneCol . ' AS telefone';
+        if ($uDocumentoCol !== '') $uSelect[] = $uDocumentoCol . ' AS documento';
+
+        $stU = $this->db->prepare('SELECT ' . implode(', ', $uSelect) . ' FROM usuarios WHERE id = ? LIMIT 1');
+        $stU->execute([$clienteId]);
+        $user = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($user)) {
+            throw new \Exception('Cliente não encontrado');
+        }
+
+        $nome = (string) ($user['nome'] ?? '');
+        $email = (string) ($user['email'] ?? '');
+        $telefone = (string) ($user['telefone'] ?? '');
+        $documento = (string) ($user['documento'] ?? '');
+
+        $pg = new PaymentService();
+
+        // 1) Produto via Mercado Pago
+        $mp = null;
+        if ($valorProduto > 0) {
+            $payer = [];
+            if (trim($email) !== '') {
+                $payer['email'] = trim($email);
+            }
+            $mp = $pg->createMercadoPagoCheckoutPreferenceProduto(
+                $pedidoId,
+                $valorProduto,
+                'Pedido manual #' . $codigoPedido . ' (produtos)',
+                $payer
+            );
+            if (empty($mp['success'])) {
+                throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar link Mercado Pago'));
+            }
+        }
+
+        // 2) Taxa via AppMax (PIX/BOLETO)
+        $taxa = null;
+        if ($valorTaxa > 0) {
+            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, $billingType, $valorTaxa, $nome, $email, $telefone, $documento, $codigoPedido);
+            if (empty($taxa['success'])) {
+                throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança AppMax (taxa)'));
+            }
+        }
+
+        return [
+            'success' => true,
+            'split' => true,
+            'pedido_id' => $pedidoId,
+            'moeda' => 'BRL',
+            'produto' => $mp,
+            'taxa' => $taxa,
+        ];
+    }
+
+    private function gerarCobrancaAppmaxPedidoManualComValor(int $pedidoId, string $billingType, float $valor, string $nome, string $email, string $telefone, string $documento, string $codigoPedido): array {
+        $valor = (float) $valor;
+        if ($valor <= 0) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $descricao = 'Pedido manual #' . $codigoPedido . ' (taxa de serviço)';
+
+        $pg = new PaymentService();
+        $productsValueCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'PEDIDO_MANUAL_TAXA_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $productsValueCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
+        ];
+
+        $result = $pg->processarPagamento([
+            'billingType' => $billingType,
+            'customer_name' => $nome,
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $productsValueCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ], $valor, 'BRL', $descricao);
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        }
+
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        // Persistir split em pedido_pagamentos
+        $pg->registrarPedidoPagamentoSplit([
+            'pedido_id' => $pedidoId,
+            'componente' => 'taxa_servico',
+            'gateway' => 'appmax',
+            'metodo' => strtolower($billingType),
+            'moeda' => 'BRL',
+            'valor' => $valor,
+            'payment_id' => $paymentId,
+            'status' => 'pending',
+            'invoice_url' => $invoiceUrl,
+            'bank_slip_url' => $bankSlipUrl,
+            'digitable_line' => $digitableLine,
+            'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+            'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+        ]);
+
+        return [
+            'success' => true,
+            'pedido_id' => $pedidoId,
+            'payment_id' => $paymentId,
+            'invoiceUrl' => $invoiceUrl,
+            'pix' => $pix,
+            'bankSlipUrl' => $bankSlipUrl,
+            'digitableLine' => $digitableLine,
+            'billingType' => $billingType,
+            'status' => (string) ($result['status'] ?? 'pending'),
+        ];
     }
 
     private function gerarLinkPagamentoStripePedidoManual(int $pedidoId): array {

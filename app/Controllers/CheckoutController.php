@@ -27,6 +27,79 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
+    private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao): array {
+        $billingType = strtoupper(trim($billingType));
+        if (!in_array($billingType, ['PIX', 'BOLETO'], true)) {
+            $billingType = 'BOLETO';
+        }
+        $valor = (float) $valor;
+        if ($valor <= 0) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $nome = (string) ($usuario['nome'] ?? 'Cliente');
+        $email = (string) ($usuario['email'] ?? '');
+        $telefone = (string) ($usuario['telefone'] ?? '');
+        $documento = (string) ($usuario['documento'] ?? '');
+
+        $productsValueCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'TAXA_SERVICO_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $productsValueCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
+        ];
+
+        $result = $this->paymentService->processarPagamento([
+            'billingType' => $billingType,
+            'customer_name' => $nome,
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $productsValueCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ], $valor, 'BRL', $descricao);
+
+        if (empty($result['success'])) {
+            return $result;
+        }
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        }
+
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        $this->paymentService->registrarPedidoPagamentoSplit([
+            'pedido_id' => $pedidoId,
+            'componente' => 'taxa_servico',
+            'gateway' => 'appmax',
+            'metodo' => strtolower($billingType),
+            'moeda' => 'BRL',
+            'valor' => $valor,
+            'payment_id' => $paymentId,
+            'status' => 'pending',
+            'invoice_url' => $invoiceUrl,
+            'bank_slip_url' => $bankSlipUrl,
+            'digitable_line' => $digitableLine,
+            'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+            'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+        ]);
+
+        return $result;
+    }
+
     private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
         $db = \Config\Database::getConnection();
 
@@ -2108,10 +2181,70 @@ class CheckoutController extends Controller {
 
                 if (!$reused && $formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
                     try {
-                        $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
-                        $gateway = 'appmax';
-                        $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
-                        $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                        // Split BRL:
+                        // - produto via Mercado Pago Checkout Pro (link hospedado)
+                        // - taxa de serviço via AppMax (PIX/BOLETO)
+                        // Por enquanto, aplicamos split apenas para PIX/BOLETO.
+                        if (in_array($formaSelecionada, ['pix', 'boleto'], true)) {
+                            $pedidoNorm = [];
+                            try {
+                                $pedidoNorm = $this->pedidoModel->getComDetalhes((int) $pedidoId);
+                            } catch (\Exception $e) {
+                                $pedidoNorm = [];
+                            }
+
+                            $totalBrl = (float) (($pedidoNorm['total'] ?? null) !== null ? $pedidoNorm['total'] : ($pedidoRowPay['total'] ?? 0));
+                            $taxaServico = (float) ($pedidoNorm['taxa_servico'] ?? 0);
+                            if ($taxaServico < 0) $taxaServico = 0.0;
+                            $valorProduto = round(max(0.0, $totalBrl - $taxaServico), 2);
+                            $valorTaxa = round(max(0.0, $taxaServico), 2);
+
+                            if ($valorProduto <= 0 && $valorTaxa <= 0) {
+                                throw new \Exception('Valores inválidos para split');
+                            }
+
+                            $descricaoProduto = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (produtos)';
+                            $descricaoTaxa = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (taxa de serviço)';
+                            $payer = [];
+                            if (!empty($dados['email']) && is_string($dados['email'])) {
+                                $payer['email'] = trim((string) $dados['email']);
+                            } elseif (!empty($usuario['email'])) {
+                                $payer['email'] = trim((string) $usuario['email']);
+                            }
+
+                            $mp = null;
+                            if ($valorProduto > 0) {
+                                $mp = $this->paymentService->createMercadoPagoCheckoutPreferenceProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
+                                if (empty($mp['success'])) {
+                                    throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar pagamento Mercado Pago (produto)'));
+                                }
+                            }
+
+                            $taxa = null;
+                            if ($valorTaxa > 0) {
+                                $billingType = $formaSelecionada === 'pix' ? 'PIX' : 'BOLETO';
+                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorTaxa, is_array($usuario) ? $usuario : [], (string) $descricaoTaxa);
+                                if (empty($taxa['success'])) {
+                                    throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
+                                }
+                            }
+
+                            // Não sobrescrever colunas legadas de pagamento no pedido em split.
+                            // A confirmação será agregada via pedido_pagamentos (webhooks).
+                            $dados['__split'] = [
+                                'success' => true,
+                                'split' => true,
+                                'moeda' => 'BRL',
+                                'produto' => $mp,
+                                'taxa' => $taxa,
+                            ];
+                        } else {
+                            // Fluxo legado (AppMax total) - cartao_credito permanece aqui por enquanto.
+                            $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
+                            $gateway = 'appmax';
+                            $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                            $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                        }
                     } catch (\Exception $e) {
                         throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
                     }
@@ -2189,6 +2322,12 @@ class CheckoutController extends Controller {
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
                     'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
                 ];
+
+                // Se geramos split, devolver detalhes para o frontend (para exibição imediata se necessário)
+                if (isset($dados['__split']) && is_array($dados['__split'])) {
+                    $response['split'] = true;
+                    $response['split_pagamentos'] = $dados['__split'];
+                }
                 
                 $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
                 $this->json($response);
@@ -2342,6 +2481,22 @@ class CheckoutController extends Controller {
 
         $paymentDetails = null;
         $pixQrCode = null;
+        $splitPagamentos = [];
+
+        // Se existir split no pedido_pagamentos, carregar para exibição
+        try {
+            $dbSplit = \Config\Database::getConnection();
+            $st = $dbSplit->prepare('SELECT componente, gateway, metodo, moeda, valor, status, invoice_url, bank_slip_url, digitable_line, pix_encoded_image, pix_payload FROM pedido_pagamentos WHERE pedido_id = :p ORDER BY id ASC');
+            $st->execute([':p' => (int) $pedidoId]);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $r) {
+                $comp = strtolower(trim((string) ($r['componente'] ?? '')));
+                if ($comp === '') continue;
+                $splitPagamentos[$comp] = $r;
+            }
+        } catch (\Exception $e) {
+            $splitPagamentos = [];
+        }
 
         // AppMax: não depende de consulta externa aqui; usar dados persistidos no pedido (quando disponíveis)
         $gatewayPedido = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
@@ -2393,7 +2548,8 @@ class CheckoutController extends Controller {
             'pedido' => $pedido,
             'itens' => (array) ($pedido['items'] ?? []),
             'paymentDetails' => $paymentDetails,
-            'pixQrCode' => $pixQrCode
+            'pixQrCode' => $pixQrCode,
+            'splitPagamentos' => $splitPagamentos,
         ]);
     }
     

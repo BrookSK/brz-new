@@ -18,7 +18,6 @@ class AdminPedidosManualController extends Controller {
         } catch (\Exception $e) {
             $usuarios = [];
         }
-
         $pdo = \Config\Database::getConnection();
         $produtos = [];
         try {
@@ -1212,43 +1211,91 @@ function gerarLinkPagamento(){
         .then(r => r.json())
         .then(data => {
             if (data && data.success) {
-                const url = String(data.invoiceUrl || '').trim();
-                const pixPayload = String((data.pix && data.pix.payload) ? data.pix.payload : '').trim();
-                const pixImg = String((data.pix && data.pix.encodedImage) ? data.pix.encodedImage : '').trim();
-                const bankSlipUrl = String(data.bankSlipUrl || '').trim();
-                const digitableLine = String(data.digitableLine || '').trim();
+                const isSplit = !!data.split;
 
-                const textToCopy = (url || pixPayload || bankSlipUrl || digitableLine);
-                window.__PAGAMENTO_LINK__ = textToCopy;
+                const buildSection = function(title, obj){
+                    obj = obj || {};
+                    const url = String(obj.init_point || obj.invoiceUrl || '').trim();
+                    const pixPayload = String((obj.pix && obj.pix.payload) ? obj.pix.payload : '').trim();
+                    const pixImg = String((obj.pix && obj.pix.encodedImage) ? obj.pix.encodedImage : '').trim();
+                    const bankSlipUrl = String(obj.bankSlipUrl || '').trim();
+                    const digitableLine = String(obj.digitableLine || '').trim();
 
-                let actions = '';
-                if (url) {
-                    actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
-                } else if (bankSlipUrl) {
-                    actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(bankSlipUrl)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
-                }
-                actions += `<button type="button" class="btn btn-sm btn-dark" onclick="copiarLinkPagamento()"><i class="fas fa-copy"></i> Copiar</button>`;
+                    const displayText = url || pixPayload || bankSlipUrl || digitableLine;
+                    const textToCopy = displayText;
 
-                const headerMsg = url ? 'Link gerado.' : (pixPayload ? 'PIX gerado.' : (bankSlipUrl ? 'Boleto gerado.' : 'Pagamento gerado.'));
+                    let actions = '';
+                    if (url) {
+                        actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                    } else if (bankSlipUrl) {
+                        actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(bankSlipUrl)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                    }
+                    actions += `<button type="button" class="btn btn-sm btn-dark" onclick="copiarTexto(${JSON.stringify(textToCopy)})"><i class="fas fa-copy"></i> Copiar</button>`;
 
-                let extra = '';
-                if (pixImg) {
-                    extra += `<div class="mt-3"><img alt="QR Code PIX" style="max-width:220px;width:100%;height:auto" src="data:image/png;base64,${escapeHtml(pixImg)}" /></div>`;
-                }
+                    let extra = '';
+                    if (pixImg) {
+                        extra += `<div class="mt-3"><img alt="QR Code PIX" style="max-width:220px;width:100%;height:auto" src="data:image/png;base64,${escapeHtml(pixImg)}" /></div>`;
+                    }
 
-                const displayText = url || pixPayload || bankSlipUrl || digitableLine;
+                    return `<div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div><strong>${escapeHtml(title)}</strong></div>
+                            <div class="d-flex gap-2">${actions}</div>
+                        </div>
+                        <textarea class="form-control mt-2" rows="${pixPayload ? 4 : 2}" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(displayText)}</textarea>
+                        ${extra}
+                    </div>`;
+                };
 
-                el.innerHTML = `<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        <strong>${headerMsg}</strong> Agora é só copiar e enviar para o cliente.
+                if (isSplit) {
+                    const produto = data.produto || null;
+                    const taxa = data.taxa || null;
+
+                    el.innerHTML = `<div class="alert alert-info">
+                        <strong>Split gerado.</strong> Envie os dois pagamentos para o cliente (produto + taxa).
                     </div>
-                    <div class="d-flex gap-2">
-                        ${actions}
+                    ${buildSection('Pagamento 1: Produtos (Mercado Pago)', produto)}
+                    ${buildSection('Pagamento 2: Taxa de serviço (AppMax)', taxa)}
+                    <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar novamente.</div>`;
+                } else {
+                    const url = String(data.invoiceUrl || '').trim();
+                    const pixPayload = String((data.pix && data.pix.payload) ? data.pix.payload : '').trim();
+                    const pixImg = String((data.pix && data.pix.encodedImage) ? data.pix.encodedImage : '').trim();
+                    const bankSlipUrl = String(data.bankSlipUrl || '').trim();
+                    const digitableLine = String(data.digitableLine || '').trim();
+
+                    const textToCopy = (url || pixPayload || bankSlipUrl || digitableLine);
+                    window.__PAGAMENTO_LINK__ = textToCopy;
+
+                    let actions = '';
+                    if (url) {
+                        actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                    } else if (bankSlipUrl) {
+                        actions = `<a class="btn btn-sm btn-outline-dark" href="${escapeHtml(bankSlipUrl)}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Abrir</a>`;
+                    }
+                    actions += `<button type="button" class="btn btn-sm btn-dark" onclick="copiarLinkPagamento()"><i class="fas fa-copy"></i> Copiar</button>`;
+
+                    const headerMsg = url ? 'Link gerado.' : (pixPayload ? 'PIX gerado.' : (bankSlipUrl ? 'Boleto gerado.' : 'Pagamento gerado.'));
+
+                    let extra = '';
+                    if (pixImg) {
+                        extra += `<div class="mt-3"><img alt="QR Code PIX" style="max-width:220px;width:100%;height:auto" src="data:image/png;base64,${escapeHtml(pixImg)}" /></div>`;
+                    }
+
+                    const displayText = url || pixPayload || bankSlipUrl || digitableLine;
+
+                    el.innerHTML = `<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <strong>${headerMsg}</strong> Agora é só copiar e enviar para o cliente.
+                        </div>
+                        <div class="d-flex gap-2">
+                            ${actions}
+                        </div>
                     </div>
-                </div>
-                <textarea class="form-control" id="linkPagamentoTexto" rows="${pixPayload ? 4 : 2}" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(displayText)}</textarea>
-                ${extra}
-                <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar outro link.</div>`;
+                    <textarea class="form-control" id="linkPagamentoTexto" rows="${pixPayload ? 4 : 2}" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;" readonly>${escapeHtml(displayText)}</textarea>
+                    ${extra}
+                    <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar outro link.</div>`;
+                }
             } else {
                 el.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml((data && data.error) ? data.error : 'Falha ao gerar link')}</div>`;
             }
@@ -1256,6 +1303,50 @@ function gerarLinkPagamento(){
         .catch(err => {
             el.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
         });
+}
+
+function copiarTexto(txt){
+    try {
+        const v = String(txt || '').trim();
+        if (!v) {
+            alert('Nada para copiar.');
+            return;
+        }
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(v).then(() => {
+                alert('Copiado!');
+            }).catch(() => {
+                fallbackCopyTextToClipboard(v);
+            });
+            return;
+        }
+    } catch(e) {}
+    fallbackCopyTextToClipboard(String(txt || ''));
+}
+
+function fallbackCopyTextToClipboard(text){
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = String(text || '');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '0';
+        ta.style.width = '2em';
+        ta.style.height = '2em';
+        ta.style.padding = '0';
+        ta.style.border = 'none';
+        ta.style.outline = 'none';
+        ta.style.boxShadow = 'none';
+        ta.style.background = 'transparent';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('Copiado!');
+    } catch(e) {
+        alert('Falha ao copiar.');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function(){

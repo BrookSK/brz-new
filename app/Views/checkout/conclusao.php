@@ -203,13 +203,62 @@
                     </p>
 
                     <?php
+                    $splitPagamentos = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
+                    $hasSplit = !empty($splitPagamentos);
                     $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '')));
                     $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
                     $bankSlipUrl = (is_array($paymentDetails) ? ($paymentDetails['bankSlipUrl'] ?? null) : null);
                     $digitableLine = (is_array($paymentDetails) ? ($paymentDetails['digitableLine'] ?? null) : null);
                     ?>
 
-                    <?php if (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
+                    <?php if (!$isPago && $hasSplit): ?>
+                        <?php
+                        $pProduto = $splitPagamentos['produto'] ?? null;
+                        $pTaxa = $splitPagamentos['taxa_servico'] ?? ($splitPagamentos['taxa'] ?? null);
+
+                        $renderSplitBox = function (string $titulo, ?array $row) {
+                            if (empty($row)) {
+                                return;
+                            }
+
+                            $url = (string) ($row['invoice_url'] ?? '');
+                            $bank = (string) ($row['bank_slip_url'] ?? '');
+                            $dig = (string) ($row['digitable_line'] ?? '');
+                            $pixImg = (string) ($row['pix_encoded_image'] ?? '');
+                            $pixPayload = (string) ($row['pix_payload'] ?? '');
+
+                            $display = $url !== '' ? $url : ($pixPayload !== '' ? $pixPayload : ($bank !== '' ? $bank : $dig));
+                            $openUrl = $url !== '' ? $url : ($bank !== '' ? $bank : '');
+
+                            $boxId = 'split_' . md5($titulo . $display);
+                            ?>
+                            <div class="border rounded p-3 mb-3" style="background: rgba(148, 163, 184, 0.08);">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div><strong><?= htmlspecialchars($titulo) ?></strong></div>
+                                    <div class="d-flex gap-2">
+                                        <?php if ($openUrl !== ''): ?>
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($openUrl) ?>" target="_blank" rel="noopener"><?= __('checkout_done.open', 'Abrir') ?></a>
+                                        <?php endif; ?>
+                                        <button type="button" class="btn btn-sm btn-outline-dark" onclick="copiarPixPayload('<?= $boxId ?>','<?= $boxId ?>_copied', this)"><?= __('checkout_done.copy', 'Copiar') ?></button>
+                                    </div>
+                                </div>
+                                <input id="<?= $boxId ?>" type="text" class="form-control mt-2" value="<?= htmlspecialchars($display) ?>" readonly onclick="this.select();" />
+                                <div id="<?= $boxId ?>_copied" class="small text-success mt-1" style="display:none;"><?= __('checkout_done.copied', 'Copiado!') ?></div>
+
+                                <?php if ($pixImg !== ''): ?>
+                                    <div class="text-center my-3">
+                                        <img src="data:image/png;base64,<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <?php
+                        };
+                        ?>
+
+                        <?php $renderSplitBox('Pagamento 1: Produtos (Mercado Pago)', is_array($pProduto) ? $pProduto : null); ?>
+                        <?php $renderSplitBox('Pagamento 2: Taxa de serviço (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
+
+                    <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
                         <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                         <?php if (!empty($pixImage)): ?>

@@ -11,6 +11,21 @@ class WebhookController extends Controller {
         $this->paymentService = new PaymentService();
     }
 
+    public function mercadopago(Request $request) {
+        $raw = file_get_contents('php://input');
+        $payload = json_decode((string) $raw, true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        try {
+            $result = $this->paymentService->processarWebhookMercadoPago($payload);
+            $this->json(['success' => true, 'result' => $result]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function asaas(Request $request) {
         $raw = file_get_contents('php://input');
         $payload = json_decode((string) $raw, true);
