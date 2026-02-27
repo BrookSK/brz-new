@@ -228,6 +228,57 @@
             </div>
             <?php endif; ?>
 
+            <?php
+                $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                $avatarUrl = null;
+                foreach ($avatarColumnCandidates as $c) {
+                    if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                        $avatarUrl = $usuario[$c];
+                        break;
+                    }
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=0b1f3a&color=fff&size=512';
+                }
+            ?>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-camera me-2"></i> <?= __('user_data.avatar.title', 'Foto de Perfil') ?>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="user-avatar">
+                            <img src="<?= htmlspecialchars((string) $avatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($usuario['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 80px; height: 80px; object-fit: cover; border-radius: 999px;">
+                            <span class="avatar-camera-indicator"><i class="fas fa-camera"></i></span>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary" id="btnAvatarView">
+                                <i class="fas fa-eye me-2"></i> <?= __('user_data.avatar.view', 'Ver') ?>
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnAvatarChange">
+                                <i class="fas fa-upload me-2"></i> <?= __('user_data.avatar.change', 'Alterar') ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="btnAvatarRemove">
+                                <i class="fas fa-undo me-2"></i> <?= __('user_data.avatar.reset', 'Voltar ao padrão') ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="avatarUploadForm" method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" class="d-none">
+                        <input type="file" name="avatar" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" />
+                    </form>
+
+                    <form id="avatarRemoveForm" method="POST" action="/meus-dados/avatar/remover" class="d-none"></form>
+                </div>
+            </div>
+
             <form method="POST" action="/meus-dados" id="formMeusDados">
             
             <!-- Profile Form -->
