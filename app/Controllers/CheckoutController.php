@@ -100,6 +100,21 @@ class CheckoutController extends Controller {
         return $result;
     }
 
+    private function pedidoJaTemSplitPagamentos(int $pedidoId): bool {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return false;
+        }
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT 1 FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
         $db = \Config\Database::getConnection();
 
@@ -2380,7 +2395,17 @@ class CheckoutController extends Controller {
                     }
                 }
 
-                if (!$reused && $formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                $moedaPedidoPay = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                if ($moedaPedidoPay === '') {
+                    $moedaPedidoPay = 'BRL';
+                }
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $moedaPedidoPay === 'BRL' && in_array($formaSelecionada, ['pix', 'boleto'], true));
+                // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
+                if ($shouldTrySplit && $reused) {
+                    $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
+                }
+
+                if ($shouldTrySplit) {
                     try {
                         // Split BRL:
                         // - produto via Mercado Pago Checkout Pro (link hospedado)
