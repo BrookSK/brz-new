@@ -115,6 +115,37 @@ class CheckoutController extends Controller {
         }
     }
 
+    private function normalizeTelefoneFromCheckout(array $dados): string {
+        $tel = (string) ($dados['telefone'] ?? '');
+        $tel = trim($tel);
+        if ($tel !== '') {
+            return $tel;
+        }
+
+        $ddi = trim((string) ($dados['telefone_ddi'] ?? ''));
+        $numero = trim((string) ($dados['telefone_numero'] ?? ''));
+        $ddi = preg_replace('/\D+/', '', $ddi);
+        $numero = preg_replace('/\D+/', '', $numero);
+
+        if ($ddi === '' && $numero === '') {
+            return '';
+        }
+
+        if ($ddi === '0') {
+            $ddiOutro = trim((string) ($dados['telefone_ddi_outro'] ?? ''));
+            $ddiOutro = preg_replace('/\D+/', '', $ddiOutro);
+            if ($ddiOutro !== '') {
+                $ddi = $ddiOutro;
+            }
+        }
+
+        if ($ddi !== '' && $numero !== '') {
+            return '+' . $ddi . $numero;
+        }
+
+        return $numero;
+    }
+
     private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
         $db = \Config\Database::getConnection();
 
@@ -2088,6 +2119,15 @@ class CheckoutController extends Controller {
 
         // Obter dados do formulário (precisamos disso para validar perfil considerando endereço selecionado)
         $dados = $request->getParams();
+
+        // Garantir que o campo telefone (hidden) esteja preenchido mesmo quando o usuário digita no campo visível.
+        try {
+            $telNorm = $this->normalizeTelefoneFromCheckout(is_array($dados) ? $dados : []);
+            if ($telNorm !== '') {
+                $dados['telefone'] = $telNorm;
+            }
+        } catch (\Throwable $e) {
+        }
         
         // Se está logado, exigir perfil completo + termos aceitos previamente
         if (!empty($usuario) && !empty($usuario['id'])) {
@@ -2449,14 +2489,18 @@ class CheckoutController extends Controller {
                             $taxa = null;
                             if ($valorTaxa > 0) {
                                 $billingType = $formaSelecionada === 'pix' ? 'PIX' : 'BOLETO';
-                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorTaxa, is_array($usuario) ? $usuario : [], (string) $descricaoTaxa);
+                                $clienteSplit = [];
+                                $clienteSplit['nome'] = (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente'));
+                                $clienteSplit['email'] = (string) ($dados['email'] ?? ($usuario['email'] ?? ''));
+                                $clienteSplit['telefone'] = (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? '')));
+                                $clienteSplit['documento'] = (string) ($dados['documento'] ?? ($usuario['documento'] ?? ''));
+
+                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorTaxa, $clienteSplit, (string) $descricaoTaxa);
                                 if (empty($taxa['success'])) {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
                                 }
                             }
 
-                            // Não sobrescrever colunas legadas de pagamento no pedido em split.
-                            // A confirmação será agregada via pedido_pagamentos (webhooks).
                             $dados['__split'] = [
                                 'success' => true,
                                 'split' => true,

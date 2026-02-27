@@ -87,7 +87,7 @@
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label"><?= __('checkout.phone_whatsapp', 'Telefone com WhatsApp') ?> *</label>
                                     <div class="input-group w-100" style="flex-wrap: nowrap;">
-                                        <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
+                                        <select class="form-select" id="telefone_ddi" name="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                             <option value="55" selected>+55</option>
                                             <option value="1">+1</option>
                                             <option value="44">+44</option>
@@ -101,12 +101,12 @@
                                             <option value="57">+57</option>
                                             <option value="0"><?= __('auth.other', 'Outro') ?></option>
                                         </select>
-                                        <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                        <input type="text" class="form-control" id="telefone_numero" name="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
                                         <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
                                     </div>
                                     <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
                                         <span class="input-group-text">DDI</span>
-                                        <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="<?= htmlspecialchars(__('auth.ddi_example', 'Ex: 81'), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="text" class="form-control" id="telefone_ddi_outro" name="telefone_ddi_outro" placeholder="<?= htmlspecialchars(__('auth.ddi_example', 'Ex: 81'), ENT_QUOTES, 'UTF-8') ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
