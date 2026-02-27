@@ -125,7 +125,7 @@ class CheckoutController extends Controller {
         }
 
         $produtoColStock = null;
-        foreach (['stock', 'estoque'] as $c) {
+        foreach (['stock', 'estoque', 'stock_quantity', 'quantidade', 'quantity', 'qtd', 'qty', 'estoque_atual'] as $c) {
             if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
                 $produtoColStock = $c;
                 break;
@@ -172,9 +172,17 @@ class CheckoutController extends Controller {
         }
 
         $variacaoColStock = null;
-        foreach (['stock', 'estoque'] as $c) {
+        foreach (['stock', 'estoque', 'stock_quantity', 'quantidade', 'quantity', 'qtd', 'qty', 'estoque_atual'] as $c) {
             if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
                 $variacaoColStock = $c;
+                break;
+            }
+        }
+
+        $variacaoColControla = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColControla = $c;
                 break;
             }
         }
@@ -217,10 +225,13 @@ class CheckoutController extends Controller {
             if ($qtd < 1) $qtd = 1;
 
             $produtoVariacaoId = null;
-            if (isset($item['produto_variacao_id']) && $item['produto_variacao_id'] !== '' && $item['produto_variacao_id'] !== null) {
-                $pv = (int) $item['produto_variacao_id'];
-                if ($pv > 0) {
-                    $produtoVariacaoId = $pv;
+            foreach (['produto_variacao_id', 'variacao_id', 'variation_id', 'produto_variacao', 'id_variacao'] as $varKey) {
+                if (isset($item[$varKey]) && $item[$varKey] !== '' && $item[$varKey] !== null) {
+                    $pv = (int) $item[$varKey];
+                    if ($pv > 0) {
+                        $produtoVariacaoId = $pv;
+                        break;
+                    }
                 }
             }
 
@@ -380,16 +391,23 @@ class CheckoutController extends Controller {
                 }
 
                 if (!empty($variacaoColStock)) {
-                    $stockV = (int) ($varRow[$variacaoColStock] ?? 0);
-                    if ($stockV < $qtd) {
-                        $erros[] = [
-                            'produto_id' => $produtoId,
-                            'produto_variacao_id' => $produtoVariacaoId,
-                            'nome' => $nomeProduto,
-                            'motivo' => 'Estoque insuficiente (variação)',
-                            'estoque_disponivel' => $stockV,
-                            'quantidade_solicitada' => $qtd,
-                        ];
+                    $controlaV = true;
+                    if (!empty($variacaoColControla) && array_key_exists($variacaoColControla, $varRow)) {
+                        $raw = $varRow[$variacaoColControla];
+                        $controlaV = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
+                    }
+                    if ($controlaV) {
+                        $stockV = (int) ($varRow[$variacaoColStock] ?? 0);
+                        if ($stockV < $qtd) {
+                            $erros[] = [
+                                'produto_id' => $produtoId,
+                                'produto_variacao_id' => $produtoVariacaoId,
+                                'nome' => $nomeProduto,
+                                'motivo' => 'Estoque insuficiente (variação)',
+                                'estoque_disponivel' => $stockV,
+                                'quantidade_solicitada' => $qtd,
+                            ];
+                        }
                     }
                 }
             } else {
