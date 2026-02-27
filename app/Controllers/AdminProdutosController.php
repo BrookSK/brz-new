@@ -3305,13 +3305,15 @@ HTML;
 
         if (!empty($fotoCapaUrl)) {
             echo '<div class="col-6 col-md-3 mb-2">
-                    <a href="' . $fotoCapaUrl . '" target="_blank">
-                        <img id="capaImg" src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    <a id="capaLink" href="' . $fotoCapaUrl . '" target="_blank">
+                        <img id="capaImg" data-placeholder="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" src="' . $fotoCapaUrl . '" alt="Capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
                     </a>
                 </div>';
         } else {
             echo '<div class="col-6 col-md-3 mb-2">
-                    <img id="capaImg" src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    <a id="capaLink" href="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" target="_blank">
+                        <img id="capaImg" data-placeholder="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" src="' . Url::absolute('/uploads/produtos/placeholder.jpg') . '" alt="Sem capa" class="img-thumbnail" style="width: 100%; height: 140px; object-fit: cover;">
+                    </a>
                 </div>';
         }
 
@@ -3319,7 +3321,7 @@ HTML;
                                         <div class="d-flex gap-2 align-items-center">
                                             <input id="capaFile" type="file" class="form-control" name="capa" accept="image/*">
                                             <button type="button" id="btnUploadCapa" class="btn btn-outline-primary" data-url="/admin/produtos/upload-capa/' . (int) $id . '">Enviar capa</button>
-                                            <button type="submit" class="btn btn-outline-danger" formaction="/admin/produtos/remover-capa/' . (int) $id . '" formmethod="POST" formnovalidate ' . (!empty($fotoCapaUrl) ? '' : 'disabled') . '>Remover capa</button>
+                                            <button type="button" id="btnRemoverCapa" class="btn btn-outline-danger" data-url="/admin/produtos/remover-capa/' . (int) $id . '" ' . (!empty($fotoCapaUrl) ? '' : 'disabled') . '>Remover capa</button>
                                         </div>
                                         <small class="text-muted">A foto de capa é usada como imagem principal do produto</small>
                                     </div>
@@ -3670,14 +3672,49 @@ HTML;
                         const data = await postFormData(url, fd);
                         if (data && data.url) {
                             capaImg.src = data.url;
-                            const parentLink = capaImg.closest('a');
+                            const parentLink = document.getElementById('capaLink') || capaImg.closest('a');
                             if (parentLink) parentLink.href = data.url;
+                            const btnRemoverCapa = document.getElementById('btnRemoverCapa');
+                            if (btnRemoverCapa) btnRemoverCapa.disabled = false;
                         }
                         capaFile.value = '';
                     } catch (e) {
                         alert(e.message || 'Erro ao enviar capa');
                     } finally {
                         btnCapa.disabled = false;
+                    }
+                });
+            }
+
+            const btnRemoverCapa = document.getElementById('btnRemoverCapa');
+            if (btnRemoverCapa && capaImg) {
+                btnRemoverCapa.addEventListener('click', async function() {
+                    try {
+                        if (btnRemoverCapa.disabled) return;
+                        if (!confirm('Remover a foto de capa deste produto?')) return;
+                        const url = btnRemoverCapa.getAttribute('data-url');
+                        if (!url) return;
+                        btnRemoverCapa.disabled = true;
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                        });
+                        const text = await res.text();
+                        let data;
+                        try { data = JSON.parse(text); } catch (e) { data = { ok: false, message: text }; }
+                        if (!res.ok || !data || data.ok !== true) {
+                            throw new Error((data && data.message) ? data.message : 'Falha ao remover capa');
+                        }
+
+                        const placeholder = capaImg.getAttribute('data-placeholder') || '/uploads/produtos/placeholder.jpg';
+                        capaImg.src = placeholder;
+                        const parentLink = document.getElementById('capaLink') || capaImg.closest('a');
+                        if (parentLink) {
+                            parentLink.href = placeholder;
+                        }
+                    } catch (e) {
+                        alert(e.message || 'Erro ao remover capa');
+                        btnRemoverCapa.disabled = false;
                     }
                 });
             }
@@ -3722,8 +3759,17 @@ HTML;
             if (btnDesmarcarOpcoes) {
                 btnDesmarcarOpcoes.addEventListener('click', function() {
                     try {
-                        document.querySelectorAll('input[type="checkbox"][name^="opcoes["]').forEach((el) => {
-                            el.checked = false;
+                        const form = btnDesmarcarOpcoes.closest('form') || document;
+                        const checks = form.querySelectorAll('input[type="checkbox"]');
+                        checks.forEach((el) => {
+                            const name = (el.getAttribute('name') || '');
+                            const id = (el.getAttribute('id') || '');
+                            const isTipo = (name === 'tipo_ids[]') || (id.startsWith('tipo_'));
+                            const isOpcao = name.startsWith('opcoes[');
+                            const isVariacaoAtiva = name.startsWith('variacao_ativo[');
+                            if (isTipo || isOpcao || isVariacaoAtiva) {
+                                el.checked = false;
+                            }
                         });
                     } catch (e) {
                     }
@@ -4682,9 +4728,21 @@ HTMLSCRIPT;
             $stmt = $pdo->prepare('UPDATE produtos SET foto_principal = NULL WHERE id = ?');
             $stmt->execute([$id]);
 
+            if ($this->isAjaxRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => true]);
+                exit;
+            }
+
             header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? ('/admin/produtos/editar/' . $id)));
             exit;
         } catch (\Exception $e) {
+            if ($this->isAjaxRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
         }
