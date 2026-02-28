@@ -40,6 +40,7 @@ class CorreiosTrackingService {
 
         $url = $this->buildUrl($baseUrl, $codigo);
         $headers = $this->buildHeaders($headerName, $token);
+        $triedUrls = [$url];
 
         $raw = null;
         $httpCode = null;
@@ -55,12 +56,12 @@ class CorreiosTrackingService {
             curl_close($ch);
 
             if ($raw === false || $raw === null) {
-                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode];
+                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode, 'tried_urls' => $triedUrls];
             }
 
             $json = json_decode($raw, true);
             if (!is_array($json)) {
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw];
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw, 'tried_urls' => $triedUrls];
             }
 
             if (is_int($httpCode) && $httpCode >= 400) {
@@ -116,6 +117,7 @@ class CorreiosTrackingService {
                     'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar rastreamento.'),
                     'http_code' => $httpCode,
                     'raw' => $json,
+                    'tried_urls' => $triedUrls,
                 ];
             }
 
@@ -126,6 +128,7 @@ class CorreiosTrackingService {
             // Se não vier nenhum evento, tenta uma vez no host de produção.
             if (empty($eventos) && is_string($url) && strpos($url, 'apihom.correios.com.br') !== false) {
                 $urlProd = str_replace('https://apihom.correios.com.br', 'https://api.correios.com.br', $url);
+                $triedUrls[] = $urlProd;
                 try {
                     $chP = curl_init($urlProd);
                     curl_setopt($chP, CURLOPT_RETURNTRANSFER, true);
@@ -147,6 +150,7 @@ class CorreiosTrackingService {
                                     'http_code' => $httpCodeP,
                                     'eventos' => $eventosP,
                                     'raw' => $jsonP,
+                                    'tried_urls' => $triedUrls,
                                 ];
                             }
                         }
@@ -161,9 +165,10 @@ class CorreiosTrackingService {
                 'http_code' => $httpCode,
                 'eventos' => $eventos,
                 'raw' => $json,
+                'tried_urls' => $triedUrls,
             ];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw];
+            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw, 'tried_urls' => $triedUrls ?? []];
         }
     }
 

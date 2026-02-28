@@ -19,6 +19,7 @@ class RastreamentoController extends Controller {
     public function index(Request $request) {
         $codigo = trim((string) $request->getParam('codigo'));
         $pedidoId = $request->getParam('id');
+        $debugTracking = ((string) $request->getParam('__debug_tracking') === '1');
 
         if ($codigo !== '') {
             // se vier número, permite cair no fluxo de pedido
@@ -39,6 +40,11 @@ class RastreamentoController extends Controller {
                     'codigo_rastreio' => strtoupper($codigo),
                     'tracking_error' => empty($resp['success']) ? ($resp['error'] ?? 'Erro ao rastrear') : null,
                     'tracking_raw' => $resp['raw'] ?? null,
+                    'tracking_debug' => $debugTracking ? [
+                        'http_code' => $resp['http_code'] ?? null,
+                        'tried_urls' => $resp['tried_urls'] ?? null,
+                        'raw' => $resp['raw'] ?? null,
+                    ] : null,
                 ]);
                 return;
             }
@@ -64,6 +70,7 @@ class RastreamentoController extends Controller {
             'codigo_rastreio' => null,
             'tracking_error' => null,
             'tracking_raw' => null,
+            'tracking_debug' => null,
         ]);
     }
 

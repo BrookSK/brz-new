@@ -26,6 +26,15 @@
         <?php endif; ?>
     <?php endif; ?>
 
+    <?php if (!empty($tracking_debug)): ?>
+        <details class="mb-4">
+            <summary>Debug rastreamento</summary>
+            <pre class="mt-2" style="white-space: pre-wrap;"><?php
+                echo htmlspecialchars(json_encode($tracking_debug, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            ?></pre>
+        </details>
+    <?php endif; ?>
+
     <div class="row g-4">
         <?php if (!empty($pedido)): ?>
         <div class="col-lg-8">
