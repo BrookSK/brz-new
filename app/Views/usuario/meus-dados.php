@@ -295,6 +295,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
@@ -388,6 +389,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                        <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <?php $enderecoEntrega = $enderecoEntrega ?? null; ?>
                         <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
@@ -640,6 +642,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const cep = document.getElementById('cep');
         const estadoSelect = document.getElementById('estado');
         const estadoText = document.getElementById('estado_text');
+        const estadoLabel = document.getElementById('label-estado');
 
         const enderecoLabel = document.getElementById('label-endereco');
         const numeroWrap = document.getElementById('numero-wrap');
@@ -711,6 +714,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const shouldUseSelect = Array.isArray(list) && list.length > 0;
 
             const estadoRequired = (pais === 'BR' || pais === 'US' || pais === 'CA');
+
+            if (estadoLabel) {
+                let lbl = (estadoLabel.textContent || '').toString();
+                lbl = lbl.replace(/\s*\*\s*$/, '');
+                estadoLabel.textContent = estadoRequired ? (lbl + ' *') : lbl;
+            }
 
             if (shouldUseSelect) {
                 const current = String(estadoSelect.value || estadoText.value || '').trim();
