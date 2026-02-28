@@ -121,6 +121,40 @@ class CorreiosTrackingService {
 
             $eventos = $this->extractEventos($json);
 
+            // Fallback: algumas instalações ficam com sigep_ambiente=homologacao e consultam
+            // apihom.correios.com.br; para códigos reais, isso costuma retornar vazio.
+            // Se não vier nenhum evento, tenta uma vez no host de produção.
+            if (empty($eventos) && is_string($url) && strpos($url, 'apihom.correios.com.br') !== false) {
+                $urlProd = str_replace('https://apihom.correios.com.br', 'https://api.correios.com.br', $url);
+                try {
+                    $chP = curl_init($urlProd);
+                    curl_setopt($chP, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chP, CURLOPT_CONNECTTIMEOUT, 15);
+                    curl_setopt($chP, CURLOPT_TIMEOUT, 30);
+                    curl_setopt($chP, CURLOPT_HTTPHEADER, $headers);
+                    $rawP = curl_exec($chP);
+                    $httpCodeP = curl_getinfo($chP, CURLINFO_HTTP_CODE);
+                    curl_close($chP);
+
+                    if ($rawP !== false && $rawP !== null) {
+                        $jsonP = json_decode($rawP, true);
+                        if (is_array($jsonP) && is_int($httpCodeP) && $httpCodeP < 400) {
+                            $eventosP = $this->extractEventos($jsonP);
+                            if (!empty($eventosP)) {
+                                return [
+                                    'success' => true,
+                                    'codigo' => $codigo,
+                                    'http_code' => $httpCodeP,
+                                    'eventos' => $eventosP,
+                                    'raw' => $jsonP,
+                                ];
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
             return [
                 'success' => true,
                 'codigo' => $codigo,
