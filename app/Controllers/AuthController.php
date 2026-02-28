@@ -18,6 +18,243 @@ class AuthController extends Controller {
         $this->wpDbService = new WordPressDbService();
     }
 
+    private function getEmailSenderConfig(): array {
+        $fromEmail = 'noreply@brazilianashop.com.br';
+        $fromName = 'Braziliana';
+
+        try {
+            $pdo = $this->usuarioModel->getConnection();
+
+            $stmt = $pdo->prepare("SHOW TABLES LIKE 'configuracoes_sistema'");
+            $stmt->execute();
+            if (!$stmt->fetchColumn()) {
+                return ['fromEmail' => $fromEmail, 'fromName' => $fromName];
+            }
+
+            $stmtCols = $pdo->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            if (is_array($cols) && in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                $st->execute(['email', 'from']);
+                $v = $st->fetchColumn();
+                if (is_string($v) && trim($v) !== '' && filter_var(trim($v), FILTER_VALIDATE_EMAIL)) {
+                    $fromEmail = trim($v);
+                }
+                $st->execute(['email', 'from_name']);
+                $v = $st->fetchColumn();
+                if (is_string($v) && trim($v) !== '') {
+                    $fromName = trim($v);
+                }
+            } else {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                $st->execute(['email_from']);
+                $v = $st->fetchColumn();
+                if (is_string($v) && trim($v) !== '' && filter_var(trim($v), FILTER_VALIDATE_EMAIL)) {
+                    $fromEmail = trim($v);
+                }
+                $st->execute(['email_from_name']);
+                $v = $st->fetchColumn();
+                if (is_string($v) && trim($v) !== '') {
+                    $fromName = trim($v);
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return ['fromEmail' => $fromEmail, 'fromName' => $fromName];
+    }
+
+    private function getEmailConfig(): array {
+        $cfg = [
+            'driver' => 'mail',
+            'host' => '',
+            'port' => '587',
+            'username' => '',
+            'password' => '',
+            'encryption' => 'tls',
+        ];
+
+        try {
+            $pdo = $this->usuarioModel->getConnection();
+            $stmt = $pdo->prepare("SHOW TABLES LIKE 'configuracoes_sistema'");
+            $stmt->execute();
+            if (!$stmt->fetchColumn()) {
+                return $cfg;
+            }
+
+            $stmtCols = $pdo->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            if (is_array($cols) && in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                foreach (['driver', 'host', 'port', 'username', 'password', 'encryption'] as $k) {
+                    $st->execute(['email', $k]);
+                    $v = $st->fetchColumn();
+                    if ($v !== false && $v !== null && trim((string) $v) !== '') {
+                        $cfg[$k] = (string) $v;
+                    }
+                }
+            } else {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                $map = [
+                    'driver' => ['email_driver'],
+                    'host' => ['email_host', 'smtp_host'],
+                    'port' => ['email_port', 'smtp_port'],
+                    'username' => ['email_username', 'smtp_usuario', 'smtp_user', 'smtp_username'],
+                    'password' => ['email_password', 'smtp_senha', 'smtp_pass', 'smtp_password'],
+                    'encryption' => ['email_encryption', 'smtp_criptografia', 'smtp_secure', 'smtp_encryption'],
+                ];
+                foreach ($map as $k => $cands) {
+                    foreach ($cands as $cand) {
+                        $st->execute([$cand]);
+                        $v = $st->fetchColumn();
+                        if ($v !== false && $v !== null && trim((string) $v) !== '') {
+                            $cfg[$k] = (string) $v;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return $cfg;
+    }
+
+    private function smtpReadLine($fp): string {
+        $data = '';
+        while (!feof($fp)) {
+            $line = fgets($fp, 515);
+            if ($line === false) {
+                break;
+            }
+            $data .= $line;
+            if (strlen($line) < 4) {
+                break;
+            }
+            if (preg_match('/^\d{3} /', $line)) {
+                break;
+            }
+        }
+        return $data;
+    }
+
+    private function smtpExpect($fp, array $codes): string {
+        $resp = $this->smtpReadLine($fp);
+        $code = (int) substr(trim($resp), 0, 3);
+        if (!in_array($code, $codes, true)) {
+            throw new \Exception('SMTP resposta inesperada: ' . trim($resp));
+        }
+        return $resp;
+    }
+
+    private function smtpCmd($fp, string $cmd, array $okCodes): string {
+        fwrite($fp, $cmd . "\r\n");
+        return $this->smtpExpect($fp, $okCodes);
+    }
+
+    private function sendSmtpEmail(array $cfg, string $to, string $subject, string $html, string $fromEmail, string $fromName): void {
+        $host = (string) ($cfg['host'] ?? '');
+        $port = (int) ((string) ($cfg['port'] ?? '587'));
+        $user = (string) ($cfg['username'] ?? '');
+        $pass = (string) ($cfg['password'] ?? '');
+        $enc = strtolower(trim((string) ($cfg['encryption'] ?? 'tls')));
+
+        if ($host === '' || $port <= 0) {
+            throw new \Exception('SMTP host/porta não configurados');
+        }
+
+        $remote = $host;
+        $crypto = false;
+        if ($enc === 'ssl') {
+            $remote = 'ssl://' . $host;
+            $crypto = true;
+        }
+
+        $fp = @fsockopen($remote, $port, $errno, $errstr, 15);
+        if (!$fp) {
+            throw new \Exception('Falha ao conectar no SMTP: ' . $errstr . ' (' . $errno . ')');
+        }
+        stream_set_timeout($fp, 15);
+
+        try {
+            $this->smtpExpect($fp, [220]);
+
+            $localhost = 'localhost';
+            $this->smtpCmd($fp, 'EHLO ' . $localhost, [250]);
+
+            if ($enc === 'tls' && !$crypto) {
+                $this->smtpCmd($fp, 'STARTTLS', [220]);
+                $ok = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                if ($ok !== true) {
+                    throw new \Exception('Falha ao iniciar STARTTLS');
+                }
+                $this->smtpCmd($fp, 'EHLO ' . $localhost, [250]);
+            }
+
+            if ($user !== '') {
+                $this->smtpCmd($fp, 'AUTH LOGIN', [334]);
+                $this->smtpCmd($fp, base64_encode($user), [334]);
+                $this->smtpCmd($fp, base64_encode($pass), [235]);
+            }
+
+            $this->smtpCmd($fp, 'MAIL FROM:<' . $fromEmail . '>', [250]);
+            $this->smtpCmd($fp, 'RCPT TO:<' . $to . '>', [250, 251]);
+            $this->smtpCmd($fp, 'DATA', [354]);
+
+            $headers = [];
+            $headers[] = 'From: ' . $this->encodeEmailHeaderName($fromName) . ' <' . $fromEmail . '>';
+            $headers[] = 'To: <' . $to . '>';
+            $headers[] = 'Subject: ' . $this->encodeEmailHeaderName($subject);
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+
+            $data = implode("\r\n", $headers) . "\r\n\r\n" . $html;
+            $data = str_replace("\r\n.", "\r\n..", $data);
+
+            fwrite($fp, $data . "\r\n.\r\n");
+            $this->smtpExpect($fp, [250]);
+            $this->smtpCmd($fp, 'QUIT', [221]);
+        } finally {
+            fclose($fp);
+        }
+    }
+
+    private function sendEmail(string $to, string $subject, string $html): void {
+        $to = trim($to);
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $sender = $this->getEmailSenderConfig();
+        $fromEmail = (string) ($sender['fromEmail'] ?? 'noreply@brazilianashop.com.br');
+        $fromName = (string) ($sender['fromName'] ?? 'Braziliana');
+
+        $cfg = $this->getEmailConfig();
+        $driver = strtolower(trim((string) ($cfg['driver'] ?? 'mail')));
+
+        if ($driver === 'smtp') {
+            $this->sendSmtpEmail($cfg, $to, $subject, $html, $fromEmail, $fromName);
+            return;
+        }
+
+        $headers = [];
+        $headers[] = 'MIME-Version: 1.0';
+        $headers[] = 'Content-Type: text/html; charset=UTF-8';
+        $headers[] = 'From: ' . $this->encodeEmailHeaderName($fromName) . ' <' . $fromEmail . '>';
+        $headers[] = 'Reply-To: ' . $fromEmail;
+        @mail($to, $subject, $html, implode("\r\n", $headers));
+    }
+
+    private function encodeEmailHeaderName(string $name): string {
+        $n = trim($name);
+        if ($n === '') {
+            return $n;
+        }
+        return '=?UTF-8?B?' . base64_encode($n) . '?=';
+    }
+
     private function tryWpRecadastroFlow(string $email, bool $isAjax = false): bool {
         $email = strtolower(trim((string) $email));
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -144,13 +381,10 @@ class AuthController extends Controller {
             . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
             . 'Este link expira em 1 hora.';
 
-        $fromEmail = 'noreply@brazilianashop.com.br';
-        $fromName = 'Braziliana';
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
-        @mail($email, $subject, $html, implode("\r\n", $headers));
+        try {
+            $this->sendEmail($email, $subject, $html);
+        } catch (\Exception $e) {
+        }
 
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -529,13 +763,10 @@ class AuthController extends Controller {
                     . 'Se você não solicitou isso, ignore este e-mail.<br><br>'
                     . 'Este link expira em 1 hora.';
 
-                $fromEmail = 'noreply@brazilianashop.com.br';
-                $fromName = 'Braziliana';
-                $headers = [];
-                $headers[] = 'MIME-Version: 1.0';
-                $headers[] = 'Content-Type: text/html; charset=UTF-8';
-                $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
-                @mail($email, $subject, $html, implode("\r\n", $headers));
+                try {
+                    $this->sendEmail($email, $subject, $html);
+                } catch (\Exception $e) {
+                }
             }
 
             // Por segurança, mesma mensagem para email existente ou não
