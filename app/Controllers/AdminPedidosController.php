@@ -2973,20 +2973,45 @@ HTML;
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Informações do Pedido</h5>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></p>
+                                <p><strong>Status:</strong> ' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</p>
+                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
                                 <hr>
                                 <div class="mb-3">
-                                    <h6 class="mb-2">Pagamento</h6>
-                                    <p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                    <p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pedido['pagamento_status'] ?? 'Pendente') . '</p>
-                                    <p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pedido['pagamento_gateway'] ?? 'N/A') . '</p>
-                                    <p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pedido['pagamento_transacao'] ?? 'N/A') . '</p>
-                                    <p class="mb-0"><strong>Data:</strong> ' . (!empty($pedido['pagamento_data']) ? date('d/m/Y H:i', strtotime($pedido['pagamento_data'])) : 'N/A') . '</p>';
+                                    <h6 class="mb-2">Pagamento</h6>';
+
+                                    $pgMetodoView = (string) ($pedido['pagamento_metodo'] ?? ($pedido['forma_pagamento'] ?? ''));
+                                    if (trim($pgMetodoView) === '') {
+                                        $pgMetodoView = 'N/A';
+                                    }
+                                    $pgStatusView = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? '')));
+                                    if (trim($pgStatusView) === '') {
+                                        $pgStatusView = 'Pendente';
+                                    }
+
+                                    $pgStatusKey = strtolower(trim((string) $pgStatusView));
+                                    $statusPedidoKey = strtolower(trim((string) ($pedido['status'] ?? '')));
+                                    if (in_array($pgStatusKey, ['approved', 'aprovado', 'confirmed', 'received', 'paid', 'pago', 'succeeded', 'success'], true)) {
+                                        if ($statusPedidoKey !== '') {
+                                            $pgStatusView = $this->getStatusLabel((string) $statusPedidoKey);
+                                        }
+                                    }
+                                    $pgGatewayView = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ($pedido['gateway'] ?? '')));
+                                    if (trim($pgGatewayView) === '') {
+                                        $pgGatewayView = 'N/A';
+                                    }
+                                    $pgTransView = (string) ($pedido['pagamento_transacao'] ?? ($pedido['payment_id'] ?? ($pedido['transaction_id'] ?? ($pedido['codigo_transacao'] ?? ''))));
+                                    if (trim($pgTransView) === '') {
+                                        $pgTransView = 'N/A';
+                                    }
+                                    $pgDataView = (string) ($pedido['pagamento_data'] ?? ($pedido['pago_em'] ?? ($pedido['paid_at'] ?? ($pedido['data_pagamento'] ?? ''))));
+
+                                    echo '<p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pgMetodoView) . '</p>'
+                                        . '<p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pgStatusView) . '</p>'
+                                        . '<p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pgGatewayView) . '</p>'
+                                        . '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>'
+                                        . '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
 
                                     $pgGateway = (string) ($pedido['pagamento_gateway'] ?? '');
                                     $pgMetodo = strtoupper((string) ($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? ''));
@@ -4155,9 +4180,25 @@ HTML;
             }
 
             // Se marcou como pago/aprovado, manter colunas relacionadas consistentes.
-            // Isso impacta diretamente a tela de comissões (que pode filtrar por payment_status).
+            // Além disso, atualizar o texto exibido no bloco "Pagamento" para bater com o status selecionado.
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
             $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
+
+            $statusLabelMap = [
+                'pendente' => 'Pendente',
+                'pago' => 'Pago',
+                'processando' => 'Processando',
+                'produto_consolidado' => 'Caixa Fechada',
+                'em_transporte' => 'Em Transporte',
+                'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
+                'enviado_ao_destinatario' => 'Enviado ao Destinatário',
+                'enviado' => 'Etiqueta gerada',
+                'entregue' => 'Entregue',
+                'cancelado' => 'Cancelado',
+            ];
+            $novoStatusKey = strtolower(trim((string) $novoStatus));
+            $pagamentoStatusTexto = $statusLabelMap[$novoStatusKey] ?? ucfirst(str_replace('_', ' ', $novoStatusKey));
+
             if ($isPaid && is_array($cols)) {
                 // 1) pago_em
                 if (in_array('pago_em', $cols, true)) {
@@ -4174,11 +4215,25 @@ HTML;
                     $params[] = 'aprovado';
                 }
 
+                // 2b) colunas usadas na tela de detalhes do admin
+                if (in_array('pagamento_status', $cols, true) && $statusCol !== 'pagamento_status') {
+                    $set[] = 'pagamento_status = ?';
+                    $params[] = $pagamentoStatusTexto;
+                }
+                if (in_array('pagamento_data', $cols, true)) {
+                    $set[] = 'pagamento_data = COALESCE(pagamento_data, NOW())';
+                }
+
                 // 3) status (caso a coluna atualizada tenha sido payment_status/status_pagamento)
                 if (in_array('status', $cols, true) && $statusCol !== 'status') {
                     $set[] = 'status = ?';
                     $params[] = 'pago';
                 }
+            }
+
+            if (!$isPaid && is_array($cols) && in_array('pagamento_status', $cols, true) && $statusCol !== 'pagamento_status') {
+                $set[] = 'pagamento_status = ?';
+                $params[] = $pagamentoStatusTexto;
             }
 
             if (is_array($cols) && in_array('updated_at', $cols, true)) {
@@ -4188,6 +4243,97 @@ HTML;
             $params[] = $id;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
+
+            if ($isPaid) {
+                try {
+                    $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+
+                    $stT->execute(['pagamentos']);
+                    $temPagamentos = ((int) ($stT->fetchColumn() ?: 0)) > 0;
+                    if ($temPagamentos) {
+                        $colsPg = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pagamentos');
+                            $colsPg = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPg = [];
+                        }
+
+                        if (is_array($colsPg) && !empty($colsPg)) {
+                            $pedidoCol = in_array('pedido_id', $colsPg, true) ? 'pedido_id' : (in_array('order_id', $colsPg, true) ? 'order_id' : '');
+                            if ($pedidoCol !== '') {
+                                $statusPgCol = '';
+                                foreach (['status_pagamento', 'payment_status', 'status'] as $cand) {
+                                    if (in_array($cand, $colsPg, true)) {
+                                        $statusPgCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                $dataPgCol = '';
+                                foreach (['data_pagamento', 'paid_at', 'pago_em', 'paid_date'] as $cand) {
+                                    if (in_array($cand, $colsPg, true)) {
+                                        $dataPgCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                if ($statusPgCol !== '') {
+                                    $setPg = [$statusPgCol . " = 'aprovado'"];
+                                    if ($dataPgCol !== '') {
+                                        $setPg[] = $dataPgCol . ' = COALESCE(' . $dataPgCol . ', NOW())';
+                                    }
+                                    $stUpPg = $pdo->prepare('UPDATE pagamentos SET ' . implode(', ', $setPg) . ' WHERE ' . $pedidoCol . ' = ?');
+                                    $stUpPg->execute([(int) $id]);
+                                }
+                            }
+                        }
+                    }
+
+                    $stT->execute(['pedido_pagamentos']);
+                    $temPedidoPagamentos = ((int) ($stT->fetchColumn() ?: 0)) > 0;
+                    if ($temPedidoPagamentos) {
+                        $colsPP = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pedido_pagamentos');
+                            $colsPP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPP = [];
+                        }
+
+                        if (is_array($colsPP) && !empty($colsPP)) {
+                            $pedidoCol = in_array('pedido_id', $colsPP, true) ? 'pedido_id' : (in_array('order_id', $colsPP, true) ? 'order_id' : '');
+                            if ($pedidoCol !== '') {
+                                $statusPPCol = '';
+                                foreach (['status', 'status_pagamento', 'payment_status'] as $cand) {
+                                    if (in_array($cand, $colsPP, true)) {
+                                        $statusPPCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                $paidAtCol = '';
+                                foreach (['pago_em', 'paid_at', 'data_pagamento', 'paid_date'] as $cand) {
+                                    if (in_array($cand, $colsPP, true)) {
+                                        $paidAtCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                if ($statusPPCol !== '') {
+                                    $setPP = [$statusPPCol . " = 'approved'"];
+                                    if ($paidAtCol !== '') {
+                                        $setPP[] = $paidAtCol . ' = COALESCE(' . $paidAtCol . ', NOW())';
+                                    }
+                                    $stUpPP = $pdo->prepare('UPDATE pedido_pagamentos SET ' . implode(', ', $setPP) . ' WHERE ' . $pedidoCol . ' = ?');
+                                    $stUpPP->execute([(int) $id]);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
 
             // Persistir histórico de status para exibição ao usuário (se a tabela existir)
             try {

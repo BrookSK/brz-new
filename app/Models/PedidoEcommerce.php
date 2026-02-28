@@ -737,6 +737,82 @@ class PedidoEcommerce {
 
         if (!$pedido) return null;
 
+        // Normalizar aliases comuns (status/pagamento) para uso consistente nas views
+        try {
+            // status do pedido
+            $altStatus = null;
+            foreach (['status_pedido', 'pedido_status'] as $k) {
+                if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                    $altStatus = $pedido[$k];
+                    break;
+                }
+            }
+            if ($altStatus !== null) {
+                $pedido['status'] = $altStatus;
+            } elseif (!array_key_exists('status', $pedido) || $pedido['status'] === null || $pedido['status'] === '') {
+                $pedido['status'] = '';
+            }
+
+            // forma/metodo de pagamento
+            if (!array_key_exists('pagamento_metodo', $pedido) || $pedido['pagamento_metodo'] === null || $pedido['pagamento_metodo'] === '') {
+                if (array_key_exists('forma_pagamento', $pedido) && $pedido['forma_pagamento'] !== null && $pedido['forma_pagamento'] !== '') {
+                    $pedido['pagamento_metodo'] = $pedido['forma_pagamento'];
+                }
+            }
+
+            // gateway
+            if (!array_key_exists('pagamento_gateway', $pedido) || $pedido['pagamento_gateway'] === null || $pedido['pagamento_gateway'] === '') {
+                foreach (['payment_gateway', 'gateway'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_gateway'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+
+            // transação
+            if (!array_key_exists('pagamento_transacao', $pedido) || $pedido['pagamento_transacao'] === null || $pedido['pagamento_transacao'] === '') {
+                foreach (['payment_id', 'transaction_id', 'codigo_transacao'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_transacao'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+
+            // status de pagamento (fonte preferida: pagamento_status, senão payment_status/status_pagamento)
+            $altPgStatus = null;
+            foreach (['pagamento_status', 'payment_status', 'status_pagamento'] as $k) {
+                if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                    $altPgStatus = $pedido[$k];
+                    break;
+                }
+            }
+            if ($altPgStatus !== null) {
+                $pedido['pagamento_status'] = $altPgStatus;
+            }
+
+            // manter também payment_status para telas que leem esse campo
+            if (!array_key_exists('payment_status', $pedido) || $pedido['payment_status'] === null || $pedido['payment_status'] === '') {
+                if (array_key_exists('pagamento_status', $pedido) && $pedido['pagamento_status'] !== null && $pedido['pagamento_status'] !== '') {
+                    $pedido['payment_status'] = $pedido['pagamento_status'];
+                } elseif (array_key_exists('status_pagamento', $pedido) && $pedido['status_pagamento'] !== null && $pedido['status_pagamento'] !== '') {
+                    $pedido['payment_status'] = $pedido['status_pagamento'];
+                }
+            }
+
+            // data de pagamento
+            if (!array_key_exists('pagamento_data', $pedido) || $pedido['pagamento_data'] === null || $pedido['pagamento_data'] === '') {
+                foreach (['pago_em', 'paid_at', 'data_pagamento'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_data'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
         // Normalizar totais + endereço para o formato esperado nas views do usuário
         try {
             $colsPedido = $this->getTableColumns('pedidos');
