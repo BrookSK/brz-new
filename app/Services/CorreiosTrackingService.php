@@ -129,7 +129,7 @@ class CorreiosTrackingService {
                 if (stripos($mensagemObjeto, 'SRO-009') !== false) {
                     return [
                         'success' => false,
-                        'error' => 'Não foi possível mostrar o rastreamento deste código aqui. Ele não está vinculado às postagens da Braziliana. Para acompanhar, consulte o site ou app dos Correios com este mesmo código.',
+                        'error' => 'No momento, os Correios não permitem que a Braziliana consulte o rastreio deste código por aqui. Para acompanhar, consulte o site ou app dos Correios com este mesmo código. Se este envio for de um pedido da Braziliana, fale com nosso suporte.',
                         'http_code' => $httpCode,
                         'raw' => $json,
                         'tried_urls' => $triedUrls,
