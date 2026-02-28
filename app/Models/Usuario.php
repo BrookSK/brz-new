@@ -419,41 +419,26 @@ class Usuario extends Model {
             // Construir SQL dinâmico apenas com colunas existentes
             $setParts = [];
             $params = [];
-            
-            $mapeamentoColunas = [
-                'nome' => 'nome',
-                'email' => 'email',
-                'documento' => 'documento',
-                'telefone' => 'telefone',
-                'avatar' => 'avatar',
-                'foto' => 'foto',
-                'foto_perfil' => 'foto_perfil',
-                'imagem_perfil' => 'imagem_perfil',
-                'endereco' => 'endereco',
-                'numero' => 'numero',
-                'complemento' => 'complemento',
-                'bairro' => 'bairro',
-                'cidade' => 'cidade',
-                'estado' => 'estado',
-                'cep' => 'cep',
-                'data_nascimento' => 'data_nascimento',
-                'pais_residencia' => 'pais_residencia',
-                'termos_aceitos_em' => 'termos_aceitos_em',
-                'termos_aceitos_ip' => 'termos_aceitos_ip',
-                'termos_versao' => 'termos_versao',
-                'perfil' => 'perfil',
-                'status' => 'status',
-                'creditos_disponiveis' => 'creditos_disponiveis',
-                'notificacoes_email' => 'notificacoes_email',
-                'notificacoes_sms' => 'notificacoes_sms',
-                'idioma' => 'idioma'
+
+            $blockedColumns = [
+                'id',
+                'created_at',
+                'updated_at',
             ];
-            
-            foreach ($mapeamentoColunas as $campoForm => $colunaBanco) {
-                if (in_array($colunaBanco, $colunas) && array_key_exists($colunaBanco, $data)) {
-                    $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
-                    $params[$colunaBanco] = $data[$colunaBanco];
+
+            foreach ((array) $data as $colunaBanco => $valor) {
+                if (!is_string($colunaBanco) || $colunaBanco === '') {
+                    continue;
                 }
+                if (in_array($colunaBanco, $blockedColumns, true)) {
+                    continue;
+                }
+                if (!in_array($colunaBanco, $colunas, true)) {
+                    continue;
+                }
+
+                $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
+                $params[$colunaBanco] = $valor;
             }
             
             // Adicionar updated_at se existir
