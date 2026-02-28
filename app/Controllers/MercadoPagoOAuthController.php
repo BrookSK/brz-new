@@ -6,6 +6,16 @@ use App\Core\Url;
 use App\Services\AuthService;
 
 class MercadoPagoOAuthController extends Controller {
+    private function getTableColumns(\PDO $pdo, string $table): array {
+        try {
+            $stmt = $pdo->query('DESCRIBE ' . $table);
+            $cols = $stmt ? $stmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
     private function getConfigFromKeyValueTable(\PDO $pdo, string $table, string $categoria, string $chave): ?string {
         try {
             $st = $pdo->prepare("SELECT valor FROM {$table} WHERE categoria = ? AND chave = ? ORDER BY id DESC LIMIT 1");
@@ -17,6 +27,69 @@ class MercadoPagoOAuthController extends Controller {
             return (string) $v;
         } catch (\Exception $e) {
             return null;
+        }
+    }
+
+    private function getConfigSmart(\PDO $pdo, string $table, string $categoria, string $chave, array $singleRowColumnCandidates = []): ?string {
+        $cols = $this->getTableColumns($pdo, $table);
+        $hasCategoria = in_array('categoria', $cols, true);
+        $hasChave = in_array('chave', $cols, true);
+
+        // Schema key/value
+        if ($hasCategoria && $hasChave) {
+            return $this->getConfigFromKeyValueTable($pdo, $table, $categoria, $chave);
+        }
+
+        // Schema single-row (colunas diretas)
+        foreach ($singleRowColumnCandidates as $col) {
+            if (!is_string($col) || $col === '') {
+                continue;
+            }
+            if (!in_array($col, $cols, true)) {
+                continue;
+            }
+            try {
+                $st = $pdo->query('SELECT ' . $col . ' FROM ' . $table . ' WHERE id = 1 LIMIT 1');
+                $v = $st ? $st->fetchColumn() : null;
+                if ($v === false || $v === null) {
+                    continue;
+                }
+                $v = is_string($v) ? trim($v) : (string) $v;
+                if ($v !== '') {
+                    return $v;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        return null;
+    }
+
+    private function saveConfigSmart(\PDO $pdo, string $table, string $categoria, string $chave, string $valor, array $singleRowColumnCandidates = []): void {
+        $cols = $this->getTableColumns($pdo, $table);
+        $hasCategoria = in_array('categoria', $cols, true);
+        $hasChave = in_array('chave', $cols, true);
+
+        // Schema key/value
+        if ($hasCategoria && $hasChave) {
+            $this->saveConfigToKeyValueTable($pdo, $table, $categoria, $chave, $valor);
+            return;
+        }
+
+        // Schema single-row (colunas diretas)
+        foreach ($singleRowColumnCandidates as $col) {
+            if (!is_string($col) || $col === '') {
+                continue;
+            }
+            if (!in_array($col, $cols, true)) {
+                continue;
+            }
+            try {
+                $st = $pdo->prepare('UPDATE ' . $table . ' SET ' . $col . ' = ?, updated_at = NOW() WHERE id = 1');
+                $st->execute([(string) $valor]);
+                return;
+            } catch (\Exception $e) {
+            }
         }
     }
 
@@ -75,7 +148,13 @@ class MercadoPagoOAuthController extends Controller {
             $this->redirect('/admin/configuracoes?mp_oauth_error=config_table');
         }
 
-        $clientId = (string) ($this->getConfigFromKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_client_id') ?? '');
+        $clientId = (string) ($this->getConfigSmart(
+            $pdo,
+            $table,
+            'pagamentos',
+            'mercadopago_client_id',
+            ['mercadopago_client_id', 'pagamentos_mercadopago_client_id']
+        ) ?? '');
         if ($clientId === '') {
             $this->redirect('/admin/configuracoes?mp_oauth_error=client_id');
         }
@@ -119,8 +198,20 @@ class MercadoPagoOAuthController extends Controller {
             $this->redirect('/admin/configuracoes?mp_oauth_error=config_table');
         }
 
-        $clientId = (string) ($this->getConfigFromKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_client_id') ?? '');
-        $clientSecret = (string) ($this->getConfigFromKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_client_secret') ?? '');
+        $clientId = (string) ($this->getConfigSmart(
+            $pdo,
+            $table,
+            'pagamentos',
+            'mercadopago_client_id',
+            ['mercadopago_client_id', 'pagamentos_mercadopago_client_id']
+        ) ?? '');
+        $clientSecret = (string) ($this->getConfigSmart(
+            $pdo,
+            $table,
+            'pagamentos',
+            'mercadopago_client_secret',
+            ['mercadopago_client_secret', 'pagamentos_mercadopago_client_secret']
+        ) ?? '');
         if ($clientId === '' || $clientSecret === '') {
             $this->redirect('/admin/configuracoes?mp_oauth_error=missing_client');
         }
@@ -145,15 +236,43 @@ class MercadoPagoOAuthController extends Controller {
         }
 
         // Salvar tokens do vendedor (conta do produto)
-        $this->saveConfigToKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_seller_access_token', $accessToken);
+        $this->saveConfigSmart(
+            $pdo,
+            $table,
+            'pagamentos',
+            'mercadopago_seller_access_token',
+            $accessToken,
+            ['mercadopago_seller_access_token', 'pagamentos_mercadopago_seller_access_token']
+        );
         if ($refreshToken !== '') {
-            $this->saveConfigToKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_seller_refresh_token', $refreshToken);
+            $this->saveConfigSmart(
+                $pdo,
+                $table,
+                'pagamentos',
+                'mercadopago_seller_refresh_token',
+                $refreshToken,
+                ['mercadopago_seller_refresh_token', 'pagamentos_mercadopago_seller_refresh_token']
+            );
         }
         if ($userId !== '') {
-            $this->saveConfigToKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_seller_user_id', $userId);
+            $this->saveConfigSmart(
+                $pdo,
+                $table,
+                'pagamentos',
+                'mercadopago_seller_user_id',
+                $userId,
+                ['mercadopago_seller_user_id', 'pagamentos_mercadopago_seller_user_id']
+            );
         }
         if ($publicKey !== '') {
-            $this->saveConfigToKeyValueTable($pdo, $table, 'pagamentos', 'mercadopago_seller_public_key', $publicKey);
+            $this->saveConfigSmart(
+                $pdo,
+                $table,
+                'pagamentos',
+                'mercadopago_seller_public_key',
+                $publicKey,
+                ['mercadopago_seller_public_key', 'pagamentos_mercadopago_seller_public_key']
+            );
         }
 
         $this->redirect('/admin/configuracoes?mp_oauth=success');
