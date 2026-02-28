@@ -2974,6 +2974,7 @@ HTML;
                             <div class="card-header">
                                 <h5 class="mb-0">Informações do Pedido</h5>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
+                                <p><strong>Status:</strong> ' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
                                 <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
                                 <hr>
