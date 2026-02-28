@@ -18,7 +18,7 @@
             <?= htmlspecialchars($tracking_error) ?>
         </div>
 
-        <?php if (!empty($tracking_raw)): ?>
+        <?php if (!empty($tracking_raw) && !empty($tracking_debug)): ?>
             <details class="mb-4">
                 <summary>Ver resposta bruta (debug)</summary>
                 <pre class="mt-2" style="white-space: pre-wrap;"><?= htmlspecialchars(json_encode($tracking_raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>

@@ -39,7 +39,7 @@ class RastreamentoController extends Controller {
                     'rastreamento' => $rastreamento,
                     'codigo_rastreio' => strtoupper($codigo),
                     'tracking_error' => empty($resp['success']) ? ($resp['error'] ?? 'Erro ao rastrear') : null,
-                    'tracking_raw' => $resp['raw'] ?? null,
+                    'tracking_raw' => $debugTracking ? ($resp['raw'] ?? null) : null,
                     'tracking_debug' => $debugTracking ? [
                         'http_code' => $resp['http_code'] ?? null,
                         'tried_urls' => $resp['tried_urls'] ?? null,
