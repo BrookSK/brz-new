@@ -24,13 +24,32 @@ class AuthController extends Controller {
             return false;
         }
 
+        $cols = [];
+        try {
+            $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $local = null;
         try {
             $local = $this->usuarioModel->findByEmail($email);
-            if ($local) {
-                return false;
-            }
         } catch (\Exception $e) {
             return false;
+        }
+
+        // Se o usuário já existe localmente, só roda o fluxo de migração se ainda não fez o primeiro acesso
+        // (ex.: nunca logou / precisa recadastro). Caso contrário, mantém comportamento padrão (senha incorreta).
+        if (is_array($local) && !empty($local)) {
+            $precisaRecadastro = !empty($local['precisa_recadastro']);
+            $hasUltimoLogin = is_array($cols) && in_array('ultimo_login', $cols, true);
+            $ultimoLogin = $hasUltimoLogin ? trim((string) ($local['ultimo_login'] ?? '')) : '';
+            $nuncaLogou = $hasUltimoLogin ? ($ultimoLogin === '' || $ultimoLogin === '0000-00-00 00:00:00') : $precisaRecadastro;
+
+            if (!$precisaRecadastro && !$nuncaLogou) {
+                return false;
+            }
         }
 
         $wpUser = null;
@@ -44,14 +63,6 @@ class AuthController extends Controller {
             return false;
         }
 
-        $cols = [];
-        try {
-            $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
-            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
-        } catch (\Exception $e) {
-            $cols = [];
-        }
-
         $nome = trim((string) ($wpUser['display_name'] ?? ''));
         if ($nome === '') {
             $nome = trim((string) ($wpUser['login'] ?? ''));
@@ -60,28 +71,51 @@ class AuthController extends Controller {
             $nome = 'Cliente';
         }
 
-        $data = [
-            'nome' => $nome,
-            'email' => $email,
-            'perfil' => 'cliente',
-            'senha' => bin2hex(random_bytes(16)),
-        ];
-
-        if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
-            $data['precisa_recadastro'] = 1;
-        }
-        if (is_array($cols) && in_array('wp_origem', $cols, true)) {
-            $data['wp_origem'] = (string) ($wpUser['source'] ?? 'br');
-        }
-        if (is_array($cols) && in_array('wp_user_id', $cols, true)) {
-            $data['wp_user_id'] = (int) ($wpUser['id'] ?? 0);
-        }
 
         $userId = 0;
-        try {
-            $userId = (int) $this->usuarioModel->create($data);
-        } catch (\Exception $e) {
-            $userId = 0;
+
+        // Se já existe localmente, não cria outro usuário: apenas atualiza flags/origem.
+        if (is_array($local) && !empty($local['id'])) {
+            $userId = (int) $local['id'];
+            $upd = [];
+            if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
+                $upd['precisa_recadastro'] = 1;
+            }
+            if (is_array($cols) && in_array('wp_origem', $cols, true)) {
+                $upd['wp_origem'] = (string) ($wpUser['source'] ?? 'br');
+            }
+            if (is_array($cols) && in_array('wp_user_id', $cols, true)) {
+                $upd['wp_user_id'] = (int) ($wpUser['id'] ?? 0);
+            }
+            if (!empty($upd)) {
+                try {
+                    $this->usuarioModel->update($userId, $upd);
+                } catch (\Exception $e) {
+                }
+            }
+        } else {
+            $data = [
+                'nome' => $nome,
+                'email' => $email,
+                'perfil' => 'cliente',
+                'senha' => bin2hex(random_bytes(16)),
+            ];
+
+            if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
+                $data['precisa_recadastro'] = 1;
+            }
+            if (is_array($cols) && in_array('wp_origem', $cols, true)) {
+                $data['wp_origem'] = (string) ($wpUser['source'] ?? 'br');
+            }
+            if (is_array($cols) && in_array('wp_user_id', $cols, true)) {
+                $data['wp_user_id'] = (int) ($wpUser['id'] ?? 0);
+            }
+
+            try {
+                $userId = (int) $this->usuarioModel->create($data);
+            } catch (\Exception $e) {
+                $userId = 0;
+            }
         }
 
         if ($userId <= 0) {
