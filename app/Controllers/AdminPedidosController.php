@@ -4189,6 +4189,97 @@ HTML;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
 
+            if ($isPaid) {
+                try {
+                    $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+
+                    $stT->execute(['pagamentos']);
+                    $temPagamentos = ((int) ($stT->fetchColumn() ?: 0)) > 0;
+                    if ($temPagamentos) {
+                        $colsPg = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pagamentos');
+                            $colsPg = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPg = [];
+                        }
+
+                        if (is_array($colsPg) && !empty($colsPg)) {
+                            $pedidoCol = in_array('pedido_id', $colsPg, true) ? 'pedido_id' : (in_array('order_id', $colsPg, true) ? 'order_id' : '');
+                            if ($pedidoCol !== '') {
+                                $statusPgCol = '';
+                                foreach (['status_pagamento', 'payment_status', 'status'] as $cand) {
+                                    if (in_array($cand, $colsPg, true)) {
+                                        $statusPgCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                $dataPgCol = '';
+                                foreach (['data_pagamento', 'paid_at', 'pago_em', 'paid_date'] as $cand) {
+                                    if (in_array($cand, $colsPg, true)) {
+                                        $dataPgCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                if ($statusPgCol !== '') {
+                                    $setPg = [$statusPgCol . " = 'aprovado'"];
+                                    if ($dataPgCol !== '') {
+                                        $setPg[] = $dataPgCol . ' = COALESCE(' . $dataPgCol . ', NOW())';
+                                    }
+                                    $stUpPg = $pdo->prepare('UPDATE pagamentos SET ' . implode(', ', $setPg) . ' WHERE ' . $pedidoCol . ' = ?');
+                                    $stUpPg->execute([(int) $id]);
+                                }
+                            }
+                        }
+                    }
+
+                    $stT->execute(['pedido_pagamentos']);
+                    $temPedidoPagamentos = ((int) ($stT->fetchColumn() ?: 0)) > 0;
+                    if ($temPedidoPagamentos) {
+                        $colsPP = [];
+                        try {
+                            $stCols = $pdo->query('DESCRIBE pedido_pagamentos');
+                            $colsPP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Exception $e) {
+                            $colsPP = [];
+                        }
+
+                        if (is_array($colsPP) && !empty($colsPP)) {
+                            $pedidoCol = in_array('pedido_id', $colsPP, true) ? 'pedido_id' : (in_array('order_id', $colsPP, true) ? 'order_id' : '');
+                            if ($pedidoCol !== '') {
+                                $statusPPCol = '';
+                                foreach (['status', 'status_pagamento', 'payment_status'] as $cand) {
+                                    if (in_array($cand, $colsPP, true)) {
+                                        $statusPPCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                $paidAtCol = '';
+                                foreach (['pago_em', 'paid_at', 'data_pagamento', 'paid_date'] as $cand) {
+                                    if (in_array($cand, $colsPP, true)) {
+                                        $paidAtCol = $cand;
+                                        break;
+                                    }
+                                }
+
+                                if ($statusPPCol !== '') {
+                                    $setPP = [$statusPPCol . " = 'approved'"];
+                                    if ($paidAtCol !== '') {
+                                        $setPP[] = $paidAtCol . ' = COALESCE(' . $paidAtCol . ', NOW())';
+                                    }
+                                    $stUpPP = $pdo->prepare('UPDATE pedido_pagamentos SET ' . implode(', ', $setPP) . ' WHERE ' . $pedidoCol . ' = ?');
+                                    $stUpPP->execute([(int) $id]);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
             // Persistir histórico de status para exibição ao usuário (se a tabela existir)
             try {
                 $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
