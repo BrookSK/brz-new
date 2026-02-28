@@ -2981,12 +2981,31 @@ HTML;
                                 <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</p>
                                 <hr>
                                 <div class="mb-3">
-                                    <h6 class="mb-2">Pagamento</h6>
-                                    <p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                    <p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pedido['pagamento_status'] ?? 'Pendente') . '</p>
-                                    <p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pedido['pagamento_gateway'] ?? 'N/A') . '</p>
-                                    <p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pedido['pagamento_transacao'] ?? 'N/A') . '</p>
-                                    <p class="mb-0"><strong>Data:</strong> ' . (!empty($pedido['pagamento_data']) ? date('d/m/Y H:i', strtotime($pedido['pagamento_data'])) : 'N/A') . '</p>';
+                                    <h6 class="mb-2">Pagamento</h6>';
+
+                                    $pgMetodoView = (string) ($pedido['pagamento_metodo'] ?? ($pedido['forma_pagamento'] ?? ''));
+                                    if (trim($pgMetodoView) === '') {
+                                        $pgMetodoView = 'N/A';
+                                    }
+                                    $pgStatusView = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? '')));
+                                    if (trim($pgStatusView) === '') {
+                                        $pgStatusView = 'Pendente';
+                                    }
+                                    $pgGatewayView = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ($pedido['gateway'] ?? '')));
+                                    if (trim($pgGatewayView) === '') {
+                                        $pgGatewayView = 'N/A';
+                                    }
+                                    $pgTransView = (string) ($pedido['pagamento_transacao'] ?? ($pedido['payment_id'] ?? ($pedido['transaction_id'] ?? ($pedido['codigo_transacao'] ?? ''))));
+                                    if (trim($pgTransView) === '') {
+                                        $pgTransView = 'N/A';
+                                    }
+                                    $pgDataView = (string) ($pedido['pagamento_data'] ?? ($pedido['pago_em'] ?? ($pedido['paid_at'] ?? ($pedido['data_pagamento'] ?? ''))));
+
+                                    echo '<p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pgMetodoView) . '</p>'
+                                        . '<p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pgStatusView) . '</p>'
+                                        . '<p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pgGatewayView) . '</p>'
+                                        . '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>'
+                                        . '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
 
                                     $pgGateway = (string) ($pedido['pagamento_gateway'] ?? '');
                                     $pgMetodo = strtoupper((string) ($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? ''));
