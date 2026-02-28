@@ -680,6 +680,16 @@ class UsuarioController extends Controller {
                     // Atualizar dados do usuário
                     $this->usuarioModel->update($usuarioId, $dadosAtualizacao);
 
+                    // Se veio do fluxo de recadastro, marcar como concluído
+                    try {
+                        $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                        $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                        if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
+                            $this->usuarioModel->update($usuarioId, ['precisa_recadastro' => 0]);
+                        }
+                    } catch (\Exception $e) {
+                    }
+
                     // Salvar Endereço de Entrega (único/principal) na tabela enderecos
                     $this->salvarEnderecoEntrega((int) $usuarioId, $dados);
                     

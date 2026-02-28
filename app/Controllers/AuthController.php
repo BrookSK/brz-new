@@ -4,15 +4,134 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\CpfValidator;
+use App\Services\WordPressDbService;
 use App\Models\Usuario;
 
 class AuthController extends Controller {
     private $authService;
     private $usuarioModel;
+    private $wpDbService;
     
     public function __construct() {
         $this->authService = new AuthService();
         $this->usuarioModel = new Usuario();
+        $this->wpDbService = new WordPressDbService();
+    }
+
+    private function tryWpRecadastroFlow(string $email, bool $isAjax = false): bool {
+        $email = strtolower(trim((string) $email));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        try {
+            $local = $this->usuarioModel->findByEmail($email);
+            if ($local) {
+                return false;
+            }
+        } catch (\Exception $e) {
+            return false;
+        }
+
+        $wpUser = null;
+        try {
+            $wpUser = $this->wpDbService->findUserByEmailPriority($email, ['br', 'us']);
+        } catch (\Exception $e) {
+            $wpUser = null;
+        }
+
+        if (!is_array($wpUser) || empty($wpUser['id'])) {
+            return false;
+        }
+
+        $cols = [];
+        try {
+            $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $nome = trim((string) ($wpUser['display_name'] ?? ''));
+        if ($nome === '') {
+            $nome = trim((string) ($wpUser['login'] ?? ''));
+        }
+        if ($nome === '') {
+            $nome = 'Cliente';
+        }
+
+        $data = [
+            'nome' => $nome,
+            'email' => $email,
+            'perfil' => 'cliente',
+            'senha' => bin2hex(random_bytes(16)),
+        ];
+
+        if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
+            $data['precisa_recadastro'] = 1;
+        }
+        if (is_array($cols) && in_array('wp_origem', $cols, true)) {
+            $data['wp_origem'] = (string) ($wpUser['source'] ?? 'br');
+        }
+        if (is_array($cols) && in_array('wp_user_id', $cols, true)) {
+            $data['wp_user_id'] = (int) ($wpUser['id'] ?? 0);
+        }
+
+        $userId = 0;
+        try {
+            $userId = (int) $this->usuarioModel->create($data);
+        } catch (\Exception $e) {
+            $userId = 0;
+        }
+
+        if ($userId <= 0) {
+            return false;
+        }
+
+        $token = '';
+        try {
+            $token = $this->usuarioModel->requestPasswordResetToken($email);
+        } catch (\Exception $e) {
+            $token = '';
+        }
+        if ($token === '') {
+            return false;
+        }
+
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+        $base = $host !== '' ? ($scheme . '://' . $host) : '';
+        $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
+
+        $subject = 'Atualização cadastral - Braziliana';
+        $html = 'Olá,<br><br>'
+            . 'Como este é um site novo, precisamos que você atualize seu cadastro para continuar usando sua conta.<br><br>'
+            . 'Clique no link abaixo para definir uma nova senha e acessar o sistema:<br><br>'
+            . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
+            . 'Este link expira em 1 hora.';
+
+        $fromEmail = 'noreply@brazilianashop.com.br';
+        $fromName = 'Braziliana';
+        $headers = [];
+        $headers[] = 'MIME-Version: 1.0';
+        $headers[] = 'Content-Type: text/html; charset=UTF-8';
+        $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
+        @mail($email, $subject, $html, implode("\r\n", $headers));
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['message'] = 'Encontramos seu cadastro no site antigo. Enviamos um e-mail para você definir uma nova senha e atualizar seus dados.';
+        $_SESSION['message_type'] = 'warning';
+
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => $_SESSION['message'], 'action' => 'password_reset_sent']);
+            return true;
+        }
+
+        $this->redirect('/login');
+        return true;
     }
 
     private function normalizeInternalRedirect(string $candidate): string {
@@ -185,6 +304,9 @@ class AuthController extends Controller {
                     }
                     return;
                 } else {
+                    if ($this->tryWpRecadastroFlow((string) $email, $isAjax)) {
+                        return;
+                    }
                     $_SESSION['message'] = 'E-mail ou senha incorretos';
                     $_SESSION['message_type'] = 'danger';
                     if ($isAjax) {
