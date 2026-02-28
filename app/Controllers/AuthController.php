@@ -35,7 +35,7 @@ class AuthController extends Controller {
 
         $wpUser = null;
         try {
-            $wpUser = $this->wpDbService->findUserByEmailPriority($email, ['br', 'us']);
+            $wpUser = $this->wpDbService->findUserByEmailPriority($email, ['br', 'red', 'us']);
         } catch (\Exception $e) {
             $wpUser = null;
         }
@@ -126,11 +126,16 @@ class AuthController extends Controller {
 
         if ($isAjax) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['success' => false, 'error' => $_SESSION['message'], 'action' => 'password_reset_sent']);
+            echo json_encode([
+                'success' => false,
+                'error' => $_SESSION['message'],
+                'action' => 'go_to_password_recovery',
+                'redirect' => '/recuperar-senha?email=' . rawurlencode($email),
+            ]);
             return true;
         }
 
-        $this->redirect('/login');
+        $this->redirect('/recuperar-senha?email=' . rawurlencode($email));
         return true;
     }
 
@@ -504,7 +509,12 @@ class AuthController extends Controller {
             return;
         }
 
-        $this->view('auth/recuperar-senha');
+        $prefillEmail = trim((string) ($request->getParam('email', '') ?? ''));
+        if ($prefillEmail !== '' && !filter_var($prefillEmail, FILTER_VALIDATE_EMAIL)) {
+            $prefillEmail = '';
+        }
+
+        $this->view('auth/recuperar-senha', ['email' => $prefillEmail]);
     }
 
     public function redefinirSenha(Request $request) {
