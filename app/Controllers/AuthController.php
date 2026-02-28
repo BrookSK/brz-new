@@ -668,10 +668,10 @@ class AuthController extends Controller {
         $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
 
         $subject = 'Atualização cadastral - Braziliana';
-        $body = 'Olá,<br><br>'
-            . 'A <strong>Braziliana</strong> está de cara nova — com novidades e melhorias para sua experiência de compra.<br><br>'
-            . 'Para manter sua conta ativa e garantir mais segurança, precisamos que você finalize a <strong>atualização cadastral</strong> e crie uma nova senha de acesso.<br><br>'
-            . 'Clique no botão abaixo para definir sua nova senha e entrar no sistema.';
+        $body = '<p style="margin:0 0 14px 0;">Olá,</p>'
+            . '<p style="margin:0 0 14px 0;">A <strong>Braziliana</strong> está de cara nova — com novidades e melhorias para sua experiência de compra.</p>'
+            . '<p style="margin:0 0 14px 0;">Para manter sua conta ativa e garantir mais segurança, precisamos que você finalize a <strong>atualização cadastral</strong> e crie uma nova senha de acesso.</p>'
+            . '<p style="margin:0;">Clique no botão abaixo para definir sua nova senha e entrar no sistema.</p>';
         $html = $this->buildBrandedEmailHtml(
             'Atualização cadastral',
             $body,
