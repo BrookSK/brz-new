@@ -367,13 +367,13 @@
 </div>
 
 <style>
-.user-avatar img {
+.col-lg-9 .user-avatar img {
     border: 3px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     height: 80px;
 }
 
-.card-body nav.nav.flex-column .nav-link {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -384,23 +384,23 @@
     align-items: center;
 }
 
-.card-body nav.nav.flex-column .nav-link:hover {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
     transform: none;
 }
 
-.card-body nav.nav.flex-column .nav-link.active {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link.active {
     background: rgba(11, 31, 58, 0.08);
     border: 1px solid rgba(11, 31, 58, 0.14);
     color: rgba(11, 31, 58, 1) !important;
 }
 
-.card {
+.col-lg-9 .card {
     transition: none;
 }
 
-.card:hover {
+.col-lg-9 .card:hover {
     transform: none;
     box-shadow: none;
 }
