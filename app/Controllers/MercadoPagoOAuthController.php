@@ -112,22 +112,38 @@ class MercadoPagoOAuthController extends Controller {
     }
 
     private function getConfigTable(\PDO $pdo): ?string {
-        try {
-            $st = $pdo->prepare('SHOW TABLES LIKE ?');
-            $st->execute(['configuracoes_sistema']);
-            if ($st->fetchColumn()) {
-                return 'configuracoes_sistema';
-            }
-        } catch (\Exception $e) {
-        }
+        $candidates = ['configuracoes_sistema', 'configuracoes'];
+        foreach ($candidates as $t) {
+            try {
+                $st = $pdo->prepare('SHOW TABLES LIKE ?');
+                $st->execute([$t]);
+                if (!$st->fetchColumn()) {
+                    continue;
+                }
 
-        try {
-            $st = $pdo->prepare('SHOW TABLES LIKE ?');
-            $st->execute(['configuracoes']);
-            if ($st->fetchColumn()) {
-                return 'configuracoes';
+                $cols = $this->getTableColumns($pdo, $t);
+
+                // Se for key/value, serve.
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    return $t;
+                }
+
+                // Se for single-row, precisa ter as colunas que vamos ler/gravar.
+                $needAny = [
+                    'mercadopago_client_id',
+                    'pagamentos_mercadopago_client_id',
+                    'mercadopago_client_secret',
+                    'pagamentos_mercadopago_client_secret',
+                    'mercadopago_seller_access_token',
+                    'pagamentos_mercadopago_seller_access_token',
+                ];
+                foreach ($needAny as $c) {
+                    if (in_array($c, $cols, true)) {
+                        return $t;
+                    }
+                }
+            } catch (\Exception $e) {
             }
-        } catch (\Exception $e) {
         }
 
         return null;
