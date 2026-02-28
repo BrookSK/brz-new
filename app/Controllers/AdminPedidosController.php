@@ -4174,6 +4174,15 @@ HTML;
                     $params[] = 'aprovado';
                 }
 
+                // 2b) colunas usadas na tela de detalhes do admin
+                if (in_array('pagamento_status', $cols, true) && $statusCol !== 'pagamento_status') {
+                    $set[] = 'pagamento_status = ?';
+                    $params[] = 'aprovado';
+                }
+                if (in_array('pagamento_data', $cols, true)) {
+                    $set[] = 'pagamento_data = COALESCE(pagamento_data, NOW())';
+                }
+
                 // 3) status (caso a coluna atualizada tenha sido payment_status/status_pagamento)
                 if (in_array('status', $cols, true) && $statusCol !== 'status') {
                     $set[] = 'status = ?';
