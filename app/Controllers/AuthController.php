@@ -155,7 +155,9 @@ class AuthController extends Controller {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        $_SESSION['message'] = 'Encontramos seu cadastro no site antigo. Enviamos um e-mail para você definir uma nova senha e atualizar seus dados.';
+        $recoveryUrl = '/recuperar-senha?email=' . rawurlencode($email);
+        $_SESSION['message'] = 'Encontramos seu cadastro no site antigo. Enviamos um e-mail para você definir uma nova senha e atualizar seus dados.'
+            . ' <a href="' . htmlspecialchars($recoveryUrl, ENT_QUOTES, 'UTF-8') . '">Não recebeu? Enviar novamente</a>';
         $_SESSION['message_type'] = 'warning';
 
         if ($isAjax) {
@@ -163,13 +165,13 @@ class AuthController extends Controller {
             echo json_encode([
                 'success' => false,
                 'error' => $_SESSION['message'],
-                'action' => 'go_to_password_recovery',
-                'redirect' => '/recuperar-senha?email=' . rawurlencode($email),
+                'action' => 'password_reset_sent',
+                'recovery_url' => $recoveryUrl,
             ]);
             return true;
         }
 
-        $this->redirect('/recuperar-senha?email=' . rawurlencode($email));
+        $this->redirect('/login');
         return true;
     }
 

@@ -148,10 +148,6 @@ $(document).ready(function() {
                 if (response.success) {
                     window.location.href = response.redirect || '/minha-conta';
                 } else {
-                    if (response.redirect) {
-                        window.location.href = response.redirect;
-                        return;
-                    }
                     showAlert('danger', response.error || I18N.error_login);
                 }
             },
