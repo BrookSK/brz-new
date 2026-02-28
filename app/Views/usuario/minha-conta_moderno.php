@@ -76,7 +76,22 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2 class="mb-1"><?= __('user.my_account', 'Minha Conta') ?></h2>
-                    <p class="text-muted mb-0"><?= __('user.welcome_back', 'Bem-vindo de volta, {name}!', ['name' => '<strong>' . htmlspecialchars($usuario['nome']) . '</strong>']) ?></p>
+                    <?php
+                        $displayName = trim((string) ($usuario['nome'] ?? ''));
+                        if ($displayName === '') {
+                            $displayName = trim((string) ($usuario['display_name'] ?? ($usuario['name'] ?? ($usuario['login'] ?? ''))));
+                        }
+                        if ($displayName === '') {
+                            $email = trim((string) ($usuario['email'] ?? ''));
+                            if ($email !== '' && strpos($email, '@') !== false) {
+                                $displayName = (string) explode('@', $email, 2)[0];
+                            }
+                        }
+                        if ($displayName === '') {
+                            $displayName = 'cliente';
+                        }
+                    ?>
+                    <p class="text-muted mb-0"><?= __('user.welcome_back', 'Bem-vindo de volta, {name}!', ['name' => '<strong>' . htmlspecialchars($displayName) . '</strong>']) ?></p>
                 </div>
                 <div class="text-end">
                     <small class="text-muted"><?= __('user.last_access', 'Último acesso:') ?></small><br>
