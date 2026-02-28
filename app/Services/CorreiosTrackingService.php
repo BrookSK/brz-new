@@ -121,6 +121,22 @@ class CorreiosTrackingService {
                 ];
             }
 
+            $mensagemObjeto = '';
+            if (isset($json['objetos'][0]['mensagem']) && is_string($json['objetos'][0]['mensagem'])) {
+                $mensagemObjeto = trim($json['objetos'][0]['mensagem']);
+            }
+            if ($mensagemObjeto !== '') {
+                if (stripos($mensagemObjeto, 'SRO-009') !== false) {
+                    return [
+                        'success' => false,
+                        'error' => 'Este código de rastreio não pode ser consultado via integração (Correios). Consulte o site/app dos Correios para acompanhar este objeto.',
+                        'http_code' => $httpCode,
+                        'raw' => $json,
+                        'tried_urls' => $triedUrls,
+                    ];
+                }
+            }
+
             $eventos = $this->extractEventos($json);
 
             // Fallback: algumas instalações ficam com sigep_ambiente=homologacao e consultam
