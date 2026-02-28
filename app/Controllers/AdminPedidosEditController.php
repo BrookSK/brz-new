@@ -367,7 +367,7 @@ class AdminPedidosEditController {
                                         <option value="em_transporte" ' . ($statusAtual === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                         <option value="aguardando_liberacao_aduaneira" ' . ($statusAtual === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                         <option value="enviado_ao_destinatario" ' . ($statusAtual === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                        <option value="enviado" ' . ($statusAtual === 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                        <option value="enviado" ' . ($statusAtual === 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                         <option value="entregue" ' . ($statusAtual === 'entregue' ? 'selected' : '') . '>Entregue</option>
                                         <option value="cancelado" ' . ($statusAtual === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>

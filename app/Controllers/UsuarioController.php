@@ -1076,7 +1076,13 @@ class UsuarioController extends Controller {
     public function avatarUpload(Request $request) {
         $this->authService->requerAutenticacao();
 
-        $usuarioId = $this->authService->getUsuarioLogado()['id'];
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $_SESSION['message'] = 'Usuário inválido.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
 
         if (!isset($_FILES['avatar']) || empty($_FILES['avatar']['tmp_name'])) {
             $_SESSION['message'] = 'Selecione uma foto para enviar.';
@@ -1117,6 +1123,14 @@ class UsuarioController extends Controller {
             return;
         }
 
+        $imgInfo = @getimagesize($file['tmp_name']);
+        if ($imgInfo === false || empty($imgInfo[0]) || empty($imgInfo[1])) {
+            $_SESSION['message'] = 'Arquivo inválido. Envie uma imagem válida.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
         $uploadsDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'avatars';
         if (!is_dir($uploadsDir)) {
             @mkdir($uploadsDir, 0775, true);
@@ -1130,7 +1144,7 @@ class UsuarioController extends Controller {
         }
 
         $ext = $allowed[$mime];
-        $filename = 'u' . (int)$usuarioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $filename = 'u' . (int) $usuarioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
         $destPath = $uploadsDir . DIRECTORY_SEPARATOR . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $destPath)) {
@@ -1390,6 +1404,10 @@ class UsuarioController extends Controller {
 
             if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
                 $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
+                continue;
+            }
+
+            if (!array_key_exists($campoForm, $dados)) {
                 continue;
             }
 

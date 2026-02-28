@@ -70,9 +70,15 @@
                 function syncBairroRules() {
                     var paisEl = document.getElementById('pais');
                     var bairroEl = document.getElementById('bairro');
+                    var bairroLabelEl = document.getElementById('label-bairro');
                     if (!paisEl || !bairroEl) return;
                     var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
                     bairroEl.required = br;
+                    if (bairroLabelEl) {
+                        var lbl = (bairroLabelEl.textContent || '').toString();
+                        lbl = lbl.replace(/\s*\*\s*$/, '');
+                        bairroLabelEl.textContent = br ? (lbl + ' *') : lbl;
+                    }
                 }
 
                 function parseTelefone(telefoneRaw) {
@@ -228,6 +234,57 @@
             </div>
             <?php endif; ?>
 
+            <?php
+                $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                $avatarUrl = null;
+                foreach ($avatarColumnCandidates as $c) {
+                    if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                        $avatarUrl = $usuario[$c];
+                        break;
+                    }
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=0b1f3a&color=fff&size=512';
+                }
+            ?>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-camera me-2"></i> <?= __('user_data.avatar.title', 'Foto de Perfil') ?>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="user-avatar">
+                            <img src="<?= htmlspecialchars((string) $avatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($usuario['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 80px; height: 80px; object-fit: cover; border-radius: 999px;">
+                            <span class="avatar-camera-indicator"><i class="fas fa-camera"></i></span>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary" id="btnAvatarView">
+                                <i class="fas fa-eye me-2"></i> <?= __('user_data.avatar.view', 'Ver') ?>
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnAvatarChange">
+                                <i class="fas fa-upload me-2"></i> <?= __('user_data.avatar.change', 'Alterar') ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="btnAvatarRemove">
+                                <i class="fas fa-undo me-2"></i> <?= __('user_data.avatar.reset', 'Voltar ao padrão') ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="avatarUploadForm" method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" class="d-none">
+                        <input type="file" name="avatar" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" />
+                    </form>
+
+                    <form id="avatarRemoveForm" method="POST" action="/meus-dados/avatar/remover" class="d-none"></form>
+                </div>
+            </div>
+
             <form method="POST" action="/meus-dados" id="formMeusDados">
             
             <!-- Profile Form -->
@@ -238,19 +295,20 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?></label>
+                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                 <input type="text" class="form-control" id="nome" name="nome" 
                                        value="<?= htmlspecialchars($usuario['nome']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?></label>
+                                <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                                 <input type="email" class="form-control" id="email" name="email" 
                                        value="<?= htmlspecialchars($usuario['email']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?></label>
+                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?> *</label>
                                 <div class="input-group w-100" style="flex-wrap: nowrap;">
                                     <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                         <option value="55" selected>+55</option>
@@ -283,12 +341,12 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?></label>
+                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?> *</label>
                                 <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
                                        value="<?= htmlspecialchars($usuario['data_nascimento'] ?? '') ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="pais_residencia" class="form-label"><?= __('auth.country_of_residence', 'País de Residência') ?></label>
+                                <label for="pais_residencia" class="form-label"><?= __('auth.country_of_residence', 'País de Residência') ?> *</label>
                                 <?php require __DIR__ . '/../_countries.php'; ?>
                                 <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
                                 <select class="form-select" id="pais_residencia" name="pais_residencia" required>
@@ -316,6 +374,7 @@
                                 'terms' => '<a href="/termos-uso" target="_blank" rel="noopener">' . __('auth.terms', 'Termos de Uso') . '</a>',
                                 'privacy' => '<a href="/politica-privacidade" target="_blank" rel="noopener">' . __('auth.privacy', 'Política de Privacidade') . '</a>',
                             ]) ?>
+                            *
                         </label>
                     </div>
                 </div>
@@ -330,11 +389,12 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                        <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <?php $enderecoEntrega = $enderecoEntrega ?? null; ?>
                         <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="pais" class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?></label>
+                                <label for="pais" class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?> *</label>
                                 <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
                                 <select class="form-select" id="pais" name="pais" required>
                                     <?php foreach ($countries as $code => $name): ?>
@@ -344,7 +404,7 @@
                                 <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?></label>
+                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?> *</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
                                        placeholder="00000-000" required>
@@ -374,7 +434,7 @@
                                        placeholder="<?= htmlspecialchars(__('auth.neighborhood_example', 'Centro'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?></label>
+                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?> *</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
                                        value="<?= htmlspecialchars((string) ($ee['cidade'] ?? ($usuario['cidade'] ?? ''))) ?>" 
                                        placeholder="<?= htmlspecialchars(__('auth.city_example', 'São Paulo'), ENT_QUOTES, 'UTF-8') ?>" required>
@@ -582,6 +642,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const cep = document.getElementById('cep');
         const estadoSelect = document.getElementById('estado');
         const estadoText = document.getElementById('estado_text');
+        const estadoLabel = document.getElementById('label-estado');
 
         const enderecoLabel = document.getElementById('label-endereco');
         const numeroWrap = document.getElementById('numero-wrap');
@@ -653,6 +714,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const shouldUseSelect = Array.isArray(list) && list.length > 0;
 
             const estadoRequired = (pais === 'BR' || pais === 'US' || pais === 'CA');
+
+            if (estadoLabel) {
+                let lbl = (estadoLabel.textContent || '').toString();
+                lbl = lbl.replace(/\s*\*\s*$/, '');
+                estadoLabel.textContent = estadoRequired ? (lbl + ' *') : lbl;
+            }
 
             if (shouldUseSelect) {
                 const current = String(estadoSelect.value || estadoText.value || '').trim();

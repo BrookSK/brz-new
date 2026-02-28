@@ -1957,7 +1957,7 @@ JS;
                             <option value="em_transporte" ' . ($status === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                             <option value="aguardando_liberacao_aduaneira" ' . ($status === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                             <option value="enviado_ao_destinatario" ' . ($status === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                            <option value="enviado" ' . ($status === 'enviado' ? 'selected' : '') . '>Enviado</option>
+                            <option value="enviado" ' . ($status === 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                             <option value="entregue" ' . ($status === 'entregue' ? 'selected' : '') . '>Entregue</option>
                             <option value="cancelado" ' . ($status === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                         </select>
@@ -2090,7 +2090,7 @@ JS;
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                                 <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                                 <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
@@ -2220,7 +2220,7 @@ JS;
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                                 <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                                 <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
@@ -2349,7 +2349,7 @@ JS;
                                                 <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                                 <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                                 <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                                 <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                                 <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                             </select>
@@ -3143,7 +3143,7 @@ HTML;
                                         <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                         <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                         <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                        <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                        <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                         <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
                                         <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>
