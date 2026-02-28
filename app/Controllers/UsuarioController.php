@@ -725,6 +725,13 @@ class UsuarioController extends Controller {
                 $this->redirect('/meus-dados');
                 return;
             }
+
+            $_SESSION['message'] = implode('<br>', array_map(static function($e) {
+                return htmlspecialchars((string) $e, ENT_QUOTES, 'UTF-8');
+            }, $erros));
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
         }
         
         // Obter dados completos do usuário
@@ -1630,9 +1637,14 @@ class UsuarioController extends Controller {
             $erros[] = 'País de residência é obrigatório';
         }
 
-        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
-        if ($pais === '') {
-            $pais = 'BR';
+        $paisResidencia = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($paisResidencia === '') {
+            $paisResidencia = 'BR';
+        }
+
+        $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
         }
 
         $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
@@ -1651,7 +1663,7 @@ class UsuarioController extends Controller {
             $docMudou = ($doc !== $docAtual);
         }
 
-        if ($pais === 'BR') {
+        if ($paisResidencia === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 if ($docMudou) {
                     $erros[] = 'CPF é obrigatório para residentes no Brasil';
@@ -1712,8 +1724,8 @@ class UsuarioController extends Controller {
 
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
-        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
-        if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if ($paisEntrega === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if ($paisEntrega === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
 
         $estado = '';
@@ -1724,7 +1736,9 @@ class UsuarioController extends Controller {
         } elseif (isset($dados['estado_ui']) && trim((string) $dados['estado_ui']) !== '') {
             $estado = trim((string) $dados['estado_ui']);
         }
-        if ($estado === '') $erros[] = 'Estado é obrigatório';
+        if (($paisEntrega === 'BR' || $paisEntrega === 'US' || $paisEntrega === 'CA') && $estado === '') {
+            $erros[] = 'Estado é obrigatório';
+        }
         
         if (!filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
             $erros[] = 'E-mail inválido';
