@@ -1407,6 +1407,10 @@ class UsuarioController extends Controller {
                 continue;
             }
 
+            if (!array_key_exists($campoForm, $dados)) {
+                continue;
+            }
+
             $val = $dados[$campoForm] ?? null;
             if ($campoForm === 'documento') {
                 $doc = preg_replace('/\D+/', '', (string) ($val ?? ''));

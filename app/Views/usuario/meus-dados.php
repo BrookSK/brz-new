@@ -70,9 +70,15 @@
                 function syncBairroRules() {
                     var paisEl = document.getElementById('pais');
                     var bairroEl = document.getElementById('bairro');
+                    var bairroLabelEl = document.getElementById('label-bairro');
                     if (!paisEl || !bairroEl) return;
                     var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
                     bairroEl.required = br;
+                    if (bairroLabelEl) {
+                        var lbl = (bairroLabelEl.textContent || '').toString();
+                        lbl = lbl.replace(/\s*\*\s*$/, '');
+                        bairroLabelEl.textContent = br ? (lbl + ' *') : lbl;
+                    }
                 }
 
                 function parseTelefone(telefoneRaw) {
@@ -291,17 +297,17 @@
                 <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?></label>
+                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                 <input type="text" class="form-control" id="nome" name="nome" 
                                        value="<?= htmlspecialchars($usuario['nome']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?></label>
+                                <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                                 <input type="email" class="form-control" id="email" name="email" 
                                        value="<?= htmlspecialchars($usuario['email']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?></label>
+                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?> *</label>
                                 <div class="input-group w-100" style="flex-wrap: nowrap;">
                                     <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                         <option value="55" selected>+55</option>
@@ -334,12 +340,12 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?></label>
+                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?> *</label>
                                 <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
                                        value="<?= htmlspecialchars($usuario['data_nascimento'] ?? '') ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="pais_residencia" class="form-label"><?= __('auth.country_of_residence', 'País de Residência') ?></label>
+                                <label for="pais_residencia" class="form-label"><?= __('auth.country_of_residence', 'País de Residência') ?> *</label>
                                 <?php require __DIR__ . '/../_countries.php'; ?>
                                 <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
                                 <select class="form-select" id="pais_residencia" name="pais_residencia" required>
@@ -367,6 +373,7 @@
                                 'terms' => '<a href="/termos-uso" target="_blank" rel="noopener">' . __('auth.terms', 'Termos de Uso') . '</a>',
                                 'privacy' => '<a href="/politica-privacidade" target="_blank" rel="noopener">' . __('auth.privacy', 'Política de Privacidade') . '</a>',
                             ]) ?>
+                            *
                         </label>
                     </div>
                 </div>
@@ -385,7 +392,7 @@
                         <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="pais" class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?></label>
+                                <label for="pais" class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?> *</label>
                                 <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
                                 <select class="form-select" id="pais" name="pais" required>
                                     <?php foreach ($countries as $code => $name): ?>
@@ -395,7 +402,7 @@
                                 <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?></label>
+                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?> *</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
                                        placeholder="00000-000" required>
@@ -425,7 +432,7 @@
                                        placeholder="<?= htmlspecialchars(__('auth.neighborhood_example', 'Centro'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?></label>
+                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?> *</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
                                        value="<?= htmlspecialchars((string) ($ee['cidade'] ?? ($usuario['cidade'] ?? ''))) ?>" 
                                        placeholder="<?= htmlspecialchars(__('auth.city_example', 'São Paulo'), ENT_QUOTES, 'UTF-8') ?>" required>
