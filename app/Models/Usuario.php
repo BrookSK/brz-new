@@ -699,11 +699,23 @@ class Usuario extends Model {
 
     public function hasAcceptedTerms(array $usuario): bool {
         $cols = $this->getUserColumns();
-        if (!in_array('termos_aceitos_em', $cols, true)) {
-            return false;
+        if (in_array('termos_aceitos_em', $cols, true)) {
+            $v = (string) ($usuario['termos_aceitos_em'] ?? '');
+            if (trim($v) !== '' && $v !== '0000-00-00 00:00:00') {
+                return true;
+            }
         }
-        $v = (string) ($usuario['termos_aceitos_em'] ?? '');
-        return trim($v) !== '';
+
+        foreach (['termos_aceitos', 'aceitou_termos', 'aceite_termos', 'termos'] as $c) {
+            if (in_array($c, $cols, true)) {
+                $v = $usuario[$c] ?? null;
+                if ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'on') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function isProfileComplete(array $usuario): bool {

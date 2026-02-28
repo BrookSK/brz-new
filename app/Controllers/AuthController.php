@@ -247,6 +247,109 @@ class AuthController extends Controller {
         @mail($to, $subject, $html, implode("\r\n", $headers));
     }
 
+    private function getConfigValue(string $categoria, string $chave, string $default = ''): string {
+        $out = $default;
+        try {
+            $pdo = $this->usuarioModel->getConnection();
+            $stmt = $pdo->prepare("SHOW TABLES LIKE 'configuracoes_sistema'");
+            $stmt->execute();
+            if (!$stmt->fetchColumn()) {
+                return $out;
+            }
+
+            $stmtCols = $pdo->query('DESCRIBE configuracoes_sistema');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            if (is_array($cols) && in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                $st->execute([$categoria, $chave]);
+                $v = $st->fetchColumn();
+                if ($v !== false && $v !== null) {
+                    $out = (string) $v;
+                }
+            } else {
+                $fullKey = $categoria . '_' . $chave;
+                $st = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                $st->execute([$fullKey]);
+                $v = $st->fetchColumn();
+                if ($v !== false && $v !== null) {
+                    $out = (string) $v;
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        $out = trim((string) $out);
+        return $out !== '' ? $out : $default;
+    }
+
+    private function getSiteBranding(): array {
+        $siteName = $this->getConfigValue('loja', 'nome', 'Braziliana');
+        $logoUrl = $this->getConfigValue('layout', 'logo', '');
+
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $siteId = $host !== '' ? ($scheme . '://' . $host) : '';
+
+        return [
+            'site_name' => $siteName,
+            'logo_url' => $logoUrl,
+            'site_id' => $siteId,
+        ];
+    }
+
+    private function buildBrandedEmailHtml(string $title, string $bodyHtml, string $ctaText, string $ctaUrl, string $note): string {
+        $b = $this->getSiteBranding();
+        $siteName = htmlspecialchars((string) ($b['site_name'] ?? 'Braziliana'), ENT_QUOTES, 'UTF-8');
+        $logoUrl = trim((string) ($b['logo_url'] ?? ''));
+        $safeLogoUrl = $logoUrl !== '' ? htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') : '';
+        $siteId = trim((string) ($b['site_id'] ?? ''));
+        $safeSiteId = $siteId !== '' ? htmlspecialchars($siteId, ENT_QUOTES, 'UTF-8') : '';
+
+        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $safeCtaText = htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8');
+        $safeCtaUrl = htmlspecialchars($ctaUrl, ENT_QUOTES, 'UTF-8');
+        $safeNote = htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
+
+        $logoBlock = '';
+        if ($safeLogoUrl !== '') {
+            $logoBlock = '<img src="' . $safeLogoUrl . '" alt="' . $siteName . '" style="display:block;max-width:160px;max-height:48px;height:auto;width:auto;">';
+        } else {
+            $logoBlock = '<div style="font-size:18px;font-weight:700;color:#0b1f3a;">' . $siteName . '</div>';
+        }
+
+        $siteIdBlock = $safeSiteId !== '' ? ('<div style="margin-top:4px;font-size:12px;color:#6c757d;">' . $safeSiteId . '</div>') : '';
+
+        return '<!doctype html>'
+            . '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+            . '<title>' . $safeTitle . '</title></head>'
+            . '<body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;">'
+            . '<div style="width:100%;padding:24px 12px;">'
+            . '<div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e9ecef;">'
+            . '<div style="padding:20px 24px;background:#ffffff;border-bottom:1px solid #eef1f4;">'
+            . $logoBlock
+            . $siteIdBlock
+            . '</div>'
+            . '<div style="padding:24px;">'
+            . '<h1 style="margin:0 0 12px 0;font-size:20px;color:#0b1f3a;">' . $safeTitle . '</h1>'
+            . '<div style="font-size:14px;line-height:1.6;color:#212529;">' . $bodyHtml . '</div>'
+            . '<div style="margin:18px 0 10px 0;">'
+            . '<a href="' . $safeCtaUrl . '" style="display:inline-block;background:#0b1f3a;color:#ffffff;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700;">' . $safeCtaText . '</a>'
+            . '</div>'
+            . '<div style="font-size:12px;color:#6c757d;line-height:1.5;margin-top:10px;">'
+            . $safeNote
+            . '<br>Se o botão não funcionar, copie e cole este link no navegador:<br>'
+            . '<a href="' . $safeCtaUrl . '" style="color:#0b1f3a;">' . $safeCtaUrl . '</a>'
+            . '</div>'
+            . '</div>'
+            . '<div style="padding:14px 24px;background:#f8f9fa;border-top:1px solid #eef1f4;font-size:12px;color:#6c757d;">'
+            . '© ' . date('Y') . ' ' . $siteName
+            . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</body></html>';
+    }
+
     private function encodeEmailHeaderName(string $name): string {
         $n = trim($name);
         if ($n === '') {
@@ -375,11 +478,16 @@ class AuthController extends Controller {
         $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
 
         $subject = 'Atualização cadastral - Braziliana';
-        $html = 'Olá,<br><br>'
+        $body = 'Olá,<br><br>'
             . 'Como este é um site novo, precisamos que você atualize seu cadastro para continuar usando sua conta.<br><br>'
-            . 'Clique no link abaixo para definir uma nova senha e acessar o sistema:<br><br>'
-            . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
-            . 'Este link expira em 1 hora.';
+            . 'Clique no botão abaixo para definir uma nova senha e acessar o sistema.';
+        $html = $this->buildBrandedEmailHtml(
+            'Atualização cadastral',
+            $body,
+            'Definir nova senha',
+            $link,
+            'Este link expira em 1 hora.'
+        );
 
         try {
             $this->sendEmail($email, $subject, $html);
@@ -757,11 +865,16 @@ class AuthController extends Controller {
                 $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
 
                 $subject = 'Recuperação de senha - Braziliana';
-                $html = 'Olá,<br><br>'
-                    . 'Recebemos uma solicitação para redefinir sua senha. Clique no link abaixo para criar uma nova senha:<br><br>'
-                    . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a><br><br>'
-                    . 'Se você não solicitou isso, ignore este e-mail.<br><br>'
-                    . 'Este link expira em 1 hora.';
+                $body = 'Olá,<br><br>'
+                    . 'Recebemos uma solicitação para redefinir sua senha.<br><br>'
+                    . 'Clique no botão abaixo para criar uma nova senha.';
+                $html = $this->buildBrandedEmailHtml(
+                    'Recuperação de senha',
+                    $body,
+                    'Redefinir senha',
+                    $link,
+                    'Este link expira em 1 hora. Se você não solicitou isso, ignore este e-mail.'
+                );
 
                 try {
                     $this->sendEmail($email, $subject, $html);
@@ -787,6 +900,14 @@ class AuthController extends Controller {
     public function redefinirSenha(Request $request) {
         $token = (string) ($request->getParam('token') ?? '');
         $token = trim($token);
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        if (isset($_SESSION['message']) && is_string($_SESSION['message']) && stripos($_SESSION['message'], 'cadastro no site antigo') !== false) {
+            unset($_SESSION['message'], $_SESSION['message_type']);
+        }
+
         if ($token === '') {
             $_SESSION['message'] = 'Link inválido.';
             $_SESSION['message_type'] = 'danger';
