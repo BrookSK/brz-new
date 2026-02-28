@@ -6,6 +6,7 @@ use App\Services\AuthService;
 use App\Services\PaymentService;
 use App\Services\CpfValidator;
 use App\Services\PdfPedidoService;
+use App\Services\WordPressDbService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
 use App\Models\Endereco;
@@ -738,6 +739,49 @@ class UsuarioController extends Controller {
         $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
         $usuario = $this->usuarioModel->find($usuarioId);
 
+        $suitesAntigas = [];
+        try {
+            $email = strtolower(trim((string) ($usuario['email'] ?? '')));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $wpDb = new WordPressDbService();
+                foreach (['br' => 'Suíte BR', 'us' => 'Suíte US', 'red' => 'Suíte Redirecionamento'] as $src => $label) {
+                    try {
+                        $u = $wpDb->findUserByEmail($email, $src);
+                        if ($u) {
+                            $meta = [];
+                            try {
+                                $meta = $wpDb->getUserMeta((int) ($u['id'] ?? 0), $src, ['suite', 'switch']);
+                            } catch (\Exception $e) {
+                                $meta = [];
+                            }
+
+                            $suiteNumero = null;
+                            foreach (['suite', 'switch'] as $mk) {
+                                if (isset($meta[$mk])) {
+                                    $v = trim((string) $meta[$mk]);
+                                    if ($v !== '' && is_numeric($v)) {
+                                        $suiteNumero = (int) $v;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            $suitesAntigas[] = [
+                                'source' => $src,
+                                'label' => $label,
+                                'id' => (int) ($u['id'] ?? 0),
+                                'email' => (string) ($u['email'] ?? ''),
+                                'suite' => $suiteNumero,
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $suitesAntigas = [];
+        }
+
         $enderecoEntrega = null;
         try {
             $enderecos = $this->usuarioModel->getEnderecos($usuarioId);
@@ -750,7 +794,8 @@ class UsuarioController extends Controller {
         
         $this->view('usuario/meus-dados', [
             'usuario' => $usuario,
-            'enderecoEntrega' => $enderecoEntrega
+            'enderecoEntrega' => $enderecoEntrega,
+            'suitesAntigas' => $suitesAntigas,
         ]);
     }
 

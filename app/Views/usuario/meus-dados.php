@@ -234,6 +234,43 @@
             </div>
             <?php endif; ?>
 
+            <?php $suitesAntigas = $suitesAntigas ?? []; ?>
+            <?php if (!empty($suitesAntigas) && is_array($suitesAntigas)): ?>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-building me-2"></i> Outras suítes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small mb-3">Encontramos outras suítes antigas vinculadas ao seu e-mail.</div>
+                    <div class="row g-3">
+                        <?php foreach ($suitesAntigas as $sa): ?>
+                            <?php if (!is_array($sa)) continue; ?>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100" style="background: rgba(248, 250, 252, 0.85);">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                <?= htmlspecialchars((string) ($sa['label'] ?? 'Suíte')) ?>
+                                            </div>
+                                            <div class="small text-muted">
+                                                Antiga
+                                                <?php if (!empty($sa['suite'])): ?>
+                                                    - Suíte <strong><?= (int) $sa['suite'] ?></strong>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">OK</span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <?php
                 $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
                 $avatarUrl = null;
