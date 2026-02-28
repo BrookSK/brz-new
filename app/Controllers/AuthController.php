@@ -669,8 +669,9 @@ class AuthController extends Controller {
 
         $subject = 'Atualização cadastral - Braziliana';
         $body = 'Olá,<br><br>'
-            . 'Como este é um site novo, precisamos que você atualize seu cadastro para continuar usando sua conta.<br><br>'
-            . 'Clique no botão abaixo para definir uma nova senha e acessar o sistema.';
+            . 'A <strong>Braziliana</strong> está de cara nova — com novidades e melhorias para sua experiência de compra.<br><br>'
+            . 'Para manter sua conta ativa e garantir mais segurança, precisamos que você finalize a <strong>atualização cadastral</strong> e crie uma nova senha de acesso.<br><br>'
+            . 'Clique no botão abaixo para definir sua nova senha e entrar no sistema.';
         $html = $this->buildBrandedEmailHtml(
             'Atualização cadastral',
             $body,
