@@ -445,10 +445,20 @@ class AuthController extends Controller {
                 $first = $get('first_name');
                 $last = $get('last_name');
                 $fullName = trim($first . ' ' . $last);
-                if ($fullName !== '' && is_array($cols) && in_array('nome', $cols, true)) {
+                if (is_array($cols) && in_array('nome', $cols, true)) {
                     $cur = trim((string) ($local['nome'] ?? ''));
                     if ($cur === '' || strtolower($cur) === 'cliente') {
-                        $upd['nome'] = $fullName;
+                        if ($fullName !== '') {
+                            $upd['nome'] = $fullName;
+                        } else {
+                            $fallback = trim((string) ($wpUser['display_name'] ?? ''));
+                            if ($fallback === '') {
+                                $fallback = trim((string) ($wpUser['login'] ?? ''));
+                            }
+                            if ($fallback !== '') {
+                                $upd['nome'] = $fallback;
+                            }
+                        }
                     }
                 }
 
@@ -568,8 +578,18 @@ class AuthController extends Controller {
                 $first = $get('first_name');
                 $last = $get('last_name');
                 $fullName = trim($first . ' ' . $last);
-                if ($fullName !== '' && in_array('nome', $cols, true)) {
-                    $data['nome'] = $fullName;
+                if (in_array('nome', $cols, true)) {
+                    if ($fullName !== '') {
+                        $data['nome'] = $fullName;
+                    } else {
+                        $fallback = trim((string) ($wpUser['display_name'] ?? ''));
+                        if ($fallback === '') {
+                            $fallback = trim((string) ($wpUser['login'] ?? ''));
+                        }
+                        if ($fallback !== '') {
+                            $data['nome'] = $fallback;
+                        }
+                    }
                 }
 
                 $doc = preg_replace('/\D+/', '', $get('cpf'));
