@@ -25,6 +25,7 @@ class PaymentService {
     private $appmaxAccessTokenExpiresAt;
     private $mercadoPagoEnabled;
     private $mercadoPagoAccessToken;
+    private $mercadoPagoSellerAccessToken;
     
     private function garantirTabelaPedidoPagamentos(): void {
         try {
@@ -74,17 +75,30 @@ class PaymentService {
         return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
     }
 
+    private function mercadoPagoTokenForRequestPath(string $path): string {
+        $path = (string) $path;
+
+        // Marketplace Split: pagamentos do produto (Payments API) devem ser feitos
+        // com o access token do vendedor (OAuth), quando disponível.
+        if (!empty($this->mercadoPagoSellerAccessToken) && substr($path, 0, 12) === '/v1/payments') {
+            return (string) $this->mercadoPagoSellerAccessToken;
+        }
+
+        return (string) $this->mercadoPagoAccessToken;
+    }
+
     private function mercadoPagoRequest(string $method, string $path, ?array $body = null, array $extraHeaders = []): array {
         if (!$this->isMercadoPagoEnabled()) {
             throw new \Exception('Mercado Pago está desativado');
         }
-        if (empty($this->mercadoPagoAccessToken)) {
+        $token = $this->mercadoPagoTokenForRequestPath($path);
+        if (empty($token)) {
             throw new \Exception('Mercado Pago não configurado (access token ausente)');
         }
 
         $url = 'https://api.mercadopago.com' . $path;
         $headers = [
-            'Authorization: Bearer ' . (string) $this->mercadoPagoAccessToken,
+            'Authorization: Bearer ' . (string) $token,
             'Accept: application/json',
             'Content-Type: application/json',
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
@@ -2474,6 +2488,7 @@ class PaymentService {
 
         $this->mercadoPagoEnabled = (string) $this->getConfig('pagamentos', 'mercadopago_enabled', '0');
         $this->mercadoPagoAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_access_token', '');
+        $this->mercadoPagoSellerAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_seller_access_token', '');
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {

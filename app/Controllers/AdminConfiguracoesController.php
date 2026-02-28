@@ -2000,9 +2000,41 @@ class AdminConfiguracoesController extends Controller {
                                                             <div class="row">
                                                                 <div class="col-md-6">
                                                                     <div class="mb-3">
+                                                                        <label class="form-label">Client ID (OAuth)</label>
+                                                                        <input type="text" class="form-control" name="pagamentos_mercadopago_client_id" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_client_id', '') . '" placeholder="1234567890">
+                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Client Secret (OAuth)</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_mercadopago_client_secret" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_client_secret', '') . '" placeholder="********">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
                                                                         <label class="form-label">Webhook URL</label>
                                                                         <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/mercadopago', ENT_QUOTES, 'UTF-8') . '" readonly>
                                                                         <small class="text-muted">Configure esta URL no painel do Mercado Pago para receber notificações.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-12">
+                                                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                                                        <a href="/mercadopago/oauth/start" class="btn btn-sm btn-primary">Conectar Mercado Pago (Conta do Produto)</a>
+                                                                        <small class="text-muted">Faça login e autorize a conta que vai receber o valor do produto (OAuth).</small>
+                                                                        ' . (!empty($this->getConfigValue($config, 'pagamentos', 'mercadopago_seller_access_token', ''))
+                                                                            ? '<span class="badge bg-success">Conectado</span>'
+                                                                            : '<span class="badge bg-secondary">Não conectado</span>') . '
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -4122,7 +4154,7 @@ HTML;
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
                 'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],

@@ -396,6 +396,10 @@ $router->post('/admin/configuracoes/importar-usuarios/iniciar', 'AdminConfigurac
 $router->post('/admin/configuracoes/importar-usuarios/processar', 'AdminConfiguracoesController', 'importarUsuariosProcessar');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
 
+// Mercado Pago OAuth (conectar conta do produto)
+$router->get('/mercadopago/oauth/start', 'MercadoPagoOAuthController', 'start');
+$router->get('/mercadopago/oauth/callback', 'MercadoPagoOAuthController', 'callback');
+
 // Mapa de calor (segmentação)
 $router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
 $router->get('/admin/configuracoes/mapa-calor/export-emails', 'AdminConfiguracoesController', 'mapaCalorExportEmails');
