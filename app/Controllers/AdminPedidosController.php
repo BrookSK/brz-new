@@ -2973,12 +2973,9 @@ HTML;
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Informações do Pedido</h5>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>Status:</strong> <span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
-                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : ('R$ ' . number_format($pedido['frete'], 2, ',', '.'))) . '</p>
+                                <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
                                 <hr>
                                 <div class="mb-3">
                                     <h6 class="mb-2">Pagamento</h6>';
@@ -2990,6 +2987,14 @@ HTML;
                                     $pgStatusView = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? '')));
                                     if (trim($pgStatusView) === '') {
                                         $pgStatusView = 'Pendente';
+                                    }
+
+                                    $pgStatusKey = strtolower(trim((string) $pgStatusView));
+                                    $statusPedidoKey = strtolower(trim((string) ($pedido['status'] ?? '')));
+                                    if (in_array($pgStatusKey, ['approved', 'aprovado', 'confirmed', 'received', 'paid', 'pago', 'succeeded', 'success'], true)) {
+                                        if ($statusPedidoKey !== '') {
+                                            $pgStatusView = $this->getStatusLabel((string) $statusPedidoKey);
+                                        }
                                     }
                                     $pgGatewayView = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ($pedido['gateway'] ?? '')));
                                     if (trim($pgGatewayView) === '') {
@@ -4174,9 +4179,25 @@ HTML;
             }
 
             // Se marcou como pago/aprovado, manter colunas relacionadas consistentes.
-            // Isso impacta diretamente a tela de comissões (que pode filtrar por payment_status).
+            // Além disso, atualizar o texto exibido no bloco "Pagamento" para bater com o status selecionado.
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
             $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
+
+            $statusLabelMap = [
+                'pendente' => 'Pendente',
+                'pago' => 'Pago',
+                'processando' => 'Processando',
+                'produto_consolidado' => 'Caixa Fechada',
+                'em_transporte' => 'Em Transporte',
+                'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
+                'enviado_ao_destinatario' => 'Enviado ao Destinatário',
+                'enviado' => 'Etiqueta gerada',
+                'entregue' => 'Entregue',
+                'cancelado' => 'Cancelado',
+            ];
+            $novoStatusKey = strtolower(trim((string) $novoStatus));
+            $pagamentoStatusTexto = $statusLabelMap[$novoStatusKey] ?? ucfirst(str_replace('_', ' ', $novoStatusKey));
+
             if ($isPaid && is_array($cols)) {
                 // 1) pago_em
                 if (in_array('pago_em', $cols, true)) {
@@ -4196,7 +4217,7 @@ HTML;
                 // 2b) colunas usadas na tela de detalhes do admin
                 if (in_array('pagamento_status', $cols, true) && $statusCol !== 'pagamento_status') {
                     $set[] = 'pagamento_status = ?';
-                    $params[] = 'aprovado';
+                    $params[] = $pagamentoStatusTexto;
                 }
                 if (in_array('pagamento_data', $cols, true)) {
                     $set[] = 'pagamento_data = COALESCE(pagamento_data, NOW())';
@@ -4207,6 +4228,11 @@ HTML;
                     $set[] = 'status = ?';
                     $params[] = 'pago';
                 }
+            }
+
+            if (!$isPaid && is_array($cols) && in_array('pagamento_status', $cols, true) && $statusCol !== 'pagamento_status') {
+                $set[] = 'pagamento_status = ?';
+                $params[] = $pagamentoStatusTexto;
             }
 
             if (is_array($cols) && in_array('updated_at', $cols, true)) {
