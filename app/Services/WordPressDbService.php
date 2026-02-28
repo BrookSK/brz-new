@@ -6,6 +6,45 @@ use Config\Database;
 class WordPressDbService {
     private const SOURCES = ['br', 'red', 'us'];
 
+    private const DEFAULT_META_KEYS = [
+        // WooCommerce billing
+        'billing_first_name',
+        'billing_last_name',
+        'billing_phone',
+        'billing_postcode',
+        'billing_address_1',
+        'billing_address_2',
+        'billing_number',
+        'billing_neighborhood',
+        'billing_city',
+        'billing_state',
+        'billing_country',
+        'billing_cpf',
+        'billing_birthdate',
+        'billing_birth_date',
+
+        // WooCommerce shipping
+        'shipping_first_name',
+        'shipping_last_name',
+        'shipping_phone',
+        'shipping_postcode',
+        'shipping_address_1',
+        'shipping_address_2',
+        'shipping_number',
+        'shipping_neighborhood',
+        'shipping_city',
+        'shipping_state',
+        'shipping_country',
+
+        // Common custom keys
+        'cpf',
+        'documento',
+        'data_nascimento',
+        'birth_date',
+        'phone',
+        'telefone',
+    ];
+
     private function getLocalPdo(): \PDO {
         return Database::getConnection();
     }
@@ -153,5 +192,93 @@ class WordPressDbService {
             }
         }
         return null;
+    }
+
+    public function getUserMeta(int $wpUserId, string $source = 'br', array $keys = []): array {
+        $wpUserId = (int) $wpUserId;
+        if ($wpUserId <= 0) {
+            return [];
+        }
+
+        $localPdo = $this->getLocalPdo();
+        $wp = $this->getWpPdo($localPdo, $source);
+        $pdo = $wp['pdo'];
+        $prefix = $wp['prefix'];
+
+        $keys = array_values(array_filter(array_map('strval', $keys), static fn($k) => trim($k) !== ''));
+        if (empty($keys)) {
+            $keys = self::DEFAULT_META_KEYS;
+        }
+
+        // Build placeholders
+        $in = implode(', ', array_fill(0, count($keys), '?'));
+        $sql = "SELECT meta_key, meta_value FROM {$prefix}usermeta WHERE user_id = ? AND meta_key IN ({$in})";
+        $st = $pdo->prepare($sql);
+        $params = array_merge([$wpUserId], $keys);
+        $st->execute($params);
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            $k = (string) ($r['meta_key'] ?? '');
+            if ($k === '') {
+                continue;
+            }
+            // Keep last value
+            $out[$k] = (string) ($r['meta_value'] ?? '');
+        }
+        return $out;
+    }
+
+    public function getNormalizedUserProfile(int $wpUserId, string $source = 'br'): array {
+        $meta = $this->getUserMeta($wpUserId, $source);
+
+        $pick = static function(array $meta, array $keys): string {
+            foreach ($keys as $k) {
+                if (array_key_exists($k, $meta)) {
+                    $v = trim((string) ($meta[$k] ?? ''));
+                    if ($v !== '') {
+                        return $v;
+                    }
+                }
+            }
+            return '';
+        };
+
+        $first = $pick($meta, ['billing_first_name', 'shipping_first_name']);
+        $last = $pick($meta, ['billing_last_name', 'shipping_last_name']);
+        $phone = $pick($meta, ['billing_phone', 'shipping_phone', 'telefone', 'phone']);
+        $cpf = $pick($meta, ['billing_cpf', 'cpf', 'documento']);
+        $birth = $pick($meta, ['billing_birthdate', 'billing_birth_date', 'data_nascimento', 'birth_date']);
+
+        $address1 = $pick($meta, ['billing_address_1', 'shipping_address_1']);
+        $number = $pick($meta, ['billing_number', 'shipping_number']);
+        $address2 = $pick($meta, ['billing_address_2', 'shipping_address_2']);
+        $neighborhood = $pick($meta, ['billing_neighborhood', 'shipping_neighborhood']);
+        $city = $pick($meta, ['billing_city', 'shipping_city']);
+        $state = $pick($meta, ['billing_state', 'shipping_state']);
+        $postcode = $pick($meta, ['billing_postcode', 'shipping_postcode']);
+        $country = strtoupper($pick($meta, ['billing_country', 'shipping_country']));
+
+        if ($country === '') {
+            $country = 'BR';
+        }
+
+        return [
+            'first_name' => $first,
+            'last_name' => $last,
+            'phone' => $phone,
+            'cpf' => $cpf,
+            'birth_date' => $birth,
+            'address_1' => $address1,
+            'number' => $number,
+            'address_2' => $address2,
+            'neighborhood' => $neighborhood,
+            'city' => $city,
+            'state' => $state,
+            'postcode' => $postcode,
+            'country' => $country,
+            'raw_meta' => $meta,
+        ];
     }
 }

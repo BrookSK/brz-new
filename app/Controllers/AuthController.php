@@ -403,6 +403,13 @@ class AuthController extends Controller {
             return false;
         }
 
+        $wpProfile = [];
+        try {
+            $wpProfile = $this->wpDbService->getNormalizedUserProfile((int) ($wpUser['id'] ?? 0), (string) ($wpUser['source'] ?? 'br'));
+        } catch (\Exception $e) {
+            $wpProfile = [];
+        }
+
         $nome = trim((string) ($wpUser['display_name'] ?? ''));
         if ($nome === '') {
             $nome = trim((string) ($wpUser['login'] ?? ''));
@@ -427,6 +434,116 @@ class AuthController extends Controller {
             if (is_array($cols) && in_array('wp_user_id', $cols, true)) {
                 $upd['wp_user_id'] = (int) ($wpUser['id'] ?? 0);
             }
+
+            // Preencher dados do WP apenas se o campo local estiver vazio
+            if (is_array($wpProfile) && !empty($wpProfile)) {
+                $get = static function(string $k) use ($wpProfile): string {
+                    $v = $wpProfile[$k] ?? '';
+                    return is_string($v) ? trim($v) : '';
+                };
+
+                $first = $get('first_name');
+                $last = $get('last_name');
+                $fullName = trim($first . ' ' . $last);
+                if ($fullName !== '' && is_array($cols) && in_array('nome', $cols, true)) {
+                    $cur = trim((string) ($local['nome'] ?? ''));
+                    if ($cur === '' || strtolower($cur) === 'cliente') {
+                        $upd['nome'] = $fullName;
+                    }
+                }
+
+                $doc = preg_replace('/\D+/', '', $get('cpf'));
+                if ($doc !== '' && is_array($cols) && in_array('documento', $cols, true)) {
+                    $cur = preg_replace('/\D+/', '', (string) ($local['documento'] ?? ''));
+                    if ($cur === '') {
+                        $upd['documento'] = $doc;
+                    }
+                }
+
+                $phone = $get('phone');
+                if ($phone !== '' && is_array($cols) && in_array('telefone', $cols, true)) {
+                    $cur = trim((string) ($local['telefone'] ?? ''));
+                    if ($cur === '') {
+                        $upd['telefone'] = $phone;
+                    }
+                }
+
+                $birth = $get('birth_date');
+                if ($birth !== '' && is_array($cols) && in_array('data_nascimento', $cols, true)) {
+                    $cur = trim((string) ($local['data_nascimento'] ?? ''));
+                    if ($cur === '' || $cur === '0000-00-00') {
+                        $norm = '';
+                        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $birth)) {
+                            $norm = $birth;
+                        } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $birth, $m)) {
+                            $norm = $m[3] . '-' . $m[2] . '-' . $m[1];
+                        }
+                        if ($norm !== '') {
+                            $upd['data_nascimento'] = $norm;
+                        }
+                    }
+                }
+
+                $country = strtoupper($get('country'));
+                if ($country !== '' && is_array($cols) && in_array('pais_residencia', $cols, true)) {
+                    $cur = strtoupper(trim((string) ($local['pais_residencia'] ?? '')));
+                    if ($cur === '') {
+                        $upd['pais_residencia'] = substr($country, 0, 2);
+                    }
+                }
+
+                $postcode = preg_replace('/\D+/', '', $get('postcode'));
+                $addr1 = $get('address_1');
+                $num = $get('number');
+                $addr2 = $get('address_2');
+                $bairro = $get('neighborhood');
+                $city = $get('city');
+                $state = $get('state');
+
+                if ($postcode !== '' && is_array($cols) && in_array('cep', $cols, true)) {
+                    $cur = preg_replace('/\D+/', '', (string) ($local['cep'] ?? ''));
+                    if ($cur === '') {
+                        $upd['cep'] = $postcode;
+                    }
+                }
+                if ($addr1 !== '' && is_array($cols) && in_array('endereco', $cols, true)) {
+                    $cur = trim((string) ($local['endereco'] ?? ''));
+                    if ($cur === '') {
+                        $upd['endereco'] = $addr1;
+                    }
+                }
+                if ($num !== '' && is_array($cols) && in_array('numero', $cols, true)) {
+                    $cur = trim((string) ($local['numero'] ?? ''));
+                    if ($cur === '') {
+                        $upd['numero'] = $num;
+                    }
+                }
+                if ($addr2 !== '' && is_array($cols) && in_array('complemento', $cols, true)) {
+                    $cur = trim((string) ($local['complemento'] ?? ''));
+                    if ($cur === '') {
+                        $upd['complemento'] = $addr2;
+                    }
+                }
+                if ($bairro !== '' && is_array($cols) && in_array('bairro', $cols, true)) {
+                    $cur = trim((string) ($local['bairro'] ?? ''));
+                    if ($cur === '') {
+                        $upd['bairro'] = $bairro;
+                    }
+                }
+                if ($city !== '' && is_array($cols) && in_array('cidade', $cols, true)) {
+                    $cur = trim((string) ($local['cidade'] ?? ''));
+                    if ($cur === '') {
+                        $upd['cidade'] = $city;
+                    }
+                }
+                if ($state !== '' && is_array($cols) && in_array('estado', $cols, true)) {
+                    $cur = trim((string) ($local['estado'] ?? ''));
+                    if ($cur === '') {
+                        $upd['estado'] = $state;
+                    }
+                }
+            }
+
             if (!empty($upd)) {
                 try {
                     $this->usuarioModel->update($userId, $upd);
@@ -440,6 +557,79 @@ class AuthController extends Controller {
                 'perfil' => 'cliente',
                 'senha' => bin2hex(random_bytes(16)),
             ];
+
+            // Dados vindos do WP (somente se existirem colunas locais)
+            if (is_array($wpProfile) && !empty($wpProfile) && is_array($cols)) {
+                $get = static function(string $k) use ($wpProfile): string {
+                    $v = $wpProfile[$k] ?? '';
+                    return is_string($v) ? trim($v) : '';
+                };
+
+                $first = $get('first_name');
+                $last = $get('last_name');
+                $fullName = trim($first . ' ' . $last);
+                if ($fullName !== '' && in_array('nome', $cols, true)) {
+                    $data['nome'] = $fullName;
+                }
+
+                $doc = preg_replace('/\D+/', '', $get('cpf'));
+                if ($doc !== '' && in_array('documento', $cols, true)) {
+                    $data['documento'] = $doc;
+                }
+
+                $phone = $get('phone');
+                if ($phone !== '' && in_array('telefone', $cols, true)) {
+                    $data['telefone'] = $phone;
+                }
+
+                $birth = $get('birth_date');
+                if ($birth !== '' && in_array('data_nascimento', $cols, true)) {
+                    $norm = '';
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $birth)) {
+                        $norm = $birth;
+                    } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $birth, $m)) {
+                        $norm = $m[3] . '-' . $m[2] . '-' . $m[1];
+                    }
+                    if ($norm !== '') {
+                        $data['data_nascimento'] = $norm;
+                    }
+                }
+
+                $country = strtoupper($get('country'));
+                if ($country !== '' && in_array('pais_residencia', $cols, true)) {
+                    $data['pais_residencia'] = substr($country, 0, 2);
+                }
+
+                $postcode = preg_replace('/\D+/', '', $get('postcode'));
+                $addr1 = $get('address_1');
+                $num = $get('number');
+                $addr2 = $get('address_2');
+                $bairro = $get('neighborhood');
+                $city = $get('city');
+                $state = $get('state');
+
+                if ($postcode !== '' && in_array('cep', $cols, true)) {
+                    $data['cep'] = $postcode;
+                }
+                if ($addr1 !== '' && in_array('endereco', $cols, true)) {
+                    $data['endereco'] = $addr1;
+                }
+                if ($num !== '' && in_array('numero', $cols, true)) {
+                    $data['numero'] = $num;
+                }
+                if ($addr2 !== '' && in_array('complemento', $cols, true)) {
+                    $data['complemento'] = $addr2;
+                }
+                if ($bairro !== '' && in_array('bairro', $cols, true)) {
+                    $data['bairro'] = $bairro;
+                }
+                if ($city !== '' && in_array('cidade', $cols, true)) {
+                    $data['cidade'] = $city;
+                }
+                if ($state !== '' && in_array('estado', $cols, true)) {
+                    $data['estado'] = $state;
+                }
+            }
 
             if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
                 $data['precisa_recadastro'] = 1;
