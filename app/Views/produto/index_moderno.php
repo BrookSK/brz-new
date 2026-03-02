@@ -155,6 +155,58 @@
             <?php endforeach; ?>
         <?php endif; ?>
     </div>
+
+    <?php
+        $page = (int) ($page ?? 1);
+        if ($page <= 0) $page = 1;
+        $totalPages = (int) ($totalPages ?? 1);
+        if ($totalPages <= 0) $totalPages = 1;
+        $searchVal = (string) ($search ?? '');
+        $categoriaVal = (string) ($categoriaSelecionada ?? '');
+
+        $buildProductsUrl = static function (int $p) use ($searchVal, $categoriaVal): string {
+            $qs = [];
+            if ($searchVal !== '') $qs['search'] = $searchVal;
+            if ($categoriaVal !== '') $qs['categoria'] = $categoriaVal;
+            if ($p > 1) $qs['page'] = $p;
+            return '/produtos' . (!empty($qs) ? ('?' . http_build_query($qs)) : '');
+        };
+    ?>
+
+    <?php if (!empty($produtos) && $totalPages > 1): ?>
+        <nav aria-label="Paginação" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>" tabindex="-1">Anterior</a>
+                </li>
+
+                <?php
+                    $start = max(1, $page - 2);
+                    $end = min($totalPages, $page + 2);
+                    if ($start > 1) {
+                        echo '<li class="page-item"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl(1), ENT_QUOTES, 'UTF-8') . '">1</a></li>';
+                        if ($start > 2) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                    }
+                    for ($p = $start; $p <= $end; $p++) {
+                        $active = ($p === $page);
+                        echo '<li class="page-item' . ($active ? ' active' : '') . '"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl($p), ENT_QUOTES, 'UTF-8') . '">' . (int) $p . '</a></li>';
+                    }
+                    if ($end < $totalPages) {
+                        if ($end < $totalPages - 1) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                        echo '<li class="page-item"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl($totalPages), ENT_QUOTES, 'UTF-8') . '">' . (int) $totalPages . '</a></li>';
+                    }
+                ?>
+
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>">Próxima</a>
+                </li>
+            </ul>
+        </nav>
+    <?php endif; ?>
 </div>
 
 <script>

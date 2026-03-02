@@ -120,6 +120,94 @@ class Produto extends Model {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    private function buildWhereProdutosAtivos(
+        array $cols,
+        array &$params,
+        ?string $term = null,
+        $categoriaId = null
+    ): array {
+        $where = [];
+
+        if ($term !== null) {
+            $where[] = "(p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)";
+            $params[':term'] = '%' . $term . '%';
+        }
+
+        if ($categoriaId !== null && $categoriaId !== '') {
+            $where[] = 'p.category_id = :categoria_id';
+            $params[':categoria_id'] = $categoriaId;
+        }
+
+        if (in_array('active', $cols, true)) {
+            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+        } elseif (in_array('ativo', $cols, true)) {
+            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
+        }
+        if (in_array('status', $cols, true)) {
+            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+        }
+
+        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        if (in_array('attributes', $cols, true)) {
+            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        if (empty($where)) {
+            $where[] = '1=1';
+        }
+
+        return $where;
+    }
+
+    public function countAllWithCategoria(): int {
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $params = [];
+        $where = $this->buildWhereProdutosAtivos($cols, $params);
+        $sql = "SELECT COUNT(*)\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where);
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getAllWithCategoriaPaginado(int $limit, int $offset): array {
+        $pdo = $this->getConnection();
+        $limit = max(1, (int) $limit);
+        $offset = max(0, (int) $offset);
+
+        $cols = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $params = [];
+        $where = $this->buildWhereProdutosAtivos($cols, $params);
+
+        $sql = "\n            SELECT p.*, c.name as categoria\n            FROM {$this->table} p\n            LEFT JOIN categorias c ON p.category_id = c.id\n            WHERE " . implode(' AND ', $where) . "\n            ORDER BY p.featured DESC, p.name ASC\n            LIMIT :offset, :limit\n        ";
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
     public function getArquivadosWithCategoria() {
         $pdo = $this->getConnection();
 
@@ -218,7 +306,7 @@ class Produto extends Model {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
-    public function search($term, $limit = 20, $categoriaId = null) {
+    public function search($term, $limit = 20, $categoriaId = null, $offset = 0) {
         $pdo = $this->getConnection();
         $cols = [];
         try {
@@ -228,34 +316,41 @@ class Produto extends Model {
             $cols = [];
         }
 
-        $where = ["(p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)"];
-        if ($categoriaId !== null && $categoriaId !== '') {
-            $where[] = 'p.category_id = :categoria_id';
-        }
-        if (in_array('active', $cols, true)) {
-            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
-        } elseif (in_array('ativo', $cols, true)) {
-            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
-        }
-        if (in_array('status', $cols, true)) {
-            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
-        }
-        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
-        if (in_array('attributes', $cols, true)) {
-            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
-        }
+        $params = [];
+        $where = $this->buildWhereProdutosAtivos($cols, $params, (string) $term, $categoriaId);
 
-        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.featured DESC, p.name ASC\n                LIMIT :limit";
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.featured DESC, p.name ASC\n                LIMIT :offset, :limit";
         $stmt = $pdo->prepare($sql);
-        $term = "%{$term}%";
         $limit = (int) $limit;
-        $stmt->bindParam(':term', $term);
-        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
-        if ($categoriaId !== null && $categoriaId !== '') {
-            $stmt->bindValue(':categoria_id', $categoriaId);
+        $offset = max(0, (int) $offset);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
         }
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function countSearch($term, $categoriaId = null): int {
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $params = [];
+        $where = $this->buildWhereProdutosAtivos($cols, $params, (string) $term, $categoriaId);
+        $sql = "SELECT COUNT(*)\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where);
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        return (int) $stmt->fetchColumn();
     }
 
     public function getByCategoriaId($categoriaId) {
@@ -285,6 +380,55 @@ class Produto extends Model {
         $sql = "SELECT * FROM {$this->table}\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY featured DESC, name ASC";
         $stmt = $pdo->prepare($sql);
         $stmt->bindParam(':category_id', $categoriaId);
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function countByCategoriaId($categoriaId): int {
+        $pdo = $this->getConnection();
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $params = [':categoria_id' => $categoriaId];
+        $where = $this->buildWhereProdutosAtivos($cols, $params, null, $categoriaId);
+
+        $sql = "SELECT COUNT(*)\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where);
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getByCategoriaIdPaginado($categoriaId, int $limit, int $offset): array {
+        $pdo = $this->getConnection();
+        $limit = max(1, (int) $limit);
+        $offset = max(0, (int) $offset);
+
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE ' . $this->table);
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $params = [':categoria_id' => $categoriaId];
+        $where = $this->buildWhereProdutosAtivos($cols, $params, null, $categoriaId);
+
+        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.featured DESC, p.name ASC\n                LIMIT :offset, :limit";
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
