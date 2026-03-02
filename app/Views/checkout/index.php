@@ -424,7 +424,16 @@
                 if (sel && sel.value) {
                     var opt = sel.options[sel.selectedIndex];
                     if (opt) {
-                        var addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+                        var pais = (opt.getAttribute('data-pais') || 'BR').toString().trim().toUpperCase();
+                        if (!pais) pais = 'BR';
+                        var addrFields = ['cep', 'endereco', 'cidade'];
+                        if (pais === 'BR') {
+                            addrFields.push('numero');
+                            addrFields.push('bairro');
+                        }
+                        if (pais === 'BR' || pais === 'US' || pais === 'CA') {
+                            addrFields.push('estado');
+                        }
                         var hasAll = true;
                         for (var i = 0; i < addrFields.length; i++) {
                             var k = 'data-' + addrFields[i];

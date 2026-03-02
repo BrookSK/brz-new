@@ -696,7 +696,19 @@ class CheckoutController extends Controller {
             return $missing;
         }
 
-        $addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+        $pais = strtoupper(trim((string) ($selectedAddress['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        $addrFields = ['cep', 'endereco', 'cidade'];
+        if ($pais === 'BR') {
+            $addrFields[] = 'numero';
+            $addrFields[] = 'bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true)) {
+            $addrFields[] = 'estado';
+        }
         $hasAll = true;
         foreach ($addrFields as $f) {
             $v = trim((string) ($selectedAddress[$f] ?? ''));
