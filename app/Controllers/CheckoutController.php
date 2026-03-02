@@ -726,6 +726,34 @@ class CheckoutController extends Controller {
         }));
     }
 
+    private function normalizeMissingForCountry(array $missing, string $paisEntrega): array {
+        if (empty($missing)) {
+            return $missing;
+        }
+
+        $paisEntrega = strtoupper(trim((string) $paisEntrega));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
+
+        $remove = [];
+        if ($paisEntrega !== 'BR') {
+            $remove[] = 'numero';
+            $remove[] = 'bairro';
+        }
+        if (!in_array($paisEntrega, ['BR', 'US', 'CA'], true)) {
+            $remove[] = 'estado';
+        }
+
+        if (empty($remove)) {
+            return $missing;
+        }
+
+        return array_values(array_filter($missing, static function ($it) use ($remove) {
+            return !in_array((string) $it, $remove, true);
+        }));
+    }
+
     private function tableExists(string $table): bool {
         try {
             $db = \Config\Database::getConnection();
@@ -1973,6 +2001,9 @@ class CheckoutController extends Controller {
         if ($paisEntrega === '') {
             $paisEntrega = 'BR';
         }
+
+        // Fora do BR, não exigir campos específicos do Brasil.
+        $faltando = $this->normalizeMissingForCountry((array) $faltando, (string) $paisEntrega);
 
         // Ajustar pendências do perfil com base no endereço selecionado (quando existir)
         if (!empty($usuario) && !empty($usuario['id']) && is_array($enderecoPrincipal) && !empty($enderecoPrincipal)) {

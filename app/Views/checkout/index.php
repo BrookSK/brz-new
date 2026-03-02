@@ -424,7 +424,11 @@
                 if (sel && sel.value) {
                     var opt = sel.options[sel.selectedIndex];
                     if (opt) {
-                        var pais = (opt.getAttribute('data-pais') || 'BR').toString().trim().toUpperCase();
+                        var pais = (opt.getAttribute('data-pais') || '').toString().trim().toUpperCase();
+                        if (!pais) {
+                            var paisEl = document.getElementById('pais');
+                            pais = (paisEl && paisEl.value ? paisEl.value : 'BR').toString().trim().toUpperCase();
+                        }
                         if (!pais) pais = 'BR';
                         var addrFields = ['cep', 'endereco', 'cidade'];
                         if (pais === 'BR') {
