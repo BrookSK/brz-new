@@ -180,6 +180,9 @@ class NotificationService {
             'nome' => $clienteNome,
             'email' => $clienteEmail,
             'telefone' => $clienteTelefone,
+            'cliente_nome' => $clienteNome,
+            'cliente_email' => $clienteEmail,
+            'cliente_telefone' => $clienteTelefone,
             'data' => date('Y-m-d H:i:s'),
             'data_pedido' => $dataPedido,
 

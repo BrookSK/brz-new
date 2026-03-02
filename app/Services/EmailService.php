@@ -503,10 +503,11 @@ class EmailService {
             $out = str_replace('{{ ' . $k . ' }}', $val, $out);
             $out = str_replace('{{(' . $k . ')}}', $val, $out);
             $out = str_replace('{{ (' . $k . ') }}', $val, $out);
+            $out = str_replace('{(' . $k . ')}', $val, $out);
+            $out = str_replace('{ (' . $k . ') }', $val, $out);
         }
 
-        // Se for texto simples (sem tags), converte quebras de linha para <br>
-        if (trim($out) !== '' && !preg_match('/<\s*\w+[\s>]/', $out)) {
+        if (trim($out) !== '') {
             $out = nl2br($out);
         }
 
