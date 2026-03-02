@@ -2184,6 +2184,7 @@ class CheckoutController extends Controller {
                     // não bloquear o checkout por pendências de endereço no perfil do usuário.
                     if (!empty($faltando)) {
                         $selectedAddress = null;
+                        $paisEntregaSel = '';
 
                         $enderecoSel = (int) ($dados['endereco_selecionado'] ?? 0);
                         if ($enderecoSel > 0) {
@@ -2193,6 +2194,7 @@ class CheckoutController extends Controller {
                                     $uidAddr = (int) ($addr['usuario_id'] ?? 0);
                                     if ($uidAddr === (int) $usuario['id']) {
                                         $selectedAddress = $addr;
+                                        $paisEntregaSel = (string) ($addr['pais'] ?? '');
                                     }
                                 }
                             } catch (\Exception $e) {
@@ -2201,6 +2203,7 @@ class CheckoutController extends Controller {
 
                         if ($selectedAddress === null) {
                             $selectedAddress = [
+                                'pais' => (string) ($dados['pais'] ?? ''),
                                 'cep' => (string) ($dados['cep'] ?? ''),
                                 'endereco' => (string) ($dados['endereco'] ?? ''),
                                 'numero' => (string) ($dados['numero'] ?? ''),
@@ -2208,7 +2211,18 @@ class CheckoutController extends Controller {
                                 'cidade' => (string) ($dados['cidade'] ?? ''),
                                 'estado' => (string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')),
                             ];
+                            $paisEntregaSel = (string) ($dados['pais'] ?? '');
                         }
+
+                        if ($paisEntregaSel === '' && is_array($selectedAddress)) {
+                            $paisEntregaSel = (string) ($selectedAddress['pais'] ?? '');
+                        }
+                        if ($paisEntregaSel === '') {
+                            $paisEntregaSel = 'BR';
+                        }
+
+                        // Fora do BR, não bloquear por numero/bairro (campos específicos do Brasil)
+                        $faltando = $this->normalizeMissingForCountry((array) $faltando, $paisEntregaSel);
 
                         $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $selectedAddress);
                     }
