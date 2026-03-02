@@ -463,9 +463,51 @@ class EmailService {
 
     public function renderTemplate(string $tpl, array $vars): string {
         $out = $tpl;
-        foreach ($vars as $k => $v) {
-            $out = str_replace('{{' . $k . '}}', (string) $v, $out);
+
+        $isTruthy = static function ($v): bool {
+            if ($v === null) {
+                return false;
+            }
+            if (is_bool($v)) {
+                return $v;
+            }
+            if (is_numeric($v)) {
+                return (float) $v !== 0.0;
+            }
+            $s = trim((string) $v);
+            if ($s === '') {
+                return false;
+            }
+            $sLower = strtolower($s);
+            if ($sLower === '0' || $sLower === 'false' || $sLower === 'null') {
+                return false;
+            }
+            return true;
+        };
+
+        // Suporte simples a blocos {{#if var}}...{{/if}}
+        $guard = 0;
+        while (strpos($out, '{{#if') !== false && $guard < 100) {
+            $guard++;
+            $out = preg_replace_callback('/\{\{#if\s+([a-zA-Z0-9_\.\-]+)\s*\}\}(.*?)\{\{\/if\}\}/s', function ($m) use ($vars, $isTruthy) {
+                $key = (string) ($m[1] ?? '');
+                $inner = (string) ($m[2] ?? '');
+                $val = $vars[$key] ?? null;
+                return $isTruthy($val) ? $inner : '';
+            }, $out);
         }
+
+        foreach ($vars as $k => $v) {
+            $val = (string) $v;
+            $out = str_replace('{{' . $k . '}}', $val, $out);
+            $out = str_replace('{{ ' . $k . ' }}', $val, $out);
+        }
+
+        // Se for texto simples (sem tags), converte quebras de linha para <br>
+        if (trim($out) !== '' && !preg_match('/<\s*\w+[\s>]/', $out)) {
+            $out = nl2br($out);
+        }
+
         return $out;
     }
 }

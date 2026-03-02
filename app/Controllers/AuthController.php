@@ -1097,6 +1097,11 @@ class AuthController extends Controller {
                         'token' => $token,
                         'link' => $link,
                         'data' => date('Y-m-d H:i:s'),
+
+                        'usuario_nome' => '',
+                        'usuario_email' => $email,
+                        'token_reset' => $token,
+                        'data_solicitacao' => date('Y-m-d H:i:s'),
                     ];
                     $subjectTpl = $emailSvc->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
                     $htmlTpl = $emailSvc->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);
