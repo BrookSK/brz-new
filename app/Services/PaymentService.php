@@ -201,11 +201,6 @@ class PaymentService {
             ],
         ];
 
-        if ($applicationFeeBrl > 0) {
-            // Marketplace split (checkout transparente): comissão do marketplace/integrador.
-            $payload['application_fee'] = (float) $applicationFeeBrl;
-        }
-
         try {
             $idemKey = substr(hash('sha256', 'pix-produto|' . (string) $pedidoId . '|' . (string) round($valorBrl, 2) . '|' . (string) $descricao), 0, 32);
             $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload, ['X-Idempotency-Key: ' . $idemKey]);

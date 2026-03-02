@@ -2565,7 +2565,7 @@ class CheckoutController extends Controller {
                             if ($valorProduto > 0) {
                                 if ($formaSelecionada === 'pix') {
                                     $valorMp = round((float) ($valorProduto + $valorImposto), 2);
-                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorMp, (string) $descricaoProduto, $payer, (float) $valorImposto);
+                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorMp, (string) $descricaoProduto, $payer, 0.0);
                                     if (empty($mp['success'])) {
                                         throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar PIX Mercado Pago (produto)'));
                                     }
