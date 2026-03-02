@@ -709,20 +709,22 @@ class CheckoutController extends Controller {
         if (in_array($pais, ['BR', 'US', 'CA'], true)) {
             $addrFields[] = 'estado';
         }
-        $hasAll = true;
+
+        // Remover do array de pendências apenas os campos de endereço que já foram preenchidos
+        // no endereço selecionado/preenchido no checkout.
+        $filled = [];
         foreach ($addrFields as $f) {
             $v = trim((string) ($selectedAddress[$f] ?? ''));
-            if ($v === '') {
-                $hasAll = false;
-                break;
+            if ($v !== '') {
+                $filled[] = $f;
             }
         }
-        if (!$hasAll) {
+        if (empty($filled)) {
             return $missing;
         }
 
-        return array_values(array_filter($missing, function ($it) use ($addrFields) {
-            return !in_array((string) $it, $addrFields, true);
+        return array_values(array_filter($missing, function ($it) use ($filled) {
+            return !in_array((string) $it, $filled, true);
         }));
     }
 
