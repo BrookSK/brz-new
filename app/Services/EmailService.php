@@ -501,6 +501,8 @@ class EmailService {
             $val = (string) $v;
             $out = str_replace('{{' . $k . '}}', $val, $out);
             $out = str_replace('{{ ' . $k . ' }}', $val, $out);
+            $out = str_replace('{{(' . $k . ')}}', $val, $out);
+            $out = str_replace('{{ (' . $k . ') }}', $val, $out);
         }
 
         // Se for texto simples (sem tags), converte quebras de linha para <br>

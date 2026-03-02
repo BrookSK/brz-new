@@ -58,6 +58,18 @@ class NotificationService {
         $moeda = (string) ($pedido['moeda'] ?? '');
         $valorTotal = (string) ($pedido['total'] ?? ($pedido['valor_total'] ?? ''));
 
+        $rawDataPedido = (string) ($pedido['data_pedido'] ?? ($pedido['created_at'] ?? ($pedido['criado_em'] ?? ($pedido['data_criacao'] ?? ($pedido['data'] ?? '')))));
+        $dataPedido = '';
+        if ($rawDataPedido !== '') {
+            $ts = strtotime($rawDataPedido);
+            if ($ts !== false) {
+                $dataPedido = date('d/m/Y H:i:s', $ts);
+            }
+        }
+        if ($dataPedido === '') {
+            $dataPedido = date('d/m/Y H:i:s');
+        }
+
         $fmtMoney = static function ($value, string $moeda): string {
             $v = (float) $value;
             $m = strtoupper(trim($moeda));
@@ -169,6 +181,7 @@ class NotificationService {
             'email' => $clienteEmail,
             'telefone' => $clienteTelefone,
             'data' => date('Y-m-d H:i:s'),
+            'data_pedido' => $dataPedido,
 
             'itens' => $itensHtml,
             'endereco_entrega' => $enderecoEntrega,
@@ -223,7 +236,8 @@ class NotificationService {
         }
 
         $pedidoId = (int) ($vars['pedido_id'] ?? 0);
-        $dedupeKey = 'pedido_event:' . $eventoNome . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+        $dedupeKeyEvento = $tplEventoNome !== '' ? $tplEventoNome : $eventoNome;
+        $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
         $this->emailService->send($to, $subject, $html, $dedupeKey, [
             'evento' => $eventoNome,
             'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
