@@ -2284,6 +2284,20 @@ class AdminEstoqueController extends Controller {
                 exit;
             }
 
+            $normalizeDate = static function ($v): string {
+                $s = trim((string) ($v ?? ''));
+                if ($s === '') return '';
+                // Aceitar DATETIME do banco e manter apenas YYYY-MM-DD
+                if (preg_match('/^\d{4}-\d{2}-\d{2}/', $s)) {
+                    return substr($s, 0, 10);
+                }
+                // Aceitar DD/MM/YYYY
+                if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+                    return $m[3] . '-' . $m[2] . '-' . $m[1];
+                }
+                return $s;
+            };
+
             $ids = $request->getParam('estoque_id', []);
             $qtds = $request->getParam('quantidade', []);
             $dcs = $request->getParam('data_compra', []);
@@ -2308,6 +2322,7 @@ class AdminEstoqueController extends Controller {
                     quantidade = :quantidade,
                     data_compra = :data_compra,
                     data_validade = :data_validade,
+                    is_alimenticio = :is_alimenticio,
                     observacao = :observacao,
                     galpao = :galpao,
                     prateleira = :prateleira
@@ -2367,6 +2382,9 @@ class AdminEstoqueController extends Controller {
                 $pra = trim((string) ($prats[$i] ?? ''));
                 $isAli = (int) ($isAliArr[$i] ?? 0);
 
+                $newDc = $normalizeDate($newDc);
+                $newDv = $normalizeDate($newDv);
+
                 // Normalizar prateleira (mesma regra do salvar entrada)
                 if ($gal !== '') {
                     $gal = preg_replace('/\s+/', ' ', $gal);
@@ -2381,15 +2399,17 @@ class AdminEstoqueController extends Controller {
                     }
                 }
 
-                if ($isAli === 0) {
-                    $newDv = '';
+                // Se o usuário preencheu a validade, considerar como item com controle de validade.
+                if ($newDv !== '') {
+                    $isAli = 1;
                 }
 
-                $oldDc = (string) ($old['data_compra'] ?? '');
-                $oldDv = (string) ($old['data_validade'] ?? '');
+                $oldDc = $normalizeDate((string) ($old['data_compra'] ?? ''));
+                $oldDv = $normalizeDate((string) ($old['data_validade'] ?? ''));
                 $oldObs = (string) ($old['observacao'] ?? '');
                 $oldGal = trim((string) ($old['galpao'] ?? ''));
                 $oldPra = trim((string) ($old['prateleira'] ?? ''));
+                $oldIsAli = (int) ($old['is_alimenticio'] ?? 0);
 
                 // Impedir conflito: não permitir renomear para localização já existente no mesmo produto
                 $stmtDup = $this->connection->prepare('
@@ -2436,6 +2456,9 @@ class AdminEstoqueController extends Controller {
                 if ($newDv !== $oldDv) {
                     $diffs[] = 'Validade: ' . ($oldDv !== '' ? $oldDv : '-') . ' -> ' . ($newDv !== '' ? $newDv : '-');
                 }
+                if ($isAli !== $oldIsAli) {
+                    $diffs[] = 'Controlar validade: ' . ($oldIsAli ? 'Sim' : 'Não') . ' -> ' . ($isAli ? 'Sim' : 'Não');
+                }
                 if ($newObs !== $oldObs) {
                     $diffs[] = 'Obs.: ' . ($oldObs !== '' ? $oldObs : '-') . ' -> ' . ($newObs !== '' ? $newObs : '-');
                 }
@@ -2448,6 +2471,7 @@ class AdminEstoqueController extends Controller {
                     ':quantidade' => $newQtd,
                     ':data_compra' => ($newDc !== '' ? $newDc : null),
                     ':data_validade' => ($newDv !== '' ? $newDv : null),
+                    ':is_alimenticio' => $isAli,
                     ':observacao' => ($newObs !== '' ? $newObs : null),
                     ':galpao' => ($gal !== '' ? $gal : null),
                     ':prateleira' => ($pra !== '' ? $pra : null),

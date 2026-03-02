@@ -161,14 +161,20 @@
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <div class="text-muted small"><?= __('product_details.availability', 'Disponibilidade') ?></div>
                             <div>
-                                <?php if ($produto['estoque'] > 0): ?>
-                                    <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
-                                        <?= $produto['estoque'] ?> <?= __('product_details.units', 'unidades') ?>
+                                <?php if ($variacoesEnabled): ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(59, 130, 246, 0.10); border: 1px solid rgba(59, 130, 246, 0.18); color: rgba(30, 64, 175, 1);">
+                                        <?= __('product_details.variations_select_to_check', 'Selecione as opções para ver disponibilidade.') ?>
                                     </span>
                                 <?php else: ?>
-                                    <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                        <?= __('product_details.out_of_stock', 'Fora de estoque') ?>
-                                    </span>
+                                    <?php if ($produto['estoque'] > 0): ?>
+                                        <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                            <?= $produto['estoque'] ?> <?= __('product_details.units', 'unidades') ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                            <?= __('product_details.out_of_stock', 'Fora de estoque') ?>
+                                        </span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -181,17 +187,21 @@
                                 <label for="quantity" class="form-label"><?= __('product_details.quantity', 'Quantidade') ?></label>
                                 <div class="input-group" style="max-width: 220px;">
                                     <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
+                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $variacoesEnabled ? 1 : (int) ($produto['estoque'] ?? 0) ?>">
                                     <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
                                 </div>
                             </div>
 
                             <div class="col-12">
-                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
-                                    <?php if ($produto['estoque'] > 0): ?>
+                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= ($variacoesEnabled || ($produto['estoque'] ?? 0) <= 0) ? 'disabled' : '' ?>>
+                                    <?php if ($variacoesEnabled): ?>
                                         <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
                                     <?php else: ?>
-                                        <i class="fas fa-times"></i> <?= __('product_details.unavailable', 'Produto Indisponível') ?>
+                                        <?php if ($produto['estoque'] > 0): ?>
+                                            <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
+                                        <?php else: ?>
+                                            <i class="fas fa-times"></i> <?= __('product_details.unavailable', 'Produto Indisponível') ?>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </button>
                             </div>
@@ -771,6 +781,19 @@ function inicializarDetalhesProduto() {
         if (s <= 0) qty.val('1');
     }
 
+    function setStockUiNeedVariation() {
+        const badge = $('#stock-badge');
+        const btn = $('#btn-add-to-cart');
+        const qty = $('#quantity');
+        if (!badge.length || !btn.length || !qty.length) return;
+
+        badge.text(I18N.variations_select_to_check);
+        badge.attr('style', 'background: rgba(59, 130, 246, 0.10); border: 1px solid rgba(59, 130, 246, 0.18); color: rgba(30, 64, 175, 1);');
+        btn.prop('disabled', true);
+        qty.attr('max', '1');
+        qty.val('1');
+    }
+
     function setPriceUi(priceUsd) {
         const p = Number(priceUsd || 0);
         const amount = $('.amount');
@@ -833,7 +856,7 @@ function inicializarDetalhesProduto() {
             hidden.val('');
             status.text(I18N.variations_select_to_check);
             setPriceUi(basePrice);
-            setStockUi(<?= (int) ($produto['estoque'] ?? 0) ?>);
+            setStockUiNeedVariation();
             renderGallery(fotosProdutoBase);
             return;
         }
@@ -1049,6 +1072,7 @@ function inicializarDetalhesProduto() {
         });
         // Inicial
         $('#variacao-status').text(I18N.variations_select_to_check);
+        setStockUiNeedVariation();
         refreshOptionAvailability();
     }
 
