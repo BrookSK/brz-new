@@ -2,12 +2,15 @@
 namespace App\Services;
 
 use App\Models\PedidoEcommerce;
+use App\Services\EmailService;
 
 class NotificationService {
     private PedidoEcommerce $pedidoModel;
+    private EmailService $emailService;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
+        $this->emailService = new EmailService();
     }
 
     public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): void {
@@ -89,15 +92,12 @@ class NotificationService {
             $html = 'Olá ' . htmlspecialchars((string) ($vars['nome'] ?? ''), ENT_QUOTES, 'UTF-8') . ',<br>Seu pedido <strong>#' . htmlspecialchars((string) ($vars['codigo_pedido'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong> está com status <strong>' . htmlspecialchars((string) ($vars['status'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong>.';
         }
 
-        $fromEmail = (string) $this->getConfig('email', 'from', 'noreply@brazilianashop.com.br');
-        $fromName = (string) $this->getConfig('email', 'from_name', 'Braziliana');
-
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
-
-        @mail($to, $subject, $html, implode("\r\n", $headers));
+        $pedidoId = (int) ($vars['pedido_id'] ?? 0);
+        $dedupeKey = 'pedido_event:' . $eventoNome . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+        $this->emailService->send($to, $subject, $html, $dedupeKey, [
+            'evento' => $eventoNome,
+            'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
+        ]);
     }
 
     private function enviarWhatsAppPorWebhook(string $eventoNome, array $vars): void {

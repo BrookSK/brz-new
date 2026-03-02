@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\CpfValidator;
+use App\Services\EmailService;
 use App\Services\WordPressDbService;
 use App\Models\Usuario;
 
@@ -1088,8 +1089,26 @@ class AuthController extends Controller {
                 );
 
                 try {
-                    $this->sendEmail($email, $subject, $html);
+                    $emailSvc = new EmailService();
+                    $tpl = $emailSvc->getTemplate('recuperar_senha');
+                    $vars = [
+                        'nome' => '',
+                        'email' => $email,
+                        'token' => $token,
+                        'link' => $link,
+                        'data' => date('Y-m-d H:i:s'),
+                    ];
+                    $subjectTpl = $emailSvc->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
+                    $htmlTpl = $emailSvc->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);
+
+                    $finalSubject = trim($subjectTpl) !== '' ? $subjectTpl : $subject;
+                    $finalHtml = trim($htmlTpl) !== '' ? $htmlTpl : $html;
+                    $dedupeKey = 'user_password_reset:' . strtolower($email) . ':' . $token;
+                    $emailSvc->send($email, $finalSubject, $finalHtml, $dedupeKey, [
+                        'evento' => 'recuperar_senha',
+                    ]);
                 } catch (\Exception $e) {
+                    error_log('[EMAIL][RECUPERAR_SENHA] Falha ao enviar: ' . $e->getMessage());
                 }
             }
 
@@ -1272,6 +1291,32 @@ class AuthController extends Controller {
                         }
                         
                         if ($usuarioId) {
+                            try {
+                                $emailSvc = new EmailService();
+                                $tpl = $emailSvc->getTemplate('welcome');
+                                $vars = [
+                                    'nome' => (string) ($dados['nome'] ?? ''),
+                                    'email' => (string) ($dados['email'] ?? ''),
+                                    'data' => date('Y-m-d H:i:s'),
+                                ];
+                                $subject = $emailSvc->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
+                                $html = $emailSvc->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);
+                                if (trim($subject) === '') {
+                                    $subject = 'Bem-vindo(a) à Braziliana';
+                                }
+                                if (trim($html) === '') {
+                                    $html = '<p style="margin:0 0 12px 0;">Olá ' . htmlspecialchars((string) ($vars['nome'] ?? ''), ENT_QUOTES, 'UTF-8') . ',</p>'
+                                        . '<p style="margin:0;">Seu cadastro foi realizado com sucesso.</p>';
+                                }
+                                $dedupeKey = 'user_welcome:' . (int) $usuarioId;
+                                $emailSvc->send((string) ($dados['email'] ?? ''), $subject, $html, $dedupeKey, [
+                                    'evento' => 'welcome',
+                                    'usuario_id' => (int) $usuarioId,
+                                ]);
+                            } catch (\Exception $e) {
+                                error_log('[EMAIL][WELCOME] Falha ao enviar: ' . $e->getMessage());
+                            }
+
                             // Fazer login automático
                             $usuario = $this->authService->login($dados['email'], $dados['senha']);
                             if ($isAjax) {
