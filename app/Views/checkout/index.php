@@ -2160,45 +2160,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const enderecoForm = document.getElementById('endereco-form');
     
     if (enderecoSelect) {
-        enderecoSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            
-            if (this.value === '') {
-                // Mostrar formulário para novo endereço
-                enderecoForm.style.display = 'block';
-                // Limpar campos do formulário
-                if (document.getElementById('pais')) document.getElementById('pais').value = 'BR';
-                document.getElementById('cep').value = '';
-                document.getElementById('endereco').value = '';
-                document.querySelector('input[name="numero"]').value = '';
-                document.querySelector('input[name="complemento"]').value = '';
-                document.getElementById('bairro').value = '';
-                document.getElementById('cidade').value = '';
-                document.getElementById('estado').value = '';
-                try { atualizarEnderecoPorPais(); } catch (e) {}
-            } else {
-                // Preencher formulário com endereço selecionado
-                enderecoForm.style.display = 'block';
-                if (document.getElementById('pais')) {
-                    document.getElementById('pais').value = selectedOption.dataset.pais || 'BR';
-                }
-                document.getElementById('cep').value = selectedOption.dataset.cep || '';
-                document.getElementById('endereco').value = selectedOption.dataset.endereco || '';
-                document.querySelector('input[name="numero"]').value = selectedOption.dataset.numero || '';
-                document.querySelector('input[name="complemento"]').value = selectedOption.dataset.complemento || '';
-                document.getElementById('bairro').value = selectedOption.dataset.bairro || '';
-                document.getElementById('cidade').value = selectedOption.dataset.cidade || '';
-                document.getElementById('estado').value = selectedOption.dataset.estado || '';
-                try { atualizarEnderecoPorPais(); } catch (e) {}
-            }
-        });
-    }
-    
-    if (btnNovoEndereco) {
-        btnNovoEndereco.addEventListener('click', function() {
-            enderecoSelect.value = '';
+        function fillEnderecoFormFromSelectedOption(selectedOption) {
+            if (!enderecoForm) return;
             enderecoForm.style.display = 'block';
-            // Limpar campos
+            if (document.getElementById('pais')) {
+                document.getElementById('pais').value = (selectedOption && selectedOption.dataset && selectedOption.dataset.pais) ? (selectedOption.dataset.pais || 'BR') : 'BR';
+            }
+            document.getElementById('cep').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.cep || '') : '';
+            document.getElementById('endereco').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.endereco || '') : '';
+            document.querySelector('input[name="numero"]').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.numero || '') : '';
+            document.querySelector('input[name="complemento"]').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.complemento || '') : '';
+            document.getElementById('bairro').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.bairro || '') : '';
+            document.getElementById('cidade').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.cidade || '') : '';
+            document.getElementById('estado').value = (selectedOption && selectedOption.dataset) ? (selectedOption.dataset.estado || '') : '';
+            try { atualizarEnderecoPorPais(); } catch (e) {}
+        }
+
+        function clearEnderecoForm() {
+            if (!enderecoForm) return;
+            enderecoForm.style.display = 'block';
             if (document.getElementById('pais')) document.getElementById('pais').value = 'BR';
             document.getElementById('cep').value = '';
             document.getElementById('endereco').value = '';
@@ -2208,6 +2188,54 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('cidade').value = '';
             document.getElementById('estado').value = '';
             try { atualizarEnderecoPorPais(); } catch (e) {}
+        }
+
+        function enderecoSelecionadoTemCamposObrigatoriosFaltando(selectedOption) {
+            if (!selectedOption || !selectedOption.dataset) return true;
+            var pais = (selectedOption.dataset.pais || 'BR').toString().toUpperCase();
+            var required = ['cep', 'endereco', 'cidade'];
+            if (['BR','US','CA'].indexOf(pais) !== -1) {
+                required.push('estado');
+            }
+            if (pais === 'BR') {
+                required.push('numero');
+                required.push('bairro');
+            }
+            for (var i = 0; i < required.length; i++) {
+                var k = required[i];
+                var v = (selectedOption.dataset[k] || '').toString().trim();
+                if (!v) return true;
+            }
+            return false;
+        }
+
+        function handleEnderecoChange() {
+            const selectedOption = enderecoSelect.options[enderecoSelect.selectedIndex];
+            if (enderecoSelect.value === '') {
+                clearEnderecoForm();
+                return;
+            }
+
+            // Se o endereço selecionado está incompleto (ex.: sem numero/bairro para BR), mostrar formulário para completar.
+            if (enderecoSelecionadoTemCamposObrigatoriosFaltando(selectedOption)) {
+                fillEnderecoFormFromSelectedOption(selectedOption);
+            } else {
+                // Endereço completo: manter formulário oculto (melhor UX)
+                if (enderecoForm) enderecoForm.style.display = 'none';
+            }
+        }
+
+        enderecoSelect.addEventListener('change', handleEnderecoChange);
+
+        // Quando existe um endereço principal já selecionado, o evento change não dispara.
+        // Se ele estiver incompleto, abrimos o formulário automaticamente para permitir preencher numero/bairro.
+        try { handleEnderecoChange(); } catch (e) {}
+    }
+    
+    if (btnNovoEndereco) {
+        btnNovoEndereco.addEventListener('click', function() {
+            enderecoSelect.value = '';
+            clearEnderecoForm();
         });
     }
 });
