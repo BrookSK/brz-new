@@ -13,6 +13,15 @@ class NotificationService {
         $this->emailService = new EmailService();
     }
 
+    private function resolveTemplateEventoNome(string $eventoNome): string {
+        $e = trim($eventoNome);
+        $aliases = [
+            'pagamento_aprovado' => 'pedido_aprovado',
+            'pedido_pago' => 'pedido_aprovado',
+        ];
+        return $aliases[$e] ?? $e;
+    }
+
     public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): void {
         if (empty($eventoNome)) {
             return;
@@ -191,14 +200,25 @@ class NotificationService {
             return;
         }
 
+        $tplEventoNome = $this->resolveTemplateEventoNome($eventoNome);
         $tpl = $this->getEmailTemplate($eventoNome);
-        $subject = $this->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
-        $html = $this->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);
+        $subjectTpl = (string) ($tpl['assunto'] ?? '');
+        $htmlTpl = (string) ($tpl['corpo_html'] ?? '');
+
+        if (($subjectTpl === '' && $htmlTpl === '') && $tplEventoNome !== $eventoNome) {
+            $tpl = $this->getEmailTemplate($tplEventoNome);
+            $subjectTpl = (string) ($tpl['assunto'] ?? '');
+            $htmlTpl = (string) ($tpl['corpo_html'] ?? '');
+        }
+
+        $subject = $this->renderTemplate($subjectTpl, $vars);
+        $html = $this->renderTemplate($htmlTpl, $vars);
 
         if (trim($subject) === '') {
             $subject = 'Atualização do seu pedido ' . ($vars['codigo_pedido'] ?? '');
         }
         if (trim($html) === '') {
+            error_log('[NOTIFICACOES][EMAIL] Template vazio/nao encontrado para evento=' . $eventoNome . ' (template=' . $tplEventoNome . ')');
             $html = 'Olá ' . htmlspecialchars((string) ($vars['nome'] ?? ''), ENT_QUOTES, 'UTF-8') . ',<br>Seu pedido <strong>#' . htmlspecialchars((string) ($vars['codigo_pedido'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong> está com status <strong>' . htmlspecialchars((string) ($vars['status'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong>.';
         }
 
@@ -475,11 +495,7 @@ class NotificationService {
     }
 
     private function renderTemplate(string $tpl, array $vars): string {
-        $out = $tpl;
-        foreach ($vars as $k => $v) {
-            $out = str_replace('{{' . $k . '}}', (string) $v, $out);
-        }
-        return $out;
+        return $this->emailService->renderTemplate($tpl, $vars);
     }
 
     private function encodeHeaderName(string $name): string {
