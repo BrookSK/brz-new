@@ -1076,6 +1076,18 @@ class AuthController extends Controller {
                 $base = $host !== '' ? ($scheme . '://' . $host) : '';
                 $link = ($base !== '' ? $base : '') . '/redefinir-senha/' . rawurlencode($token);
 
+                $usuarioNome = '';
+                try {
+                    $u = $this->usuarioModel->findByEmail($email);
+                    if (is_array($u) && !empty($u['nome'])) {
+                        $usuarioNome = (string) $u['nome'];
+                    }
+                } catch (\Exception $e) {
+                    $usuarioNome = '';
+                }
+
+                $dataSolicitacao = date('d/m/Y H:i:s');
+
                 $subject = 'Recuperação de senha - Braziliana';
                 $body = 'Olá,<br><br>'
                     . 'Recebemos uma solicitação para redefinir sua senha.<br><br>'
@@ -1098,10 +1110,14 @@ class AuthController extends Controller {
                         'link' => $link,
                         'data' => date('Y-m-d H:i:s'),
 
-                        'usuario_nome' => '',
+                        'usuario_nome' => $usuarioNome,
                         'usuario_email' => $email,
-                        'token_reset' => $token,
-                        'data_solicitacao' => date('Y-m-d H:i:s'),
+                        // Compatibilidade com templates do admin: muitos usam token_reset como "link"
+                        'token_reset' => $link,
+                        // Se o template quiser o código/token puro
+                        'codigo_reset' => $token,
+                        'link_reset' => $link,
+                        'data_solicitacao' => $dataSolicitacao,
                     ];
                     $subjectTpl = $emailSvc->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
                     $htmlTpl = $emailSvc->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);

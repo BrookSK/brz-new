@@ -489,7 +489,7 @@ class EmailService {
         $guard = 0;
         while (strpos($out, '{{#if') !== false && $guard < 100) {
             $guard++;
-            $out = preg_replace_callback('/\{\{#if\s+([a-zA-Z0-9_\.\-]+)\s*\}\}(.*?)\{\{\/if\}\}/s', function ($m) use ($vars, $isTruthy) {
+            $out = preg_replace_callback('/\{\{\s*#if\s+([a-zA-Z0-9_\.\-]+)\s*\}\}(.*?)\{\{\s*\/if\s*\}\}/s', function ($m) use ($vars, $isTruthy) {
                 $key = (string) ($m[1] ?? '');
                 $inner = (string) ($m[2] ?? '');
                 $val = $vars[$key] ?? null;
