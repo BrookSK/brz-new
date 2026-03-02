@@ -5,6 +5,9 @@
     <div class="row mb-4">
         <div class="col-lg-6">
             <form method="GET" class="d-flex">
+                <?php if (!empty($categoriaSelecionada)): ?>
+                    <input type="hidden" name="categoria" value="<?= htmlspecialchars((string) $categoriaSelecionada, ENT_QUOTES, 'UTF-8') ?>">
+                <?php endif; ?>
                 <div class="input-group input-group-lg">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="fas fa-search text-muted"></i>
@@ -19,6 +22,9 @@
         </div>
         <div class="col-lg-3">
             <form method="GET">
+                <?php if (!empty($search)): ?>
+                    <input type="hidden" name="search" value="<?= htmlspecialchars((string) $search, ENT_QUOTES, 'UTF-8') ?>">
+                <?php endif; ?>
                 <select name="categoria" class="form-select form-select-lg" onchange="this.form.submit()">
                     <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
                     <?php foreach ($categorias as $cat): ?>

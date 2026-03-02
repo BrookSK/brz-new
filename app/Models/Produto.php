@@ -218,7 +218,7 @@ class Produto extends Model {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
-    public function search($term, $limit = 20) {
+    public function search($term, $limit = 20, $categoriaId = null) {
         $pdo = $this->getConnection();
         $cols = [];
         try {
@@ -229,6 +229,9 @@ class Produto extends Model {
         }
 
         $where = ["(p.name LIKE :term OR p.description LIKE :term OR c.name LIKE :term)"];
+        if ($categoriaId !== null && $categoriaId !== '') {
+            $where[] = 'p.category_id = :categoria_id';
+        }
         if (in_array('active', $cols, true)) {
             $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
         } elseif (in_array('ativo', $cols, true)) {
@@ -248,6 +251,9 @@ class Produto extends Model {
         $limit = (int) $limit;
         $stmt->bindParam(':term', $term);
         $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        if ($categoriaId !== null && $categoriaId !== '') {
+            $stmt->bindValue(':categoria_id', $categoriaId);
+        }
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

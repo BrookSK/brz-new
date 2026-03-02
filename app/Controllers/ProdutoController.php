@@ -27,7 +27,9 @@ class ProdutoController extends Controller {
         $search = $request->getParam('search');
         $categoria = $request->getParam('categoria');
         
-        if ($search) {
+        if ($search && $categoria) {
+            $produtos = $this->produtoModel->search($search, 20, $categoria);
+        } elseif ($search) {
             $produtos = $this->produtoModel->search($search);
         } elseif ($categoria) {
             $produtos = $this->produtoModel->getByCategoriaId($categoria);
