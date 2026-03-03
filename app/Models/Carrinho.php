@@ -42,7 +42,7 @@ class Carrinho extends Model {
         }
 
         if (empty($candidates)) {
-            return $alias . '.peso';
+            return '0';
         }
 
         $parts = [];
@@ -553,7 +553,7 @@ class Carrinho extends Model {
         $stmt = $this->connection->prepare("
             SELECT ci.*, p.nome{$skuSelect}{$descSelect}, {$pesoExpr} AS peso{$moedaSelect} {$clubeSelect}
             FROM carrinho_items ci 
-            JOIN produtos p ON ci.produto_id = p.id 
+            LEFT JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id
         ");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
