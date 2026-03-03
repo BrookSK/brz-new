@@ -307,7 +307,7 @@
                     </div>
                     
                     <div class="d-grid">
-                        <a href="/carrinho/checkout" class="btn btn-primary btn-lg">
+                        <a id="btnCheckoutFromCart" href="/carrinho/checkout" class="btn btn-primary btn-lg" style="position: relative; z-index: 5;" onclick="try{window.location.href='/carrinho/checkout';}catch(e){} return false;">
                             <i class="fas fa-lock"></i> <?= __('cart.checkout', 'Finalizar Compra') ?>
                         </a>
                     </div>
