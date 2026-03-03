@@ -1687,6 +1687,7 @@ class AdminPedidosWpController extends Controller {
                     'total_declaracao' => 0.0,
                     'qtd_itens' => 0,
                     'peso_total_kg' => 0.0,
+                    'qtd_pedidos' => 0,
                 ];
             }
 
@@ -1701,6 +1702,7 @@ class AdminPedidosWpController extends Controller {
             $totalsByCurrency[$currency]['total_declaracao'] += $td;
             $totalsByCurrency[$currency]['qtd_itens'] += (int) ($r['qtd_itens'] ?? 0);
             $totalsByCurrency[$currency]['peso_total_kg'] += (float) ($r['peso_total_kg'] ?? 0.0);
+            $totalsByCurrency[$currency]['qtd_pedidos'] += 1;
 
             $sheet->fromArray([
                 (int) ($r['wp_order_id'] ?? 0),
@@ -1752,7 +1754,8 @@ class AdminPedidosWpController extends Controller {
             $rowNum++;
 
             foreach ($totalsByCurrency as $cur => $t) {
-                $label = 'TOTAL GERAL' . ($cur !== '' ? ' (' . $cur . ')' : '');
+                $qtdPedidos = (int) ($t['qtd_pedidos'] ?? 0);
+                $label = 'TOTAL GERAL' . ($cur !== '' ? ' (' . $cur . ')' : '') . ' - ' . $qtdPedidos . ' pedidos';
                 $sheet->fromArray([
                     $label, '', '', '', '', '', '', '', (string) $cur,
                     round((float) ($t['total_produtos'] ?? 0.0), 2),
