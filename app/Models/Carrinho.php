@@ -203,16 +203,21 @@ class Carrinho extends Model {
     }
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
+        $itemsCols = $this->getTableColumns('carrinho_items');
+        $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
+        $varCol = (is_array($itemsCols) && in_array('produto_variacao_id', $itemsCols, true))
+            ? 'produto_variacao_id'
+            : ((is_array($itemsCols) && in_array('variacao_id', $itemsCols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
         // Verificar se item já existe
-        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0)");
+        $stmt = $this->connection->prepare(
+            "SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE({$varCol},0) = COALESCE(:produto_variacao_id,0)"
+        );
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->bindParam(':produto_id', $produtoId);
         $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
         $stmt->execute();
         $itemExistente = $stmt->fetch(\PDO::FETCH_ASSOC);
-
-        $itemsCols = $this->getTableColumns('carrinho_items');
-        $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
         
         // Obter dados do produto
         $produtoModel = new Produto();
@@ -285,7 +290,7 @@ class Carrinho extends Model {
             $subtotal = $quantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
-                INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, {$unitCol}, subtotal) 
+                INSERT INTO carrinho_items (carrinho_id, produto_id, {$varCol}, variacao_descricao, quantidade, {$unitCol}, subtotal) 
                 VALUES (:carrinho_id, :produto_id, :produto_variacao_id, :variacao_descricao, :quantidade, :valor_unitario, :subtotal)
             ");
             $stmt->bindParam(':carrinho_id', $carrinhoId);
