@@ -307,7 +307,7 @@
                     </div>
                     
                     <div class="d-grid">
-                        <a href="/carrinho/checkout" class="btn btn-primary btn-lg <?= !empty($excede_peso) ? 'disabled' : '' ?>" <?= !empty($excede_peso) ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
+                        <a href="/carrinho/checkout" class="btn btn-primary btn-lg">
                             <i class="fas fa-lock"></i> <?= __('cart.checkout', 'Finalizar Compra') ?>
                         </a>
                     </div>
