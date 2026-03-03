@@ -1022,14 +1022,10 @@
                             $cart = $cModel->getOrCreateCarrinho($_SESSION['usuario_id'] ?? 0, null, 'BRL');
                             $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
                             if ($cartId > 0) {
-                                $itemsDb = $cModel->getItems($cartId);
-                                if (is_array($itemsDb)) {
-                                    foreach ($itemsDb as $it) {
-                                        if (!is_array($it)) continue;
-                                        $q = (int) ($it['quantidade'] ?? 0);
-                                        if ($q > 0) $totalItens += $q;
-                                    }
-                                }
+                                $db = $cModel->getConnection();
+                                $st = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                                $st->execute([$cartId]);
+                                $totalItens = (int) ($st->fetchColumn() ?: 0);
                             }
                         } catch (\Throwable $e) {
                             $totalItens = 0;
