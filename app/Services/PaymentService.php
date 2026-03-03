@@ -3159,6 +3159,17 @@ class PaymentService {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->devolverEstoquePorPedido($db, (int) $pedidoId);
+                try {
+                    $this->pedidoModel->dispararEvento('pagamento_estornado', $pedidoId);
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($paymentStatusInterno === 'rejected') {
+                try {
+                    $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
+                } catch (\Exception $e) {
+                }
             }
 
             try {
@@ -3485,6 +3496,11 @@ class PaymentService {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->devolverEstoquePorPedido($db, (int) $pedidoId);
+                $this->pedidoModel->dispararEvento('pagamento_estornado', $pedidoId);
+            }
+
+            if ($paymentStatusInterno === 'rejected') {
+                $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema

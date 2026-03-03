@@ -122,6 +122,24 @@ class CarrinhoController extends Controller {
         }
     }
 
+    private function hydrateCartFromCookie(): void {
+        try {
+            if (!empty($_SESSION['carrinho']) || empty($_COOKIE['guest_cart'])) {
+                return;
+            }
+            $raw = (string) $_COOKIE['guest_cart'];
+            $decoded = base64_decode($raw, true);
+            if ($decoded === false || $decoded === '') {
+                return;
+            }
+            $arr = json_decode($decoded, true);
+            if (is_array($arr) && !empty($arr)) {
+                $_SESSION['carrinho'] = $arr;
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
@@ -172,6 +190,7 @@ class CarrinhoController extends Controller {
 
     public function index(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
         $cartId = 0;
@@ -439,6 +458,7 @@ class CarrinhoController extends Controller {
 
     public function checkout(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $pesoTotal = 0.0;
         $uid = $this->getLoggedUserId();
@@ -503,6 +523,7 @@ class CarrinhoController extends Controller {
         }
         
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
 
@@ -630,6 +651,7 @@ class CarrinhoController extends Controller {
 
     public function remover(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
         
@@ -731,6 +753,7 @@ class CarrinhoController extends Controller {
 
     public function atualizar(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
         $quantidade = $request->getParam('quantidade', null);
@@ -819,6 +842,7 @@ class CarrinhoController extends Controller {
 
     public function limpar(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $uid = $this->getLoggedUserId();
         if ($uid > 0) {
             try {
@@ -846,6 +870,7 @@ class CarrinhoController extends Controller {
 
     public function calcular(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
         $carrinho = [];

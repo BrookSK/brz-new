@@ -24,6 +24,19 @@ class ApiController extends Controller {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+        try {
+            if (empty($_SESSION['carrinho']) && !empty($_COOKIE['guest_cart'])) {
+                $raw = (string) $_COOKIE['guest_cart'];
+                $decoded = base64_decode($raw, true);
+                if ($decoded !== false && $decoded !== '') {
+                    $arr = json_decode($decoded, true);
+                    if (is_array($arr) && !empty($arr)) {
+                        $_SESSION['carrinho'] = $arr;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
         $c = $_SESSION['carrinho'] ?? [];
         return is_array($c) ? $c : [];
     }
