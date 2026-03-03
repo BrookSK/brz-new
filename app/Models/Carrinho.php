@@ -210,6 +210,9 @@ class Carrinho extends Model {
         $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
         $stmt->execute();
         $itemExistente = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        $itemsCols = $this->getTableColumns('carrinho_items');
+        $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
         
         // Obter dados do produto
         $produtoModel = new Produto();
@@ -269,7 +272,7 @@ class Carrinho extends Model {
             
             $stmt = $this->connection->prepare("
                 UPDATE carrinho_items 
-                SET quantidade = :quantidade, valor_unitario = :valor_unitario, subtotal = :subtotal 
+                SET quantidade = :quantidade, {$unitCol} = :valor_unitario, subtotal = :subtotal 
                 WHERE id = :id
             ");
             $stmt->bindParam(':quantidade', $novaQuantidade);
@@ -282,7 +285,7 @@ class Carrinho extends Model {
             $subtotal = $quantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
-                INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, valor_unitario, subtotal) 
+                INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, {$unitCol}, subtotal) 
                 VALUES (:carrinho_id, :produto_id, :produto_variacao_id, :variacao_descricao, :quantidade, :valor_unitario, :subtotal)
             ");
             $stmt->bindParam(':carrinho_id', $carrinhoId);

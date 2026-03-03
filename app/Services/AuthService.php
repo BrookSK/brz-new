@@ -42,20 +42,12 @@ class AuthService {
                 if ($qtd < 1) $qtd = 1;
 
                 $pvId = null;
-                if (isset($it['produto_variacao_id']) && $it['produto_variacao_id'] !== '' && $it['produto_variacao_id'] !== null) {
-                    $tmp = (int) $it['produto_variacao_id'];
-                    if ($tmp > 0) $pvId = $tmp;
-                } else {
-                    // tentativa de extrair da key "produtoId:variacaoId"
-                    if (is_string($k) && strpos($k, ':') !== false) {
-                        $parts = explode(':', $k);
-                        if (count($parts) >= 2) {
-                            $tmp = (int) ($parts[1] ?? 0);
-                            if ($tmp > 0) $pvId = $tmp;
-                        }
+                if (isset($it['produto_variacao_id']) && $it['produto_variacao_id'] !== null && $it['produto_variacao_id'] !== '') {
+                    $tmpPv = (int) $it['produto_variacao_id'];
+                    if ($tmpPv > 0) {
+                        $pvId = $tmpPv;
                     }
                 }
-
                 $varDesc = isset($it['variacao_descricao']) ? (string) $it['variacao_descricao'] : null;
                 $this->carrinhoModel->adicionarItem($cartId, $pid, $qtd, $pvId, $varDesc);
             }
