@@ -1309,31 +1309,6 @@ class AdminPedidosWpController extends Controller {
             fputcsv($out, ['erro', $e->getMessage()], ';');
         }
 
-        if (!empty($grand['by_currency'])) {
-            fputcsv($out, [''], ';');
-
-            foreach ($grand['by_currency'] as $currency => $t) {
-                $label = 'TOTAL GERAL' . ($currency !== '' ? ' (' . $currency . ')' : '');
-                fputcsv($out, [
-                    $label,
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    (string) $currency,
-                    round((float) ($t['total_produtos'] ?? 0.0), 2),
-                    round((float) ($t['total_taxa_servico'] ?? 0.0), 2),
-                    round((float) ($t['total_venda'] ?? 0.0), 2),
-                    round((float) ($t['valor_total_declaracao'] ?? 0.0), 2),
-                    (int) ($grand['qtd_total_itens'] ?? 0),
-                    round((float) ($grand['peso_total_itens_kg'] ?? 0.0), 3),
-                ], ';');
-            }
-        }
-
         fclose($out);
     }
 
