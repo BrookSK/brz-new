@@ -41,6 +41,7 @@ $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'im
 $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
 $router->get('/admin/pedidos-wp/export', 'AdminPedidosWpController', 'exportCsv');
+$router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'exportXlsx');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
  $router->post('/admin/pedidos-wp/wexpress/regerar/{id}', 'AdminPedidosWpController', 'regerarEtiquetaWexpress');
  $router->get('/admin/pedidos-wp/estatisticas', 'AdminPedidosWpController', 'estatisticas');

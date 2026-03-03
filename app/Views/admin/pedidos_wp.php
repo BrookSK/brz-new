@@ -74,9 +74,12 @@ function wpFormatMoney($v, $currency) {
                     <label class="form-label">Data final</label>
                     <input type="date" class="form-control" name="end" required>
                 </div>
-                <div class="col-md-6 d-flex align-items-end">
+                <div class="col-md-6 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-download"></i> Baixar CSV
+                    </button>
+                    <button type="submit" class="btn btn-outline-success" formaction="/admin/pedidos-wp/export-xlsx">
+                        <i class="fas fa-file-excel"></i> Baixar XLSX
                     </button>
                 </div>
             </form>

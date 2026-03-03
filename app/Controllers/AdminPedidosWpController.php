@@ -8,6 +8,10 @@ use App\Services\ViaCepService;
 use App\Services\WExpressService;
 use App\Services\WooCommerceService;
 use Config\Database;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class AdminPedidosWpController extends Controller {
 
@@ -1310,6 +1314,459 @@ class AdminPedidosWpController extends Controller {
         }
 
         fclose($out);
+    }
+
+    public function exportXlsx(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
+
+        $start = trim((string) ($request->getParam('start') ?? ''));
+        $end = trim((string) ($request->getParam('end') ?? ''));
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.';
+            return;
+        }
+
+        $startDt = $start . ' 00:00:00';
+        $endDt = $end . ' 23:59:59';
+
+        try {
+            $localPdo = Database::getConnection();
+            $sources = $source === 'all' ? self::SOURCES : [$source];
+
+            $headers = [
+                'WP Order ID',
+                'Origem',
+                'Data',
+                'Hora',
+                'Status',
+                'Nome',
+                'Sobrenome',
+                'Email',
+                'Moeda',
+                'Total Produtos',
+                'Total Taxa Serviço',
+                'Total Venda',
+                'Total Declaração',
+                'Qtd Itens',
+                'Peso Total (kg)',
+            ];
+
+            $rowsAll = [];
+            $rowsByMonth = [];
+            $monthKeys = [];
+
+            foreach ($sources as $src) {
+                $wp = $this->getWpPdo($localPdo, $src);
+                $prefix = $wp['prefix'];
+                $wpPdo = $wp['pdo'];
+
+                $stIds = $wpPdo->prepare(
+                    "SELECT ID FROM {$prefix}posts WHERE post_type = 'shop_order' AND post_status <> 'trash' AND post_date >= :start AND post_date <= :end ORDER BY post_date ASC"
+                );
+                $stIds->bindValue(':start', $startDt);
+                $stIds->bindValue(':end', $endDt);
+                $stIds->execute();
+
+                $ids = [];
+                while (true) {
+                    $id = $stIds->fetchColumn();
+                    if ($id === false || $id === null) break;
+                    $ids[] = (int) $id;
+                }
+                if (empty($ids)) continue;
+
+                $chunkSize = 200;
+                for ($i = 0; $i < count($ids); $i += $chunkSize) {
+                    $chunk = array_slice($ids, $i, $chunkSize);
+                    $chunkRows = $this->buildExportRowsChunk($wpPdo, $prefix, $src, $chunk);
+                    foreach ($chunkRows as $r) {
+                        if (!is_array($r)) continue;
+                        $rowsAll[] = $r;
+                        $mk = (string) ($r['month_key'] ?? '');
+                        if ($mk !== '') {
+                            $monthKeys[$mk] = true;
+                            if (!isset($rowsByMonth[$mk])) $rowsByMonth[$mk] = [];
+                            $rowsByMonth[$mk][] = $r;
+                        }
+                    }
+                }
+            }
+
+            ksort($monthKeys);
+            $monthKeys = array_keys($monthKeys);
+
+            $spreadsheet = new Spreadsheet();
+            $spreadsheet->getProperties()->setCreator('Braziliana')->setTitle('Pedidos WP - Exportação');
+
+            $sheetAll = $spreadsheet->getActiveSheet();
+            $sheetAll->setTitle('Todos');
+            $this->fillSheetWithRows($sheetAll, $headers, $rowsAll, $monthKeys, true, true);
+
+            foreach ($monthKeys as $idx => $mk) {
+                $sheet = $spreadsheet->createSheet();
+                $title = $mk;
+                if (strlen($title) > 31) $title = substr($title, 0, 31);
+                $sheet->setTitle($title);
+                $this->fillSheetWithRows($sheet, $headers, $rowsByMonth[$mk] ?? [], [$mk], false, true);
+            }
+
+            $filename = 'pedidos-wp_' . $start . '_a_' . $end . '.xlsx';
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Cache-Control: max-age=0');
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+
+        } catch (\Exception $e) {
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Erro ao gerar XLSX: ' . $e->getMessage();
+            return;
+        }
+    }
+
+    private function buildExportRowsChunk(\PDO $wpPdo, string $prefix, string $src, array $orderIds): array {
+        $orderIds = array_values(array_filter(array_map('intval', $orderIds), static fn($v) => $v > 0));
+        if (empty($orderIds)) return [];
+
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+
+        $sqlOrders = "SELECT ID, post_date, post_status FROM {$prefix}posts WHERE ID IN ({$placeholders})";
+        $stO = $wpPdo->prepare($sqlOrders);
+        $stO->execute($orderIds);
+        $orders = $stO->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $orderInfo = [];
+        foreach ($orders as $r) {
+            if (!is_array($r)) continue;
+            $id = (int) ($r['ID'] ?? 0);
+            if ($id <= 0) continue;
+            $orderInfo[$id] = [
+                'created_at' => (string) ($r['post_date'] ?? ''),
+                'status' => (string) ($r['post_status'] ?? ''),
+            ];
+        }
+
+        $metaKeys = [
+            '_order_total',
+            '_order_currency',
+            '_billing_email',
+            '_billing_first_name',
+            '_billing_last_name',
+        ];
+        $inMeta = implode(',', array_fill(0, count($metaKeys), '?'));
+        $sqlMeta = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$placeholders}) AND meta_key IN ({$inMeta})";
+        $stM = $wpPdo->prepare($sqlMeta);
+        $stM->execute(array_merge($orderIds, $metaKeys));
+        $metaRows = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $metaByOrder = [];
+        foreach ($metaRows as $mr) {
+            if (!is_array($mr)) continue;
+            $oid = (int) ($mr['post_id'] ?? 0);
+            $k = (string) ($mr['meta_key'] ?? '');
+            if ($oid <= 0 || $k === '') continue;
+            if (!isset($metaByOrder[$oid])) $metaByOrder[$oid] = [];
+            $metaByOrder[$oid][$k] = $mr['meta_value'] ?? '';
+        }
+
+        $sqlItems = "SELECT order_item_id, order_id, order_item_type FROM {$prefix}woocommerce_order_items WHERE order_id IN ({$placeholders}) AND order_item_type IN ('line_item','fee')";
+        $stI = $wpPdo->prepare($sqlItems);
+        $stI->execute($orderIds);
+        $itemRows = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $itemIds = [];
+        $itemOrder = [];
+        $itemType = [];
+        foreach ($itemRows as $ir) {
+            if (!is_array($ir)) continue;
+            $iid = (int) ($ir['order_item_id'] ?? 0);
+            $oid = (int) ($ir['order_id'] ?? 0);
+            $type = (string) ($ir['order_item_type'] ?? '');
+            if ($iid <= 0 || $oid <= 0) continue;
+            $itemIds[] = $iid;
+            $itemOrder[$iid] = $oid;
+            $itemType[$iid] = $type;
+        }
+
+        $agg = [];
+        foreach ($orderIds as $oid) {
+            $agg[$oid] = [
+                'declared_total' => 0.0,
+                'has_declared' => false,
+                'qty_total' => 0,
+                'weight_total_kg' => 0.0,
+                'products_total' => 0.0,
+                'fee_total' => 0.0,
+            ];
+        }
+
+        if (!empty($itemIds)) {
+            $itemPlaceholders = implode(',', array_fill(0, count($itemIds), '?'));
+            $sqlItemMeta = "SELECT order_item_id, meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id IN ({$itemPlaceholders})";
+            $stIM = $wpPdo->prepare($sqlItemMeta);
+            $stIM->execute($itemIds);
+            $itemMetaRows = $stIM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $metaByItem = [];
+            foreach ($itemMetaRows as $r) {
+                if (!is_array($r)) continue;
+                $iid = (int) ($r['order_item_id'] ?? 0);
+                $k = (string) ($r['meta_key'] ?? '');
+                if ($iid <= 0 || $k === '') continue;
+                if (!isset($metaByItem[$iid])) $metaByItem[$iid] = [];
+                $metaByItem[$iid][$k] = $r['meta_value'] ?? '';
+            }
+
+            foreach ($metaByItem as $iid => $m) {
+                $oid = (int) ($itemOrder[$iid] ?? 0);
+                if ($oid <= 0 || !isset($agg[$oid])) continue;
+                $type = (string) ($itemType[$iid] ?? '');
+                $lineTotalRaw = str_replace(',', '.', (string) ($m['_line_total'] ?? ''));
+                $lineTotalRaw = preg_replace('/[^0-9\.\-]/', '', $lineTotalRaw);
+                $lineTotal = ($lineTotalRaw !== null && $lineTotalRaw !== '' && is_numeric($lineTotalRaw)) ? (float) $lineTotalRaw : 0.0;
+                if ($type === 'fee') {
+                    $agg[$oid]['fee_total'] += $lineTotal;
+                } elseif ($type === 'line_item') {
+                    $agg[$oid]['products_total'] += $lineTotal;
+                }
+            }
+
+            $productIds = [];
+            foreach ($metaByItem as $iid => $m) {
+                $pid = isset($m['_variation_id']) && is_numeric($m['_variation_id']) && (int) $m['_variation_id'] > 0
+                    ? (int) $m['_variation_id']
+                    : (isset($m['_product_id']) && is_numeric($m['_product_id']) ? (int) $m['_product_id'] : 0);
+                if ($pid > 0) $productIds[$pid] = true;
+            }
+            $productIds = array_keys($productIds);
+
+            $weightByProduct = [];
+            if (!empty($productIds)) {
+                $prodPlaceholders = implode(',', array_fill(0, count($productIds), '?'));
+                $stW = $wpPdo->prepare("SELECT post_id, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$prodPlaceholders}) AND meta_key = '_weight'");
+                $stW->execute($productIds);
+                $wRows = $stW->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($wRows as $wr) {
+                    if (!is_array($wr)) continue;
+                    $pid = (int) ($wr['post_id'] ?? 0);
+                    $v = str_replace(',', '.', (string) ($wr['meta_value'] ?? ''));
+                    if ($pid > 0 && is_numeric($v) && (float) $v > 0) {
+                        $weightByProduct[$pid] = (float) $v;
+                    }
+                }
+            }
+
+            foreach ($metaByItem as $iid => $m) {
+                $oid = (int) ($itemOrder[$iid] ?? 0);
+                if ($oid <= 0 || !isset($agg[$oid])) continue;
+
+                $type = (string) ($itemType[$iid] ?? '');
+                if ($type !== 'line_item') continue;
+
+                $qtd = (int) (is_numeric($m['_qty'] ?? null) ? (int) $m['_qty'] : 1);
+                if ($qtd <= 0) $qtd = 1;
+                $agg[$oid]['qty_total'] += $qtd;
+
+                $pesoKg = null;
+                foreach (['peso', '_peso', 'weight', '_weight', 'peso_kg', '_peso_kg', 'invoice_weight', '_invoice_weight', 'invoice_peso', '_invoice_peso'] as $wk) {
+                    $v = str_replace(',', '.', (string) ($m[$wk] ?? ''));
+                    if (is_numeric($v) && (float) $v > 0) {
+                        $pesoKg = (float) $v;
+                        break;
+                    }
+                }
+                if ($pesoKg === null) {
+                    $pid = isset($m['_variation_id']) && is_numeric($m['_variation_id']) && (int) $m['_variation_id'] > 0
+                        ? (int) $m['_variation_id']
+                        : (isset($m['_product_id']) && is_numeric($m['_product_id']) ? (int) $m['_product_id'] : 0);
+                    if ($pid > 0 && isset($weightByProduct[$pid])) {
+                        $pesoKg = (float) $weightByProduct[$pid];
+                    }
+                }
+                if ($pesoKg !== null && $pesoKg > 0) {
+                    $agg[$oid]['weight_total_kg'] += ($pesoKg * $qtd);
+                }
+
+                $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
+                if ($declaredUnit !== null && $declaredUnit > 0) {
+                    $agg[$oid]['has_declared'] = true;
+                    $agg[$oid]['declared_total'] += ($declaredUnit * $qtd);
+                }
+            }
+        }
+
+        $out = [];
+        foreach ($orderIds as $oid) {
+            $oi = $orderInfo[$oid] ?? ['created_at' => '', 'status' => ''];
+            $m = $metaByOrder[$oid] ?? [];
+
+            $dt = (string) ($oi['created_at'] ?? '');
+            $ts = $dt !== '' ? strtotime($dt) : false;
+            $data = $ts ? date('d/m/Y', $ts) : '';
+            $hora = $ts ? date('H:i', $ts) : '';
+            $monthKey = $ts ? date('Y-m', $ts) : '';
+
+            $status = (string) ($oi['status'] ?? '');
+            $email = (string) ($m['_billing_email'] ?? '');
+            $fn = (string) ($m['_billing_first_name'] ?? '');
+            $ln = (string) ($m['_billing_last_name'] ?? '');
+
+            $currency = (string) ($m['_order_currency'] ?? '');
+            $totalVenda = $this->parseWpMoney($m['_order_total'] ?? null);
+
+            $totalProdutos = round((float) ($agg[$oid]['products_total'] ?? 0.0), 2);
+            $totalTaxaServico = round((float) ($agg[$oid]['fee_total'] ?? 0.0), 2);
+
+            $declTotal = null;
+            if (!empty($agg[$oid]['has_declared'])) {
+                $declTotal = round((float) ($agg[$oid]['declared_total'] ?? 0.0), 2);
+            }
+
+            $qtdTotal = (int) ($agg[$oid]['qty_total'] ?? 0);
+            $pesoTotal = round((float) ($agg[$oid]['weight_total_kg'] ?? 0.0), 3);
+
+            $out[] = [
+                'wp_order_id' => $oid,
+                'origem' => strtoupper($src),
+                'data' => $data,
+                'hora' => $hora,
+                'status' => $status,
+                'nome' => $fn,
+                'sobrenome' => $ln,
+                'email' => $email,
+                'moeda' => $currency,
+                'total_produtos' => $totalProdutos,
+                'total_taxa_servico' => $totalTaxaServico,
+                'total_venda' => $totalVenda !== null ? round($totalVenda, 2) : null,
+                'total_declaracao' => $declTotal,
+                'qtd_itens' => $qtdTotal,
+                'peso_total_kg' => $pesoTotal,
+                'month_key' => $monthKey,
+            ];
+        }
+
+        usort($out, function ($a, $b) {
+            $da = (string) (is_array($a) ? ($a['month_key'] ?? '') : '');
+            $db = (string) (is_array($b) ? ($b['month_key'] ?? '') : '');
+            if ($da === $db) {
+                return (int) (($a['wp_order_id'] ?? 0)) <=> (int) (($b['wp_order_id'] ?? 0));
+            }
+            return strcmp($da, $db);
+        });
+
+        return $out;
+    }
+
+    private function fillSheetWithRows($sheet, array $headers, array $rows, array $monthKeys, bool $colorByMonth, bool $addTotals): void {
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:' . Coordinate::stringFromColumnIndex(count($headers)) . '1')->getFont()->setBold(true);
+
+        $rowNum = 2;
+        $monthColorMap = [];
+        $palette = ['D9EAD3', 'D0E0E3', 'FCE5CD', 'D9D2E9', 'FFF2CC', 'F4CCCC', 'CFE2F3', 'EAD1DC'];
+        foreach (array_values($monthKeys) as $i => $mk) {
+            $monthColorMap[(string) $mk] = $palette[$i % count($palette)];
+        }
+
+        $totalsByCurrency = [];
+
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+
+            $currency = (string) ($r['moeda'] ?? '');
+            if (!isset($totalsByCurrency[$currency])) {
+                $totalsByCurrency[$currency] = [
+                    'total_produtos' => 0.0,
+                    'total_taxa_servico' => 0.0,
+                    'total_venda' => 0.0,
+                    'total_declaracao' => 0.0,
+                    'qtd_itens' => 0,
+                    'peso_total_kg' => 0.0,
+                ];
+            }
+
+            $tp = is_numeric($r['total_produtos'] ?? null) ? (float) $r['total_produtos'] : 0.0;
+            $tf = is_numeric($r['total_taxa_servico'] ?? null) ? (float) $r['total_taxa_servico'] : 0.0;
+            $tv = is_numeric($r['total_venda'] ?? null) ? (float) $r['total_venda'] : 0.0;
+            $td = is_numeric($r['total_declaracao'] ?? null) ? (float) $r['total_declaracao'] : 0.0;
+
+            $totalsByCurrency[$currency]['total_produtos'] += $tp;
+            $totalsByCurrency[$currency]['total_taxa_servico'] += $tf;
+            $totalsByCurrency[$currency]['total_venda'] += $tv;
+            $totalsByCurrency[$currency]['total_declaracao'] += $td;
+            $totalsByCurrency[$currency]['qtd_itens'] += (int) ($r['qtd_itens'] ?? 0);
+            $totalsByCurrency[$currency]['peso_total_kg'] += (float) ($r['peso_total_kg'] ?? 0.0);
+
+            $sheet->fromArray([
+                (int) ($r['wp_order_id'] ?? 0),
+                (string) ($r['origem'] ?? ''),
+                (string) ($r['data'] ?? ''),
+                (string) ($r['hora'] ?? ''),
+                (string) ($r['status'] ?? ''),
+                (string) ($r['nome'] ?? ''),
+                (string) ($r['sobrenome'] ?? ''),
+                (string) ($r['email'] ?? ''),
+                (string) ($currency),
+                is_numeric($r['total_produtos'] ?? null) ? (float) $r['total_produtos'] : null,
+                is_numeric($r['total_taxa_servico'] ?? null) ? (float) $r['total_taxa_servico'] : null,
+                is_numeric($r['total_venda'] ?? null) ? (float) $r['total_venda'] : null,
+                is_numeric($r['total_declaracao'] ?? null) ? (float) $r['total_declaracao'] : null,
+                (int) ($r['qtd_itens'] ?? 0),
+                is_numeric($r['peso_total_kg'] ?? null) ? (float) $r['peso_total_kg'] : null,
+            ], null, 'A' . $rowNum);
+
+            if ($colorByMonth) {
+                $mk = (string) ($r['month_key'] ?? '');
+                $color = $monthColorMap[$mk] ?? null;
+                if ($color) {
+                    $sheet->getStyle('A' . $rowNum . ':' . Coordinate::stringFromColumnIndex(count($headers)) . $rowNum)
+                        ->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()
+                        ->setARGB($color);
+                }
+            }
+
+            $rowNum++;
+        }
+
+        // number formats
+        $lastRow = max(1, $rowNum - 1);
+        if ($lastRow >= 2) {
+            $sheet->getStyle('J2:M' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('O2:O' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.000');
+        }
+
+        // Autosize
+        for ($c = 1; $c <= count($headers); $c++) {
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setAutoSize(true);
+        }
+
+        if ($addTotals && !empty($totalsByCurrency)) {
+            $sheet->fromArray([''], null, 'A' . $rowNum);
+            $rowNum++;
+
+            foreach ($totalsByCurrency as $cur => $t) {
+                $label = 'TOTAL GERAL' . ($cur !== '' ? ' (' . $cur . ')' : '');
+                $sheet->fromArray([
+                    $label, '', '', '', '', '', '', '', (string) $cur,
+                    round((float) ($t['total_produtos'] ?? 0.0), 2),
+                    round((float) ($t['total_taxa_servico'] ?? 0.0), 2),
+                    round((float) ($t['total_venda'] ?? 0.0), 2),
+                    round((float) ($t['total_declaracao'] ?? 0.0), 2),
+                    (int) ($t['qtd_itens'] ?? 0),
+                    round((float) ($t['peso_total_kg'] ?? 0.0), 3),
+                ], null, 'A' . $rowNum);
+
+                $sheet->getStyle('A' . $rowNum . ':' . Coordinate::stringFromColumnIndex(count($headers)) . $rowNum)->getFont()->setBold(true);
+                $rowNum++;
+            }
+        }
     }
 
     private function exportCsvChunk($out, \PDO $wpPdo, string $prefix, string $src, array $orderIds, array &$grand): void {
