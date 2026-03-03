@@ -270,6 +270,7 @@ class CarrinhoController extends Controller {
         $subtotal = 0;
         $pesoTotal = 0;
         $totalItensAtivos = 0;
+        $totalItensAll = 0;
 
         $pesoClubeTotal = 0.0;
         $subtotalClube = 0.0;
@@ -362,6 +363,8 @@ class CarrinhoController extends Controller {
                     'ativo' => $ativo ? 1 : 0,
                 ];
 
+                $totalItensAll += (int) ($item['quantidade'] ?? 0);
+
                 if ($ativo) {
                     $subtotal += $itemSubtotal;
                     $pesoTotal += $pesoItem;
@@ -406,6 +409,12 @@ class CarrinhoController extends Controller {
         // Se o carrinho estiver no DB, usar os totais persistidos (inclui desconto/cashback do Clube)
         if ($uid > 0 && $cartId > 0) {
             try {
+                // Se existir item desativado, não usar totais do DB (DB não conhece a flag de ativo/inativo)
+                $hasInactive = ($totalItensAtivos < $totalItensAll);
+                if ($hasInactive) {
+                    throw new \RuntimeException('Skip DB totals due to inactive items');
+                }
+
                 $db = $this->carrinhoModel->getConnection();
                 $cols = [];
                 try {
