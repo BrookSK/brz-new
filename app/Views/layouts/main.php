@@ -1053,11 +1053,6 @@
                         <li class="nav-item">
                             <a class="btn btn-primary btn-sm ms-2" href="/register"><?= __('nav.register', 'Cadastrar') ?></a>
                         </li>
-                        <li class="nav-item">
-                            <a class="btn btn-outline-danger btn-sm ms-2" href="/loginadmin">
-                                <i class="fas fa-user-shield"></i> Admin
-                            </a>
-                        </li>
                     <?php endif; ?>
                     
                     <!-- Carrinho -->

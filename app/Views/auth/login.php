@@ -71,39 +71,6 @@
                 </div>
             </div>
             
-            <!-- Login Admin -->
-            <div class="card shadow-lg mt-4">
-                <div class="card-body p-4">
-                    <div class="text-center">
-                        <h5 class="mb-3"><?= __('auth.admin_access', 'Acesso Administrativo') ?></h5>
-                        <p class="text-muted small"><?= __('auth.admin_access_subtitle', 'Acesso restrito para administradores') ?></p>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleAdminLogin()">
-                            <i class="fas fa-user-shield me-2"></i> <?= __('auth.admin_login', 'Login Admin') ?>
-                        </button>
-                    </div>
-                    
-                    <div id="adminLoginForm" style="display: none;" class="mt-3">
-                        <form method="POST" action="/login">
-                            <input type="hidden" name="admin_login" value="1">
-                            <div class="mb-3">
-                                <label class="form-label"><?= __('auth.admin_email', 'E-mail Admin') ?></label>
-                                <input type="email" class="form-control" name="email" 
-                                       value="" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label"><?= __('auth.password', 'Senha') ?></label>
-                                <input type="password" class="form-control" name="senha" 
-                                       placeholder="••••••••" required>
-                            </div>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-dark">
-                                    <i class="fas fa-shield-alt me-2"></i> <?= __('auth.login_as_admin', 'Entrar como Admin') ?>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
