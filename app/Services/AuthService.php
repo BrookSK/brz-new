@@ -113,6 +113,12 @@ class AuthService {
         try {
             $uidCart = (int) ($_SESSION['usuario_id'] ?? 0);
             if ($uidCart > 0) {
+                // Se por algum motivo houver itens no carrinho da sessão, persiste no carrinho do usuário (DB)
+                // antes de limpar a sessão.
+                if (!empty($_SESSION['carrinho']) && is_array($_SESSION['carrinho'])) {
+                    $this->mergeSessionCartToUser($uidCart);
+                }
+
                 unset($_SESSION['carrinho']);
                 if (isset($_COOKIE['guest_cart'])) {
                     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
