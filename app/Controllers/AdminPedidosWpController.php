@@ -1255,12 +1255,20 @@ class AdminPedidosWpController extends Controller {
             'cliente_nome',
             'cliente_sobrenome',
             'cliente_email',
-            'total_compra',
+            'total_produtos',
+            'total_taxa_servico',
+            'total_venda',
             'moeda',
             'valor_total_declaracao',
             'qtd_total_itens',
             'peso_total_itens_kg',
         ], ';');
+
+        $grand = [
+            'by_currency' => [],
+            'qtd_total_itens' => 0,
+            'peso_total_itens_kg' => 0.0,
+        ];
 
         try {
             $localPdo = Database::getConnection();
@@ -1294,17 +1302,42 @@ class AdminPedidosWpController extends Controller {
                 $chunkSize = 200;
                 for ($i = 0; $i < count($ids); $i += $chunkSize) {
                     $chunk = array_slice($ids, $i, $chunkSize);
-                    $this->exportCsvChunk($out, $wpPdo, $prefix, $src, $chunk);
+                    $this->exportCsvChunk($out, $wpPdo, $prefix, $src, $chunk, $grand);
                 }
             }
         } catch (\Exception $e) {
             fputcsv($out, ['erro', $e->getMessage()], ';');
         }
 
+        if (!empty($grand['by_currency'])) {
+            fputcsv($out, [''], ';');
+
+            foreach ($grand['by_currency'] as $currency => $t) {
+                $label = 'TOTAL GERAL' . ($currency !== '' ? ' (' . $currency . ')' : '');
+                fputcsv($out, [
+                    $label,
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    round((float) ($t['total_produtos'] ?? 0.0), 2),
+                    round((float) ($t['total_taxa_servico'] ?? 0.0), 2),
+                    round((float) ($t['total_venda'] ?? 0.0), 2),
+                    (string) $currency,
+                    round((float) ($t['valor_total_declaracao'] ?? 0.0), 2),
+                    (int) ($grand['qtd_total_itens'] ?? 0),
+                    round((float) ($grand['peso_total_itens_kg'] ?? 0.0), 3),
+                ], ';');
+            }
+        }
+
         fclose($out);
     }
 
-    private function exportCsvChunk($out, \PDO $wpPdo, string $prefix, string $src, array $orderIds): void {
+    private function exportCsvChunk($out, \PDO $wpPdo, string $prefix, string $src, array $orderIds, array &$grand): void {
         $orderIds = array_values(array_filter(array_map('intval', $orderIds), static fn($v) => $v > 0));
         if (empty($orderIds)) {
             return;
@@ -1349,19 +1382,22 @@ class AdminPedidosWpController extends Controller {
             $metaByOrder[$oid][$k] = $mr['meta_value'] ?? '';
         }
 
-        $sqlItems = "SELECT order_item_id, order_id FROM {$prefix}woocommerce_order_items WHERE order_id IN ({$placeholders}) AND order_item_type = 'line_item'";
+        $sqlItems = "SELECT order_item_id, order_id, order_item_type FROM {$prefix}woocommerce_order_items WHERE order_id IN ({$placeholders}) AND order_item_type IN ('line_item','fee')";
         $stI = $wpPdo->prepare($sqlItems);
         $stI->execute($orderIds);
         $itemRows = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         $itemIds = [];
         $itemOrder = [];
+        $itemType = [];
         foreach ($itemRows as $ir) {
             if (!is_array($ir)) continue;
             $iid = (int) ($ir['order_item_id'] ?? 0);
             $oid = (int) ($ir['order_id'] ?? 0);
+            $type = (string) ($ir['order_item_type'] ?? '');
             if ($iid <= 0 || $oid <= 0) continue;
             $itemIds[] = $iid;
             $itemOrder[$iid] = $oid;
+            $itemType[$iid] = $type;
         }
 
         $agg = [];
@@ -1371,6 +1407,8 @@ class AdminPedidosWpController extends Controller {
                 'has_declared' => false,
                 'qty_total' => 0,
                 'weight_total_kg' => 0.0,
+                'products_total' => 0.0,
+                'fee_total' => 0.0,
             ];
         }
 
@@ -1389,6 +1427,20 @@ class AdminPedidosWpController extends Controller {
                 if ($iid <= 0 || $k === '') continue;
                 if (!isset($metaByItem[$iid])) $metaByItem[$iid] = [];
                 $metaByItem[$iid][$k] = $r['meta_value'] ?? '';
+            }
+
+            foreach ($metaByItem as $iid => $m) {
+                $oid = (int) ($itemOrder[$iid] ?? 0);
+                if ($oid <= 0 || !isset($agg[$oid])) continue;
+                $type = (string) ($itemType[$iid] ?? '');
+                $lineTotalRaw = str_replace(',', '.', (string) ($m['_line_total'] ?? ''));
+                $lineTotalRaw = preg_replace('/[^0-9\.\-]/', '', $lineTotalRaw);
+                $lineTotal = ($lineTotalRaw !== null && $lineTotalRaw !== '' && is_numeric($lineTotalRaw)) ? (float) $lineTotalRaw : 0.0;
+                if ($type === 'fee') {
+                    $agg[$oid]['fee_total'] += $lineTotal;
+                } elseif ($type === 'line_item') {
+                    $agg[$oid]['products_total'] += $lineTotal;
+                }
             }
 
             $productIds = [];
@@ -1419,6 +1471,11 @@ class AdminPedidosWpController extends Controller {
             foreach ($metaByItem as $iid => $m) {
                 $oid = (int) ($itemOrder[$iid] ?? 0);
                 if ($oid <= 0 || !isset($agg[$oid])) continue;
+
+                $type = (string) ($itemType[$iid] ?? '');
+                if ($type !== 'line_item') {
+                    continue;
+                }
 
                 $qtd = (int) (is_numeric($m['_qty'] ?? null) ? (int) $m['_qty'] : 1);
                 if ($qtd <= 0) $qtd = 1;
@@ -1466,14 +1523,24 @@ class AdminPedidosWpController extends Controller {
             $fn = (string) ($m['_billing_first_name'] ?? '');
             $ln = (string) ($m['_billing_last_name'] ?? '');
 
-            $totalCompra = $m['_order_total'] ?? '';
+            $totalVenda = $m['_order_total'] ?? '';
             $currency = (string) ($m['_order_currency'] ?? '');
+
+            $currencyKey = trim((string) $currency);
+            if (!isset($grand['by_currency'][$currencyKey])) {
+                $grand['by_currency'][$currencyKey] = [
+                    'total_produtos' => 0.0,
+                    'total_taxa_servico' => 0.0,
+                    'total_venda' => 0.0,
+                    'valor_total_declaracao' => 0.0,
+                ];
+            }
 
             $declTotal = null;
             if (!empty($agg[$oid]['has_declared'])) {
                 $declTotal = round((float) $agg[$oid]['declared_total'], 2);
             } else {
-                $tc = str_replace(',', '.', (string) $totalCompra);
+                $tc = str_replace(',', '.', (string) $totalVenda);
                 $tc = preg_replace('/[^0-9\.\-]/', '', $tc);
                 if ($tc !== null && $tc !== '' && is_numeric($tc)) {
                     $declTotal = round((float) $tc, 2);
@@ -1481,6 +1548,28 @@ class AdminPedidosWpController extends Controller {
             }
             $qtdTotal = (int) ($agg[$oid]['qty_total'] ?? 0);
             $pesoTotal = round((float) ($agg[$oid]['weight_total_kg'] ?? 0.0), 3);
+
+            $totalProdutos = round((float) ($agg[$oid]['products_total'] ?? 0.0), 2);
+            $totalTaxaServico = round((float) ($agg[$oid]['fee_total'] ?? 0.0), 2);
+
+            $totalVendaNum = 0.0;
+            $tv = str_replace(',', '.', (string) $totalVenda);
+            $tv = preg_replace('/[^0-9\.\-]/', '', $tv);
+            if ($tv !== null && $tv !== '' && is_numeric($tv)) {
+                $totalVendaNum = (float) $tv;
+            }
+
+            $declNum = 0.0;
+            if ($declTotal !== null && $declTotal !== '' && is_numeric($declTotal)) {
+                $declNum = (float) $declTotal;
+            }
+
+            $grand['by_currency'][$currencyKey]['total_produtos'] += (float) $totalProdutos;
+            $grand['by_currency'][$currencyKey]['total_taxa_servico'] += (float) $totalTaxaServico;
+            $grand['by_currency'][$currencyKey]['total_venda'] += (float) $totalVendaNum;
+            $grand['by_currency'][$currencyKey]['valor_total_declaracao'] += (float) $declNum;
+            $grand['qtd_total_itens'] = (int) ($grand['qtd_total_itens'] ?? 0) + (int) $qtdTotal;
+            $grand['peso_total_itens_kg'] = (float) ($grand['peso_total_itens_kg'] ?? 0.0) + (float) $pesoTotal;
 
             fputcsv($out, [
                 $oid,
@@ -1491,7 +1580,9 @@ class AdminPedidosWpController extends Controller {
                 $fn,
                 $ln,
                 $email,
-                $totalCompra,
+                $totalProdutos,
+                $totalTaxaServico,
+                $totalVenda,
                 $currency,
                 $declTotal,
                 $qtdTotal,
