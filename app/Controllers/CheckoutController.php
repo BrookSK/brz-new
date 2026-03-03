@@ -1621,6 +1621,36 @@ class CheckoutController extends Controller {
         return true;
     }
 
+    private function getUserCartIdPreferNonEmpty(int $usuarioId): int {
+        if ($usuarioId <= 0) return 0;
+        try {
+            $db = $this->carrinhoModel->getConnection();
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st->execute([$usuarioId]);
+            $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return 0;
+            }
+
+            foreach ($ids as $cid) {
+                try {
+                    $stCnt = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cid]);
+                    $cnt = (int) ($stCnt->fetchColumn() ?: 0);
+                    if ($cnt > 0) {
+                        return $cid;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            return (int) $ids[0];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function validatePesoMaximoCarrinhoAtivoOrFail(bool $asJson = false): bool {
         // Revalidar peso ativo no backend (evita bypass via request manual)
         $usuario = $this->authService->getUsuarioLogado();
@@ -1663,19 +1693,40 @@ class CheckoutController extends Controller {
         $uid = (int) (($usuario['id'] ?? 0));
         if ($uid > 0) {
             try {
-                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                if ($cartId <= 0) {
+                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                }
+
                 if ($cartId > 0) {
-                    $items = $this->carrinhoModel->getItems($cartId);
+                    $db = $this->carrinhoModel->getConnection();
+                    $cols = [];
+                    try {
+                        $stCols = $db->query('DESCRIBE carrinho_items');
+                        $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Throwable $e) {
+                        $cols = [];
+                    }
+
+                    $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true)) ? 'preco_unitario' : 'valor_unitario';
+                    $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+                        ? 'produto_variacao_id'
+                        : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
+                    $st = $db->prepare('SELECT *, ' . $unitCol . ' AS unit_price, ' . $varCol . ' AS var_id FROM carrinho_items WHERE carrinho_id = ?');
+                    $st->execute([$cartId]);
+                    $items = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
                     $out = [];
                     foreach (($items ?: []) as $it) {
                         $pid = (int) ($it['produto_id'] ?? 0);
                         if ($pid <= 0) continue;
-                        $pvId = (int) ($it['produto_variacao_id'] ?? 0);
+                        $pvId = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0)));
                         $key = ((string) $pid) . ':' . ((string) $pvId);
                         $qtd = (int) ($it['quantidade'] ?? 1);
                         if ($qtd < 1) $qtd = 1;
-                        $vu = (float) ($it['valor_unitario'] ?? 0);
+                        $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                         $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                         $out[$key] = [
                             'produto_id' => $pid,
@@ -1686,11 +1737,11 @@ class CheckoutController extends Controller {
                             'preco_unitario' => $vu,
                             'quantidade' => $qtd,
                             'subtotal' => $sub,
-                            'peso' => (float) ($it['peso'] ?? ($it['weight'] ?? 0)),
+                            'peso' => 0.0,
                         ];
                     }
+
                     if (!empty($out)) {
-                        // Filtrar itens desativados (persistidos em sessão)
                         try {
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
