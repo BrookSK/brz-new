@@ -14,6 +14,37 @@ class CarrinhoController extends Controller {
     private $authService;
     private $carrinhoModel;
 
+    private function getUserCartIdPreferNonEmpty(int $usuarioId): int {
+        if ($usuarioId <= 0) return 0;
+        try {
+            $db = $this->carrinhoModel->getConnection();
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st->execute([$usuarioId]);
+            $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return 0;
+            }
+
+            foreach ($ids as $cid) {
+                try {
+                    $stCnt = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cid]);
+                    $cnt = (int) ($stCnt->fetchColumn() ?: 0);
+                    if ($cnt > 0) {
+                        return $cid;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            // fallback: carrinho mais recente (mesmo vazio)
+            return (int) $ids[0];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function tableExists(string $table): bool {
         try {
             $db = \Config\Database::getConnection();
@@ -156,9 +187,12 @@ class CarrinhoController extends Controller {
     private function getCarrinhoFromDb(int $usuarioId): array {
         if ($usuarioId <= 0) return [];
         try {
-            $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
-            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-            if ($cartId <= 0) return [];
+            $cartId = (int) $this->getUserCartIdPreferNonEmpty($usuarioId);
+            if ($cartId <= 0) {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId <= 0) return [];
+            }
 
             $db = $this->carrinhoModel->getConnection();
 
