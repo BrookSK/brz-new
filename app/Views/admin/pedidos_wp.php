@@ -26,6 +26,11 @@ function wpFormatMoney($v, $currency) {
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2"><?= __('admin.orders_wp.title', 'Pedidos (WordPress)') ?> (<?= (int) $total ?>)</h1>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="collapse" data-bs-target="#wpExportBox" aria-expanded="false" aria-controls="wpExportBox">
+            <i class="fas fa-file-export"></i> Exportar pedidos
+        </button>
+    </div>
 </div>
 
 <?php if ($erro !== ''): ?>
@@ -55,6 +60,29 @@ function wpFormatMoney($v, $currency) {
         <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> <?= __('common.filter', 'Filtrar') ?></button>
     </div>
 </form>
+
+<div class="collapse mb-4" id="wpExportBox">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <form method="GET" action="/admin/pedidos-wp/export" class="row g-3" target="_blank">
+                <input type="hidden" name="source" value="<?= htmlspecialchars($source) ?>">
+                <div class="col-md-3">
+                    <label class="form-label">Data inicial</label>
+                    <input type="date" class="form-control" name="start" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data final</label>
+                    <input type="date" class="form-control" name="end" required>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-download"></i> Baixar CSV
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-body">
@@ -127,13 +155,34 @@ function wpFormatMoney($v, $currency) {
                 <ul class="pagination justify-content-center mb-0">
                     <?php
                     $params = $_GET;
-                    for ($i = 1; $i <= $totalPaginas; $i++):
+                    $current = (int) $page;
+                    if ($current <= 0) $current = 1;
+                    $start = max(1, $current - 1);
+                    $end = min($totalPaginas, $current + 1);
+
+                    $params['page'] = 1;
+                    $urlFirst = '/admin/pedidos-wp?' . http_build_query($params);
+                    $params['page'] = max(1, $current - 1);
+                    $urlPrev = '/admin/pedidos-wp?' . http_build_query($params);
+                    $params['page'] = min($totalPaginas, $current + 1);
+                    $urlNext = '/admin/pedidos-wp?' . http_build_query($params);
+                    $params['page'] = $totalPaginas;
+                    $urlLast = '/admin/pedidos-wp?' . http_build_query($params);
+                    ?>
+
+                    <li class="page-item <?= $current <= 1 ? 'disabled' : '' ?>"><a class="page-link" href="<?= htmlspecialchars($urlFirst) ?>">&laquo;</a></li>
+                    <li class="page-item <?= $current <= 1 ? 'disabled' : '' ?>"><a class="page-link" href="<?= htmlspecialchars($urlPrev) ?>">&lsaquo;</a></li>
+
+                    <?php for ($i = $start; $i <= $end; $i++):
                         $params['page'] = $i;
                         $url = '/admin/pedidos-wp?' . http_build_query($params);
-                        $active = ($i === (int) $page) ? 'active' : '';
+                        $active = ($i === $current) ? 'active' : '';
                     ?>
                         <li class="page-item <?= $active ?>"><a class="page-link" href="<?= htmlspecialchars($url) ?>"><?= $i ?></a></li>
                     <?php endfor; ?>
+
+                    <li class="page-item <?= $current >= $totalPaginas ? 'disabled' : '' ?>"><a class="page-link" href="<?= htmlspecialchars($urlNext) ?>">&rsaquo;</a></li>
+                    <li class="page-item <?= $current >= $totalPaginas ? 'disabled' : '' ?>"><a class="page-link" href="<?= htmlspecialchars($urlLast) ?>">&raquo;</a></li>
                 </ul>
             </nav>
         <?php endif; ?>

@@ -1214,6 +1214,292 @@ class AdminPedidosWpController extends Controller {
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
+    public function exportCsv(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $sourceParam = strtolower(trim((string) ($request->getParam('source') ?? 'br')));
+        $source = in_array($sourceParam, array_merge(self::SOURCES, ['all']), true) ? $sourceParam : 'br';
+
+        $start = trim((string) ($request->getParam('start') ?? ''));
+        $end = trim((string) ($request->getParam('end') ?? ''));
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Parâmetros inválidos. Use start/end no formato YYYY-MM-DD.';
+            return;
+        }
+
+        $startDt = $start . ' 00:00:00';
+        $endDt = $end . ' 23:59:59';
+
+        $filename = 'pedidos-wp-' . $source . '-' . $start . '-a-' . $end . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $out = fopen('php://output', 'w');
+        if (!$out) {
+            return;
+        }
+
+        fwrite($out, "\xEF\xBB\xBF");
+
+        fputcsv($out, [
+            'wp_order_id',
+            'origem',
+            'data',
+            'hora',
+            'status',
+            'cliente_nome',
+            'cliente_sobrenome',
+            'cliente_email',
+            'total_compra',
+            'moeda',
+            'valor_total_declaracao',
+            'qtd_total_itens',
+            'peso_total_itens_kg',
+        ], ';');
+
+        try {
+            $localPdo = Database::getConnection();
+            $sources = $source === 'all' ? self::SOURCES : [$source];
+
+            foreach ($sources as $src) {
+                $wp = $this->getWpPdo($localPdo, $src);
+                $prefix = $wp['prefix'];
+                $wpPdo = $wp['pdo'];
+
+                $stIds = $wpPdo->prepare(
+                    "SELECT ID FROM {$prefix}posts WHERE post_type = 'shop_order' AND post_status <> 'trash' AND post_date >= :start AND post_date <= :end ORDER BY post_date DESC"
+                );
+                $stIds->bindValue(':start', $startDt);
+                $stIds->bindValue(':end', $endDt);
+                $stIds->execute();
+
+                $ids = [];
+                while (true) {
+                    $id = $stIds->fetchColumn();
+                    if ($id === false || $id === null) {
+                        break;
+                    }
+                    $ids[] = (int) $id;
+                }
+
+                if (empty($ids)) {
+                    continue;
+                }
+
+                $chunkSize = 200;
+                for ($i = 0; $i < count($ids); $i += $chunkSize) {
+                    $chunk = array_slice($ids, $i, $chunkSize);
+                    $this->exportCsvChunk($out, $wpPdo, $prefix, $src, $chunk);
+                }
+            }
+        } catch (\Exception $e) {
+            fputcsv($out, ['erro', $e->getMessage()], ';');
+        }
+
+        fclose($out);
+    }
+
+    private function exportCsvChunk($out, \PDO $wpPdo, string $prefix, string $src, array $orderIds): void {
+        $orderIds = array_values(array_filter(array_map('intval', $orderIds), static fn($v) => $v > 0));
+        if (empty($orderIds)) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+
+        $sqlOrders = "SELECT ID, post_date, post_status FROM {$prefix}posts WHERE ID IN ({$placeholders})";
+        $stO = $wpPdo->prepare($sqlOrders);
+        $stO->execute($orderIds);
+        $orders = $stO->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $orderInfo = [];
+        foreach ($orders as $r) {
+            if (!is_array($r)) continue;
+            $id = (int) ($r['ID'] ?? 0);
+            if ($id <= 0) continue;
+            $orderInfo[$id] = [
+                'created_at' => (string) ($r['post_date'] ?? ''),
+                'status' => (string) ($r['post_status'] ?? ''),
+            ];
+        }
+
+        $metaKeys = [
+            '_order_total',
+            '_order_currency',
+            '_billing_email',
+            '_billing_first_name',
+            '_billing_last_name',
+        ];
+        $inMeta = implode(',', array_fill(0, count($metaKeys), '?'));
+        $sqlMeta = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$placeholders}) AND meta_key IN ({$inMeta})";
+        $stM = $wpPdo->prepare($sqlMeta);
+        $stM->execute(array_merge($orderIds, $metaKeys));
+        $metaRows = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $metaByOrder = [];
+        foreach ($metaRows as $mr) {
+            if (!is_array($mr)) continue;
+            $oid = (int) ($mr['post_id'] ?? 0);
+            $k = (string) ($mr['meta_key'] ?? '');
+            if ($oid <= 0 || $k === '') continue;
+            if (!isset($metaByOrder[$oid])) $metaByOrder[$oid] = [];
+            $metaByOrder[$oid][$k] = $mr['meta_value'] ?? '';
+        }
+
+        $sqlItems = "SELECT order_item_id, order_id FROM {$prefix}woocommerce_order_items WHERE order_id IN ({$placeholders}) AND order_item_type = 'line_item'";
+        $stI = $wpPdo->prepare($sqlItems);
+        $stI->execute($orderIds);
+        $itemRows = $stI->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $itemIds = [];
+        $itemOrder = [];
+        foreach ($itemRows as $ir) {
+            if (!is_array($ir)) continue;
+            $iid = (int) ($ir['order_item_id'] ?? 0);
+            $oid = (int) ($ir['order_id'] ?? 0);
+            if ($iid <= 0 || $oid <= 0) continue;
+            $itemIds[] = $iid;
+            $itemOrder[$iid] = $oid;
+        }
+
+        $agg = [];
+        foreach ($orderIds as $oid) {
+            $agg[$oid] = [
+                'declared_total' => 0.0,
+                'has_declared' => false,
+                'qty_total' => 0,
+                'weight_total_kg' => 0.0,
+            ];
+        }
+
+        if (!empty($itemIds)) {
+            $itemPlaceholders = implode(',', array_fill(0, count($itemIds), '?'));
+            $sqlItemMeta = "SELECT order_item_id, meta_key, meta_value FROM {$prefix}woocommerce_order_itemmeta WHERE order_item_id IN ({$itemPlaceholders})";
+            $stIM = $wpPdo->prepare($sqlItemMeta);
+            $stIM->execute($itemIds);
+            $itemMetaRows = $stIM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $metaByItem = [];
+            foreach ($itemMetaRows as $r) {
+                if (!is_array($r)) continue;
+                $iid = (int) ($r['order_item_id'] ?? 0);
+                $k = (string) ($r['meta_key'] ?? '');
+                if ($iid <= 0 || $k === '') continue;
+                if (!isset($metaByItem[$iid])) $metaByItem[$iid] = [];
+                $metaByItem[$iid][$k] = $r['meta_value'] ?? '';
+            }
+
+            $productIds = [];
+            foreach ($metaByItem as $iid => $m) {
+                $pid = isset($m['_variation_id']) && is_numeric($m['_variation_id']) && (int) $m['_variation_id'] > 0
+                    ? (int) $m['_variation_id']
+                    : (isset($m['_product_id']) && is_numeric($m['_product_id']) ? (int) $m['_product_id'] : 0);
+                if ($pid > 0) $productIds[$pid] = true;
+            }
+            $productIds = array_keys($productIds);
+
+            $weightByProduct = [];
+            if (!empty($productIds)) {
+                $prodPlaceholders = implode(',', array_fill(0, count($productIds), '?'));
+                $stW = $wpPdo->prepare("SELECT post_id, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$prodPlaceholders}) AND meta_key = '_weight'");
+                $stW->execute($productIds);
+                $wRows = $stW->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($wRows as $wr) {
+                    if (!is_array($wr)) continue;
+                    $pid = (int) ($wr['post_id'] ?? 0);
+                    $v = str_replace(',', '.', (string) ($wr['meta_value'] ?? ''));
+                    if ($pid > 0 && is_numeric($v) && (float) $v > 0) {
+                        $weightByProduct[$pid] = (float) $v;
+                    }
+                }
+            }
+
+            foreach ($metaByItem as $iid => $m) {
+                $oid = (int) ($itemOrder[$iid] ?? 0);
+                if ($oid <= 0 || !isset($agg[$oid])) continue;
+
+                $qtd = (int) (is_numeric($m['_qty'] ?? null) ? (int) $m['_qty'] : 1);
+                if ($qtd <= 0) $qtd = 1;
+                $agg[$oid]['qty_total'] += $qtd;
+
+                $pesoKg = null;
+                foreach (['peso', '_peso', 'weight', '_weight', 'peso_kg', '_peso_kg', 'invoice_weight', '_invoice_weight', 'invoice_peso', '_invoice_peso'] as $wk) {
+                    $v = str_replace(',', '.', (string) ($m[$wk] ?? ''));
+                    if (is_numeric($v) && (float) $v > 0) {
+                        $pesoKg = (float) $v;
+                        break;
+                    }
+                }
+                if ($pesoKg === null) {
+                    $pid = isset($m['_variation_id']) && is_numeric($m['_variation_id']) && (int) $m['_variation_id'] > 0
+                        ? (int) $m['_variation_id']
+                        : (isset($m['_product_id']) && is_numeric($m['_product_id']) ? (int) $m['_product_id'] : 0);
+                    if ($pid > 0 && isset($weightByProduct[$pid])) {
+                        $pesoKg = (float) $weightByProduct[$pid];
+                    }
+                }
+                if ($pesoKg !== null && $pesoKg > 0) {
+                    $agg[$oid]['weight_total_kg'] += ($pesoKg * $qtd);
+                }
+
+                $declaredUnit = $this->findDeclaredUnitValueFromItemMeta($m);
+                if ($declaredUnit !== null && $declaredUnit > 0) {
+                    $agg[$oid]['has_declared'] = true;
+                    $agg[$oid]['declared_total'] += ($declaredUnit * $qtd);
+                }
+            }
+        }
+
+        foreach ($orderIds as $oid) {
+            $oi = $orderInfo[$oid] ?? ['created_at' => '', 'status' => ''];
+            $m = $metaByOrder[$oid] ?? [];
+
+            $dt = (string) ($oi['created_at'] ?? '');
+            $ts = $dt !== '' ? strtotime($dt) : false;
+            $data = $ts ? date('d/m/Y', $ts) : '';
+            $hora = $ts ? date('H:i', $ts) : '';
+
+            $status = (string) ($oi['status'] ?? '');
+            $email = (string) ($m['_billing_email'] ?? '');
+            $fn = (string) ($m['_billing_first_name'] ?? '');
+            $ln = (string) ($m['_billing_last_name'] ?? '');
+
+            $totalCompra = $m['_order_total'] ?? '';
+            $currency = (string) ($m['_order_currency'] ?? '');
+
+            $declTotal = null;
+            if (!empty($agg[$oid]['has_declared'])) {
+                $declTotal = round((float) $agg[$oid]['declared_total'], 2);
+            } else {
+                $tc = str_replace(',', '.', (string) $totalCompra);
+                $tc = preg_replace('/[^0-9\.\-]/', '', $tc);
+                if ($tc !== null && $tc !== '' && is_numeric($tc)) {
+                    $declTotal = round((float) $tc, 2);
+                }
+            }
+            $qtdTotal = (int) ($agg[$oid]['qty_total'] ?? 0);
+            $pesoTotal = round((float) ($agg[$oid]['weight_total_kg'] ?? 0.0), 3);
+
+            fputcsv($out, [
+                $oid,
+                strtoupper($src),
+                $data,
+                $hora,
+                $status,
+                $fn,
+                $ln,
+                $email,
+                $totalCompra,
+                $currency,
+                $declTotal,
+                $qtdTotal,
+                $pesoTotal,
+            ], ';');
+        }
+    }
+
     public function gerarEtiquetaWexpress(Request $request, int $id) {
         $this->handleEtiquetaWexpress($request, $id, false);
     }
