@@ -1255,10 +1255,10 @@ class AdminPedidosWpController extends Controller {
             'cliente_nome',
             'cliente_sobrenome',
             'cliente_email',
+            'moeda',
             'total_produtos',
             'total_taxa_servico',
             'total_venda',
-            'moeda',
             'valor_total_declaracao',
             'qtd_total_itens',
             'peso_total_itens_kg',
@@ -1323,10 +1323,10 @@ class AdminPedidosWpController extends Controller {
                     '',
                     '',
                     '',
+                    (string) $currency,
                     round((float) ($t['total_produtos'] ?? 0.0), 2),
                     round((float) ($t['total_taxa_servico'] ?? 0.0), 2),
                     round((float) ($t['total_venda'] ?? 0.0), 2),
-                    (string) $currency,
                     round((float) ($t['valor_total_declaracao'] ?? 0.0), 2),
                     (int) ($grand['qtd_total_itens'] ?? 0),
                     round((float) ($grand['peso_total_itens_kg'] ?? 0.0), 3),
@@ -1539,12 +1539,6 @@ class AdminPedidosWpController extends Controller {
             $declTotal = null;
             if (!empty($agg[$oid]['has_declared'])) {
                 $declTotal = round((float) $agg[$oid]['declared_total'], 2);
-            } else {
-                $tc = str_replace(',', '.', (string) $totalVenda);
-                $tc = preg_replace('/[^0-9\.\-]/', '', $tc);
-                if ($tc !== null && $tc !== '' && is_numeric($tc)) {
-                    $declTotal = round((float) $tc, 2);
-                }
             }
             $qtdTotal = (int) ($agg[$oid]['qty_total'] ?? 0);
             $pesoTotal = round((float) ($agg[$oid]['weight_total_kg'] ?? 0.0), 3);
@@ -1560,7 +1554,7 @@ class AdminPedidosWpController extends Controller {
             }
 
             $declNum = 0.0;
-            if ($declTotal !== null && $declTotal !== '' && is_numeric($declTotal)) {
+            if (!empty($agg[$oid]['has_declared']) && $declTotal !== null && $declTotal !== '' && is_numeric($declTotal)) {
                 $declNum = (float) $declTotal;
             }
 
@@ -1580,10 +1574,10 @@ class AdminPedidosWpController extends Controller {
                 $fn,
                 $ln,
                 $email,
+                $currency,
                 $totalProdutos,
                 $totalTaxaServico,
                 $totalVenda,
-                $currency,
                 $declTotal,
                 $qtdTotal,
                 $pesoTotal,
