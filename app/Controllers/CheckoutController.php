@@ -2902,7 +2902,48 @@ class CheckoutController extends Controller {
                     $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                 } catch (\Exception $e) {
                 }
+
+                // Limpar carrinho no DB (usuário logado) e na sessão/cookie
+                try {
+                    if (session_status() === PHP_SESSION_NONE) {
+                        session_start();
+                    }
+                } catch (\Throwable $e) {
+                }
+
+                try {
+                    $usuario = $this->authService->getUsuarioLogado();
+                    $uid = (int) (($usuario['id'] ?? 0));
+                    if ($uid > 0) {
+                        $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                        if ($cartId <= 0) {
+                            $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                        }
+                        if ($cartId > 0) {
+                            $this->carrinhoModel->limparCarrinho($cartId);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+
                 unset($_SESSION['carrinho']);
+                unset($_SESSION['carrinho_itens_ativos']);
+
+                if (isset($_COOKIE['guest_cart'])) {
+                    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('guest_cart', '', [
+                            'expires' => time() - 3600,
+                            'path' => '/',
+                            'secure' => $secure,
+                            'httponly' => false,
+                            'samesite' => 'Lax',
+                        ]);
+                    } else {
+                        setcookie('guest_cart', '', time() - 3600, '/; samesite=Lax', '', $secure, false);
+                    }
+                }
             }
 
             $this->json([
