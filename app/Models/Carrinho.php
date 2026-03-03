@@ -537,8 +537,21 @@ class Carrinho extends Model {
         $prodCols = $this->getTableColumns('produtos');
         $hasClubeAtivo = is_array($prodCols) && in_array('clube_ativo', $prodCols, true);
         $clubeSelect = $hasClubeAtivo ? ', COALESCE(p.clube_ativo,0) AS clube_ativo' : ', 0 AS clube_ativo';
+
+        $hasMoedaProduto = is_array($prodCols) && (in_array('moeda', $prodCols, true) || in_array('currency', $prodCols, true));
+        $moedaCol = '';
+        if ($hasMoedaProduto) {
+            $moedaCol = in_array('moeda', $prodCols, true) ? 'p.moeda' : 'p.currency';
+        }
+        $moedaSelect = $moedaCol !== '' ? (', ' . $moedaCol . ' as moeda_produto') : '';
+
+        $hasSku = is_array($prodCols) && in_array('sku', $prodCols, true);
+        $hasDesc = is_array($prodCols) && in_array('descricao', $prodCols, true);
+        $skuSelect = $hasSku ? ', p.sku' : ', NULL AS sku';
+        $descSelect = $hasDesc ? ', p.descricao' : ', NULL AS descricao';
+
         $stmt = $this->connection->prepare("
-            SELECT ci.*, p.nome, p.sku, p.descricao, {$pesoExpr} AS peso, p.moeda as moeda_produto {$clubeSelect}
+            SELECT ci.*, p.nome{$skuSelect}{$descSelect}, {$pesoExpr} AS peso{$moedaSelect} {$clubeSelect}
             FROM carrinho_items ci 
             JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id

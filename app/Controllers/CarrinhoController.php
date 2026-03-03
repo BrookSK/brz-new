@@ -165,11 +165,11 @@ class CarrinhoController extends Controller {
             foreach (($items ?: []) as $it) {
                 $pid = (int) ($it['produto_id'] ?? 0);
                 if ($pid <= 0) continue;
-                $pvId = (int) ($it['produto_variacao_id'] ?? 0);
+                $pvId = (int) ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0));
                 $key = ((string) $pid) . ':' . ((string) $pvId);
                 $qtd = (int) ($it['quantidade'] ?? 1);
                 if ($qtd < 1) $qtd = 1;
-                $vu = (float) ($it['valor_unitario'] ?? 0);
+                $vu = (float) ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0));
                 $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                 $out[$key] = [
                     'produto_id' => $pid,
