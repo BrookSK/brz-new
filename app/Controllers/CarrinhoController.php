@@ -160,16 +160,34 @@ class CarrinhoController extends Controller {
             $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
             if ($cartId <= 0) return [];
 
-            $items = $this->carrinhoModel->getItems($cartId);
+            $db = $this->carrinhoModel->getConnection();
+
+            $cols = [];
+            try {
+                $stCols = $db->query('DESCRIBE carrinho_items');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+
+            $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true)) ? 'preco_unitario' : 'valor_unitario';
+            $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+                ? 'produto_variacao_id'
+                : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
+            $st = $db->prepare('SELECT *, ' . $unitCol . ' AS unit_price, ' . $varCol . ' AS var_id FROM carrinho_items WHERE carrinho_id = ?');
+            $st->execute([$cartId]);
+            $items = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
             $out = [];
             foreach (($items ?: []) as $it) {
                 $pid = (int) ($it['produto_id'] ?? 0);
                 if ($pid <= 0) continue;
-                $pvId = (int) ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0));
+                $pvId = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0)));
                 $key = ((string) $pid) . ':' . ((string) $pvId);
                 $qtd = (int) ($it['quantidade'] ?? 1);
                 if ($qtd < 1) $qtd = 1;
-                $vu = (float) ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0));
+                $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                 $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                 $out[$key] = [
                     'produto_id' => $pid,
