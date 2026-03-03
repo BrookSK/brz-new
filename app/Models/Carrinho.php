@@ -592,8 +592,16 @@ class Carrinho extends Model {
             $quantidade = 1;
         }
 
+        $cols = $this->getTableColumns('carrinho_items');
+        $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+            ? 'produto_variacao_id'
+            : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+        $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true))
+            ? 'preco_unitario'
+            : ((is_array($cols) && in_array('valor_unitario', $cols, true)) ? 'valor_unitario' : 'valor_unitario');
+
         // Obter item
-        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
+        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(" . $varCol . ",0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
         $stmt->bindValue(':carrinho_id', (int) $carrinhoId, \PDO::PARAM_INT);
         $stmt->bindValue(':produto_id', (int) $produtoId, \PDO::PARAM_INT);
         if ($produtoVariacaoId === null || $produtoVariacaoId === '') {
@@ -607,7 +615,7 @@ class Carrinho extends Model {
             return false;
         }
 
-        $valorUnitario = (float) ($item['valor_unitario'] ?? 0);
+        $valorUnitario = (float) ($item[$unitCol] ?? ($item['valor_unitario'] ?? ($item['preco_unitario'] ?? 0)));
         $subtotal = $quantidade * $valorUnitario;
 
         $stmt = $this->connection->prepare("UPDATE carrinho_items SET quantidade = :q, subtotal = :s WHERE id = :id");

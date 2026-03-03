@@ -790,6 +790,66 @@ class CarrinhoController extends Controller {
             $this->json(['error' => 'Quantidade inválida'], 400);
             return;
         }
+
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $pvId = null;
+                $produtoIdDb = (int) $produtoId;
+                if (is_string($produtoId) && strpos($produtoId, ':') !== false) {
+                    $parts = explode(':', $produtoId);
+                    $produtoIdDb = (int) ($parts[0] ?? 0);
+                    $pvTmp = (int) ($parts[1] ?? 0);
+                    if ($pvTmp > 0) {
+                        $pvId = $pvTmp;
+                    }
+                } elseif ($produtoIdFallback !== null && $produtoIdFallback !== '') {
+                    $produtoIdDb = (int) $produtoIdFallback;
+                }
+
+                if ($produtoIdDb <= 0) {
+                    $this->json(['error' => 'Produto não informado'], 400);
+                    return;
+                }
+
+                $produto = $this->produtoModel->find($produtoIdDb);
+                if ($produto && (int) ($produto['estoque'] ?? 0) < (int) $quantidade) {
+                    $this->json(['error' => 'Estoque insuficiente'], 400);
+                    return;
+                }
+
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId <= 0) {
+                    $this->json(['error' => 'Carrinho não encontrado'], 400);
+                    return;
+                }
+
+                $ok = $this->carrinhoModel->setQuantidadeItem($cartId, $produtoIdDb, (int) $quantidade, $pvId);
+                if (!$ok) {
+                    $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+                    return;
+                }
+
+                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Carrinho atualizado',
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Throwable $e) {
+                // fallback session
+            }
+        }
         
         $itemKey = null;
         $produtoIdDb = $produtoId;
