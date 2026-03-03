@@ -108,62 +108,24 @@ class AuthService {
             session_start();
         }
 
-        // Preservar carrinho do visitante ao deslogar (session_destroy apagaria os itens)
+        // Ao deslogar de um usuário, o carrinho não deve “vazar” para o modo visitante.
+        // Mantemos o carrinho no banco (para restaurar quando logar novamente) e limpamos sessão/cookie do visitante.
         try {
-            $sessCart = $_SESSION['carrinho'] ?? null;
             $uidCart = (int) ($_SESSION['usuario_id'] ?? 0);
-
-            if ((!is_array($sessCart) || empty($sessCart)) && $uidCart > 0) {
-                try {
-                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uidCart, null, 'BRL');
-                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-                    if ($cartId > 0) {
-                        $items = $this->carrinhoModel->getItems($cartId);
-                        $out = [];
-                        foreach (($items ?: []) as $it) {
-                            if (!is_array($it)) continue;
-                            $pid = (int) ($it['produto_id'] ?? 0);
-                            if ($pid <= 0) continue;
-                            $pvId = (int) ($it['produto_variacao_id'] ?? 0);
-                            $key = ((string) $pid) . ':' . ((string) $pvId);
-                            $qtd = (int) ($it['quantidade'] ?? 1);
-                            if ($qtd < 1) $qtd = 1;
-                            $vu = (float) ($it['valor_unitario'] ?? 0);
-                            $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
-                            $out[$key] = [
-                                'produto_id' => $pid,
-                                'produto_variacao_id' => ($pvId > 0 ? $pvId : null),
-                                'variacao_descricao' => $it['variacao_descricao'] ?? null,
-                                'nome' => $it['nome'] ?? null,
-                                'price' => $vu,
-                                'preco_unitario' => $vu,
-                                'quantidade' => $qtd,
-                                'subtotal' => $sub,
-                            ];
-                        }
-                        if (!empty($out)) {
-                            $sessCart = $out;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                }
-            }
-
-            if (is_array($sessCart) && !empty($sessCart)) {
-                $payload = base64_encode((string) json_encode($sessCart, JSON_UNESCAPED_UNICODE));
-                if ($payload !== '') {
+            if ($uidCart > 0) {
+                unset($_SESSION['carrinho']);
+                if (isset($_COOKIE['guest_cart'])) {
                     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-                    $ttl = 60 * 60 * 24 * 7;
                     if (PHP_VERSION_ID >= 70300) {
-                        setcookie('guest_cart', $payload, [
-                            'expires' => time() + $ttl,
+                        setcookie('guest_cart', '', [
+                            'expires' => time() - 3600,
                             'path' => '/',
                             'secure' => $secure,
                             'httponly' => false,
                             'samesite' => 'Lax',
                         ]);
                     } else {
-                        setcookie('guest_cart', $payload, time() + $ttl, '/; samesite=Lax', '', $secure, false);
+                        setcookie('guest_cart', '', time() - 3600, '/; samesite=Lax', '', $secure, false);
                     }
                 }
             }
