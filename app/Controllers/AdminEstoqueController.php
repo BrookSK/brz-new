@@ -55,6 +55,25 @@ class AdminEstoqueController extends Controller {
         return $total;
     }
 
+    private function getTotalReservadoRealProduto(int $produtoId): int {
+        if ($produtoId <= 0 || !$this->tableExists('estoque_reservas')) {
+            return 0;
+        }
+
+        try {
+            $stmt = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total
+                FROM estoque_reservas er
+                LEFT JOIN pedidos p ON p.id = er.pedido_id
+                WHERE er.produto_id = :produto_id
+                  AND er.status = 'ativa'
+                  AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
+            $stmt->execute([':produto_id' => $produtoId]);
+            return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function getTotalPendenciaCompraProduto(int $produtoId): int {
         if ($produtoId <= 0 || !$this->tableExists('lista_compras')) {
             return 0;
@@ -72,14 +91,53 @@ class AdminEstoqueController extends Controller {
         // Regra: não permitir que o sistema "fique devendo" estoque reservado.
         // Se estoque_total < reservado_total, criar pendência de compra suficiente para cobrir o déficit.
         $estoqueTotal = $this->getTotalEstoqueProduto($produtoId);
-        $reservado = $this->getTotalReservadoProduto($produtoId);
+        // IMPORTANTE: aqui deve considerar apenas reservas reais. Se incluir lista_compras (pendência),
+        // a pendência passa a se auto-inflar a cada ajuste.
+        $reservado = $this->getTotalReservadoRealProduto($produtoId);
         if ($reservado <= 0) {
             return 0;
         }
 
         $deficit = $reservado - $estoqueTotal;
+        $pendAtual = $this->getTotalPendenciaCompraProduto($produtoId);
+
+        // Se não existe déficit, a pendência não deve existir. Reduzir/zerar pendências pendentes.
         if ($deficit <= 0) {
+            if ($pendAtual > 0 && $this->tableExists('lista_compras')) {
+                try {
+                    $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE produto_id = :p AND status = 'pendente'");
+                    $stmt->execute([':p' => $produtoId]);
+                } catch (\Throwable $e) {
+                }
+            }
             return 0;
+        }
+
+        // Se a pendência atual estiver maior que o déficit, reduzir para evitar efeito bola de neve.
+        if ($pendAtual > $deficit && $this->tableExists('lista_compras')) {
+            $excesso = $pendAtual - $deficit;
+            try {
+                $stmtRows = $this->connection->prepare("SELECT id, COALESCE(quantidade_faltante,0) AS quantidade_faltante FROM lista_compras WHERE produto_id = :p AND status = 'pendente' ORDER BY id DESC");
+                $stmtRows->execute([':p' => $produtoId]);
+                $rows = $stmtRows->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                foreach ($rows as $r) {
+                    if ($excesso <= 0) break;
+                    $id = (int) ($r['id'] ?? 0);
+                    if ($id <= 0) continue;
+                    $q = (int) ($r['quantidade_faltante'] ?? 0);
+                    if ($q <= 0) {
+                        continue;
+                    }
+
+                    $reduz = ($q >= $excesso) ? $excesso : $q;
+                    $novo = $q - $reduz;
+                    $stUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = :q, status = CASE WHEN :q = 0 THEN 'comprado' ELSE status END WHERE id = :id AND status = 'pendente'");
+                    $stUpd->execute([':q' => $novo, ':id' => $id]);
+                    $excesso -= $reduz;
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
         $pendAtual = $this->getTotalPendenciaCompraProduto($produtoId);
@@ -2506,11 +2564,7 @@ class AdminEstoqueController extends Controller {
             }
 
             if ($saidaTotal > 0) {
-                // Regra de soma zero: se houve redução de estoque, isso pode impactar reservas.
-                // Sempre gerar/aumentar pendência de compra equivalente à saída.
-                $this->ajustarListaComprasAposSaida($produtoId, $saidaTotal);
-
-                // Se a redução colocou o estoque abaixo do reservado, garantir pendência adicional para cobrir déficit.
+                // Se a redução colocou o estoque abaixo do reservado real, garantir pendência suficiente para cobrir o déficit.
                 $adicional = $this->garantirSomaZeroAposReducao($produtoId);
                 $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
                 if ($reservadoAtual > 0) {
@@ -2623,8 +2677,6 @@ class AdminEstoqueController extends Controller {
                 $paramsMov[':usuario_login'] = ($loggedLogin !== '' ? $loggedLogin : null);
             }
             $stmtMov->execute($paramsMov);
-
-            $this->ajustarListaComprasAposSaida($produtoId, $oldQtd);
 
             $adicional = $this->garantirSomaZeroAposReducao($produtoId);
             $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
