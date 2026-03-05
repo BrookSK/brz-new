@@ -2091,11 +2091,139 @@ class AdminEstoqueController extends Controller {
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
                         <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">Abrir lista de compras</a>
-                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas">Ver reservas</button>
+                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '">Ver reservas</button>
                     </div>
                     ' . ($statusReposicao ? '<div class="alert alert-warning mt-3 mb-0">Status: <strong>Reposição</strong>. Reservado acima do estoque; o disponível fica negativo até entrada.</div>' : '') . '
                 </div>
             </div>';
+
+        echo '<div class="modal fade" id="modalReservas" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Reservas / Pedidos relacionados</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
+                            <div id="reservas_loading" class="text-muted">Carregando...</div>
+                            <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
+                            <div class="accordion" id="accordionReservas"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <a class="btn btn-outline-primary" id="reservas_ir_compras" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+
+        echo '<script>
+            function escapeHtml2(str){
+                if (str === null || str === undefined) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/\'/g, "&#039;");
+            }
+            function formatMoney2(v){
+                if (v === null || v === undefined || v === "") return "-";
+                var n = Number(v);
+                if (isNaN(n)) return String(v);
+                return "$ " + n.toFixed(2);
+            }
+            function renderAccordionReservas(pedidos){
+                var acc = document.getElementById("accordionReservas");
+                if (!acc) return;
+                acc.innerHTML = "";
+                pedidos.forEach(function(p){
+                    var pid = p.id || 0;
+                    var headId = "resHead_" + pid;
+                    var bodyId = "resBody_" + pid;
+                    var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney2(p.valor_total) : "-";
+                    var status = p.status ? escapeHtml2(p.status) : "";
+                    var codigo = p.codigo_pedido ? escapeHtml2(p.codigo_pedido) : "";
+                    var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
+                    var criado = p.created_at ? escapeHtml2(p.created_at) : "";
+                    var pagoEm = p.pago_em ? escapeHtml2(p.pago_em) : "";
+                    var itensHtml = "";
+                    if (Array.isArray(p.itens) && p.itens.length > 0) {
+                        itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
+                        itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
+                        p.itens.forEach(function(it){
+                            itensHtml += "<tr>";
+                            itensHtml += "<td>" + escapeHtml2(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
+                            itensHtml += "<td>" + escapeHtml2(it.quantidade || 0) + "</td>";
+                            itensHtml += "<td>" + formatMoney2(it.preco_unitario) + "</td>";
+                            itensHtml += "<td>" + formatMoney2(it.subtotal) + "</td>";
+                            itensHtml += "</tr>";
+                        });
+                        itensHtml += "</tbody></table></div>";
+                    } else {
+                        itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
+                    }
+                    var html = "";
+                    html += "<div class=\"accordion-item\">";
+                    html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
+                    html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
+                    html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
+                    html += "</button></h2>";
+                    html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionReservas\">";
+                    html += "<div class=\"accordion-body\">";
+                    html += "<div class=\"mb-2\">";
+                    html += "<div><strong>Cliente:</strong> " + escapeHtml2(cliente) + "</div>";
+                    html += "<div><strong>Criado em:</strong> " + criado + "</div>";
+                    if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
+                    html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
+                    html += "</div>";
+                    html += itensHtml;
+                    html += "</div></div></div>";
+                    acc.insertAdjacentHTML("beforeend", html);
+                });
+            }
+            var modalReservas = document.getElementById("modalReservas");
+            if (modalReservas) {
+                modalReservas.addEventListener("show.bs.modal", function (event) {
+                    var button = event.relatedTarget;
+                    var produtoId = (button && button.getAttribute) ? (button.getAttribute("data-produto-id") || "") : "";
+                    if (!produtoId) {
+                        produtoId = "' . (int) $produtoId . '";
+                    }
+                    var produtoNome = (button && button.getAttribute) ? (button.getAttribute("data-produto-nome") || "") : "";
+                    if (!produtoNome) {
+                        produtoNome = "' . htmlspecialchars($produtoNome) . '";
+                    }
+                    var label = document.getElementById("reservas_produto_nome");
+                    if (label) label.textContent = produtoNome;
+                    var linkCompras = document.getElementById("reservas_ir_compras");
+                    if (linkCompras) linkCompras.href = "/admin/estoque/compras?produto_id=" + encodeURIComponent(String(produtoId)) + "&status=pendente";
+                    var loading = document.getElementById("reservas_loading");
+                    var empty = document.getElementById("reservas_empty");
+                    var acc = document.getElementById("accordionReservas");
+                    if (acc) acc.innerHTML = "";
+                    if (empty) empty.classList.add("d-none");
+                    if (loading) loading.style.display = "block";
+
+                    fetch("/admin/estoque/reservas?produto_id=" + encodeURIComponent(String(produtoId)))
+                        .then(function(r){ return r.json(); })
+                        .then(function(data){
+                            var pedidos = (data && data.pedidos) ? data.pedidos : [];
+                            if (loading) loading.style.display = "none";
+                            if (!Array.isArray(pedidos) || pedidos.length === 0) {
+                                if (empty) empty.classList.remove("d-none");
+                                return;
+                            }
+                            renderAccordionReservas(pedidos);
+                        })
+                        .catch(function(){
+                            if (loading) loading.style.display = "none";
+                            if (empty) empty.classList.remove("d-none");
+                        });
+                });
+            }
+        </script>';
 
         echo '<div class="row g-4">
                 <div class="col-lg-8">
