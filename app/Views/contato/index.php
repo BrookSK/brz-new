@@ -50,6 +50,7 @@
             <div class="card shadow-sm">
                 <div class="card-body p-4">
                     <form method="POST" action="/contato" id="contactForm">
+                        <input type="hidden" name="contact_token" value="<?= htmlspecialchars((string)($contactToken ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="nome" class="form-label">Nome Completo</label>

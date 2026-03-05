@@ -6,6 +6,26 @@ use App\Core\Request;
 class ContatoController extends Controller {
     public function index(Request $request) {
         if (strtoupper((string) $request->getMethod()) === 'POST') {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+
+            $token = (string) $request->getParam('contact_token', '');
+            if ($token === '') {
+                return $this->json(['success' => false, 'error' => 'Token inválido. Recarregue a página e tente novamente.'], 400);
+            }
+
+            $expected = (string) ($_SESSION['contact_token'] ?? '');
+            if ($expected === '' || !hash_equals($expected, $token)) {
+                return $this->json(['success' => false, 'error' => 'Token expirado. Recarregue a página e tente novamente.'], 400);
+            }
+
+            // Idempotência: se esse token já foi processado com sucesso, não reenviar.
+            $lastSent = (string) ($_SESSION['contact_token_last_sent'] ?? '');
+            if ($lastSent !== '' && hash_equals($lastSent, $token)) {
+                return $this->json(['success' => true, 'duplicate' => true]);
+            }
+
             $nome = trim((string) $request->getParam('nome', ''));
             $email = trim((string) $request->getParam('email', ''));
             $telefone = trim((string) $request->getParam('telefone', ''));
@@ -49,9 +69,26 @@ class ContatoController extends Controller {
                 return $this->json(['success' => false, 'error' => 'Não foi possível enviar sua mensagem agora. Tente novamente.'], 500);
             }
 
+            $_SESSION['contact_token_last_sent'] = $token;
+            try {
+                $_SESSION['contact_token'] = bin2hex(random_bytes(16));
+            } catch (\Throwable $e) {
+                $_SESSION['contact_token'] = (string) mt_rand(100000, 999999) . (string) time();
+            }
+
             return $this->json(['success' => true]);
         }
 
-        $this->view('contato/index');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['contact_token'])) {
+            try {
+                $_SESSION['contact_token'] = bin2hex(random_bytes(16));
+            } catch (\Throwable $e) {
+                $_SESSION['contact_token'] = (string) mt_rand(100000, 999999) . (string) time();
+            }
+        }
+        $this->view('contato/index', ['contactToken' => (string) $_SESSION['contact_token']]);
     }
 }
