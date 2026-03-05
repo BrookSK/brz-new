@@ -1166,6 +1166,22 @@ class AuthController extends Controller {
             return;
         }
 
+        // GET: não permitir abrir formulário com token inválido/expirado
+        if ($request->getMethod() !== 'POST') {
+            $valid = false;
+            try {
+                $valid = (bool) $this->usuarioModel->isPasswordResetTokenValid($token);
+            } catch (\Exception $e) {
+                $valid = false;
+            }
+            if (!$valid) {
+                $_SESSION['message'] = 'Link inválido ou expirado. Solicite a recuperação novamente.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/recuperar-senha');
+                return;
+            }
+        }
+
         if ($request->getMethod() === 'POST') {
             $senha = (string) ($request->getParam('senha') ?? '');
             $confirm = (string) ($request->getParam('senha_confirmacao') ?? '');

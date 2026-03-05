@@ -29,6 +29,11 @@ class Usuario extends Model {
         }
     }
 
+    public function isPasswordResetTokenValid(string $token): bool {
+        $uid = $this->getUserIdByResetToken($token);
+        return !empty($uid) && (int) $uid > 0;
+    }
+
     public function setRememberToken(int $usuarioId, string $token, int $ttlSeconds): bool {
         $usuarioId = (int) $usuarioId;
         $token = trim((string) $token);
