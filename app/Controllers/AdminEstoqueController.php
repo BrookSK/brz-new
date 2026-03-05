@@ -85,6 +85,73 @@ class AdminEstoqueController extends Controller {
         }
     }
 
+    private function normalizeReservasProduto(int $produtoId): void {
+        if ($produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_reservas') || !$this->columnExists('estoque_reservas', 'produto_id') || !$this->columnExists('estoque_reservas', 'status')) {
+            return;
+        }
+        if (!$this->columnExists('estoque_reservas', 'quantidade_reservada')) {
+            return;
+        }
+
+        $temPedido = $this->columnExists('estoque_reservas', 'pedido_id');
+        if (!$temPedido) {
+            return;
+        }
+
+        try {
+            // remove reservas órfãs (sem pedido)
+            $stmtDelOrf = $this->connection->prepare(
+                "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa' AND (pedido_id IS NULL OR pedido_id = 0)"
+            );
+            $stmtDelOrf->execute([':produto_id' => $produtoId]);
+        } catch (\Exception $e) {
+        }
+
+        try {
+            // normaliza reservas por pedido: não pode ser maior do que a quantidade do produto no pedido
+            $stmtPeds = $this->connection->prepare(
+                "SELECT DISTINCT pedido_id FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa' AND pedido_id IS NOT NULL AND pedido_id <> 0"
+            );
+            $stmtPeds->execute([':produto_id' => $produtoId]);
+            $pedidoIds = $stmtPeds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $pedidoIds = array_values(array_filter(array_map('intval', $pedidoIds)));
+            foreach ($pedidoIds as $pedidoId) {
+                if ($pedidoId <= 0) continue;
+                $qPedido = $this->getQtdProdutoNoPedido($pedidoId, $produtoId);
+                if ($qPedido <= 0) {
+                    // pedido não tem esse produto: remove reservas
+                    try {
+                        $stmtDel = $this->connection->prepare(
+                            "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
+                        );
+                        $stmtDel->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                    } catch (\Exception $e) {
+                    }
+                    continue;
+                }
+
+                try {
+                    $stmtSum = $this->connection->prepare(
+                        "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
+                    );
+                    $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                    $qRes = (int) ($stmtSum->fetchColumn() ?: 0);
+                    if ($qRes > $qPedido) {
+                        $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qPedido);
+                    } else {
+                        // mesmo quando não está maior, eliminamos duplicatas mantendo 1 linha com o total
+                        $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qRes);
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getTotalReservadoProduto(int $produtoId): int {
         if ($produtoId <= 0) {
             return 0;
@@ -2062,6 +2129,9 @@ class AdminEstoqueController extends Controller {
                 header('Location: /admin/estoque');
                 exit;
             }
+
+            // Normalizar reservas do produto para evitar números inflados no resumo
+            $this->normalizeReservasProduto($produtoId);
 
             // Produto
             $schema = $this->getProdutosSchema();
