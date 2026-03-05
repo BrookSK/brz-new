@@ -586,6 +586,20 @@ class AdminComprasController extends Controller {
         header('Content-Type: application/json; charset=utf-8');
 
         $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $valorRaw = (string) ($request->getParam('valor', '') ?? '');
+        $valorRaw = trim($valorRaw);
+        $valor = null;
+        if ($valorRaw !== '') {
+            $valorNorm = str_replace([' ', 'R$', 'r$'], '', $valorRaw);
+            $valorNorm = str_replace('.', '', $valorNorm);
+            $valorNorm = str_replace(',', '.', $valorNorm);
+            if (is_numeric($valorNorm)) {
+                $tmp = (float) $valorNorm;
+                if ($tmp > 0) {
+                    $valor = $tmp;
+                }
+            }
+        }
 
         if ($pedidoId <= 0) {
             echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
@@ -594,7 +608,7 @@ class AdminComprasController extends Controller {
 
         try {
             $svc = new \App\Services\PedidoDiferencaAsaasService($this->connection);
-            $result = $svc->gerarCobrancaDiferenca($pedidoId);
+            $result = $svc->gerarCobrancaDiferenca($pedidoId, $valor);
 
             $created = is_array($result['created'] ?? null) ? $result['created'] : [];
 
@@ -1716,12 +1730,17 @@ class AdminComprasController extends Controller {
 
                             html += "<div class=\"mt-2 d-flex flex-wrap gap-2\">";
                             html += "<a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a>";
-                            if (!pago) {
+                            var gw = String(p.payment_gateway || p.gateway || "").toLowerCase();
+                            var payId = String(p.payment_id || p.asaas_payment_id || "");
+                            var temAsaas = (gw === "asaas" && payId.trim() !== "");
+                            if (!pago && temAsaas) {
                                 html += "<div class=\"input-group input-group-sm\" style=\"max-width:320px;\">";
                                 html += "<span class=\"input-group-text\">$</span>";
                                 html += "<input type=\"number\" step=\"0.01\" min=\"0\" class=\"form-control\" placeholder=\"Valor da diferença\" id=\"diff_val_" + pid + "\">";
                                 html += "<button type=\"button\" class=\"btn btn-outline-success\" onclick=\"gerarLinkDiferenca(" + pid + ")\">Gerar link</button>";
                                 html += "</div>";
+                            } else if (!pago && !temAsaas) {
+                                html += "<div class=\"text-muted small\">Cobrança de diferença disponível apenas para pedidos Asaas.</div>";
                             }
                             html += "</div>";
                             html += "<div class=\"mt-2\" id=\"diff_out_" + pid + "\"></div>";

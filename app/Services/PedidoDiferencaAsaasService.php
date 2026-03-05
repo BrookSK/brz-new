@@ -34,7 +34,7 @@ class PedidoDiferencaAsaasService {
      *
      * Valor já pago = valor do payment original do pedido (Asaas) + (eventual diferença já quitada, se houver colunas).
      */
-    public function gerarCobrancaDiferenca(int $pedidoId): array {
+    public function gerarCobrancaDiferenca(int $pedidoId, ?float $valorOverride = null): array {
         if ($pedidoId <= 0) {
             throw new \Exception('Pedido inválido');
         }
@@ -87,9 +87,14 @@ class PedidoDiferencaAsaasService {
         }
 
         $valorJaPago = $valorPagoOriginal + $valorPagoDiferenca;
-        $diferenca = round($novoTotal - $valorJaPago, 2);
-        if ($diferenca <= 0) {
-            throw new \Exception('Sem diferença a cobrar (novo total não excede o valor já pago)');
+        $diferenca = 0.0;
+        if ($valorOverride !== null && (float) $valorOverride > 0) {
+            $diferenca = round((float) $valorOverride, 2);
+        } else {
+            $diferenca = round($novoTotal - $valorJaPago, 2);
+            if ($diferenca <= 0) {
+                throw new \Exception('Sem diferença a cobrar (novo total não excede o valor já pago)');
+            }
         }
 
         $customerId = (string) ($payment['customer'] ?? '');
