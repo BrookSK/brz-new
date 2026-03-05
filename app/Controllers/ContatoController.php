@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Services\EmailService;
 
 class ContatoController extends Controller {
     public function index(Request $request) {
@@ -64,8 +65,13 @@ class ContatoController extends Controller {
             $headers[] = 'From: Braziliana <noreply@brazilianashop.com.br>';
             $headers[] = 'Reply-To: ' . $email;
 
-            $ok = @mail($to, $subject, $html, implode("\r\n", $headers));
-            if (!$ok) {
+            try {
+                $emailService = new EmailService();
+                $dedupeKey = 'contact:' . $token;
+                $emailService->send($to, $subject, $html, $dedupeKey, [
+                    'evento' => 'contato_site',
+                ]);
+            } catch (\Throwable $e) {
                 return $this->json(['success' => false, 'error' => 'Não foi possível enviar sua mensagem agora. Tente novamente.'], 500);
             }
 
