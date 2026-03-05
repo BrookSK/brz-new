@@ -203,7 +203,12 @@ class Router {
 
         if (!$matchedRoute) {
             http_response_code(404);
-            echo "Página não encontrada";
+            $view404 = __DIR__ . '/../Views/errors/404.php';
+            if (is_file($view404)) {
+                require $view404;
+            } else {
+                echo "Página não encontrada";
+            }
             return;
         }
 
