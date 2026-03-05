@@ -2188,6 +2188,7 @@ class AdminEstoqueController extends Controller {
                     var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
                     var criado = p.created_at ? escapeHtml2(p.created_at) : "";
                     var pagoEm = p.pago_em ? escapeHtml2(p.pago_em) : "";
+                    var qtdReservada = (p.quantidade_reservada !== null && p.quantidade_reservada !== undefined) ? Number(p.quantidade_reservada) : 0;
                     var itensHtml = "";
                     if (Array.isArray(p.itens) && p.itens.length > 0) {
                         itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
@@ -2208,11 +2209,12 @@ class AdminEstoqueController extends Controller {
                     html += "<div class=\"accordion-item\">";
                     html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
                     html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
-                    html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
+                    html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - Qtd reservada: " + (isNaN(qtdReservada) ? 0 : qtdReservada) + (status ? (" - " + status) : "") + " - " + total;
                     html += "</button></h2>";
                     html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionReservas\">";
                     html += "<div class=\"accordion-body\">";
                     html += "<div class=\"mb-2\">";
+                    html += "<div><strong>Quantidade reservada:</strong> " + escapeHtml2(isNaN(qtdReservada) ? 0 : qtdReservada) + "</div>";
                     html += "<div><strong>Cliente:</strong> " + escapeHtml2(cliente) + "</div>";
                     html += "<div><strong>Criado em:</strong> " + criado + "</div>";
                     if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
