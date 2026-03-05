@@ -2202,6 +2202,9 @@ class AdminEstoqueController extends Controller {
                 }
             }
 
+            // Normalizar pendências: se não há déficit (estoque >= reserva real), pendência não deve ficar presa.
+            $this->garantirSomaZeroAposReducao($produtoId);
+
             $pendenciaCompra = 0;
             if ($this->tableExists('lista_compras')) {
                 try {
