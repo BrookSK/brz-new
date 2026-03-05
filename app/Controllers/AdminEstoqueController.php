@@ -1127,21 +1127,9 @@ class AdminEstoqueController extends Controller {
             $skuExpr = (is_string($skuCol) && $skuCol !== '') ? ('p.' . $skuCol) : "''";
 
             // Buscar status geral do estoque (apenas itens com quantidade no galpão)
-            // Regra: Reservado = reservas reais (estoque_reservas ativa) + demanda pendente (lista_compras pendente)
+            // Regra (UI): Reservado = apenas reservas reais (estoque_reservas ativa). A pendência de compra fica na tela de compras.
             $reservaJoin = '';
             $reservadoSelectExpr = '0';
-
-            if ($this->tableExists('lista_compras')) {
-                $reservaJoin .= "
-                    LEFT JOIN (
-                        SELECT produto_id, SUM(COALESCE(quantidade_faltante,0)) as reservado
-                        FROM lista_compras
-                        WHERE status = 'pendente'
-                        GROUP BY produto_id
-                    ) res_lc ON res_lc.produto_id = p.id
-                ";
-                $reservadoSelectExpr = 'COALESCE(res_lc.reservado, 0)';
-            }
 
             if ($this->tableExists('estoque_reservas')) {
                 $reservaJoin .= "
@@ -1154,7 +1142,7 @@ class AdminEstoqueController extends Controller {
                         GROUP BY er.produto_id
                     ) res_er ON res_er.produto_id = p.id
                 ";
-                $reservadoSelectExpr = '(' . $reservadoSelectExpr . ' + COALESCE(res_er.reservado, 0))';
+                $reservadoSelectExpr = 'COALESCE(res_er.reservado, 0)';
             }
 
             $stmt = $this->connection->prepare("
