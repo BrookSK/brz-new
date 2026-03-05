@@ -35,7 +35,7 @@ class AdminEstoqueController extends Controller {
         // Reservas reais
         if ($this->tableExists('estoque_reservas')) {
             try {
-                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
+                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total\n                    FROM estoque_reservas er\n                    LEFT JOIN pedidos p ON p.id = er.pedido_id\n                    WHERE er.produto_id = :produto_id\n                      AND er.status = 'ativa'\n                      AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
                 $stmt->execute([':produto_id' => $produtoId]);
                 $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
             } catch (\Exception $e) {
@@ -1088,10 +1088,12 @@ class AdminEstoqueController extends Controller {
             if ($this->tableExists('estoque_reservas')) {
                 $reservaJoin .= "
                     LEFT JOIN (
-                        SELECT produto_id, SUM(COALESCE(quantidade_reservada,0)) as reservado
-                        FROM estoque_reservas
-                        WHERE status = 'ativa'
-                        GROUP BY produto_id
+                        SELECT er.produto_id, SUM(COALESCE(er.quantidade_reservada,0)) as reservado
+                        FROM estoque_reservas er
+                        LEFT JOIN pedidos p ON p.id = er.pedido_id
+                        WHERE er.status = 'ativa'
+                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
+                        GROUP BY er.produto_id
                     ) res_er ON res_er.produto_id = p.id
                 ";
                 $reservadoSelectExpr = '(' . $reservadoSelectExpr . ' + COALESCE(res_er.reservado, 0))';
@@ -1926,7 +1928,7 @@ class AdminEstoqueController extends Controller {
             $totalReservadoReal = 0;
             if ($this->tableExists('estoque_reservas')) {
                 try {
-                    $stmtRes = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
+                    $stmtRes = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total\n                        FROM estoque_reservas er\n                        LEFT JOIN pedidos p ON p.id = er.pedido_id\n                        WHERE er.produto_id = :produto_id\n                          AND er.status = 'ativa'\n                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
                     $stmtRes->execute([':produto_id' => $produtoId]);
                     $totalReservadoReal = (int) (($stmtRes->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
                 } catch (\Exception $e) {
@@ -1956,7 +1958,9 @@ class AdminEstoqueController extends Controller {
                     $stmtRA = $this->connection->prepare(
                         "SELECT er.pedido_id, SUM(COALESCE(er.quantidade_reservada,0)) as quantidade
                          FROM estoque_reservas er
+                         LEFT JOIN pedidos p ON p.id = er.pedido_id
                          WHERE er.produto_id = :produto_id AND er.status = 'ativa'
+                           AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                          GROUP BY er.pedido_id
                          ORDER BY er.pedido_id DESC"
                     );
