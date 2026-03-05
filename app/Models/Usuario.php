@@ -192,8 +192,6 @@ class Usuario extends Model {
 
         $token = bin2hex(random_bytes(32));
         $hash = hash('sha256', $token);
-        $expiresAt = date('Y-m-d H:i:s', time() + 3600);
-        $createdAt = date('Y-m-d H:i:s');
 
         try {
             $stDel = $this->connection->prepare('DELETE FROM password_resets WHERE usuario_id = ?');
@@ -202,8 +200,8 @@ class Usuario extends Model {
         }
 
         try {
-            $st = $this->connection->prepare('INSERT INTO password_resets (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)');
-            $st->execute([(int) $user['id'], $hash, $expiresAt, $createdAt]);
+            $st = $this->connection->prepare("INSERT INTO password_resets (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())");
+            $st->execute([(int) $user['id'], $hash]);
         } catch (\Exception $e) {
             return '';
         }

@@ -1070,6 +1070,13 @@ class AuthController extends Controller {
                 $token = '';
             }
 
+            if ($token === '') {
+                $_SESSION['message'] = 'E-mail não encontrado.';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/recuperar-senha');
+                return;
+            }
+
             if ($token !== '') {
                 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                 $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
@@ -1133,8 +1140,7 @@ class AuthController extends Controller {
                 }
             }
 
-            // Por segurança, mesma mensagem para email existente ou não
-            $_SESSION['message'] = 'Se o e-mail estiver cadastrado, você receberá instruções para recuperar sua senha.';
+            $_SESSION['message'] = 'Enviamos as instruções para redefinir sua senha.';
             $_SESSION['message_type'] = 'success';
             $this->redirect('/login');
             return;
