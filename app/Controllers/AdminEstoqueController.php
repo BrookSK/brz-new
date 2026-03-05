@@ -166,7 +166,10 @@ class AdminEstoqueController extends Controller {
                 $stmt = $this->connection->prepare(
                     "SELECT er.pedido_id, SUM(COALESCE(er.quantidade_reservada,0)) as quantidade_reservada
                      FROM estoque_reservas er
-                     WHERE er.produto_id = :produto_id AND er.status = 'ativa'
+                     LEFT JOIN pedidos p ON p.id = er.pedido_id
+                     WHERE er.produto_id = :produto_id
+                       AND er.status = 'ativa'
+                       AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                      GROUP BY er.pedido_id
                      ORDER BY er.pedido_id DESC"
                 );
@@ -174,15 +177,36 @@ class AdminEstoqueController extends Controller {
                 $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $pedidoIds = [];
                 $qPorPedido = [];
+                $orfas = 0;
                 foreach ($rows as $r) {
                     $pid = (int) ($r['pedido_id'] ?? 0);
-                    if ($pid <= 0) continue;
+                    $q = (int) ($r['quantidade_reservada'] ?? 0);
+                    if ($pid <= 0) {
+                        $orfas += $q;
+                        continue;
+                    }
                     $pedidoIds[] = $pid;
-                    $qPorPedido[$pid] = (int) ($r['quantidade_reservada'] ?? 0);
+                    $qPorPedido[$pid] = $q;
                 }
 
                 if (empty($pedidoIds)) {
-                    echo json_encode(['success' => true, 'pedidos' => []]);
+                    $out = [];
+                    if ($orfas > 0) {
+                        $out[] = [
+                            'id' => 0,
+                            'codigo_pedido' => '',
+                            'status' => 'Reserva órfã (sem pedido)',
+                            'valor_total' => null,
+                            'moeda' => '',
+                            'created_at' => '',
+                            'pago_em' => '',
+                            'cliente_nome' => '',
+                            'cliente_email' => '',
+                            'quantidade_reservada' => (int) $orfas,
+                            'itens' => [],
+                        ];
+                    }
+                    echo json_encode(['success' => true, 'pedidos' => $out]);
                     return;
                 }
 
@@ -237,6 +261,22 @@ class AdminEstoqueController extends Controller {
                             'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ''),
                         ];
                     }
+                }
+
+                if ($orfas > 0) {
+                    $pedidos[0] = [
+                        'id' => 0,
+                        'codigo_pedido' => '',
+                        'status' => 'Reserva órfã (sem pedido)',
+                        'valor_total' => null,
+                        'moeda' => '',
+                        'created_at' => '',
+                        'pago_em' => '',
+                        'cliente_nome' => '',
+                        'cliente_email' => '',
+                        'quantidade_reservada' => (int) $orfas,
+                        'itens' => [],
+                    ];
                 }
 
                 echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
