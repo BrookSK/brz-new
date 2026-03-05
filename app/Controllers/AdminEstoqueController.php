@@ -2005,10 +2005,12 @@ class AdminEstoqueController extends Controller {
                 }
             }
 
-            $totalReservado = $totalReservadoReal + $pendenciaCompra;
+            // IMPORTANTE (UI): "Reservado" aqui representa apenas reserva real (pedidos/estoque_reservas).
+            // A pendência de compra é exibida separadamente para não parecer duplicação.
+            $totalReservado = $totalReservadoReal;
 
-            $totalDisponivel = $totalEstoque - $totalReservado;
-            $statusReposicao = ($totalReservado > $totalEstoque);
+            $totalDisponivel = $totalEstoque - $totalReservadoReal;
+            $statusReposicao = ($totalReservadoReal > $totalEstoque);
 
             $reservasAtivas = [];
             if ($this->tableExists('estoque_reservas')) {
@@ -2095,9 +2097,9 @@ class AdminEstoqueController extends Controller {
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Estoque total</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reservado</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservado . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reserva (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Pendência (compras)</div><div style="font-weight:900;font-size:20px;">' . (int) $pendenciaCompra . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
                         <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">Abrir lista de compras</a>
