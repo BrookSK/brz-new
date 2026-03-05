@@ -25,6 +25,66 @@ class AdminEstoqueController extends Controller {
         }
     }
 
+    private function getQtdProdutoNoPedido(int $pedidoId, int $produtoId): int {
+        if ($pedidoId <= 0 || $produtoId <= 0) {
+            return 0;
+        }
+        $itensTable = $this->findPedidoItensTable();
+        if (!$itensTable) {
+            return 0;
+        }
+        try {
+            $stmt = $this->connection->prepare(
+                "SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM {$itensTable} WHERE pedido_id = :pedido_id AND produto_id = :produto_id"
+            );
+            $stmt->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
+            return (int) ($stmt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    private function normalizeReservaPedidoProduto(int $pedidoId, int $produtoId, int $qtdCorreta): void {
+        if ($pedidoId <= 0 || $produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_reservas') || !$this->columnExists('estoque_reservas', 'pedido_id')) {
+            return;
+        }
+        try {
+            $stmtIds = $this->connection->prepare(
+                "SELECT id FROM estoque_reservas WHERE pedido_id = :pedido_id AND produto_id = :produto_id AND status = 'ativa' ORDER BY id ASC"
+            );
+            $stmtIds->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
+            $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return;
+            }
+
+            if ($qtdCorreta <= 0) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $stmtDel = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                $stmtDel->execute($ids);
+                return;
+            }
+
+            $keepId = (int) $ids[0];
+            $stmtUp = $this->connection->prepare(
+                "UPDATE estoque_reservas SET quantidade_reservada = :q WHERE id = :id LIMIT 1"
+            );
+            $stmtUp->execute([':q' => $qtdCorreta, ':id' => $keepId]);
+
+            if (count($ids) > 1) {
+                $delIds = array_slice($ids, 1);
+                $in = implode(',', array_fill(0, count($delIds), '?'));
+                $stmtDel = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                $stmtDel->execute($delIds);
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getTotalReservadoProduto(int $produtoId): int {
         if ($produtoId <= 0) {
             return 0;
@@ -224,6 +284,12 @@ class AdminEstoqueController extends Controller {
                 $pedidos = [];
                 foreach ($pedidosRows as $p) {
                     $pid = (int) ($p['id'] ?? 0);
+                    $qReservada = (int) ($qPorPedido[$pid] ?? 0);
+                    $qPedido = $this->getQtdProdutoNoPedido($pid, $produtoId);
+                    if ($qPedido > 0 && $qReservada > $qPedido) {
+                        $this->normalizeReservaPedidoProduto($pid, $produtoId, $qPedido);
+                        $qReservada = $qPedido;
+                    }
                     $pedidos[$pid] = [
                         'id' => $pid,
                         'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ''),
@@ -234,7 +300,7 @@ class AdminEstoqueController extends Controller {
                         'pago_em' => isset($p['pago_em']) ? (string) $p['pago_em'] : '',
                         'cliente_nome' => (string) ($p['cliente_nome'] ?? ''),
                         'cliente_email' => (string) ($p['cliente_email'] ?? ''),
-                        'quantidade_reservada' => (int) ($qPorPedido[$pid] ?? 0),
+                        'quantidade_reservada' => (int) $qReservada,
                         'itens' => [],
                     ];
                 }
@@ -450,34 +516,71 @@ class AdminEstoqueController extends Controller {
                 if ($podeReservar && $consumir > 0) {
                     try {
                         if ($temPedidoEmReserva && $pedidoId > 0) {
-                            $stmtChk = $this->connection->prepare(
-                                "SELECT id, quantidade_reservada FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa' LIMIT 1"
+                            $qtdPedido = $this->getQtdProdutoNoPedido($pedidoId, $produtoId);
+                            if ($qtdPedido <= 0) {
+                                // se não existe item no pedido, não cria/reserva nada
+                                continue;
+                            }
+
+                            $stmtSum = $this->connection->prepare(
+                                "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
                             );
-                            $stmtChk->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
-                            $ex = $stmtChk->fetch(\PDO::FETCH_ASSOC);
-                            if ($ex && (int) ($ex['id'] ?? 0) > 0) {
+                            $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                            $reservadoAtual = (int) ($stmtSum->fetchColumn() ?: 0);
+
+                            // Normalizar caso já esteja maior do que o pedido (duplicação/bug anterior)
+                            if ($reservadoAtual > $qtdPedido) {
+                                $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qtdPedido);
+                                $reservadoAtual = $qtdPedido;
+                            }
+
+                            $faltanteReserva = $qtdPedido - $reservadoAtual;
+                            if ($faltanteReserva <= 0) {
+                                continue;
+                            }
+
+                            $add = $consumir;
+                            if ($add > $faltanteReserva) {
+                                $add = $faltanteReserva;
+                            }
+                            if ($add <= 0) {
+                                continue;
+                            }
+
+                            $stmtIds = $this->connection->prepare(
+                                "SELECT id FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa' ORDER BY id ASC"
+                            );
+                            $stmtIds->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                            $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            $ids = array_values(array_filter(array_map('intval', $ids)));
+
+                            if (!empty($ids)) {
+                                $keepId = (int) $ids[0];
                                 $stmtUpRes = $this->connection->prepare(
                                     "UPDATE estoque_reservas SET quantidade_reservada = (COALESCE(quantidade_reservada,0) + :q) WHERE id = :id LIMIT 1"
                                 );
-                                $stmtUpRes->execute([':q' => $consumir, ':id' => (int) $ex['id']]);
+                                $stmtUpRes->execute([':q' => $add, ':id' => $keepId]);
+                                if (count($ids) > 1) {
+                                    $delIds = array_slice($ids, 1);
+                                    $in = implode(',', array_fill(0, count($delIds), '?'));
+                                    $stmtDelDup = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                                    $stmtDelDup->execute($delIds);
+                                }
                             } else {
                                 $cols = ['produto_id', 'pedido_id', 'quantidade_reservada', 'status'];
                                 $vals = [':produto_id', ':pedido_id', ':q', "'ativa'"];
-                                $params = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':q' => $consumir];
+                                $params = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':q' => $add];
                                 $stmtInsRes = $this->connection->prepare(
                                     'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
                                 );
                                 $stmtInsRes->execute($params);
                             }
+
+                            // só baixa a pendência pelo que realmente virou reserva
+                            $consumir = $add;
                         } else {
-                            // Sem pedido_id disponível: cria uma reserva genérica (mantém o "reservado" apontando)
-                            $cols = ['produto_id', 'quantidade_reservada', 'status'];
-                            $vals = [':produto_id', ':q', "'ativa'"];
-                            $params = [':produto_id' => $produtoId, ':q' => $consumir];
-                            $stmtInsRes = $this->connection->prepare(
-                                'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
-                            );
-                            $stmtInsRes->execute($params);
+                            // Sem pedido_id: não cria reserva fantasma. Mantém na lista_compras para análise.
+                            continue;
                         }
                     } catch (\Exception $e) {
                     }
@@ -486,15 +589,22 @@ class AdminEstoqueController extends Controller {
                     continue;
                 }
 
-                if ($falt <= $restante) {
+                if ($consumir <= 0) {
+                    continue;
+                }
+
+                if ($falt <= $restante && $consumir === $falt) {
                     $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = 0 WHERE id = :id LIMIT 1");
                     $stmtUpd->execute([':id' => $id]);
                     $restante -= $falt;
                 } else {
                     $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = :falt WHERE id = :id LIMIT 1");
-                    $stmtUpd->execute([':id' => $id, ':falt' => ($falt - $restante)]);
-                    $restante = 0;
-                    break;
+                    $novoFalt = $falt - $consumir;
+                    if ($novoFalt < 0) {
+                        $novoFalt = 0;
+                    }
+                    $stmtUpd->execute([':id' => $id, ':falt' => $novoFalt]);
+                    $restante -= $consumir;
                 }
             }
         } catch (\Exception $e) {
