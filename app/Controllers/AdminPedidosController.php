@@ -4261,6 +4261,14 @@ HTML;
                 }
             }
 
+            if (!$isPaid && $wasPaid) {
+                try {
+                    $paySvc = new PaymentService();
+                    $paySvc->estornarEstoquePorPedido((int) $id);
+                } catch (\Exception $e) {
+                }
+            }
+
             if ($isPaid) {
                 try {
                     $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
