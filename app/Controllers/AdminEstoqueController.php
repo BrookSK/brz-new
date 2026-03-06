@@ -162,7 +162,14 @@ class AdminEstoqueController extends Controller {
         // Reservas reais
         if ($this->tableExists('estoque_reservas')) {
             try {
-                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total\n                    FROM estoque_reservas er\n                    LEFT JOIN pedidos p ON p.id = er.pedido_id\n                    WHERE er.produto_id = :produto_id\n                      AND er.status = 'ativa'\n                      AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
+                $stmt = $this->connection->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
+                    FROM estoque_reservas er
+                    LEFT JOIN pedidos p ON p.id = er.pedido_id
+                    WHERE er.produto_id = :produto_id
+                      AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
+                      AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+                );
                 $stmt->execute([':produto_id' => $produtoId]);
                 $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
             } catch (\Exception $e) {
@@ -188,12 +195,14 @@ class AdminEstoqueController extends Controller {
         }
 
         try {
-            $stmt = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total
+            $stmt = $this->connection->prepare(
+                "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
                 FROM estoque_reservas er
                 LEFT JOIN pedidos p ON p.id = er.pedido_id
                 WHERE er.produto_id = :produto_id
-                  AND er.status = 'ativa'
-                  AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
+                  AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
+                  AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+            );
             $stmt->execute([':produto_id' => $produtoId]);
             return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
         } catch (\Throwable $e) {
@@ -295,7 +304,7 @@ class AdminEstoqueController extends Controller {
                      FROM estoque_reservas er
                      LEFT JOIN pedidos p ON p.id = er.pedido_id
                      WHERE er.produto_id = :produto_id
-                       AND er.status = 'ativa'
+                       AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
                        AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                      GROUP BY er.pedido_id
                      ORDER BY er.pedido_id DESC"
