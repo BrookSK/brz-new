@@ -2664,7 +2664,8 @@ class CheckoutController extends Controller {
                         } else {
                             // Fluxo legado (AppMax total) - cartao_credito permanece aqui por enquanto.
                             $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
-                            $gateway = 'appmax';
+                            $formaSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+                            $gateway = in_array($formaSel, ['pix', 'boleto'], true) ? 'asaas' : 'appmax';
                             $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                             $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
                         }

@@ -2741,6 +2741,10 @@ class PaymentService {
     
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
         if ($moeda === 'BRL') {
+            $bt = strtoupper((string) ($dadosPagamento['billingType'] ?? ''));
+            if (in_array($bt, ['PIX', 'BOLETO'], true)) {
+                return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
+            }
             return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
         }
 
