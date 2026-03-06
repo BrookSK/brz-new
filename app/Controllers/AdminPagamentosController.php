@@ -1332,16 +1332,6 @@ class AdminPagamentosController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
-
-            $jaPago = false;
-            try {
-                $stPrev = $pdo->prepare('SELECT status FROM pedidos WHERE id = :id LIMIT 1');
-                $stPrev->execute([':id' => $pedidoId]);
-                $prev = strtolower(trim((string) ($stPrev->fetchColumn() ?: '')));
-                $jaPago = in_array($prev, ['pago', 'paid', 'approved', 'aprovado'], true);
-            } catch (\Exception $e) {
-                $jaPago = false;
-            }
             
             // Atualizar status do pagamento
             $stmt = $pdo->prepare("
@@ -1362,14 +1352,6 @@ class AdminPagamentosController extends Controller {
             $stmt->execute();
             
             $pdo->commit();
-
-            if (!$jaPago) {
-                try {
-                    $svc = new \App\Services\PaymentService();
-                    $svc->baixarEstoquePorPedido((int) $pedidoId);
-                } catch (\Exception $e) {
-                }
-            }
             
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
