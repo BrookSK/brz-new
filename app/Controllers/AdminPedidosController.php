@@ -4484,6 +4484,110 @@ HTML;
                 exit;
             }
 
+            // Ao finalizar o ciclo do pedido (ex.: entregue), dar baixa física no estoque pelo que estava reservado.
+            // Sem isso, o reservado some e o disponível sobe, sem reduzir o estoque total.
+            $cicloFechado = in_array(strtolower(trim((string) $novoStatus)), [
+                'produto_consolidado',
+                'em_transporte',
+                'aguardando_liberacao_aduaneira',
+                'enviado_ao_destinatario',
+                'enviado',
+                'entregue',
+            ], true);
+
+            if ($cicloFechado) {
+                $temReservas = false;
+                $temEstoqueInterno = false;
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['estoque_reservas']);
+                    $temReservas = ((int) $stmtT->fetchColumn() > 0);
+                    $stmtT->execute(['estoque_interno']);
+                    $temEstoqueInterno = ((int) $stmtT->fetchColumn() > 0);
+                } catch (\Exception $e) {
+                    $temReservas = false;
+                    $temEstoqueInterno = false;
+                }
+
+                if ($temReservas && $temEstoqueInterno) {
+                    $temStatusReserva = false;
+                    try {
+                        $st = $pdo->query('DESCRIBE estoque_reservas');
+                        $colsRes = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        $temStatusReserva = is_array($colsRes) && in_array('status', $colsRes, true);
+                        $temPedidoIdReserva = is_array($colsRes) && in_array('pedido_id', $colsRes, true);
+                        $temProdutoIdReserva = is_array($colsRes) && in_array('produto_id', $colsRes, true);
+                        $temQtdReserva = is_array($colsRes) && in_array('quantidade_reservada', $colsRes, true);
+                    } catch (\Exception $e) {
+                        $temStatusReserva = false;
+                        $temPedidoIdReserva = false;
+                        $temProdutoIdReserva = false;
+                        $temQtdReserva = false;
+                    }
+
+                    if (!empty($temPedidoIdReserva) && !empty($temProdutoIdReserva) && !empty($temQtdReserva)) {
+                        // Somar reservas por produto e consumir FIFO do estoque_interno
+                        try {
+                            $sql = 'SELECT produto_id, COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) as qtd FROM estoque_reservas WHERE pedido_id = ?';
+                            $params = [(int) $id];
+                            if ($temStatusReserva) {
+                                $sql .= " AND (status IS NULL OR status = '' OR status <> 'finalizada')";
+                            }
+                            $sql .= ' GROUP BY produto_id';
+                            $stRes = $pdo->prepare($sql);
+                            $stRes->execute($params);
+                            $resRows = $stRes->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        } catch (\Exception $e) {
+                            $resRows = [];
+                        }
+
+                        foreach (($resRows ?? []) as $rr) {
+                            $produtoId = (int) ($rr['produto_id'] ?? 0);
+                            $qtdReservada = (int) ($rr['qtd'] ?? 0);
+                            if ($produtoId <= 0 || $qtdReservada <= 0) {
+                                continue;
+                            }
+
+                            $restante = $qtdReservada;
+                            try {
+                                $stmtLocs = $pdo->prepare(
+                                    'SELECT id, quantidade FROM estoque_interno WHERE produto_id = ? AND quantidade > 0 '
+                                    . 'ORDER BY CASE WHEN data_compra IS NULL THEN 1 ELSE 0 END ASC, data_compra ASC, id ASC'
+                                );
+                                $stmtLocs->execute([$produtoId]);
+                                $locs = $stmtLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            } catch (\Exception $e) {
+                                $locs = [];
+                            }
+
+                            foreach ($locs as $loc) {
+                                if ($restante <= 0) break;
+                                $locId = (int) ($loc['id'] ?? 0);
+                                $qAtual = (int) ($loc['quantidade'] ?? 0);
+                                if ($locId <= 0 || $qAtual <= 0) continue;
+                                $consumir = ($qAtual <= $restante) ? $qAtual : $restante;
+                                $novoQ = $qAtual - $consumir;
+                                try {
+                                    $stmtUpd = $pdo->prepare('UPDATE estoque_interno SET quantidade = ? WHERE id = ? LIMIT 1');
+                                    $stmtUpd->execute([$novoQ, $locId]);
+                                } catch (\Exception $e) {
+                                }
+                                $restante -= $consumir;
+                            }
+                        }
+
+                        // Finalizar reservas do pedido (para não “voltar” a contar depois)
+                        if ($temStatusReserva) {
+                            try {
+                                $stFin = $pdo->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = ? AND (status IS NULL OR status = '' OR status <> 'finalizada')");
+                                $stFin->execute([(int) $id]);
+                            } catch (\Exception $e) {
+                            }
+                        }
+                    }
+                }
+            }
+
             if ((string) $novoStatus === 'produto_consolidado') {
                 try {
                     $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -4698,7 +4802,23 @@ HTML;
                         $temPedidoId = false;
                     }
 
-                    if (!empty($temPedidoId)) {
+                    $temStatus = false;
+                    try {
+                        $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'status'");
+                        $stmtC->execute();
+                        $temStatus = ((int) $stmtC->fetchColumn() > 0);
+                    } catch (\Exception $e) {
+                        $temStatus = false;
+                    }
+
+                    if (!empty($temPedidoId) && $temStatus) {
+                        try {
+                            $stmtFin = $pdo->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = ? AND status = 'ativa'");
+                            $stmtFin->execute([(int) $id]);
+                        } catch (\Exception $e) {
+                        }
+                    } elseif (!empty($temPedidoId)) {
+                        // Fallback legado sem coluna status
                         try {
                             $stmtDel = $pdo->prepare('DELETE FROM estoque_reservas WHERE pedido_id = ?');
                             $stmtDel->execute([(int) $id]);

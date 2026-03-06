@@ -274,13 +274,13 @@ class AdminPedidosEditController extends Controller {
             return;
         }
 
-        // Consumir apenas reservas ativas (o que ainda não foi baixado fisicamente)
+        // Consumir reservas ainda não finalizadas (para evitar dupla baixa)
         $temStatus = $this->columnExists('estoque_reservas', 'status');
         try {
             $sql = 'SELECT produto_id, COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) as qtd '
                 . 'FROM estoque_reservas WHERE pedido_id = :pedido_id';
             if ($temStatus) {
-                $sql .= " AND status = 'ativa'";
+                $sql .= " AND (status IS NULL OR status = '' OR status <> 'finalizada')";
             }
             $sql .= ' GROUP BY produto_id';
 
@@ -331,6 +331,15 @@ class AdminPedidosEditController extends Controller {
                 } catch (\Exception $e) {
                 }
                 $restante -= $consumir;
+            }
+        }
+
+        // Marcar como finalizada para não consumir novamente
+        if ($temStatus) {
+            try {
+                $stmtFin = $this->connection->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = :pedido_id AND (status IS NULL OR status = '' OR status <> 'finalizada')");
+                $stmtFin->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
             }
         }
     }
