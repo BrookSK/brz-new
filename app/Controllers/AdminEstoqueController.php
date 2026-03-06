@@ -53,7 +53,7 @@ class AdminEstoqueController extends Controller {
         }
         try {
             $stmtIds = $this->connection->prepare(
-                "SELECT id FROM estoque_reservas WHERE pedido_id = :pedido_id AND produto_id = :produto_id AND status = 'ativa' ORDER BY id ASC"
+                "SELECT id FROM estoque_reservas WHERE pedido_id = :pedido_id AND produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') ORDER BY id ASC"
             );
             $stmtIds->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
             $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -104,7 +104,7 @@ class AdminEstoqueController extends Controller {
         try {
             // remove reservas órfãs (sem pedido)
             $stmtDelOrf = $this->connection->prepare(
-                "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa' AND (pedido_id IS NULL OR pedido_id = 0)"
+                "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') AND (pedido_id IS NULL OR pedido_id = 0)"
             );
             $stmtDelOrf->execute([':produto_id' => $produtoId]);
         } catch (\Exception $e) {
@@ -113,7 +113,7 @@ class AdminEstoqueController extends Controller {
         try {
             // normaliza reservas por pedido: não pode ser maior do que a quantidade do produto no pedido
             $stmtPeds = $this->connection->prepare(
-                "SELECT DISTINCT pedido_id FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa' AND pedido_id IS NOT NULL AND pedido_id <> 0"
+                "SELECT DISTINCT pedido_id FROM estoque_reservas WHERE produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') AND pedido_id IS NOT NULL AND pedido_id <> 0"
             );
             $stmtPeds->execute([':produto_id' => $produtoId]);
             $pedidoIds = $stmtPeds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -125,7 +125,7 @@ class AdminEstoqueController extends Controller {
                     // pedido não tem esse produto: remove reservas
                     try {
                         $stmtDel = $this->connection->prepare(
-                            "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
+                            "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
                         );
                         $stmtDel->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
                     } catch (\Exception $e) {
@@ -135,7 +135,7 @@ class AdminEstoqueController extends Controller {
 
                 try {
                     $stmtSum = $this->connection->prepare(
-                        "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
+                        "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
                     );
                     $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
                     $qRes = (int) ($stmtSum->fetchColumn() ?: 0);
@@ -590,7 +590,7 @@ class AdminEstoqueController extends Controller {
                             }
 
                             $stmtSum = $this->connection->prepare(
-                                "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa'"
+                                "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
                             );
                             $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
                             $reservadoAtual = (int) ($stmtSum->fetchColumn() ?: 0);
@@ -615,7 +615,7 @@ class AdminEstoqueController extends Controller {
                             }
 
                             $stmtIds = $this->connection->prepare(
-                                "SELECT id FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa' ORDER BY id ASC"
+                                "SELECT id FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '') ORDER BY id ASC"
                             );
                             $stmtIds->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
                             $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
