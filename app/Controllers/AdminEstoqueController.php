@@ -29,19 +29,30 @@ class AdminEstoqueController extends Controller {
         if ($pedidoId <= 0 || $produtoId <= 0) {
             return 0;
         }
-        $itensTable = $this->findPedidoItensTable();
-        if (!$itensTable) {
+
+        $total = 0;
+        $t1 = $this->tableExists('pedido_itens') ? 'pedido_itens' : null;
+        $t2 = $this->tableExists('pedido_items') ? 'pedido_items' : null;
+
+        if (!$t1 && !$t2) {
             return 0;
         }
-        try {
-            $stmt = $this->connection->prepare(
-                "SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM {$itensTable} WHERE pedido_id = :pedido_id AND produto_id = :produto_id"
-            );
-            $stmt->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
-            return (int) ($stmt->fetchColumn() ?: 0);
-        } catch (\Exception $e) {
-            return 0;
+
+        foreach ([$t1, $t2] as $t) {
+            if (empty($t)) {
+                continue;
+            }
+            try {
+                $stmt = $this->connection->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM {$t} WHERE pedido_id = :pedido_id AND produto_id = :produto_id"
+                );
+                $stmt->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
+                $total += (int) ($stmt->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+            }
         }
+
+        return (int) $total;
     }
 
     private function normalizeReservaPedidoProduto(int $pedidoId, int $produtoId, int $qtdCorreta): void {
