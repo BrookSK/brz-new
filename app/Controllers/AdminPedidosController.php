@@ -4184,6 +4184,14 @@ HTML;
             // Além disso, atualizar o texto exibido no bloco "Pagamento" para bater com o status selecionado.
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
             $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
+            $wasPaid = false;
+            try {
+                if ($statusAnterior !== null) {
+                    $wasPaid = in_array(strtolower(trim((string) $statusAnterior)), $paidValues, true);
+                }
+            } catch (\Exception $e) {
+                $wasPaid = false;
+            }
 
             $statusLabelMap = [
                 'pendente' => 'Pendente',
@@ -4244,6 +4252,14 @@ HTML;
             $params[] = $id;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
+
+            if ($isPaid && !$wasPaid) {
+                try {
+                    $paySvc = new PaymentService();
+                    $paySvc->baixarEstoquePorPedido((int) $id);
+                } catch (\Exception $e) {
+                }
+            }
 
             if ($isPaid) {
                 try {

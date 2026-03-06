@@ -810,6 +810,131 @@ class PaymentService {
         }
     }
 
+    public function baixarEstoquePorPedido(int $pedidoId): void {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+
+            $itensTable = '';
+            foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+                try {
+                    $st = $db->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+                    $st->execute([$t]);
+                    if ((int) ($st->fetchColumn() ?: 0) > 0) {
+                        $itensTable = $t;
+                        break;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if ($itensTable === '') {
+                return;
+            }
+
+            $itens = [];
+            try {
+                $stItens = $db->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                $stItens->execute([$pedidoId]);
+                $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $itens = [];
+            }
+            if (empty($itens)) {
+                return;
+            }
+
+            $hasEstoqueInterno = false;
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+                $st->execute(['estoque_interno']);
+                $hasEstoqueInterno = ((int) ($st->fetchColumn() ?: 0)) > 0;
+            } catch (\Exception $e) {
+                $hasEstoqueInterno = false;
+            }
+
+            $colsProdutos = [];
+            try {
+                $stCols = $db->query('DESCRIBE produtos');
+                $colsProdutos = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsProdutos = [];
+            }
+
+            $stockCol = '';
+            if (is_array($colsProdutos) && in_array('stock', $colsProdutos, true)) {
+                $stockCol = 'stock';
+            } elseif (is_array($colsProdutos) && in_array('estoque', $colsProdutos, true)) {
+                $stockCol = 'estoque';
+            }
+            $setUpdatedAt = (is_array($colsProdutos) && in_array('updated_at', $colsProdutos, true));
+
+            $stUpdProdutos = null;
+            if (!$hasEstoqueInterno && $stockCol !== '') {
+                $sqlUpd = 'UPDATE produtos SET ' . $stockCol . ' = GREATEST(0, ' . $stockCol . ' - :qtd)';
+                if ($setUpdatedAt) {
+                    $sqlUpd .= ', updated_at = NOW()';
+                }
+                $sqlUpd .= ' WHERE id = :pid';
+                $stUpdProdutos = $db->prepare($sqlUpd);
+            }
+
+            $stLocs = null;
+            $stUpdLoc = null;
+            if ($hasEstoqueInterno) {
+                $stLocs = $db->prepare('SELECT id, quantidade FROM estoque_interno WHERE produto_id = ? AND quantidade > 0 ORDER BY CASE WHEN data_compra IS NULL THEN 1 ELSE 0 END ASC, data_compra ASC, id ASC');
+                $stUpdLoc = $db->prepare('UPDATE estoque_interno SET quantidade = ? WHERE id = ? LIMIT 1');
+            }
+
+            foreach ($itens as $it) {
+                $pid = (int) ($it['produto_id'] ?? 0);
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($pid <= 0 || $qtd <= 0) {
+                    continue;
+                }
+
+                if ($hasEstoqueInterno && $stLocs && $stUpdLoc) {
+                    $restante = $qtd;
+                    try {
+                        $stLocs->execute([$pid]);
+                        $locs = $stLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($locs as $loc) {
+                            if ($restante <= 0) {
+                                break;
+                            }
+                            $locId = (int) ($loc['id'] ?? 0);
+                            $qAtual = (int) ($loc['quantidade'] ?? 0);
+                            if ($locId <= 0 || $qAtual <= 0) {
+                                continue;
+                            }
+                            $consumir = ($qAtual <= $restante) ? $qAtual : $restante;
+                            $novoQ = $qAtual - $consumir;
+                            try {
+                                $stUpdLoc->execute([$novoQ, $locId]);
+                            } catch (\Exception $e) {
+                            }
+                            $restante -= $consumir;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                    continue;
+                }
+
+                if ($stUpdProdutos) {
+                    try {
+                        $stUpdProdutos->execute([':qtd' => $qtd, ':pid' => $pid]);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
     private function debitarRendimentoClubePorPedidoEstornado(\PDO $db, int $pedidoId): void {
         try {
             $pedidoId = (int) $pedidoId;
