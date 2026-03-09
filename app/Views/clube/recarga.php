@@ -230,7 +230,7 @@ try {
                             </div>
 
                             <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
-                                <div class="small text-muted">Equivalente em BRL (taxa de conversão Braziliana)</div>
+                                <div class="small text-muted">Equivalente em BRL</div>
                                 <div class="h5 mb-0" id="qc_equiv_brl">-</div>
                                 <div class="small text-muted" id="qc_rate_text">-</div>
                             </div>
@@ -423,7 +423,7 @@ try {
         const usd = Math.max(v, MIN_USD);
         const brl = usd * USD_BRL_RATE;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
-        document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(4).replace('.', ',');
+        document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_hint').textContent = 'Mínimo: $' + MIN_USD.toFixed(2);
     }
 
