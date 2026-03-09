@@ -65,6 +65,9 @@ $router->post('/admin/pagamentos/cancelar-pedido/{id}', 'AdminPagamentosControll
 $router->get('/admin/pagamentos/configuracoes', 'AdminPagamentosController', 'configuracoes');
 $router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosController', 'salvarConfiguracoes');
 
+// Clube - Recargas (checkout rápido)
+$router->get('/admin/clube/recargas', 'AdminClubeRecargasController', 'index');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');

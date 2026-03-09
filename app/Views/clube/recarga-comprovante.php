@@ -122,6 +122,13 @@ $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
     .no-print {
         display: none !important;
     }
+    .print-only {
+        display: block !important;
+    }
+}
+
+.print-only {
+    display: none;
 }
 </style>
 
@@ -150,6 +157,14 @@ $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
             </div>
 
             <div id="printArea">
+                <div class="text-center mb-3 print-only" style="padding-top: 12px;">
+                    <?php if (!empty($siteLogo)): ?>
+                        <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height: 42px; max-width: 100%; object-fit: contain;">
+                    <?php else: ?>
+                        <div style="font-weight:800; color:#0b1f3a; font-size: 18px;">Braziliana</div>
+                    <?php endif; ?>
+                </div>
+
                 <?php if (!$isPaid): ?>
                     <div class="alert alert-warning no-print" style="border-radius:14px;">
                         <div class="fw-bold">Pagamento ainda não confirmado</div>
