@@ -1,4 +1,3 @@
-<?php ob_start(); ?>
 <?php
 $rec = isset($recarga) && is_array($recarga) ? $recarga : [];
 $isPaid = !empty($is_paid);
@@ -88,6 +87,20 @@ $rate = isset($rec['usd_brl_rate']) ? (float) $rec['usd_brl_rate'] : null;
 $valorUsd = (float) ($rec['valor'] ?? 0);
 $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
 ?>
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprovante da Recarga</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f8fb; }
+    </style>
+</head>
+<body>
 
 <style>
 @media print {
@@ -185,7 +198,6 @@ $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
 
                         <div class="d-flex flex-wrap gap-2 no-print">
                             <a class="btn btn-primary" href="/clube/recarga">Nova recarga</a>
-                            <a class="btn btn-outline-secondary" href="/minha-conta">Minha conta</a>
                         </div>
                     </div>
                 </div>
@@ -243,21 +255,5 @@ $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
 })();
 </script>
 
-<?php $content = ob_get_clean(); ?>
-<?php $title = 'Comprovante da Recarga'; ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f6f8fb; }
-    </style>
-</head>
-<body>
-    <?= $content ?>
 </body>
 </html>

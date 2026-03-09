@@ -1,4 +1,85 @@
-<?php ob_start(); ?>
+<?php
+$siteLogo = '';
+try {
+    $raw = '';
+    $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+    foreach ($tablesToTry as $t) {
+        if ($raw !== '') break;
+        try {
+            $pdo = \Config\Database::getConnection();
+            $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+            $stmtT->execute([$t]);
+            if (!$stmtT->fetchColumn()) {
+                continue;
+            }
+            $stmtCols = $pdo->query('DESCRIBE ' . $t);
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols)) {
+                $cols = [];
+            }
+            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                if ($valCol !== '') {
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stmt->execute(['layout', 'logo']);
+                    $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+            }
+            $keyCol = '';
+            if (in_array('chave', $cols, true)) $keyCol = 'chave';
+            elseif (in_array('key', $cols, true)) $keyCol = 'key';
+            elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+            elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+            $valCol = '';
+            if (in_array('valor', $cols, true)) $valCol = 'valor';
+            elseif (in_array('value', $cols, true)) $valCol = 'value';
+            elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+            if ($keyCol !== '' && $valCol !== '') {
+                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                $stmt->execute(['layout_logo']);
+                $raw = (string) ($stmt->fetchColumn() ?: '');
+                if ($raw !== '') break;
+            }
+            if (in_array('layout_logo', $cols, true)) {
+                $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                $raw = (string) ($stmt2 ? ($stmt2->fetchColumn() ?: '') : '');
+                if ($raw !== '') break;
+            }
+        } catch (\Exception $e) {
+        }
+    }
+    $siteLogo = is_string($raw) ? trim($raw) : '';
+} catch (\Exception $e) {
+    $siteLogo = '';
+}
+?>
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recarga do Clube</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f8fb; }
+    </style>
+</head>
+<body>
+
+<div class="container" style="padding: 22px 0 0;">
+    <div class="text-center mb-3">
+        <?php if (!empty($siteLogo)): ?>
+            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height: 52px; max-width: 100%; object-fit: contain;">
+        <?php else: ?>
+            <div style="font-weight:800; color:#0b1f3a; font-size: 20px;">Braziliana</div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-10">
@@ -567,89 +648,5 @@
 })();
 </script>
 
-<?php $content = ob_get_clean(); ?>
-<?php $title = 'Recarga do Clube'; ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f6f8fb; }
-    </style>
-</head>
-<body>
-    <?= $content ?>
 </body>
 </html>
-                    imgWrap.style.display = 'none';
-                }
-            }
-            document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
-
-            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Após você pagar o Pix, esta página vai confirmar automaticamente e abrir o comprovante.';
-            startRecargaPolling(data.recarga_id, data.public_token);
-            return;
-        }
-
-        // Cartão: confirmar no frontend
-        const cs = (data.client_secret || '').toString();
-        if(!cs){
-            setError('Stripe: client_secret ausente');
-            return;
-        }
-
-        const confirmRes = await stripe.confirmCardPayment(cs, {
-            payment_method: { 
-                card: cardEl,
-                billing_details: {
-                    name: (nome + ' ' + sobrenome).trim(),
-                    email: email
-                }
-            }
-        });
-        if(confirmRes.error){
-            const errEl = document.getElementById('qc_stripe_errors');
-            if(errEl){
-                errEl.textContent = confirmRes.error.message || 'Pagamento não autorizado';
-                errEl.style.display = '';
-            }
-            return;
-        }
-
-        // Sucesso: o webhook credita automaticamente
-        const okMsg = document.getElementById('qc_pix_status');
-        if(okMsg){
-            okMsg.textContent = 'Pagamento aprovado no cartão. Estamos confirmando e vamos abrir o comprovante automaticamente.';
-        }
-        startRecargaPolling(data.recarga_id, data.public_token);
-    }
-
-    document.addEventListener('DOMContentLoaded', function(){
-        updateEquiv();
-        setMetodo('pix');
-        syncDdiOutro();
-        syncDocumentoRules();
-
-        document.getElementById('qc_valor_usd')?.addEventListener('input', updateEquiv);
-        document.getElementById('qc_valor_usd')?.addEventListener('blur', clampValorMinimo);
-        document.getElementById('qc_telefone_ddi')?.addEventListener('change', syncDdiOutro);
-        document.getElementById('qc_pais')?.addEventListener('change', syncDocumentoRules);
-        document.getElementById('qc_email')?.addEventListener('blur', emailCheck);
-        document.getElementById('qc_metodo_pix')?.addEventListener('click', function(){ setMetodo('pix'); });
-        document.getElementById('qc_metodo_card')?.addEventListener('click', function(){ setMetodo('card'); });
-        document.getElementById('qc_btn_pagar')?.addEventListener('click', pagar);
-
-        document.getElementById('qc_pais_search')?.addEventListener('input', function(e){
-            filterSelectOptions(document.getElementById('qc_pais'), e.target.value);
-        });
-    });
-})();
-</script>
-
-<?php $content = ob_get_clean(); ?>
-<?php $title = 'Recarga do Clube'; ?>
-<?php include __DIR__ . '/../layouts/main.php'; ?>
