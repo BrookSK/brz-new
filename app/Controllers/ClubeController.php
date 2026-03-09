@@ -25,6 +25,10 @@ class ClubeController extends Controller {
         $this->view('clube/como-funciona');
     }
 
+    public function comoFuncionaClube(Request $request) {
+        $this->view('clube/como-funciona-clube');
+    }
+
     private function getUsdBrlRate(): float {
         $rate = 5.5;
         try {

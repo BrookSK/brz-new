@@ -560,37 +560,156 @@ Se você está aguardando a chegada de itens ou tem dúvida sobre o que enviar, 
                     <h2 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq18">
                             <i class="fas fa-file-contract me-2"></i>
-                            18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
+                            18. CLUBE BRAZILIANA - PROGRAMA DE BENEFÍCIOS
                         </button>
                     </h2>
                     <div id="faq18" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body">
-                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">18. CLUBE BRASILIANA - PROGRAMA DE BENEFÍCIOS
-O Clube Braziliana é um programa de benefícios com créditos internos.
-18.1. Ativação e Acesso
-Para ativar e manter o acesso às áreas e produtos do Clube, é necessário manter um saldo mínimo de US$ 39,00 em créditos na sua carteira (considerando o equivalente em USD)
-Se o saldo mínimo não estiver disponível, algumas áreas do Clube podem ficar bloqueadas até a regularização
-18.2. Produtos Elegíveis
-Os benefícios do Clube valem apenas para produtos marcados como Clube Ativo.
-18.3. Benefícios (Desconto e Cashback)
-O Clube pode aplicar desconto progressivo e/ou cashback em créditos, conforme regras do sistema
-O cashback retorna para sua carteira como créditos internos, na mesma moeda do pedido
-Benefícios podem variar conforme regras do sistema
-18.4. Rendimento do Clube (quando existir)
-O Clube pode gerar créditos adicionais periodicamente, apenas enquanto o saldo mínimo for mantido
-Esses créditos são internos e não são saqueáveis
-Podem ser utilizados para pagar pedidos de Redirecionamentos
-A Braziliana se reserva o direito de reduzir, suspender ou encerrar o programa de créditos adicionais sem aviso prévio.
-18.5. Natureza dos Créditos
-IMPORTANTE - O Clube Braziliana:
-É um programa de benefícios
-NÃO é banco e NÃO oferece investimento
-Todos os valores do Clube são créditos internos
-Créditos não são dinheiro
-Créditos não são saqueáveis
-Créditos não representam investimento
-Créditos podem ser auditados a qualquer momento
-Créditos estão sujeitos às regras e alterações do programa</pre>
+                            <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">18. CLUBE BRASILIANA – PROGRAMA DE BENEFÍCIOS
+
+O Clube Braziliana é um programa de benefícios baseado em créditos internos da plataforma, destinado a oferecer vantagens aos usuários em compras e serviços disponíveis no sistema.
+
+A participação no Clube implica a aceitação integral das regras descritas nesta seção.
+
+18.1. Ativação e Participação
+
+Para participar do Clube Braziliana, o usuário deverá realizar um depósito mínimo de US$ 39,00 (ou equivalente em USD) em créditos dentro de sua carteira interna na plataforma.
+
+Esse valor corresponde ao depósito mínimo para ativação do programa.
+
+Enquanto o saldo mínimo estiver mantido, o usuário poderá acessar os benefícios disponíveis dentro do Clube.
+
+Caso o saldo fique abaixo do valor mínimo exigido, o acesso a determinadas funcionalidades e benefícios poderá ser temporariamente suspenso até a regularização do saldo.
+
+18.2. Limite Máximo do Clube
+
+O Clube Braziliana possui um limite máximo de participação equivalente a R$ 150.000,00 em créditos totais depositados pelos participantes.
+
+Quando esse limite for atingido:
+
+novos depósitos no Clube poderão ser temporariamente suspensos
+
+novos participantes poderão ficar em lista de espera
+
+depósitos adicionais poderão não ser aceitos
+
+A liberação para novos depósitos poderá ocorrer novamente caso o saldo total do Clube volte a ficar abaixo do limite estabelecido.
+
+A Braziliana poderá, a seu critério, alterar o limite máximo de participação do Clube a qualquer momento, conforme necessidades operacionais do sistema.
+
+18.3. Prazo de Permanência e Liberação de Utilização
+
+Os créditos depositados para participação no Clube Braziliana ficam vinculados ao programa por um prazo mínimo de 6 (seis) meses, contados a partir da data do primeiro depósito.
+
+Durante esse período:
+
+os créditos permanecem ativos dentro da carteira do usuário
+
+os benefícios do Clube permanecem válidos
+
+o saldo poderá ter restrições de utilização até o término do prazo mínimo
+
+Após o período mínimo de 6 meses, os créditos poderão ser utilizados normalmente dentro das funcionalidades disponíveis na plataforma.
+
+18.4. Produtos Elegíveis
+
+Os benefícios do Clube são aplicáveis exclusivamente a produtos ou serviços identificados na plataforma como “Clube Ativo”.
+
+Produtos que não possuam essa identificação não participam das vantagens do programa.
+
+18.5. Benefícios do Clube
+
+Os participantes do Clube poderão receber benefícios como:
+
+descontos em produtos ou serviços elegíveis
+
+cashback em créditos internos
+
+créditos adicionais gerados pelo sistema
+
+participação em sorteios e gratificações exclusivas para membros do Clube
+
+O cashback recebido retorna automaticamente para a carteira interna do usuário, na mesma moeda utilizada na operação.
+
+Os benefícios podem variar de acordo com:
+
+campanhas promocionais
+
+regras operacionais do sistema
+
+alterações realizadas pela plataforma.
+
+18.6. Sorteios e Gratificações Exclusivas
+
+Durante o período mínimo de 6 (seis) meses de participação no Clube, contados a partir do primeiro depósito, os membros poderão participar de:
+
+sorteios promocionais
+
+campanhas de gratificação
+
+benefícios exclusivos para participantes do Clube
+
+Essas ações promocionais são eventuais e opcionais, podendo ocorrer em datas específicas ou campanhas internas.
+
+A participação e as regras de cada sorteio ou gratificação poderão ser definidas em regulamentos próprios divulgados pela plataforma.
+
+18.7. Créditos Adicionais do Clube
+
+Enquanto o saldo mínimo do Clube estiver ativo e respeitado o prazo mínimo de permanência, o sistema poderá gerar créditos adicionais mensais.
+
+O Clube poderá gerar até 10% ao mês em créditos internos, calculados sobre o saldo elegível mantido na carteira.
+
+Esses créditos:
+
+são gerados exclusivamente dentro do sistema
+
+possuem natureza promocional
+
+não são transferíveis para fora da plataforma
+
+não são saqueáveis
+
+podem ser utilizados para pagamentos de serviços ou produtos disponíveis na plataforma, incluindo redirecionamentos.
+
+A Braziliana poderá alterar, reduzir, suspender ou encerrar a geração desses créditos adicionais a qualquer momento, sem necessidade de aviso prévio.
+
+18.8. Natureza dos Créditos
+
+IMPORTANTE: O Clube Braziliana é exclusivamente um programa de benefícios internos da plataforma.
+
+Dessa forma:
+
+A Braziliana não é instituição financeira
+
+O Clube não constitui investimento
+
+Os créditos não representam dinheiro
+
+Os créditos não possuem garantia de rendimento
+
+Os créditos não são saqueáveis
+
+Os créditos não possuem conversão direta em moeda fiduciária
+
+Todos os valores do Clube são créditos internos utilizados exclusivamente dentro do ecossistema da plataforma.
+
+18.9. Auditoria e Alterações
+
+Os créditos e benefícios do Clube podem ser auditados automaticamente pelo sistema a qualquer momento, com o objetivo de garantir o funcionamento correto do programa.
+
+A Braziliana se reserva o direito de:
+
+alterar regras do Clube
+
+modificar benefícios
+
+ajustar percentuais
+
+suspender funcionalidades
+
+encerrar o programa
+
+sempre que necessário para manutenção do sistema ou adequação às políticas operacionais.</pre>
                         </div>
                     </div>
                 </div>
