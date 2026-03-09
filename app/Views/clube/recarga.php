@@ -238,6 +238,8 @@ try {
                             <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
                                 <div class="small text-muted">Equivalente em BRL</div>
                                 <div class="h5 mb-0" id="qc_equiv_brl">-</div>
+                                <div class="small text-muted mt-1" id="qc_pix_fee">-</div>
+                                <div class="small" style="font-weight:700; color:#0b1f3a;" id="qc_pix_total">-</div>
                                 <div class="small text-muted" id="qc_rate_text">-</div>
                             </div>
 
@@ -428,7 +430,12 @@ try {
         const v = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
         const usd = Math.max(v, MIN_USD);
         const brl = usd * USD_BRL_RATE;
+        const feeRate = 0.035;
+        const fee = brl * feeRate;
+        const totalPix = brl + fee;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
+        document.getElementById('qc_pix_fee').textContent = 'Taxa Stripe (3,5%): R$ ' + fee.toFixed(2).replace('.', ',');
+        document.getElementById('qc_pix_total').textContent = 'Valor final no Pix: R$ ' + totalPix.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_hint').textContent = 'Mínimo: $' + MIN_USD.toFixed(2);
     }
