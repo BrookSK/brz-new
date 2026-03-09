@@ -614,7 +614,26 @@ class ClubeRecargaController extends Controller {
             if (empty($pi['success'])) {
                 $err = (string) ($pi['error'] ?? 'Falha ao iniciar pagamento Stripe');
                 $lower = strtolower($err);
-                if ($metodo !== 'card' && (strpos($lower, 'payment method type "pix" is invalid') !== false || strpos($lower, 'payment method type "pix"') !== false)) {
+                $pixNotEnabled = false;
+                if ($metodo !== 'card') {
+                    // Erro típico quando PIX não está ativado no Stripe.
+                    // Pode vir como JSON dentro do texto: "Erro Stripe HTTP 400: {\"error\":{...}}"
+                    if (
+                        strpos($lower, 'payment_intent_invalid_parameter') !== false
+                        && strpos($lower, 'payment_method_types') !== false
+                        && strpos($lower, 'pix') !== false
+                        && strpos($lower, 'invalid') !== false
+                    ) {
+                        $pixNotEnabled = true;
+                    }
+
+                    // Fallback: mensagem direta do Stripe
+                    if (!$pixNotEnabled && (strpos($lower, 'payment method type') !== false) && (strpos($lower, 'pix') !== false) && (strpos($lower, 'invalid') !== false)) {
+                        $pixNotEnabled = true;
+                    }
+                }
+
+                if ($pixNotEnabled) {
                     $this->json([
                         'success' => false,
                         'error' => 'PIX não está habilitado na sua conta Stripe. Ative em Painel Stripe > Configurações de Pagamentos, ou selecione Cartão.',
