@@ -13,7 +13,6 @@ class ClubeRecargaController extends Controller {
 
     private const CLUBE_CAP_BRL = 150000.00;
     private const CLUBE_LOCK_MONTHS = 6;
-    private const STRIPE_PIX_FEE_RATE = 0.035;
 
     public function __construct() {
         $this->usuarioModel = new Usuario();
@@ -615,12 +614,6 @@ class ClubeRecargaController extends Controller {
 
             $descricao = 'Recarga Clube #' . $recargaId;
 
-            $valorBrlCobranca = $valorBrl;
-            if ($metodo === 'pix') {
-                $valorBrlCobranca = (float) ($valorBrl * (1.0 + (float) self::STRIPE_PIX_FEE_RATE));
-            }
-            $valorBrlCobranca = (float) round($valorBrlCobranca, 2);
-
             $stripeCustomer = [
                 'email' => $email,
                 'name' => $nomeCompleto,
@@ -629,7 +622,6 @@ class ClubeRecargaController extends Controller {
                     'usd_amount' => (string) $valorUsd,
                     'usd_brl_rate' => (string) $rate,
                     'brl_amount' => (string) $valorBrl,
-                    'brl_amount_charge' => (string) $valorBrlCobranca,
                     'flow' => 'clube_quick_checkout',
                     'metodo' => $metodo,
                 ],
@@ -638,7 +630,7 @@ class ClubeRecargaController extends Controller {
             if ($metodo === 'card') {
                 $pi = $this->paymentService->createStripePaymentIntentCarteiraRecargaCardBrl($recargaId, $valorBrl, $descricao, $stripeCustomer);
             } else {
-                $pi = $this->paymentService->createStripePaymentIntentCarteiraRecargaPixBrl($recargaId, $valorBrlCobranca, $descricao, $stripeCustomer);
+                $pi = $this->paymentService->createStripePaymentIntentCarteiraRecargaPixBrl($recargaId, $valorBrl, $descricao, $stripeCustomer);
             }
 
             if (empty($pi['success'])) {
@@ -688,7 +680,6 @@ class ClubeRecargaController extends Controller {
                 'valor_usd' => $valorUsd,
                 'usd_brl_rate' => $rate,
                 'valor_brl' => $valorBrl,
-                'valor_brl_cobranca' => $valorBrlCobranca,
                 'metodo' => $metodo,
                 'payment_intent_id' => $paymentIntentId,
                 'client_secret' => (string) ($pi['client_secret'] ?? ''),
