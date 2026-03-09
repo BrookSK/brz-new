@@ -337,7 +337,17 @@ class PaymentService {
 
         if (!empty($customer['email'])) {
             $body['receipt_email'] = (string) $customer['email'];
+            $body['payment_method_data[billing_details][email]'] = (string) $customer['email'];
         }
+
+        $billingName = '';
+        if (!empty($customer['name'])) {
+            $billingName = trim((string) $customer['name']);
+        }
+        if ($billingName === '') {
+            $billingName = $descricao !== '' ? $descricao : ('Recarga Carteira #' . $recargaId);
+        }
+        $body['payment_method_data[billing_details][name]'] = $billingName;
 
         if (!empty($customer['metadata']) && is_array($customer['metadata'])) {
             foreach ($customer['metadata'] as $k => $v) {

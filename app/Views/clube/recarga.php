@@ -381,7 +381,13 @@
         }
 
         const confirmRes = await stripe.confirmCardPayment(cs, {
-            payment_method: { card: cardEl }
+            payment_method: { 
+                card: cardEl,
+                billing_details: {
+                    name: (nome + ' ' + sobrenome).trim(),
+                    email: email
+                }
+            }
         });
         if(confirmRes.error){
             const errEl = document.getElementById('qc_stripe_errors');
