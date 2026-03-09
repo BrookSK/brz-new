@@ -569,4 +569,87 @@
 
 <?php $content = ob_get_clean(); ?>
 <?php $title = 'Recarga do Clube'; ?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f8fb; }
+    </style>
+</head>
+<body>
+    <?= $content ?>
+</body>
+</html>
+                    imgWrap.style.display = 'none';
+                }
+            }
+            document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
+
+            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Após você pagar o Pix, esta página vai confirmar automaticamente e abrir o comprovante.';
+            startRecargaPolling(data.recarga_id, data.public_token);
+            return;
+        }
+
+        // Cartão: confirmar no frontend
+        const cs = (data.client_secret || '').toString();
+        if(!cs){
+            setError('Stripe: client_secret ausente');
+            return;
+        }
+
+        const confirmRes = await stripe.confirmCardPayment(cs, {
+            payment_method: { 
+                card: cardEl,
+                billing_details: {
+                    name: (nome + ' ' + sobrenome).trim(),
+                    email: email
+                }
+            }
+        });
+        if(confirmRes.error){
+            const errEl = document.getElementById('qc_stripe_errors');
+            if(errEl){
+                errEl.textContent = confirmRes.error.message || 'Pagamento não autorizado';
+                errEl.style.display = '';
+            }
+            return;
+        }
+
+        // Sucesso: o webhook credita automaticamente
+        const okMsg = document.getElementById('qc_pix_status');
+        if(okMsg){
+            okMsg.textContent = 'Pagamento aprovado no cartão. Estamos confirmando e vamos abrir o comprovante automaticamente.';
+        }
+        startRecargaPolling(data.recarga_id, data.public_token);
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+        updateEquiv();
+        setMetodo('pix');
+        syncDdiOutro();
+        syncDocumentoRules();
+
+        document.getElementById('qc_valor_usd')?.addEventListener('input', updateEquiv);
+        document.getElementById('qc_valor_usd')?.addEventListener('blur', clampValorMinimo);
+        document.getElementById('qc_telefone_ddi')?.addEventListener('change', syncDdiOutro);
+        document.getElementById('qc_pais')?.addEventListener('change', syncDocumentoRules);
+        document.getElementById('qc_email')?.addEventListener('blur', emailCheck);
+        document.getElementById('qc_metodo_pix')?.addEventListener('click', function(){ setMetodo('pix'); });
+        document.getElementById('qc_metodo_card')?.addEventListener('click', function(){ setMetodo('card'); });
+        document.getElementById('qc_btn_pagar')?.addEventListener('click', pagar);
+
+        document.getElementById('qc_pais_search')?.addEventListener('input', function(e){
+            filterSelectOptions(document.getElementById('qc_pais'), e.target.value);
+        });
+    });
+})();
+</script>
+
+<?php $content = ob_get_clean(); ?>
+<?php $title = 'Recarga do Clube'; ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

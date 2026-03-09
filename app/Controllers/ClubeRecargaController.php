@@ -70,6 +70,7 @@ class ClubeRecargaController extends Controller {
                 `usuario_id` int(11) NOT NULL,
                 `moeda` varchar(3) NOT NULL DEFAULT 'USD',
                 `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                `origem` varchar(40) DEFAULT NULL,
                 `public_token` varchar(64) DEFAULT NULL,
                 `pagador_nome` varchar(191) DEFAULT NULL,
                 `pagador_email` varchar(191) DEFAULT NULL,
@@ -103,6 +104,7 @@ class ClubeRecargaController extends Controller {
             }
 
             $toAdd = [
+                'origem' => "ALTER TABLE carteira_recargas ADD COLUMN origem varchar(40) DEFAULT NULL",
                 'public_token' => "ALTER TABLE carteira_recargas ADD COLUMN public_token varchar(64) DEFAULT NULL",
                 'pagador_nome' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_nome varchar(191) DEFAULT NULL",
                 'pagador_email' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_email varchar(191) DEFAULT NULL",
@@ -510,10 +512,11 @@ class ClubeRecargaController extends Controller {
 
             $publicToken = $this->generatePublicToken();
 
-            $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, public_token, pagador_nome, pagador_email, pagador_documento, metodo, usd_brl_rate, valor_brl, status, created_at, updated_at) VALUES (:uid, 'USD', :valor, :ptok, :pnome, :pemail, :pdoc, :metodo, :rate, :vbrl, 'pending', NOW(), NOW())");
+            $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, origem, public_token, pagador_nome, pagador_email, pagador_documento, metodo, usd_brl_rate, valor_brl, status, created_at, updated_at) VALUES (:uid, 'USD', :valor, :origem, :ptok, :pnome, :pemail, :pdoc, :metodo, :rate, :vbrl, 'pending', NOW(), NOW())");
             $stmtIns->execute([
                 ':uid' => $usuarioId,
                 ':valor' => $valorUsd,
+                ':origem' => 'clube_quick_checkout',
                 ':ptok' => $publicToken,
                 ':pnome' => $nomeCompleto,
                 ':pemail' => $email,

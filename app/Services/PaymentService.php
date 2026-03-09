@@ -1798,6 +1798,7 @@ class PaymentService {
                 `usuario_id` int(11) NOT NULL,
                 `moeda` varchar(3) NOT NULL DEFAULT 'USD',
                 `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                `origem` varchar(40) DEFAULT NULL,
                 `public_token` varchar(64) DEFAULT NULL,
                 `pagador_nome` varchar(191) DEFAULT NULL,
                 `pagador_email` varchar(191) DEFAULT NULL,
@@ -1831,6 +1832,7 @@ class PaymentService {
             }
 
             $toAdd = [
+                'origem' => "ALTER TABLE carteira_recargas ADD COLUMN origem varchar(40) DEFAULT NULL",
                 'public_token' => "ALTER TABLE carteira_recargas ADD COLUMN public_token varchar(64) DEFAULT NULL",
                 'pagador_nome' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_nome varchar(191) DEFAULT NULL",
                 'pagador_email' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_email varchar(191) DEFAULT NULL",

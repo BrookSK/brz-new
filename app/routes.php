@@ -11,7 +11,10 @@ $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
 $router->post('/produtos/carrinho', 'ProdutoController', 'adicionarAoCarrinho');
-$router->get('/clube-brasiliana', 'ClubeController', 'comoFunciona');
+$router->get('/clube-brasiliana', function($request) {
+    header('Location: /como-funciona-clube');
+    exit;
+});
 $router->get('/produtos-clube', 'ClubeController', 'produtosClube');
 $router->get('/clube/recarga', 'ClubeRecargaController', 'index');
 $router->get('/clube/recarga/email-check', 'ClubeRecargaController', 'emailCheck');
@@ -41,6 +44,10 @@ $router->get('/politicas', 'PoliticasController', 'index');
 // Páginas institucionais
 $router->get('/politica-privacidade', 'PoliticaPrivacidadeController', 'index');
 $router->get('/termos-uso', 'TermosUsoController', 'index');
+
+// Site lock (pré-publicação)
+$router->get('/site-lock', 'SiteLockController', 'index');
+$router->post('/site-lock/unlock', 'SiteLockController', 'unlock');
 
 // Autenticação
 $router->get('/login', 'AuthController', 'login');
@@ -167,6 +174,7 @@ $router->get('/admin', function($request) {
         ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-plane', 'label' => 'Remessa ShipStation (UPS)', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube (Quick)', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
     ];
@@ -393,6 +401,9 @@ $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosContr
 $router->post('/admin/pagamentos/comissoes-gerais/pagamento', 'AdminPagamentosController', 'criarPagamentoComissaoGeral');
 $router->post('/admin/pagamentos/comissoes-gerais/aprovar/{id}', 'AdminPagamentosController', 'aprovarPagamentoComissaoGeral');
 $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamentosController', 'deletarPagamentoComissaoGeral');
+
+// Clube (checkout rápido)
+$router->get('/admin/clube/recargas', 'AdminClubeRecargasController', 'index');
 
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');

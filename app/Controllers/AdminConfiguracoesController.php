@@ -2425,6 +2425,24 @@ class AdminConfiguracoesController extends Controller {
                                             <hr class="my-4">
 
                                             <div class="border rounded p-3 bg-light">
+                                                <div class="fw-semibold mb-2"><i class="fas fa-lock me-1"></i>Proteção por senha (pré-publicação)</div>
+                                                <div class="text-muted small mb-3">Quando ativado, o site exige uma senha para acessar (exceto Admin e as páginas do checkout rápido do clube).</div>
+
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" name="sistema_site_lock_enabled" value="1" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                    <label class="form-check-label">Ativar senha no site</label>
+                                                </div>
+
+                                                <div class="mb-0">
+                                                    <label class="form-label">Senha do site</label>
+                                                    <input type="password" class="form-control" name="sistema_site_lock_password" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'site_lock_password', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="********">
+                                                    <small class="text-muted">Não use a mesma senha do admin. Quem digitar essa senha uma vez fica liberado na sessão.</small>
+                                                </div>
+                                            </div>
+
+                                            <hr class="my-4">
+
+                                            <div class="border rounded p-3 bg-light">
                                                 <div class="fw-semibold mb-2"><i class="fas fa-file-import me-1"></i>Importação de Usuários (CSV)</div>
                                                 <div class="text-muted small mb-3">Baixe o modelo, preencha e importe. O endereço usa prioridade <strong>Billing</strong> e, se não houver, usa <strong>Shipping</strong>.</div>
 
