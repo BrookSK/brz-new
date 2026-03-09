@@ -562,7 +562,8 @@ try {
             senha,
             aceitou_termos,
             metodo,
-            valor_usd: valor
+            valor_usd: valor,
+            usd_brl_rate: USD_BRL_RATE
         };
 
         const r = await fetch('/clube/recarga/criar', {

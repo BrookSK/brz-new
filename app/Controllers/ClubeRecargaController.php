@@ -527,7 +527,29 @@ class ClubeRecargaController extends Controller {
             return;
         }
 
-        $rate = $this->getUsdBrlRate();
+        $serverRate = $this->getUsdBrlRate();
+        $rate = $serverRate;
+        $clientRateRaw = $data['usd_brl_rate'] ?? null;
+        $clientRate = 0.0;
+        if ($clientRateRaw !== null) {
+            $clientRate = (float) str_replace(',', '.', (string) $clientRateRaw);
+        }
+        if ($clientRate > 0) {
+            // Proteção anti-manipulação: só aceita a taxa do cliente se estiver próxima da taxa do servidor.
+            // Isso garante que o BRL exibido no front e o BRL cobrado no Stripe batam.
+            $diff = abs($clientRate - $serverRate);
+            $rel = ($serverRate > 0) ? ($diff / $serverRate) : 0.0;
+            if ($rel > 0.02 && $diff > 0.05) {
+                $this->json([
+                    'success' => false,
+                    'error' => 'A taxa de câmbio foi atualizada. Recarregue a página para calcular o valor em BRL novamente.',
+                    'server_usd_brl_rate' => $serverRate,
+                ], 409);
+                return;
+            }
+            $rate = $clientRate;
+        }
+
         $valorBrl = (float) ($valorUsd * $rate);
         if ($valorBrl <= 0) {
             $this->json(['success' => false, 'error' => 'Falha ao calcular valor em BRL'], 500);
