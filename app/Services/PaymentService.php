@@ -349,6 +349,14 @@ class PaymentService {
         }
         $body['payment_method_data[billing_details][name]'] = $billingName;
 
+        $taxId = '';
+        if (!empty($customer['tax_id'])) {
+            $taxId = preg_replace('/\D+/', '', (string) $customer['tax_id']);
+        }
+        if ($taxId !== '') {
+            $body['payment_method_data[billing_details][tax_id]'] = $taxId;
+        }
+
         if (!empty($customer['metadata']) && is_array($customer['metadata'])) {
             foreach ($customer['metadata'] as $k => $v) {
                 $k = trim((string) $k);

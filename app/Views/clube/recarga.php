@@ -385,7 +385,8 @@
                 card: cardEl,
                 billing_details: {
                     name: (nome + ' ' + sobrenome).trim(),
-                    email: email
+                    email: email,
+                    tax_id: documento.replace(/\D/g,'')
                 }
             }
         });

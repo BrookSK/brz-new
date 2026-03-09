@@ -359,6 +359,7 @@ class ClubeRecargaController extends Controller {
             $stripeCustomer = [
                 'email' => $email,
                 'name' => $nomeCompleto,
+                'tax_id' => $doc,
                 'metadata' => [
                     'usd_amount' => (string) $valorUsd,
                     'usd_brl_rate' => (string) $rate,
