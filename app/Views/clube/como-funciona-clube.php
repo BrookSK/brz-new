@@ -148,11 +148,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="d-flex flex-wrap gap-2">
-                <a href="/produtos-clube" class="btn btn-primary"><i class="fas fa-crown me-2"></i>Ir para produtos do Clube</a>
-                <a href="/faq" class="btn btn-outline-primary"><i class="fas fa-question-circle me-2"></i>Voltar para o FAQ</a>
-            </div>
         </div>
     </div>
 </div>
