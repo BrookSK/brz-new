@@ -107,7 +107,9 @@
                                 <div class="fw-bold mb-2">PIX</div>
                                 <div id="qc_pix_status" class="text-muted small">Gere o pagamento para ver o QR Code.</div>
                                 <div id="qc_pix_qr" class="mt-2" style="display:none;">
-                                    <a href="#" target="_blank" id="qc_pix_hosted" class="btn btn-sm btn-outline-primary">Abrir instruções Pix</a>
+                                    <div class="d-flex justify-content-center" id="qc_pix_img_wrap" style="display:none;">
+                                        <img id="qc_pix_img" alt="QR Code Pix" style="max-width: 220px; width: 100%; height: auto; border-radius: 10px; border: 1px solid rgba(11,31,58,0.14); background: #fff; padding: 10px;" />
+                                    </div>
                                     <div class="small text-muted mt-2">Copiar e colar:</div>
                                     <textarea class="form-control" id="qc_pix_copypaste" rows="3" readonly></textarea>
                                 </div>
@@ -366,9 +368,18 @@
             const pix = data.pix || {};
             document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Faça o Pix para concluir.';
             document.getElementById('qc_pix_qr').style.display = '';
-            const hosted = (pix.hosted_instructions_url || '').toString();
-            document.getElementById('qc_pix_hosted').href = hosted || '#';
-            document.getElementById('qc_pix_hosted').style.display = hosted ? '' : 'none';
+            const imgUrl = (pix.image_url_png || pix.image_url_svg || '').toString();
+            const imgWrap = document.getElementById('qc_pix_img_wrap');
+            const imgEl = document.getElementById('qc_pix_img');
+            if(imgWrap && imgEl){
+                if(imgUrl){
+                    imgEl.src = imgUrl;
+                    imgWrap.style.display = '';
+                } else {
+                    imgEl.removeAttribute('src');
+                    imgWrap.style.display = 'none';
+                }
+            }
             document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
             return;
         }
