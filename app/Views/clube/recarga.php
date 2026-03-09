@@ -230,8 +230,8 @@ try {
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Valor da recarga (mín. $5) *</label>
-                                <input type="number" class="form-control" id="qc_valor_usd" min="<?= (float) ($min_usd ?? 5.0) ?>" step="0.01" value="<?= (float) ($min_usd ?? 5.0) ?>">
+                                <label class="form-label">Valor da recarga (mín. $39) *</label>
+                                <input type="number" class="form-control" id="qc_valor_usd" min="<?= (float) ($min_usd ?? 39.0) ?>" step="0.01" value="<?= (float) ($min_usd ?? 39.0) ?>">
                                 <div class="form-text" id="qc_rate_hint"></div>
                             </div>
 
