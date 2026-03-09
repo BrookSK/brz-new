@@ -4148,6 +4148,41 @@ HTML;
             $valueCol = $tableInfo['valueCol'];
             $updatedAtCol = $tableInfo['updatedAtCol'];
 
+            // Garantir colunas do site-lock em schema legado (single_row)
+            try {
+                if (($tableInfo['mode'] ?? '') === 'single_row') {
+                    $st = $pdo->query('DESCRIBE ' . $table);
+                    $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    if (!is_array($cols)) {
+                        $cols = [];
+                    }
+
+                    $addedAny = false;
+                    if (!in_array('sistema_site_lock_enabled', $cols, true) && !in_array('site_lock_enabled', $cols, true)) {
+                        try {
+                            $pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN sistema_site_lock_enabled TINYINT(1) NOT NULL DEFAULT 0');
+                            $addedAny = true;
+                        } catch (\Exception $e) {
+                        }
+                    }
+                    if (!in_array('sistema_site_lock_password', $cols, true) && !in_array('site_lock_password', $cols, true)) {
+                        try {
+                            $pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN sistema_site_lock_password VARCHAR(191) DEFAULT NULL');
+                            $addedAny = true;
+                        } catch (\Exception $e) {
+                        }
+                    }
+
+                    if ($addedAny) {
+                        $tableInfo = $this->getConfigTableInfo($pdo);
+                        $table = $tableInfo['table'];
+                        $valueCol = $tableInfo['valueCol'];
+                        $updatedAtCol = $tableInfo['updatedAtCol'];
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
             // Se for schema single_row, garantir que existe uma linha (e descobrir o id correto)
             if (($tableInfo['mode'] ?? '') === 'single_row') {
                 $idCol = $tableInfo['idCol'] ?? 'id';
