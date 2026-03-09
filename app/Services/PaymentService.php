@@ -1798,6 +1798,13 @@ class PaymentService {
                 `usuario_id` int(11) NOT NULL,
                 `moeda` varchar(3) NOT NULL DEFAULT 'USD',
                 `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                `public_token` varchar(64) DEFAULT NULL,
+                `pagador_nome` varchar(191) DEFAULT NULL,
+                `pagador_email` varchar(191) DEFAULT NULL,
+                `pagador_documento` varchar(30) DEFAULT NULL,
+                `metodo` varchar(20) DEFAULT NULL,
+                `usd_brl_rate` decimal(10,6) DEFAULT NULL,
+                `valor_brl` decimal(10,2) DEFAULT NULL,
                 `gateway` varchar(20) DEFAULT NULL,
                 `payment_id` varchar(191) DEFAULT NULL,
                 `invoice_url` text,
@@ -1807,9 +1814,42 @@ class PaymentService {
                 `paid_at` timestamp NULL DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 KEY `idx_usuario_id` (`usuario_id`),
+                KEY `idx_public_token` (`public_token`),
                 KEY `idx_gateway_payment` (`gateway`, `payment_id`),
                 KEY `idx_status` (`status`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $cols = [];
+            try {
+                $st = $db->query('DESCRIBE carteira_recargas');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $toAdd = [
+                'public_token' => "ALTER TABLE carteira_recargas ADD COLUMN public_token varchar(64) DEFAULT NULL",
+                'pagador_nome' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_nome varchar(191) DEFAULT NULL",
+                'pagador_email' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_email varchar(191) DEFAULT NULL",
+                'pagador_documento' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_documento varchar(30) DEFAULT NULL",
+                'metodo' => "ALTER TABLE carteira_recargas ADD COLUMN metodo varchar(20) DEFAULT NULL",
+                'usd_brl_rate' => "ALTER TABLE carteira_recargas ADD COLUMN usd_brl_rate decimal(10,6) DEFAULT NULL",
+                'valor_brl' => "ALTER TABLE carteira_recargas ADD COLUMN valor_brl decimal(10,2) DEFAULT NULL",
+            ];
+
+            foreach ($toAdd as $c => $sql) {
+                if (!is_array($cols) || !in_array($c, $cols, true)) {
+                    try { $db->exec($sql); } catch (\Exception $e) {}
+                }
+            }
+
+            try {
+                $db->exec("CREATE INDEX idx_public_token ON carteira_recargas (public_token)");
+            } catch (\Exception $e) {
+            }
         } catch (\Exception $e) {
         }
     }
@@ -3051,6 +3091,8 @@ class PaymentService {
             return ['status' => 'ignored'];
         }
 
+        $paymentId = trim((string) ($obj['id'] ?? ''));
+
         // Disputa / Chargeback (Stripe)
         // Referências comuns:
         // - charge.dispute.created
@@ -3147,23 +3189,6 @@ class PaymentService {
                 'payment_intent' => $paymentIntentId,
                 'reason' => $reason,
             ];
-        }
-
-        // Webhook via Checkout Session (link hospedado)
-        if ($eventType === 'checkout.session.completed') {
-            $pi = (string) ($obj['payment_intent'] ?? '');
-            if ($pi !== '') {
-                $this->tentarCreditarCarteiraPorRecarga('stripe', $pi, 'approved', 'SUCCEEDED');
-                $this->atualizarPagamentoPedidoPorGateway($pi, 'stripe', 'approved', 'SUCCEEDED');
-                return ['status' => 'processed'];
-            }
-            return ['status' => 'ignored'];
-        }
-
-        // Webhook via PaymentIntent (Elements / API)
-        $paymentId = (string) ($obj['id'] ?? '');
-        if ($paymentId === '') {
-            return ['status' => 'ignored'];
         }
 
         $gatewayStatus = strtoupper((string) ($obj['status'] ?? ''));

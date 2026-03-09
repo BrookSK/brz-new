@@ -16,6 +16,8 @@ $router->get('/produtos-clube', 'ClubeController', 'produtosClube');
 $router->get('/clube/recarga', 'ClubeRecargaController', 'index');
 $router->get('/clube/recarga/email-check', 'ClubeRecargaController', 'emailCheck');
 $router->post('/clube/recarga/criar', 'ClubeRecargaController', 'criar');
+$router->get('/clube/recarga/status', 'ClubeRecargaController', 'status');
+$router->get('/clube/recarga/comprovante/{id}', 'ClubeRecargaController', 'comprovante');
 $router->get('/carrinho', 'CarrinhoController', 'index');
 $router->post('/carrinho/adicionar', 'CarrinhoController', 'adicionar');
 $router->post('/carrinho/remover', 'CarrinhoController', 'remover');

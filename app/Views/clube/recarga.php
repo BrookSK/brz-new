@@ -8,11 +8,7 @@
                     <div class="text-muted">Checkout rápido (sem login)</div>
                 </div>
                 <div class="small text-muted">
-                    <a href="/clube-brasiliana" class="text-decoration-none">Como funciona o Clube</a>
-                    <span class="mx-2">·</span>
-                    <a href="/termos-uso" class="text-decoration-none">Termos</a>
-                    <span class="mx-2">·</span>
-                    <a href="/politica-privacidade" class="text-decoration-none">Privacidade</a>
+                    <a href="/como-funciona-clube" class="text-decoration-none">Como funciona o Clube</a>
                 </div>
             </div>
 
@@ -124,7 +120,7 @@
                             <div class="form-check mt-4">
                                 <input class="form-check-input" type="checkbox" value="1" id="qc_termos">
                                 <label class="form-check-label" for="qc_termos">
-                                    Li e aceito os <a href="/termos-uso" target="_blank">termos e condições</a> de uso e a <a href="/politica-privacidade" target="_blank">política de privacidade</a>. Concordo que li os termos de como funciona o clube Braziliana (<a href="/clube-brasiliana" target="_blank">ver</a>).
+                                    Concordo que li os termos de como funciona o Clube Brasiliana: <a href="/como-funciona-clube" target="_blank" class="text-primary text-decoration-none">Como funciona o Clube Brasiliana</a>.
                                 </label>
                             </div>
 
@@ -183,6 +179,32 @@
     let elements = null;
     let cardEl = null;
 
+    let recargaPollTimer = null;
+
+    function startRecargaPolling(recargaId, token){
+        if(recargaPollTimer) {
+            clearInterval(recargaPollTimer);
+            recargaPollTimer = null;
+        }
+        if(!recargaId || !token) return;
+
+        const btn = document.getElementById('qc_btn_pagar');
+        if(btn){
+            btn.disabled = true;
+            btn.textContent = 'Aguardando confirmação';
+        }
+
+        recargaPollTimer = setInterval(async function(){
+            try{
+                const r = await fetch('/clube/recarga/status?recarga_id=' + encodeURIComponent(recargaId) + '&token=' + encodeURIComponent(token));
+                const data = await r.json();
+                if(data && data.success && data.is_paid && data.redirect_url){
+                    window.location.href = data.redirect_url;
+                }
+            }catch(e){}
+        }, 4000);
+    }
+
     function setError(msg){
         const el = document.getElementById('qc_error');
         if(!el) return;
@@ -232,13 +254,100 @@
         if(hintEl) hintEl.style.display = br ? 'none' : 'block';
     }
 
+    function parseDateYmd(ymd){
+        ymd = (ymd || '').toString().trim();
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+        const parts = ymd.split('-').map(p => parseInt(p, 10));
+        const y = parts[0], m = parts[1], d = parts[2];
+        if(!y || !m || !d) return null;
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        // valida se não virou (ex: 2025-02-31)
+        if(dt.getUTCFullYear() !== y || (dt.getUTCMonth() + 1) !== m || dt.getUTCDate() !== d) return null;
+        return dt;
+    }
+
+    function validateAdultDob(ymd){
+        const dt = parseDateYmd(ymd);
+        if(!dt) return { ok:false, error:'Data de nascimento inválida' };
+        const now = new Date();
+        const year = dt.getUTCFullYear();
+        if(year < 1900) return { ok:false, error:'Data de nascimento inválida' };
+        if(dt.getTime() > now.getTime()) return { ok:false, error:'Data de nascimento inválida' };
+
+        let age = now.getFullYear() - year;
+        const m = (now.getMonth() + 1) - (dt.getUTCMonth() + 1);
+        if(m < 0 || (m === 0 && now.getDate() < dt.getUTCDate())) age--;
+        if(age < 18) return { ok:false, error:'Você precisa ter no mínimo 18 anos' };
+        return { ok:true };
+    }
+
+    function isValidCpf(cpf){
+        cpf = (cpf || '').toString().replace(/\D/g,'');
+        if(cpf.length !== 11) return false;
+        if(/^([0-9])\1{10}$/.test(cpf)) return false;
+        const nums = cpf.split('').map(n => parseInt(n,10));
+        let sum = 0;
+        for(let i=0, w=10; i<9; i++, w--) sum += nums[i] * w;
+        let d1 = 11 - (sum % 11);
+        if(d1 >= 10) d1 = 0;
+        if(nums[9] !== d1) return false;
+        sum = 0;
+        for(let i=0, w=11; i<10; i++, w--) sum += nums[i] * w;
+        let d2 = 11 - (sum % 11);
+        if(d2 >= 10) d2 = 0;
+        return nums[10] === d2;
+    }
+
+    function isValidCnpj(cnpj){
+        cnpj = (cnpj || '').toString().replace(/\D/g,'');
+        if(cnpj.length !== 14) return false;
+        if(/^([0-9])\1{13}$/.test(cnpj)) return false;
+        const nums = cnpj.split('').map(n => parseInt(n,10));
+        const w1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+        let sum = 0;
+        for(let i=0;i<12;i++) sum += nums[i] * w1[i];
+        let r = sum % 11;
+        let d1 = (r < 2) ? 0 : (11 - r);
+        if(nums[12] !== d1) return false;
+        const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+        sum = 0;
+        for(let i=0;i<13;i++) sum += nums[i] * w2[i];
+        r = sum % 11;
+        let d2 = (r < 2) ? 0 : (11 - r);
+        return nums[13] === d2;
+    }
+
+    function validateCpfCnpj(doc){
+        const d = (doc || '').toString().replace(/\D/g,'');
+        if(d.length === 11) return isValidCpf(d);
+        if(d.length === 14) return isValidCnpj(d);
+        return false;
+    }
+
     function updateEquiv(){
         const v = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
         const usd = Math.max(v, MIN_USD);
+        const inputEl = document.getElementById('qc_valor_usd');
+        if(inputEl){
+            const cur = parseFloat((inputEl.value || '0').toString().replace(',','.')) || 0;
+            if(cur + 0.00001 < MIN_USD){
+                inputEl.value = MIN_USD.toFixed(2);
+            }
+        }
         const brl = usd * USD_BRL_RATE;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(4).replace('.', ',');
         document.getElementById('qc_rate_hint').textContent = 'Mínimo: $' + MIN_USD.toFixed(2);
+    }
+
+    function clampValorMinimo(){
+        const inputEl = document.getElementById('qc_valor_usd');
+        if(!inputEl) return;
+        let v = parseFloat((inputEl.value || '0').toString().replace(',','.')) || 0;
+        if(v + 0.00001 < MIN_USD){
+            inputEl.value = MIN_USD.toFixed(2);
+        }
+        updateEquiv();
     }
 
     async function emailCheck(){
@@ -322,16 +431,23 @@
         const aceitou_termos = !!document.getElementById('qc_termos')?.checked;
 
         let valor = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
-        if(valor < MIN_USD) valor = MIN_USD;
+        if(valor + 0.00001 < MIN_USD){
+            clampValorMinimo();
+            setError('O valor mínimo é $' + MIN_USD.toFixed(2));
+            return;
+        }
 
         if(!email){ setError('Informe o e-mail'); return; }
         if(!nome || !sobrenome){ setError('Informe nome e sobrenome'); return; }
         if(!telefone_numero){ setError('Informe o telefone'); return; }
         if(!data_nascimento){ setError('Informe a data de nascimento'); return; }
+        const dobCheck = validateAdultDob(data_nascimento);
+        if(!dobCheck.ok){ setError(dobCheck.error || 'Data de nascimento inválida'); return; }
         if(!aceitou_termos){ setError('Você precisa aceitar os termos'); return; }
         if(pais === 'BR'){
             const docDigits = documento.replace(/\D/g,'');
             if(!docDigits || docDigits.length < 11){ setError('CPF/CNPJ é obrigatório para Brasil'); return; }
+            if(!validateCpfCnpj(docDigits)){ setError('CPF/CNPJ inválido'); return; }
         }
 
         if(metodo==='card'){
@@ -381,6 +497,9 @@
                 }
             }
             document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
+
+            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Após você pagar o Pix, esta página vai confirmar automaticamente e abrir o comprovante.';
+            startRecargaPolling(data.recarga_id, data.public_token);
             return;
         }
 
@@ -410,7 +529,11 @@
         }
 
         // Sucesso: o webhook credita automaticamente
-        alert('Pagamento aprovado. A recarga será creditada em instantes.');
+        const okMsg = document.getElementById('qc_pix_status');
+        if(okMsg){
+            okMsg.textContent = 'Pagamento aprovado no cartão. Estamos confirmando e vamos abrir o comprovante automaticamente.';
+        }
+        startRecargaPolling(data.recarga_id, data.public_token);
     }
 
     document.addEventListener('DOMContentLoaded', function(){
@@ -420,6 +543,7 @@
         syncDocumentoRules();
 
         document.getElementById('qc_valor_usd')?.addEventListener('input', updateEquiv);
+        document.getElementById('qc_valor_usd')?.addEventListener('blur', clampValorMinimo);
         document.getElementById('qc_telefone_ddi')?.addEventListener('change', syncDdiOutro);
         document.getElementById('qc_pais')?.addEventListener('change', syncDocumentoRules);
         document.getElementById('qc_email')?.addEventListener('blur', emailCheck);
