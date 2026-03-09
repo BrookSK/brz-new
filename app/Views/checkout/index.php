@@ -840,7 +840,9 @@ function ensureStripeInit() {
         try {
             stripeClient = Stripe(publishableKey);
             stripeElements = stripeClient.elements();
-            stripeCard = stripeElements.create('card');
+            stripeCard = stripeElements.create('card', {
+                hidePostalCode: true
+            });
             stripeCardMounted = false;
 
             stripeCard.on('change', function(event) {
