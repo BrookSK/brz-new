@@ -4212,7 +4212,7 @@ HTML;
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
-                'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
+                'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'site_lock_password'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'wordpress_br' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'wordpress_red' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
@@ -4226,7 +4226,7 @@ HTML;
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
