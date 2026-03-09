@@ -151,7 +151,7 @@
                             </div>
 
                             <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
-                                <div class="small text-muted">Equivalente em BRL (taxa Braziliana)</div>
+                                <div class="small text-muted">Equivalente em BRL (taxa de conversão Braziliana)</div>
                                 <div class="h5 mb-0" id="qc_equiv_brl">-</div>
                                 <div class="small text-muted" id="qc_rate_text">-</div>
                             </div>
