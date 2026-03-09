@@ -158,7 +158,7 @@ $valorBrl = isset($rec['valor_brl']) ? (float) $rec['valor_brl'] : null;
                 <?php else: ?>
                     <div class="alert alert-success no-print" style="border-radius:14px;">
                         <div class="fw-bold">Pagamento confirmado</div>
-                        <div class="small">Obrigado! Sua recarga foi creditada na carteira.</div>
+                        <div class="small">Obrigado!<br><br>Sua recarga foi creditada na carteira  e já faz parte do nosso programa de bonificações<br><br>Em breve você poderá acompanhar os seu crédito e bonificações na sua página de informações da conta.</div>
                     </div>
                 <?php endif; ?>
 

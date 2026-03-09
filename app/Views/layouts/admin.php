@@ -66,7 +66,9 @@
         $adminFavicon = '';
     }
 
-    $adminFaviconEsc = htmlspecialchars($adminFavicon, ENT_QUOTES, 'UTF-8');
+    $faviconVer = $adminFavicon !== '' ? substr(sha1($adminFavicon), 0, 10) : '';
+    $adminFaviconHref = $adminFavicon !== '' ? ($adminFavicon . (strpos($adminFavicon, '?') === false ? '?' : '&') . 'v=' . rawurlencode($faviconVer)) : '';
+    $adminFaviconEsc = htmlspecialchars($adminFaviconHref, ENT_QUOTES, 'UTF-8');
     $faviconMime = '';
     if ($adminFavicon !== '') {
         $ext = strtolower(pathinfo(parse_url($adminFavicon, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));

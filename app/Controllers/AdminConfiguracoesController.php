@@ -6518,6 +6518,25 @@ HTML;
                 } catch (\Exception $e) {
                 }
 
+                // Layout (favicon, logos, banners) em schema single_row
+                try {
+                    $layoutCols = [
+                        'layout_logo' => 'logo',
+                        'layout_logo_footer' => 'logo_footer',
+                        'layout_logo_admin' => 'logo_admin',
+                        'layout_favicon' => 'favicon',
+                        'layout_banners' => 'banners',
+                        'layout_banners_en' => 'banners_en',
+                    ];
+                    foreach ($layoutCols as $col => $key) {
+                        if (in_array($col, $cols, true)) {
+                            $columnMap['layout'] = $columnMap['layout'] ?? [];
+                            $columnMap['layout'][$key] = $col;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+
                 if (in_array('webhook_link_pagamento_pedido_manual_url', $cols, true)) {
                     $columnMap['pagamentos']['webhook_link_pagamento_pedido_manual_url'] = 'webhook_link_pagamento_pedido_manual_url';
                 }
