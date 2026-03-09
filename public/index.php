@@ -231,6 +231,7 @@ function _siteLockIsBypassPath(string $path): bool {
     if (strpos($p, '/webhook/') === 0) return true;
     if (strpos($p, '/site-lock') === 0) return true;
     if (strpos($p, '/clube/recarga') === 0) return true;
+    if (strpos($p, '/como-funciona-clube') === 0) return true;
     if (strpos($p, '/uploads/') === 0) return true;
     if (strpos($p, '/assets/') === 0) return true;
     if ($p === '/favicon.ico' || $p === '/robots.txt' || $p === '/sitemap.xml') return true;

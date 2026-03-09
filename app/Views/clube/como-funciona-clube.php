@@ -1,4 +1,85 @@
-<?php ob_start(); ?>
+<?php
+$siteLogo = '';
+try {
+    $raw = '';
+    $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+    foreach ($tablesToTry as $t) {
+        if ($raw !== '') break;
+        try {
+            $pdo = \Config\Database::getConnection();
+            $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+            $stmtT->execute([$t]);
+            if (!$stmtT->fetchColumn()) {
+                continue;
+            }
+            $stmtCols = $pdo->query('DESCRIBE ' . $t);
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (!is_array($cols)) {
+                $cols = [];
+            }
+            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                if ($valCol !== '') {
+                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stmt->execute(['layout', 'logo']);
+                    $raw = (string) ($stmt->fetchColumn() ?: '');
+                    if ($raw !== '') break;
+                }
+            }
+            $keyCol = '';
+            if (in_array('chave', $cols, true)) $keyCol = 'chave';
+            elseif (in_array('key', $cols, true)) $keyCol = 'key';
+            elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+            elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+            $valCol = '';
+            if (in_array('valor', $cols, true)) $valCol = 'valor';
+            elseif (in_array('value', $cols, true)) $valCol = 'value';
+            elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+            if ($keyCol !== '' && $valCol !== '') {
+                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                $stmt->execute(['layout_logo']);
+                $raw = (string) ($stmt->fetchColumn() ?: '');
+                if ($raw !== '') break;
+            }
+            if (in_array('layout_logo', $cols, true)) {
+                $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                $raw = (string) ($stmt2 ? ($stmt2->fetchColumn() ?: '') : '');
+                if ($raw !== '') break;
+            }
+        } catch (\Exception $e) {
+        }
+    }
+    $siteLogo = is_string($raw) ? trim($raw) : '';
+} catch (\Exception $e) {
+    $siteLogo = '';
+}
+?>
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como funciona o Clube Braziliana</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f8fb; }
+    </style>
+</head>
+<body>
+
+<div class="container" style="padding: 22px 0 0;">
+    <div class="text-center mb-3">
+        <?php if (!empty($siteLogo)): ?>
+            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height: 52px; max-width: 100%; object-fit: contain;">
+        <?php else: ?>
+            <div style="font-weight:800; color:#0b1f3a; font-size: 20px;">Braziliana</div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-9">
@@ -152,6 +233,5 @@
     </div>
 </div>
 
-<?php $content = ob_get_clean(); ?>
-<?php $title = 'Clube Braziliana - Como funciona'; ?>
-<?php include __DIR__ . '/../layouts/main.php'; ?>
+</body>
+</html>
