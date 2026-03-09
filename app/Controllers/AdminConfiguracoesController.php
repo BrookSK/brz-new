@@ -6455,6 +6455,34 @@ HTML;
                     ],
                 ];
 
+                // Sistema: proteção por senha (pré-publicação)
+                try {
+                    $colEnabled = null;
+                    foreach (['sistema_site_lock_enabled', 'site_lock_enabled'] as $c) {
+                        if (in_array($c, $cols, true)) {
+                            $colEnabled = $c;
+                            break;
+                        }
+                    }
+                    $colPass = null;
+                    foreach (['sistema_site_lock_password', 'site_lock_password'] as $c) {
+                        if (in_array($c, $cols, true)) {
+                            $colPass = $c;
+                            break;
+                        }
+                    }
+                    if ($colEnabled || $colPass) {
+                        $columnMap['sistema'] = $columnMap['sistema'] ?? [];
+                        if ($colEnabled) {
+                            $columnMap['sistema']['site_lock_enabled'] = $colEnabled;
+                        }
+                        if ($colPass) {
+                            $columnMap['sistema']['site_lock_password'] = $colPass;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+
                 if (in_array('webhook_link_pagamento_pedido_manual_url', $cols, true)) {
                     $columnMap['pagamentos']['webhook_link_pagamento_pedido_manual_url'] = 'webhook_link_pagamento_pedido_manual_url';
                 }
