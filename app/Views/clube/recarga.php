@@ -180,6 +180,17 @@
     let cardEl = null;
 
     let recargaPollTimer = null;
+    let paymentLocked = false;
+
+    function lockPaymentUi(){
+        paymentLocked = true;
+        const btnPix = document.getElementById('qc_metodo_pix');
+        const btnCard = document.getElementById('qc_metodo_card');
+        const inputValor = document.getElementById('qc_valor_usd');
+        if(btnPix) btnPix.disabled = true;
+        if(btnCard) btnCard.disabled = true;
+        if(inputValor) inputValor.disabled = true;
+    }
 
     function startRecargaPolling(recargaId, token){
         if(recargaPollTimer) {
@@ -187,6 +198,8 @@
             recargaPollTimer = null;
         }
         if(!recargaId || !token) return;
+
+        lockPaymentUi();
 
         const btn = document.getElementById('qc_btn_pagar');
         if(btn){
@@ -381,6 +394,9 @@
     }
 
     function setMetodo(next){
+        if(paymentLocked) {
+            return;
+        }
         metodo = next;
         document.getElementById('qc_metodo_pix').className = (metodo==='pix') ? 'btn btn-primary' : 'btn btn-outline-primary';
         document.getElementById('qc_metodo_card').className = (metodo==='card') ? 'btn btn-primary' : 'btn btn-outline-secondary';
@@ -404,7 +420,7 @@
         }
         stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
         elements = stripe.elements();
-        cardEl = elements.create('card');
+        cardEl = elements.create('card', { hidePostalCode: true });
         cardEl.mount('#qc_stripe_card');
         return true;
     }
