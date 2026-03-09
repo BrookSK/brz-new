@@ -334,7 +334,7 @@ class ClubeRecargaController extends Controller {
 
         $capUsdEquiv = $rate > 0 ? ($capBrl / $rate) : 0.0;
         $this->view('clube/recarga', [
-            'min_usd' => 39.0,
+            'min_usd' => 5.0,
             'usd_brl_rate' => $rate,
             'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
             'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey(),
@@ -377,8 +377,8 @@ class ClubeRecargaController extends Controller {
         }
 
         $valorUsd = (float) str_replace(',', '.', (string) ($data['valor_usd'] ?? '0'));
-        if ($valorUsd + 0.00001 < 39.0) {
-            $this->json(['success' => false, 'error' => 'Valor mínimo é $39.00'], 400);
+        if ($valorUsd + 0.00001 < 5.0) {
+            $this->json(['success' => false, 'error' => 'Valor mínimo é $5.00'], 400);
             return;
         }
 

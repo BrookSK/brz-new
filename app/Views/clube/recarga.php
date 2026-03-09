@@ -181,7 +181,7 @@ try {
                                 <label class="form-label">Forma de pagamento</label>
                                 <div class="d-flex flex-wrap gap-2">
                                     <button type="button" class="btn btn-outline-primary" id="qc_metodo_pix">PIX (Stripe)</button>
-                                    <button type="button" class="btn btn-outline-secondary" id="qc_metodo_card">Cartão</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="qc_metodo_card" style="display:none;" disabled>Cartão</button>
                                 </div>
                                 <div class="form-text">Padrão: Pix</div>
                             </div>
@@ -230,8 +230,8 @@ try {
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Valor da recarga (mín. $39) *</label>
-                                <input type="number" class="form-control" id="qc_valor_usd" min="<?= (float) ($min_usd ?? 39.0) ?>" step="0.01" value="<?= (float) ($min_usd ?? 39.0) ?>">
+                                <label class="form-label">Valor da recarga (mín. $5) *</label>
+                                <input type="number" class="form-control" id="qc_valor_usd" min="<?= (float) ($min_usd ?? 5.0) ?>" step="0.01" value="<?= (float) ($min_usd ?? 5.0) ?>">
                                 <div class="form-text" id="qc_rate_hint"></div>
                             </div>
 
@@ -435,7 +435,7 @@ try {
         const totalPix = brl + fee;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
         document.getElementById('qc_pix_fee').textContent = 'Taxa Stripe (3,5%): R$ ' + fee.toFixed(2).replace('.', ',');
-        document.getElementById('qc_pix_total').textContent = 'Valor final no Pix: R$ ' + totalPix.toFixed(2).replace('.', ',');
+        document.getElementById('qc_pix_total').textContent = 'Valor final aproximado no Pix: R$ ' + totalPix.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_hint').textContent = 'Mínimo: $' + MIN_USD.toFixed(2);
     }
@@ -660,7 +660,6 @@ try {
         document.getElementById('qc_pais')?.addEventListener('change', syncDocumentoRules);
         document.getElementById('qc_email')?.addEventListener('blur', emailCheck);
         document.getElementById('qc_metodo_pix')?.addEventListener('click', function(){ setMetodo('pix'); });
-        document.getElementById('qc_metodo_card')?.addEventListener('click', function(){ setMetodo('card'); });
         document.getElementById('qc_btn_pagar')?.addEventListener('click', pagar);
 
         document.getElementById('qc_pais_search')?.addEventListener('input', function(e){
