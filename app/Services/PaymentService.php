@@ -255,6 +255,137 @@ class PaymentService {
         }
     }
 
+    public function createStripePaymentIntentCarteiraRecargaCardBrl(int $recargaId, float $valorBrl, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round(((float) $valorBrl) * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para recarga.'];
+        }
+
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'brl',
+            'description' => $descricao,
+            'metadata[carteira_recarga_id]' => (string) $recargaId,
+            'payment_method_types[0]' => 'card',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+        }
+
+        if (!empty($customer['metadata']) && is_array($customer['metadata'])) {
+            foreach ($customer['metadata'] as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                if (is_array($v) || is_object($v)) {
+                    $v = json_encode($v, JSON_UNESCAPED_UNICODE);
+                }
+                $body['metadata[' . $k . ']'] = (string) $v;
+            }
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '' || $clientSecret === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar PaymentIntent.'];
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function createStripePaymentIntentCarteiraRecargaPixBrl(int $recargaId, float $valorBrl, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round(((float) $valorBrl) * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para recarga.'];
+        }
+
+        // Para Pix, confirmamos no backend para obter o QR/payload imediatamente.
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'brl',
+            'description' => $descricao,
+            'metadata[carteira_recarga_id]' => (string) $recargaId,
+            'payment_method_types[0]' => 'pix',
+            'confirm' => 'true',
+            'payment_method_data[type]' => 'pix',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+        }
+
+        if (!empty($customer['metadata']) && is_array($customer['metadata'])) {
+            foreach ($customer['metadata'] as $k => $v) {
+                $k = trim((string) $k);
+                if ($k === '') continue;
+                if (is_array($v) || is_object($v)) {
+                    $v = json_encode($v, JSON_UNESCAPED_UNICODE);
+                }
+                $body['metadata[' . $k . ']'] = (string) $v;
+            }
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar PaymentIntent (id ausente).'];
+            }
+
+            $pix = null;
+            $next = $pi['next_action'] ?? null;
+            if (is_array($next)) {
+                $pixObj = $next['pix_display_qr_code'] ?? null;
+                if (is_array($pixObj)) {
+                    $pix = [
+                        'hosted_instructions_url' => (string) ($pixObj['hosted_instructions_url'] ?? ''),
+                        'expires_at' => $pixObj['expires_at'] ?? null,
+                        'copy_paste' => (string) ($pixObj['data'] ?? ($pixObj['pix_code'] ?? '')),
+                        'image_url_png' => (string) ($pixObj['image_url_png'] ?? ''),
+                        'image_url_svg' => (string) ($pixObj['image_url_svg'] ?? ''),
+                    ];
+                }
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'pix' => $pix,
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     public function createMercadoPagoCheckoutPreferenceProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], ?string $successUrl = null, ?string $failureUrl = null, ?string $pendingUrl = null): array {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) {
