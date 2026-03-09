@@ -327,13 +327,6 @@
     function updateEquiv(){
         const v = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
         const usd = Math.max(v, MIN_USD);
-        const inputEl = document.getElementById('qc_valor_usd');
-        if(inputEl){
-            const cur = parseFloat((inputEl.value || '0').toString().replace(',','.')) || 0;
-            if(cur + 0.00001 < MIN_USD){
-                inputEl.value = MIN_USD.toFixed(2);
-            }
-        }
         const brl = usd * USD_BRL_RATE;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(4).replace('.', ',');
