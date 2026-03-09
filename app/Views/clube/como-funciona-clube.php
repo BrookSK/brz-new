@@ -27,7 +27,7 @@
                 <div class="card-body p-4">
                     <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.2. Limite máximo do Clube</h2>
                     <div class="text-muted">
-                        <div class="mb-3">O Clube Braziliana possui um limite máximo de participação equivalente a <strong>US$ 150.000,00</strong> em créditos totais depositados pelos participantes.</div>
+                        <div class="mb-3">O Clube Braziliana possui um limite máximo de participação equivalente a <strong>R$ 150.000,00</strong> em créditos totais depositados pelos participantes.</div>
 
                         <div class="fw-semibold" style="color:#0b1f3a;">Quando esse limite for atingido:</div>
                         <ul class="mb-3">

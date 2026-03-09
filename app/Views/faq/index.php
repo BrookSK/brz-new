@@ -583,7 +583,7 @@ Caso o saldo fique abaixo do valor mínimo exigido, o acesso a determinadas func
 
 18.2. Limite Máximo do Clube
 
-O Clube Braziliana possui um limite máximo de participação equivalente a US$ 150.000,00 em créditos totais depositados pelos participantes.
+O Clube Braziliana possui um limite máximo de participação equivalente a R$ 150.000,00 em créditos totais depositados pelos participantes.
 
 Quando esse limite for atingido:
 
