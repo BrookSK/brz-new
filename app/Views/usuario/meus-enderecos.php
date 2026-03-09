@@ -5,12 +5,12 @@ ob_start();
 <div class="container py-4">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
         <div>
-            <h1 class="h4 mb-1">Endereços</h1>
-            <div class="text-muted small">Gerencie seus endereços de entrega.</div>
+            <h1 class="h4 mb-1"><?= __('user_addresses.title', 'Endereços') ?></h1>
+            <div class="text-muted small"><?= __('user_addresses.subtitle', 'Gerencie seus endereços de entrega.') ?></div>
         </div>
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-sm btn-primary" id="btn-novo-endereco">
-                <i class="fas fa-plus me-2"></i> Novo endereço
+                <i class="fas fa-plus me-2"></i> <?= __('user_addresses.new_address', 'Novo endereço') ?>
             </button>
         </div>
     </div>
@@ -28,20 +28,20 @@ ob_start();
 
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-0">
-                    <h5 class="mb-0"><i class="fas fa-list me-2"></i> Seus endereços</h5>
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i> <?= __('user_addresses.your_addresses', 'Seus endereços') ?></h5>
                 </div>
                 <div class="card-body">
                     <?php if (empty($enderecos)): ?>
-                        <div class="text-muted">Você ainda não possui endereços cadastrados.</div>
+                        <div class="text-muted"><?= __('user_addresses.empty', 'Você ainda não possui endereços cadastrados.') ?></div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Endereço</th>
-                                        <th>País</th>
-                                        <th>Principal</th>
-                                        <th class="text-end">Ações</th>
+                                        <th><?= __('user_addresses.table.address', 'Endereço') ?></th>
+                                        <th><?= __('user_addresses.table.country', 'País') ?></th>
+                                        <th><?= __('user_addresses.table.primary', 'Principal') ?></th>
+                                        <th class="text-end"><?= __('common.actions', 'Ações') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -69,7 +69,7 @@ ob_start();
                                             <td><?= htmlspecialchars($pais) ?></td>
                                             <td>
                                                 <?php if ($principal): ?>
-                                                    <span class="badge" style="background: rgba(16,185,129,0.10); border: 1px solid rgba(16,185,129,0.18); color: rgba(6,78,59,1);">Principal</span>
+                                                    <span class="badge" style="background: rgba(16,185,129,0.10); border: 1px solid rgba(16,185,129,0.18); color: rgba(6,78,59,1);"><?= __('user_addresses.primary_badge', 'Principal') ?></span>
                                                 <?php else: ?>
                                                     <span class="text-muted">—</span>
                                                 <?php endif; ?>
@@ -90,15 +90,15 @@ ob_start();
                                                     data-estado="<?= htmlspecialchars((string) ($e['estado'] ?? ($e['uf'] ?? ''))) ?>"
                                                     data-principal="<?= $principal ? '1' : '0' ?>"
                                                 >
-                                                    Editar
+                                                    <?= __('common.edit', 'Editar') ?>
                                                 </button>
                                                 <?php if (!$principal): ?>
                                                     <form method="POST" action="/meus-enderecos/principal/<?= (int) ($e['id'] ?? 0) ?>" class="d-inline">
-                                                        <button type="submit" class="btn btn-sm btn-outline-success">Tornar principal</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-success"><?= __('user_addresses.make_primary', 'Tornar principal') ?></button>
                                                     </form>
                                                 <?php endif; ?>
-                                                <form method="POST" action="/meus-enderecos/excluir/<?= (int) ($e['id'] ?? 0) ?>" class="d-inline" onsubmit="return confirm('Excluir este endereço?');">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Excluir</button>
+                                                <form method="POST" action="/meus-enderecos/excluir/<?= (int) ($e['id'] ?? 0) ?>" class="d-inline" onsubmit="return confirm((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.confirm_delete) ? window.USER_ADDRESSES_I18N.confirm_delete : 'Excluir este endereço?');">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><?= __('common.delete', 'Excluir') ?></button>
                                                 </form>
                                             </td>
                                         </tr>
@@ -112,7 +112,7 @@ ob_start();
 
             <div class="card border-0 shadow-sm" id="endereco-editor" style="display:none;">
                 <div class="card-header bg-white border-0">
-                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i> <span id="editor-title">Novo endereço</span></h5>
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i> <span id="editor-title"><?= __('user_addresses.editor.new_title', 'Novo endereço') ?></span></h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="/meus-enderecos/salvar" id="endereco-form">
@@ -120,57 +120,57 @@ ob_start();
 
                         <div class="row g-3">
                             <div class="col-md-3">
-                                <label class="form-label">País / Country *</label>
+                                <label class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?> *</label>
                                 <?php require __DIR__ . '/../_countries.php'; ?>
                                 <select class="form-select" name="pais" id="pais" required>
                                     <?php foreach ($countries as $code => $name): ?>
                                         <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($name) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
+                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" id="label-cep">CEP / ZIP Code *</label>
+                                <label class="form-label" id="label-cep"><?= __('auth.cep', 'CEP') ?> / <?= __('checkout.zip_code', 'ZIP Code') ?> *</label>
                                 <input type="text" class="form-control" name="cep" id="cep" required maxlength="12" value="">
                             </div>
                             <div class="col-md-9">
-                                <label class="form-label" id="label-endereco">Rua / Street *</label>
+                                <label class="form-label" id="label-endereco"><?= __('auth.street', 'Rua') ?> / <?= __('checkout.street_en', 'Street') ?> *</label>
                                 <input type="text" class="form-control" name="endereco" id="endereco" required value="">
                             </div>
                             <div class="col-md-3" id="numero-wrap">
-                                <label class="form-label" id="label-numero">Número / Number *</label>
+                                <label class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?> / <?= __('checkout.number_en', 'Number') ?> *</label>
                                 <input type="text" class="form-control" name="numero" id="numero" value="">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" id="label-complemento">Complemento / Complement</label>
+                                <label class="form-label" id="label-complemento"><?= __('auth.complement', 'Complemento') ?> / <?= __('checkout.complement_en', 'Complement') ?></label>
                                 <input type="text" class="form-control" name="complemento" id="complemento" value="">
                             </div>
                             <div class="col-md-3" id="bairro-wrap">
-                                <label class="form-label" id="label-bairro">Bairro / District</label>
+                                <label class="form-label" id="label-bairro"><?= __('auth.district', 'Bairro') ?> / <?= __('checkout.district_en', 'District') ?></label>
                                 <input type="text" class="form-control" name="bairro" id="bairro" value="">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Cidade / City *</label>
+                                <label class="form-label"><?= __('auth.city', 'Cidade') ?> / <?= __('checkout.city_en', 'City') ?> *</label>
                                 <input type="text" class="form-control" name="cidade" id="cidade" required value="">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" id="label-estado">Estado / State</label>
+                                <label class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?> / <?= __('checkout.state_en', 'State') ?></label>
                                 <select class="form-select" name="estado" id="estado">
-                                    <option value="">Selecione...</option>
+                                    <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                 </select>
                                 <input type="text" class="form-control" id="estado_text" name="estado_text" style="display:none;" value="">
                             </div>
                             <div class="col-12">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" value="1" id="principal" name="principal">
-                                    <label class="form-check-label" for="principal">Definir como principal</label>
+                                    <label class="form-check-label" for="principal"><?= __('user_addresses.set_as_primary', 'Definir como principal') ?></label>
                                 </div>
                             </div>
                         </div>
 
                         <div class="d-flex gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary">Salvar</button>
-                            <button type="button" class="btn btn-outline-secondary" id="btn-cancelar">Cancelar</button>
+                            <button type="submit" class="btn btn-primary"><?= __('common.save', 'Salvar') ?></button>
+                            <button type="button" class="btn btn-outline-secondary" id="btn-cancelar"><?= __('common.cancel', 'Cancelar') ?></button>
                         </div>
                     </form>
                 </div>
@@ -181,6 +181,19 @@ ob_start();
 </div>
 
 <script>
+(function(){
+    window.USER_ADDRESSES_I18N = {
+        select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
+        confirm_delete: <?= json_encode(__('user_addresses.confirm_delete', 'Excluir este endereço?'), JSON_UNESCAPED_UNICODE) ?>,
+        new_title: <?= json_encode(__('user_addresses.editor.new_title', 'Novo endereço'), JSON_UNESCAPED_UNICODE) ?>,
+        edit_title: <?= json_encode(__('user_addresses.editor.edit_title', 'Editar endereço'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_1: <?= json_encode(__('checkout.address_line_1', 'Address line 1 *'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_2_optional: <?= json_encode(__('checkout.address_line_2_optional', 'Address line 2 (optional)'), JSON_UNESCAPED_UNICODE) ?>,
+        number_label: <?= json_encode(__('auth.number_label', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+        number_label_en: <?= json_encode(__('checkout.number_en', 'Number'), JSON_UNESCAPED_UNICODE) ?>
+    };
+})();
+
 (function(){
     function filterSelectOptions(selectEl, query) {
         if (!selectEl) return;
@@ -222,17 +235,19 @@ ob_start();
         }
 
         if (enderecoLabel) {
-            enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : 'Address line 1 *';
+            enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : ((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.address_line_1) ? window.USER_ADDRESSES_I18N.address_line_1 : 'Address line 1 *');
         }
         if (compLabel) {
-            compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : 'Address line 2 (optional)';
+            compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : ((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.address_line_2_optional) ? window.USER_ADDRESSES_I18N.address_line_2_optional : 'Address line 2 (optional)');
         }
 
         if (numeroWrap && numeroInput && numeroLabel) {
             if (pais === 'BR') {
                 numeroWrap.style.display = '';
                 numeroInput.required = true;
-                numeroLabel.textContent = 'Número / Number *';
+                const pt = (window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.number_label) ? window.USER_ADDRESSES_I18N.number_label : 'Número';
+                const en = (window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.number_label_en) ? window.USER_ADDRESSES_I18N.number_label_en : 'Number';
+                numeroLabel.textContent = pt + ' / ' + en + ' *';
             } else {
                 numeroWrap.style.display = 'none';
                 numeroInput.required = false;
@@ -260,7 +275,8 @@ ob_start();
                 var current = String(estadoSelect.value || estadoText.value || '').trim();
                 while (estadoSelect.options.length > 0) estadoSelect.remove(0);
                 var optEmpty = document.createElement('option');
-                optEmpty.value = ''; optEmpty.textContent = 'Selecione...';
+                optEmpty.value = '';
+                optEmpty.textContent = (window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.select) ? window.USER_ADDRESSES_I18N.select : 'Selecione...';
                 estadoSelect.appendChild(optEmpty);
                 list.forEach(function(uf){
                     var opt = document.createElement('option');
@@ -297,7 +313,7 @@ ob_start();
     function openEditor(title) {
         var box = document.getElementById('endereco-editor');
         var t = document.getElementById('editor-title');
-        if (t) t.textContent = title || 'Novo endereço';
+        if (t) t.textContent = title || ((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.new_title) ? window.USER_ADDRESSES_I18N.new_title : 'Novo endereço');
         if (box) box.style.display = 'block';
         atualizarEnderecoPorPais();
         box?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -330,7 +346,7 @@ ob_start();
         if (btnNovo) {
             btnNovo.addEventListener('click', function(){
                 clearEditor();
-                openEditor('Novo endereço');
+                openEditor((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.new_title) ? window.USER_ADDRESSES_I18N.new_title : 'Novo endereço');
             });
         }
 
@@ -361,7 +377,7 @@ ob_start();
                 if (stSel && stSel.style.display !== 'none') {
                     stSel.value = (btn.getAttribute('data-estado') || '').toUpperCase();
                 }
-                openEditor('Editar endereço');
+                openEditor((window.USER_ADDRESSES_I18N && window.USER_ADDRESSES_I18N.edit_title) ? window.USER_ADDRESSES_I18N.edit_title : 'Editar endereço');
             });
         });
 

@@ -25,6 +25,144 @@ class AdminEstoqueController extends Controller {
         }
     }
 
+    private function getQtdProdutoNoPedido(int $pedidoId, int $produtoId): int {
+        if ($pedidoId <= 0 || $produtoId <= 0) {
+            return 0;
+        }
+
+        $total = 0;
+        $t1 = $this->tableExists('pedido_itens') ? 'pedido_itens' : null;
+        $t2 = $this->tableExists('pedido_items') ? 'pedido_items' : null;
+
+        if (!$t1 && !$t2) {
+            return 0;
+        }
+
+        foreach ([$t1, $t2] as $t) {
+            if (empty($t)) {
+                continue;
+            }
+            try {
+                $stmt = $this->connection->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM {$t} WHERE pedido_id = :pedido_id AND produto_id = :produto_id"
+                );
+                $stmt->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
+                $total += (int) ($stmt->fetchColumn() ?: 0);
+            } catch (\Exception $e) {
+            }
+        }
+
+        return (int) $total;
+    }
+
+    private function normalizeReservaPedidoProduto(int $pedidoId, int $produtoId, int $qtdCorreta): void {
+        if ($pedidoId <= 0 || $produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_reservas') || !$this->columnExists('estoque_reservas', 'pedido_id')) {
+            return;
+        }
+        try {
+            $stmtIds = $this->connection->prepare(
+                "SELECT id FROM estoque_reservas WHERE pedido_id = :pedido_id AND produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') ORDER BY id ASC"
+            );
+            $stmtIds->execute([':pedido_id' => $pedidoId, ':produto_id' => $produtoId]);
+            $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return;
+            }
+
+            if ($qtdCorreta <= 0) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $stmtDel = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                $stmtDel->execute($ids);
+                return;
+            }
+
+            $keepId = (int) $ids[0];
+            $stmtUp = $this->connection->prepare(
+                "UPDATE estoque_reservas SET quantidade_reservada = :q WHERE id = :id LIMIT 1"
+            );
+            $stmtUp->execute([':q' => $qtdCorreta, ':id' => $keepId]);
+
+            if (count($ids) > 1) {
+                $delIds = array_slice($ids, 1);
+                $in = implode(',', array_fill(0, count($delIds), '?'));
+                $stmtDel = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                $stmtDel->execute($delIds);
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function normalizeReservasProduto(int $produtoId): void {
+        if ($produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_reservas') || !$this->columnExists('estoque_reservas', 'produto_id') || !$this->columnExists('estoque_reservas', 'status')) {
+            return;
+        }
+        if (!$this->columnExists('estoque_reservas', 'quantidade_reservada')) {
+            return;
+        }
+
+        $temPedido = $this->columnExists('estoque_reservas', 'pedido_id');
+        if (!$temPedido) {
+            return;
+        }
+
+        try {
+            // remove reservas órfãs (sem pedido)
+            $stmtDelOrf = $this->connection->prepare(
+                "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') AND (pedido_id IS NULL OR pedido_id = 0)"
+            );
+            $stmtDelOrf->execute([':produto_id' => $produtoId]);
+        } catch (\Exception $e) {
+        }
+
+        try {
+            // normaliza reservas por pedido: não pode ser maior do que a quantidade do produto no pedido
+            $stmtPeds = $this->connection->prepare(
+                "SELECT DISTINCT pedido_id FROM estoque_reservas WHERE produto_id = :produto_id AND (status = 'ativa' OR status IS NULL OR status = '') AND pedido_id IS NOT NULL AND pedido_id <> 0"
+            );
+            $stmtPeds->execute([':produto_id' => $produtoId]);
+            $pedidoIds = $stmtPeds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $pedidoIds = array_values(array_filter(array_map('intval', $pedidoIds)));
+            foreach ($pedidoIds as $pedidoId) {
+                if ($pedidoId <= 0) continue;
+                $qPedido = $this->getQtdProdutoNoPedido($pedidoId, $produtoId);
+                if ($qPedido <= 0) {
+                    // pedido não tem esse produto: remove reservas
+                    try {
+                        $stmtDel = $this->connection->prepare(
+                            "DELETE FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
+                        );
+                        $stmtDel->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                    } catch (\Exception $e) {
+                    }
+                    continue;
+                }
+
+                try {
+                    $stmtSum = $this->connection->prepare(
+                        "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
+                    );
+                    $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                    $qRes = (int) ($stmtSum->fetchColumn() ?: 0);
+                    if ($qRes > $qPedido) {
+                        $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qPedido);
+                    } else {
+                        // mesmo quando não está maior, eliminamos duplicatas mantendo 1 linha com o total
+                        $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qRes);
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     private function getTotalReservadoProduto(int $produtoId): int {
         if ($produtoId <= 0) {
             return 0;
@@ -35,7 +173,14 @@ class AdminEstoqueController extends Controller {
         // Reservas reais
         if ($this->tableExists('estoque_reservas')) {
             try {
-                $stmt = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
+                $stmt = $this->connection->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
+                    FROM estoque_reservas er
+                    LEFT JOIN pedidos p ON p.id = er.pedido_id
+                    WHERE er.produto_id = :produto_id
+                      AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
+                      AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+                );
                 $stmt->execute([':produto_id' => $produtoId]);
                 $total += (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
             } catch (\Exception $e) {
@@ -55,6 +200,27 @@ class AdminEstoqueController extends Controller {
         return $total;
     }
 
+    private function getTotalReservadoRealProduto(int $produtoId): int {
+        if ($produtoId <= 0 || !$this->tableExists('estoque_reservas')) {
+            return 0;
+        }
+
+        try {
+            $stmt = $this->connection->prepare(
+                "SELECT COALESCE(SUM(COALESCE(er.quantidade_reservada,0)),0) as total
+                FROM estoque_reservas er
+                LEFT JOIN pedidos p ON p.id = er.pedido_id
+                WHERE er.produto_id = :produto_id
+                  AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
+                  AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))"
+            );
+            $stmt->execute([':produto_id' => $produtoId]);
+            return (int) (($stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function getTotalPendenciaCompraProduto(int $produtoId): int {
         if ($produtoId <= 0 || !$this->tableExists('lista_compras')) {
             return 0;
@@ -72,14 +238,53 @@ class AdminEstoqueController extends Controller {
         // Regra: não permitir que o sistema "fique devendo" estoque reservado.
         // Se estoque_total < reservado_total, criar pendência de compra suficiente para cobrir o déficit.
         $estoqueTotal = $this->getTotalEstoqueProduto($produtoId);
-        $reservado = $this->getTotalReservadoProduto($produtoId);
+        // IMPORTANTE: aqui deve considerar apenas reservas reais. Se incluir lista_compras (pendência),
+        // a pendência passa a se auto-inflar a cada ajuste.
+        $reservado = $this->getTotalReservadoRealProduto($produtoId);
         if ($reservado <= 0) {
             return 0;
         }
 
         $deficit = $reservado - $estoqueTotal;
+        $pendAtual = $this->getTotalPendenciaCompraProduto($produtoId);
+
+        // Se não existe déficit, a pendência não deve existir. Reduzir/zerar pendências pendentes.
         if ($deficit <= 0) {
+            if ($pendAtual > 0 && $this->tableExists('lista_compras')) {
+                try {
+                    $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE produto_id = :p AND status = 'pendente'");
+                    $stmt->execute([':p' => $produtoId]);
+                } catch (\Throwable $e) {
+                }
+            }
             return 0;
+        }
+
+        // Se a pendência atual estiver maior que o déficit, reduzir para evitar efeito bola de neve.
+        if ($pendAtual > $deficit && $this->tableExists('lista_compras')) {
+            $excesso = $pendAtual - $deficit;
+            try {
+                $stmtRows = $this->connection->prepare("SELECT id, COALESCE(quantidade_faltante,0) AS quantidade_faltante FROM lista_compras WHERE produto_id = :p AND status = 'pendente' ORDER BY id DESC");
+                $stmtRows->execute([':p' => $produtoId]);
+                $rows = $stmtRows->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                foreach ($rows as $r) {
+                    if ($excesso <= 0) break;
+                    $id = (int) ($r['id'] ?? 0);
+                    if ($id <= 0) continue;
+                    $q = (int) ($r['quantidade_faltante'] ?? 0);
+                    if ($q <= 0) {
+                        continue;
+                    }
+
+                    $reduz = ($q >= $excesso) ? $excesso : $q;
+                    $novo = $q - $reduz;
+                    $stUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = :q, status = CASE WHEN :q = 0 THEN 'comprado' ELSE status END WHERE id = :id AND status = 'pendente'");
+                    $stUpd->execute([':q' => $novo, ':id' => $id]);
+                    $excesso -= $reduz;
+                }
+            } catch (\Throwable $e) {
+            }
         }
 
         $pendAtual = $this->getTotalPendenciaCompraProduto($produtoId);
@@ -108,7 +313,10 @@ class AdminEstoqueController extends Controller {
                 $stmt = $this->connection->prepare(
                     "SELECT er.pedido_id, SUM(COALESCE(er.quantidade_reservada,0)) as quantidade_reservada
                      FROM estoque_reservas er
-                     WHERE er.produto_id = :produto_id AND er.status = 'ativa'
+                     LEFT JOIN pedidos p ON p.id = er.pedido_id
+                     WHERE er.produto_id = :produto_id
+                       AND (er.status = 'ativa' OR er.status IS NULL OR er.status = '')
+                       AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                      GROUP BY er.pedido_id
                      ORDER BY er.pedido_id DESC"
                 );
@@ -116,15 +324,36 @@ class AdminEstoqueController extends Controller {
                 $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $pedidoIds = [];
                 $qPorPedido = [];
+                $orfas = 0;
                 foreach ($rows as $r) {
                     $pid = (int) ($r['pedido_id'] ?? 0);
-                    if ($pid <= 0) continue;
+                    $q = (int) ($r['quantidade_reservada'] ?? 0);
+                    if ($pid <= 0) {
+                        $orfas += $q;
+                        continue;
+                    }
                     $pedidoIds[] = $pid;
-                    $qPorPedido[$pid] = (int) ($r['quantidade_reservada'] ?? 0);
+                    $qPorPedido[$pid] = $q;
                 }
 
                 if (empty($pedidoIds)) {
-                    echo json_encode(['success' => true, 'pedidos' => []]);
+                    $out = [];
+                    if ($orfas > 0) {
+                        $out[] = [
+                            'id' => 0,
+                            'codigo_pedido' => '',
+                            'status' => 'Reserva órfã (sem pedido)',
+                            'valor_total' => null,
+                            'moeda' => '',
+                            'created_at' => '',
+                            'pago_em' => '',
+                            'cliente_nome' => '',
+                            'cliente_email' => '',
+                            'quantidade_reservada' => (int) $orfas,
+                            'itens' => [],
+                        ];
+                    }
+                    echo json_encode(['success' => true, 'pedidos' => $out]);
                     return;
                 }
 
@@ -142,6 +371,12 @@ class AdminEstoqueController extends Controller {
                 $pedidos = [];
                 foreach ($pedidosRows as $p) {
                     $pid = (int) ($p['id'] ?? 0);
+                    $qReservada = (int) ($qPorPedido[$pid] ?? 0);
+                    $qPedido = $this->getQtdProdutoNoPedido($pid, $produtoId);
+                    if ($qPedido > 0 && $qReservada > $qPedido) {
+                        $this->normalizeReservaPedidoProduto($pid, $produtoId, $qPedido);
+                        $qReservada = $qPedido;
+                    }
                     $pedidos[$pid] = [
                         'id' => $pid,
                         'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ''),
@@ -152,7 +387,7 @@ class AdminEstoqueController extends Controller {
                         'pago_em' => isset($p['pago_em']) ? (string) $p['pago_em'] : '',
                         'cliente_nome' => (string) ($p['cliente_nome'] ?? ''),
                         'cliente_email' => (string) ($p['cliente_email'] ?? ''),
-                        'quantidade_reservada' => (int) ($qPorPedido[$pid] ?? 0),
+                        'quantidade_reservada' => (int) $qReservada,
                         'itens' => [],
                     ];
                 }
@@ -179,6 +414,22 @@ class AdminEstoqueController extends Controller {
                             'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ''),
                         ];
                     }
+                }
+
+                if ($orfas > 0) {
+                    $pedidos[0] = [
+                        'id' => 0,
+                        'codigo_pedido' => '',
+                        'status' => 'Reserva órfã (sem pedido)',
+                        'valor_total' => null,
+                        'moeda' => '',
+                        'created_at' => '',
+                        'pago_em' => '',
+                        'cliente_nome' => '',
+                        'cliente_email' => '',
+                        'quantidade_reservada' => (int) $orfas,
+                        'itens' => [],
+                    ];
                 }
 
                 echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
@@ -352,34 +603,71 @@ class AdminEstoqueController extends Controller {
                 if ($podeReservar && $consumir > 0) {
                     try {
                         if ($temPedidoEmReserva && $pedidoId > 0) {
-                            $stmtChk = $this->connection->prepare(
-                                "SELECT id, quantidade_reservada FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'ativa' LIMIT 1"
+                            $qtdPedido = $this->getQtdProdutoNoPedido($pedidoId, $produtoId);
+                            if ($qtdPedido <= 0) {
+                                // se não existe item no pedido, não cria/reserva nada
+                                continue;
+                            }
+
+                            $stmtSum = $this->connection->prepare(
+                                "SELECT COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '')"
                             );
-                            $stmtChk->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
-                            $ex = $stmtChk->fetch(\PDO::FETCH_ASSOC);
-                            if ($ex && (int) ($ex['id'] ?? 0) > 0) {
+                            $stmtSum->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                            $reservadoAtual = (int) ($stmtSum->fetchColumn() ?: 0);
+
+                            // Normalizar caso já esteja maior do que o pedido (duplicação/bug anterior)
+                            if ($reservadoAtual > $qtdPedido) {
+                                $this->normalizeReservaPedidoProduto($pedidoId, $produtoId, $qtdPedido);
+                                $reservadoAtual = $qtdPedido;
+                            }
+
+                            $faltanteReserva = $qtdPedido - $reservadoAtual;
+                            if ($faltanteReserva <= 0) {
+                                continue;
+                            }
+
+                            $add = $consumir;
+                            if ($add > $faltanteReserva) {
+                                $add = $faltanteReserva;
+                            }
+                            if ($add <= 0) {
+                                continue;
+                            }
+
+                            $stmtIds = $this->connection->prepare(
+                                "SELECT id FROM estoque_reservas WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND (status = 'ativa' OR status IS NULL OR status = '') ORDER BY id ASC"
+                            );
+                            $stmtIds->execute([':produto_id' => $produtoId, ':pedido_id' => $pedidoId]);
+                            $ids = $stmtIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            $ids = array_values(array_filter(array_map('intval', $ids)));
+
+                            if (!empty($ids)) {
+                                $keepId = (int) $ids[0];
                                 $stmtUpRes = $this->connection->prepare(
                                     "UPDATE estoque_reservas SET quantidade_reservada = (COALESCE(quantidade_reservada,0) + :q) WHERE id = :id LIMIT 1"
                                 );
-                                $stmtUpRes->execute([':q' => $consumir, ':id' => (int) $ex['id']]);
+                                $stmtUpRes->execute([':q' => $add, ':id' => $keepId]);
+                                if (count($ids) > 1) {
+                                    $delIds = array_slice($ids, 1);
+                                    $in = implode(',', array_fill(0, count($delIds), '?'));
+                                    $stmtDelDup = $this->connection->prepare("DELETE FROM estoque_reservas WHERE id IN ({$in})");
+                                    $stmtDelDup->execute($delIds);
+                                }
                             } else {
                                 $cols = ['produto_id', 'pedido_id', 'quantidade_reservada', 'status'];
                                 $vals = [':produto_id', ':pedido_id', ':q', "'ativa'"];
-                                $params = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':q' => $consumir];
+                                $params = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId, ':q' => $add];
                                 $stmtInsRes = $this->connection->prepare(
                                     'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
                                 );
                                 $stmtInsRes->execute($params);
                             }
+
+                            // só baixa a pendência pelo que realmente virou reserva
+                            $consumir = $add;
                         } else {
-                            // Sem pedido_id disponível: cria uma reserva genérica (mantém o "reservado" apontando)
-                            $cols = ['produto_id', 'quantidade_reservada', 'status'];
-                            $vals = [':produto_id', ':q', "'ativa'"];
-                            $params = [':produto_id' => $produtoId, ':q' => $consumir];
-                            $stmtInsRes = $this->connection->prepare(
-                                'INSERT INTO estoque_reservas (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')'
-                            );
-                            $stmtInsRes->execute($params);
+                            // Sem pedido_id: não cria reserva fantasma. Mantém na lista_compras para análise.
+                            continue;
                         }
                     } catch (\Exception $e) {
                     }
@@ -388,15 +676,22 @@ class AdminEstoqueController extends Controller {
                     continue;
                 }
 
-                if ($falt <= $restante) {
+                if ($consumir <= 0) {
+                    continue;
+                }
+
+                if ($falt <= $restante && $consumir === $falt) {
                     $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = 0 WHERE id = :id LIMIT 1");
                     $stmtUpd->execute([':id' => $id]);
                     $restante -= $falt;
                 } else {
                     $stmtUpd = $this->connection->prepare("UPDATE lista_compras SET quantidade_faltante = :falt WHERE id = :id LIMIT 1");
-                    $stmtUpd->execute([':id' => $id, ':falt' => ($falt - $restante)]);
-                    $restante = 0;
-                    break;
+                    $novoFalt = $falt - $consumir;
+                    if ($novoFalt < 0) {
+                        $novoFalt = 0;
+                    }
+                    $stmtUpd->execute([':id' => $id, ':falt' => $novoFalt]);
+                    $restante -= $consumir;
                 }
             }
         } catch (\Exception $e) {
@@ -592,6 +887,46 @@ class AdminEstoqueController extends Controller {
             'currencyCol' => $currencyCol,
             'imgCol' => $imgCol,
         ];
+    }
+
+    private function getProdutosStockCol(): ?string {
+        $schema = $this->getProdutosSchema();
+        $cols = $schema['cols'] ?? [];
+        if (!is_array($cols) || empty($cols)) {
+            return null;
+        }
+
+        foreach (['estoque', 'estoque_atual', 'saldo', 'quantidade', 'qty', 'stock_quantity', 'stock'] as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    private function syncProdutoEstoqueFromInterno(int $produtoId): void {
+        if ($produtoId <= 0) {
+            return;
+        }
+        if (!$this->tableExists('estoque_interno')) {
+            return;
+        }
+
+        $stockCol = $this->getProdutosStockCol();
+        if (!$stockCol) {
+            return;
+        }
+
+        try {
+            $stmtTotal = $this->connection->prepare('SELECT COALESCE(SUM(COALESCE(quantidade,0)),0) as total FROM estoque_interno WHERE produto_id = :produto_id');
+            $stmtTotal->execute([':produto_id' => $produtoId]);
+            $total = (int) (($stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+
+            $stmtUpd = $this->connection->prepare('UPDATE produtos SET `' . $stockCol . '` = :total WHERE id = :id LIMIT 1');
+            $stmtUpd->execute([':total' => $total, ':id' => $produtoId]);
+        } catch (\Exception $e) {
+        }
     }
 
     private function resolveProdutoImagem(array $produto, ?string $imgCol): ?string {
@@ -1017,51 +1352,60 @@ class AdminEstoqueController extends Controller {
             // Esta tela é apenas para listagem. A entrada é feita em /admin/estoque/entrada.
 
             $schemaProdutos = $this->getProdutosSchema();
+            $nameCol = $schemaProdutos['nameCol'] ?? null;
+            $skuCol = $schemaProdutos['skuCol'] ?? null;
             $imgCol = $schemaProdutos['imgCol'] ?? null;
             $imgSelect = "'' AS imagem_raw";
             if (is_string($imgCol) && $imgCol !== '') {
                 $imgSelect = 'p.' . $imgCol . ' AS imagem_raw';
             }
 
+            $nameExpr = (is_string($nameCol) && $nameCol !== '') ? ('p.' . $nameCol) : "CAST(p.id AS CHAR)";
+            $skuExpr = (is_string($skuCol) && $skuCol !== '') ? ('p.' . $skuCol) : "''";
+
             // Buscar status geral do estoque (apenas itens com quantidade no galpão)
-            // Regra: Reservado = reservas reais (estoque_reservas ativa) + demanda pendente (lista_compras pendente)
+            // Regra (UI): Reservado = apenas reservas reais (estoque_reservas ativa). A pendência de compra fica na tela de compras.
             $reservaJoin = '';
             $reservadoSelectExpr = '0';
-
-            if ($this->tableExists('lista_compras')) {
-                $reservaJoin .= "
-                    LEFT JOIN (
-                        SELECT produto_id, SUM(COALESCE(quantidade_faltante,0)) as reservado
-                        FROM lista_compras
-                        WHERE status = 'pendente'
-                        GROUP BY produto_id
-                    ) res_lc ON res_lc.produto_id = v.produto_id
-                ";
-                $reservadoSelectExpr = 'COALESCE(res_lc.reservado, 0)';
-            }
 
             if ($this->tableExists('estoque_reservas')) {
                 $reservaJoin .= "
                     LEFT JOIN (
-                        SELECT produto_id, SUM(COALESCE(quantidade_reservada,0)) as reservado
-                        FROM estoque_reservas
-                        WHERE status = 'ativa'
-                        GROUP BY produto_id
-                    ) res_er ON res_er.produto_id = v.produto_id
+                        SELECT er.produto_id, SUM(COALESCE(er.quantidade_reservada,0)) as reservado
+                        FROM estoque_reservas er
+                        LEFT JOIN pedidos p ON p.id = er.pedido_id
+                        WHERE er.status = 'ativa'
+                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
+                        GROUP BY er.produto_id
+                    ) res_er ON res_er.produto_id = p.id
                 ";
-                $reservadoSelectExpr = '(' . $reservadoSelectExpr . ' + COALESCE(res_er.reservado, 0))';
+                $reservadoSelectExpr = 'COALESCE(res_er.reservado, 0)';
             }
 
             $stmt = $this->connection->prepare("
                 SELECT
-                    v.*, 
+                    p.id as produto_id,
+                    {$nameExpr} as produto_nome,
+                    {$skuExpr} as sku,
+                    e.total as quantidade_estoque,
+                    CASE
+                        WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                        WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                        ELSE 'normal'
+                    END as status_estoque,
                     loc.localizacao,
                     loc.data_compra_mais_recente,
                     loc.validade_mais_proxima,
                     {$reservadoSelectExpr} as reservado,
                     {$imgSelect}
-                FROM vw_status_geral_estoque v
-                JOIN produtos p ON p.id = v.produto_id
+                FROM (
+                    SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
+                    FROM estoque_interno
+                    WHERE quantidade > 0
+                    GROUP BY produto_id
+                ) e
+                JOIN produtos p ON p.id = e.produto_id
+                LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 {$reservaJoin}
                 JOIN (
                     SELECT
@@ -1076,8 +1420,8 @@ class AdminEstoqueController extends Controller {
                     FROM estoque_interno e
                     WHERE e.quantidade > 0
                     GROUP BY e.produto_id
-                ) loc ON loc.produto_id = v.produto_id
-                ORDER BY v.produto_nome
+                ) loc ON loc.produto_id = p.id
+                ORDER BY produto_nome
             ");
             $stmt->execute();
             $status_geral = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -1089,9 +1433,21 @@ class AdminEstoqueController extends Controller {
                     SUM(CASE WHEN status_estoque = 'baixo' THEN 1 ELSE 0 END) as baixos,
                     SUM(CASE WHEN status_estoque = 'normal' THEN 1 ELSE 0 END) as normais
                 FROM (
-                    SELECT v.*
-                    FROM vw_status_geral_estoque v
-                    JOIN (SELECT DISTINCT produto_id FROM estoque_interno WHERE quantidade > 0) e ON e.produto_id = v.produto_id
+                    SELECT
+                        p.id as produto_id,
+                        CASE
+                            WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                            WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                            ELSE 'normal'
+                        END as status_estoque
+                    FROM (
+                        SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
+                        FROM estoque_interno
+                        WHERE quantidade > 0
+                        GROUP BY produto_id
+                    ) e
+                    JOIN produtos p ON p.id = e.produto_id
+                    LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 ) t
             ");
             $stmt->execute();
@@ -1609,6 +1965,8 @@ class AdminEstoqueController extends Controller {
 
                 $this->ajustarListaComprasAposEntrada($produtoId, $quantidade);
 
+                $this->syncProdutoEstoqueFromInterno($produtoId);
+
                 $this->connection->commit();
 
                 $this->setFlash('Quantidade atualizada com sucesso (sem duplicar localização).', 'success');
@@ -1702,6 +2060,8 @@ class AdminEstoqueController extends Controller {
 
             $this->ajustarListaComprasAposEntrada($produtoId, $quantidade);
 
+            $this->syncProdutoEstoqueFromInterno($produtoId);
+
             $this->connection->commit();
 
             $this->setFlash('Entrada de estoque registrada com sucesso.', 'success');
@@ -1790,6 +2150,9 @@ class AdminEstoqueController extends Controller {
                 exit;
             }
 
+            // Normalizar reservas do produto para evitar números inflados no resumo
+            $this->normalizeReservasProduto($produtoId);
+
             // Produto
             $schema = $this->getProdutosSchema();
             $nameCol = $schema['nameCol'] ?? null;
@@ -1851,13 +2214,16 @@ class AdminEstoqueController extends Controller {
             $totalReservadoReal = 0;
             if ($this->tableExists('estoque_reservas')) {
                 try {
-                    $stmtRes = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_reservada),0) as total FROM estoque_reservas WHERE produto_id = :produto_id AND status = 'ativa'");
+                    $stmtRes = $this->connection->prepare("SELECT COALESCE(SUM(er.quantidade_reservada),0) as total\n                        FROM estoque_reservas er\n                        LEFT JOIN pedidos p ON p.id = er.pedido_id\n                        WHERE er.produto_id = :produto_id\n                          AND er.status = 'ativa'\n                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))");
                     $stmtRes->execute([':produto_id' => $produtoId]);
                     $totalReservadoReal = (int) (($stmtRes->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
                 } catch (\Exception $e) {
                     $totalReservadoReal = 0;
                 }
             }
+
+            // Normalizar pendências: se não há déficit (estoque >= reserva real), pendência não deve ficar presa.
+            $this->garantirSomaZeroAposReducao($produtoId);
 
             $pendenciaCompra = 0;
             if ($this->tableExists('lista_compras')) {
@@ -1870,10 +2236,12 @@ class AdminEstoqueController extends Controller {
                 }
             }
 
-            $totalReservado = $totalReservadoReal + $pendenciaCompra;
+            // IMPORTANTE (UI): "Reservado" aqui representa apenas reserva real (pedidos/estoque_reservas).
+            // A pendência de compra é exibida separadamente para não parecer duplicação.
+            $totalReservado = $totalReservadoReal;
 
-            $totalDisponivel = $totalEstoque - $totalReservado;
-            $statusReposicao = ($totalReservado > $totalEstoque);
+            $totalDisponivel = $totalEstoque - $totalReservadoReal;
+            $statusReposicao = ($totalReservadoReal > $totalEstoque);
 
             $reservasAtivas = [];
             if ($this->tableExists('estoque_reservas')) {
@@ -1881,7 +2249,9 @@ class AdminEstoqueController extends Controller {
                     $stmtRA = $this->connection->prepare(
                         "SELECT er.pedido_id, SUM(COALESCE(er.quantidade_reservada,0)) as quantidade
                          FROM estoque_reservas er
+                         LEFT JOIN pedidos p ON p.id = er.pedido_id
                          WHERE er.produto_id = :produto_id AND er.status = 'ativa'
+                           AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                          GROUP BY er.pedido_id
                          ORDER BY er.pedido_id DESC"
                     );
@@ -1958,17 +2328,147 @@ class AdminEstoqueController extends Controller {
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Estoque total</div><div style="font-weight:900;font-size:20px;">' . (int) $totalEstoque . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reservado</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservado . '</div></div></div>
-                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                         <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Reserva (real)</div><div style="font-weight:900;font-size:20px;">' . (int) $totalReservadoReal . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Pendência (compras)</div><div style="font-weight:900;font-size:20px;">' . (int) $pendenciaCompra . '</div></div></div>
+                        <div class="col-md-3"><div class="p-3" style="border:1px solid rgba(148,163,184,.22);border-radius:14px;background:#fff;"><div class="text-muted small">Disponível</div><div style="font-weight:900;font-size:20px;color:' . ($totalDisponivel < 0 ? '#b91c1c' : '#0f172a') . ';">' . (int) $totalDisponivel . '</div></div></div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
                         <a class="btn btn-outline-primary btn-sm" href="/admin/estoque/compras?produto_id=' . (int) $produtoId . '" target="_blank">Abrir lista de compras</a>
-                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas">Ver reservas</button>
+                        <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '">Ver reservas</button>
                     </div>
                     ' . ($statusReposicao ? '<div class="alert alert-warning mt-3 mb-0">Status: <strong>Reposição</strong>. Reservado acima do estoque; o disponível fica negativo até entrada.</div>' : '') . '
                 </div>
             </div>';
+
+        echo '<div class="modal fade" id="modalReservas" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Reservas / Pedidos relacionados</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
+                            <div id="reservas_loading" class="text-muted">Carregando...</div>
+                            <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
+                            <div class="accordion" id="accordionReservas"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <a class="btn btn-outline-primary" id="reservas_ir_compras" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+
+        echo '<script>
+            function escapeHtml2(str){
+                if (str === null || str === undefined) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/\"/g, "&quot;")
+                    .replace(/\'/g, "&#039;");
+            }
+            function formatMoney2(v){
+                if (v === null || v === undefined || v === "") return "-";
+                var n = Number(v);
+                if (isNaN(n)) return String(v);
+                return "$ " + n.toFixed(2);
+            }
+            function renderAccordionReservas(pedidos){
+                var acc = document.getElementById("accordionReservas");
+                if (!acc) return;
+                acc.innerHTML = "";
+                pedidos.forEach(function(p){
+                    var pid = p.id || 0;
+                    var headId = "resHead_" + pid;
+                    var bodyId = "resBody_" + pid;
+                    var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney2(p.valor_total) : "-";
+                    var status = p.status ? escapeHtml2(p.status) : "";
+                    var codigo = p.codigo_pedido ? escapeHtml2(p.codigo_pedido) : "";
+                    var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
+                    var criado = p.created_at ? escapeHtml2(p.created_at) : "";
+                    var pagoEm = p.pago_em ? escapeHtml2(p.pago_em) : "";
+                    var qtdReservada = (p.quantidade_reservada !== null && p.quantidade_reservada !== undefined) ? Number(p.quantidade_reservada) : 0;
+                    var itensHtml = "";
+                    if (Array.isArray(p.itens) && p.itens.length > 0) {
+                        itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
+                        itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
+                        p.itens.forEach(function(it){
+                            itensHtml += "<tr>";
+                            itensHtml += "<td>" + escapeHtml2(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
+                            itensHtml += "<td>" + escapeHtml2(it.quantidade || 0) + "</td>";
+                            itensHtml += "<td>" + formatMoney2(it.preco_unitario) + "</td>";
+                            itensHtml += "<td>" + formatMoney2(it.subtotal) + "</td>";
+                            itensHtml += "</tr>";
+                        });
+                        itensHtml += "</tbody></table></div>";
+                    } else {
+                        itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
+                    }
+                    var html = "";
+                    html += "<div class=\"accordion-item\">";
+                    html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
+                    html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
+                    html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - Qtd reservada: " + (isNaN(qtdReservada) ? 0 : qtdReservada) + (status ? (" - " + status) : "") + " - " + total;
+                    html += "</button></h2>";
+                    html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionReservas\">";
+                    html += "<div class=\"accordion-body\">";
+                    html += "<div class=\"mb-2\">";
+                    html += "<div><strong>Quantidade reservada:</strong> " + escapeHtml2(isNaN(qtdReservada) ? 0 : qtdReservada) + "</div>";
+                    html += "<div><strong>Cliente:</strong> " + escapeHtml2(cliente) + "</div>";
+                    html += "<div><strong>Criado em:</strong> " + criado + "</div>";
+                    if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
+                    html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
+                    html += "</div>";
+                    html += itensHtml;
+                    html += "</div></div></div>";
+                    acc.insertAdjacentHTML("beforeend", html);
+                });
+            }
+            var modalReservas = document.getElementById("modalReservas");
+            if (modalReservas) {
+                modalReservas.addEventListener("show.bs.modal", function (event) {
+                    var button = event.relatedTarget;
+                    var produtoId = (button && button.getAttribute) ? (button.getAttribute("data-produto-id") || "") : "";
+                    if (!produtoId) {
+                        produtoId = "' . (int) $produtoId . '";
+                    }
+                    var produtoNome = (button && button.getAttribute) ? (button.getAttribute("data-produto-nome") || "") : "";
+                    if (!produtoNome) {
+                        produtoNome = "' . htmlspecialchars($produtoNome) . '";
+                    }
+                    var label = document.getElementById("reservas_produto_nome");
+                    if (label) label.textContent = produtoNome;
+                    var linkCompras = document.getElementById("reservas_ir_compras");
+                    if (linkCompras) linkCompras.href = "/admin/estoque/compras?produto_id=" + encodeURIComponent(String(produtoId)) + "&status=pendente";
+                    var loading = document.getElementById("reservas_loading");
+                    var empty = document.getElementById("reservas_empty");
+                    var acc = document.getElementById("accordionReservas");
+                    if (acc) acc.innerHTML = "";
+                    if (empty) empty.classList.add("d-none");
+                    if (loading) loading.style.display = "block";
+
+                    fetch("/admin/estoque/reservas?produto_id=" + encodeURIComponent(String(produtoId)))
+                        .then(function(r){ return r.json(); })
+                        .then(function(data){
+                            var pedidos = (data && data.pedidos) ? data.pedidos : [];
+                            if (loading) loading.style.display = "none";
+                            if (!Array.isArray(pedidos) || pedidos.length === 0) {
+                                if (empty) empty.classList.remove("d-none");
+                                return;
+                            }
+                            renderAccordionReservas(pedidos);
+                        })
+                        .catch(function(){
+                            if (loading) loading.style.display = "none";
+                            if (empty) empty.classList.remove("d-none");
+                        });
+                });
+            }
+        </script>';
 
         echo '<div class="row g-4">
                 <div class="col-lg-8">
@@ -2209,6 +2709,20 @@ class AdminEstoqueController extends Controller {
                 exit;
             }
 
+            $normalizeDate = static function ($v): string {
+                $s = trim((string) ($v ?? ''));
+                if ($s === '') return '';
+                // Aceitar DATETIME do banco e manter apenas YYYY-MM-DD
+                if (preg_match('/^\d{4}-\d{2}-\d{2}/', $s)) {
+                    return substr($s, 0, 10);
+                }
+                // Aceitar DD/MM/YYYY
+                if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+                    return $m[3] . '-' . $m[2] . '-' . $m[1];
+                }
+                return $s;
+            };
+
             $ids = $request->getParam('estoque_id', []);
             $qtds = $request->getParam('quantidade', []);
             $dcs = $request->getParam('data_compra', []);
@@ -2233,6 +2747,7 @@ class AdminEstoqueController extends Controller {
                     quantidade = :quantidade,
                     data_compra = :data_compra,
                     data_validade = :data_validade,
+                    is_alimenticio = :is_alimenticio,
                     observacao = :observacao,
                     galpao = :galpao,
                     prateleira = :prateleira
@@ -2292,6 +2807,9 @@ class AdminEstoqueController extends Controller {
                 $pra = trim((string) ($prats[$i] ?? ''));
                 $isAli = (int) ($isAliArr[$i] ?? 0);
 
+                $newDc = $normalizeDate($newDc);
+                $newDv = $normalizeDate($newDv);
+
                 // Normalizar prateleira (mesma regra do salvar entrada)
                 if ($gal !== '') {
                     $gal = preg_replace('/\s+/', ' ', $gal);
@@ -2306,15 +2824,17 @@ class AdminEstoqueController extends Controller {
                     }
                 }
 
-                if ($isAli === 0) {
-                    $newDv = '';
+                // Se o usuário preencheu a validade, considerar como item com controle de validade.
+                if ($newDv !== '') {
+                    $isAli = 1;
                 }
 
-                $oldDc = (string) ($old['data_compra'] ?? '');
-                $oldDv = (string) ($old['data_validade'] ?? '');
+                $oldDc = $normalizeDate((string) ($old['data_compra'] ?? ''));
+                $oldDv = $normalizeDate((string) ($old['data_validade'] ?? ''));
                 $oldObs = (string) ($old['observacao'] ?? '');
                 $oldGal = trim((string) ($old['galpao'] ?? ''));
                 $oldPra = trim((string) ($old['prateleira'] ?? ''));
+                $oldIsAli = (int) ($old['is_alimenticio'] ?? 0);
 
                 // Impedir conflito: não permitir renomear para localização já existente no mesmo produto
                 $stmtDup = $this->connection->prepare('
@@ -2361,6 +2881,9 @@ class AdminEstoqueController extends Controller {
                 if ($newDv !== $oldDv) {
                     $diffs[] = 'Validade: ' . ($oldDv !== '' ? $oldDv : '-') . ' -> ' . ($newDv !== '' ? $newDv : '-');
                 }
+                if ($isAli !== $oldIsAli) {
+                    $diffs[] = 'Controlar validade: ' . ($oldIsAli ? 'Sim' : 'Não') . ' -> ' . ($isAli ? 'Sim' : 'Não');
+                }
                 if ($newObs !== $oldObs) {
                     $diffs[] = 'Obs.: ' . ($oldObs !== '' ? $oldObs : '-') . ' -> ' . ($newObs !== '' ? $newObs : '-');
                 }
@@ -2373,6 +2896,7 @@ class AdminEstoqueController extends Controller {
                     ':quantidade' => $newQtd,
                     ':data_compra' => ($newDc !== '' ? $newDc : null),
                     ':data_validade' => ($newDv !== '' ? $newDv : null),
+                    ':is_alimenticio' => $isAli,
                     ':observacao' => ($newObs !== '' ? $newObs : null),
                     ':galpao' => ($gal !== '' ? $gal : null),
                     ':prateleira' => ($pra !== '' ? $pra : null),
@@ -2403,11 +2927,7 @@ class AdminEstoqueController extends Controller {
             }
 
             if ($saidaTotal > 0) {
-                // Regra de soma zero: se houve redução de estoque, isso pode impactar reservas.
-                // Sempre gerar/aumentar pendência de compra equivalente à saída.
-                $this->ajustarListaComprasAposSaida($produtoId, $saidaTotal);
-
-                // Se a redução colocou o estoque abaixo do reservado, garantir pendência adicional para cobrir déficit.
+                // Se a redução colocou o estoque abaixo do reservado real, garantir pendência suficiente para cobrir o déficit.
                 $adicional = $this->garantirSomaZeroAposReducao($produtoId);
                 $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
                 if ($reservadoAtual > 0) {
@@ -2418,6 +2938,8 @@ class AdminEstoqueController extends Controller {
                     $this->setFlash($msg, 'warning');
                 }
             }
+
+            $this->syncProdutoEstoqueFromInterno($produtoId);
 
             $this->connection->commit();
 
@@ -2519,8 +3041,6 @@ class AdminEstoqueController extends Controller {
             }
             $stmtMov->execute($paramsMov);
 
-            $this->ajustarListaComprasAposSaida($produtoId, $oldQtd);
-
             $adicional = $this->garantirSomaZeroAposReducao($produtoId);
             $reservadoAtual = $this->getTotalReservadoProduto($produtoId);
             if ($reservadoAtual > 0) {
@@ -2530,6 +3050,8 @@ class AdminEstoqueController extends Controller {
                 }
                 $this->setFlash($msg, 'warning');
             }
+
+            $this->syncProdutoEstoqueFromInterno($produtoId);
 
             $this->connection->commit();
 

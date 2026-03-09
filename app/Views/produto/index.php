@@ -5,11 +5,11 @@
     
     <div class="row mb-4">
         <div class="col-lg-8">
-            <h2><i class="fas fa-box"></i> Produtos Disponíveis</h2>
+            <h2><i class="fas fa-box"></i> <?= __('products.title', 'Produtos Disponíveis') ?></h2>
         </div>
         <div class="col-lg-4 text-end">
             <a href="/carrinho" class="btn btn-outline-primary">
-                <i class="fas fa-shopping-cart"></i> Ver Carrinho
+                <i class="fas fa-shopping-cart"></i> <?= __('products.view_cart', 'Ver Carrinho') ?>
             </a>
         </div>
     </div>
@@ -17,7 +17,7 @@
     <div class="row mb-4">
         <div class="col-lg-4">
             <form method="GET" class="d-flex">
-                <input type="text" name="search" class="form-control me-2" placeholder="Buscar produtos..." value="<?= htmlspecialchars($search ?? '') ?>">
+                <input type="text" name="search" class="form-control me-2" placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i>
                 </button>
@@ -26,7 +26,7 @@
         <div class="col-lg-4">
             <form method="GET">
                 <select name="categoria" class="form-select" onchange="this.form.submit()">
-                    <option value="">Todas as Categorias</option>
+                    <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
                     <?php foreach ($categorias as $cat): ?>
                         <option value="<?= htmlspecialchars($cat) ?>" <?= ($categoriaSelecionada ?? '') === $cat ? 'selected' : '' ?>>
                             <?= htmlspecialchars($cat) ?>
@@ -41,7 +41,7 @@
         <?php if (empty($produtos)): ?>
             <div class="col-lg-12">
                 <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> Nenhum produto encontrado.
+                    <i class="fas fa-info-circle"></i> <?= __('products.none_found', 'Nenhum produto encontrado.') ?>
                 </div>
             </div>
         <?php else: ?>
@@ -90,9 +90,9 @@
                             <input type="number" class="form-control quantidade-input" value="1" min="1" max="<?= $produto['estoque'] ?>" data-produto-id="<?= $produto['id'] ?>">
                             <button class="btn btn-primary btn-adicionar" data-produto-id="<?= $produto['id'] ?>" data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>" data-produto-preco="<?= $produto['valor'] ?>" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
                                 <?php if ($produto['estoque'] > 0): ?>
-                                    <i class="fas fa-cart-plus"></i> Adicionar
+                                    <i class="fas fa-cart-plus"></i> <?= __('products.add', 'Adicionar') ?>
                                 <?php else: ?>
-                                    <i class="fas fa-times"></i> Indisponível
+                                    <i class="fas fa-times"></i> <?= __('products.unavailable', 'Indisponível') ?>
                                 <?php endif; ?>
                             </button>
                         </div>
@@ -155,6 +155,12 @@
 </style>
 
 <script>
+const I18N = {
+    add: <?= json_encode(__('products.add', 'Adicionar'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('products.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    error_add: <?= json_encode(__('products.error_add', 'Erro ao adicionar produto'), JSON_UNESCAPED_UNICODE) ?>
+};
+
 // TESTE BÁSICO - VERIFICAR SE JAVASCRIPT ESTÁ FUNCIONANDO
 console.log('🚀 SCRIPT CARREGADO - TESTE BÁSICO');
 console.log('📄 Documento:', document);
@@ -208,7 +214,7 @@ function adicionarAoCarrinho(botao) {
     
     // Desabilitar botão
     botao.disabled = true;
-    botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + I18N.adding;
     
     console.log('🌐 Iniciando requisição AJAX...');
     
@@ -227,7 +233,7 @@ function adicionarAoCarrinho(botao) {
             
             // Reabilitar botão
             botao.disabled = false;
-            botao.innerHTML = '<i class="fas fa-cart-plus"></i> Adicionar';
+            botao.innerHTML = '<i class="fas fa-cart-plus"></i> ' + I18N.add;
             
             if (xhr.status === 200) {
                 try {
@@ -269,7 +275,7 @@ function adicionarAoCarrinho(botao) {
                 }
             } else {
                 console.log('❌ Erro HTTP:', xhr.status);
-                mostrarAlerta('danger', 'Erro ao adicionar produto');
+                mostrarAlerta('danger', I18N.error_add);
             }
         }
     };
@@ -307,6 +313,11 @@ function mostrarAlerta(tipo, mensagem) {
 
 // Função para atualizar badge
 function atualizarBadge(totalItens) {
+    if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+        window.updateCartBadge(totalItens);
+        return;
+    }
+
     console.log('🏷️ Atualizando badge:', totalItens);
     
     var badges = document.querySelectorAll('.cart-badge');

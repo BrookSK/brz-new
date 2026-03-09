@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\CpfValidator;
 use App\Models\Carrinho;
 use App\Models\Usuario;
 use App\Models\Endereco;
@@ -26,10 +27,792 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
-    private function garantirCarteiraUsuario(
-        \PDO $db,
-        int $usuarioId
-    ): void {
+    private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao): array {
+        $billingType = strtoupper(trim($billingType));
+        if (!in_array($billingType, ['PIX', 'BOLETO'], true)) {
+            $billingType = 'BOLETO';
+        }
+        $valor = (float) $valor;
+        if ($valor <= 0) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $nome = (string) ($usuario['nome'] ?? 'Cliente');
+        $email = (string) ($usuario['email'] ?? '');
+        $telefone = (string) ($usuario['telefone'] ?? '');
+        $documento = (string) ($usuario['documento'] ?? '');
+
+        $productsValueCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'TAXA_SERVICO_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $productsValueCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
+        ];
+
+        $result = $this->paymentService->processarPagamento([
+            'billingType' => $billingType,
+            'customer_name' => $nome,
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $productsValueCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ], $valor, 'BRL', $descricao);
+
+        if (empty($result['success'])) {
+            return $result;
+        }
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        }
+
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        $this->paymentService->registrarPedidoPagamentoSplit([
+            'pedido_id' => $pedidoId,
+            'componente' => 'taxa_servico',
+            'gateway' => 'appmax',
+            'metodo' => strtolower($billingType),
+            'moeda' => 'BRL',
+            'valor' => $valor,
+            'payment_id' => $paymentId,
+            'status' => 'pending',
+            'invoice_url' => $invoiceUrl,
+            'bank_slip_url' => $bankSlipUrl,
+            'digitable_line' => $digitableLine,
+            'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+            'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+        ]);
+
+        return $result;
+    }
+
+    private function pedidoJaTemSplitPagamentos(int $pedidoId): bool {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return false;
+        }
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT 1 FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function normalizeTelefoneFromCheckout(array $dados): string {
+        $tel = (string) ($dados['telefone'] ?? '');
+        $tel = trim($tel);
+        if ($tel !== '') {
+            return $tel;
+        }
+
+        $ddi = trim((string) ($dados['telefone_ddi'] ?? ''));
+        $numero = trim((string) ($dados['telefone_numero'] ?? ''));
+        $ddi = preg_replace('/\D+/', '', $ddi);
+        $numero = preg_replace('/\D+/', '', $numero);
+
+        if ($ddi === '' && $numero === '') {
+            return '';
+        }
+
+        if ($ddi === '0') {
+            $ddiOutro = trim((string) ($dados['telefone_ddi_outro'] ?? ''));
+            $ddiOutro = preg_replace('/\D+/', '', $ddiOutro);
+            if ($ddiOutro !== '') {
+                $ddi = $ddiOutro;
+            }
+        }
+
+        if ($ddi !== '' && $numero !== '') {
+            return '+' . $ddi . $numero;
+        }
+
+        return $numero;
+    }
+
+    private function validarDisponibilidadeCarrinhoNoBanco(array $carrinho): array {
+        $db = \Config\Database::getConnection();
+
+        $dbName = null;
+        try {
+            $dbName = $db->query('SELECT DATABASE()')->fetchColumn();
+        } catch (\Throwable $e) {
+            $dbName = null;
+        }
+
+        $produtoCols = [];
+        try {
+            $st = $db->query('DESCRIBE produtos');
+            $produtoCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Throwable $e) {
+            $produtoCols = [];
+        }
+
+        $produtoColAtivo = null;
+        foreach (['active', 'ativo'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColAtivo = $c;
+                break;
+            }
+        }
+
+        $produtoColStatus = null;
+        if (is_array($produtoCols) && in_array('status', $produtoCols, true)) {
+            $produtoColStatus = 'status';
+        }
+
+        $produtoColStock = null;
+        foreach (['stock', 'estoque', 'stock_quantity', 'quantidade', 'quantity', 'qtd', 'qty', 'estoque_atual'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColStock = $c;
+                break;
+            }
+        }
+
+        $produtoColControla = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoColControla = $c;
+                break;
+            }
+        }
+
+        $produtoPkCol = 'id';
+        if (is_array($produtoCols) && !in_array('id', $produtoCols, true) && in_array('produto_id', $produtoCols, true)) {
+            $produtoPkCol = 'produto_id';
+        }
+
+        $produtoLookupCols = [];
+        foreach (['id', 'produto_id', 'product_id', 'wp_product_id', 'woocommerce_product_id'] as $c) {
+            if (is_array($produtoCols) && in_array($c, $produtoCols, true)) {
+                $produtoLookupCols[] = $c;
+            }
+        }
+        if (empty($produtoLookupCols)) {
+            $produtoLookupCols = [$produtoPkCol];
+        }
+
+        $variacoesTable = null;
+        $hasProdutoVariacoes = false;
+        foreach (['produto_variacoes', 'produto_variations', 'product_variacoes', 'product_variations', 'variacoes_produto', 'variations'] as $t) {
+            try {
+                $st = $db->query("SHOW TABLES LIKE " . $db->quote($t));
+                $exists = (bool) ($st && $st->fetch());
+                if ($exists) {
+                    $variacoesTable = $t;
+                    $hasProdutoVariacoes = true;
+                    break;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $variacaoCols = [];
+        if ($hasProdutoVariacoes && $variacoesTable) {
+            try {
+                $st = $db->query('DESCRIBE ' . $variacoesTable);
+                $variacaoCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $variacaoCols = [];
+            }
+        }
+
+        $variacaoColAtivo = null;
+        foreach (['active', 'ativo'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColAtivo = $c;
+                break;
+            }
+        }
+
+        $variacaoColStatus = null;
+        if (is_array($variacaoCols) && in_array('status', $variacaoCols, true)) {
+            $variacaoColStatus = 'status';
+        }
+
+        $variacaoColStock = null;
+        foreach (['stock', 'estoque', 'stock_quantity', 'quantidade', 'quantity', 'qtd', 'qty', 'estoque_atual'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColStock = $c;
+                break;
+            }
+        }
+
+        $variacaoColControla = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoColControla = $c;
+                break;
+            }
+        }
+
+        $variacaoPkCol = 'id';
+        if (is_array($variacaoCols) && !in_array('id', $variacaoCols, true) && in_array('variacao_id', $variacaoCols, true)) {
+            $variacaoPkCol = 'variacao_id';
+        }
+
+        $variacaoProdutoFkCol = null;
+        foreach (['produto_id', 'product_id'] as $c) {
+            if (is_array($variacaoCols) && in_array($c, $variacaoCols, true)) {
+                $variacaoProdutoFkCol = $c;
+                break;
+            }
+        }
+
+        $erros = [];
+
+        $stProduto = null;
+        try {
+            $select = ['`' . $produtoPkCol . '` AS id'];
+            if (is_array($produtoCols) && in_array('nome', $produtoCols, true)) {
+                $select[] = 'nome';
+            }
+            if (is_array($produtoCols) && in_array('name', $produtoCols, true)) {
+                $select[] = 'name';
+            }
+            if (is_array($produtoCols) && in_array('sku', $produtoCols, true)) {
+                $select[] = 'sku';
+            }
+            if (!empty($produtoColAtivo)) $select[] = $produtoColAtivo;
+            if (!empty($produtoColStatus)) $select[] = $produtoColStatus;
+            if (!empty($produtoColStock)) $select[] = $produtoColStock;
+            if (!empty($produtoColControla)) $select[] = $produtoColControla;
+            $select = array_values(array_unique($select));
+
+            $whereParts = [];
+            foreach ($produtoLookupCols as $c) {
+                if (preg_match('/^[a-zA-Z0-9_]+$/', (string) $c)) {
+                    $whereParts[] = '`' . $c . '` = ?';
+                }
+            }
+            if (empty($whereParts)) {
+                $whereParts[] = '`' . $produtoPkCol . '` = ?';
+            }
+
+            $stProduto = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE (' . implode(' OR ', $whereParts) . ') LIMIT 1');
+        } catch (\Throwable $e) {
+            $stProduto = null;
+        }
+
+        $stVariacao = null;
+        if ($hasProdutoVariacoes && $variacoesTable) {
+            try {
+                $select = ['`' . $variacaoPkCol . '` AS id'];
+                if (!empty($variacaoProdutoFkCol)) {
+                    $select[] = '`' . $variacaoProdutoFkCol . '` AS produto_id';
+                }
+                if (!empty($variacaoColAtivo)) $select[] = $variacaoColAtivo;
+                if (!empty($variacaoColStatus)) $select[] = $variacaoColStatus;
+                if (!empty($variacaoColStock)) $select[] = $variacaoColStock;
+                if (!empty($variacaoColControla)) $select[] = $variacaoColControla;
+                $select = array_values(array_unique($select));
+                $stVariacao = $db->prepare('SELECT ' . implode(', ', $select) . ' FROM ' . $variacoesTable . ' WHERE `' . $variacaoPkCol . '` = ? LIMIT 1');
+            } catch (\Throwable $e) {
+                $stVariacao = null;
+            }
+        }
+
+        foreach ($carrinho as $cartKey => $item) {
+            $produtoId = (int) ($item['produto_id'] ?? ($item['id'] ?? 0));
+            if ($produtoId <= 0 && (is_int($cartKey) || (is_string($cartKey) && ctype_digit($cartKey)))) {
+                $produtoId = (int) $cartKey;
+            }
+            if ($produtoId <= 0) {
+                continue;
+            }
+            $qtd = (int) ($item['quantidade'] ?? 1);
+            if ($qtd < 1) $qtd = 1;
+
+            $produtoVariacaoId = null;
+            foreach (['produto_variacao_id', 'variacao_id', 'variation_id', 'produto_variacao', 'id_variacao'] as $varKey) {
+                if (isset($item[$varKey]) && $item[$varKey] !== '' && $item[$varKey] !== null) {
+                    $pv = (int) $item[$varKey];
+                    if ($pv > 0) {
+                        $produtoVariacaoId = $pv;
+                        break;
+                    }
+                }
+            }
+
+            $produtoRow = null;
+            if ($stProduto) {
+                try {
+                    $params = array_fill(0, count($produtoLookupCols), $produtoId);
+                    if (empty($params)) {
+                        $params = [$produtoId];
+                    }
+                    $stProduto->execute($params);
+                    $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $produtoRow = null;
+                }
+            }
+
+            // Fallback: alguns carrinhos armazenam o ID da variação no campo produto_id.
+            // Se o produto não existir, tentar tratar o produto_id como variação.
+            if ((!$produtoRow || empty($produtoRow['id'])) && $produtoVariacaoId === null && $hasProdutoVariacoes && $stVariacao) {
+                try {
+                    $stVariacao->execute([$produtoId]);
+                    $varAsProduct = $stVariacao->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    if (is_array($varAsProduct) && !empty($varAsProduct['id']) && !empty($varAsProduct['produto_id'])) {
+                        $produtoVariacaoId = (int) $varAsProduct['id'];
+                        $produtoId = (int) $varAsProduct['produto_id'];
+
+                        if ($stProduto) {
+                            try {
+                                $stProduto->execute([$produtoId]);
+                                $produtoRow = $stProduto->fetch(\PDO::FETCH_ASSOC) ?: null;
+                            } catch (\Throwable $e) {
+                                $produtoRow = null;
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            if (!$produtoRow || empty($produtoRow['id'])) {
+                try {
+                    $this->debugLog('[CHECKOUT] Produto não encontrado no banco. produto_id=' . $produtoId . ' lookup_cols=' . json_encode($produtoLookupCols));
+                } catch (\Throwable $e) {
+                }
+                $erros[] = [
+                    'produto_id' => $produtoId,
+                    'produto_variacao_id' => $produtoVariacaoId,
+                    'lookup_cols' => $produtoLookupCols,
+                    'db' => ($dbName !== false ? $dbName : null),
+                    'motivo' => 'Produto não encontrado',
+                    'quantidade_solicitada' => $qtd,
+                ];
+                continue;
+            }
+
+            $nomeProduto = (string) ($item['nome'] ?? ($item['name'] ?? ($produtoRow['nome'] ?? ($produtoRow['name'] ?? ''))));
+            if (trim($nomeProduto) === '') {
+                $nomeProduto = 'Produto #' . $produtoId;
+            }
+
+            if (!empty($produtoColAtivo)) {
+                $rawAtivo = $produtoRow[$produtoColAtivo] ?? 0;
+                $ativoOk = false;
+                if (is_numeric($rawAtivo)) {
+                    $ativoOk = ((int) $rawAtivo) === 1;
+                } else {
+                    $s = strtolower(trim((string) $rawAtivo));
+                    $ativoOk = in_array($s, ['1', 'true', 'yes', 'sim', 'ativo', 'active'], true);
+                }
+                if (!$ativoOk) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Produto inativo',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+            }
+
+            if (!empty($produtoColStatus)) {
+                $st = strtolower(trim((string) ($produtoRow[$produtoColStatus] ?? '')));
+                $statusOk = true;
+                if ($st !== '') {
+                    if (is_numeric($st)) {
+                        $statusOk = ((int) $st) === 1;
+                    } else {
+                        $statusOk = in_array($st, ['published', 'ativo', 'active', 'enabled', 'instock', 'in_stock', 'available', 'disponivel'], true);
+                    }
+                }
+                if (!$statusOk) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Produto indisponível',
+                        'status' => $st,
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+            }
+
+            if ($produtoVariacaoId !== null) {
+                if (!$hasProdutoVariacoes || !$stVariacao) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação não disponível',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                $varRow = null;
+                try {
+                    $stVariacao->execute([(int) $produtoVariacaoId]);
+                    $varRow = $stVariacao->fetch(\PDO::FETCH_ASSOC) ?: null;
+                } catch (\Throwable $e) {
+                    $varRow = null;
+                }
+
+                if (!$varRow || empty($varRow['id'])) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação não encontrada',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                if (isset($varRow['produto_id']) && (int) $varRow['produto_id'] !== $produtoId) {
+                    $erros[] = [
+                        'produto_id' => $produtoId,
+                        'produto_variacao_id' => $produtoVariacaoId,
+                        'nome' => $nomeProduto,
+                        'motivo' => 'Variação inválida para este produto',
+                        'quantidade_solicitada' => $qtd,
+                    ];
+                    continue;
+                }
+
+                if (!empty($variacaoColAtivo)) {
+                    $rawAtivoV = $varRow[$variacaoColAtivo] ?? 0;
+                    $ativoVOk = false;
+                    if (is_numeric($rawAtivoV)) {
+                        $ativoVOk = ((int) $rawAtivoV) === 1;
+                    } else {
+                        $s = strtolower(trim((string) $rawAtivoV));
+                        $ativoVOk = in_array($s, ['1', 'true', 'yes', 'sim', 'ativo', 'active'], true);
+                    }
+                    if (!$ativoVOk) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => $produtoVariacaoId,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Variação inativa',
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+
+                if (!empty($variacaoColStatus)) {
+                    $stV = strtolower(trim((string) ($varRow[$variacaoColStatus] ?? '')));
+                    $statusVOk = true;
+                    if ($stV !== '') {
+                        if (is_numeric($stV)) {
+                            $statusVOk = ((int) $stV) === 1;
+                        } else {
+                            $statusVOk = in_array($stV, ['published', 'ativo', 'active', 'enabled', 'instock', 'in_stock', 'available', 'disponivel'], true);
+                        }
+                    }
+                    if (!$statusVOk) {
+                        $erros[] = [
+                            'produto_id' => $produtoId,
+                            'produto_variacao_id' => $produtoVariacaoId,
+                            'nome' => $nomeProduto,
+                            'motivo' => 'Variação indisponível',
+                            'status' => $stV,
+                            'quantidade_solicitada' => $qtd,
+                        ];
+                        continue;
+                    }
+                }
+
+                if (!empty($variacaoColStock)) {
+                    $controlaV = true;
+                    if (!empty($variacaoColControla) && array_key_exists($variacaoColControla, $varRow)) {
+                        $raw = $varRow[$variacaoColControla];
+                        $controlaV = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
+                    }
+                    if ($controlaV) {
+                        $stockV = (int) ($varRow[$variacaoColStock] ?? 0);
+                        if ($stockV < $qtd) {
+                            $erros[] = [
+                                'produto_id' => $produtoId,
+                                'produto_variacao_id' => $produtoVariacaoId,
+                                'nome' => $nomeProduto,
+                                'motivo' => 'Estoque insuficiente (variação)',
+                                'estoque_disponivel' => $stockV,
+                                'quantidade_solicitada' => $qtd,
+                            ];
+                        }
+                    }
+                }
+            } else {
+                if (!empty($produtoColStock) && isset($produtoRow[$produtoColStock])) {
+                    $controla = true;
+                    if (!empty($produtoColControla) && array_key_exists($produtoColControla, $produtoRow)) {
+                        $raw = $produtoRow[$produtoColControla];
+                        $controla = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
+                    }
+                    if ($controla) {
+                        $stock = (int) $produtoRow[$produtoColStock];
+                        if ($stock < $qtd) {
+                            $erros[] = [
+                                'produto_id' => $produtoId,
+                                'produto_variacao_id' => null,
+                                'nome' => $nomeProduto,
+                                'motivo' => 'Estoque insuficiente',
+                                'estoque_disponivel' => $stock,
+                                'quantidade_solicitada' => $qtd,
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $erros;
+    }
+
+    private function debugLog(string $message): void {
+        $enabled = false;
+        if (isset($_ENV['APP_DEBUG'])) {
+            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
+        } elseif (isset($_SERVER['APP_DEBUG'])) {
+            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
+        }
+
+        if ($enabled) {
+            error_log($message);
+        }
+    }
+
+    private function formatarErroParaUsuario(string $mensagem): string {
+        $m = trim($mensagem);
+
+        if (stripos($m, 'Erro Asaas HTTP') !== false) {
+            $jsonPos = strpos($m, '{');
+            if ($jsonPos !== false) {
+                $jsonStr = substr($m, $jsonPos);
+                $decoded = json_decode($jsonStr, true);
+                if (is_array($decoded) && !empty($decoded['errors']) && is_array($decoded['errors'])) {
+                    $first = $decoded['errors'][0] ?? null;
+                    if (is_array($first)) {
+                        $desc = (string) ($first['description'] ?? '');
+                        if ($desc !== '') {
+                            return $desc;
+                        }
+                    }
+                }
+            }
+        }
+
+        $prefixes = [
+            'Erro ao processar pedido:',
+            'Erro ao processar pagamento:',
+        ];
+        foreach ($prefixes as $p) {
+            if (stripos($m, $p) === 0) {
+                $m = trim(substr($m, strlen($p)));
+            }
+        }
+
+        return $m !== '' ? $m : 'Não foi possível processar o pagamento. Tente novamente.';
+    }
+
+    private function getConfigValue(string $chave, $default = null) {
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $stmt->execute([$chave]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && array_key_exists('valor', $row)) {
+                return $row['valor'];
+            }
+        } catch (\Exception $e) {
+        }
+        return $default;
+    }
+
+    private function getTaxaServicoPorKg(): float {
+        $v = $this->getConfigValue('taxa_servico_usd_por_kg', null);
+        if ($v === null || $v === '') {
+            $v = $this->getConfigValue('entrega_taxa_servico_kg', null);
+        }
+        if ($v === null || $v === '') {
+            $v = '39';
+        }
+        return floatval($v);
+    }
+
+    private function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
+    }
+
+    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
+        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
+        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
+        if (!$calcularAutomatico) {
+            return 0.0;
+        }
+
+        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
+        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
+            return 0.0;
+        }
+
+        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
+        if ($fretePorKg <= 0) {
+            return 0.0;
+        }
+
+        $pesoArredondado = ceil($pesoTotal);
+        return $fretePorKg * $pesoArredondado;
+    }
+
+    private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
+        if (empty($missing)) {
+            return $missing;
+        }
+        if (!is_array($selectedAddress) || empty($selectedAddress)) {
+            return $missing;
+        }
+
+        $pais = strtoupper(trim((string) ($selectedAddress['pais'] ?? 'BR')));
+        if ($pais === '') {
+            $pais = 'BR';
+        }
+
+        $addrFields = ['cep', 'endereco', 'cidade'];
+        if ($pais === 'BR') {
+            $addrFields[] = 'numero';
+            $addrFields[] = 'bairro';
+        }
+        if (in_array($pais, ['BR', 'US', 'CA'], true)) {
+            $addrFields[] = 'estado';
+        }
+
+        // Remover do array de pendências apenas os campos de endereço que já foram preenchidos
+        // no endereço selecionado/preenchido no checkout.
+        $filled = [];
+        foreach ($addrFields as $f) {
+            $v = trim((string) ($selectedAddress[$f] ?? ''));
+            if ($v !== '') {
+                $filled[] = $f;
+            }
+        }
+        if (empty($filled)) {
+            return $missing;
+        }
+
+        return array_values(array_filter($missing, function ($it) use ($filled) {
+            return !in_array((string) $it, $filled, true);
+        }));
+    }
+
+    private function normalizeMissingForCountry(array $missing, string $paisEntrega): array {
+        if (empty($missing)) {
+            return $missing;
+        }
+
+        $paisEntrega = strtoupper(trim((string) $paisEntrega));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
+
+        $remove = [];
+        if ($paisEntrega !== 'BR') {
+            $remove[] = 'numero';
+            $remove[] = 'bairro';
+        }
+        if (!in_array($paisEntrega, ['BR', 'US', 'CA'], true)) {
+            $remove[] = 'estado';
+        }
+
+        if (empty($remove)) {
+            return $missing;
+        }
+
+        return array_values(array_filter($missing, static function ($it) use ($remove) {
+            return !in_array((string) $it, $remove, true);
+        }));
+    }
+
+    private function tableExists(string $table): bool {
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
+        $temPedidoItens = false;
+        $temPedidoItems = false;
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_itens']);
+            $temPedidoItens = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItens = false;
+        }
+        try {
+            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $st->execute(['pedido_items']);
+            $temPedidoItems = (bool) $st->fetchColumn();
+        } catch (\Throwable $e) {
+            $temPedidoItems = false;
+        }
+
+        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
+        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
+
+        if ($pedidoId > 0) {
+            $c1 = 0;
+            $c2 = 0;
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c1 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c1 = 0;
+            }
+            try {
+                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
+                $st->execute([$pedidoId]);
+                $c2 = (int) ($st->fetchColumn() ?: 0);
+            } catch (\Throwable $e) {
+                $c2 = 0;
+            }
+            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
+        }
+
+        return 'pedido_itens';
+    }
+
+    private function garantirCarteiraUsuario(\PDO $db, int $usuarioId): void {
         if ($usuarioId <= 0) {
             return;
         }
@@ -79,12 +862,7 @@ class CheckoutController extends Controller {
         }
     }
 
-    private function debitarCarteiraParaPedido(
-        int $usuarioId,
-        int $pedidoId,
-        float $valor,
-        string $moeda
-    ): array {
+    private function debitarCarteiraParaPedido(int $usuarioId, int $pedidoId, float $valor, string $moeda): array {
         $usuarioId = (int) $usuarioId;
         $pedidoId = (int) $pedidoId;
         $valor = (float) $valor;
@@ -150,194 +928,17 @@ class CheckoutController extends Controller {
         }
     }
 
-    private function normalizeMissingForSelectedAddress(array $missing, ?array $selectedAddress): array {
-        if (empty($missing)) {
-            return $missing;
-        }
-        if (!is_array($selectedAddress) || empty($selectedAddress)) {
-            return $missing;
-        }
-
-        $addrFields = ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
-        $hasAll = true;
-        foreach ($addrFields as $f) {
-            $v = trim((string) ($selectedAddress[$f] ?? ''));
-            if ($v === '') {
-                $hasAll = false;
-                break;
-            }
-        }
-        if (!$hasAll) {
-            return $missing;
-        }
-
-        // Se o endereço selecionado já tem os campos, não considerar esses campos como pendentes no perfil.
-        return array_values(array_filter($missing, function ($it) use ($addrFields) {
-            return !in_array((string) $it, $addrFields, true);
-        }));
-    }
-
-    private function tableExists(string $table): bool {
-        try {
-            $db = \Config\Database::getConnection();
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute([$table]);
-            return (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    private function pickPedidoItensTable(\PDO $db, int $pedidoId = 0): string {
-        $temPedidoItens = false;
-        $temPedidoItems = false;
-        try {
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute(['pedido_itens']);
-            $temPedidoItens = (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            $temPedidoItens = false;
-        }
-        try {
-            $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
-            $st->execute(['pedido_items']);
-            $temPedidoItems = (bool) $st->fetchColumn();
-        } catch (\Throwable $e) {
-            $temPedidoItems = false;
-        }
-
-        if ($temPedidoItens && !$temPedidoItems) return 'pedido_itens';
-        if ($temPedidoItems && !$temPedidoItens) return 'pedido_items';
-        if (!$temPedidoItens && !$temPedidoItems) return 'pedido_itens';
-
-        // Se ambos existirem, preferir a tabela que já possui itens desse pedido
-        if ($pedidoId > 0) {
-            $c1 = 0;
-            $c2 = 0;
-            try {
-                $st = $db->prepare('SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = ?');
-                $st->execute([$pedidoId]);
-                $c1 = (int) ($st->fetchColumn() ?: 0);
-            } catch (\Throwable $e) {
-                $c1 = 0;
-            }
-            try {
-                $st = $db->prepare('SELECT COUNT(*) FROM pedido_items WHERE pedido_id = ?');
-                $st->execute([$pedidoId]);
-                $c2 = (int) ($st->fetchColumn() ?: 0);
-            } catch (\Throwable $e) {
-                $c2 = 0;
-            }
-            return ($c2 > $c1) ? 'pedido_items' : 'pedido_itens';
-        }
-
-        return 'pedido_itens';
-    }
-
-    private function formatarErroParaUsuario(string $mensagem): string {
-        $m = trim($mensagem);
-
-        // Extrair erro do Asaas quando vier como JSON
-        if (stripos($m, 'Erro Asaas HTTP') !== false) {
-            $jsonPos = strpos($m, '{');
-            if ($jsonPos !== false) {
-                $jsonStr = substr($m, $jsonPos);
-                $decoded = json_decode($jsonStr, true);
-                if (is_array($decoded) && !empty($decoded['errors']) && is_array($decoded['errors'])) {
-                    $first = $decoded['errors'][0] ?? null;
-                    if (is_array($first)) {
-                        $desc = (string) ($first['description'] ?? '');
-                        if ($desc !== '') {
-                            return $desc;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Remover prefixos técnicos em cadeia
-        $prefixes = [
-            'Erro ao processar pedido:',
-            'Erro ao processar pagamento:',
-        ];
-        foreach ($prefixes as $p) {
-            if (stripos($m, $p) === 0) {
-                $m = trim(substr($m, strlen($p)));
-            }
-        }
-
-        return $m !== '' ? $m : 'Não foi possível processar o pagamento. Tente novamente.';
-    }
-
-    private function getConfigValue(string $chave, $default = null) {
-        try {
-            $db = \Config\Database::getConnection();
-            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-            $stmt->execute([$chave]);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($row && array_key_exists('valor', $row)) {
-                return $row['valor'];
-            }
-        } catch (\Exception $e) {
-        }
-        return $default;
-    }
-
-    private function getTaxaServicoPorKg(): float {
-        $v = $this->getConfigValue('taxa_servico_usd_por_kg', null);
-        if ($v === null || $v === '') {
-            $v = $this->getConfigValue('entrega_taxa_servico_kg', null);
-        }
-        if ($v === null || $v === '') {
-            $v = '39';
-        }
-        return floatval($v);
-    }
-
-    private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
-        $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
-        $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
-        if (!$calcularAutomatico) {
-            return 0.0;
-        }
-
-        $freteGratisAcima = floatval($this->getConfigValue('entrega_frete_gratis_acima', '0'));
-        if ($freteGratisAcima <= 0 || $subtotal >= $freteGratisAcima) {
-            return 0.0;
-        }
-
-        $fretePorKg = floatval($this->getConfigValue('entrega_frete_padrao', '15'));
-        if ($fretePorKg <= 0) {
-            return 0.0;
-        }
-
-        $pesoArredondado = ceil($pesoTotal);
-        return $fretePorKg * $pesoArredondado;
-    }
-
-    private function debugLog(string $message): void {
-        $enabled = false;
-        if (isset($_ENV['APP_DEBUG'])) {
-            $enabled = ($_ENV['APP_DEBUG'] === '1' || strtolower((string) $_ENV['APP_DEBUG']) === 'true');
-        } elseif (isset($_SERVER['APP_DEBUG'])) {
-            $enabled = ($_SERVER['APP_DEBUG'] === '1' || strtolower((string) $_SERVER['APP_DEBUG']) === 'true');
-        }
-
-        if ($enabled) {
-            error_log($message);
-        }
-    }
-
     private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
         $uid = (int) ($usuario['id'] ?? 0);
         $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
         $items = [];
         foreach ($carrinho as $it) {
-            $pid = (int) ($it['produto_id'] ?? ($it['id'] ?? 0));
-            $qtd = (int) ($it['quantidade'] ?? 1);
+            $produtoId = (int) ($it['produto_id'] ?? ($it['id'] ?? 0));
+            $qtd = (int) ($it['quantidade'] ?? ($it['qty'] ?? 1));
+            if ($produtoId <= 0 || $qtd <= 0) continue;
             $vid = (int) ($it['produto_variacao_id'] ?? 0);
             $vu = (float) ($it['preco_unitario'] ?? ($it['price'] ?? ($it['preco'] ?? 0)));
-            $items[] = [$pid, $vid, $qtd, round($vu, 2)];
+            $items[] = [$produtoId, $vid, $qtd, round($vu, 2)];
         }
         sort($items);
         $payload = json_encode([
@@ -1020,6 +1621,36 @@ class CheckoutController extends Controller {
         return true;
     }
 
+    private function getUserCartIdPreferNonEmpty(int $usuarioId): int {
+        if ($usuarioId <= 0) return 0;
+        try {
+            $db = $this->carrinhoModel->getConnection();
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st->execute([$usuarioId]);
+            $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return 0;
+            }
+
+            foreach ($ids as $cid) {
+                try {
+                    $stCnt = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cid]);
+                    $cnt = (int) ($stCnt->fetchColumn() ?: 0);
+                    if ($cnt > 0) {
+                        return $cid;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            return (int) $ids[0];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function validatePesoMaximoCarrinhoAtivoOrFail(bool $asJson = false): bool {
         // Revalidar peso ativo no backend (evita bypass via request manual)
         $usuario = $this->authService->getUsuarioLogado();
@@ -1062,19 +1693,40 @@ class CheckoutController extends Controller {
         $uid = (int) (($usuario['id'] ?? 0));
         if ($uid > 0) {
             try {
-                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                if ($cartId <= 0) {
+                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                }
+
                 if ($cartId > 0) {
-                    $items = $this->carrinhoModel->getItems($cartId);
+                    $db = $this->carrinhoModel->getConnection();
+                    $cols = [];
+                    try {
+                        $stCols = $db->query('DESCRIBE carrinho_items');
+                        $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Throwable $e) {
+                        $cols = [];
+                    }
+
+                    $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true)) ? 'preco_unitario' : 'valor_unitario';
+                    $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+                        ? 'produto_variacao_id'
+                        : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
+                    $st = $db->prepare('SELECT *, ' . $unitCol . ' AS unit_price, ' . $varCol . ' AS var_id FROM carrinho_items WHERE carrinho_id = ?');
+                    $st->execute([$cartId]);
+                    $items = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
                     $out = [];
                     foreach (($items ?: []) as $it) {
                         $pid = (int) ($it['produto_id'] ?? 0);
                         if ($pid <= 0) continue;
-                        $pvId = (int) ($it['produto_variacao_id'] ?? 0);
+                        $pvId = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0)));
                         $key = ((string) $pid) . ':' . ((string) $pvId);
                         $qtd = (int) ($it['quantidade'] ?? 1);
                         if ($qtd < 1) $qtd = 1;
-                        $vu = (float) ($it['valor_unitario'] ?? 0);
+                        $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                         $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                         $out[$key] = [
                             'produto_id' => $pid,
@@ -1085,11 +1737,11 @@ class CheckoutController extends Controller {
                             'preco_unitario' => $vu,
                             'quantidade' => $qtd,
                             'subtotal' => $sub,
-                            'peso' => (float) ($it['peso'] ?? ($it['weight'] ?? 0)),
+                            'peso' => 0.0,
                         ];
                     }
+
                     if (!empty($out)) {
-                        // Filtrar itens desativados (persistidos em sessão)
                         try {
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
@@ -1403,6 +2055,9 @@ class CheckoutController extends Controller {
             $paisEntrega = 'BR';
         }
 
+        // Fora do BR, não exigir campos específicos do Brasil.
+        $faltando = $this->normalizeMissingForCountry((array) $faltando, (string) $paisEntrega);
+
         // Ajustar pendências do perfil com base no endereço selecionado (quando existir)
         if (!empty($usuario) && !empty($usuario['id']) && is_array($enderecoPrincipal) && !empty($enderecoPrincipal)) {
             $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $enderecoPrincipal);
@@ -1457,6 +2112,7 @@ class CheckoutController extends Controller {
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
             'total' => $total,
+            'pix_desconto_taxa_servico_percent' => (float) $this->getPixDescontoTaxaServicoPercent(),
             'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
             'exchange_rates' => [
@@ -1556,6 +2212,18 @@ class CheckoutController extends Controller {
             $this->redirect('/produtos');
             return;
         }
+
+        // Obter dados do formulário (precisamos disso para validar perfil considerando endereço selecionado)
+        $dados = $request->getParams();
+
+        // Garantir que o campo telefone (hidden) esteja preenchido mesmo quando o usuário digita no campo visível.
+        try {
+            $telNorm = $this->normalizeTelefoneFromCheckout(is_array($dados) ? $dados : []);
+            if ($telNorm !== '') {
+                $dados['telefone'] = $telNorm;
+            }
+        } catch (\Throwable $e) {
+        }
         
         // Se está logado, exigir perfil completo + termos aceitos previamente
         if (!empty($usuario) && !empty($usuario['id'])) {
@@ -1564,6 +2232,54 @@ class CheckoutController extends Controller {
                 if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
                     $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
                     $termosOk = $this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+
+                    // Se existe endereço selecionado/preenchido no checkout e ele está completo,
+                    // não bloquear o checkout por pendências de endereço no perfil do usuário.
+                    if (!empty($faltando)) {
+                        $selectedAddress = null;
+                        $paisEntregaSel = '';
+
+                        $enderecoSel = (int) ($dados['endereco_selecionado'] ?? 0);
+                        if ($enderecoSel > 0) {
+                            try {
+                                $addr = $this->enderecoModel->find($enderecoSel);
+                                if (is_array($addr) && !empty($addr)) {
+                                    $uidAddr = (int) ($addr['usuario_id'] ?? 0);
+                                    if ($uidAddr === (int) $usuario['id']) {
+                                        $selectedAddress = $addr;
+                                        $paisEntregaSel = (string) ($addr['pais'] ?? '');
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        if ($selectedAddress === null) {
+                            $selectedAddress = [
+                                'pais' => (string) ($dados['pais'] ?? ''),
+                                'cep' => (string) ($dados['cep'] ?? ''),
+                                'endereco' => (string) ($dados['endereco'] ?? ''),
+                                'numero' => (string) ($dados['numero'] ?? ''),
+                                'bairro' => (string) ($dados['bairro'] ?? ''),
+                                'cidade' => (string) ($dados['cidade'] ?? ''),
+                                'estado' => (string) ($dados['estado'] ?? ($dados['estado_text'] ?? '')),
+                            ];
+                            $paisEntregaSel = (string) ($dados['pais'] ?? '');
+                        }
+
+                        if ($paisEntregaSel === '' && is_array($selectedAddress)) {
+                            $paisEntregaSel = (string) ($selectedAddress['pais'] ?? '');
+                        }
+                        if ($paisEntregaSel === '') {
+                            $paisEntregaSel = 'BR';
+                        }
+
+                        // Fora do BR, não bloquear por numero/bairro (campos específicos do Brasil)
+                        $faltando = $this->normalizeMissingForCountry((array) $faltando, $paisEntregaSel);
+
+                        $faltando = $this->normalizeMissingForSelectedAddress((array) $faltando, $selectedAddress);
+                    }
+
                     if (!$termosOk || !empty($faltando)) {
                         $parts = [];
                         if (!$termosOk) {
@@ -1581,9 +2297,6 @@ class CheckoutController extends Controller {
             } catch (\Exception $e) {
             }
         }
-        
-        // Obter dados do formulário
-        $dados = $request->getParams();
         
         // Resto do processamento do pedido...
         $this->debugLog('[CHECKOUT] processar() chamado - INICIO');
@@ -1641,6 +2354,17 @@ class CheckoutController extends Controller {
         // Se algum item (principalmente temporário da assessoria) expirou e foi removido do banco, bloquear checkout
         try {
             $db = \Config\Database::getConnection();
+
+            $produtoPkCandidates = ['id'];
+            try {
+                $stCols = $db->query('DESCRIBE produtos');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (is_array($cols) && in_array('produto_id', $cols, true) && !in_array('produto_id', $produtoPkCandidates, true)) {
+                    $produtoPkCandidates[] = 'produto_id';
+                }
+            } catch (\Throwable $e) {
+            }
+
             $removedExpired = false;
             foreach ($carrinho as $k => $item) {
                 $pid = $item['produto_id'] ?? null;
@@ -1648,9 +2372,15 @@ class CheckoutController extends Controller {
                     continue;
                 }
                 try {
-                    $stmtP = $db->prepare('SELECT id FROM produtos WHERE id = ? LIMIT 1');
-                    $stmtP->execute([(int) $pid]);
-                    $exists = $stmtP->fetchColumn();
+                    $exists = false;
+                    foreach ($produtoPkCandidates as $pkCol) {
+                        $stmtP = $db->prepare('SELECT 1 FROM produtos WHERE ' . $pkCol . ' = ? LIMIT 1');
+                        $stmtP->execute([(int) $pid]);
+                        $exists = (bool) $stmtP->fetchColumn();
+                        if ($exists) {
+                            break;
+                        }
+                    }
                     if (!$exists) {
                         unset($_SESSION['carrinho'][$k]);
                         $removedExpired = true;
@@ -1666,6 +2396,23 @@ class CheckoutController extends Controller {
                 return;
             }
         } catch (\Exception $e) {
+        }
+
+        // Revalidar disponibilidade do carrinho no momento da finalização (status/ativo/estoque)
+        try {
+            $itensIndisponiveis = $this->validarDisponibilidadeCarrinhoNoBanco((array) $carrinho);
+            if (!empty($itensIndisponiveis)) {
+                $this->json([
+                    'error' => 'Alguns produtos do seu carrinho não estão mais disponíveis. Atualize o carrinho e tente novamente.',
+                    'itens_indisponiveis' => $itensIndisponiveis,
+                ], 400);
+                return;
+            }
+        } catch (\Throwable $e) {
+            $this->json([
+                'error' => 'Não foi possível validar a disponibilidade do carrinho. Tente novamente.',
+            ], 500);
+            return;
         }
         
         try {
@@ -1798,12 +2545,130 @@ class CheckoutController extends Controller {
                     }
                 }
 
-                if (!$reused && $formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL') {
+                $moedaPedidoPay = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                if ($moedaPedidoPay === '') {
+                    $moedaPedidoPay = 'BRL';
+                }
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $moedaPedidoPay === 'BRL' && in_array($formaSelecionada, ['pix', 'boleto'], true));
+                // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
+                if ($shouldTrySplit && $reused) {
+                    $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
+                }
+
+                if ($shouldTrySplit) {
                     try {
-                        $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
-                        $gateway = 'appmax';
-                        $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
-                        $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                        // Split BRL:
+                        // - produto via Mercado Pago Checkout Pro (link hospedado)
+                        // - taxa de serviço via AppMax (PIX/BOLETO)
+                        // Por enquanto, aplicamos split apenas para PIX/BOLETO.
+                        if (in_array($formaSelecionada, ['pix', 'boleto'], true)) {
+                            $pedidoNorm = [];
+                            try {
+                                $pedidoNorm = $this->pedidoModel->getComDetalhes((int) $pedidoId);
+                            } catch (\Exception $e) {
+                                $pedidoNorm = [];
+                            }
+
+                            $totalBrl = (float) (($pedidoNorm['total'] ?? null) !== null ? $pedidoNorm['total'] : ($pedidoRowPay['total'] ?? 0));
+                            $taxaServico = (float) ($pedidoNorm['taxa_servico'] ?? 0);
+                            if ($taxaServico < 0) $taxaServico = 0.0;
+                            $valorImposto = 0.0;
+                            try {
+                                $colsPed = [];
+                                $dbCols = \Config\Database::getConnection();
+                                $stCols = $dbCols->query('DESCRIBE pedidos');
+                                $colsPed = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                $colImp = '';
+                                if (is_array($colsPed)) {
+                                    foreach (['valor_impostos', 'impostos'] as $c) {
+                                        if (in_array($c, $colsPed, true)) {
+                                            $colImp = $c;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if ($colImp !== '') {
+                                    $stImp = $dbCols->prepare('SELECT ' . $colImp . ' AS impostos FROM pedidos WHERE id = ? LIMIT 1');
+                                    $stImp->execute([(int) $pedidoId]);
+                                    $rowImp = $stImp->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                    $valorImposto = (float) ($rowImp['impostos'] ?? 0);
+                                }
+                            } catch (\Exception $e) {
+                                $valorImposto = 0.0;
+                            }
+                            if ($valorImposto < 0) $valorImposto = 0.0;
+                            $valorImposto = round((float) $valorImposto, 2);
+                            $valorProduto = round(max(0.0, $totalBrl - $taxaServico), 2);
+                            $valorTaxa = round(max(0.0, $taxaServico), 2);
+
+                            if ($valorProduto <= 0 && $valorTaxa <= 0) {
+                                throw new \Exception('Valores inválidos para split');
+                            }
+
+                            $descricaoProduto = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (produtos)';
+                            $descricaoTaxa = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (taxa de serviço)';
+                            $payer = [];
+                            if (!empty($dados['email']) && is_string($dados['email'])) {
+                                $payer['email'] = trim((string) $dados['email']);
+                            } elseif (!empty($usuario['email'])) {
+                                $payer['email'] = trim((string) $usuario['email']);
+                            }
+
+                            $mp = null;
+                            if ($valorProduto > 0) {
+                                if ($formaSelecionada === 'pix') {
+                                    $valorMp = round((float) ($valorProduto + $valorImposto), 2);
+                                    $mp = $this->paymentService->createMercadoPagoPixPaymentProduto((int) $pedidoId, (float) $valorMp, (string) $descricaoProduto, $payer, 0.0);
+                                    if (empty($mp['success'])) {
+                                        throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar PIX Mercado Pago (produto)'));
+                                    }
+                                } else {
+                                    $mp = $this->paymentService->createMercadoPagoCheckoutPreferenceProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $payer);
+                                    if (empty($mp['success'])) {
+                                        throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar pagamento Mercado Pago (produto)'));
+                                    }
+                                }
+                            }
+
+                            $taxa = null;
+                            if ($valorTaxa > 0) {
+                                $billingType = $formaSelecionada === 'pix' ? 'PIX' : 'BOLETO';
+                                $clienteSplit = [];
+                                $clienteSplit['nome'] = (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente'));
+                                $clienteSplit['email'] = (string) ($dados['email'] ?? ($usuario['email'] ?? ''));
+                                $clienteSplit['telefone'] = (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? '')));
+                                $clienteSplit['documento'] = (string) ($dados['documento'] ?? ($usuario['documento'] ?? ''));
+
+                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorTaxa, $clienteSplit, (string) $descricaoTaxa);
+                                if (empty($taxa['success'])) {
+                                    throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
+                                }
+                            }
+
+                            $dados['__split'] = [
+                                'success' => true,
+                                'split' => true,
+                                'moeda' => 'BRL',
+                                'produto' => $mp,
+                                'taxa' => $taxa,
+                                'imposto' => [
+                                    'success' => true,
+                                    'gateway' => 'mercadopago',
+                                    'metodo' => $formaSelecionada,
+                                    'moeda' => 'BRL',
+                                    'valor' => (float) $valorImposto,
+                                    'payment_id' => (string) (is_array($mp) ? ($mp['payment_id'] ?? '') : ''),
+                                    'status' => 'pending',
+                                ],
+                            ];
+                        } else {
+                            // Fluxo legado (AppMax total) - cartao_credito permanece aqui por enquanto.
+                            $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
+                            $formaSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+                            $gateway = in_array($formaSel, ['pix', 'boleto'], true) ? 'asaas' : 'appmax';
+                            $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
+                            $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+                        }
                     } catch (\Exception $e) {
                         throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
                     }
@@ -1869,8 +2734,40 @@ class CheckoutController extends Controller {
                 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
                 // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
-                if (!$reused && ($formaSelecionada === 'carteira' || strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) === 'BRL')) {
+                $moedaPedidoClear = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                if ($moedaPedidoClear === '') {
+                    $moedaPedidoClear = 'BRL';
+                }
+                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
+                $shouldClearCartNow = (!$isStripeFlow) && (
+                    $formaSelecionada === 'carteira'
+                    || $moedaPedidoClear === 'BRL'
+                    || in_array($formaSelecionada, ['pix', 'boleto'], true)
+                );
+
+                if ($shouldClearCartNow) {
+                    // Limpar carrinho no DB (usuário logado) e na sessão (fallback)
+                    try {
+                        $uid = (int) ($usuario['id'] ?? 0);
+                        if ($uid > 0) {
+                            $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                            if ($cartId > 0) {
+                                $this->carrinhoModel->limparCarrinho($cartId);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                    }
+
+                    try {
+                        if (session_status() === PHP_SESSION_NONE) {
+                            session_start();
+                        }
+                    } catch (\Throwable $e) {
+                    }
+
                     unset($_SESSION['carrinho']);
+                    unset($_SESSION['carrinho_itens_ativos']);
                     $this->debugLog('[CHECKOUT] Carrinho limpo');
                 }
                 
@@ -1881,6 +2778,12 @@ class CheckoutController extends Controller {
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
                     'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
                 ];
+
+                // Se geramos split, devolver detalhes para o frontend (para exibição imediata se necessário)
+                if (isset($dados['__split']) && is_array($dados['__split'])) {
+                    $response['split'] = true;
+                    $response['split_pagamentos'] = $dados['__split'];
+                }
                 
                 $this->debugLog('[CHECKOUT] Resposta sucesso: ' . json_encode($response));
                 $this->json($response);
@@ -1900,7 +2803,8 @@ class CheckoutController extends Controller {
             $this->debugLog('[CHECKOUT] Excecao: ' . $e->getMessage());
             $this->debugLog('[CHECKOUT] Stack: ' . $e->getTraceAsString());
             $msgUser = $this->formatarErroParaUsuario($e->getMessage());
-            $this->json(['error' => 'Erro ao processar pedido: ' . $msgUser], 500);
+            $http = (stripos($msgUser, 'Estoque insuficiente') !== false) ? 400 : 500;
+            $this->json(['error' => 'Erro ao processar pedido: ' . $msgUser], $http);
         }
         
         $this->debugLog('[CHECKOUT] processar() - FIM');
@@ -1999,7 +2903,48 @@ class CheckoutController extends Controller {
                     $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                 } catch (\Exception $e) {
                 }
+
+                // Limpar carrinho no DB (usuário logado) e na sessão/cookie
+                try {
+                    if (session_status() === PHP_SESSION_NONE) {
+                        session_start();
+                    }
+                } catch (\Throwable $e) {
+                }
+
+                try {
+                    $usuario = $this->authService->getUsuarioLogado();
+                    $uid = (int) (($usuario['id'] ?? 0));
+                    if ($uid > 0) {
+                        $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                        if ($cartId <= 0) {
+                            $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                        }
+                        if ($cartId > 0) {
+                            $this->carrinhoModel->limparCarrinho($cartId);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+
                 unset($_SESSION['carrinho']);
+                unset($_SESSION['carrinho_itens_ativos']);
+
+                if (isset($_COOKIE['guest_cart'])) {
+                    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('guest_cart', '', [
+                            'expires' => time() - 3600,
+                            'path' => '/',
+                            'secure' => $secure,
+                            'httponly' => false,
+                            'samesite' => 'Lax',
+                        ]);
+                    } else {
+                        setcookie('guest_cart', '', time() - 3600, '/; samesite=Lax', '', $secure, false);
+                    }
+                }
             }
 
             $this->json([
@@ -2033,6 +2978,22 @@ class CheckoutController extends Controller {
 
         $paymentDetails = null;
         $pixQrCode = null;
+        $splitPagamentos = [];
+
+        // Se existir split no pedido_pagamentos, carregar para exibição
+        try {
+            $dbSplit = \Config\Database::getConnection();
+            $st = $dbSplit->prepare('SELECT componente, gateway, metodo, moeda, valor, status, invoice_url, bank_slip_url, digitable_line, pix_encoded_image, pix_payload FROM pedido_pagamentos WHERE pedido_id = :p ORDER BY id ASC');
+            $st->execute([':p' => (int) $pedidoId]);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $r) {
+                $comp = strtolower(trim((string) ($r['componente'] ?? '')));
+                if ($comp === '') continue;
+                $splitPagamentos[$comp] = $r;
+            }
+        } catch (\Exception $e) {
+            $splitPagamentos = [];
+        }
 
         // AppMax: não depende de consulta externa aqui; usar dados persistidos no pedido (quando disponíveis)
         $gatewayPedido = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
@@ -2084,12 +3045,23 @@ class CheckoutController extends Controller {
             'pedido' => $pedido,
             'itens' => (array) ($pedido['items'] ?? []),
             'paymentDetails' => $paymentDetails,
-            'pixQrCode' => $pixQrCode
+            'pixQrCode' => $pixQrCode,
+            'splitPagamentos' => $splitPagamentos,
         ]);
     }
     
     private function salvarItensPedido($pedidoId, $carrinho) {
         $db = \Config\Database::getConnection();
+
+        $startedTx = false;
+        try {
+            if (!$db->inTransaction()) {
+                $db->beginTransaction();
+                $startedTx = true;
+            }
+        } catch (\Throwable $e) {
+            $startedTx = false;
+        }
 
         $itensTable = $this->pickPedidoItensTable($db, (int) $pedidoId);
 
@@ -2102,8 +3074,96 @@ class CheckoutController extends Controller {
             $colsItens = [];
         }
         
-        foreach ($carrinho as $item) {
-            $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
+        // Detectar colunas de estoque
+        $prodCols = [];
+        try {
+            $st = $db->query('DESCRIBE produtos');
+            $prodCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Throwable $e) {
+            $prodCols = [];
+        }
+        $prodStockCol = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($prodCols) && in_array($c, $prodCols, true)) {
+                $prodStockCol = $c;
+                break;
+            }
+        }
+
+        $hasProdutoVariacoes = false;
+        try {
+            $st = $db->query("SHOW TABLES LIKE 'produto_variacoes'");
+            $hasProdutoVariacoes = (bool) ($st && $st->fetch());
+        } catch (\Throwable $e) {
+            $hasProdutoVariacoes = false;
+        }
+        $varCols = [];
+        if ($hasProdutoVariacoes) {
+            try {
+                $st = $db->query('DESCRIBE produto_variacoes');
+                $varCols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $varCols = [];
+            }
+        }
+        $varStockCol = null;
+        foreach (['stock', 'estoque'] as $c) {
+            if (is_array($varCols) && in_array($c, $varCols, true)) {
+                $varStockCol = $c;
+                break;
+            }
+        }
+
+        $prodControlaCol = null;
+        foreach (['controla_estoque', 'manage_stock'] as $c) {
+            if (is_array($prodCols) && in_array($c, $prodCols, true)) {
+                $prodControlaCol = $c;
+                break;
+            }
+        }
+
+        $stmtStockProduto = null;
+        if (!empty($prodStockCol)) {
+            $stmtStockProduto = $db->prepare('UPDATE produtos SET ' . $prodStockCol . ' = ' . $prodStockCol . ' - ? WHERE id = ? AND ' . $prodStockCol . ' >= ?');
+        }
+        $stmtStockVariacao = null;
+        if (!empty($varStockCol)) {
+            $stmtStockVariacao = $db->prepare('UPDATE produto_variacoes SET ' . $varStockCol . ' = ' . $varStockCol . ' - ? WHERE id = ? AND ' . $varStockCol . ' >= ?');
+        }
+
+        $temListaCompras = false;
+        $colsLista = [];
+        try {
+            $st = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $st->execute(['lista_compras']);
+            $temListaCompras = ((int) ($st->fetchColumn() ?: 0) > 0);
+        } catch (\Throwable $e) {
+            $temListaCompras = false;
+        }
+        if ($temListaCompras) {
+            try {
+                $st = $db->query('DESCRIBE lista_compras');
+                $colsLista = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $colsLista = [];
+            }
+        }
+        $listaTemPedidoId = $temListaCompras && is_array($colsLista) && in_array('pedido_id', $colsLista, true);
+        $listaTemProdutoId = $temListaCompras && is_array($colsLista) && in_array('produto_id', $colsLista, true);
+        $listaTemStatus = $temListaCompras && is_array($colsLista) && in_array('status', $colsLista, true);
+        $listaTemTipo = $temListaCompras && is_array($colsLista) && in_array('tipo_compra', $colsLista, true);
+        $listaQtdCol = '';
+        if ($temListaCompras && is_array($colsLista) && in_array('quantidade_faltante', $colsLista, true)) {
+            $listaQtdCol = 'quantidade_faltante';
+        } elseif ($temListaCompras && is_array($colsLista) && in_array('quantidade_necessaria', $colsLista, true)) {
+            $listaQtdCol = 'quantidade_necessaria';
+        }
+
+        $criouPendenciaLista = false;
+
+        try {
+            foreach ($carrinho as $item) {
+                $this->debugLog('[CHECKOUT_ITENS] Item do carrinho: ' . json_encode($item));
             
             // Validar se o produto existe antes de inserir
             $produtoId = $item['produto_id'] ?? $item['id'] ?? null;
@@ -2126,7 +3186,11 @@ class CheckoutController extends Controller {
             // Buscar dados do produto para persistir no pedido
             $produtoRow = null;
             try {
-                $stmtP = $db->prepare('SELECT id, name, nome, sku, url_original FROM produtos WHERE id = ? LIMIT 1');
+                $select = ['id', 'name', 'nome', 'sku', 'url_original'];
+                if (!empty($prodControlaCol)) {
+                    $select[] = $prodControlaCol;
+                }
+                $stmtP = $db->prepare('SELECT ' . implode(', ', array_values(array_unique($select))) . ' FROM produtos WHERE id = ? LIMIT 1');
                 $stmtP->execute([$produtoId]);
                 $produtoRow = $stmtP->fetch(\PDO::FETCH_ASSOC);
             } catch (\Exception $e) {
@@ -2218,25 +3282,143 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
-            $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
-            $stmt = $db->prepare($sql);
-            $stmt->execute($vals);
+                $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+                $stmt = $db->prepare($sql);
+                $stmt->execute($vals);
             
-            $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
+                $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
 
-            if ($produtoVariacaoId !== null) {
-                try {
-                    $stmtStock = $db->prepare('UPDATE produto_variacoes SET stock = stock - ? WHERE id = ? AND stock >= ?');
-                    $stmtStock->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
-                } catch (\Exception $e) {
+                $controlaEstoque = !empty($prodStockCol);
+                if (!empty($prodControlaCol) && is_array($produtoRow) && array_key_exists($prodControlaCol, $produtoRow)) {
+                    $raw = $produtoRow[$prodControlaCol];
+                    $controlaEstoque = !empty($raw) && (string) $raw !== '0' && strtolower((string) $raw) !== 'false';
                 }
-            } else {
+
+                if ($controlaEstoque) {
+                    if ($produtoVariacaoId !== null) {
+                        if (!$stmtStockVariacao) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                        $stmtStockVariacao->execute([(int) $quantidade, (int) $produtoVariacaoId, (int) $quantidade]);
+                        if ((int) $stmtStockVariacao->rowCount() <= 0) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                    } else {
+                        if (!$stmtStockProduto) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                        $stmtStockProduto->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
+                        if ((int) $stmtStockProduto->rowCount() <= 0) {
+                            throw new \Exception('Estoque insuficiente');
+                        }
+                    }
+                } else {
+                    if ($temListaCompras && $listaTemPedidoId && $listaTemProdutoId && $listaQtdCol !== '') {
+                        try {
+                            $faltante = (int) $quantidade;
+
+                            // Considerar estoque cadastrado para registrar apenas o faltante (quando houver coluna)
+                            if ($produtoVariacaoId !== null && !empty($varStockCol)) {
+                                try {
+                                    $stS = $db->prepare('SELECT ' . $varStockCol . ' FROM produto_variacoes WHERE id = ? LIMIT 1');
+                                    $stS->execute([(int) $produtoVariacaoId]);
+                                    $stockAtual = (int) ($stS->fetchColumn() ?: 0);
+                                    $faltante = max(0, ((int) $quantidade) - $stockAtual);
+                                } catch (\Exception $e) {
+                                }
+                            } elseif ($produtoVariacaoId === null && !empty($prodStockCol)) {
+                                try {
+                                    $stS = $db->prepare('SELECT ' . $prodStockCol . ' FROM produtos WHERE id = ? LIMIT 1');
+                                    $stS->execute([(int) $produtoId]);
+                                    $stockAtual = (int) ($stS->fetchColumn() ?: 0);
+                                    $faltante = max(0, ((int) $quantidade) - $stockAtual);
+                                } catch (\Exception $e) {
+                                }
+                            }
+
+                            if ($faltante <= 0) {
+                                continue;
+                            }
+
+                            $sqlFind = 'SELECT id, ' . $listaQtdCol . ' AS qtd FROM lista_compras WHERE pedido_id = ? AND produto_id = ?';
+                            $params = [(int) $pedidoId, (int) $produtoId];
+                            if ($listaTemStatus) {
+                                $sqlFind .= " AND status = 'pendente'";
+                            }
+                            if ($listaTemTipo) {
+                                $sqlFind .= ' AND (tipo_compra = ? OR tipo_compra IS NULL OR tipo_compra = \"\")';
+                                $params[] = 'online';
+                            }
+                            $sqlFind .= ' ORDER BY id DESC LIMIT 1';
+                            $stFind = $db->prepare($sqlFind);
+                            $stFind->execute($params);
+                            $ex = $stFind->fetch(\PDO::FETCH_ASSOC);
+                            if (is_array($ex) && !empty($ex['id'])) {
+                                $newQtd = ((int) ($ex['qtd'] ?? 0)) + (int) $faltante;
+                                $stUpd = $db->prepare('UPDATE lista_compras SET ' . $listaQtdCol . ' = ? WHERE id = ?');
+                                $stUpd->execute([$newQtd, (int) $ex['id']]);
+                                $criouPendenciaLista = true;
+                            } else {
+                                $colsIns = ['produto_id', 'pedido_id', $listaQtdCol];
+                                $valsIns = [':produto_id', ':pedido_id', ':q'];
+                                $pIns = [':produto_id' => (int) $produtoId, ':pedido_id' => (int) $pedidoId, ':q' => (int) $faltante];
+                                if ($listaTemStatus) {
+                                    $colsIns[] = 'status';
+                                    $valsIns[] = "'pendente'";
+                                }
+                                if ($listaTemTipo) {
+                                    $colsIns[] = 'tipo_compra';
+                                    $valsIns[] = ':tipo_compra';
+                                    $pIns[':tipo_compra'] = 'online';
+                                }
+                                $sqlIns = 'INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')';
+                                $stIns = $db->prepare($sqlIns);
+                                $stIns->execute($pIns);
+                                $criouPendenciaLista = true;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+            }
+
+            // Se gerou pendência na lista de compras, marcar pedido como pendente de conferência (quando colunas existirem)
+            if ($criouPendenciaLista) {
                 try {
-                    $stmtStock = $db->prepare('UPDATE produtos SET stock = stock - ? WHERE id = ? AND stock >= ?');
-                    $stmtStock->execute([(int) $quantidade, (int) $produtoId, (int) $quantidade]);
+                    $colsPed = [];
+                    try {
+                        $st = $db->query('DESCRIBE pedidos');
+                        $colsPed = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsPed = [];
+                    }
+
+                    $set = [];
+                    $params = [':id' => (int) $pedidoId];
+                    if (is_array($colsPed) && in_array('status_conferencia', $colsPed, true)) {
+                        $set[] = 'status_conferencia = :sc';
+                        $params[':sc'] = 'pendente';
+                    }
+                    if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
+                        $set[] = 'origem_pedido = :op';
+                        $params[':op'] = 'online';
+                    }
+                    if (!empty($set)) {
+                        $st = $db->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                        $st->execute($params);
+                    }
                 } catch (\Exception $e) {
                 }
             }
+
+            if ($startedTx && $db->inTransaction()) {
+                $db->commit();
+            }
+        } catch (\Exception $e) {
+            if ($startedTx && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
         }
     }
     
@@ -2618,16 +3800,48 @@ class CheckoutController extends Controller {
         $pais = $paisEntrega;
         
         // Dados pessoais
-        if (empty($dados['nome'])) $erros[] = 'Nome é obrigatório';
+        if (empty($dados['nome'])) {
+            $erros[] = 'Nome é obrigatório';
+        } else {
+            $nome = trim((string) $dados['nome']);
+            $parts = preg_split('/\s+/', $nome) ?: [];
+            $parts = array_values(array_filter($parts, static fn($p) => is_string($p) && mb_strlen(trim($p)) >= 2));
+            if (count($parts) < 2) {
+                $erros[] = 'Informe nome e sobrenome';
+            }
+        }
         if (empty($dados['email'])) $erros[] = 'E-mail é obrigatório';
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
         if ($pais === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
                 $erros[] = 'CPF é obrigatório para residentes no Brasil';
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
             }
         }
         if (empty($dados['telefone'])) $erros[] = 'Telefone é obrigatório';
-        if (empty($dados['data_nascimento'])) $erros[] = 'Data de nascimento é obrigatória';
+        if (empty($dados['data_nascimento'])) {
+            $erros[] = 'Data de nascimento é obrigatória';
+        } else {
+            $rawBirth = trim((string) ($dados['data_nascimento'] ?? ''));
+            $birth = \DateTime::createFromFormat('Y-m-d', $rawBirth);
+            if (!$birth) {
+                $birth = \DateTime::createFromFormat('d/m/Y', $rawBirth);
+            }
+            if (!$birth) {
+                $erros[] = 'Data de nascimento inválida';
+            } else {
+                $birth->setTime(0, 0, 0);
+                $today = new \DateTime('today');
+                if ($birth > $today) {
+                    $erros[] = 'Data de nascimento não pode ser no futuro';
+                }
+            }
+        }
         
         // Endereço
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
@@ -2648,9 +3862,16 @@ class CheckoutController extends Controller {
                 $erros[] = 'Telefone do destinatário é obrigatório';
             }
             if ($pais === 'BR') {
-                $docDest = preg_replace('/\D+/', '', (string) ($dados['destinatario_documento'] ?? ''));
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
                 if ($docDest === '' || strlen($docDest) < 11) {
                     $erros[] = 'CPF do destinatário é obrigatório para entregas no Brasil';
+                } elseif (strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
+                }
+            } else {
+                $docDest = CpfValidator::onlyDigits((string) ($dados['destinatario_documento'] ?? ''));
+                if ($docDest !== '' && strlen($docDest) === 11 && !CpfValidator::isValid($docDest)) {
+                    $erros[] = 'CPF do destinatário inválido';
                 }
             }
         }
@@ -2806,6 +4027,11 @@ class CheckoutController extends Controller {
                 ];
             }
 
+            $usuario['documento'] = preg_replace('/\D+/', '', (string) ($usuario['documento'] ?? ''));
+            if (($usuario['documento'] ?? '') === '') {
+                $usuario['documento'] = null;
+            }
+
             if (empty($usuario['email'])) {
                 throw new \Exception('E-mail é obrigatório para criar pedido');
             }
@@ -2862,7 +4088,7 @@ class CheckoutController extends Controller {
                     $usuario['nome'] ?? 'Cliente',
                     $usuario['email'],
                     password_hash((string) $senhaPlano, PASSWORD_DEFAULT),
-                    $usuario['documento'] ?? ('DOC' . time())
+                    $usuario['documento']
                 ]);
                 $usuarioId = $db->lastInsertId();
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
@@ -2947,7 +4173,7 @@ class CheckoutController extends Controller {
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
-                    $usuario['documento'] ?? ('DOC' . time()),
+                    $usuario['documento'],
                     $usuario['telefone'] ?? '',
                     $usuario['email']
                 ]);
@@ -3064,12 +4290,26 @@ class CheckoutController extends Controller {
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
 
+            // PIX: desconto configurável na taxa de serviço
+            $formaPagamentoSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+            if ($formaPagamentoSel === 'pix') {
+                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
+                if ($pct > 0) {
+                    $taxaServicoUsd = max(0.0, $taxaServicoUsd * (1.0 - ($pct / 100.0)));
+                }
+            }
+
             $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
             if ($paisEntrega === '') {
                 $paisEntrega = 'BR';
             }
             if ($paisEntrega !== 'BR') {
                 $impostosUsd = 0.0;
+            }
+
+            // Imposto de compra nos EUA (10%) embutido no subtotal dos produtos.
+            if ($paisEntrega === 'US') {
+                $subtotal = (float) $subtotal * 1.10;
             }
 
             $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;

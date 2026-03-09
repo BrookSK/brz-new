@@ -42,7 +42,7 @@ class Carrinho extends Model {
         }
 
         if (empty($candidates)) {
-            return $alias . '.peso';
+            return '0';
         }
 
         $parts = [];
@@ -203,8 +203,16 @@ class Carrinho extends Model {
     }
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
+        $itemsCols = $this->getTableColumns('carrinho_items');
+        $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
+        $varCol = (is_array($itemsCols) && in_array('produto_variacao_id', $itemsCols, true))
+            ? 'produto_variacao_id'
+            : ((is_array($itemsCols) && in_array('variacao_id', $itemsCols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
         // Verificar se item já existe
-        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0)");
+        $stmt = $this->connection->prepare(
+            "SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE({$varCol},0) = COALESCE(:produto_variacao_id,0)"
+        );
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->bindParam(':produto_id', $produtoId);
         $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
@@ -218,27 +226,71 @@ class Carrinho extends Model {
         if (!$produto || $produto['estoque'] < $quantidade) {
             return false;
         }
+
+        // Definir preço unitário efetivo (promo quando válida; variação override tem prioridade)
+        $precoBase = (float) ($produto['valor'] ?? 0);
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? 0);
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $precoUnitario = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
+        if ($produtoVariacaoId !== null && (int) $produtoVariacaoId > 0) {
+            try {
+                if ($this->tableExists('produto_variacoes')) {
+                    $stCols = $this->connection->query('DESCRIBE produto_variacoes');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                    $hasAtivo = is_array($cols) && in_array('ativo', $cols, true);
+                    $select = 'id, produto_id, price_override, stock' . ($hasAtivo ? ', ativo' : '');
+                    $sql = 'SELECT ' . $select . ' FROM produto_variacoes WHERE id = ? LIMIT 1';
+                    $stVar = $this->connection->prepare($sql);
+                    $stVar->execute([(int) $produtoVariacaoId]);
+                    $var = $stVar->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+                    if (!$var || empty($var['id'])) {
+                        return false;
+                    }
+                    if (isset($var['produto_id']) && (int) $var['produto_id'] !== (int) $produtoId) {
+                        return false;
+                    }
+                    if ($hasAtivo && isset($var['ativo']) && (int) $var['ativo'] !== 1) {
+                        return false;
+                    }
+                    $stockVar = (int) ($var['stock'] ?? 0);
+                    if ($stockVar < (int) $quantidade) {
+                        return false;
+                    }
+                    $override = $var['price_override'] ?? null;
+                    if ($override !== null && $override !== '' && (float) $override > 0) {
+                        $precoUnitario = (float) $override;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // fallback: mantém preço do produto
+            }
+        }
         
         if ($itemExistente) {
             // Atualizar quantidade
             $novaQuantidade = $itemExistente['quantidade'] + $quantidade;
-            $novoSubtotal = $novaQuantidade * $produto['valor'];
+            $novoSubtotal = $novaQuantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
                 UPDATE carrinho_items 
-                SET quantidade = :quantidade, subtotal = :subtotal 
+                SET quantidade = :quantidade, {$unitCol} = :valor_unitario, subtotal = :subtotal 
                 WHERE id = :id
             ");
             $stmt->bindParam(':quantidade', $novaQuantidade);
+            $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $novoSubtotal);
             $stmt->bindParam(':id', $itemExistente['id']);
             $stmt->execute();
         } else {
             // Inserir novo item
-            $subtotal = $quantidade * $produto['valor'];
+            $subtotal = $quantidade * $precoUnitario;
             
             $stmt = $this->connection->prepare("
-                INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, variacao_descricao, quantidade, valor_unitario, subtotal) 
+                INSERT INTO carrinho_items (carrinho_id, produto_id, {$varCol}, variacao_descricao, quantidade, {$unitCol}, subtotal) 
                 VALUES (:carrinho_id, :produto_id, :produto_variacao_id, :variacao_descricao, :quantidade, :valor_unitario, :subtotal)
             ");
             $stmt->bindParam(':carrinho_id', $carrinhoId);
@@ -246,7 +298,7 @@ class Carrinho extends Model {
             $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
             $stmt->bindValue(':variacao_descricao', $variacaoDescricao);
             $stmt->bindParam(':quantidade', $quantidade);
-            $stmt->bindParam(':valor_unitario', $produto['valor']);
+            $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $subtotal);
             $stmt->execute();
         }
@@ -485,10 +537,23 @@ class Carrinho extends Model {
         $prodCols = $this->getTableColumns('produtos');
         $hasClubeAtivo = is_array($prodCols) && in_array('clube_ativo', $prodCols, true);
         $clubeSelect = $hasClubeAtivo ? ', COALESCE(p.clube_ativo,0) AS clube_ativo' : ', 0 AS clube_ativo';
+
+        $hasMoedaProduto = is_array($prodCols) && (in_array('moeda', $prodCols, true) || in_array('currency', $prodCols, true));
+        $moedaCol = '';
+        if ($hasMoedaProduto) {
+            $moedaCol = in_array('moeda', $prodCols, true) ? 'p.moeda' : 'p.currency';
+        }
+        $moedaSelect = $moedaCol !== '' ? (', ' . $moedaCol . ' as moeda_produto') : '';
+
+        $hasSku = is_array($prodCols) && in_array('sku', $prodCols, true);
+        $hasDesc = is_array($prodCols) && in_array('descricao', $prodCols, true);
+        $skuSelect = $hasSku ? ', p.sku' : ', NULL AS sku';
+        $descSelect = $hasDesc ? ', p.descricao' : ', NULL AS descricao';
+
         $stmt = $this->connection->prepare("
-            SELECT ci.*, p.nome, p.sku, p.descricao, {$pesoExpr} AS peso, p.moeda as moeda_produto {$clubeSelect}
+            SELECT ci.*, p.nome{$skuSelect}{$descSelect}, {$pesoExpr} AS peso{$moedaSelect} {$clubeSelect}
             FROM carrinho_items ci 
-            JOIN produtos p ON ci.produto_id = p.id 
+            LEFT JOIN produtos p ON ci.produto_id = p.id 
             WHERE ci.carrinho_id = :carrinho_id
         ");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
@@ -527,8 +592,16 @@ class Carrinho extends Model {
             $quantidade = 1;
         }
 
+        $cols = $this->getTableColumns('carrinho_items');
+        $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+            ? 'produto_variacao_id'
+            : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+        $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true))
+            ? 'preco_unitario'
+            : ((is_array($cols) && in_array('valor_unitario', $cols, true)) ? 'valor_unitario' : 'valor_unitario');
+
         // Obter item
-        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(produto_variacao_id,0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
+        $stmt = $this->connection->prepare("SELECT * FROM carrinho_items WHERE carrinho_id = :carrinho_id AND produto_id = :produto_id AND COALESCE(" . $varCol . ",0) = COALESCE(:produto_variacao_id,0) LIMIT 1");
         $stmt->bindValue(':carrinho_id', (int) $carrinhoId, \PDO::PARAM_INT);
         $stmt->bindValue(':produto_id', (int) $produtoId, \PDO::PARAM_INT);
         if ($produtoVariacaoId === null || $produtoVariacaoId === '') {
@@ -542,7 +615,7 @@ class Carrinho extends Model {
             return false;
         }
 
-        $valorUnitario = (float) ($item['valor_unitario'] ?? 0);
+        $valorUnitario = (float) ($item[$unitCol] ?? ($item['valor_unitario'] ?? ($item['preco_unitario'] ?? 0)));
         $subtotal = $quantidade * $valorUnitario;
 
         $stmt = $this->connection->prepare("UPDATE carrinho_items SET quantidade = :q, subtotal = :s WHERE id = :id");

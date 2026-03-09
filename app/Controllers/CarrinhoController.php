@@ -14,6 +14,37 @@ class CarrinhoController extends Controller {
     private $authService;
     private $carrinhoModel;
 
+    private function getUserCartIdPreferNonEmpty(int $usuarioId): int {
+        if ($usuarioId <= 0) return 0;
+        try {
+            $db = $this->carrinhoModel->getConnection();
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st->execute([$usuarioId]);
+            $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return 0;
+            }
+
+            foreach ($ids as $cid) {
+                try {
+                    $stCnt = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                    $stCnt->execute([$cid]);
+                    $cnt = (int) ($stCnt->fetchColumn() ?: 0);
+                    if ($cnt > 0) {
+                        return $cid;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            // fallback: carrinho mais recente (mesmo vazio)
+            return (int) $ids[0];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     private function tableExists(string $table): bool {
         try {
             $db = \Config\Database::getConnection();
@@ -122,6 +153,24 @@ class CarrinhoController extends Controller {
         }
     }
 
+    private function hydrateCartFromCookie(): void {
+        try {
+            if (!empty($_SESSION['carrinho']) || empty($_COOKIE['guest_cart'])) {
+                return;
+            }
+            $raw = (string) $_COOKIE['guest_cart'];
+            $decoded = base64_decode($raw, true);
+            if ($decoded === false || $decoded === '') {
+                return;
+            }
+            $arr = json_decode($decoded, true);
+            if (is_array($arr) && !empty($arr)) {
+                $_SESSION['carrinho'] = $arr;
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
     public function __construct() {
         $this->produtoModel = new Produto();
         $this->produtoFotoModel = new ProdutoFoto();
@@ -138,20 +187,41 @@ class CarrinhoController extends Controller {
     private function getCarrinhoFromDb(int $usuarioId): array {
         if ($usuarioId <= 0) return [];
         try {
-            $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
-            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-            if ($cartId <= 0) return [];
+            $cartId = (int) $this->getUserCartIdPreferNonEmpty($usuarioId);
+            if ($cartId <= 0) {
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($usuarioId, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId <= 0) return [];
+            }
 
-            $items = $this->carrinhoModel->getItems($cartId);
+            $db = $this->carrinhoModel->getConnection();
+
+            $cols = [];
+            try {
+                $stCols = $db->query('DESCRIBE carrinho_items');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+
+            $unitCol = (is_array($cols) && in_array('preco_unitario', $cols, true)) ? 'preco_unitario' : 'valor_unitario';
+            $varCol = (is_array($cols) && in_array('produto_variacao_id', $cols, true))
+                ? 'produto_variacao_id'
+                : ((is_array($cols) && in_array('variacao_id', $cols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
+            $st = $db->prepare('SELECT *, ' . $unitCol . ' AS unit_price, ' . $varCol . ' AS var_id FROM carrinho_items WHERE carrinho_id = ?');
+            $st->execute([$cartId]);
+            $items = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
             $out = [];
             foreach (($items ?: []) as $it) {
                 $pid = (int) ($it['produto_id'] ?? 0);
                 if ($pid <= 0) continue;
-                $pvId = (int) ($it['produto_variacao_id'] ?? 0);
+                $pvId = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0)));
                 $key = ((string) $pid) . ':' . ((string) $pvId);
                 $qtd = (int) ($it['quantidade'] ?? 1);
                 if ($qtd < 1) $qtd = 1;
-                $vu = (float) ($it['valor_unitario'] ?? 0);
+                $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                 $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
                 $out[$key] = [
                     'produto_id' => $pid,
@@ -172,6 +242,7 @@ class CarrinhoController extends Controller {
 
     public function index(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
         $cartId = 0;
@@ -199,6 +270,7 @@ class CarrinhoController extends Controller {
         $subtotal = 0;
         $pesoTotal = 0;
         $totalItensAtivos = 0;
+        $totalItensAll = 0;
 
         $pesoClubeTotal = 0.0;
         $subtotalClube = 0.0;
@@ -291,6 +363,8 @@ class CarrinhoController extends Controller {
                     'ativo' => $ativo ? 1 : 0,
                 ];
 
+                $totalItensAll += (int) ($item['quantidade'] ?? 0);
+
                 if ($ativo) {
                     $subtotal += $itemSubtotal;
                     $pesoTotal += $pesoItem;
@@ -335,6 +409,12 @@ class CarrinhoController extends Controller {
         // Se o carrinho estiver no DB, usar os totais persistidos (inclui desconto/cashback do Clube)
         if ($uid > 0 && $cartId > 0) {
             try {
+                // Se existir item desativado, não usar totais do DB (DB não conhece a flag de ativo/inativo)
+                $hasInactive = ($totalItensAtivos < $totalItensAll);
+                if ($hasInactive) {
+                    throw new \RuntimeException('Skip DB totals due to inactive items');
+                }
+
                 $db = $this->carrinhoModel->getConnection();
                 $cols = [];
                 try {
@@ -439,6 +519,7 @@ class CarrinhoController extends Controller {
 
     public function checkout(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $pesoTotal = 0.0;
         $uid = $this->getLoggedUserId();
@@ -503,6 +584,7 @@ class CarrinhoController extends Controller {
         }
         
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
 
@@ -567,8 +649,13 @@ class CarrinhoController extends Controller {
         }
 
         $itemKey = ((string) $produtoId) . ':' . ((string) ($pvId ?? 0));
-        
-        $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+
+        $precoBase = (float) ($produto['preco'] ?? ($produto['valor'] ?? 0));
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? ($produto['preco_promo'] ?? ($produto['sale_price'] ?? 0)));
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
         if ($pvId !== null && $pvId > 0) {
             $infoVar = $this->getVariacaoInfo($pvId);
             if ($infoVar) {
@@ -625,6 +712,7 @@ class CarrinhoController extends Controller {
 
     public function remover(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
         
@@ -726,6 +814,7 @@ class CarrinhoController extends Controller {
 
     public function atualizar(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $produtoId = $request->getParam('id', null);
         $produtoIdFallback = $request->getParam('produto_id', null);
         $quantidade = $request->getParam('quantidade', null);
@@ -743,6 +832,66 @@ class CarrinhoController extends Controller {
         if ($quantidade < 1) {
             $this->json(['error' => 'Quantidade inválida'], 400);
             return;
+        }
+
+        $uid = $this->getLoggedUserId();
+        if ($uid > 0) {
+            try {
+                $pvId = null;
+                $produtoIdDb = (int) $produtoId;
+                if (is_string($produtoId) && strpos($produtoId, ':') !== false) {
+                    $parts = explode(':', $produtoId);
+                    $produtoIdDb = (int) ($parts[0] ?? 0);
+                    $pvTmp = (int) ($parts[1] ?? 0);
+                    if ($pvTmp > 0) {
+                        $pvId = $pvTmp;
+                    }
+                } elseif ($produtoIdFallback !== null && $produtoIdFallback !== '') {
+                    $produtoIdDb = (int) $produtoIdFallback;
+                }
+
+                if ($produtoIdDb <= 0) {
+                    $this->json(['error' => 'Produto não informado'], 400);
+                    return;
+                }
+
+                $produto = $this->produtoModel->find($produtoIdDb);
+                if ($produto && (int) ($produto['estoque'] ?? 0) < (int) $quantidade) {
+                    $this->json(['error' => 'Estoque insuficiente'], 400);
+                    return;
+                }
+
+                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                if ($cartId <= 0) {
+                    $this->json(['error' => 'Carrinho não encontrado'], 400);
+                    return;
+                }
+
+                $ok = $this->carrinhoModel->setQuantidadeItem($cartId, $produtoIdDb, (int) $quantidade, $pvId);
+                if (!$ok) {
+                    $this->json(['error' => 'Produto não encontrado no carrinho'], 404);
+                    return;
+                }
+
+                $stCnt = $this->carrinhoModel->getConnection()->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([$cartId]);
+                $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
+
+                $stTot = $this->carrinhoModel->getConnection()->prepare('SELECT valor_total FROM carrinhos WHERE id = ? LIMIT 1');
+                $stTot->execute([$cartId]);
+                $totalValor = (float) ($stTot->fetchColumn() ?: 0);
+
+                $this->json([
+                    'success' => true,
+                    'message' => 'Carrinho atualizado',
+                    'total_itens' => $totalItens,
+                    'total_valor' => $totalValor
+                ]);
+                return;
+            } catch (\Throwable $e) {
+                // fallback session
+            }
         }
         
         $itemKey = null;
@@ -814,6 +963,7 @@ class CarrinhoController extends Controller {
 
     public function limpar(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
         $uid = $this->getLoggedUserId();
         if ($uid > 0) {
             try {
@@ -841,6 +991,7 @@ class CarrinhoController extends Controller {
 
     public function calcular(Request $request) {
         session_start();
+        $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
         $carrinho = [];

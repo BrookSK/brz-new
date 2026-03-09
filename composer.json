@@ -5,7 +5,9 @@
     "require": {
         "php": "^8.0",
         "ext-pdo": "*",
-        "ext-mysqli": "*"
+        "ext-mysqli": "*",
+        "dompdf/dompdf": "^2.0",
+        "phpoffice/phpspreadsheet": "^1.29"
     },
     "autoload": {
         "psr-4": {

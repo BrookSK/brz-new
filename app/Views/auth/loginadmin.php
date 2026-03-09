@@ -63,14 +63,6 @@
                 </div>
             </div>
             
-            <!-- Informações de Acesso -->
-            <div class="alert alert-warning mt-4">
-                <h6><i class="fas fa-info-circle"></i> Informações de Acesso</h6>
-                <hr>
-                <p class="mb-2"><strong>Email:</strong> admin@onsolutions.com</p>
-                <p class="mb-2"><strong>Senha:</strong> admin123</p>
-                <small class="text-muted">Use estas credenciais para acessar o painel administrativo</small>
-            </div>
         </div>
     </div>
 </div>

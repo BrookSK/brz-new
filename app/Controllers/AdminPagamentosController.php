@@ -6,12 +6,125 @@ use App\Services\AuthService;
 use App\Services\PaymentService;
 
 class AdminPagamentosController extends Controller {
+
+    private function tableExistsPdo(\PDO $pdo, string $table): bool {
+        try {
+            $st = $pdo->prepare('SHOW TABLES LIKE ?');
+            $st->execute([$table]);
+            return (bool) $st->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function getConfigValueFromKeyValueTable(\PDO $pdo, string $table, string $categoria, string $chave): ?string {
+        try {
+            $cols = $this->getTableColumnsPdo($pdo, $table);
+            if (empty($cols)) {
+                return null;
+            }
+            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $st = $pdo->prepare('SELECT valor FROM ' . $table . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                $st->execute([(string) $categoria, (string) $chave]);
+                $v = $st->fetchColumn();
+                return ($v !== false && $v !== null) ? (string) $v : null;
+            }
+            if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                $fullKey = $categoria . '_' . $chave;
+                $st = $pdo->prepare('SELECT valor FROM ' . $table . ' WHERE chave = ? LIMIT 1');
+                $st->execute([(string) $fullKey]);
+                $v = $st->fetchColumn();
+                return ($v !== false && $v !== null) ? (string) $v : null;
+            }
+        } catch (\Exception $e) {
+        }
+        return null;
+    }
+
+    private function saveConfigValueToKeyValueTable(\PDO $pdo, string $table, string $categoria, string $chave, ?string $valor): void {
+        $cols = $this->getTableColumnsPdo($pdo, $table);
+        if (empty($cols)) {
+            return;
+        }
+        $valor = $valor === null ? '' : (string) $valor;
+
+        if (in_array('categoria', $cols, true) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+            $st = $pdo->prepare('INSERT INTO ' . $table . ' (categoria, chave, valor) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+            $st->execute([(string) $categoria, (string) $chave, (string) $valor]);
+            return;
+        }
+        if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+            $fullKey = $categoria . '_' . $chave;
+            $st = $pdo->prepare('INSERT INTO ' . $table . ' (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+            $st->execute([(string) $fullKey, (string) $valor]);
+            return;
+        }
+    }
+
+    private function getTableColumnsPdo(\PDO $pdo, string $table): array {
+        try {
+            $stmt = $pdo->query('DESCRIBE ' . $table);
+            return $stmt ? ($stmt->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $columns, array $candidates): string {
+        $lower = [];
+        foreach ($columns as $c) {
+            $lower[strtolower((string) $c)] = (string) $c;
+        }
+        foreach ($candidates as $cand) {
+            $key = strtolower((string) $cand);
+            if (isset($lower[$key])) {
+                return $lower[$key];
+            }
+        }
+        return '';
+    }
+
+    private function buildCoalesceExpr(string $tableAlias, array $tableColumns, array $candidates, string $fallback = "''"): string {
+        $parts = [];
+        $lower = [];
+        foreach ($tableColumns as $c) {
+            $lower[strtolower((string) $c)] = (string) $c;
+        }
+        foreach ($candidates as $cand) {
+            $key = strtolower((string) $cand);
+            if (isset($lower[$key])) {
+                $parts[] = $tableAlias . '.' . $lower[$key];
+            }
+        }
+        if (empty($parts)) {
+            return $fallback;
+        }
+        if (count($parts) === 1) {
+            return 'COALESCE(' . $parts[0] . ', ' . $fallback . ')';
+        }
+        return 'COALESCE(' . implode(', ', $parts) . ', ' . $fallback . ')';
+    }
     
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
+
+        $loadError = '';
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = \Config\Database::getConnection();
+
+            $colsPedidos = $this->getTableColumnsPdo($pdo, 'pedidos');
+            $colsUsuarios = $this->getTableColumnsPdo($pdo, 'usuarios');
+
+            $colUsuarioNome = $this->pickColumn($colsUsuarios, ['nome', 'name', 'full_name']);
+            $colPedidoCreatedAt = $this->pickColumn($colsPedidos, ['created_at', 'data_criacao', 'created', 'data', 'data_pedido']);
+
+            $exprGateway = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_gateway', 'pagamento_gateway', 'gateway_pagamento'], "''");
+            $exprPaymentId = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
+            $exprPaymentStatus = $this->buildCoalesceExpr('p', $colsPedidos, ['payment_status', 'pagamento_status', 'status_pagamento'], "''");
+            $exprPaymentMetodo = $this->buildCoalesceExpr('p', $colsPedidos, ['forma_pagamento', 'pagamento_metodo', 'payment_method', 'metodo_pagamento'], "''");
+            $exprValorTotal = $this->buildCoalesceExpr('p', $colsPedidos, ['valor_total', 'total', 'total_valor', 'valor', 'amount', 'amount_total', 'total_amount', 'total_pedido', 'valor_final'], '0');
+
             $pagina = $request->getParam('pagina', 1);
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
@@ -19,16 +132,22 @@ class AdminPagamentosController extends Controller {
             $status = $request->getParam('status', '');
             $metodo = $request->getParam('metodo', '');
             $gateway = $request->getParam('gateway', '');
+
+            $selectUsuarioNome = "'Visitante'";
+            if ($colUsuarioNome !== '') {
+                $selectUsuarioNome = 'u.' . $colUsuarioNome;
+            }
             
             $sql = "
                 SELECT
                     p.*,
-                    u.nome as cliente_nome,
+                    {$selectUsuarioNome} as cliente_nome,
                     u.email as cliente_email,
-                    COALESCE(p.payment_gateway, p.pagamento_gateway, '') as gateway_pagamento,
-                    COALESCE(p.payment_id, p.pagamento_transacao, '') as codigo_transacao,
-                    COALESCE(p.payment_status, p.pagamento_status, '') as status_pagamento,
-                    COALESCE(p.forma_pagamento, p.pagamento_metodo, '') as metodo_pagamento
+                    {$exprGateway} as gateway_pagamento,
+                    {$exprPaymentId} as codigo_transacao,
+                    {$exprPaymentStatus} as status_pagamento,
+                    {$exprPaymentMetodo} as metodo_pagamento,
+                    {$exprValorTotal} as valor_total_calc
                 FROM pedidos p
                 LEFT JOIN usuarios u ON p.usuario_id = u.id
                 WHERE 1=1
@@ -36,23 +155,28 @@ class AdminPagamentosController extends Controller {
             $params = [];
             
             if (!empty($busca)) {
-                $sql .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
+                $sql .= " AND (p.id LIKE :busca OR {$selectUsuarioNome} LIKE :busca OR {$exprPaymentId} LIKE :busca)";
                 $params[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sql .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
+                $sql .= " AND {$exprPaymentStatus} = :status";
                 $params[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sql .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
+                $sql .= " AND {$exprPaymentMetodo} = :metodo";
                 $params[':metodo'] = $metodo;
             }
             if (!empty($gateway)) {
-                $sql .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $sql .= " AND LOWER({$exprGateway}) = :gateway";
                 $params[':gateway'] = strtolower((string) $gateway);
             }
             
-            $sql .= " ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset";
+            if ($colPedidoCreatedAt !== '') {
+                $sql .= ' ORDER BY p.' . $colPedidoCreatedAt . ' DESC';
+            } else {
+                $sql .= ' ORDER BY p.id DESC';
+            }
+            $sql .= " LIMIT :limite OFFSET :offset";
             
             $stmt = $pdo->prepare($sql);
             foreach ($params as $key => $value) $stmt->bindValue($key, $value);
@@ -64,19 +188,19 @@ class AdminPagamentosController extends Controller {
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
             if (!empty($busca)) {
-                $sqlTotal .= " AND (p.id LIKE :busca OR u.nome LIKE :busca OR COALESCE(p.payment_id, p.pagamento_transacao, '') LIKE :busca)";
+                $sqlTotal .= " AND (p.id LIKE :busca OR {$selectUsuarioNome} LIKE :busca OR {$exprPaymentId} LIKE :busca)";
                 $paramsTotal[':busca'] = "%{$busca}%";
             }
             if (!empty($status)) {
-                $sqlTotal .= " AND COALESCE(p.payment_status, p.pagamento_status, '') = :status";
+                $sqlTotal .= " AND {$exprPaymentStatus} = :status";
                 $paramsTotal[':status'] = $status;
             }
             if (!empty($metodo)) {
-                $sqlTotal .= " AND COALESCE(p.forma_pagamento, p.pagamento_metodo, '') = :metodo";
+                $sqlTotal .= " AND {$exprPaymentMetodo} = :metodo";
                 $paramsTotal[':metodo'] = $metodo;
             }
             if (!empty($gateway)) {
-                $sqlTotal .= " AND LOWER(COALESCE(p.payment_gateway, p.pagamento_gateway, '')) = :gateway";
+                $sqlTotal .= " AND LOWER({$exprGateway}) = :gateway";
                 $paramsTotal[':gateway'] = strtolower((string) $gateway);
             }
             
@@ -86,24 +210,42 @@ class AdminPagamentosController extends Controller {
             $total = $stmtTotal->fetch(\PDO::FETCH_ASSOC)['total'];
             $totalPaginas = ceil($total / $limite);
             
-            // Estatísticas
-            $stmtStats = $pdo->query("
-                SELECT 
-                    COUNT(*) as total_transacoes,
-                    SUM(p.valor_total) as valor_total,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'approved' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'aprovado' THEN p.valor_total ELSE 0 END) as valor_aprovado,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'pending' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'pendente' THEN p.valor_total ELSE 0 END) as valor_pendente,
-                    SUM(CASE WHEN COALESCE(p.payment_status, p.pagamento_status, '') = 'rejected' OR COALESCE(p.payment_status, p.pagamento_status, '') = 'recusado' THEN p.valor_total ELSE 0 END) as valor_recusado
-                FROM pedidos p
-                WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            ");
-            $stats = $stmtStats->fetch(\PDO::FETCH_ASSOC);
+            // Estatísticas (não pode derrubar a listagem caso falhe por schema)
+            $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
+            try {
+                $where30 = '';
+                if ($colPedidoCreatedAt !== '') {
+                    $where30 = ' WHERE p.' . $colPedidoCreatedAt . ' >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                }
+                $stmtStats = $pdo->query("
+                    SELECT 
+                        COUNT(*) as total_transacoes,
+                        SUM({$exprValorTotal}) as valor_total,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('approved','aprovado','paid','pago','succeeded','success') THEN {$exprValorTotal} ELSE 0 END) as valor_aprovado,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('pending','pendente') THEN {$exprValorTotal} ELSE 0 END) as valor_pendente,
+                        SUM(CASE WHEN LOWER({$exprPaymentStatus}) IN ('rejected','recusado','failed','canceled','cancelled') THEN {$exprValorTotal} ELSE 0 END) as valor_recusado
+                    FROM pedidos p
+                    {$where30}
+                ");
+                $rowStats = $stmtStats ? $stmtStats->fetch(\PDO::FETCH_ASSOC) : null;
+                if (is_array($rowStats)) {
+                    $stats = array_merge($stats, $rowStats);
+                }
+            } catch (\Exception $e) {
+                // fallback silencioso
+            }
+
+            // Se o stats não veio, ao menos refletir a existência de dados na tela.
+            if ((int) ($stats['total_transacoes'] ?? 0) <= 0) {
+                $stats['total_transacoes'] = (int) ($total ?? 0);
+            }
             
         } catch (\Exception $e) {
             $pagamentos = [];
             $total = 0;
             $totalPaginas = 0;
             $stats = ['total_transacoes' => 0, 'valor_total' => 0, 'valor_aprovado' => 0, 'valor_pendente' => 0, 'valor_recusado' => 0];
+            $loadError = $e->getMessage();
         }
         
         // Incluir o partial do menu lateral
@@ -140,15 +282,20 @@ class AdminPagamentosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
-                    <div>
+                    <div class="d-flex gap-2">
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar Relatório
                         </button>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
+                        <a class="btn btn-outline-primary" href="/admin/pagamentos/configuracoes"><i class="fas fa-cog"></i> Configurações</a>
                     </div>
                 </div>';
+
+                if (!empty($loadError)) {
+                    echo '<div class="alert alert-danger">Erro ao carregar pagamentos: ' . htmlspecialchars($loadError) . '</div>';
+                }
                 
                 echo '<div class="row mb-4">
                     <div class="col-xl-3 col-md-6 mb-4">
@@ -231,6 +378,7 @@ class AdminPagamentosController extends Controller {
                             <option value="">Todos gateways</option>
                             <option value="stripe" ' . ($gateway === 'stripe' ? 'selected' : '') . '>Stripe</option>
                             <option value="appmax" ' . ($gateway === 'appmax' ? 'selected' : '') . '>AppMax</option>
+                            <option value="carteira" ' . ($gateway === 'carteira' ? 'selected' : '') . '>Carteira</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -244,6 +392,12 @@ class AdminPagamentosController extends Controller {
                     $pedidoIdRow = (int) ($pagamento['id'] ?? 0);
                     $stRow = strtolower(trim((string) ($pagamento['status_pagamento'] ?? 'pending')));
                     $gwRow = strtolower(trim((string) ($pagamento['gateway_pagamento'] ?? '')));
+                    $valorRow = 0.0;
+                    if (isset($pagamento['valor_total_calc'])) {
+                        $valorRow = (float) $pagamento['valor_total_calc'];
+                    } elseif (isset($pagamento['valor_total'])) {
+                        $valorRow = (float) $pagamento['valor_total'];
+                    }
 
                     $statusBadge = 'Pendente';
                     $statusClass = 'status-pendente';
@@ -271,7 +425,7 @@ class AdminPagamentosController extends Controller {
                                     <small class="text-muted">Método: ' . htmlspecialchars((string) ($pagamento['metodo_pagamento'] ?? 'N/A')) . '</small><br>
                                     <small class="text-muted">Gateway: ' . htmlspecialchars($gwRow !== '' ? strtoupper($gwRow) : 'N/A') . '</small><br>
                                     <small class="text-muted">Transação: ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
-                                    <strong>Valor: R$ ' . number_format($pagamento['valor_total'], 2, ',', '.') . '</strong>
+                                    <strong>Valor: R$ ' . number_format($valorRow, 2, ',', '.') . '</strong>
                                 </p>
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="/admin/pedidos/detalhes/' . $pedidoIdRow . '" class="btn btn-sm btn-outline-primary">
@@ -432,23 +586,18 @@ class AdminPagamentosController extends Controller {
             $svc = new PaymentService();
 
             $db = \Config\Database::getConnection();
-            $colsP = [];
-            try {
-                $stmtColsP = $db->query('DESCRIBE pedidos');
-                $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            } catch (\Exception $e) {
-                $colsP = [];
-            }
+            $colsP = $this->getTableColumnsPdo($db, 'pedidos');
 
-            $gateway = '';
-            $paymentId = '';
-            if (!empty($colsP)) {
-                $st = $db->prepare('SELECT payment_gateway, payment_id, payment_status FROM pedidos WHERE id = ? LIMIT 1');
-                $st->execute([$pedidoId]);
-                $row = $st->fetch(\PDO::FETCH_ASSOC);
-                $gateway = strtolower(trim((string) ($row['payment_gateway'] ?? '')));
-                $paymentId = trim((string) ($row['payment_id'] ?? ''));
-            }
+            $exprGateway = $this->buildCoalesceExpr('p', $colsP, ['payment_gateway', 'pagamento_gateway', 'gateway_pagamento'], "''");
+            $exprPaymentId = $this->buildCoalesceExpr('p', $colsP, ['payment_id', 'pagamento_transacao', 'pagamento_id', 'transaction_id'], "''");
+            $exprPaymentStatus = $this->buildCoalesceExpr('p', $colsP, ['payment_status', 'pagamento_status', 'status_pagamento'], "''");
+
+            $st = $db->prepare('SELECT ' . $exprGateway . ' AS gateway_pagamento, ' . $exprPaymentId . ' AS payment_id_calc, ' . $exprPaymentStatus . ' AS status_pagamento FROM pedidos p WHERE p.id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $gateway = strtolower(trim((string) ($row['gateway_pagamento'] ?? '')));
+            $paymentId = trim((string) ($row['payment_id_calc'] ?? ''));
+            $paymentStatus = strtolower(trim((string) ($row['status_pagamento'] ?? '')));
 
             if ($gateway === 'stripe') {
                 $resp = $svc->atualizarStatusPagamentoStripePorPedido($pedidoId);
@@ -459,6 +608,17 @@ class AdminPagamentosController extends Controller {
             if ($gateway === 'appmax') {
                 $resp = $svc->atualizarStatusPagamentoAppmaxPorPedido($pedidoId);
                 $this->json($resp);
+                return;
+            }
+
+            if (in_array($gateway, ['carteira', 'wallet'], true)) {
+                $this->json([
+                    'success' => true,
+                    'gateway' => $gateway,
+                    'payment_id' => $paymentId,
+                    'payment_status' => $paymentStatus !== '' ? $paymentStatus : 'approved',
+                    'message' => 'Status da carteira é local (sem refresh externo)'
+                ]);
                 return;
             }
 
@@ -1209,16 +1369,56 @@ class AdminPagamentosController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
-            
-            // Buscar configurações de pagamento
-            $stmt = $pdo->query("SELECT * FROM configuracoes WHERE categoria = 'pagamento'");
-            $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // Organizar configurações por chave
+            $pdo = \Config\Database::getConnection();
+
             $config = [];
-            foreach ($configuracoes as $c) {
-                $config[$c['chave']] = $c['valor'];
+            $keys = [
+                'stripe_public_key',
+                'stripe_secret_key',
+                'stripe_webhook_secret',
+                'stripe_enabled',
+                'mercadopago_access_token',
+                'mercadopago_public_key',
+                'mercadopago_client_id',
+                'mercadopago_client_secret',
+                'mercadopago_enabled',
+                'pix_key',
+                'pix_key_type',
+                'pix_enabled',
+                'default_currency',
+                'default_payment_method',
+            ];
+
+            if ($this->tableExistsPdo($pdo, 'configuracoes_sistema')) {
+                foreach ($keys as $k) {
+                    $v = $this->getConfigValueFromKeyValueTable($pdo, 'configuracoes_sistema', 'pagamentos', (string) $k);
+                    if ($v !== null) {
+                        $config[$k] = $v;
+                    }
+                }
+            }
+
+            if ($this->tableExistsPdo($pdo, 'configuracoes')) {
+                foreach ($keys as $k) {
+                    if (array_key_exists($k, $config)) {
+                        continue;
+                    }
+                    $v = $this->getConfigValueFromKeyValueTable($pdo, 'configuracoes', 'pagamentos', (string) $k);
+                    if ($v === null) {
+                        try {
+                            $st = $pdo->prepare("SELECT valor FROM configuracoes WHERE categoria = 'pagamento' AND chave = ? LIMIT 1");
+                            $st->execute([(string) $k]);
+                            $vv = $st->fetchColumn();
+                            if ($vv !== false && $vv !== null) {
+                                $v = (string) $vv;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                    if ($v !== null) {
+                        $config[$k] = $v;
+                    }
+                }
             }
             
         } catch (\Exception $e) {
@@ -1386,5 +1586,71 @@ class AdminPagamentosController extends Controller {
 </body>
 </html>';
         exit;
+    }
+
+    public function salvarConfiguracoes(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $dados = $request->getParams();
+        $keys = [
+            'stripe_public_key',
+            'stripe_secret_key',
+            'stripe_webhook_secret',
+            'stripe_enabled',
+            'mercadopago_access_token',
+            'mercadopago_public_key',
+            'mercadopago_client_id',
+            'mercadopago_client_secret',
+            'mercadopago_enabled',
+            'pix_key',
+            'pix_key_type',
+            'pix_enabled',
+            'default_currency',
+            'default_payment_method',
+        ];
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            if (!$pdo->inTransaction()) {
+                $pdo->beginTransaction();
+            }
+
+            $table = null;
+            if ($this->tableExistsPdo($pdo, 'configuracoes_sistema')) {
+                $table = 'configuracoes_sistema';
+            } elseif ($this->tableExistsPdo($pdo, 'configuracoes')) {
+                $table = 'configuracoes';
+            }
+            if ($table === null) {
+                throw new \Exception('Tabela de configurações não encontrada');
+            }
+
+            foreach ($keys as $k) {
+                $val = $dados[$k] ?? '';
+                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled'], true)) {
+                    $val = !empty($dados[$k]) ? '1' : '0';
+                }
+                $this->saveConfigValueToKeyValueTable($pdo, $table, 'pagamentos', (string) $k, is_string($val) ? $val : (string) $val);
+            }
+
+            if ($pdo->inTransaction()) {
+                $pdo->commit();
+            }
+
+            header('Location: /admin/pagamentos/configuracoes');
+            exit;
+        } catch (\Exception $e) {
+            try {
+                if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+            } catch (\Exception $e2) {
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
     }
 }

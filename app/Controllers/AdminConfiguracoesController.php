@@ -8,6 +8,56 @@ use Config\Database;
 class AdminConfiguracoesController extends Controller {
     
     public function index(Request $request) {
+        try {
+            $dbg = (string) ($request->getParam('__debug_admin_config') ?? '');
+            if ($dbg === '1') {
+                header('Content-Type: text/plain; charset=UTF-8');
+                $out = [];
+                $out[] = 'debug=AdminConfiguracoesController@index';
+                $out[] = '__FILE__=' . (string) __FILE__;
+                $out[] = 'realpath(__FILE__)=' . (string) (realpath(__FILE__) ?: '');
+                $out[] = 'php_version=' . (string) PHP_VERSION;
+                $out[] = 'sapi=' . (string) (php_sapi_name() ?: '');
+                $out[] = 'cwd=' . (string) (getcwd() ?: '');
+                $out[] = 'document_root=' . (string) ($_SERVER['DOCUMENT_ROOT'] ?? '');
+                $out[] = 'request_uri=' . (string) ($_SERVER['REQUEST_URI'] ?? '');
+
+                if (function_exists('opcache_get_status')) {
+                    $st = @opcache_get_status(false);
+                    $enabled = (is_array($st) && isset($st['opcache_enabled'])) ? (bool) $st['opcache_enabled'] : null;
+                    $out[] = 'opcache_get_status=available';
+                    $out[] = 'opcache_enabled=' . ($enabled === null ? 'null' : ($enabled ? '1' : '0'));
+
+                    if (is_array($st) && isset($st['scripts']) && is_array($st['scripts'])) {
+                        $needle = (string) (realpath(__FILE__) ?: __FILE__);
+                        $keys = array_keys($st['scripts']);
+                        $foundKey = '';
+                        foreach ($keys as $k) {
+                            if (!is_string($k)) continue;
+                            if ($k === $needle || str_replace('\\', '/', $k) === str_replace('\\', '/', $needle)) {
+                                $foundKey = $k;
+                                break;
+                            }
+                        }
+                        $out[] = 'opcache_script_entry_found=' . ($foundKey !== '' ? '1' : '0');
+                        if ($foundKey !== '') {
+                            $entry = $st['scripts'][$foundKey];
+                            if (is_array($entry)) {
+                                $out[] = 'opcache_script_timestamp=' . (string) ($entry['timestamp'] ?? '');
+                                $out[] = 'opcache_script_last_used_timestamp=' . (string) ($entry['last_used_timestamp'] ?? '');
+                            }
+                        }
+                    }
+                } else {
+                    $out[] = 'opcache_get_status=unavailable';
+                }
+
+                echo implode("\n", $out);
+                exit;
+            }
+        } catch (\Exception $e) {
+        }
+
         $auth = new AuthService();
         $auth->requerPerfil('admin');
         try {
@@ -57,24 +107,35 @@ class AdminConfiguracoesController extends Controller {
                 $configuracoes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
                 foreach ($configuracoes as $c) {
-                    $fullKey = '';
+                    $valor = $c['valor'] ?? '';
+
+                    $categoria = '';
+                    $chave = '';
+
                     if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
-                        $cat = (string) ($c['categoria'] ?? '');
-                        $k = (string) ($c['chave'] ?? '');
-                        $fullKey = ($cat !== '' && $k !== '') ? ($cat . '_' . $k) : '';
+                        $categoria = (string) ($c['categoria'] ?? '');
+                        $chave = (string) ($c['chave'] ?? '');
                     } else {
                         $fullKey = (string) ($c['chave'] ?? '');
+                        if ($fullKey === '') {
+                            continue;
+                        }
+
+                        if (preg_match('/^(wordpress|woocommerce)_(br|red|us)_(.+)$/', $fullKey, $m)) {
+                            $categoria = $m[1] . '_' . $m[2];
+                            $chave = $m[3];
+                        } elseif (strpos($fullKey, '_') !== false) {
+                            [$categoria, $chave] = explode('_', $fullKey, 2);
+                        } else {
+                            $categoria = 'geral';
+                            $chave = $fullKey;
+                        }
                     }
 
-                    $valor = $c['valor'] ?? '';
-                    if ($fullKey === '') {
+                    $categoria = trim($categoria);
+                    $chave = trim($chave);
+                    if ($categoria === '' || $chave === '') {
                         continue;
-                    }
-                    if (strpos($fullKey, '_') !== false) {
-                        [$categoria, $chave] = explode('_', $fullKey, 2);
-                    } else {
-                        $categoria = 'geral';
-                        $chave = $fullKey;
                     }
                     if (!isset($config[$categoria])) {
                         $config[$categoria] = [];
@@ -139,6 +200,7 @@ class AdminConfiguracoesController extends Controller {
             $clubeFaixas = [];
         }
 
+        echo "<!-- DEBUG_ADMIN_CONFIG controller=" . basename(__FILE__) . " ts=" . date('c') . " -->\n";
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -162,12 +224,12 @@ class AdminConfiguracoesController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Configurações</h1>
-                    <div>
-                        <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
-                            <i class="fas fa-download me-1"></i>Backup
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="testarStripeAPI()">
+                            <i class="fas fa-plug"></i> Testar Conexão
                         </button>
-                        <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                        <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoStripe()">
+                            <i class="fas fa-book"></i> Documentação
                         </button>
                     </div>
                 </div>
@@ -387,6 +449,54 @@ class AdminConfiguracoesController extends Controller {
                                                 });
                                                 </script>
                                                 ';
+
+                                            echo '
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Favicon</div>
+                                                <div class="text-muted small mb-3">Upload do ícone para aparecer na aba do navegador.</div>
+
+                                                ';
+                                                $existingFavicon = (string) $this->getConfigValue($config, 'layout', 'favicon', '');
+                                                $existingFavicon = is_string($existingFavicon) ? trim($existingFavicon) : '';
+                                                $existingFaviconEsc = htmlspecialchars($existingFavicon, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingFaviconEsc !== '' ? '<img src="' . $existingFaviconEsc . '" alt="Favicon" style="height: 32px; width: 32px; object-fit: contain;"> <span class="text-muted small">' . $existingFaviconEsc . '</span>' : '<div class="text-muted">Nenhum favicon cadastrado</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_favicon_keep" value="' . $existingFaviconEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Favicon</label>
+                                                        <input type="file" class="form-control" name="layout_favicon" accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutFavicon">Remover favicon</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutFavicon");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_favicon_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Favicon será removido ao salvar.");
+                                                    });
+                                                });
+                                                </script>
+                                                ';
+                                            $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
+                                            if (!in_array($selectedLang, ['pt', 'en'], true)) {
+                                                $selectedLang = 'pt';
+                                            }
+
                                             echo '
                                             </div>
 
@@ -397,9 +507,22 @@ class AdminConfiguracoesController extends Controller {
                                                 Mobile: <strong>391 x 333</strong>
                                             </div>
 
+                                            <div class="mb-3">
+                                                <label class="form-label small mb-1">Idioma do banner</label>
+                                                <select class="form-select" name="layout_banners_lang" onchange="(function(sel){var u=new URL(window.location.href);u.searchParams.set(\'layout_banners_lang\', sel.value);window.location.href=u.toString();})(this)">';
+
+                                            echo '<option value="pt" ' . ($selectedLang === 'pt' ? 'selected' : '') . '>Português (PT)</option>';
+                                            echo '<option value="en" ' . ($selectedLang === 'en' ? 'selected' : '') . '>English (EN)</option>';
+
+                                            echo '</select>
+                                                <div class="text-muted small mt-1">Os banners exibidos na Home mudam de acordo com o idioma selecionado no site.</div>
+                                            </div>
+
                                             <div id="layout-banners-existing" class="row g-2 mb-3">
                                                 ';
-                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', 'banners', '[]');
+
+                                                $bannersKey = ($selectedLang === 'en') ? 'banners_en' : 'banners';
+                                                $existingBannersRaw = (string) $this->getConfigValue($config, 'layout', $bannersKey, '[]');
                                                 $existingBanners = json_decode($existingBannersRaw, true);
                                                 if (!is_array($existingBanners)) $existingBanners = [];
                                                 foreach ($existingBanners as $idx => $item) {
@@ -525,6 +648,76 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">WooCommerce (REST API)</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                Configure as credenciais por origem (BR / RED / US). Se estiver vazio, o sistema pode cair para a configuração antiga (sem origem) quando aplicável.
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">BR (https://br.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_br_store_url" value="' . $this->getConfigValue($config, 'woocommerce_br', 'store_url', $this->getConfigValue($config, 'woocommerce', 'store_url', '')) . '" placeholder="https://br.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_br_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_br', 'consumer_key', $this->getConfigValue($config, 'woocommerce', 'consumer_key', '')) . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_br_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_br', 'consumer_secret', $this->getConfigValue($config, 'woocommerce', 'consumer_secret', '')) . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">RED (https://redirecionamento.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_red_store_url" value="' . $this->getConfigValue($config, 'woocommerce_red', 'store_url', '') . '" placeholder="https://redirecionamento.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_red_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_red', 'consumer_key', '') . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_red_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_red', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3">
+                                                <div class="fw-semibold mb-2">US (https://us.brazilianashop.com.br)</div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Store URL</label>
+                                                    <input type="url" class="form-control" name="woocommerce_us_store_url" value="' . $this->getConfigValue($config, 'woocommerce_us', 'store_url', '') . '" placeholder="https://us.brazilianashop.com.br/">
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Key</label>
+                                                            <input type="password" class="form-control" name="woocommerce_us_consumer_key" value="' . $this->getConfigValue($config, 'woocommerce_us', 'consumer_key', '') . '" placeholder="ck_...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Consumer Secret</label>
+                                                            <input type="password" class="form-control" name="woocommerce_us_consumer_secret" value="' . $this->getConfigValue($config, 'woocommerce_us', 'consumer_secret', '') . '" placeholder="cs_...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="mb-3">
                                                 <label class="form-label">Store URL</label>
                                                 <input type="url" class="form-control" name="woocommerce_store_url" value="' . $this->getConfigValue($config, 'woocommerce', 'store_url', '') . '" placeholder="https://br.brazilianashop.com.br/">
@@ -559,6 +752,136 @@ class AdminConfiguracoesController extends Controller {
                                             <h5 class="mb-0">Integração WordPress (Somente leitura)</h5>
                                         </div>
                                         <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                Configure as credenciais do banco WordPress por origem (BR / RED / US). Como são sites diferentes, podem existir IDs/números repetidos.
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">BR (https://br.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_host" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_host', $this->getConfigValue($config, 'wordpress', 'db_host', 'localhost')) . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_name" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_name', $this->getConfigValue($config, 'wordpress', 'db_name', '')) . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_db_user" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_user', $this->getConfigValue($config, 'wordpress', 'db_user', '')) . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_br_db_pass" value="' . $this->getConfigValue($config, 'wordpress_br', 'db_pass', $this->getConfigValue($config, 'wordpress', 'db_pass', '')) . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_br_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_br', 'table_prefix', $this->getConfigValue($config, 'wordpress', 'table_prefix', 'wp_')) . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3 mb-3">
+                                                <div class="fw-semibold mb-2">RED (https://redirecionamento.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_host" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_name" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_name', '') . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_db_user" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_user', '') . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_red_db_pass" value="' . $this->getConfigValue($config, 'wordpress_red', 'db_pass', '') . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_red_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_red', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="border rounded p-3">
+                                                <div class="fw-semibold mb-2">US (https://us.brazilianashop.com.br)</div>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Host</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_host" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_host', 'localhost') . '" placeholder="localhost">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Database (nome)</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_name" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_name', '') . '" placeholder="wp_database">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Usuário</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_db_user" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_user', '') . '" placeholder="wp_user">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Senha</label>
+                                                            <input type="password" class="form-control" name="wordpress_us_db_pass" value="' . $this->getConfigValue($config, 'wordpress_us', 'db_pass', '') . '" placeholder="********">
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Prefixo das tabelas</label>
+                                                            <input type="text" class="form-control" name="wordpress_us_table_prefix" value="' . $this->getConfigValue($config, 'wordpress_us', 'table_prefix', 'wp_') . '" placeholder="wp_">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
@@ -1007,6 +1330,57 @@ class AdminConfiguracoesController extends Controller {
 
                                             <hr>
 
+                                            <h6 class="mb-3">Correios (Etiquetas - Provider)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Provider de etiqueta</label>
+                                                        <select class="form-select" name="entrega_correios_provider">
+                                                            <option value="sigep" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', 'sigep') === 'sigep' ? 'selected' : '') . '>SIGEP (SOAP)</option>
+                                                            <option value="prepostagem_v3" ' . ($this->getConfigValue($config, 'entrega', 'correios_provider', '') === 'prepostagem_v3' ? 'selected' : '') . '>Pré-Postagem v3 (REST)</option>
+                                                        </select>
+                                                        <small class="text-muted">Escolha como o sistema vai gerar etiquetas dos Correios (SIGEP legado ou Pré-Postagem v3).</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6"></div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Token (Pré-Postagem v3)</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_correios_prepostagem_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_token', '') . '" placeholder="Bearer token (Cartão de Postagem)">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                        <small class="text-muted">A API Pré-Postagem exige autorização via Cartão de Postagem.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">IdCorreios (opcional)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_id_correios" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_id_correios', '') . '" placeholder="IdCorreios">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Código do serviço (Pré-Postagem)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_prepostagem_codigo_servico" value="' . $this->getConfigValue($config, 'entrega', 'correios_prepostagem_codigo_servico', '') . '" placeholder="Ex.: 03220">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Remetente (JSON - Pré-Postagem)</label>
+                                                <textarea class="form-control" name="entrega_correios_prepostagem_sender_json" rows="6" placeholder="{\n  \"nome\": \"Fulano\",\n  \"cpfCnpj\": \"00000000000\",\n  \"endereco\": {\n    \"cep\": \"00000000\",\n    \"logradouro\": \"Rua\",\n    \"numero\": \"123\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"Cidade\",\n    \"uf\": \"SP\"\n  }\n}">' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_prepostagem_sender_json', ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Estrutura compatível com o schema RemetenteDTO / EnderecoRemetenteDTO da API Pré-Postagem.</small>
+                                            </div>
+
+                                            <hr>
+
                                             <h6 class="mb-3">Correios (SIGEP Web)</h6>
 
                                             <div class="row">
@@ -1116,6 +1490,43 @@ class AdminConfiguracoesController extends Controller {
                                                 <div class="col-md-6"></div>
                                             </div>
 
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Usuário (Meu Correios - Token)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_token_usuario" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_usuario', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Usuário do Meu Correios">
+                                                        <small class="text-muted">Usado para gerar automaticamente o token (Authorization: Basic). Se vazio, o sistema tenta reutilizar o usuário do SIGEP.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Senha / Código de acesso (Meu Correios - Token)</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_correios_token_senha" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_token_senha', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Senha/Código de acesso do Meu Correios">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                        <small class="text-muted">Muitas vezes esta credencial é diferente da senha do SIGEP. Necessária para auto-renovar token.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente (Token)</label>
+                                                        <select class="form-select" name="entrega_correios_token_ambiente">
+                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === '' ? 'selected' : '') . '>Seguir SIGEP</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_token_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                        <small class="text-muted">Força onde o sistema vai gerar o token (api/apihom). Se vazio, segue o ambiente do SIGEP ou a Base URL do rastreio.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-8"></div>
+                                            </div>
+
                                             <div class="mb-3">
                                                 <label class="form-label">Token / API Key</label>
                                                 <div class="input-group">
@@ -1125,6 +1536,38 @@ class AdminConfiguracoesController extends Controller {
                                                     </button>
                                                 </div>
                                                 <small class="text-muted">O sistema usa automaticamente o endpoint do Packet Service conforme o ambiente selecionado em SIGEP (Homologação/Produção).</small>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente (CEP)</label>
+                                                        <select class="form-select" name="entrega_correios_cep_ambiente">
+                                                            <option value="" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === '' ? 'selected' : '') . '>Seguir SIGEP</option>
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_cep_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                        <small class="text-muted">Usado para consulta de CEP (Busca CEP). Se vazio, segue o ambiente do SIGEP.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-8">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Base URL (CEP)</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_cep_base_url" value="' . $this->getConfigValue($config, 'entrega', 'correios_cep_base_url', '') . '" placeholder="https://api.correios.com.br/cep">
+                                                        <small class="text-muted">Opcional. Se vazio, o sistema usa a URL padrão do ambiente selecionado.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Token (CEP - Busca CEP)</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" name="entrega_correios_cep_token" value="' . $this->getConfigValue($config, 'entrega', 'correios_cep_token', '') . '" placeholder="Bearer token (API Busca CEP)">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Se preenchido, este token será usado apenas para consulta de CEP. Se vazio, o sistema reutiliza o token do Rastreamento.</small>
                                             </div>
 
                                             <hr>
@@ -1522,6 +1965,84 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                             </div>
 
+                                            <div class="row mt-3">
+                                                <div class="col-12">
+                                                    <div class="card">
+                                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                                            <h6 class="mb-0">💙 Mercado Pago</h6>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="mercadopago_enabled" name="pagamentos_mercadopago_enabled" value="1" ' . ($this->getConfigValue($config, 'pagamentos', 'mercadopago_enabled', '0') === '1' ? 'checked' : '') . '>
+                                                                <label class="form-check-label" for="mercadopago_enabled">Ativo</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Access Token</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_mercadopago_access_token" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_access_token', '') . '" placeholder="APP_USR-...">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <small class="text-muted">Use o Access Token da conta/app do Mercado Pago.</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Public Key (opcional)</label>
+                                                                        <input type="text" class="form-control" name="pagamentos_mercadopago_public_key" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_public_key', '') . '" placeholder="APP_USR-...">
+                                                                        <small class="text-muted">Obrigatória apenas se você for usar SDK/JS do MP no frontend.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Client ID (OAuth)</label>
+                                                                        <input type="text" class="form-control" name="pagamentos_mercadopago_client_id" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_client_id', '') . '" placeholder="1234567890">
+                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Client Secret (OAuth)</label>
+                                                                        <div class="input-group">
+                                                                            <input type="password" class="form-control" name="pagamentos_mercadopago_client_secret" value="' . $this->getConfigValue($config, 'pagamentos', 'mercadopago_client_secret', '') . '" placeholder="********">
+                                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                                <i class="fas fa-eye"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                        <small class="text-muted">Obrigatório para Marketplace Split (OAuth do vendedor).</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Webhook URL</label>
+                                                                        <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/mercadopago', ENT_QUOTES, 'UTF-8') . '" readonly>
+                                                                        <small class="text-muted">Configure esta URL no painel do Mercado Pago para receber notificações.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-12">
+                                                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                                                        <a href="/mercadopago/oauth/start" class="btn btn-sm btn-primary">Conectar Mercado Pago (Conta do Produto)</a>
+                                                                        <small class="text-muted">Faça login e autorize a conta que vai receber o valor do produto (OAuth).</small>
+                                                                        ' . (!empty($this->getConfigValue($config, 'pagamentos', 'mercadopago_seller_access_token', ''))
+                                                                            ? '<span class="badge bg-success">Conectado</span>'
+                                                                            : '<span class="badge bg-secondary">Não conectado</span>') . '
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="row">
                                                 <div class="col-12">
                                                     <h6 class="mb-3">Webhook - Pedido Manual</h6>
@@ -1529,6 +2050,19 @@ class AdminConfiguracoesController extends Controller {
                                                         <label class="form-label">Webhook - Link de Pagamento do Pedido Manual (URL)</label>
                                                         <input type="url" class="form-control" name="pagamentos_webhook_link_pagamento_pedido_manual_url" value="' . $this->getConfigValue($config, 'pagamentos', 'webhook_link_pagamento_pedido_manual_url', '') . '" placeholder="https://seu-webhook.com/pedidos/manual/link-pagamento">
                                                         <small class="text-muted">O sistema enviará POST em JSON com dados do pedido, cliente e link de pagamento assim que o link for gerado.</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <h6 class="mb-3">Desconto no PIX</h6>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Desconto na taxa de serviço para PIX (%)</label>
+                                                        <input type="number" class="form-control" name="pagamentos_pix_desconto_taxa_servico_percent" value="' . $this->getConfigValue($config, 'pagamentos', 'pix_desconto_taxa_servico_percent', '0') . '" step="0.01" min="0" max="100">
+                                                        <small class="text-muted">Aplicado ao calcular a taxa de serviço quando a forma de pagamento selecionada for PIX.</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -3441,8 +3975,63 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Upload do favicon
+            try {
+                $keepFavicon = (string) ($request->getParam('layout_favicon_keep', '') ?? '');
+                $keepFavicon = trim($keepFavicon);
+
+                $faviconUrl = $keepFavicon;
+                if (isset($_FILES['layout_favicon']) && is_array($_FILES['layout_favicon'])) {
+                    $name = (string) ($_FILES['layout_favicon']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_favicon']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_favicon']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['ico','png','svg'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $candidates = [
+                                $docRoot . '/public/uploads/favicon/',
+                                $docRoot . '/uploads/favicon/',
+                                $docRoot . '/public/uploads/favicons/',
+                                $docRoot . '/uploads/favicons/',
+                            ];
+                            $uploadDir = '';
+                            foreach ($candidates as $dir) {
+                                if (!is_dir($dir)) {
+                                    @mkdir($dir, 0755, true);
+                                }
+                                if (is_dir($dir) && is_writable($dir)) {
+                                    $uploadDir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+                                    break;
+                                }
+                            }
+
+                            if ($uploadDir !== '') {
+                                $webDir = '/uploads/favicon/';
+                                if (strpos(str_replace('\\', '/', $uploadDir), '/favicons/') !== false) {
+                                    $webDir = '/uploads/favicons/';
+                                }
+                                $fileName = 'favicon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $faviconUrl = $webDir . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_favicon', $faviconUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
+                $bannersLang = (string) $request->getParam('layout_banners_lang', 'pt');
+                if (!in_array($bannersLang, ['pt', 'en'], true)) {
+                    $bannersLang = 'pt';
+                }
+
                 $keepDesktop = $request->getParam('layout_banners_keep_desktop', []);
                 $keepMobile = $request->getParam('layout_banners_keep_mobile', []);
                 $keepLink = $request->getParam('layout_banners_keep_link', []);
@@ -3527,7 +4116,12 @@ HTML;
                 }
 
                 $final = array_merge($keptItems, $newItems);
-                $request->setParam('layout_banners', json_encode(array_values($final), JSON_UNESCAPED_UNICODE));
+                $json = json_encode(array_values($final), JSON_UNESCAPED_UNICODE);
+                if ($bannersLang === 'en') {
+                    $request->setParam('layout_banners_en', $json);
+                } else {
+                    $request->setParam('layout_banners', $json);
+                }
             } catch (\Exception $e) {
             }
 
@@ -3558,22 +4152,28 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
-                'layout' => ['banners', 'logo', 'logo_footer', 'logo_admin'],
+                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'webhook_link_pagamento_pedido_manual_url'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_br' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_red' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
+                'wordpress_us' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'woocommerce' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_br' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_red' => ['store_url', 'consumer_key', 'consumer_secret'],
+                'woocommerce_us' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
@@ -3607,6 +4207,11 @@ HTML;
                             $valor = is_numeric($valor) ? floatval($valor) : 0;
                         }
                         if ($categoria === 'comissao' && in_array($chave, ['processamento_percent', 'comissao_processamento_percent'], true)) {
+                            $valor = is_numeric($valor) ? (float) $valor : 0;
+                            if ($valor < 0) $valor = 0;
+                            if ($valor > 100) $valor = 100;
+                        }
+                        if ($categoria === 'pagamentos' && $chave === 'pix_desconto_taxa_servico_percent') {
                             $valor = is_numeric($valor) ? (float) $valor : 0;
                             if ($valor < 0) $valor = 0;
                             if ($valor > 100) $valor = 100;
@@ -5645,8 +6250,8 @@ HTML;
                     html += "<p class=\"card-text\"><small>" + (tpl.assunto || '') + "</small></p>";
                     html += "<p class=\"card-text\"><small class=\"text-muted\">" + (tpl.updated_at || '') + "</small></p>";
                     html += "<div class=\"d-flex gap-2\">";
-                    html += "<button class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
-                    html += "<button class=\"btn btn-sm btn-outline-success\" onclick=\"testarTemplateEmail('" + evento + "')\">Testar</button>";
+                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-primary\" onclick=\"carregarTemplate('" + evento + "')\">Carregar</button>";
+                    html += "<button type=\"button\" class=\"btn btn-sm btn-outline-success\" onclick=\"testarTemplateEmail('" + evento + "')\">Testar</button>";
                     html += "</div>";
                     html += "</div>";
                     html += "</div>";
@@ -5727,13 +6332,52 @@ HTML;
     private function getConfigTableInfo(\PDO $pdo): array {
         $tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
         $table = null;
+        $cols = [];
+        $types = [];
+
+        $bestScore = -1;
         foreach ($tableCandidates as $t) {
             try {
                 $stmtTable = $pdo->prepare("SHOW TABLES LIKE ?");
                 $stmtTable->execute([$t]);
-                if ($stmtTable->fetchColumn()) {
+                if (!$stmtTable->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtD = $pdo->query('DESCRIBE ' . $t);
+                $describeRowsT = $stmtD ? ($stmtD->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                $colsT = [];
+                $typesT = [];
+                foreach ($describeRowsT as $r) {
+                    $field = (string) ($r['Field'] ?? '');
+                    if ($field === '') continue;
+                    $colsT[] = $field;
+                    $typesT[$field] = strtolower((string) ($r['Type'] ?? ''));
+                }
+
+                $hasCategoria = in_array('categoria', $colsT, true);
+                $hasChave = in_array('chave', $colsT, true);
+                $hasValor = in_array('valor', $colsT, true) || in_array('value', $colsT, true) || in_array('conteudo', $colsT, true) || in_array('content', $colsT, true) || in_array('config_value', $colsT, true);
+
+                $hasKey = false;
+                foreach (['chave','key','nome','config_key','configuracao','slug','parametro'] as $kc) {
+                    if (in_array($kc, $colsT, true)) { $hasKey = true; break; }
+                }
+
+                $score = 0;
+                if ($hasCategoria && $hasChave && $hasValor) {
+                    $score = 3;
+                } elseif ($hasKey && $hasValor) {
+                    $score = 2;
+                } elseif (in_array('id', $colsT, true)) {
+                    $score = 1;
+                }
+
+                if ($score > $bestScore) {
+                    $bestScore = $score;
                     $table = $t;
-                    break;
+                    $cols = $colsT;
+                    $types = $typesT;
                 }
             } catch (\Exception $e) {
             }
@@ -5741,19 +6385,6 @@ HTML;
 
         if (!$table) {
             throw new \Exception('Tabela de configurações não encontrada');
-        }
-
-        $stmt = $pdo->query('DESCRIBE ' . $table);
-        $describeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        $cols = [];
-        $types = [];
-        foreach ($describeRows as $r) {
-            $field = (string) ($r['Field'] ?? '');
-            if ($field === '') {
-                continue;
-            }
-            $cols[] = $field;
-            $types[$field] = strtolower((string) ($r['Type'] ?? ''));
         }
 
         $keyCandidates = ['chave', 'key', 'nome', 'config_key', 'configuracao', 'slug', 'parametro'];

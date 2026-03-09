@@ -1,9 +1,84 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="<?= htmlspecialchars((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocaleHtml() : 'pt-BR'), ENT_QUOTES, 'UTF-8') ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'Braziliana - E-commerce Internacional' ?></title>
+    <?php
+    $siteFavicon = '';
+    try {
+        $rawFav = '';
+        $tablesToTryFav = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTryFav as $t) {
+            if ($rawFav !== '') break;
+            try {
+                $pdoFav = \Config\Database::getConnection();
+                $stmtT = $pdoFav->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdoFav->query('DESCRIBE ' . $t);
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'favicon']);
+                        $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                        if ($rawFav !== '') break;
+                    }
+                }
+
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_favicon']);
+                    $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+
+                if (in_array('layout_favicon', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdoFav->query('SELECT layout_favicon AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $rawFav = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $siteFavicon = is_string($rawFav) ? trim($rawFav) : '';
+    } catch (\Exception $e) {
+        $siteFavicon = '';
+    }
+
+    $siteFaviconEsc = htmlspecialchars($siteFavicon, ENT_QUOTES, 'UTF-8');
+    $faviconMime = '';
+    if ($siteFavicon !== '') {
+        $ext = strtolower(pathinfo(parse_url($siteFavicon, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+        if ($ext === 'ico') $faviconMime = 'image/x-icon';
+        elseif ($ext === 'png') $faviconMime = 'image/png';
+        elseif ($ext === 'svg') $faviconMime = 'image/svg+xml';
+    }
+    ?>
+    <?php if ($siteFaviconEsc !== ''): ?>
+        <link rel="icon" href="<?= $siteFaviconEsc ?>" <?= $faviconMime !== '' ? ('type="' . htmlspecialchars($faviconMime, ENT_QUOTES, 'UTF-8') . '"') : '' ?>>
+        <link rel="shortcut icon" href="<?= $siteFaviconEsc ?>" <?= $faviconMime !== '' ? ('type="' . htmlspecialchars($faviconMime, ENT_QUOTES, 'UTF-8') . '"') : '' ?>>
+    <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -73,7 +148,15 @@
             font-weight: 600;
             padding: 0.55rem 0.75rem;
             border-radius: 999px;
+            white-space: nowrap;
             transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        @media (min-width: 992px) {
+            .navbar .navbar-nav.mx-auto {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
         }
 
         .navbar .nav-link:hover {
@@ -110,6 +193,24 @@
 
         .navbar .cart-badge {
             background: var(--danger-color) !important;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .navbar .nav-link.position-relative .cart-badge {
+            position: absolute;
+            top: -6px;
+            right: -10px;
+            transform: none;
         }
 
         .site-footer {
@@ -442,14 +543,16 @@
             right: -8px;
             background: var(--danger-color);
             color: white;
-            border-radius: 50%;
-            width: 20px;
+            border-radius: 999px;
+            min-width: 20px;
             height: 20px;
-            display: flex;
+            padding: 0 6px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
         }
         
         .stats-card {
@@ -516,6 +619,7 @@
             border: none;
             color: white;
             font-size: 1.5rem;
+            position: relative;
             box-shadow: 0 5px 20px rgba(37, 99, 235, 0.4);
             transition: background-color 0.2s ease, box-shadow 0.2s ease;
         }
@@ -561,7 +665,8 @@
                 padding-top: var(--navbar-height) !important;
             }
 
-            .navbar .container {
+            .navbar .container,
+            .navbar .container-fluid {
                 padding-left: 12px;
                 padding-right: 12px;
             }
@@ -737,16 +842,17 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container">
+        <div class="container-fluid px-3">
             <?php
             $siteLogo = '';
             try {
-                $pdo = \Config\Database::getConnection();
+                $raw = isset($settings) ? ($settings['site_logo'] ?? '') : '';
                 $raw = '';
                 $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
                 foreach ($tablesToTry as $t) {
                     if ($raw !== '') break;
                     try {
+                        $pdo = \Config\Database::getConnection();
                         $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
                         $stmtT->execute([$t]);
                         if (!$stmtT->fetchColumn()) {
@@ -823,26 +929,36 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mx-auto gap-lg-1">
                     <li class="nav-item">
-                        <a class="nav-link" href="/"><i class="fas fa-home"></i> Início</a>
+                        <a class="nav-link" href="/"><i class="fas fa-home"></i> <?= __('nav.home', 'Início') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> Produtos</a>
+                        <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> <?= __('nav.products', 'Produtos') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> Como Funciona</a>
+                        <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> <?= __('nav.how_it_works', 'Como Funciona') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/faq"><i class="fas fa-comments"></i> FAQ</a>
+                        <a class="nav-link" href="/faq"><i class="fas fa-comments"></i> <?= __('nav.faq', 'FAQ') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> Contato</a>
+                        <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> <?= __('nav.contact', 'Contato') ?></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> Redirecionamento</a>
+                        <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> <?= __('nav.forwarding', 'Redirecionamento') ?></a>
                     </li>
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">
+                    <li class="nav-item dropdown me-3">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-language me-1"></i>
+                            <span><?= __('nav.language', 'Idioma') ?></span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/lang/pt"><span class="me-2">PT</span> <?= __('nav.language_pt', 'Português') ?></a></li>
+                            <li><a class="dropdown-item" href="/lang/en"><span class="me-2">EN</span> <?= __('nav.language_en', 'English') ?></a></li>
+                        </ul>
+                    </li>
                     <!-- Seletor de Moeda -->
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
@@ -851,10 +967,10 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item currency-selector" href="#" data-currency="BRL">
-                                <i class="fas fa-dollar-sign me-2"></i> Real (BRL)
+                                <i class="fas fa-dollar-sign me-2"></i> <?= __('nav.currency_brl', 'Real (BRL)') ?>
                             </a></li>
                             <li><a class="dropdown-item currency-selector" href="#" data-currency="USD">
-                                <i class="fas fa-dollar-sign me-2"></i> Dólar (USD)
+                                <i class="fas fa-dollar-sign me-2"></i> <?= __('nav.currency_usd', 'Dólar (USD)') ?>
                             </a></li>
                         </ul>
                     </li>
@@ -898,7 +1014,25 @@
                         }
                     }
                     $usuarioPerfil = $isLoggedIn ? ($_SESSION['usuario_perfil'] ?? 'cliente') : 'cliente';
-                    $totalItens = isset($_SESSION['carrinho']) ? array_sum(array_column($_SESSION['carrinho'], 'quantidade')) : 0;
+
+                    $totalItens = 0;
+                    if ($isLoggedIn) {
+                        try {
+                            $cModel = new \App\Models\Carrinho();
+                            $cart = $cModel->getOrCreateCarrinho($_SESSION['usuario_id'] ?? 0, null, 'BRL');
+                            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                            if ($cartId > 0) {
+                                $db = $cModel->getConnection();
+                                $st = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                                $st->execute([$cartId]);
+                                $totalItens = (int) ($st->fetchColumn() ?: 0);
+                            }
+                        } catch (\Throwable $e) {
+                            $totalItens = 0;
+                        }
+                    } else {
+                        $totalItens = isset($_SESSION['carrinho']) ? array_sum(array_column($_SESSION['carrinho'], 'quantidade')) : 0;
+                    }
                     ?>
                     
                     <?php if ($isLoggedIn): ?>
@@ -915,32 +1049,27 @@
                                 <span class="d-none d-md-inline"><?= htmlspecialchars($usuarioLogado) ?></span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> Minha Conta</a></li>
+                                <li><a class="dropdown-item" href="/minha-conta"><i class="fas fa-tachometer-alt"></i> <?= __('nav.my_account', 'Minha Conta') ?></a></li>
                                 <?php if ($usuarioPerfil === 'representante'): ?>
-                                    <li><a class="dropdown-item" href="/meu-painel"><i class="fas fa-chart-line"></i> Meu Painel</a></li>
+                                    <li><a class="dropdown-item" href="/meu-painel"><i class="fas fa-chart-line"></i> <?= __('nav.my_panel', 'Meu Painel') ?></a></li>
                                 <?php endif; ?>
-                                <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> Meus Pedidos</a></li>
-                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> Meus Dados</a></li>
-                                <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)): ?>
+                                <li><a class="dropdown-item" href="/meus-pedidos"><i class="fas fa-shopping-bag"></i> <?= __('nav.my_orders', 'Meus Pedidos') ?></a></li>
+                                <li><a class="dropdown-item" href="/meus-dados"><i class="fas fa-user"></i> <?= __('nav.my_data', 'Meus Dados') ?></a></li>
+                                <?php if (in_array($usuarioPerfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true)): ?>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-primary" href="/admin/dashboard"><i class="fas fa-cog"></i> Painel Admin</a></li>
+                                    <li><a class="dropdown-item text-primary" href="<?= ($usuarioPerfil === 'conferente') ? '/admin/remessa-wp' : '/admin/dashboard' ?>"><i class="fas fa-cog"></i> <?= __('nav.admin_panel', 'Painel Admin') ?></a></li>
                                 <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
+                                <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt"></i> <?= __('nav.logout', 'Sair') ?></a></li>
                             </ul>
                         </li>
                     <?php else: ?>
                         <!-- Botões Login/Cadastro -->
                         <li class="nav-item">
-                            <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Entrar</a>
+                            <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> <?= __('nav.login', 'Entrar') ?></a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-primary btn-sm ms-2" href="/register">Cadastrar</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="btn btn-outline-danger btn-sm ms-2" href="/loginadmin">
-                                <i class="fas fa-user-shield"></i> Admin
-                            </a>
+                            <a class="btn btn-primary btn-sm ms-2" href="/register"><?= __('nav.register', 'Cadastrar') ?></a>
                         </li>
                     <?php endif; ?>
                     
@@ -1065,7 +1194,7 @@
                             Braziliana
                         <?php endif; ?>
                     </h5>
-                    <p class="text-muted">Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.</p>
+                    <p class="text-muted"><?= __('footer.tagline', 'Sua plataforma confiável para importação de produtos dos EUA com logística completa e transparente.') ?></p>
                     <div class="mt-3">
                         <a href="#" class="social-link me-2"><i class="fab fa-facebook"></i></a>
                         <a href="#" class="social-link me-2"><i class="fab fa-instagram"></i></a>
@@ -1075,22 +1204,22 @@
                 </div>
                 
                 <div class="col-lg-2 mb-4">
-                    <h6 class="mb-3">Links Úteis</h6>
+                    <h6 class="mb-3"><?= __('footer.useful_links', 'Links Úteis') ?></h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/" class="footer-link">Início</a></li>
-                        <li class="mb-2"><a href="/produtos" class="footer-link">Produtos</a></li>
-                        <li class="mb-2"><a href="/como-funciona" class="footer-link">Como Funciona</a></li>
+                        <li class="mb-2"><a href="/" class="footer-link"><?= __('nav.home', 'Início') ?></a></li>
+                        <li class="mb-2"><a href="/produtos" class="footer-link"><?= __('nav.products', 'Produtos') ?></a></li>
+                        <li class="mb-2"><a href="/como-funciona" class="footer-link"><?= __('nav.how_it_works', 'Como Funciona') ?></a></li>
                         <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                     </ul>
                 </div>
                 
                 <div class="col-lg-3 mb-4">
-                    <h6 class="mb-3">Atendimento</h6>
+                    <h6 class="mb-3"><?= __('footer.support', 'Atendimento') ?></h6>
                     <ul class="list-unstyled">
-                        <li class="mb-2"><a href="/contato" class="footer-link">Contato</a></li>
-                        <li class="mb-2"><a href="/suporte" class="footer-link">Suporte</a></li>
-                        <li class="mb-2"><a href="/rastreamento" class="footer-link">Rastrear Pedido</a></li>
-                        <li class="mb-2"><a href="/politicas" class="footer-link">Políticas</a></li>
+                        <li class="mb-2"><a href="/contato" class="footer-link"><?= __('nav.contact', 'Contato') ?></a></li>
+                        <li class="mb-2"><a href="/suporte" class="footer-link"><?= __('footer.support_page', 'Suporte') ?></a></li>
+                        <li class="mb-2"><a href="/rastreamento" class="footer-link"><?= __('footer.track_order', 'Rastrear Pedido') ?></a></li>
+                        <li class="mb-2"><a href="/politicas" class="footer-link"><?= __('footer.policies', 'Políticas') ?></a></li>
                     </ul>
                 </div>
                 
@@ -1358,6 +1487,42 @@
         console.log('jQuery carregado:', typeof $ !== 'undefined');
         console.log('Swal carregado:', typeof Swal !== 'undefined');
         console.log('CurrencyConverter carregado:', typeof window.CurrencyConverter !== 'undefined');
+    </script>
+
+    <script>
+        window.updateCartBadge = function(totalItens) {
+            try {
+                const n = Number(totalItens || 0);
+
+                const ensureBadge = function(parent) {
+                    if (!parent) return null;
+                    let badge = parent.querySelector('.cart-badge');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'cart-badge';
+                        parent.appendChild(badge);
+                    }
+                    return badge;
+                };
+
+                const navLink = document.querySelector('a.nav-link.position-relative[href="/carrinho"]');
+                const navBadge = ensureBadge(navLink);
+
+                const floatBtn = document.querySelector('.floating-cart button');
+                const floatBadge = ensureBadge(floatBtn);
+
+                [navBadge, floatBadge].forEach(function(b) {
+                    if (!b) return;
+                    if (n > 0) {
+                        b.textContent = String(n);
+                        b.style.display = 'inline-flex';
+                    } else {
+                        b.style.display = 'none';
+                    }
+                });
+            } catch (e) {
+            }
+        };
     </script>
     
     <!-- Incluir Mini Carrinho DEPOIS dos scripts principais -->

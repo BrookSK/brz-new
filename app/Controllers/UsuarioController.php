@@ -4,9 +4,12 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 use App\Services\PaymentService;
+use App\Services\CpfValidator;
 use App\Services\PdfPedidoService;
+use App\Services\WordPressDbService;
 use App\Models\Usuario;
 use App\Models\PedidoEcommerce;
+use App\Models\Endereco;
 use App\Models\Carrinho;
 use App\Models\AssessoriaOrcamento;
 
@@ -625,13 +628,17 @@ class UsuarioController extends Controller {
         
         if ($request->getMethod() === 'POST') {
             $dados = $request->getParams();
-            
-            $erros = $this->validarDadosPessoais($dados);
+
+            $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+            $usuarioAtual = $usuarioId > 0 ? $this->usuarioModel->find($usuarioId) : null;
+
+            $cpfWarning = false;
+            $erros = $this->validarDadosPessoais($dados, $usuarioAtual, $cpfWarning);
             
             if (empty($erros)) {
                 try {
                     // Obter usuário logado
-                    $usuarioId = $this->authService->getUsuarioLogado()['id'];
+                    $usuarioId = $usuarioId ?: (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
                     
                     // Verificar estrutura da tabela antes de atualizar
                     $this->verificarEstruturaTabela();
@@ -674,6 +681,16 @@ class UsuarioController extends Controller {
                     // Atualizar dados do usuário
                     $this->usuarioModel->update($usuarioId, $dadosAtualizacao);
 
+                    // Se veio do fluxo de recadastro, marcar como concluído
+                    try {
+                        $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                        $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                        if (is_array($cols) && in_array('precisa_recadastro', $cols, true)) {
+                            $this->usuarioModel->update($usuarioId, ['precisa_recadastro' => 0]);
+                        }
+                    } catch (\Exception $e) {
+                    }
+
                     // Salvar Endereço de Entrega (único/principal) na tabela enderecos
                     $this->salvarEnderecoEntrega((int) $usuarioId, $dados);
                     
@@ -691,9 +708,14 @@ class UsuarioController extends Controller {
                         error_log('Erro ao registrar log de auditoria: ' . $e->getMessage());
                         // Continuar mesmo se o log falhar
                     }
-                    
-                    $_SESSION['message'] = 'Dados atualizados com sucesso!';
-                    $_SESSION['message_type'] = 'success';
+
+                    if ($cpfWarning) {
+                        $_SESSION['message'] = 'Dados atualizados, mas seu CPF está inválido. Atualize para continuar comprando.';
+                        $_SESSION['message_type'] = 'warning';
+                    } else {
+                        $_SESSION['message'] = 'Dados atualizados com sucesso!';
+                        $_SESSION['message_type'] = 'success';
+                    }
                     
                 } catch (\Exception $e) {
                     $_SESSION['message'] = 'Erro ao atualizar dados: ' . $e->getMessage();
@@ -704,11 +726,61 @@ class UsuarioController extends Controller {
                 $this->redirect('/meus-dados');
                 return;
             }
+
+            $_SESSION['message'] = implode('<br>', array_map(static function($e) {
+                return htmlspecialchars((string) $e, ENT_QUOTES, 'UTF-8');
+            }, $erros));
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
         }
         
         // Obter dados completos do usuário
         $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
         $usuario = $this->usuarioModel->find($usuarioId);
+
+        $suitesAntigas = [];
+        try {
+            $email = strtolower(trim((string) ($usuario['email'] ?? '')));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $wpDb = new WordPressDbService();
+                foreach (['br' => 'Suíte BR', 'us' => 'Suíte US', 'red' => 'Suíte Redirecionamento'] as $src => $label) {
+                    try {
+                        $u = $wpDb->findUserByEmail($email, $src);
+                        if ($u) {
+                            $meta = [];
+                            try {
+                                $meta = $wpDb->getUserMeta((int) ($u['id'] ?? 0), $src, ['suite', 'switch']);
+                            } catch (\Exception $e) {
+                                $meta = [];
+                            }
+
+                            $suiteNumero = null;
+                            foreach (['suite', 'switch'] as $mk) {
+                                if (isset($meta[$mk])) {
+                                    $v = trim((string) $meta[$mk]);
+                                    if ($v !== '' && is_numeric($v)) {
+                                        $suiteNumero = (int) $v;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            $suitesAntigas[] = [
+                                'source' => $src,
+                                'label' => $label,
+                                'id' => (int) ($u['id'] ?? 0),
+                                'email' => (string) ($u['email'] ?? ''),
+                                'suite' => $suiteNumero,
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $suitesAntigas = [];
+        }
 
         $enderecoEntrega = null;
         try {
@@ -722,7 +794,8 @@ class UsuarioController extends Controller {
         
         $this->view('usuario/meus-dados', [
             'usuario' => $usuario,
-            'enderecoEntrega' => $enderecoEntrega
+            'enderecoEntrega' => $enderecoEntrega,
+            'suitesAntigas' => $suitesAntigas,
         ]);
     }
 
@@ -1065,7 +1138,13 @@ class UsuarioController extends Controller {
     public function avatarUpload(Request $request) {
         $this->authService->requerAutenticacao();
 
-        $usuarioId = $this->authService->getUsuarioLogado()['id'];
+        $usuarioId = (int) ($this->authService->getUsuarioLogado()['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $_SESSION['message'] = 'Usuário inválido.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
 
         if (!isset($_FILES['avatar']) || empty($_FILES['avatar']['tmp_name'])) {
             $_SESSION['message'] = 'Selecione uma foto para enviar.';
@@ -1106,6 +1185,14 @@ class UsuarioController extends Controller {
             return;
         }
 
+        $imgInfo = @getimagesize($file['tmp_name']);
+        if ($imgInfo === false || empty($imgInfo[0]) || empty($imgInfo[1])) {
+            $_SESSION['message'] = 'Arquivo inválido. Envie uma imagem válida.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-dados');
+            return;
+        }
+
         $uploadsDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'avatars';
         if (!is_dir($uploadsDir)) {
             @mkdir($uploadsDir, 0775, true);
@@ -1119,7 +1206,7 @@ class UsuarioController extends Controller {
         }
 
         $ext = $allowed[$mime];
-        $filename = 'u' . (int)$usuarioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $filename = 'u' . (int) $usuarioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
         $destPath = $uploadsDir . DIRECTORY_SEPARATOR . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $destPath)) {
@@ -1344,36 +1431,54 @@ class UsuarioController extends Controller {
         }
         
         $dadosAtualizacao = [];
-        
-        // Mapeamento de campos do formulário para colunas do banco
+
+        // Mapeamento flexível (compatibilidade com diferentes schemas)
         $mapeamento = [
-            'nome' => 'nome',
-            'email' => 'email',
-            'telefone' => 'telefone',
-            'documento' => 'documento',
-            'cep' => 'cep',
-            'endereco' => 'endereco',
-            'numero' => 'numero',
-            'complemento' => 'complemento',
-            'bairro' => 'bairro',
-            'cidade' => 'cidade',
-            'estado' => 'estado',
-            'data_nascimento' => 'data_nascimento',
-            'pais_residencia' => 'pais_residencia',
-            'notificacoes_email' => 'notificacoes_email',
-            'notificacoes_sms' => 'notificacoes_sms',
-            'idioma' => 'idioma'
+            'nome' => ['nome', 'name'],
+            'email' => ['email'],
+            'telefone' => ['telefone', 'phone'],
+            'documento' => ['documento', 'cpf'],
+            'cep' => ['cep', 'zip_code'],
+            'endereco' => ['endereco', 'address'],
+            'numero' => ['numero', 'number'],
+            'complemento' => ['complemento'],
+            'bairro' => ['bairro', 'neighborhood'],
+            'cidade' => ['cidade', 'city'],
+            'estado' => ['estado', 'state'],
+            'data_nascimento' => ['data_nascimento', 'birth_date'],
+            'pais_residencia' => ['pais_residencia', 'country_of_residence'],
+            'notificacoes_email' => ['notificacoes_email'],
+            'notificacoes_sms' => ['notificacoes_sms'],
+            'idioma' => ['idioma']
         ];
-        
-        // Adicionar apenas campos que existem na tabela
-        foreach ($mapeamento as $campoForm => $colunaBanco) {
-            if (in_array($colunaBanco, $colunas)) {
-                if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
-                    $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
-                } else {
-                    $dadosAtualizacao[$colunaBanco] = $dados[$campoForm] ?? '';
+
+        foreach ($mapeamento as $campoForm => $colunasBanco) {
+            $colunaBanco = null;
+            foreach ($colunasBanco as $c) {
+                if (in_array($c, $colunas, true)) {
+                    $colunaBanco = $c;
+                    break;
                 }
             }
+            if ($colunaBanco === null) {
+                continue;
+            }
+
+            if ($colunaBanco === 'notificacoes_email' || $colunaBanco === 'notificacoes_sms') {
+                $dadosAtualizacao[$colunaBanco] = isset($dados[$campoForm]) ? 1 : 0;
+                continue;
+            }
+
+            if (!array_key_exists($campoForm, $dados)) {
+                continue;
+            }
+
+            $val = $dados[$campoForm] ?? null;
+            if ($campoForm === 'documento') {
+                $doc = preg_replace('/\D+/', '', (string) ($val ?? ''));
+                $val = $doc === '' ? null : $doc;
+            }
+            $dadosAtualizacao[$colunaBanco] = $val;
         }
         
         // Adicionar campos obrigatórios se existirem
@@ -1536,11 +1641,18 @@ class UsuarioController extends Controller {
         }
     }
 
-    private function validarDadosPessoais($dados) {
+    private function validarDadosPessoais($dados, $usuarioAtual = null, &$cpfWarning = false) {
         $erros = [];
         
         if (empty($dados['nome'])) {
             $erros[] = 'Nome é obrigatório';
+        } else {
+            $nome = trim((string) $dados['nome']);
+            $parts = preg_split('/\s+/', $nome) ?: [];
+            $parts = array_values(array_filter($parts, static fn($p) => is_string($p) && mb_strlen(trim($p)) >= 2));
+            if (count($parts) < 2) {
+                $erros[] = 'Informe nome e sobrenome';
+            }
         }
         
         if (empty($dados['telefone'])) {
@@ -1549,28 +1661,116 @@ class UsuarioController extends Controller {
 
         if (empty($dados['data_nascimento'])) {
             $erros[] = 'Data de nascimento é obrigatória';
+        } else {
+            $rawBirth = trim((string) ($dados['data_nascimento'] ?? ''));
+            $birth = \DateTime::createFromFormat('Y-m-d', $rawBirth);
+            if (!$birth) {
+                $birth = \DateTime::createFromFormat('d/m/Y', $rawBirth);
+            }
+            if (!$birth) {
+                $erros[] = 'Data de nascimento inválida';
+            } else {
+                $birth->setTime(0, 0, 0);
+                $today = new \DateTime('today');
+                if ($birth > $today) {
+                    $erros[] = 'Data de nascimento não pode ser no futuro';
+                }
+            }
         }
 
         if (empty($dados['pais_residencia'])) {
             $erros[] = 'País de residência é obrigatório';
         }
 
-        $pais = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
-        if ($pais === '') {
-            $pais = 'BR';
+        $paisResidencia = strtoupper(trim((string) ($dados['pais_residencia'] ?? 'BR')));
+        if ($paisResidencia === '') {
+            $paisResidencia = 'BR';
         }
 
-        $doc = preg_replace('/\D+/', '', (string) ($dados['documento'] ?? ''));
-        if ($pais === 'BR') {
+        $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+        if ($paisEntrega === '') {
+            $paisEntrega = 'BR';
+        }
+
+        $doc = CpfValidator::onlyDigits((string) ($dados['documento'] ?? ''));
+        $docAtual = null;
+        if (is_array($usuarioAtual)) {
+            $docAtual = CpfValidator::onlyDigits((string) ($usuarioAtual['documento'] ?? ($usuarioAtual['cpf'] ?? '')));
+            if ($docAtual === '') {
+                $docAtual = null;
+            }
+        }
+
+        $docMudou = false;
+        if ($docAtual === null) {
+            $docMudou = ($doc !== '');
+        } else {
+            $docMudou = ($doc !== $docAtual);
+        }
+
+        if ($paisResidencia === 'BR') {
             if ($doc === '' || strlen($doc) < 11) {
-                $erros[] = 'CPF é obrigatório para residentes no Brasil';
+                if ($docMudou) {
+                    $erros[] = 'CPF é obrigatório para residentes no Brasil';
+                } else {
+                    $cpfWarning = true;
+                }
+            } elseif (strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                if ($docMudou) {
+                    $erros[] = 'CPF inválido';
+                } else {
+                    $cpfWarning = true;
+                }
+            }
+        } else {
+            if ($doc !== '' && strlen($doc) === 11 && !CpfValidator::isValid($doc)) {
+                $erros[] = 'CPF inválido';
+            }
+        }
+
+        // CPF duplicado: só validar quando o usuário está tentando alterar e o CPF é válido
+        $usuarioAtualId = 0;
+        if (is_array($usuarioAtual) && !empty($usuarioAtual['id'])) {
+            $usuarioAtualId = (int) $usuarioAtual['id'];
+        }
+        if (empty($erros) && $docMudou && $doc !== '' && strlen($doc) === 11 && CpfValidator::isValid($doc)) {
+            try {
+                $stmtCols = $this->usuarioModel->getConnection()->query('DESCRIBE usuarios');
+                $colsU = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                $docCol = null;
+                if (is_array($colsU)) {
+                    if (in_array('documento', $colsU, true)) {
+                        $docCol = 'documento';
+                    } elseif (in_array('cpf', $colsU, true)) {
+                        $docCol = 'cpf';
+                    }
+                }
+
+                if ($docCol) {
+                    $sql = 'SELECT id FROM usuarios WHERE ' . $docCol . ' = :doc';
+                    if ($usuarioAtualId > 0) {
+                        $sql .= ' AND id != :id';
+                    }
+                    $sql .= ' LIMIT 1';
+                    $stDup = $this->usuarioModel->getConnection()->prepare($sql);
+                    $stDup->bindValue(':doc', $doc);
+                    if ($usuarioAtualId > 0) {
+                        $stDup->bindValue(':id', $usuarioAtualId, \PDO::PARAM_INT);
+                    }
+                    $stDup->execute();
+                    $dupId = (int) ($stDup->fetchColumn() ?: 0);
+                    if ($dupId > 0) {
+                        $erros[] = 'CPF já cadastrado';
+                    }
+                }
+            } catch (\Exception $e) {
             }
         }
 
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
-        if (empty($dados['numero'])) $erros[] = 'Número é obrigatório';
-        if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if ($paisEntrega === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if ($paisEntrega === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
 
         $estado = '';
@@ -1581,7 +1781,9 @@ class UsuarioController extends Controller {
         } elseif (isset($dados['estado_ui']) && trim((string) $dados['estado_ui']) !== '') {
             $estado = trim((string) $dados['estado_ui']);
         }
-        if ($estado === '') $erros[] = 'Estado é obrigatório';
+        if (($paisEntrega === 'BR' || $paisEntrega === 'US' || $paisEntrega === 'CA') && $estado === '') {
+            $erros[] = 'Estado é obrigatório';
+        }
         
         if (!filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
             $erros[] = 'E-mail inválido';

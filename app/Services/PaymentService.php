@@ -23,6 +23,599 @@ class PaymentService {
     private $appmaxBaseUrl;
     private $appmaxAccessToken;
     private $appmaxAccessTokenExpiresAt;
+    private $mercadoPagoEnabled;
+    private $mercadoPagoAccessToken;
+    private $mercadoPagoSellerAccessToken;
+    
+    private function garantirTabelaPedidoPagamentos(): void {
+        try {
+            $db = \Config\Database::getConnection();
+            $db->exec("CREATE TABLE IF NOT EXISTS `pedido_pagamentos` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `pedido_id` int(11) NOT NULL,
+                `componente` varchar(30) NOT NULL,
+                `gateway` varchar(30) NOT NULL,
+                `metodo` varchar(30) DEFAULT NULL,
+                `moeda` varchar(3) NOT NULL DEFAULT 'BRL',
+                `valor` decimal(12,2) NOT NULL DEFAULT 0.00,
+                `payment_id` varchar(255) DEFAULT NULL,
+                `status` varchar(50) NOT NULL DEFAULT 'pending',
+                `gateway_status` varchar(80) DEFAULT NULL,
+                `invoice_url` text,
+                `bank_slip_url` text,
+                `digitable_line` text,
+                `pix_encoded_image` longtext,
+                `pix_payload` longtext,
+                `metadata` json DEFAULT NULL,
+                `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_pp_pedido` (`pedido_id`),
+                KEY `idx_pp_pedido_comp` (`pedido_id`, `componente`),
+                UNIQUE KEY `uk_pp_gateway_payment_comp` (`gateway`, `payment_id`, `componente`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            // Migração best-effort: versões antigas tinham UNIQUE(gateway,payment_id)
+            // e isso impede múltiplos componentes (ex.: produto+imposto) no mesmo payment_id.
+            try {
+                $db->exec('ALTER TABLE pedido_pagamentos DROP INDEX uk_pp_gateway_payment');
+            } catch (\Exception $e) {
+            }
+            try {
+                $db->exec('ALTER TABLE pedido_pagamentos ADD UNIQUE KEY uk_pp_gateway_payment_comp (gateway, payment_id, componente)');
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+        }
+
+    }
+
+    private function isMercadoPagoEnabled(): bool {
+        $v = strtolower(trim((string) $this->mercadoPagoEnabled));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function mercadoPagoTokenForRequestPath(string $path): string {
+        $path = (string) $path;
+
+        // Marketplace Split: pagamentos do produto (Payments API) devem ser feitos
+        // com o access token do vendedor (OAuth), quando disponível.
+        if (!empty($this->mercadoPagoSellerAccessToken) && substr($path, 0, 12) === '/v1/payments') {
+            return (string) $this->mercadoPagoSellerAccessToken;
+        }
+
+        return (string) $this->mercadoPagoAccessToken;
+    }
+
+    private function mercadoPagoRequest(string $method, string $path, ?array $body = null, array $extraHeaders = []): array {
+        if (!$this->isMercadoPagoEnabled()) {
+            throw new \Exception('Mercado Pago está desativado');
+        }
+        $token = $this->mercadoPagoTokenForRequestPath($path);
+        if (empty($token)) {
+            throw new \Exception('Mercado Pago não configurado (access token ausente)');
+        }
+
+        $url = 'https://api.mercadopago.com' . $path;
+        $headers = [
+            'Authorization: Bearer ' . (string) $token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        if (!empty($extraHeaders)) {
+            foreach ($extraHeaders as $h) {
+                if (!is_string($h)) {
+                    continue;
+                }
+                $h = trim($h);
+                if ($h === '') {
+                    continue;
+                }
+                $headers[] = $h;
+            }
+        }
+        $payload = $body !== null ? json_encode($body) : null;
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com Mercado Pago: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro Mercado Pago HTTP ' . $httpCode . ': ' . $msg);
+            }
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload ?? '',
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function createMercadoPagoPixPaymentProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], float $applicationFeeBrl = 0.0): array {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if (!$this->isMercadoPagoEnabled()) {
+            return ['success' => false, 'error' => 'Mercado Pago está desabilitado.'];
+        }
+        if (empty($this->mercadoPagoAccessToken)) {
+            return ['success' => false, 'error' => 'Mercado Pago não configurado (access token ausente).'];
+        }
+        $valorBrl = (float) $valorBrl;
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+
+        $applicationFeeBrl = (float) $applicationFeeBrl;
+        if ($applicationFeeBrl < 0) {
+            $applicationFeeBrl = 0.0;
+        }
+
+        $base = Url::base();
+        $notificationUrl = rtrim($base, '/') . '/webhook/mercadopago';
+
+        $payerEmail = '';
+        if (!empty($payer['email']) && is_string($payer['email'])) {
+            $payerEmail = trim((string) $payer['email']);
+        }
+        if ($payerEmail === '') {
+            // Mercado Pago normalmente exige payer.email
+            $payerEmail = 'cliente@brazilianashop.com';
+        }
+
+        $payload = [
+            'transaction_amount' => (float) $valorBrl,
+            'description' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produto)'),
+            'payment_method_id' => 'pix',
+            'external_reference' => (string) $pedidoId,
+            'notification_url' => $notificationUrl,
+            'payer' => [
+                'email' => $payerEmail,
+            ],
+        ];
+
+        try {
+            $idemKey = substr(hash('sha256', 'pix-produto|' . (string) $pedidoId . '|' . (string) round($valorBrl, 2) . '|' . (string) $descricao), 0, 32);
+            $resp = $this->mercadoPagoRequest('POST', '/v1/payments', $payload, ['X-Idempotency-Key: ' . $idemKey]);
+            $paymentId = (string) ($resp['id'] ?? '');
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Mercado Pago: resposta inválida ao criar pagamento PIX.'];
+            }
+
+            $qrPayload = (string) ($resp['point_of_interaction']['transaction_data']['qr_code'] ?? '');
+            $qrBase64 = (string) ($resp['point_of_interaction']['transaction_data']['qr_code_base64'] ?? '');
+
+            // Persistir registro split como pending
+            $this->upsertPedidoPagamento([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'mercadopago',
+                'metodo' => 'pix',
+                'moeda' => 'BRL',
+                'valor' => (float) $valorBrl,
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'pix_encoded_image' => $qrBase64,
+                'pix_payload' => $qrPayload,
+                'metadata' => json_encode(['raw' => $resp, 'application_fee' => $applicationFeeBrl], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            if ($applicationFeeBrl > 0) {
+                $this->upsertPedidoPagamento([
+                    'pedido_id' => $pedidoId,
+                    'componente' => 'imposto',
+                    'gateway' => 'mercadopago',
+                    'metodo' => 'pix',
+                    'moeda' => 'BRL',
+                    'valor' => (float) $applicationFeeBrl,
+                    'payment_id' => $paymentId,
+                    'status' => 'pending',
+                    'gateway_status' => 'APPLICATION_FEE',
+                    'metadata' => json_encode(['raw' => $resp, 'application_fee' => $applicationFeeBrl], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'pix' => [
+                    'encodedImage' => $qrBase64,
+                    'payload' => $qrPayload,
+                ],
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function createMercadoPagoCheckoutPreferenceProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], ?string $successUrl = null, ?string $failureUrl = null, ?string $pendingUrl = null): array {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if (!$this->isMercadoPagoEnabled()) {
+            return ['success' => false, 'error' => 'Mercado Pago está desabilitado.'];
+        }
+        if (empty($this->mercadoPagoAccessToken)) {
+            return ['success' => false, 'error' => 'Mercado Pago não configurado (access token ausente).'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+
+        $base = Url::base();
+        if ($successUrl === null || trim((string) $successUrl) === '') {
+            $successUrl = rtrim($base, '/') . '/pedido/detalhes/' . $pedidoId . '?mp=success';
+        }
+        if ($failureUrl === null || trim((string) $failureUrl) === '') {
+            $failureUrl = rtrim($base, '/') . '/pedido/detalhes/' . $pedidoId . '?mp=failure';
+        }
+        if ($pendingUrl === null || trim((string) $pendingUrl) === '') {
+            $pendingUrl = rtrim($base, '/') . '/pedido/detalhes/' . $pedidoId . '?mp=pending';
+        }
+
+        $notificationUrl = rtrim($base, '/') . '/webhook/mercadopago';
+
+        $payload = [
+            'items' => [
+                [
+                    'title' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produto)'),
+                    'quantity' => 1,
+                    'currency_id' => 'BRL',
+                    'unit_price' => (float) $valorBrl,
+                ]
+            ],
+            'external_reference' => (string) $pedidoId,
+            'notification_url' => $notificationUrl,
+            'back_urls' => [
+                'success' => $successUrl,
+                'failure' => $failureUrl,
+                'pending' => $pendingUrl,
+            ],
+            'auto_return' => 'approved',
+        ];
+
+        if (!empty($payer)) {
+            $payload['payer'] = $payer;
+        }
+
+        try {
+            $pref = $this->mercadoPagoRequest('POST', '/checkout/preferences', $payload);
+            $prefId = (string) ($pref['id'] ?? '');
+            $initPoint = (string) ($pref['init_point'] ?? ($pref['sandbox_init_point'] ?? ''));
+            if ($prefId === '' || $initPoint === '') {
+                return ['success' => false, 'error' => 'Mercado Pago: resposta inválida ao criar preferência.'];
+            }
+
+            // Persistir registro split como pending (payment_id real virá no webhook)
+            $this->upsertPedidoPagamento([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'mercadopago',
+                'metodo' => 'checkout_pro',
+                'moeda' => 'BRL',
+                'valor' => (float) $valorBrl,
+                'status' => 'pending',
+                'invoice_url' => $initPoint,
+                'metadata' => json_encode(['preference_id' => $prefId], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'preference_id' => $prefId,
+                'init_point' => $initPoint,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function processarWebhookMercadoPago(array $payload): array {
+        // Mercado Pago envia notificações em formatos diferentes.
+        // Preferimos buscar o payment_id e consultar /v1/payments/{id}.
+        $paymentId = '';
+        if (isset($payload['data']['id']) && (is_string($payload['data']['id']) || is_numeric($payload['data']['id']))) {
+            $paymentId = (string) $payload['data']['id'];
+        } elseif (isset($payload['id']) && (is_string($payload['id']) || is_numeric($payload['id']))) {
+            $paymentId = (string) $payload['id'];
+        }
+        $paymentId = trim($paymentId);
+        if ($paymentId === '') {
+            return ['status' => 'ignored'];
+        }
+
+        $pay = $this->mercadoPagoRequest('GET', '/v1/payments/' . rawurlencode($paymentId), null);
+        $status = strtolower(trim((string) ($pay['status'] ?? '')));
+        $statusDetail = strtoupper(trim((string) ($pay['status_detail'] ?? '')));
+        $externalRef = trim((string) ($pay['external_reference'] ?? ''));
+
+        $internal = 'pending';
+        if ($status === 'approved') {
+            $internal = 'approved';
+        } elseif (in_array($status, ['rejected', 'cancelled', 'canceled'], true)) {
+            $internal = 'rejected';
+        } elseif (in_array($status, ['refunded', 'charged_back'], true)) {
+            $internal = 'refunded';
+        }
+
+        $pedidoId = (ctype_digit($externalRef) ? (int) $externalRef : 0);
+        if ($pedidoId > 0) {
+            // Atualiza todos os componentes vinculados a esse payment_id (produto e, se existir, imposto)
+            $this->atualizarSplitPorGatewayPaymentId($paymentId, 'mercadopago', $internal, $statusDetail !== '' ? $statusDetail : strtoupper($status));
+
+            // Se ainda não existe registro, criar pelo menos o componente produto.
+            $this->upsertPedidoPagamento([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'mercadopago',
+                'metodo' => 'checkout_pro',
+                'moeda' => 'BRL',
+                'valor' => (float) ($pay['transaction_amount'] ?? 0),
+                'payment_id' => $paymentId,
+                'status' => $internal,
+                'gateway_status' => ($statusDetail !== '' ? $statusDetail : strtoupper($status)),
+                'metadata' => json_encode(['raw' => $pay], JSON_UNESCAPED_UNICODE),
+            ]);
+        }
+
+        // Também tenta atualizar via (gateway,payment_id) caso já exista registro
+        $this->atualizarSplitPorGatewayPaymentId($paymentId, 'mercadopago', $internal, $statusDetail !== '' ? $statusDetail : strtoupper($status));
+
+        return ['status' => 'processed', 'payment_id' => $paymentId, 'pedido_id' => $pedidoId, 'payment_status' => $internal];
+    }
+
+    private function upsertPedidoPagamento(array $row): void {
+        try {
+            $pedidoId = (int) ($row['pedido_id'] ?? 0);
+            $componente = strtolower(trim((string) ($row['componente'] ?? '')));
+            $gateway = strtolower(trim((string) ($row['gateway'] ?? '')));
+            if ($pedidoId <= 0 || $componente === '' || $gateway === '') {
+                return;
+            }
+            $this->garantirTabelaPedidoPagamentos();
+            $db = \Config\Database::getConnection();
+
+            $cols = [];
+            try {
+                $st = $db->query('DESCRIBE pedido_pagamentos');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            if (empty($cols)) {
+                return;
+            }
+
+            $allowed = [
+                'pedido_id','componente','gateway','metodo','moeda','valor','payment_id','status','gateway_status',
+                'invoice_url','bank_slip_url','digitable_line','pix_encoded_image','pix_payload','metadata'
+            ];
+
+            $data = [];
+            foreach ($allowed as $k) {
+                if (in_array($k, $cols, true) && array_key_exists($k, $row)) {
+                    $data[$k] = $row[$k];
+                }
+            }
+            $data['pedido_id'] = $pedidoId;
+            $data['componente'] = $componente;
+            $data['gateway'] = $gateway;
+
+            $existingId = 0;
+            try {
+                if (in_array('payment_id', $cols, true) && !empty($data['payment_id'])) {
+                    $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid AND componente = :c LIMIT 1');
+                    $st->execute([':g' => $gateway, ':pid' => (string) $data['payment_id'], ':c' => $componente]);
+                    $existingId = (int) ($st->fetchColumn() ?: 0);
+                }
+                if ($existingId <= 0) {
+                    $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE pedido_id = :p AND componente = :c ORDER BY id DESC LIMIT 1');
+                    $st->execute([':p' => $pedidoId, ':c' => $componente]);
+                    $existingId = (int) ($st->fetchColumn() ?: 0);
+                }
+            } catch (\Exception $e) {
+                $existingId = 0;
+            }
+
+            if ($existingId > 0) {
+                $set = [];
+                $params = [':id' => $existingId];
+                foreach ($data as $k => $v) {
+                    if (in_array($k, ['pedido_id','componente','gateway'], true)) {
+                        continue;
+                    }
+                    $set[] = $k . ' = :' . $k;
+                    $params[':' . $k] = $v;
+                }
+                if (!empty($set)) {
+                    $sql = 'UPDATE pedido_pagamentos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                    $stUp = $db->prepare($sql);
+                    $stUp->execute($params);
+                }
+            } else {
+                $insCols = [];
+                $insVals = [];
+                $params = [];
+                foreach ($data as $k => $v) {
+                    $insCols[] = $k;
+                    $insVals[] = ':' . $k;
+                    $params[':' . $k] = $v;
+                }
+                $sql = 'INSERT INTO pedido_pagamentos (' . implode(', ', $insCols) . ') VALUES (' . implode(', ', $insVals) . ')';
+                $stIns = $db->prepare($sql);
+                $stIns->execute($params);
+            }
+
+            $this->recalcularStatusPagamentoPedidoSplit($pedidoId);
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function registrarPedidoPagamentoSplit(array $row): void {
+        $this->upsertPedidoPagamento($row);
+    }
+
+    private function obterStatusSplitPorPedido(int $pedidoId): array {
+        try {
+            $this->garantirTabelaPedidoPagamentos();
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT componente, status FROM pedido_pagamentos WHERE pedido_id = :p');
+            $st->execute([':p' => $pedidoId]);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $map = [];
+            foreach ($rows as $r) {
+                $c = strtolower(trim((string) ($r['componente'] ?? '')));
+                if ($c === '') continue;
+                $map[$c] = strtolower(trim((string) ($r['status'] ?? 'pending')));
+            }
+            return $map;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function recalcularStatusPagamentoPedidoSplit(int $pedidoId): void {
+        try {
+            $pedidoId = (int) $pedidoId;
+            if ($pedidoId <= 0) return;
+
+            $stMap = $this->obterStatusSplitPorPedido($pedidoId);
+            if (empty($stMap)) {
+                return;
+            }
+
+            $produto = $stMap['produto'] ?? null;
+            $taxa = $stMap['taxa_servico'] ?? ($stMap['taxa'] ?? null);
+            $imposto = $stMap['imposto'] ?? null;
+
+            // Se ainda não temos os dois, não mexer (split incompleto)
+            if ($produto === null || $taxa === null) {
+                return;
+            }
+
+            $produtoOk = ($produto === 'approved');
+            $taxaOk = ($taxa === 'approved');
+            $impostoOk = ($imposto === null ? true : ($imposto === 'approved'));
+            $statusAgregado = ($produtoOk && $taxaOk && $impostoOk) ? 'approved' : 'pending';
+
+            $db = \Config\Database::getConnection();
+            $colsP = [];
+            try {
+                $stColsP = $db->query('DESCRIBE pedidos');
+                $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $colsP = [];
+            }
+            if (empty($colsP)) return;
+
+            $set = [];
+            $params = [':id' => $pedidoId];
+
+            if (in_array('payment_gateway', $colsP, true)) {
+                $set[] = 'payment_gateway = :payment_gateway';
+                $params[':payment_gateway'] = 'split';
+            }
+            if (in_array('payment_status', $colsP, true)) {
+                $set[] = 'payment_status = :payment_status';
+                $params[':payment_status'] = $statusAgregado;
+            }
+
+            if ($statusAgregado === 'approved') {
+                if (in_array('pago_em', $colsP, true)) {
+                    $set[] = 'pago_em = :pago_em';
+                    $params[':pago_em'] = date('Y-m-d H:i:s');
+                }
+                if (in_array('status', $colsP, true)) {
+                    $set[] = 'status = :status';
+                    $params[':status'] = 'pago';
+                }
+            }
+
+            if (!empty($set)) {
+                $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $stUp = $db->prepare($sql);
+                $stUp->execute($params);
+            }
+
+            if ($statusAgregado === 'approved') {
+                // Garante cashback/efeitos apenas quando ambos pagos
+                $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function atualizarSplitPorGatewayPaymentId(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): bool {
+        try {
+            $paymentId = trim((string) $paymentId);
+            $gateway = strtolower(trim((string) $gateway));
+            if ($paymentId === '' || $gateway === '') {
+                return false;
+            }
+
+            $this->garantirTabelaPedidoPagamentos();
+            $db = \Config\Database::getConnection();
+
+            $stFind = $db->prepare('SELECT id, pedido_id FROM pedido_pagamentos WHERE gateway = :g AND payment_id = :pid');
+            $stFind->execute([':g' => $gateway, ':pid' => $paymentId]);
+            $rows = $stFind->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($rows)) {
+                return false;
+            }
+
+            $pedidoId = 0;
+            foreach ($rows as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $pedidoId = (int) ($r['pedido_id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $set = ['status = :st'];
+                $params = [':st' => $paymentStatusInterno, ':id' => $id];
+                if ($gatewayStatus !== '') {
+                    $set[] = 'gateway_status = :gst';
+                    $params[':gst'] = $gatewayStatus;
+                }
+                $sql = 'UPDATE pedido_pagamentos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                $stUp = $db->prepare($sql);
+                $stUp->execute($params);
+            }
+
+            if ($pedidoId > 0) {
+                $this->recalcularStatusPagamentoPedidoSplit($pedidoId);
+            }
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
     
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
@@ -947,7 +1540,9 @@ class PaymentService {
 
             $this->atualizarPagamentoPedidoPorPedidoId((int) $pedidoId, 'carteira', 'refunded', 'refunded');
 
-            $db->commit();
+            if ($db->inTransaction()) {
+                $db->commit();
+            }
             return [
                 'success' => true,
                 'gateway' => 'carteira',
@@ -959,8 +1554,86 @@ class PaymentService {
                 'status' => 'refunded',
             ];
         } catch (\Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function devolverEstoquePorPedido(\PDO $db, int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        try {
+            // Detectar tabela de itens
+            $itensTable = '';
+            foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
+                try {
+                    $st = $db->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+                    $st->execute([$t]);
+                    if ((int) ($st->fetchColumn() ?: 0) > 0) {
+                        $itensTable = $t;
+                        break;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if ($itensTable === '') {
+                return;
+            }
+
+            $itens = [];
+            try {
+                $stItens = $db->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                $stItens->execute([(int) $pedidoId]);
+                $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $itens = [];
+            }
+            if (empty($itens)) {
+                return;
+            }
+
+            // Detectar coluna de estoque em produtos
+            $cols = [];
+            try {
+                $stCols = $db->query('DESCRIBE produtos');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $stockCol = '';
+            if (is_array($cols) && in_array('stock', $cols, true)) {
+                $stockCol = 'stock';
+            } elseif (is_array($cols) && in_array('estoque', $cols, true)) {
+                $stockCol = 'estoque';
+            }
+            if ($stockCol === '') {
+                return;
+            }
+
+            $setUpdatedAt = (is_array($cols) && in_array('updated_at', $cols, true));
+            $sqlUpd = 'UPDATE produtos SET ' . $stockCol . ' = ' . $stockCol . ' + :qtd';
+            if ($setUpdatedAt) {
+                $sqlUpd .= ', updated_at = NOW()';
+            }
+            $sqlUpd .= ' WHERE id = :pid';
+            $stUpd = $db->prepare($sqlUpd);
+            foreach ($itens as $it) {
+                $pid = (int) ($it['produto_id'] ?? 0);
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($pid <= 0 || $qtd <= 0) {
+                    continue;
+                }
+                try {
+                    $stUpd->execute([':qtd' => $qtd, ':pid' => $pid]);
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+            return;
         }
     }
 
@@ -1807,6 +2480,10 @@ class PaymentService {
         $this->appmaxBaseUrl = (string) $this->getConfig('pagamentos', 'appmax_base_url', '');
         $this->appmaxAccessToken = null;
         $this->appmaxAccessTokenExpiresAt = null;
+
+        $this->mercadoPagoEnabled = (string) $this->getConfig('pagamentos', 'mercadopago_enabled', '0');
+        $this->mercadoPagoAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_access_token', '');
+        $this->mercadoPagoSellerAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_seller_access_token', '');
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {
@@ -2064,6 +2741,10 @@ class PaymentService {
     
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
         if ($moeda === 'BRL') {
+            $bt = strtoupper((string) ($dadosPagamento['billingType'] ?? ''));
+            if (in_array($bt, ['PIX', 'BOLETO'], true)) {
+                return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
+            }
             return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
         }
 
@@ -2221,6 +2902,104 @@ class PaymentService {
             return ['status' => 'ignored'];
         }
 
+        // Disputa / Chargeback (Stripe)
+        // Referências comuns:
+        // - charge.dispute.created
+        // - charge.dispute.funds_withdrawn
+        // - charge.dispute.closed
+        // - charge.dispute.funds_reinstated
+        if (str_starts_with($eventType, 'charge.dispute.')) {
+            $disputeStatus = strtolower(trim((string) ($obj['status'] ?? '')));
+            $reason = (string) ($obj['reason'] ?? '');
+
+            // Resolver charge_id, payment_intent e/ou metadata (pedido)
+            $chargeId = trim((string) ($obj['charge'] ?? ($obj['charge_id'] ?? '')));
+            $paymentIntentId = trim((string) ($obj['payment_intent'] ?? ''));
+
+            $internal = 'dispute';
+            if (in_array($disputeStatus, ['lost'], true)) {
+                $internal = 'chargeback';
+            } elseif (in_array($disputeStatus, ['won'], true)) {
+                // disputa encerrada a favor do lojista
+                $internal = 'approved';
+            } elseif (in_array($eventType, ['charge.dispute.funds_withdrawn'], true)) {
+                $internal = 'chargeback';
+            }
+
+            // Tenta localizar e atualizar pedido
+            try {
+                $db = \Config\Database::getConnection();
+                $colsP = [];
+                try {
+                    $stmtColsP = $db->query('DESCRIBE pedidos');
+                    $colsP = $stmtColsP ? ($stmtColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsP = [];
+                }
+
+                $pedidoId = 0;
+                if (is_array($colsP) && in_array('payment_id', $colsP, true) && in_array('payment_gateway', $colsP, true)) {
+                    // Algumas implementações salvam payment_intent em payment_id
+                    if ($paymentIntentId !== '') {
+                        $st = $db->prepare('SELECT id FROM pedidos WHERE payment_gateway = ? AND payment_id = ? LIMIT 1');
+                        $st->execute(['stripe', $paymentIntentId]);
+                        $pedidoId = (int) ($st->fetchColumn() ?: 0);
+                    }
+                }
+
+                // Fallback: tentar na tabela pagamentos por charge_id/payment_intent
+                if ($pedidoId <= 0) {
+                    try {
+                        $stmtColsPg = $db->query('DESCRIBE pagamentos');
+                        $colsPg = $stmtColsPg ? ($stmtColsPg->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        if (is_array($colsPg) && in_array('pedido_id', $colsPg, true)) {
+                            $transacaoCol = null;
+                            foreach (['codigo_transacao', 'transaction_id', 'transacao', 'payment_id', 'charge_id'] as $c) {
+                                if (in_array($c, $colsPg, true)) {
+                                    $transacaoCol = $c;
+                                    break;
+                                }
+                            }
+                            if ($transacaoCol && ($chargeId !== '' || $paymentIntentId !== '')) {
+                                $needle = $paymentIntentId !== '' ? $paymentIntentId : $chargeId;
+                                $st = $db->prepare('SELECT pedido_id FROM pagamentos WHERE ' . $transacaoCol . ' = ? LIMIT 1');
+                                $st->execute([$needle]);
+                                $pedidoId = (int) ($st->fetchColumn() ?: 0);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $pedidoId = 0;
+                    }
+                }
+
+                if ($pedidoId > 0) {
+                    // Atualiza apenas payment_status (e efeitos financeiros quando aplicável)
+                    $gatewayStatus = $disputeStatus !== '' ? strtoupper($disputeStatus) : strtoupper($eventType);
+                    $this->atualizarPagamentoPedidoPorPedidoId((int) $pedidoId, 'stripe', $internal, $gatewayStatus);
+                    return [
+                        'status' => 'processed',
+                        'event' => $eventType,
+                        'internal' => $internal,
+                        'pedido_id' => (int) $pedidoId,
+                        'charge_id' => $chargeId,
+                        'payment_intent' => $paymentIntentId,
+                        'reason' => $reason,
+                    ];
+                }
+            } catch (\Exception $e) {
+                // não falhar webhook
+            }
+
+            return [
+                'status' => 'ignored',
+                'event' => $eventType,
+                'internal' => $internal,
+                'charge_id' => $chargeId,
+                'payment_intent' => $paymentIntentId,
+                'reason' => $reason,
+            ];
+        }
+
         // Webhook via Checkout Session (link hospedado)
         if ($eventType === 'checkout.session.completed') {
             $pi = (string) ($obj['payment_intent'] ?? '');
@@ -2354,12 +3133,18 @@ class PaymentService {
             }
 
             $aprovado = ($paymentStatusInterno === 'approved');
-            if ($aprovado && in_array('pago_em', $colsP, true)) {
+            // Se este pedido usa split (produto + taxa), não marcar como pago aqui.
+            // O status agregado é recalculado a partir da tabela pedido_pagamentos.
+            $splitMap = $this->obterStatusSplitPorPedido((int) $pedidoId);
+            $hasSplit = (!empty($splitMap));
+            $hasSplitBoth = ($hasSplit && (array_key_exists('produto', $splitMap)) && (array_key_exists('taxa_servico', $splitMap) || array_key_exists('taxa', $splitMap)));
+
+            if ($aprovado && !$hasSplitBoth && in_array('pago_em', $colsP, true)) {
                 $set[] = 'pago_em = :pago_em';
                 $params['pago_em'] = date('Y-m-d H:i:s');
             }
 
-            if ($aprovado && in_array('status', $colsP, true)) {
+            if ($aprovado && !$hasSplitBoth && in_array('status', $colsP, true)) {
                 $set[] = 'status = :status';
                 $params['status'] = 'pago';
             }
@@ -2370,13 +3155,25 @@ class PaymentService {
                 $stmtUp->execute($params);
             }
 
-            if ($aprovado) {
+            if ($aprovado && !$hasSplitBoth) {
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
             }
 
             if ($paymentStatusInterno === 'refunded') {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->devolverEstoquePorPedido($db, (int) $pedidoId);
+                try {
+                    $this->pedidoModel->dispararEvento('pagamento_estornado', $pedidoId);
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($paymentStatusInterno === 'rejected') {
+                try {
+                    $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
+                } catch (\Exception $e) {
+                }
             }
 
             try {
@@ -2519,6 +3316,11 @@ class PaymentService {
 
     private function atualizarPagamentoPedidoPorGateway(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
         try {
+            // Primeiro: se existe split payment com este (gateway,payment_id), atualizar split e recalcular.
+            if ($this->atualizarSplitPorGatewayPaymentId($paymentId, $gateway, $paymentStatusInterno, $gatewayStatus)) {
+                return;
+            }
+
             $db = \Config\Database::getConnection();
 
             $colsP = [];
@@ -2697,6 +3499,12 @@ class PaymentService {
             if ($paymentStatusInterno === 'refunded') {
                 $this->debitarCashbackClubePorPedidoEstornado($db, (int) $pedidoId);
                 $this->debitarRendimentoClubePorPedidoEstornado($db, (int) $pedidoId);
+                $this->devolverEstoquePorPedido($db, (int) $pedidoId);
+                $this->pedidoModel->dispararEvento('pagamento_estornado', $pedidoId);
+            }
+
+            if ($paymentStatusInterno === 'rejected') {
+                $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
@@ -3187,8 +3995,24 @@ class PaymentService {
         $paymentId = (string) ($norm['payment_intent_id'] ?? '');
         $source = (string) ($norm['source'] ?? '');
         $session = $norm['session'] ?? null;
+
+        // Fallback: algumas versões da API podem não retornar payment_intent no expand.
+        if ($paymentId === '' && str_starts_with($storedPaymentId, 'cs_')) {
+            try {
+                $s = $this->stripeRequest('GET', '/v1/checkout/sessions/' . rawurlencode($storedPaymentId), null);
+                $pi = (string) ($s['payment_intent']['id'] ?? ($s['payment_intent'] ?? ''));
+                $pi = trim($pi);
+                if ($pi !== '') {
+                    $paymentId = $pi;
+                    $source = 'checkout_session';
+                    $session = is_array($s) ? $s : null;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
         if ($paymentId === '') {
-            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id'];
+            return ['success' => false, 'error' => 'Stripe: não foi possível resolver o payment_intent a partir do payment_id: ' . $storedPaymentId];
         }
         if ($source === 'checkout_session') {
             $this->atualizarPedidoStripeComPaymentIntent($pedidoId, $paymentId, is_array($session) ? $session : null);

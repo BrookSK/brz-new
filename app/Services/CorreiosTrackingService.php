@@ -12,12 +12,35 @@ class CorreiosTrackingService {
         $baseUrl = trim((string) ($config['base_url'] ?? ''));
         $token = trim((string) ($config['token'] ?? ''));
         $headerName = trim((string) ($config['header'] ?? 'Authorization'));
+
+        if ($token === '') {
+            try {
+                $tokSvc = new CorreiosTokenService();
+                $rTok = $tokSvc->getValidTokenFromSigep('tracking');
+                if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                    $token = (string) $rTok['token'];
+                } else {
+                    $refreshErr = (string) ($rTok['error'] ?? 'Falha ao renovar token');
+                    if ($baseUrl === '') {
+                        return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url).'];
+                    }
+                    return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (token vazio). Auto-renovação falhou: ' . $refreshErr];
+                }
+            } catch (\Exception $e) {
+                if ($baseUrl === '') {
+                    return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url).'];
+                }
+                return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (token vazio). Auto-renovação falhou: ' . $e->getMessage()];
+            }
+        }
+
         if ($baseUrl === '' || $token === '') {
             return ['success' => false, 'error' => 'Rastreamento dos Correios não configurado (base_url/token).'];
         }
 
         $url = $this->buildUrl($baseUrl, $codigo);
         $headers = $this->buildHeaders($headerName, $token);
+        $triedUrls = [$url];
 
         $raw = null;
         $httpCode = null;
@@ -33,25 +56,124 @@ class CorreiosTrackingService {
             curl_close($ch);
 
             if ($raw === false || $raw === null) {
-                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode];
+                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode, 'tried_urls' => $triedUrls];
             }
 
             $json = json_decode($raw, true);
             if (!is_array($json)) {
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw];
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw, 'tried_urls' => $triedUrls];
             }
 
             if (is_int($httpCode) && $httpCode >= 400) {
                 $msg = $this->extractErrorMessage($json);
+
+                // Token expirado: tentar renovar automaticamente uma vez
+                if (stripos($msg, 'GTW-007') !== false) {
+                    try {
+                        $tokSvc = new CorreiosTokenService();
+                        $rTok = $tokSvc->getValidTokenFromSigep('tracking');
+                        if (!empty($rTok['success']) && !empty($rTok['token'])) {
+                            $token2 = (string) $rTok['token'];
+                            $headers2 = $this->buildHeaders($headerName, $token2);
+
+                            $ch2 = curl_init($url);
+                            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 15);
+                            curl_setopt($ch2, CURLOPT_TIMEOUT, 30);
+                            curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers2);
+                            $raw2 = curl_exec($ch2);
+                            $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                            $err2 = curl_error($ch2);
+                            curl_close($ch2);
+
+                            if ($raw2 === false || $raw2 === null) {
+                                return ['success' => false, 'error' => 'Falha na requisição: ' . $err2, 'http_code' => $httpCode2];
+                            }
+                            $json2 = json_decode($raw2, true);
+                            if (is_array($json2) && is_int($httpCode2) && $httpCode2 < 400) {
+                                $eventos2 = $this->extractEventos($json2);
+                                return [
+                                    'success' => true,
+                                    'codigo' => $codigo,
+                                    'http_code' => $httpCode2,
+                                    'eventos' => $eventos2,
+                                    'raw' => $json2,
+                                ];
+                            }
+                        }
+                        if (empty($rTok['success'])) {
+                            $refreshErr = (string) ($rTok['error'] ?? 'Falha ao renovar token');
+                            if ($refreshErr !== '') {
+                                $msg = trim($msg) . ' (Auto-renovação falhou: ' . $refreshErr . ')';
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $msg = trim($msg) . ' (Auto-renovação falhou: ' . $e->getMessage() . ')';
+                    }
+                }
+
                 return [
                     'success' => false,
                     'error' => $msg !== '' ? $msg : ('Erro HTTP ' . $httpCode . ' ao consultar rastreamento.'),
                     'http_code' => $httpCode,
                     'raw' => $json,
+                    'tried_urls' => $triedUrls,
                 ];
             }
 
+            $mensagemObjeto = '';
+            if (isset($json['objetos'][0]['mensagem']) && is_string($json['objetos'][0]['mensagem'])) {
+                $mensagemObjeto = trim($json['objetos'][0]['mensagem']);
+            }
+            if ($mensagemObjeto !== '') {
+                if (stripos($mensagemObjeto, 'SRO-009') !== false) {
+                    return [
+                        'success' => false,
+                        'error' => 'No momento, os Correios não permitem que a Braziliana consulte o rastreio deste código por aqui. Para acompanhar, consulte o site ou app dos Correios com este mesmo código. Se este envio for de um pedido da Braziliana, fale com nosso suporte.',
+                        'http_code' => $httpCode,
+                        'raw' => $json,
+                        'tried_urls' => $triedUrls,
+                    ];
+                }
+            }
+
             $eventos = $this->extractEventos($json);
+
+            // Fallback: algumas instalações ficam com sigep_ambiente=homologacao e consultam
+            // apihom.correios.com.br; para códigos reais, isso costuma retornar vazio.
+            // Se não vier nenhum evento, tenta uma vez no host de produção.
+            if (empty($eventos) && is_string($url) && strpos($url, 'apihom.correios.com.br') !== false) {
+                $urlProd = str_replace('https://apihom.correios.com.br', 'https://api.correios.com.br', $url);
+                $triedUrls[] = $urlProd;
+                try {
+                    $chP = curl_init($urlProd);
+                    curl_setopt($chP, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chP, CURLOPT_CONNECTTIMEOUT, 15);
+                    curl_setopt($chP, CURLOPT_TIMEOUT, 30);
+                    curl_setopt($chP, CURLOPT_HTTPHEADER, $headers);
+                    $rawP = curl_exec($chP);
+                    $httpCodeP = curl_getinfo($chP, CURLINFO_HTTP_CODE);
+                    curl_close($chP);
+
+                    if ($rawP !== false && $rawP !== null) {
+                        $jsonP = json_decode($rawP, true);
+                        if (is_array($jsonP) && is_int($httpCodeP) && $httpCodeP < 400) {
+                            $eventosP = $this->extractEventos($jsonP);
+                            if (!empty($eventosP)) {
+                                return [
+                                    'success' => true,
+                                    'codigo' => $codigo,
+                                    'http_code' => $httpCodeP,
+                                    'eventos' => $eventosP,
+                                    'raw' => $jsonP,
+                                    'tried_urls' => $triedUrls,
+                                ];
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
 
             return [
                 'success' => true,
@@ -59,9 +181,10 @@ class CorreiosTrackingService {
                 'http_code' => $httpCode,
                 'eventos' => $eventos,
                 'raw' => $json,
+                'tried_urls' => $triedUrls,
             ];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw];
+            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw, 'tried_urls' => $triedUrls ?? []];
         }
     }
 
@@ -112,6 +235,8 @@ class CorreiosTrackingService {
             $candidates = $json['eventos'];
         } elseif (isset($json['objetos'][0]['eventos']) && is_array($json['objetos'][0]['eventos'])) {
             $candidates = $json['objetos'][0]['eventos'];
+        } elseif (isset($json['objeto']['eventos']) && is_array($json['objeto']['eventos'])) {
+            $candidates = $json['objeto']['eventos'];
         } elseif (isset($json['packages'][0]['events']) && is_array($json['packages'][0]['events'])) {
             $candidates = $json['packages'][0]['events'];
         } elseif (isset($json['package']['events']) && is_array($json['package']['events'])) {
@@ -124,23 +249,55 @@ class CorreiosTrackingService {
         foreach ($candidates as $ev) {
             if (!is_array($ev)) continue;
 
-            $etapa = (string) ($ev['status'] ?? ($ev['descricao'] ?? ($ev['evento'] ?? ($ev['eventType'] ?? ($ev['eventDescription'] ?? '')))));
-            $descricao = (string) ($ev['descricao'] ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? ($ev['eventDescription'] ?? $etapa))));
+            $etapa = (string) (
+                $ev['status']
+                ?? ($ev['descricao'] ?? ($ev['evento'] ?? ($ev['eventType'] ?? ($ev['eventDescription'] ?? ($ev['descricaoEvento'] ?? '')))))
+            );
+            $descricao = (string) (
+                $ev['descricao']
+                ?? ($ev['detalhe'] ?? ($ev['mensagem'] ?? ($ev['eventDescription'] ?? ($ev['descricaoEvento'] ?? $etapa))))
+            );
 
             $local = '';
-            if (isset($ev['unidade']['nome'])) {
-                $local = (string) $ev['unidade']['nome'];
-            } elseif (isset($ev['eventLocation'])) {
-                $local = (string) $ev['eventLocation'];
-            } elseif (isset($ev['location'])) {
-                $local = (string) $ev['location'];
-            } elseif (isset($ev['local'])) {
-                $local = (string) $ev['local'];
+            // SRO Rastro v3 costuma trazer unidade.{nome,endereco.{cidade,uf}}
+            if (isset($ev['unidade']) && is_array($ev['unidade'])) {
+                $nomeUn = isset($ev['unidade']['nome']) ? (string) $ev['unidade']['nome'] : '';
+                $cidadeUf = '';
+                if (isset($ev['unidade']['endereco']) && is_array($ev['unidade']['endereco'])) {
+                    $cid = (string) ($ev['unidade']['endereco']['cidade'] ?? '');
+                    $uf = (string) ($ev['unidade']['endereco']['uf'] ?? '');
+                    if ($cid !== '' && $uf !== '') {
+                        $cidadeUf = $cid . '/' . $uf;
+                    } elseif ($cid !== '') {
+                        $cidadeUf = $cid;
+                    } elseif ($uf !== '') {
+                        $cidadeUf = $uf;
+                    }
+                }
+
+                $local = trim($nomeUn);
+                if ($cidadeUf !== '') {
+                    $local = trim($local . ' - ' . $cidadeUf);
+                }
+            }
+
+            if ($local === '') {
+                if (isset($ev['eventLocation'])) {
+                    $local = (string) $ev['eventLocation'];
+                } elseif (isset($ev['location'])) {
+                    $local = (string) $ev['location'];
+                } elseif (isset($ev['local'])) {
+                    $local = (string) $ev['local'];
+                }
             }
 
             $dataHora = '';
             if (!empty($ev['dataHora'])) {
                 $dataHora = (string) $ev['dataHora'];
+            } elseif (!empty($ev['dtHrCriado'])) {
+                $dataHora = (string) $ev['dtHrCriado'];
+            } elseif (!empty($ev['dtHr'])) {
+                $dataHora = (string) $ev['dtHr'];
             } elseif (!empty($ev['eventDate']) && !empty($ev['eventTime'])) {
                 $dataHora = (string) ($ev['eventDate'] . ' ' . $ev['eventTime']);
             } elseif (!empty($ev['eventDateTime'])) {

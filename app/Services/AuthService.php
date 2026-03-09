@@ -42,25 +42,32 @@ class AuthService {
                 if ($qtd < 1) $qtd = 1;
 
                 $pvId = null;
-                if (isset($it['produto_variacao_id']) && $it['produto_variacao_id'] !== '' && $it['produto_variacao_id'] !== null) {
-                    $tmp = (int) $it['produto_variacao_id'];
-                    if ($tmp > 0) $pvId = $tmp;
-                } else {
-                    // tentativa de extrair da key "produtoId:variacaoId"
-                    if (is_string($k) && strpos($k, ':') !== false) {
-                        $parts = explode(':', $k);
-                        if (count($parts) >= 2) {
-                            $tmp = (int) ($parts[1] ?? 0);
-                            if ($tmp > 0) $pvId = $tmp;
-                        }
+                if (isset($it['produto_variacao_id']) && $it['produto_variacao_id'] !== null && $it['produto_variacao_id'] !== '') {
+                    $tmpPv = (int) $it['produto_variacao_id'];
+                    if ($tmpPv > 0) {
+                        $pvId = $tmpPv;
                     }
                 }
-
                 $varDesc = isset($it['variacao_descricao']) ? (string) $it['variacao_descricao'] : null;
                 $this->carrinhoModel->adicionarItem($cartId, $pid, $qtd, $pvId, $varDesc);
             }
 
             unset($_SESSION['carrinho']);
+
+            if (isset($_COOKIE['guest_cart'])) {
+                $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                if (PHP_VERSION_ID >= 70300) {
+                    setcookie('guest_cart', '', [
+                        'expires' => time() - 3600,
+                        'path' => '/',
+                        'secure' => $secure,
+                        'httponly' => false,
+                        'samesite' => 'Lax',
+                    ]);
+                } else {
+                    setcookie('guest_cart', '', time() - 3600, '/; samesite=Lax', '', $secure, false);
+                }
+            }
         } catch (\Exception $e) {
             // se falhar, mantém sessão como fallback
         }
@@ -89,21 +96,81 @@ class AuthService {
     }
     
     public function logout() {
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        // Ao deslogar de um usuário, o carrinho não deve “vazar” para o modo visitante.
+        // Mantemos o carrinho no banco (para restaurar quando logar novamente) e limpamos sessão/cookie do visitante.
+        try {
+            $uidCart = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($uidCart > 0) {
+                // Se por algum motivo houver itens no carrinho da sessão, persiste no carrinho do usuário (DB)
+                // antes de limpar a sessão.
+                if (!empty($_SESSION['carrinho']) && is_array($_SESSION['carrinho'])) {
+                    $this->mergeSessionCartToUser($uidCart);
+                }
+
+                unset($_SESSION['carrinho']);
+                if (isset($_COOKIE['guest_cart'])) {
+                    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('guest_cart', '', [
+                            'expires' => time() - 3600,
+                            'path' => '/',
+                            'secure' => $secure,
+                            'httponly' => false,
+                            'samesite' => 'Lax',
+                        ]);
+                    } else {
+                        setcookie('guest_cart', '', time() - 3600, '/; samesite=Lax', '', $secure, false);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $uid = (int) ($_SESSION['usuario_id'] ?? 0);
+        try {
+            if ($uid > 0) {
+                $this->usuarioModel->clearRememberTokens($uid);
+            }
+        } catch (\Exception $e) {
+        }
+
         session_destroy();
-        
-        // Limpar cookie de remember
+
         if (isset($_COOKIE['remember_token'])) {
-            setcookie('remember_token', '', time() - 3600, '/');
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('remember_token', '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie('remember_token', '', time() - 3600, '/; samesite=Lax', '', $secure, true);
+            }
         }
     }
     
     public function criarSessao($usuario) {
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
         $_SESSION['usuario_email'] = $usuario['email'];
+        $docSess = '';
+        if (isset($usuario['documento'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['documento']);
+        } elseif (isset($usuario['cpf'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['cpf']);
+        }
+        $_SESSION['usuario_documento'] = $docSess;
         $perfil = (string) ($usuario['perfil'] ?? '');
         $role = (string) ($usuario['role'] ?? '');
         $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
@@ -119,6 +186,30 @@ class AuthService {
         $_SESSION['usuario_avatar'] = $avatarUrl;
         $_SESSION['logado'] = true;
         $_SESSION['ultimo_acesso'] = time();
+
+        try {
+            $uid = (int) ($usuario['id'] ?? 0);
+            if ($uid > 0) {
+                $token = bin2hex(random_bytes(32));
+                $ttl = 60 * 60 * 24 * 7;
+                $ok = $this->usuarioModel->setRememberToken($uid, $token, $ttl);
+                if ($ok) {
+                    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                    if (PHP_VERSION_ID >= 70300) {
+                        setcookie('remember_token', $token, [
+                            'expires' => time() + $ttl,
+                            'path' => '/',
+                            'secure' => $secure,
+                            'httponly' => true,
+                            'samesite' => 'Lax',
+                        ]);
+                    } else {
+                        setcookie('remember_token', $token, time() + $ttl, '/; samesite=Lax', '', $secure, true);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
         
         // Gerar CSRF token
         if (!isset($_SESSION['csrf_token'])) {
@@ -145,6 +236,7 @@ class AuthService {
             'id' => $_SESSION['usuario_id'],
             'nome' => $_SESSION['usuario_nome'],
             'email' => $_SESSION['usuario_email'],
+            'documento' => $_SESSION['usuario_documento'] ?? '',
             'perfil' => $_SESSION['usuario_perfil'],
             'role' => $_SESSION['usuario_role'] ?? $_SESSION['usuario_perfil'],
             'avatar' => $_SESSION['usuario_avatar'] ?? null
@@ -163,7 +255,28 @@ class AuthService {
     
     public function requerAutenticacao() {
         if (!$this->estaLogado()) {
-            header('Location: /login');
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $isLoginUri = (stripos($uri, '/login') === 0 || stripos($uri, '/loginadmin') === 0);
+
+            if ($uri !== '' && $uri[0] === '/' && !$isLoginUri) {
+                $_SESSION['redirect_after_login'] = $uri;
+            }
+
+            $redirectParam = '';
+            if (isset($_SESSION['redirect_after_login']) && is_string($_SESSION['redirect_after_login'])) {
+                $redirectParam = rawurlencode($_SESSION['redirect_after_login']);
+            }
+
+            if ($isAdminUri) {
+                header('Location: /loginadmin' . ($redirectParam !== '' ? ('?redirect=' . $redirectParam) : ''));
+            } else {
+                header('Location: /login' . ($redirectParam !== '' ? ('?redirect=' . $redirectParam) : ''));
+            }
             exit;
         }
     }
@@ -179,7 +292,10 @@ class AuthService {
         if ($perfilNeed === '' || ($perfilAtual !== $perfilNeed && $roleAtual !== $perfilNeed)) {
             $_SESSION['message'] = 'Acesso negado. Permissão de ' . $perfil . ' necessária.';
             $_SESSION['message_type'] = 'danger';
-            $target = $this->estaLogado() ? '/admin' : '/login';
+            // Evitar loop (/admin/dashboard -> /admin -> /admin/dashboard ...)
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $target = $isAdminUri ? '/' : '/login';
             header('Location: ' . $target);
             exit;
         }
@@ -204,7 +320,10 @@ class AuthService {
         if (!in_array($perfilAtual, $perfisNorm, true) && !in_array($roleAtual, $perfisNorm, true)) {
             $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
             $_SESSION['message_type'] = 'danger';
-            $target = $this->estaLogado() ? '/admin' : '/login';
+            // Evitar loop (/admin/dashboard -> /admin -> /admin/dashboard ...)
+            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+            $isAdminUri = (stripos($uri, '/admin') === 0);
+            $target = $isAdminUri ? '/' : '/login';
             header('Location: ' . $target);
             exit;
         }
@@ -220,8 +339,8 @@ class AuthService {
         if ($perfil === '' && $role === '') {
             return false;
         }
-        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador'], true)
-            || in_array($role, ['admin', 'vendedor', 'suporte', 'redirecionador'], true);
+        return in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true)
+            || in_array($role, ['admin', 'vendedor', 'suporte', 'redirecionador', 'conferente'], true);
     }
     
     public function requerPermissao($acao) {

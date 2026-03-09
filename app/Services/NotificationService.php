@@ -2,12 +2,24 @@
 namespace App\Services;
 
 use App\Models\PedidoEcommerce;
+use App\Services\EmailService;
 
 class NotificationService {
     private PedidoEcommerce $pedidoModel;
+    private EmailService $emailService;
 
     public function __construct() {
         $this->pedidoModel = new PedidoEcommerce();
+        $this->emailService = new EmailService();
+    }
+
+    private function resolveTemplateEventoNome(string $eventoNome): string {
+        $e = trim($eventoNome);
+        $aliases = [
+            'pagamento_aprovado' => 'pedido_aprovado',
+            'pedido_pago' => 'pedido_aprovado',
+        ];
+        return $aliases[$e] ?? $e;
     }
 
     public function notificarEventoPedido(?string $eventoNome, int $pedidoId, array $extra = []): void {
@@ -41,21 +53,147 @@ class NotificationService {
         $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
 
         $codigoPedido = (string) ($pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? $pedido['id']));
+        $numeroPedido = (string) ($pedido['numero_pedido'] ?? ($pedido['codigo_pedido'] ?? $pedido['id']));
         $status = (string) ($pedido['status'] ?? '');
         $moeda = (string) ($pedido['moeda'] ?? '');
         $valorTotal = (string) ($pedido['total'] ?? ($pedido['valor_total'] ?? ''));
+
+        $rawDataPedido = (string) ($pedido['data_pedido'] ?? ($pedido['created_at'] ?? ($pedido['criado_em'] ?? ($pedido['data_criacao'] ?? ($pedido['data'] ?? '')))));
+        $dataPedido = '';
+        if ($rawDataPedido !== '') {
+            $ts = strtotime($rawDataPedido);
+            if ($ts !== false) {
+                $dataPedido = date('d/m/Y H:i:s', $ts);
+            }
+        }
+        if ($dataPedido === '') {
+            $dataPedido = date('d/m/Y H:i:s');
+        }
+
+        $fmtMoney = static function ($value, string $moeda): string {
+            $v = (float) $value;
+            $m = strtoupper(trim($moeda));
+            $symbol = ($m === 'BRL') ? 'R$' : (($m === 'USD') ? 'US$' : ($m !== '' ? ($m . ' ') : ''));
+            return $symbol . ' ' . number_format($v, 2, ',', '.');
+        };
+
+        $buildEnderecoEntrega = static function (array $p): string {
+            $linha1 = trim((string) ($p['endereco_entrega'] ?? ''));
+            $num = trim((string) ($p['numero_entrega'] ?? ''));
+            $comp = trim((string) ($p['complemento_entrega'] ?? ''));
+            $bairro = trim((string) ($p['bairro_entrega'] ?? ''));
+            $cidade = trim((string) ($p['cidade_entrega'] ?? ''));
+            $estado = trim((string) ($p['estado_entrega'] ?? ''));
+            $cep = trim((string) ($p['cep_entrega'] ?? ''));
+
+            $linha1Fmt = $linha1;
+            if ($linha1Fmt !== '' && $num !== '') {
+                $linha1Fmt .= ', ' . $num;
+            }
+            if ($comp !== '') {
+                $linha1Fmt .= ($linha1Fmt !== '' ? ' - ' : '') . $comp;
+            }
+
+            $linha2Parts = [];
+            if ($bairro !== '') $linha2Parts[] = $bairro;
+            if ($cidade !== '') $linha2Parts[] = $cidade;
+            if ($estado !== '') $linha2Parts[] = $estado;
+            $linha2 = implode(' - ', $linha2Parts);
+            if ($cep !== '') {
+                $linha2 .= ($linha2 !== '' ? ' - ' : '') . $cep;
+            }
+
+            $out = '';
+            if ($linha1Fmt !== '') {
+                $out .= htmlspecialchars($linha1Fmt, ENT_QUOTES, 'UTF-8');
+            }
+            if ($linha2 !== '') {
+                $out .= ($out !== '' ? '<br>' : '') . htmlspecialchars($linha2, ENT_QUOTES, 'UTF-8');
+            }
+            return $out;
+        };
+
+        $buildItensHtml = static function (array $p, string $moeda) use ($fmtMoney): string {
+            $itens = $p['items'] ?? ($p['itens'] ?? []);
+            if (!is_array($itens) || empty($itens)) {
+                return '';
+            }
+
+            $rows = '';
+            foreach ($itens as $it) {
+                if (!is_array($it)) continue;
+                $nome = (string) ($it['nome'] ?? ($it['nome_produto'] ?? ''));
+                $var = trim((string) ($it['variacao_label'] ?? ($it['variacao_descricao'] ?? '')));
+                if ($var !== '') {
+                    $nome .= ' (' . $var . ')';
+                }
+                if ($nome === '') {
+                    $nome = 'Item';
+                }
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($qtd <= 0) $qtd = 1;
+                $pu = (float) ($it['preco_unitario'] ?? 0);
+                $sub = $it['subtotal'] ?? null;
+                $subVal = $sub !== null ? (float) $sub : ($pu * $qtd);
+
+                $rows .= '<tr>'
+                    . '<td style="padding:8px;border-bottom:1px solid #eee;">' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">' . (int) $qtd . '</td>'
+                    . '<td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">' . htmlspecialchars($fmtMoney($pu, $moeda), ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">' . htmlspecialchars($fmtMoney($subVal, $moeda), ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '</tr>';
+            }
+
+            if ($rows === '') {
+                return '';
+            }
+
+            return '<table style="width:100%;border-collapse:collapse;">'
+                . '<thead>'
+                . '<tr>'
+                . '<th style="text-align:left;padding:8px;border-bottom:2px solid #ddd;">Item</th>'
+                . '<th style="text-align:center;padding:8px;border-bottom:2px solid #ddd;">Qtd</th>'
+                . '<th style="text-align:right;padding:8px;border-bottom:2px solid #ddd;">Unit</th>'
+                . '<th style="text-align:right;padding:8px;border-bottom:2px solid #ddd;">Subtotal</th>'
+                . '</tr>'
+                . '</thead>'
+                . '<tbody>' . $rows . '</tbody>'
+                . '</table>';
+        };
+
+        $enderecoEntrega = $buildEnderecoEntrega($pedido);
+        $itensHtml = $buildItensHtml($pedido, $moeda);
+        $subtotal = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
+        $frete = (float) ($pedido['valor_frete'] ?? ($pedido['frete'] ?? 0));
+        $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
+        $impostos = (float) ($pedido['valor_impostos'] ?? ($pedido['impostos'] ?? 0));
+        $total = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
 
         $base = [
             'evento' => $eventoNome,
             'pedido_id' => (string) ($pedido['id'] ?? ''),
             'codigo_pedido' => $codigoPedido,
+            'numero_pedido' => $numeroPedido,
             'status' => $status,
             'moeda' => $moeda,
             'valor_total' => $valorTotal,
             'nome' => $clienteNome,
             'email' => $clienteEmail,
             'telefone' => $clienteTelefone,
+            'cliente_nome' => $clienteNome,
+            'cliente_email' => $clienteEmail,
+            'cliente_telefone' => $clienteTelefone,
             'data' => date('Y-m-d H:i:s'),
+            'data_pedido' => $dataPedido,
+
+            'itens' => $itensHtml,
+            'endereco_entrega' => $enderecoEntrega,
+
+            'subtotal_produtos' => $fmtMoney($subtotal, $moeda),
+            'valor_frete' => $frete <= 0 ? 'Frete grátis' : $fmtMoney($frete, $moeda),
+            'taxa_servico' => $fmtMoney($taxaServico, $moeda),
+            'valor_impostos' => $fmtMoney($impostos, $moeda),
+            'total' => $fmtMoney($total, $moeda),
         ];
 
         foreach ($extra as $k => $v) {
@@ -78,26 +216,35 @@ class NotificationService {
             return;
         }
 
+        $tplEventoNome = $this->resolveTemplateEventoNome($eventoNome);
         $tpl = $this->getEmailTemplate($eventoNome);
-        $subject = $this->renderTemplate((string) ($tpl['assunto'] ?? ''), $vars);
-        $html = $this->renderTemplate((string) ($tpl['corpo_html'] ?? ''), $vars);
+        $subjectTpl = (string) ($tpl['assunto'] ?? '');
+        $htmlTpl = (string) ($tpl['corpo_html'] ?? '');
+
+        if (($subjectTpl === '' && $htmlTpl === '') && $tplEventoNome !== $eventoNome) {
+            $tpl = $this->getEmailTemplate($tplEventoNome);
+            $subjectTpl = (string) ($tpl['assunto'] ?? '');
+            $htmlTpl = (string) ($tpl['corpo_html'] ?? '');
+        }
+
+        $subject = $this->renderTemplate($subjectTpl, $vars);
+        $html = $this->renderTemplate($htmlTpl, $vars);
 
         if (trim($subject) === '') {
             $subject = 'Atualização do seu pedido ' . ($vars['codigo_pedido'] ?? '');
         }
         if (trim($html) === '') {
+            error_log('[NOTIFICACOES][EMAIL] Template vazio/nao encontrado para evento=' . $eventoNome . ' (template=' . $tplEventoNome . ')');
             $html = 'Olá ' . htmlspecialchars((string) ($vars['nome'] ?? ''), ENT_QUOTES, 'UTF-8') . ',<br>Seu pedido <strong>#' . htmlspecialchars((string) ($vars['codigo_pedido'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong> está com status <strong>' . htmlspecialchars((string) ($vars['status'] ?? ''), ENT_QUOTES, 'UTF-8') . '</strong>.';
         }
 
-        $fromEmail = (string) $this->getConfig('email', 'from', 'noreply@brazilianashop.com.br');
-        $fromName = (string) $this->getConfig('email', 'from_name', 'Braziliana');
-
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/html; charset=UTF-8';
-        $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $fromEmail . '>';
-
-        @mail($to, $subject, $html, implode("\r\n", $headers));
+        $pedidoId = (int) ($vars['pedido_id'] ?? 0);
+        $dedupeKeyEvento = $tplEventoNome !== '' ? $tplEventoNome : $eventoNome;
+        $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+        $this->emailService->send($to, $subject, $html, $dedupeKey, [
+            'evento' => $eventoNome,
+            'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
+        ]);
     }
 
     private function enviarWhatsAppPorWebhook(string $eventoNome, array $vars): void {
@@ -365,11 +512,7 @@ class NotificationService {
     }
 
     private function renderTemplate(string $tpl, array $vars): string {
-        $out = $tpl;
-        foreach ($vars as $k => $v) {
-            $out = str_replace('{{' . $k . '}}', (string) $v, $out);
-        }
-        return $out;
+        return $this->emailService->renderTemplate($tpl, $vars);
     }
 
     private function encodeHeaderName(string $name): string {

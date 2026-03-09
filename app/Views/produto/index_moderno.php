@@ -5,22 +5,28 @@
     <div class="row mb-4">
         <div class="col-lg-6">
             <form method="GET" class="d-flex">
+                <?php if (!empty($categoriaSelecionada)): ?>
+                    <input type="hidden" name="categoria" value="<?= htmlspecialchars((string) $categoriaSelecionada, ENT_QUOTES, 'UTF-8') ?>">
+                <?php endif; ?>
                 <div class="input-group input-group-lg">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="fas fa-search text-muted"></i>
                     </span>
                     <input type="text" name="search" class="form-control border-start-0" 
-                           placeholder="Buscar produtos..." value="<?= htmlspecialchars($search ?? '') ?>">
+                           placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
                     <button type="submit" class="btn btn-primary btn-lg">
-                        Buscar
+                        <?= __('products.search_button', 'Buscar') ?>
                     </button>
                 </div>
             </form>
         </div>
         <div class="col-lg-3">
             <form method="GET">
+                <?php if (!empty($search)): ?>
+                    <input type="hidden" name="search" value="<?= htmlspecialchars((string) $search, ENT_QUOTES, 'UTF-8') ?>">
+                <?php endif; ?>
                 <select name="categoria" class="form-select form-select-lg" onchange="this.form.submit()">
-                    <option value="">Todas as Categorias</option>
+                    <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
                     <?php foreach ($categorias as $cat): ?>
                         <option value="<?= htmlspecialchars($cat['id']) ?>" 
                                 <?= ($categoriaSelecionada ?? '') == $cat['id'] ? 'selected' : '' ?>>
@@ -33,7 +39,7 @@
         <div class="col-lg-3 text-end">
             <a href="/carrinho" class="btn btn-success btn-lg">
                 <i class="fas fa-shopping-cart me-2"></i>
-                Ver Carrinho
+                <?= __('products.view_cart', 'Ver Carrinho') ?>
                 <span class="badge bg-white text-success ms-2 cart-badge">0</span>
             </a>
         </div>
@@ -45,8 +51,8 @@
             <div class="col-lg-12">
                 <div class="text-center py-5">
                     <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Nenhum produto encontrado</h3>
-                    <p class="text-muted">Tente ajustar sua busca ou filtros</p>
+                    <h3 class="text-muted"><?= __('products.none_found', 'Nenhum produto encontrado') ?></h3>
+                    <p class="text-muted"><?= __('products.try_adjust_search', 'Tente ajustar sua busca ou filtros') ?></p>
                 </div>
             </div>
         <?php else: ?>
@@ -62,13 +68,13 @@
                             <?php if ($produto['stock'] <= 5 && $produto['stock'] > 0): ?>
                                 <span class="position-absolute top-0 end-0 m-2 badge bg-warning">
                                     <i class="fas fa-exclamation-triangle me-1"></i>
-                                    <?= $produto['stock'] ?> unidades
+                                    <?= (int) $produto['stock'] ?> <?= __('home.units_short', 'unidades') ?>
                                 </span>
                             <?php endif; ?>
                             <!-- Badge de Destaque -->
                             <?php if ($produto['featured']): ?>
                                 <span class="position-absolute top-0 start-0 m-2 badge bg-danger">
-                                    <i class="fas fa-star me-1"></i>Destaque
+                                    <i class="fas fa-star me-1"></i><?= __('products.featured', 'Destaque') ?>
                                 </span>
                             <?php endif; ?>
                         <?php else: ?>
@@ -82,7 +88,7 @@
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="fas fa-tag me-1"></i>
-                                <?= htmlspecialchars($produto['categoria'] ?? 'Sem categoria') ?>
+                                <?= htmlspecialchars($produto['categoria'] ?? __('products.no_category', 'Sem categoria')) ?>
                             </small>
                         </div>
                         
@@ -96,25 +102,31 @@
                         
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="price-section">
+                                <?php
+                                    $precoBase = (float) ($produto['price'] ?? 0);
+                                    $precoPromo = (float) ($produto['sale_price'] ?? 0);
+                                    $temPromo = ($precoPromo > 0 && $precoPromo < $precoBase);
+                                    $precoExibir = $temPromo ? $precoPromo : $precoBase;
+                                ?>
                                 <span class="h4 text-primary fw-bold mb-0 product-price" 
-                                      data-original-price="<?= $produto['price'] ?>">
-                                    <?= number_format($produto['price'], 2, ',', '.') ?>
+                                      data-original-price="<?= $precoExibir ?>">
+                                    <?= number_format($precoExibir, 2, ',', '.') ?>
                                 </span>
-                                <?php if ($produto['sale_price'] > 0): ?>
-                                    <small class="text-decoration-line-through text-muted product-sale-price"
-                                          data-original-sale-price="<?= $produto['sale_price'] ?>">
-                                        <?= number_format($produto['sale_price'], 2, ',', '.') ?>
+                                <?php if ($temPromo): ?>
+                                    <small class="text-decoration-line-through text-muted product-original-price"
+                                          data-original-original-price="<?= $precoBase ?>">
+                                        <?= number_format($precoBase, 2, ',', '.') ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
                             <div class="stock-info">
                                 <?php if ($produto['stock'] > 0): ?>
                                     <span class="badge bg-success">
-                                        <i class="fas fa-check-circle me-1"></i>Disponível
+                                        <i class="fas fa-check-circle me-1"></i><?= __('products.available', 'Disponível') ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="badge bg-danger">
-                                        <i class="fas fa-times-circle me-1"></i>Esgotado
+                                        <i class="fas fa-times-circle me-1"></i><?= __('products.out_of_stock', 'Esgotado') ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
@@ -125,16 +137,16 @@
                         <div class="d-grid gap-2">
                             <a href="/produto/detalhes/<?= $produto['id'] ?>" 
                                class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-eye me-2"></i>Ver Detalhes
+                                <i class="fas fa-eye me-2"></i><?= __('products.view_details', 'Ver Detalhes') ?>
                             </a>
                             <button class="btn btn-primary btn-sm btn-adicionar-modern" 
                                     data-produto-id="<?= $produto['id'] ?>"
                                     data-produto-nome="<?= htmlspecialchars($produto['name']) ?>"
-                                    data-produto-preco="<?= $produto['price'] ?>"
+                                    data-produto-preco="<?= $precoExibir ?>"
                                     data-is-variavel="<?= !empty($produto['is_variavel']) ? '1' : '0' ?>"
                                     <?= $produto['stock'] > 0 ? '' : 'disabled' ?>>
                                 <i class="fas fa-cart-plus me-2"></i>
-                                <?= $produto['stock'] > 0 ? 'Adicionar ao Carrinho' : 'Indisponível' ?>
+                                <?= $produto['stock'] > 0 ? __('products.add_to_cart', 'Adicionar ao Carrinho') : __('products.unavailable', 'Indisponível') ?>
                             </button>
                         </div>
                     </div>
@@ -143,7 +155,67 @@
             <?php endforeach; ?>
         <?php endif; ?>
     </div>
+
+    <?php
+        $page = (int) ($page ?? 1);
+        if ($page <= 0) $page = 1;
+        $totalPages = (int) ($totalPages ?? 1);
+        if ($totalPages <= 0) $totalPages = 1;
+        $searchVal = (string) ($search ?? '');
+        $categoriaVal = (string) ($categoriaSelecionada ?? '');
+
+        $buildProductsUrl = static function (int $p) use ($searchVal, $categoriaVal): string {
+            $qs = [];
+            if ($searchVal !== '') $qs['search'] = $searchVal;
+            if ($categoriaVal !== '') $qs['categoria'] = $categoriaVal;
+            if ($p > 1) $qs['page'] = $p;
+            return '/produtos' . (!empty($qs) ? ('?' . http_build_query($qs)) : '');
+        };
+    ?>
+
+    <?php if (!empty($produtos) && $totalPages > 1): ?>
+        <nav aria-label="Paginação" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>" tabindex="-1">Anterior</a>
+                </li>
+
+                <?php
+                    $start = max(1, $page - 2);
+                    $end = min($totalPages, $page + 2);
+                    if ($start > 1) {
+                        echo '<li class="page-item"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl(1), ENT_QUOTES, 'UTF-8') . '">1</a></li>';
+                        if ($start > 2) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                    }
+                    for ($p = $start; $p <= $end; $p++) {
+                        $active = ($p === $page);
+                        echo '<li class="page-item' . ($active ? ' active' : '') . '"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl($p), ENT_QUOTES, 'UTF-8') . '">' . (int) $p . '</a></li>';
+                    }
+                    if ($end < $totalPages) {
+                        if ($end < $totalPages - 1) {
+                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        }
+                        echo '<li class="page-item"><a class="page-link" href="' . htmlspecialchars($buildProductsUrl($totalPages), ENT_QUOTES, 'UTF-8') . '">' . (int) $totalPages . '</a></li>';
+                    }
+                ?>
+
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>">Próxima</a>
+                </li>
+            </ul>
+        </nav>
+    <?php endif; ?>
 </div>
+
+<script>
+window.PRODUCTS_MODERNO_I18N = {
+    add_to_cart: <?= json_encode(__('products.add_to_cart', 'Adicionar ao Carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('products.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    error_add: <?= json_encode(__('products.error_add', 'Erro ao adicionar produto'), JSON_UNESCAPED_UNICODE) ?>
+};
+</script>
 
 <style>
 .product-card-modern {
@@ -233,10 +305,10 @@ function updateProductPrices(currency) {
         }
     });
     
-    // Atualizar preços promocionais
-    const salePrices = document.querySelectorAll('.product-sale-price');
-    salePrices.forEach((element, index) => {
-        const originalValue = parseFloat(element.getAttribute('data-original-sale-price'));
+    // Atualizar preços originais (riscados) quando houver promoção
+    const originalPrices = document.querySelectorAll('.product-original-price');
+    originalPrices.forEach((element, index) => {
+        const originalValue = parseFloat(element.getAttribute('data-original-original-price'));
         
         if (!isNaN(originalValue)) {
             let convertedPrice;
@@ -271,7 +343,7 @@ function adicionarAoCarrinhoModerno(botao) {
     
     // Desabilitar botão
     botao.disabled = true;
-    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adicionando...';
+    botao.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.adding) ? window.PRODUCTS_MODERNO_I18N.adding : 'Adicionando...');
     
     // Fazer requisição AJAX
     fetch('/carrinho/adicionar', {
@@ -286,7 +358,7 @@ function adicionarAoCarrinhoModerno(botao) {
     .then(data => {
         // Reabilitar botão
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.add_to_cart) ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
         
         if (data.success) {
             mostrarAlerta('success', data.message);
@@ -297,8 +369,8 @@ function adicionarAoCarrinhoModerno(botao) {
     })
     .catch(error => {
         botao.disabled = false;
-        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>Adicionar ao Carrinho';
-        mostrarAlerta('danger', 'Erro ao adicionar produto');
+        botao.innerHTML = '<i class="fas fa-cart-plus me-2"></i>' + ((window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.add_to_cart) ? window.PRODUCTS_MODERNO_I18N.add_to_cart : 'Adicionar ao Carrinho');
+        mostrarAlerta('danger', (window.PRODUCTS_MODERNO_I18N && window.PRODUCTS_MODERNO_I18N.error_add) ? window.PRODUCTS_MODERNO_I18N.error_add : 'Erro ao adicionar produto');
     });
 }
 
@@ -324,6 +396,11 @@ function mostrarAlerta(tipo, mensagem) {
 
 // Função para atualizar badge
 function atualizarBadge(totalItens) {
+    if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+        window.updateCartBadge(totalItens);
+        return;
+    }
+
     const badges = document.querySelectorAll('.cart-badge');
     badges.forEach(badge => {
         if (totalItens > 0) {

@@ -42,6 +42,7 @@ $router->post('/login', 'AuthController', 'login');
 $router->get('/loginadmin', 'AuthController', 'loginAdmin');
 $router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
+$router->get('/lang/{locale}', 'LangController', 'set');
 $router->get('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->post('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->get('/redefinir-senha/{token}', 'AuthController', 'redefinirSenha');
@@ -108,12 +109,42 @@ $router->get('/admin', function($request) {
             session_start();
         }
         $perfil = (string) ($_SESSION['usuario_perfil'] ?? '');
+        if ($perfil === '') {
+            $perfil = (string) ($_SESSION['usuario_role'] ?? '');
+        }
     } catch (\Exception $e) {
         $perfil = '';
     }
     $perfil = strtolower(trim($perfil));
+
+    if ($perfil === 'administrator' || $perfil === 'administrador') {
+        $perfil = 'admin';
+    } elseif ($perfil === 'seller') {
+        $perfil = 'vendedor';
+    } elseif ($perfil === 'support') {
+        $perfil = 'suporte';
+    }
     if ($perfil === '') {
         $perfil = 'cliente';
+    }
+
+    // Bloquear acesso ao admin para usuários sem permissão
+    $adminAllowed = ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante', 'conferente'];
+    if (!in_array($perfil, $adminAllowed, true)) {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['message'] = 'Acesso negado. Permissão insuficiente.';
+        $_SESSION['message_type'] = 'danger';
+
+        $isLogged = !empty($_SESSION['logado']);
+        header('Location: ' . ($isLogged ? '/' : '/loginadmin'));
+        exit;
+    }
+
+    if ($perfil === 'conferente') {
+        header('Location: /admin/remessa-wp');
+        exit;
     }
 
     if ($perfil === 'representante') {
@@ -347,6 +378,9 @@ $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController'
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');
 $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', 'confirmarPagamento');
 
+$router->get('/admin/pagamentos/configuracoes', 'AdminPagamentosController', 'configuracoes');
+$router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosController', 'salvarConfiguracoes');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');
@@ -361,6 +395,10 @@ $router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoe
 $router->post('/admin/configuracoes/importar-usuarios/iniciar', 'AdminConfiguracoesController', 'importarUsuariosIniciar');
 $router->post('/admin/configuracoes/importar-usuarios/processar', 'AdminConfiguracoesController', 'importarUsuariosProcessar');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
+
+// Mercado Pago OAuth (conectar conta do produto)
+$router->get('/mercadopago/oauth/start', 'MercadoPagoOAuthController', 'start');
+$router->get('/mercadopago/oauth/callback', 'MercadoPagoOAuthController', 'callback');
 
 // Mapa de calor (segmentação)
 $router->get('/admin/configuracoes/mapa-calor/clientes', 'AdminConfiguracoesController', 'mapaCalorClientes');
@@ -386,6 +424,7 @@ $router->post('/admin/testar-email-template', 'AdminNotificacoesController', 'te
 $router->post('/webhook/asaas', 'WebhookController', 'asaas');
 $router->post('/webhook/stripe', 'WebhookController', 'stripe');
 $router->post('/webhook/appmax', 'WebhookController', 'appmax');
+$router->post('/webhook/mercadopago', 'WebhookController', 'mercadopago');
 
 // API
 $router->get('/api/produtos/buscar', 'ApiController', 'buscarProdutos');
@@ -441,6 +480,15 @@ $router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}',
 $router->post('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-gerada', 'AdminRemessaInternacionalController', 'marcarEtiquetaGerada');
 $router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-download', 'AdminRemessaInternacionalController', 'baixarEtiquetaWexpress');
 $router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaInternacionalController', 'fecharJanela');
+
+// Rotas de Remessa WP
+$router->get('/admin/remessa-wp', 'AdminRemessaWpController', 'index');
+$router->get('/admin/remessa-wp/janela/{id}', 'AdminRemessaWpController', 'verJanela');
+$router->get('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaWpController', 'detalhesPedidoJanela');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/confirmar-recebimento', 'AdminRemessaWpController', 'confirmarRecebimento');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/medicamento', 'AdminRemessaWpController', 'salvarMedicamento');
+$router->post('/admin/remessa-wp/janela/{janelaId}/pedido/{pedidoId}/documento/{tipo}', 'AdminRemessaWpController', 'uploadDocumento');
+$router->post('/admin/remessa-wp/primeira-remessa/popular', 'AdminRemessaWpController', 'popularPrimeiraRemessa');
 
 // Rotas de Remessa Correios
 $router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');

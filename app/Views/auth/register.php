@@ -7,23 +7,23 @@
                 <div class="card-body p-5">
                     <div class="text-center mb-4">
                         <i class="fas fa-user-plus fa-3x text-primary mb-3"></i>
-                        <h3 class="mb-0">Criar Conta</h3>
-                        <p class="text-muted">Junte-se a milhares de clientes satisfeitos</p>
+                        <h3 class="mb-0"><?= __('auth.create_account', 'Criar Conta') ?></h3>
+                        <p class="text-muted"><?= __('auth.create_account_subtitle', 'Junte-se a milhares de clientes satisfeitos') ?></p>
                     </div>
                     
                     <form method="POST" action="/register" id="registerForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="nome" class="form-label">Nome Completo</label>
+                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-user"></i></span>
                                     <input type="text" class="form-control" id="nome" name="nome" 
-                                           placeholder="Seu nome" required>
+                                           placeholder="<?= htmlspecialchars(__('auth.your_name', 'Seu nome'), ENT_QUOTES, 'UTF-8') ?>" required>
                                 </div>
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="telefone" class="form-label">Telefone</label>
+                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?></label>
                                 <div class="input-group w-100" style="flex-wrap: nowrap;">
                                     <span class="input-group-text" style="padding-left: 10px; padding-right: 10px;"><i class="fas fa-phone"></i></span>
                                     <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
@@ -38,21 +38,21 @@
                                         <option value="54">+54</option>
                                         <option value="56">+56</option>
                                         <option value="57">+57</option>
-                                        <option value="0">Outro</option>
+                                        <option value="0"><?= __('auth.other', 'Outro') ?></option>
                                     </select>
                                     <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" 
-                                           placeholder="Número" required>
+                                           placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
                                     <input type="hidden" class="form-control" id="telefone" name="telefone" value="">
                                 </div>
                                 <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
                                     <span class="input-group-text">DDI</span>
-                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="<?= htmlspecialchars(__('auth.ddi_example', 'Ex: 81'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="email" class="form-label">E-mail</label>
+                            <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 <input type="email" class="form-control" id="email" name="email" 
@@ -72,14 +72,14 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-cake-candles"></i></span>
                                     <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <label for="pais_residencia" class="form-label"><?= __('auth.country_residence', 'País de Residência') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-flag"></i></span>
                                     <?php require __DIR__ . '/../_countries.php'; ?>
@@ -90,61 +90,61 @@
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="<?= htmlspecialchars(__('auth.filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="cep" class="form-label">CEP</label>
+                            <div class="col-md-6 mb-3" id="field-cep">
+                                <label for="cep" class="form-label" id="label-cep"><?= __('auth.zip', 'CEP') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-dot"></i></span>
                                     <input type="text" class="form-control" id="cep" name="cep" placeholder="00000-000" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="endereco" class="form-label">Endereço</label>
+                                <label for="endereco" class="form-label" id="label-endereco"><?= __('auth.address', 'Endereço') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map"></i></span>
-                                    <input type="text" class="form-control" id="endereco" name="endereco" placeholder="Rua, Avenida, etc." required>
+                                    <input type="text" class="form-control" id="endereco" name="endereco" placeholder="<?= htmlspecialchars(__('auth.address_placeholder', 'Rua, Avenida, etc.'), ENT_QUOTES, 'UTF-8') ?>" required>
                                 </div>
                             </div>
                         </div>
 
                         <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="numero" class="form-label">Número</label>
+                            <div class="col-md-4 mb-3" id="field-numero">
+                                <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
-                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123" required>
+                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123">
                                 </div>
                             </div>
                             <div class="col-md-8 mb-3">
-                                <label for="complemento" class="form-label">Complemento</label>
+                                <label for="complemento" class="form-label" id="label-complemento"><?= __('auth.complement', 'Complemento') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-building"></i></span>
-                                    <input type="text" class="form-control" id="complemento" name="complemento" placeholder="Apto, Casa, etc.">
+                                    <input type="text" class="form-control" id="complemento" name="complemento" placeholder="<?= htmlspecialchars(__('auth.complement_placeholder', 'Apto, Casa, etc.'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                             </div>
                         </div>
 
                         <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="bairro" class="form-label">Bairro</label>
+                            <div class="col-md-4 mb-3" id="field-bairro">
+                                <label for="bairro" class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
                                     <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro">
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="cidade" class="form-label">Cidade</label>
+                                <label for="cidade" class="form-label" id="label-cidade"><?= __('auth.city', 'Cidade') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-city"></i></span>
                                     <input type="text" class="form-control" id="cidade" name="cidade" placeholder="São Paulo" required>
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="estado" class="form-label">Estado</label>
+                                <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map-pin"></i></span>
                                     <input type="text" class="form-control" id="estado" name="estado" placeholder="SP" required>
@@ -154,11 +154,11 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="senha" class="form-label">Senha</label>
+                                <label for="senha" class="form-label"><?= __('auth.password_min', 'Senha') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                     <input type="password" class="form-control" id="senha" name="senha" 
-                                           placeholder="Mínimo 6 caracteres" required minlength="6">
+                                           placeholder="<?= htmlspecialchars(__('auth.password_min_placeholder', 'Mínimo 6 caracteres'), ENT_QUOTES, 'UTF-8') ?>" required minlength="6">
                                     <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                         <i class="fas fa-eye"></i>
                                     </button>
@@ -166,11 +166,11 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="confirmar_senha" class="form-label">Confirmar Senha</label>
+                                <label for="confirmar_senha" class="form-label"><?= __('auth.confirm_password', 'Confirmar Senha') ?></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                     <input type="password" class="form-control" id="confirmar_senha" 
-                                           name="senha_confirmacao" placeholder="Confirme sua senha" required>
+                                           name="senha_confirmacao" placeholder="<?= htmlspecialchars(__('auth.confirm_password_placeholder', 'Confirme sua senha'), ENT_QUOTES, 'UTF-8') ?>" required>
                                 </div>
                             </div>
                         </div>
@@ -179,8 +179,11 @@
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="termos" name="termos" required>
                                 <label class="form-check-label" for="termos">
-                                    Li e aceito os <a href="/termos-uso" class="text-decoration-none">Termos de Uso</a> e 
-                                    <a href="/politica-privacidade" class="text-decoration-none">Política de Privacidade</a>
+                                    <?php
+                                        $termsLink = '<a href="/termos-uso" class="text-decoration-none">' . __('auth.terms', 'Termos de Uso') . '</a>';
+                                        $privacyLink = '<a href="/politica-privacidade" class="text-decoration-none">' . __('auth.privacy', 'Política de Privacidade') . '</a>';
+                                        echo __('auth.accept_terms', 'Li e aceito os {terms} e {privacy}', ['terms' => $termsLink, 'privacy' => $privacyLink]);
+                                    ?>
                                 </label>
                             </div>
                         </div>
@@ -189,21 +192,21 @@
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="newsletter" name="newsletter">
                                 <label class="form-check-label" for="newsletter">
-                                    Desejo receber ofertas exclusivas por e-mail
+                                    <?= __('auth.newsletter_optin', 'Desejo receber ofertas exclusivas por e-mail') ?>
                                 </label>
                             </div>
                         </div>
                         
                         <div class="d-grid mb-3">
                             <button type="submit" class="btn btn-primary btn-lg" id="registerBtn">
-                                <i class="fas fa-user-plus me-2"></i> Criar Conta
+                                <i class="fas fa-user-plus me-2"></i> <?= __('auth.create', 'Criar Conta') ?>
                             </button>
                         </div>
                         
                         <div class="text-center">
                             <p class="mb-0">
-                                Já tem uma conta? 
-                                <a href="/login" class="text-decoration-none">Faça login</a>
+                                <?= __('auth.have_account', 'Já tem uma conta?') ?>
+                                <a href="/login" class="text-decoration-none"><?= __('auth.do_login', 'Faça login') ?></a>
                             </p>
                         </div>
                     </form>
@@ -215,6 +218,29 @@
 
 <script>
 $(document).ready(function() {
+    const I18N = {
+        cpf_required: <?= json_encode(__('auth.document_required', 'CPF *'), JSON_UNESCAPED_UNICODE) ?>,
+        cpf: <?= json_encode(__('auth.document', 'CPF'), JSON_UNESCAPED_UNICODE) ?>,
+        doc_hint: <?= json_encode(__('auth.document_br_required_hint', 'Obrigatório apenas para residentes no Brasil.'), JSON_UNESCAPED_UNICODE) ?>,
+        address_br: <?= json_encode(__('auth.address', 'Endereço'), JSON_UNESCAPED_UNICODE) ?>,
+        complement_br: <?= json_encode(__('auth.complement', 'Complemento'), JSON_UNESCAPED_UNICODE) ?>,
+        city_br: <?= json_encode(__('auth.city', 'Cidade'), JSON_UNESCAPED_UNICODE) ?>,
+        state_br: <?= json_encode(__('auth.state', 'Estado'), JSON_UNESCAPED_UNICODE) ?>,
+        zip_br: <?= json_encode(__('auth.zip', 'CEP'), JSON_UNESCAPED_UNICODE) ?>,
+        number_br: <?= json_encode(__('auth.number_label', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+        neighborhood_br: <?= json_encode(__('auth.neighborhood', 'Bairro'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_1: <?= json_encode(__('auth.address_line_1', 'Address line 1'), JSON_UNESCAPED_UNICODE) ?>,
+        address_line_2_optional: <?= json_encode(__('auth.address_line_2_optional', 'Address line 2 (optional)'), JSON_UNESCAPED_UNICODE) ?>,
+        city_en: <?= json_encode(__('auth.city_en', 'City'), JSON_UNESCAPED_UNICODE) ?>,
+        state_en: <?= json_encode(__('auth.state_en', 'State'), JSON_UNESCAPED_UNICODE) ?>,
+        passwords_dont_match: <?= json_encode(__('auth.passwords_dont_match', 'As senhas não coincidem'), JSON_UNESCAPED_UNICODE) ?>,
+        password_too_short: <?= json_encode(__('auth.password_too_short', 'A senha deve ter no mínimo 6 caracteres'), JSON_UNESCAPED_UNICODE) ?>,
+        creating: <?= json_encode(__('auth.creating_account', 'Criando conta...'), JSON_UNESCAPED_UNICODE) ?>,
+        created_redirect: <?= json_encode(__('auth.account_created_redirect', 'Conta criada com sucesso! Redirecionando...'), JSON_UNESCAPED_UNICODE) ?>,
+        error_create: <?= json_encode(__('auth.error_create_account', 'Erro ao criar conta'), JSON_UNESCAPED_UNICODE) ?>,
+        error_connection: <?= json_encode(__('auth.error_connection', 'Erro de conexão. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>
+    };
+
     function filterSelectOptions($select, query) {
         query = (query || '').toString().trim().toLowerCase();
         $select.find('option').each(function() {
@@ -235,9 +261,10 @@ $(document).ready(function() {
         const $label = $('#label-documento');
         const $hint = $('#hint-documento');
 
-        $label.text(br ? 'CPF *' : 'CPF');
+        $label.text(br ? I18N.cpf_required : I18N.cpf);
         $doc.prop('required', br);
         $doc.attr('placeholder', br ? '000.000.000-00' : '');
+        $hint.text(I18N.doc_hint);
         $hint.toggle(!br);
     }
 
@@ -247,6 +274,37 @@ $(document).ready(function() {
         if ($bairro.length) {
             $bairro.prop('required', br);
         }
+    }
+
+    function syncEnderecoRules() {
+        const br = isBrazil();
+
+        $('#label-endereco').text(br ? I18N.address_br : I18N.address_line_1);
+        $('#label-complemento').text(br ? I18N.complement_br : I18N.address_line_2_optional);
+        $('#label-cidade').text(br ? I18N.city_br : I18N.city_en);
+        $('#label-estado').text(br ? I18N.state_br : I18N.state_en);
+        $('#label-cep').text(I18N.zip_br);
+        $('#label-numero').text(I18N.number_br);
+        $('#label-bairro').text(I18N.neighborhood_br);
+
+        $('#cep').prop('required', true);
+        $('#numero').prop('required', br);
+        if (br) {
+            $('#numero').attr('required', 'required');
+        } else {
+            $('#numero').removeAttr('required');
+        }
+
+        $('#field-cep').toggle(true);
+        $('#field-numero').toggle(br);
+        $('#field-bairro').toggle(br);
+
+        if (!br) {
+            $('#numero').val('');
+            $('#bairro').val('');
+        }
+
+        syncBairroRules();
     }
 
     // Toggle password visibility
@@ -287,19 +345,19 @@ $(document).ready(function() {
         const confirmarSenha = $('#confirmar_senha').val();
         
         if (senha !== confirmarSenha) {
-            showAlert('danger', 'As senhas não coincidem');
+            showAlert('danger', I18N.passwords_dont_match);
             return;
         }
         
         if (senha.length < 6) {
-            showAlert('danger', 'A senha deve ter no mínimo 6 caracteres');
+            showAlert('danger', I18N.password_too_short);
             return;
         }
         
         const btn = $('#registerBtn');
         const originalText = btn.html();
         
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Criando conta...');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> ' + I18N.creating);
         
         $.ajax({
             url: '/register',
@@ -308,16 +366,16 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    showAlert('success', 'Conta criada com sucesso! Redirecionando...');
+                    showAlert('success', I18N.created_redirect);
                     setTimeout(function() {
                         window.location.href = response.redirect || '/login';
                     }, 2000);
                 } else {
-                    showAlert('danger', response.error || 'Erro ao criar conta');
+                    showAlert('danger', response.error || I18N.error_create);
                 }
             },
             error: function() {
-                showAlert('danger', 'Erro de conexão. Tente novamente.');
+                showAlert('danger', I18N.error_connection);
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
@@ -371,11 +429,11 @@ $(document).ready(function() {
 
     $('#pais_residencia').on('change', function() {
         syncDocumentoRules();
-        syncBairroRules();
+        syncEnderecoRules();
     });
 
     syncDocumentoRules();
-    syncBairroRules();
+    syncEnderecoRules();
 });
 
 function showAlert(type, message) {

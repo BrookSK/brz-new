@@ -16,7 +16,7 @@
                             <label for="email" class="form-label">E-mail</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                                <input type="email" class="form-control" id="email" name="email" placeholder="seu@email.com" required>
+                                <input type="email" class="form-control" id="email" name="email" placeholder="seu@email.com" value="<?= htmlspecialchars((string) ($email ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                             </div>
                         </div>
 

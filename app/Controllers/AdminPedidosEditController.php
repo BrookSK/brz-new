@@ -3,7 +3,7 @@ namespace App\Controllers;
 
 use App\Services\AuthService;
 
-class AdminPedidosEditController {
+class AdminPedidosEditController extends Controller {
     private $connection;
 
     public function __construct() {
@@ -234,6 +234,10 @@ class AdminPedidosEditController {
             return;
         }
 
+        // Ao finalizar o ciclo (ex.: entregue), dar baixa física no estoque pelo que estava reservado.
+        // Sem isso, o "reservado" some e o "disponível" sobe, sem reduzir o estoque total.
+        $this->baixarEstoqueInternoPeloReservadoDoPedido($pedidoId);
+
         if ($this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id') && $this->columnExists('estoque_reservas', 'status')) {
             try {
                 $stmt = $this->connection->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = :pedido_id");
@@ -246,6 +250,95 @@ class AdminPedidosEditController {
             try {
                 $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'cancelado', quantidade_faltante = 0 WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
+            } catch (\Exception $e) {
+            }
+        }
+    }
+
+    private function baixarEstoqueInternoPeloReservadoDoPedido(int $pedidoId): void {
+        if ($pedidoId <= 0) {
+            return;
+        }
+
+        if (!$this->tableExists('estoque_interno') || !$this->tableExists('estoque_reservas')) {
+            return;
+        }
+
+        if (!$this->columnExists('estoque_reservas', 'pedido_id')
+            || !$this->columnExists('estoque_reservas', 'produto_id')
+            || !$this->columnExists('estoque_reservas', 'quantidade_reservada')) {
+            return;
+        }
+
+        if (!$this->columnExists('estoque_interno', 'produto_id') || !$this->columnExists('estoque_interno', 'quantidade')) {
+            return;
+        }
+
+        // Consumir reservas ainda não finalizadas (para evitar dupla baixa)
+        $temStatus = $this->columnExists('estoque_reservas', 'status');
+        try {
+            $sql = 'SELECT produto_id, COALESCE(SUM(COALESCE(quantidade_reservada,0)),0) as qtd '
+                . 'FROM estoque_reservas WHERE pedido_id = :pedido_id';
+            if ($temStatus) {
+                $sql .= " AND (status IS NULL OR status = '' OR status <> 'finalizada')";
+            }
+            $sql .= ' GROUP BY produto_id';
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute([':pedido_id' => $pedidoId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $rows = [];
+        }
+
+        if (empty($rows)) {
+            return;
+        }
+
+        foreach ($rows as $r) {
+            $produtoId = (int) ($r['produto_id'] ?? 0);
+            $qtd = (int) ($r['qtd'] ?? 0);
+            if ($produtoId <= 0 || $qtd <= 0) {
+                continue;
+            }
+
+            $restante = $qtd;
+            try {
+                $stmtLocs = $this->connection->prepare(
+                    'SELECT id, quantidade FROM estoque_interno WHERE produto_id = :produto_id AND quantidade > 0 '
+                    . 'ORDER BY CASE WHEN data_compra IS NULL THEN 1 ELSE 0 END ASC, data_compra ASC, id ASC'
+                );
+                $stmtLocs->execute([':produto_id' => $produtoId]);
+                $locs = $stmtLocs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $locs = [];
+            }
+
+            foreach ($locs as $loc) {
+                if ($restante <= 0) {
+                    break;
+                }
+                $locId = (int) ($loc['id'] ?? 0);
+                $qAtual = (int) ($loc['quantidade'] ?? 0);
+                if ($locId <= 0 || $qAtual <= 0) {
+                    continue;
+                }
+                $consumir = ($qAtual <= $restante) ? $qAtual : $restante;
+                $novoQ = $qAtual - $consumir;
+                try {
+                    $stmtUpd = $this->connection->prepare('UPDATE estoque_interno SET quantidade = :q WHERE id = :id LIMIT 1');
+                    $stmtUpd->execute([':q' => $novoQ, ':id' => $locId]);
+                } catch (\Exception $e) {
+                }
+                $restante -= $consumir;
+            }
+        }
+
+        // Marcar como finalizada para não consumir novamente
+        if ($temStatus) {
+            try {
+                $stmtFin = $this->connection->prepare("UPDATE estoque_reservas SET status = 'finalizada' WHERE pedido_id = :pedido_id AND (status IS NULL OR status = '' OR status <> 'finalizada')");
+                $stmtFin->execute([':pedido_id' => $pedidoId]);
             } catch (\Exception $e) {
             }
         }
@@ -363,17 +456,23 @@ class AdminPedidosEditController {
                                         <option value="pendente" ' . ($statusAtual === 'pendente' ? 'selected' : '') . '>Pendente</option>
                                         <option value="pago" ' . ($statusAtual === 'pago' ? 'selected' : '') . '>Pago</option>
                                         <option value="processando" ' . ($statusAtual === 'processando' ? 'selected' : '') . '>Processando</option>
-                                        <option value="produto_consolidado" ' . ($statusAtual === 'produto_consolidado' ? 'selected' : '') . '>Produto Consolidado</option>
+                                        <option value="produto_consolidado" ' . ($statusAtual === 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
                                         <option value="em_transporte" ' . ($statusAtual === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
                                         <option value="aguardando_liberacao_aduaneira" ' . ($statusAtual === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
                                         <option value="enviado_ao_destinatario" ' . ($statusAtual === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                        <option value="enviado" ' . ($statusAtual === 'enviado' ? 'selected' : '') . '>Enviado</option>
+                                        <option value="enviado" ' . ($statusAtual === 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                                         <option value="entregue" ' . ($statusAtual === 'entregue' ? 'selected' : '') . '>Entregue</option>
                                         <option value="cancelado" ' . ($statusAtual === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
                                     </select>
                                     <button type="button" class="btn btn-outline-primary w-100 mt-2" onclick="atualizarSomenteStatus()">
                                         <i class="fas fa-rotate me-1"></i>Atualizar Status
                                     </button>
+                                </div>
+
+                                <div class="mb-0">
+                                    <label class="form-label">Observação do vendedor</label>
+                                    <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="Observação interna para compras/PDF...">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
+                                    <div class="form-text">Essa observação é interna e aparece no PDF do relatório de compras.</div>
                                 </div>
                             </div>
                         </div>
@@ -646,6 +745,7 @@ class AdminPedidosEditController {
                     status: document.getElementById("pedido_status")?.value,
                     frete: document.getElementById("valor_frete")?.value,
                     desconto: document.getElementById("percentual_desconto")?.value,
+                    observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
                     itens: itens
                 };
 
@@ -957,6 +1057,11 @@ class AdminPedidosEditController {
 
             $setParts[] = 'total = :total';
             $paramsUpd[':total'] = $total;
+
+            if (is_array($colsPedidos) && in_array('observacao_vendedor', $colsPedidos, true)) {
+                $setParts[] = 'observacao_vendedor = :observacao_vendedor';
+                $paramsUpd[':observacao_vendedor'] = (string) ($dados['observacao_vendedor'] ?? '');
+            }
 
             // Se marcar como pago/aprovado, manter payment_status/pago_em consistentes (impacta comissões)
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];

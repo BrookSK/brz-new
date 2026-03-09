@@ -26,14 +26,33 @@ class ProdutoController extends Controller {
     public function index(Request $request) {
         $search = $request->getParam('search');
         $categoria = $request->getParam('categoria');
+
+        $page = (int) $request->getParam('page');
+        if ($page <= 0) $page = 1;
+        $limit = 20;
+        $offset = ($page - 1) * $limit;
+
+        $total = 0;
         
-        if ($search) {
-            $produtos = $this->produtoModel->search($search);
+        if ($search && $categoria) {
+            $total = $this->produtoModel->countSearch($search, $categoria);
+            $produtos = $this->produtoModel->search($search, $limit, $categoria, $offset);
+        } elseif ($search) {
+            $total = $this->produtoModel->countSearch($search, null);
+            $produtos = $this->produtoModel->search($search, $limit, null, $offset);
         } elseif ($categoria) {
-            $produtos = $this->produtoModel->getByCategoriaId($categoria);
+            $total = $this->produtoModel->countByCategoriaId($categoria);
+            $produtos = $this->produtoModel->getByCategoriaIdPaginado($categoria, $limit, $offset);
         } else {
             // Usar método que inclui JOIN com categorias
-            $produtos = $this->produtoModel->getAllWithCategoria();
+            $total = $this->produtoModel->countAllWithCategoria();
+            $produtos = $this->produtoModel->getAllWithCategoriaPaginado($limit, $offset);
+        }
+
+        $totalPages = (int) ceil(($total > 0 ? $total : 0) / $limit);
+        if ($totalPages <= 0) $totalPages = 1;
+        if ($page > $totalPages) {
+            $page = $totalPages;
         }
         
         // Adicionar foto de capa (produtos.foto_principal) com fallback para galeria
@@ -103,7 +122,11 @@ class ProdutoController extends Controller {
             'produtos' => $produtos,
             'categorias' => $categorias,
             'search' => $search,
-            'categoriaSelecionada' => $categoria
+            'categoriaSelecionada' => $categoria,
+            'page' => $page,
+            'limit' => $limit,
+            'total' => $total,
+            'totalPages' => $totalPages,
         ]);
     }
 

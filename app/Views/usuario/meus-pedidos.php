@@ -9,23 +9,64 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
                 <div>
-                    <h2 class="mb-1">Meus Pedidos</h2>
-                    <p class="text-muted mb-0">Histórico completo dos seus pedidos</p>
+                    <h2 class="mb-1"><?= __('user_orders.title', 'Meus Pedidos') ?></h2>
+                    <p class="text-muted mb-0"><?= __('user_orders.subtitle', 'Histórico completo dos seus pedidos') ?></p>
                 </div>
                 <div class="d-flex gap-2 user-page-actions">
                     <div class="input-group" style="width: 250px;">
-                        <input type="text" class="form-control" placeholder="Buscar pedido..." id="buscaPedido">
+                        <input type="text" class="form-control" placeholder="<?= htmlspecialchars(__('user_orders.search_placeholder', 'Buscar pedido...'), ENT_QUOTES, 'UTF-8') ?>" id="buscaPedido">
                         <button class="btn btn-outline-secondary" type="button">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>
                     <select class="form-select" id="filtroStatus" style="width: 150px;">
-                        <option value="">Todos Status</option>
-                        <option value="pendente">Pendente</option>
-                        <option value="processando">Processando</option>
-                        <option value="enviado">Enviado</option>
-                        <option value="entregue">Entregue</option>
-                        <option value="cancelado">Cancelado</option>
+                        <option value=""><?= __('user_orders.filter.all_status', 'Todos Status') ?></option>
+                        <?php
+                            $normalizeStatusKey = function($st) {
+                                $s = is_string($st) ? $st : '';
+                                $s = trim($s);
+                                if ($s === '') return '';
+                                if (function_exists('mb_strtolower')) {
+                                    $s = mb_strtolower($s, 'UTF-8');
+                                } else {
+                                    $s = strtolower($s);
+                                }
+                                if (function_exists('iconv')) {
+                                    $t = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
+                                    if ($t !== false && is_string($t) && $t !== '') {
+                                        $s = $t;
+                                    }
+                                }
+                                $s = preg_replace('/[^a-z0-9]+/', '_', $s);
+                                $s = preg_replace('/_+/', '_', $s);
+                                $s = trim($s, '_');
+                                return (string) $s;
+                            };
+
+                            $presentStatusMap = [];
+                            foreach (($pedidos ?? []) as $p) {
+                                $stRaw = (string) ($p['status'] ?? '');
+                                if ($stRaw === '') {
+                                    $stRaw = (string) ($p['payment_status'] ?? ($p['status_pagamento'] ?? ''));
+                                }
+                                $stKey = $normalizeStatusKey($stRaw);
+                                if ($stKey !== '') {
+                                    $presentStatusMap[$stKey] = true;
+                                }
+                            }
+
+                            $statusOptions = array_keys($presentStatusMap);
+                            sort($statusOptions);
+
+                            $statusLabels = [
+                                'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
+                            ];
+
+                            foreach ($statusOptions as $key) {
+                                $label = $statusLabels[$key] ?? ucfirst(str_replace('_', ' ', (string) $key));
+                                echo '<option value="' . htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') . '">' . $label . '</option>';
+                            }
+                        ?>
                     </select>
                 </div>
             </div>
@@ -38,7 +79,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="flex-grow-1">
                                     <h4 class="mb-1 fw-bold"><?= count($pedidos) ?></h4>
-                                    <p class="text-muted small mb-0">Total de Pedidos</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.total_orders', 'Total de Pedidos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-primary bg-opacity-10 rounded-circle p-3">
@@ -61,7 +102,7 @@
                                         echo count($ativos);
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Pedidos Ativos</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.active_orders', 'Pedidos Ativos') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
@@ -84,7 +125,7 @@
                                         echo count($entregues);
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Pedidos Entregues</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.delivered_orders', 'Pedidos Entregues') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-info bg-opacity-10 rounded-circle p-3">
@@ -123,7 +164,7 @@
                                         }
                                         ?>
                                     </h4>
-                                    <p class="text-muted small mb-0">Total Gasto</p>
+                                    <p class="text-muted small mb-0"><?= __('user_orders.stats.total_spent', 'Total Gasto') ?></p>
                                 </div>
                                 <div class="ms-3">
                                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
@@ -144,10 +185,10 @@
                                     <div class="bg-light rounded-circle p-4 d-inline-block mb-3">
                                         <i class="fas fa-shopping-bag text-muted fs-2"></i>
                                     </div>
-                                    <h5 class="mb-2">Nenhum pedido encontrado</h5>
-                                    <p class="text-muted mb-4">Você ainda não fez nenhuma compra.</p>
+                                    <h5 class="mb-2"><?= __('user_orders.empty_title', 'Nenhum pedido encontrado') ?></h5>
+                                    <p class="text-muted mb-4"><?= __('user_orders.empty_subtitle', 'Você ainda não fez nenhuma compra.') ?></p>
                                     <a href="/produtos" class="btn btn-primary">
-                                        <i class="fas fa-shopping-cart me-2"></i> Ver Produtos
+                                        <i class="fas fa-shopping-cart me-2"></i> <?= __('user_orders.view_products', 'Ver Produtos') ?>
                                     </a>
                                 </div>
                             <?php else: ?>
@@ -155,12 +196,12 @@
                                     <table class="table table-hover" id="tabelaPedidos">
                                         <thead>
                                             <tr>
-                                                <th>Código</th>
-                                                <th>Data</th>
-                                                <th>Status</th>
-                                                <th>Valor</th>
-                                                <th>Itens</th>
-                                                <th>Ações</th>
+                                                <th><?= __('user_orders.table.code', 'Código') ?></th>
+                                                <th><?= __('user_orders.table.date', 'Data') ?></th>
+                                                <th><?= __('user_orders.table.status', 'Status') ?></th>
+                                                <th><?= __('user_orders.table.amount', 'Valor') ?></th>
+                                                <th><?= __('user_orders.table.items', 'Itens') ?></th>
+                                                <th><?= __('user_orders.table.actions', 'Ações') ?></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -176,10 +217,11 @@
                                                 if ($statusPedido === '') {
                                                     $statusPedido = (string) ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? 'pendente'));
                                                 }
+                                                $statusPedidoKey = $normalizeStatusKey($statusPedido);
                                                 $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
                                                 $totalPedido = floatval($pedido['valor_total'] ?? ($pedido['total'] ?? ($pedido['valor'] ?? ($pedido['amount'] ?? 0))));
                                             ?>
-                                            <tr data-status="<?= htmlspecialchars($statusPedido) ?>">
+                                            <tr data-status="<?= htmlspecialchars($statusPedidoKey) ?>">
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
@@ -215,28 +257,18 @@
                                                         'transito' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
                                                         'aduana' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
                                                         'entrega' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
-                                                        'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)']
+                                                        'concluido' => ['bg' => 'rgba(16, 185, 129, 0.10)', 'border' => 'rgba(16, 185, 129, 0.18)', 'color' => 'rgba(6, 78, 59, 1)'],
+                                                        'etiqueta_gerada' => ['bg' => 'rgba(56, 189, 248, 0.12)', 'border' => 'rgba(56, 189, 248, 0.22)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'enviado_ao_destinatario' => ['bg' => 'rgba(11, 31, 58, 0.08)', 'border' => 'rgba(11, 31, 58, 0.14)', 'color' => 'rgba(11, 31, 58, 1)'],
+                                                        'caixa_fechada' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
+                                                        'aguardando_liberacao_aduaneira' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                        'aguardando_lib_alfandegaria' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
                                                     ];
                                                     $statusLabels = [
-                                                        'pendente' => 'Pendente',
-                                                        'processando' => 'Processando',
-                                                        'enviado' => 'Enviado',
-                                                        'entregue' => 'Entregue',
-                                                        'cancelado' => 'Cancelado',
-                                                        'pago' => 'Pago',
-                                                        'paid' => 'Pago',
-                                                        'aprovado' => 'Pago',
-                                                        'approved' => 'Pago',
-                                                        'selecao' => 'Seleção',
-                                                        'cobranca' => 'Cobrança',
-                                                        'despacho' => 'Despacho',
-                                                        'transito' => 'Trânsito',
-                                                        'aduana' => 'Aduana',
-                                                        'entrega' => 'Entrega',
-                                                        'concluido' => 'Concluído'
+                                                        'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
                                                     ];
-                                                    $badge = $statusColors[$statusPedido] ?? $statusColors['selecao'];
-                                                    $label = $statusLabels[$statusPedido] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : 'Pendente');
+                                                    $badge = $statusColors[$statusPedidoKey] ?? $statusColors['selecao'];
+                                                    $label = $statusLabels[$statusPedidoKey] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
                                                     ?>
                                                     <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                         <?= $label ?>
@@ -264,30 +296,30 @@
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <i class="fas fa-box text-muted me-2"></i>
-                                                        <span class="small"><?= $pedido['total_itens'] ?? 0 ?> itens</span>
+                                                        <span class="small"><?= (int) ($pedido['total_itens'] ?? 0) ?> <?= __('user_orders.items_count', 'itens') ?></span>
                                                     </div>
                                                 </td>
                                                 <td>
                                                     <div class="btn-group">
                                                         <a href="/pedido/detalhes/<?= $pedido['id'] ?>" 
                                                            class="btn btn-sm btn-outline-primary"
-                                                           title="Ver Detalhes">
+                                                           title="<?= htmlspecialchars(__('user_orders.actions.view_details', 'Ver Detalhes'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
                                                         <a class="btn btn-sm btn-outline-dark"
                                                            href="/meu-ticket/abrir/pedido/<?= (int) ($pedido['id'] ?? 0) ?>"
-                                                           title="Suporte">
+                                                           title="<?= htmlspecialchars(__('user_orders.actions.support', 'Suporte'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-life-ring"></i>
                                                         </a>
                                                         <button class="btn btn-sm btn-outline-success" 
                                                                 onclick="rastrearPedido('<?= htmlspecialchars((string)($pedido['codigo_pedido'] ?? $pedido['codigo'] ?? $pedido['codigo_rastreamento'] ?? $pedido['rastreamento'] ?? $pedido['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')"
-                                                                title="Rastrear">
+                                                                title="<?= htmlspecialchars(__('user_orders.actions.track', 'Rastrear'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-search-location"></i>
                                                         </button>
                                                         <?php if ($pedido['status'] === 'entregue'): ?>
                                                         <button class="btn btn-sm btn-outline-info" 
                                                                 onclick="recomprarPedido(<?= $pedido['id'] ?>)"
-                                                                title="Comprar Novamente">
+                                                                title="<?= htmlspecialchars(__('user_orders.actions.buy_again', 'Comprar Novamente'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-redo"></i>
                                                         </button>
                                                         <?php endif; ?>
@@ -301,7 +333,7 @@
 
                                 <!-- Pagination -->
                                 <?php if ($total_paginas > 1): ?>
-                                <nav aria-label="Navegação de páginas" class="mt-4">
+                                <nav aria-label="<?= htmlspecialchars(__('user_orders.pagination.aria', 'Navegação de páginas'), ENT_QUOTES, 'UTF-8') ?>" class="mt-4">
                                     <ul class="pagination justify-content-center">
                                         <?php if ($pagina > 1): ?>
                                         <li class="page-item">
@@ -335,13 +367,13 @@
 </div>
 
 <style>
-.user-avatar img {
+.col-lg-9 .user-avatar img {
     border: 3px solid #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     height: 80px;
 }
 
-.card-body nav.nav.flex-column .nav-link {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -352,23 +384,23 @@
     align-items: center;
 }
 
-.card-body nav.nav.flex-column .nav-link:hover {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link:hover {
     background-color: #f8f9fa;
     color: #495057;
     transform: none;
 }
 
-.card-body nav.nav.flex-column .nav-link.active {
+.col-lg-9 .card-body nav.nav.flex-column .nav-link.active {
     background: rgba(11, 31, 58, 0.08);
     border: 1px solid rgba(11, 31, 58, 0.14);
     color: rgba(11, 31, 58, 1) !important;
 }
 
-.card {
+.col-lg-9 .card {
     transition: none;
 }
 
-.card:hover {
+.col-lg-9 .card:hover {
     transform: none;
     box-shadow: none;
 }
@@ -438,17 +470,34 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const normalizeStatusKey = function(st) {
+        try {
+            let s = String(st || '').trim().toLowerCase();
+            if (!s) return '';
+            if (s.normalize) {
+                s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            }
+            s = s.replace(/[^a-z0-9]+/g, '_');
+            s = s.replace(/_+/g, '_');
+            s = s.replace(/^_+|_+$/g, '');
+            return s;
+        } catch (e) {
+            return String(st || '').trim().toLowerCase();
+        }
+    };
+
     // Filtro por status
     const filtroStatus = document.getElementById('filtroStatus');
     const tabelaPedidos = document.getElementById('tabelaPedidos');
     
     if (filtroStatus && tabelaPedidos) {
         filtroStatus.addEventListener('change', function() {
-            const status = this.value;
+            const status = normalizeStatusKey(this.value);
             const rows = tabelaPedidos.querySelectorAll('tbody tr');
             
             rows.forEach(row => {
-                if (status === '' || row.dataset.status === status) {
+                const rowStatus = normalizeStatusKey(row.dataset.status);
+                if (status === '' || rowStatus === status) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';

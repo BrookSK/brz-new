@@ -737,9 +737,179 @@ class PedidoEcommerce {
 
         if (!$pedido) return null;
 
+        // Normalizar aliases comuns (status/pagamento) para uso consistente nas views
+        try {
+            // status do pedido
+            $altStatus = null;
+            foreach (['status_pedido', 'pedido_status'] as $k) {
+                if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                    $altStatus = $pedido[$k];
+                    break;
+                }
+            }
+            if ($altStatus !== null) {
+                $pedido['status'] = $altStatus;
+            } elseif (!array_key_exists('status', $pedido) || $pedido['status'] === null || $pedido['status'] === '') {
+                $pedido['status'] = '';
+            }
+
+            // forma/metodo de pagamento
+            if (!array_key_exists('pagamento_metodo', $pedido) || $pedido['pagamento_metodo'] === null || $pedido['pagamento_metodo'] === '') {
+                if (array_key_exists('forma_pagamento', $pedido) && $pedido['forma_pagamento'] !== null && $pedido['forma_pagamento'] !== '') {
+                    $pedido['pagamento_metodo'] = $pedido['forma_pagamento'];
+                }
+            }
+
+            // gateway
+            if (!array_key_exists('pagamento_gateway', $pedido) || $pedido['pagamento_gateway'] === null || $pedido['pagamento_gateway'] === '') {
+                foreach (['payment_gateway', 'gateway'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_gateway'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+
+            // transação
+            if (!array_key_exists('pagamento_transacao', $pedido) || $pedido['pagamento_transacao'] === null || $pedido['pagamento_transacao'] === '') {
+                foreach (['payment_id', 'transaction_id', 'codigo_transacao'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_transacao'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+
+            // status de pagamento (fonte preferida: pagamento_status, senão payment_status/status_pagamento)
+            $altPgStatus = null;
+            foreach (['pagamento_status', 'payment_status', 'status_pagamento'] as $k) {
+                if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                    $altPgStatus = $pedido[$k];
+                    break;
+                }
+            }
+            if ($altPgStatus !== null) {
+                $pedido['pagamento_status'] = $altPgStatus;
+            }
+
+            // manter também payment_status para telas que leem esse campo
+            if (!array_key_exists('payment_status', $pedido) || $pedido['payment_status'] === null || $pedido['payment_status'] === '') {
+                if (array_key_exists('pagamento_status', $pedido) && $pedido['pagamento_status'] !== null && $pedido['pagamento_status'] !== '') {
+                    $pedido['payment_status'] = $pedido['pagamento_status'];
+                } elseif (array_key_exists('status_pagamento', $pedido) && $pedido['status_pagamento'] !== null && $pedido['status_pagamento'] !== '') {
+                    $pedido['payment_status'] = $pedido['status_pagamento'];
+                }
+            }
+
+            // data de pagamento
+            if (!array_key_exists('pagamento_data', $pedido) || $pedido['pagamento_data'] === null || $pedido['pagamento_data'] === '') {
+                foreach (['pago_em', 'paid_at', 'data_pagamento'] as $k) {
+                    if (array_key_exists($k, $pedido) && $pedido[$k] !== null && $pedido[$k] !== '') {
+                        $pedido['pagamento_data'] = $pedido[$k];
+                        break;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
         // Normalizar totais + endereço para o formato esperado nas views do usuário
         try {
             $colsPedido = $this->getTableColumns('pedidos');
+
+            // Tracking / etiqueta
+            try {
+                $pedido['tracking_code'] = $pedido['tracking_code'] ?? null;
+                $pedido['tracking_source'] = $pedido['tracking_source'] ?? null;
+                $pedido['tracking_label_url'] = $pedido['tracking_label_url'] ?? null;
+
+                $colTracking = $this->pickColumn($colsPedido, ['tracking_code', 'codigo_rastreio', 'rastreamento', 'tracking']);
+                $trk = '';
+                if ($colTracking && array_key_exists($colTracking, $pedido)) {
+                    $trk = trim((string) ($pedido[$colTracking] ?? ''));
+                }
+
+                $trkFonte = '';
+                $trkUrl = '';
+
+                if ($trk !== '') {
+                    $trkFonte = 'Pedido';
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('shipstation_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier_code FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'ShipStation' . (!empty($row['carrier_code']) ? (' (' . trim((string) $row['carrier_code']) . ')') : '');
+                                $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('stamps_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, label_url, carrier FROM stamps_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $t = trim((string) ($row['tracking_number'] ?? ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Stamps' . (!empty($row['carrier']) ? (' (' . trim((string) $row['carrier']) . ')') : '');
+                                $trkUrl = trim((string) ($row['label_url'] ?? ''));
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('correios_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $t = trim((string) ($st->fetchColumn() ?: ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Correios';
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
+                    if ($this->tableExists('remessa_janela_pedidos')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT courier_tracking_number, wexpress_tracking_number, wexpress_status FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $courier = trim((string) ($row['courier_tracking_number'] ?? ''));
+                            $wx = trim((string) ($row['wexpress_tracking_number'] ?? ''));
+                            $wxStatus = trim((string) ($row['wexpress_status'] ?? ''));
+                            if ($courier !== '' || $wx !== '') {
+                                $trk = $courier !== '' ? $courier : $wx;
+                                $trkFonte = 'W-Express' . ($wxStatus !== '' ? (' (' . $wxStatus . ')') : '');
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk !== '') {
+                    $pedido['tracking_code'] = $trk;
+                    $pedido['tracking_source'] = $trkFonte !== '' ? $trkFonte : null;
+                    $pedido['tracking_label_url'] = $trkUrl !== '' ? $trkUrl : null;
+                }
+            } catch (\Exception $e) {
+            }
 
             $moeda = strtoupper((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL')));
             $moeda = trim($moeda);
@@ -1345,6 +1515,8 @@ class PedidoEcommerce {
                 }
             }
 
+            $sumItensSubtotal = 0.0;
+
             foreach ($itens as &$item) {
                 $item['referencia'] = $item['referencia'] ?? ($item['nome_produto_sku'] ?? '');
                 $img = '';
@@ -1484,6 +1656,42 @@ class PedidoEcommerce {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) return [];
 
+        $eventos = [];
+        $pedidoCreatedGlobal = null;
+        $pedidoUpdatedGlobal = null;
+        $pushEvento = function ($status, $createdAt, $observacao = '', $usuario = 'Sistema') use (&$eventos) {
+            $st = trim((string) $status);
+            $dt = $createdAt;
+            if ($st === '') {
+                return;
+            }
+            if (is_string($dt)) {
+                $dt = trim($dt);
+                if ($dt === '') {
+                    $dt = null;
+                }
+            }
+            $eventos[] = [
+                'novo_status' => $st,
+                'status_novo' => $st,
+                'observacao' => (string) $observacao,
+                'created_at' => $dt,
+                'usuario_alterou' => (string) $usuario,
+            ];
+        };
+
+        $getTs = function ($row, $keyCandidates) {
+            if (!is_array($row)) {
+                return null;
+            }
+            foreach ($keyCandidates as $k) {
+                if (array_key_exists($k, $row) && $row[$k] !== null && $row[$k] !== '') {
+                    return $row[$k];
+                }
+            }
+            return null;
+        };
+
         try {
             $usuarioCol = $this->resolvePedidoStatusHistoryUsuarioColumn();
             $userNomeCol = 'nome';
@@ -1504,10 +1712,198 @@ class PedidoEcommerce {
                 ORDER BY psh.created_at DESC
             ");
             $stmt->execute([':id' => $pedidoId]);
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (!empty($rows)) {
+                foreach ($rows as $r) {
+                    $st = $r['status_novo'] ?? ($r['novo_status'] ?? '');
+                    $dt = $getTs($r, ['created_at', 'data_hora', 'data', 'date']);
+                    $obs = (string) ($r['observacao'] ?? '');
+                    $usr = (string) ($r['usuario_alterou'] ?? 'Sistema');
+                    $pushEvento($st, $dt, $obs, $usr);
+                }
+            }
         } catch (\Exception $e) {
+            // fallback
+        }
+
+        // Fallback: tabela rastreamento (quando existir)
+        try {
+            if ($this->tableExists('rastreamento')) {
+                $colsR = $this->getTableColumns('rastreamento');
+                if (is_array($colsR) && !empty($colsR)) {
+                    $colPedido = $this->pickColumn($colsR, ['pedido_id', 'order_id']);
+                    $colEtapa = $this->pickColumn($colsR, ['novo_status', 'etapa', 'status', 'status_novo']);
+                    $colDesc = $this->pickColumn($colsR, ['observacao', 'descricao', 'description', 'mensagem', 'message']);
+                    $colLocal = $this->pickColumn($colsR, ['local', 'location']);
+                    $colData = $this->pickColumn($colsR, ['created_at', 'data_hora', 'data', 'date']);
+
+                    if ($colPedido) {
+                        $select = [];
+                        if ($colEtapa) $select[] = $colEtapa . ' AS etapa';
+                        if ($colDesc) $select[] = $colDesc . ' AS descricao';
+                        if ($colLocal) $select[] = $colLocal . ' AS local';
+                        if ($colData) $select[] = $colData . ' AS created_at';
+                        if (empty($select)) {
+                            $select[] = '*';
+                        }
+
+                        $orderBy = $colData ? (' ORDER BY ' . $colData . ' DESC') : ' ORDER BY id DESC';
+                        $st = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM rastreamento WHERE ' . $colPedido . ' = ?' . $orderBy);
+                        $st->execute([$pedidoId]);
+                        $rrows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        $out = [];
+                        foreach ($rrows as $r) {
+                            $etapa = trim((string) ($r['etapa'] ?? ($r[$colEtapa] ?? '')));
+                            $desc = trim((string) ($r['descricao'] ?? ($r[$colDesc] ?? '')));
+                            $local = trim((string) ($r['local'] ?? ($r[$colLocal] ?? '')));
+                            $dt = $r['created_at'] ?? ($colData ? ($r[$colData] ?? null) : null);
+
+                            $obs = $desc;
+                            if ($local !== '') {
+                                $obs = ($obs !== '' ? ($obs . ' - ' . $local) : $local);
+                            }
+
+                            $out[] = [
+                                'status_novo' => $etapa,
+                                'novo_status' => $etapa,
+                                'observacao' => $obs,
+                                'created_at' => $dt,
+                                'usuario_alterou' => 'Sistema',
+                            ];
+                        }
+
+                        if (!empty($out)) {
+                            foreach ($out as $ev) {
+                                $pushEvento($ev['novo_status'] ?? ($ev['status_novo'] ?? ''), $ev['created_at'] ?? null, $ev['observacao'] ?? '', $ev['usuario_alterou'] ?? 'Sistema');
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        // Eventos sintéticos a partir do pedido (criado/pago) e tabelas de etiqueta
+        try {
+            $colsP = $this->getTableColumns('pedidos');
+            $colStatus = $this->pickColumn($colsP, ['status', 'status_pedido', 'pedido_status']);
+            $colCreated = $this->pickColumn($colsP, ['created_at', 'data_criacao', 'data_pedido']);
+            $colUpdated = $this->pickColumn($colsP, ['updated_at', 'data_atualizacao', 'updated']);
+            $colPagoEm = $this->pickColumn($colsP, ['pago_em', 'paid_at', 'data_pagamento']);
+            $colPaymentStatus = $this->pickColumn($colsP, ['payment_status', 'status_pagamento']);
+
+            $select = ['id'];
+            if ($colStatus) $select[] = $colStatus . ' AS st';
+            if ($colCreated) $select[] = $colCreated . ' AS created_at';
+            if ($colUpdated) $select[] = $colUpdated . ' AS updated_at';
+            if ($colPagoEm) $select[] = $colPagoEm . ' AS pago_em';
+            if ($colPaymentStatus) $select[] = $colPaymentStatus . ' AS payment_status';
+            $st = $this->connection->prepare('SELECT ' . implode(', ', $select) . ' FROM pedidos WHERE id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $pr = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $pedidoCreated = $getTs($pr, ['created_at']);
+            $pedidoUpdated = $getTs($pr, ['updated_at']);
+            $pedidoCreatedGlobal = $pedidoCreated;
+            $pedidoUpdatedGlobal = $pedidoUpdated;
+            if ($pedidoCreated) {
+                $pushEvento('pedido_criado', $pedidoCreated, '', 'Sistema');
+            }
+
+            $pagoEmVal = $getTs($pr, ['pago_em']);
+            $pstatusVal = strtolower(trim((string) ($pr['payment_status'] ?? '')));
+            $isPaid = ($pagoEmVal !== null && $pagoEmVal !== '') || in_array($pstatusVal, ['approved','aprovado','paid','pago','succeeded','success','received','confirmed'], true);
+            if ($isPaid) {
+                $pushEvento('pago', $pagoEmVal ?: $pedidoCreated, '', 'Sistema');
+            }
+
+            $stVal = trim((string) ($pr['st'] ?? ''));
+            if ($stVal !== '') {
+                $pushEvento($stVal, $pedidoUpdated ?: $pedidoCreated, '', 'Sistema');
+            }
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $labelTables = [
+                ['table' => 'shipstation_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','generated_at','created','data_hora','data_criacao','data'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
+                ['table' => 'stamps_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','generated_at','created','data_hora','data_criacao','data'], 'extra' => ['label_url' => 'label_url', 'tracking_number' => 'tracking_number']],
+                ['table' => 'correios_etiquetas', 'status' => 'enviado', 'cols' => ['updated_at','created_at','gerado_em','data_criacao','data_hora','data'], 'extra' => ['codigo_etiqueta' => 'codigo_etiqueta']],
+                ['table' => 'remessa_janela_pedidos', 'status' => 'em_transporte', 'cols' => ['updated_at','created_at','gerado_em','data_criacao','data_hora','data'], 'extra' => ['wexpress_status' => 'wexpress_status', 'wexpress_tracking_number' => 'wexpress_tracking_number', 'courier_tracking_number' => 'courier_tracking_number']],
+            ];
+
+            foreach ($labelTables as $lt) {
+                $t = (string) ($lt['table'] ?? '');
+                if ($t === '' || !$this->tableExists($t)) {
+                    continue;
+                }
+                $colsT = $this->getTableColumns($t);
+                if (empty($colsT)) {
+                    continue;
+                }
+                $colPedido = $this->pickColumn($colsT, ['pedido_id', 'order_id']);
+                if (!$colPedido) {
+                    continue;
+                }
+                $dtCol = $this->pickColumn($colsT, (array) ($lt['cols'] ?? ['updated_at','created_at']));
+                $fields = [];
+                $fields[] = $dtCol ? ($dtCol . ' AS dt') : 'NULL AS dt';
+                foreach ((array) ($lt['extra'] ?? []) as $alias => $col) {
+                    if (in_array($col, $colsT, true)) {
+                        $fields[] = $col . ' AS ' . $alias;
+                    }
+                }
+                $sql = 'SELECT ' . implode(', ', $fields) . ' FROM ' . $t . ' WHERE ' . $colPedido . ' = ? ORDER BY ' . ($dtCol ? $dtCol : 'id') . ' DESC LIMIT 1';
+                $st = $this->connection->prepare($sql);
+                $st->execute([$pedidoId]);
+                $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $dt = $row['dt'] ?? null;
+                if (($dt === null || $dt === '') && ($pedidoUpdatedGlobal || $pedidoCreatedGlobal)) {
+                    $dt = $pedidoUpdatedGlobal ?: $pedidoCreatedGlobal;
+                }
+                $obsParts = [];
+                foreach (['tracking_number','codigo_etiqueta','wexpress_tracking_number','courier_tracking_number','wexpress_status'] as $k) {
+                    $v = trim((string) ($row[$k] ?? ''));
+                    if ($v !== '') {
+                        $obsParts[] = $v;
+                    }
+                }
+                $obs = '';
+                if ($t !== 'remessa_janela_pedidos' && !empty($obsParts)) {
+                    $obs = 'Código: ' . $obsParts[0];
+                }
+                $pushEvento((string) ($lt['status'] ?? 'enviado'), $dt, $obs, 'Sistema');
+            }
+        } catch (\Exception $e) {
+        }
+
+        if (empty($eventos)) {
             return [];
         }
+
+        usort($eventos, function ($a, $b) {
+            $da = isset($a['created_at']) ? strtotime((string) $a['created_at']) : 0;
+            $db = isset($b['created_at']) ? strtotime((string) $b['created_at']) : 0;
+            if ($da === $db) {
+                return 0;
+            }
+            return ($da > $db) ? -1 : 1;
+        });
+
+        // Deduplicar eventos idênticos
+        $uniq = [];
+        $seen = [];
+        foreach ($eventos as $ev) {
+            $k = strtolower(trim((string) ($ev['novo_status'] ?? ''))) . '|' . trim((string) ($ev['created_at'] ?? '')) . '|' . trim((string) ($ev['observacao'] ?? ''));
+            if (isset($seen[$k])) {
+                continue;
+            }
+            $seen[$k] = true;
+            $uniq[] = $ev;
+        }
+
+        return $uniq;
     }
 
     public function atualizarStatus(int $pedidoId, string $novoStatus, ?string $observacao = null, $usuarioId = null): bool {

@@ -9,14 +9,33 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4 user-page-header">
                 <div>
-                    <h2 class="mb-1">Meus Dados</h2>
-                    <p class="text-muted mb-0">Gerencie suas informações pessoais</p>
+                    <h2 class="mb-1"><?= __('user_data.title', 'Meus Dados') ?></h2>
+                    <p class="text-muted mb-0"><?= __('user_data.subtitle', 'Gerencie suas informações pessoais') ?></p>
                 </div>
                 <div class="text-end">
-                    <small class="text-muted">Membro desde:</small><br>
+                    <small class="text-muted"><?= __('user_data.member_since', 'Membro desde:') ?></small><br>
                     <strong><?= date('d/m/Y', strtotime($usuario['created_at'] ?? 'now')) ?></strong>
                 </div>
             </div>
+
+            <script>
+                window.MYDATA_I18N = {
+                    cpf: <?= json_encode(__('auth.cpf', 'CPF'), JSON_UNESCAPED_UNICODE) ?>,
+                    password_mismatch: <?= json_encode(__('user_data.password_mismatch', 'As senhas não conferem!'), JSON_UNESCAPED_UNICODE) ?>,
+                    password_min_length: <?= json_encode(__('user_data.password_min_length', 'A senha deve ter pelo menos 6 caracteres!'), JSON_UNESCAPED_UNICODE) ?>,
+                    saving: <?= json_encode(__('user_data.saving', 'Salvando...'), JSON_UNESCAPED_UNICODE) ?>,
+                    select: <?= json_encode(__('common.select', 'Selecione...'), JSON_UNESCAPED_UNICODE) ?>,
+                    address_line_1: <?= json_encode(__('checkout.address_line_1', 'Address line 1 *'), JSON_UNESCAPED_UNICODE) ?>,
+                    address_line_2_optional: <?= json_encode(__('checkout.address_line_2_optional', 'Address line 2 (optional)'), JSON_UNESCAPED_UNICODE) ?>,
+                    number_label: <?= json_encode(__('auth.number_label', 'Número'), JSON_UNESCAPED_UNICODE) ?>,
+                    number_label_en: <?= json_encode(__('checkout.number_en', 'Number'), JSON_UNESCAPED_UNICODE) ?>,
+                    confirm_remove_avatar: <?= json_encode(__('user_data.avatar.confirm_remove', 'Remover sua foto de perfil?'), JSON_UNESCAPED_UNICODE) ?>,
+                    example_street: <?= json_encode(__('user_data.example.street', 'Rua Exemplo'), JSON_UNESCAPED_UNICODE) ?>,
+                    example_district: <?= json_encode(__('user_data.example.district', 'Centro'), JSON_UNESCAPED_UNICODE) ?>,
+                    example_city: <?= json_encode(__('user_data.example.city', 'São Paulo'), JSON_UNESCAPED_UNICODE) ?>,
+                    example_state: <?= json_encode(__('user_data.example.state', 'SP'), JSON_UNESCAPED_UNICODE) ?>
+                };
+            </script>
 
             <script>
             (function() {
@@ -40,7 +59,8 @@
                     var hintEl = document.getElementById('hint-documento');
                     if (!paisRes || !docEl || !labelEl) return;
                     var br = ((paisRes.value || '').toString().toUpperCase() === 'BR');
-                    labelEl.textContent = br ? 'CPF *' : 'CPF';
+                    var cpf = (window.MYDATA_I18N && window.MYDATA_I18N.cpf) ? window.MYDATA_I18N.cpf : 'CPF';
+                    labelEl.textContent = br ? (cpf + ' *') : cpf;
                     docEl.required = br;
                     if (hintEl) {
                         hintEl.style.display = br ? 'none' : 'block';
@@ -50,9 +70,15 @@
                 function syncBairroRules() {
                     var paisEl = document.getElementById('pais');
                     var bairroEl = document.getElementById('bairro');
+                    var bairroLabelEl = document.getElementById('label-bairro');
                     if (!paisEl || !bairroEl) return;
                     var br = ((paisEl.value || '').toString().toUpperCase() === 'BR');
                     bairroEl.required = br;
+                    if (bairroLabelEl) {
+                        var lbl = (bairroLabelEl.textContent || '').toString();
+                        lbl = lbl.replace(/\s*\*\s*$/, '');
+                        bairroLabelEl.textContent = br ? (lbl + ' *') : lbl;
+                    }
                 }
 
                 function parseTelefone(telefoneRaw) {
@@ -195,29 +221,131 @@
             <?php unset($_SESSION['message'], $_SESSION['message_type']); ?>
             <?php endif; ?>
 
+            <?php
+                $docDigits = preg_replace('/\D+/', '', (string) ($usuario['documento'] ?? ($usuario['cpf'] ?? '')));
+                $cpfInvalid = false;
+                if ($docDigits !== '' && strlen($docDigits) === 11) {
+                    $cpfInvalid = !\App\Services\CpfValidator::isValid($docDigits);
+                }
+            ?>
+            <?php if (!empty($cpfInvalid)): ?>
+            <div class="alert alert-warning">
+                <?= __('user_data.cpf_invalid_warning', 'Atenção: seu CPF está inválido. Atualize seus dados cadastrais para continuar comprando.') ?>
+            </div>
+            <?php endif; ?>
+
+            <?php $suitesAntigas = $suitesAntigas ?? []; ?>
+            <?php if (!empty($suitesAntigas) && is_array($suitesAntigas)): ?>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-building me-2"></i> Outras suítes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small mb-3">Encontramos outras suítes antigas vinculadas ao seu e-mail.</div>
+                    <div class="row g-3">
+                        <?php foreach ($suitesAntigas as $sa): ?>
+                            <?php if (!is_array($sa)) continue; ?>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100" style="background: rgba(248, 250, 252, 0.85);">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                <?= htmlspecialchars((string) ($sa['label'] ?? 'Suíte')) ?>
+                                            </div>
+                                            <div class="small text-muted">
+                                                Antiga
+                                                <?php if (!empty($sa['suite'])): ?>
+                                                    - Suíte <strong><?= (int) $sa['suite'] ?></strong>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">OK</span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php
+                $avatarColumnCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto'];
+                $avatarUrl = null;
+                foreach ($avatarColumnCandidates as $c) {
+                    if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                        $avatarUrl = $usuario[$c];
+                        break;
+                    }
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = $_SESSION['usuario_avatar'] ?? null;
+                }
+                if (empty($avatarUrl)) {
+                    $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode((string) ($usuario['nome'] ?? '')) . '&background=0b1f3a&color=fff&size=512';
+                }
+            ?>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-camera me-2"></i> <?= __('user_data.avatar.title', 'Foto de Perfil') ?>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="user-avatar">
+                            <img src="<?= htmlspecialchars((string) $avatarUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($usuario['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 80px; height: 80px; object-fit: cover; border-radius: 999px;">
+                            <span class="avatar-camera-indicator"><i class="fas fa-camera"></i></span>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary" id="btnAvatarView">
+                                <i class="fas fa-eye me-2"></i> <?= __('user_data.avatar.view', 'Ver') ?>
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btnAvatarChange">
+                                <i class="fas fa-upload me-2"></i> <?= __('user_data.avatar.change', 'Alterar') ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="btnAvatarRemove">
+                                <i class="fas fa-undo me-2"></i> <?= __('user_data.avatar.reset', 'Voltar ao padrão') ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="avatarUploadForm" method="POST" action="/meus-dados/avatar" enctype="multipart/form-data" class="d-none">
+                        <input type="file" name="avatar" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" />
+                    </form>
+
+                    <form id="avatarRemoveForm" method="POST" action="/meus-dados/avatar/remover" class="d-none"></form>
+                </div>
+            </div>
+
             <form method="POST" action="/meus-dados" id="formMeusDados">
             
             <!-- Profile Form -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-user-edit me-2"></i> Informações Pessoais
+                        <i class="fas fa-user-edit me-2"></i> <?= __('user_data.personal_info', 'Informações Pessoais') ?>
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="nome" class="form-label">Nome Completo</label>
+                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                 <input type="text" class="form-control" id="nome" name="nome" 
                                        value="<?= htmlspecialchars($usuario['nome']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="email" class="form-label">E-mail</label>
+                                <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                                 <input type="email" class="form-control" id="email" name="email" 
                                        value="<?= htmlspecialchars($usuario['email']) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="telefone" class="form-label">Telefone</label>
+                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?> *</label>
                                 <div class="input-group w-100" style="flex-wrap: nowrap;">
                                     <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
                                         <option value="55" selected>+55</option>
@@ -231,14 +359,14 @@
                                         <option value="54">+54</option>
                                         <option value="56">+56</option>
                                         <option value="57">+57</option>
-                                        <option value="0">Outro</option>
+                                        <option value="0"><?= __('auth.other', 'Outro') ?></option>
                                     </select>
-                                    <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="Número" required>
+                                    <input type="text" class="form-control" id="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
                                     <input type="hidden" class="form-control" id="telefone" name="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
                                 </div>
                                 <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
                                     <span class="input-group-text">DDI</span>
-                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="Ex: 81">
+                                    <input type="text" class="form-control" id="telefone_ddi_outro" placeholder="<?= htmlspecialchars(__('auth.ddi_example', 'Ex: 81'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -246,16 +374,16 @@
                                 <input type="text" class="form-control" id="documento" name="documento" 
                                        value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>" 
                                        placeholder="000.000.000-00">
-                                <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
+                                <small class="text-muted" id="hint-documento" style="display:none;"><?= __('auth.document_br_required_hint', 'Obrigatório apenas para residentes no Brasil.') ?></small>
                             </div>
 
                             <div class="col-md-6">
-                                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?> *</label>
                                 <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
                                        value="<?= htmlspecialchars($usuario['data_nascimento'] ?? '') ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="pais_residencia" class="form-label">País de Residência</label>
+                                <label for="pais_residencia" class="form-label"><?= __('auth.country_of_residence', 'País de Residência') ?> *</label>
                                 <?php require __DIR__ . '/../_countries.php'; ?>
                                 <?php $pr = strtoupper((string) ($usuario['pais_residencia'] ?? 'BR')); ?>
                                 <select class="form-select" id="pais_residencia" name="pais_residencia" required>
@@ -263,7 +391,7 @@
                                         <option value="<?= htmlspecialchars($code) ?>" <?= $pr === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="Digite para filtrar países...">
+                                <input type="text" class="form-control mt-2" id="pais_residencia_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                         </div>
                 </div>
@@ -272,14 +400,18 @@
             <?php if (empty($usuario['termos_aceitos_em'])): ?>
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-signature me-2"></i> Termos e Condições</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-signature me-2"></i> <?= __('user_data.terms.title', 'Termos e Condições') ?></h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">Você precisa aceitar os termos para continuar comprando.</div>
+                    <div class="alert alert-warning"><?= __('user_data.terms.warning', 'Você precisa aceitar os termos para continuar comprando.') ?></div>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" name="aceitar_termos" id="aceitar_termos" required>
                         <label class="form-check-label" for="aceitar_termos">
-                            Li e aceito os <a href="/termos-uso" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/politica-privacidade" target="_blank" rel="noopener">Política de Privacidade</a>
+                            <?= __('auth.legal_consent', 'Li e aceito os {terms} de uso e política de privacidade.', [
+                                'terms' => '<a href="/termos-uso" target="_blank" rel="noopener">' . __('auth.terms', 'Termos de Uso') . '</a>',
+                                'privacy' => '<a href="/politica-privacidade" target="_blank" rel="noopener">' . __('auth.privacy', 'Política de Privacidade') . '</a>',
+                            ]) ?>
+                            *
                         </label>
                     </div>
                 </div>
@@ -290,63 +422,64 @@
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-map-marker-alt me-2"></i> Endereço de Entrega
+                        <i class="fas fa-map-marker-alt me-2"></i> <?= __('checkout.shipping_address', 'Endereço de Entrega') ?>
                     </h5>
                 </div>
                 <div class="card-body">
+                        <div class="text-muted small mb-3"><?= __('common.required_fields_note', 'Campos com * são obrigatórios.') ?></div>
                         <?php $enderecoEntrega = $enderecoEntrega ?? null; ?>
                         <?php $ee = is_array($enderecoEntrega) ? $enderecoEntrega : []; ?>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="pais" class="form-label">País / Country</label>
+                                <label for="pais" class="form-label"><?= __('checkout.country', 'País') ?> / <?= __('checkout.country_en', 'Country') ?> *</label>
                                 <?php $pp = strtoupper((string) ($ee['pais'] ?? ($usuario['pais_residencia'] ?? 'BR'))); ?>
                                 <select class="form-select" id="pais" name="pais" required>
                                     <?php foreach ($countries as $code => $name): ?>
                                         <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="Digite para filtrar países...">
+                                <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="cep" class="form-label">CEP</label>
+                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?> *</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
                                        placeholder="00000-000" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="endereco" class="form-label" id="label-endereco">Endereço</label>
+                                <label for="endereco" class="form-label" id="label-endereco"><?= __('auth.address', 'Endereço') ?></label>
                                 <input type="text" class="form-control" id="endereco" name="endereco" 
                                        value="<?= htmlspecialchars((string) ($ee['endereco'] ?? ($ee['logradouro'] ?? ($usuario['endereco'] ?? '')))) ?>" 
-                                       placeholder="Rua, Avenida, etc." required>
+                                       placeholder="<?= htmlspecialchars(__('auth.address_placeholder', 'Rua, Avenida, etc.'), ENT_QUOTES, 'UTF-8') ?>" required>
                             </div>
                             <div class="col-md-3" id="numero-wrap">
-                                <label for="numero" class="form-label" id="label-numero">Número</label>
+                                <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?></label>
                                 <input type="text" class="form-control" id="numero" name="numero" 
                                        value="<?= htmlspecialchars((string) ($ee['numero'] ?? ($usuario['numero'] ?? ''))) ?>" 
-                                       placeholder="123">
+                                       placeholder="<?= htmlspecialchars(__('auth.number_example', '123'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-3">
-                                <label for="complemento" class="form-label" id="label-complemento">Complemento</label>
+                                <label for="complemento" class="form-label" id="label-complemento"><?= __('auth.complement', 'Complemento') ?></label>
                                 <input type="text" class="form-control" id="complemento" name="complemento" 
                                        value="<?= htmlspecialchars((string) ($ee['complemento'] ?? ($usuario['complemento'] ?? ''))) ?>" 
-                                       placeholder="Apto, Casa, etc.">
+                                       placeholder="<?= htmlspecialchars(__('auth.complement_placeholder', 'Apto, Casa, etc.'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-4" id="bairro-wrap">
-                                <label for="bairro" class="form-label" id="label-bairro">Bairro</label>
+                                <label for="bairro" class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?></label>
                                 <input type="text" class="form-control" id="bairro" name="bairro" 
                                        value="<?= htmlspecialchars((string) ($ee['bairro'] ?? ($usuario['bairro'] ?? ''))) ?>" 
-                                       placeholder="Centro">
+                                       placeholder="<?= htmlspecialchars(__('auth.neighborhood_example', 'Centro'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label for="cidade" class="form-label">Cidade</label>
+                                <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?> *</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
                                        value="<?= htmlspecialchars((string) ($ee['cidade'] ?? ($usuario['cidade'] ?? ''))) ?>" 
-                                       placeholder="São Paulo" required>
+                                       placeholder="<?= htmlspecialchars(__('auth.city_example', 'São Paulo'), ENT_QUOTES, 'UTF-8') ?>" required>
                             </div>
                             <div class="col-md-4">
-                                <label for="estado" class="form-label" id="label-estado">Estado</label>
+                                <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?></label>
                                 <select class="form-select" id="estado" name="estado">
-                                    <option value="">Selecione...</option>
+                                    <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                     <?php $selectedUf = (string) ($ee['estado'] ?? ($ee['uf'] ?? ($usuario['estado'] ?? ''))); ?>
                                     <option value="AC" <?= $selectedUf === 'AC' ? 'selected' : '' ?>>Acre</option>
                                     <option value="AL" <?= $selectedUf === 'AL' ? 'selected' : '' ?>>Alagoas</option>
@@ -386,30 +519,30 @@
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <h5 class="mb-0 fw-bold">
-                        <i class="fas fa-shield-alt me-2"></i> Segurança
+                        <i class="fas fa-shield-alt me-2"></i> <?= __('user_data.security.title', 'Segurança') ?>
                     </h5>
                 </div>
                 <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="senha_atual" class="form-label">Senha Atual</label>
+                                <label for="senha_atual" class="form-label"><?= __('user_data.security.current_password', 'Senha Atual') ?></label>
                                 <input type="password" class="form-control" id="senha_atual" name="senha_atual" 
-                                       placeholder="Digite sua senha atual">
+                                       placeholder="<?= htmlspecialchars(__('user_data.security.current_password_placeholder', 'Digite sua senha atual'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="senha_nova" class="form-label">Nova Senha</label>
+                                <label for="senha_nova" class="form-label"><?= __('user_data.security.new_password', 'Nova Senha') ?></label>
                                 <input type="password" class="form-control" id="senha_nova" name="senha_nova" 
-                                       placeholder="Digite a nova senha">
+                                       placeholder="<?= htmlspecialchars(__('user_data.security.new_password_placeholder', 'Digite a nova senha'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-12">
-                                <label for="senha_confirmacao" class="form-label">Confirmar Nova Senha</label>
+                                <label for="senha_confirmacao" class="form-label"><?= __('user_data.security.confirm_new_password', 'Confirmar Nova Senha') ?></label>
                                 <input type="password" class="form-control" id="senha_confirmacao" name="senha_confirmacao" 
-                                       placeholder="Confirme a nova senha">
+                                       placeholder="<?= htmlspecialchars(__('user_data.security.confirm_new_password_placeholder', 'Confirme a nova senha'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                         </div>
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            Deixe os campos de senha em branco caso não queira alterá-los.
+                            <?= __('user_data.security.keep_blank_hint', 'Deixe os campos de senha em branco caso não queira alterá-los.') ?>
                         </div>
                 </div>
             </div>
@@ -419,10 +552,10 @@
                 <div class="col-12">
                     <div class="d-flex gap-2 justify-content-end">
                         <a href="/minha-conta" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-2"></i> Cancelar
+                            <i class="fas fa-times me-2"></i> <?= __('common.cancel', 'Cancelar') ?>
                         </a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i> Salvar Alterações
+                            <i class="fas fa-save me-2"></i> <?= __('common.save_changes', 'Salvar Alterações') ?>
                         </button>
                     </div>
                 </div>
@@ -468,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (btnAvatarRemove && avatarRemoveForm) {
         btnAvatarRemove.addEventListener('click', function() {
-            const ok = confirm('Remover sua foto de perfil?');
+            const ok = confirm((window.MYDATA_I18N && window.MYDATA_I18N.confirm_remove_avatar) ? window.MYDATA_I18N.confirm_remove_avatar : 'Remover sua foto de perfil?');
             if (ok) {
                 avatarRemoveForm.submit();
             }
@@ -521,16 +654,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const cep = e.target.value.replace(/\D/g, '');
             if (cep.length === 8) {
-                fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                fetch('/api/cep/' + encodeURIComponent(cep))
                     .then(response => response.json())
                     .then(data => {
-                        if (!data.erro) {
-                            document.getElementById('endereco').value = data.logradouro || '';
-                            document.getElementById('bairro').value = data.bairro || '';
-                            document.getElementById('cidade').value = data.localidade || '';
-                            document.getElementById('estado').value = data.uf || '';
-                            document.getElementById('numero').focus();
+                        if (!data || !data.success || !data.endereco) {
+                            return;
                         }
+                        const end = data.endereco;
+                        document.getElementById('endereco').value = end.logradouro || '';
+                        document.getElementById('bairro').value = end.bairro || '';
+                        document.getElementById('cidade').value = end.localidade || '';
+                        document.getElementById('estado').value = end.uf || '';
+                        document.getElementById('numero').focus();
                     })
                     .catch(error => {
                         console.error('Erro ao buscar CEP:', error);
@@ -544,6 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const cep = document.getElementById('cep');
         const estadoSelect = document.getElementById('estado');
         const estadoText = document.getElementById('estado_text');
+        const estadoLabel = document.getElementById('label-estado');
 
         const enderecoLabel = document.getElementById('label-endereco');
         const numeroWrap = document.getElementById('numero-wrap');
@@ -579,17 +715,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (enderecoLabel) {
-            enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : 'Address line 1 *';
+            enderecoLabel.textContent = (pais === 'BR') ? 'Rua / Street *' : ((window.MYDATA_I18N && window.MYDATA_I18N.address_line_1) ? window.MYDATA_I18N.address_line_1 : 'Address line 1 *');
         }
         if (compLabel) {
-            compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : 'Address line 2 (optional)';
+            compLabel.textContent = (pais === 'BR') ? 'Complemento / Complement' : ((window.MYDATA_I18N && window.MYDATA_I18N.address_line_2_optional) ? window.MYDATA_I18N.address_line_2_optional : 'Address line 2 (optional)');
         }
 
         if (numeroWrap && numeroInput && numeroLabel) {
             if (pais === 'BR') {
                 numeroWrap.style.display = '';
                 numeroInput.required = true;
-                numeroLabel.textContent = 'Número / Number *';
+                const pt = (window.MYDATA_I18N && window.MYDATA_I18N.number_label) ? window.MYDATA_I18N.number_label : 'Número';
+                const en = (window.MYDATA_I18N && window.MYDATA_I18N.number_label_en) ? window.MYDATA_I18N.number_label_en : 'Number';
+                numeroLabel.textContent = pt + ' / ' + en + ' *';
             } else {
                 numeroWrap.style.display = 'none';
                 numeroInput.required = false;
@@ -614,6 +752,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const estadoRequired = (pais === 'BR' || pais === 'US' || pais === 'CA');
 
+            if (estadoLabel) {
+                let lbl = (estadoLabel.textContent || '').toString();
+                lbl = lbl.replace(/\s*\*\s*$/, '');
+                estadoLabel.textContent = estadoRequired ? (lbl + ' *') : lbl;
+            }
+
             if (shouldUseSelect) {
                 const current = String(estadoSelect.value || estadoText.value || '').trim();
 
@@ -622,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 const optEmpty = document.createElement('option');
                 optEmpty.value = '';
-                optEmpty.textContent = 'Selecione...';
+                optEmpty.textContent = (window.MYDATA_I18N && window.MYDATA_I18N.select) ? window.MYDATA_I18N.select : 'Selecione...';
                 estadoSelect.appendChild(optEmpty);
                 list.forEach((uf) => {
                     const opt = document.createElement('option');
@@ -673,7 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function validarSenhas() {
         if (senhaNova.value && senhaConfirmacao.value) {
             if (senhaNova.value !== senhaConfirmacao.value) {
-                senhaConfirmacao.setCustomValidity('As senhas não conferem!');
+                senhaConfirmacao.setCustomValidity((window.MYDATA_I18N && window.MYDATA_I18N.password_mismatch) ? window.MYDATA_I18N.password_mismatch : 'As senhas não conferem!');
             } else {
                 senhaConfirmacao.setCustomValidity('');
             }
@@ -692,7 +836,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Salvando...';
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> ' + ((window.MYDATA_I18N && window.MYDATA_I18N.saving) ? window.MYDATA_I18N.saving : 'Salvando...');
             }
         });
     });
@@ -760,14 +904,6 @@ document.addEventListener('DOMContentLoaded', function() {
     height: 80px;
 }
 
-.avatar-file-input-hidden {
-    position: absolute;
-    left: -9999px;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-}
-
 .col-lg-9 .nav-link {
     border-radius: 8px;
     padding: 12px 16px;
@@ -829,6 +965,19 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-check-input:focus {
     box-shadow: 0 0 0 0.2rem rgba(29, 78, 216, 0.18);
 }
+
+@media (max-width: 767.98px) {
+    .user-page-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
+
+    .user-page-header .text-end {
+        width: 100%;
+        text-align: left !important;
+    }
+}
 </style>
 
 <script>
@@ -878,10 +1027,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cepValue.length === 8) {
                 // Simulação de busca de CEP
                 setTimeout(() => {
-                    document.getElementById('endereco').value = 'Rua Exemplo';
-                    document.getElementById('bairro').value = 'Centro';
-                    document.getElementById('cidade').value = 'São Paulo';
-                    document.getElementById('estado').value = 'SP';
+                    document.getElementById('endereco').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_street) ? window.MYDATA_I18N.example_street : 'Rua Exemplo';
+                    document.getElementById('bairro').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_district) ? window.MYDATA_I18N.example_district : 'Centro';
+                    document.getElementById('cidade').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_city) ? window.MYDATA_I18N.example_city : 'São Paulo';
+                    document.getElementById('estado').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_state) ? window.MYDATA_I18N.example_state : 'SP';
                     document.getElementById('numero').focus();
                 }, 500);
             }
@@ -897,13 +1046,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (senhaNova && senhaNova !== senhaConfirmacao) {
                 e.preventDefault();
-                alert('As senhas não conferem!');
+                alert((window.MYDATA_I18N && window.MYDATA_I18N.password_mismatch) ? window.MYDATA_I18N.password_mismatch : 'As senhas não conferem!');
                 return false;
             }
             
             if (senhaNova && senhaNova.length < 6) {
                 e.preventDefault();
-                alert('A senha deve ter pelo menos 6 caracteres!');
+                alert((window.MYDATA_I18N && window.MYDATA_I18N.password_min_length) ? window.MYDATA_I18N.password_min_length : 'A senha deve ter pelo menos 6 caracteres!');
                 return false;
             }
         });
@@ -932,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Foto de Perfil</h5>
+                <h5 class="modal-title"><?= __('user_data.avatar.title', 'Foto de Perfil') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center">
@@ -1116,10 +1265,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cepValue.length === 8) {
                 // Simulação de busca de CEP
                 setTimeout(() => {
-                    document.getElementById('endereco').value = 'Rua Exemplo';
-                    document.getElementById('bairro').value = 'Centro';
-                    document.getElementById('cidade').value = 'São Paulo';
-                    document.getElementById('estado').value = 'SP';
+                    document.getElementById('endereco').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_street) ? window.MYDATA_I18N.example_street : 'Rua Exemplo';
+                    document.getElementById('bairro').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_district) ? window.MYDATA_I18N.example_district : 'Centro';
+                    document.getElementById('cidade').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_city) ? window.MYDATA_I18N.example_city : 'São Paulo';
+                    document.getElementById('estado').value = (window.MYDATA_I18N && window.MYDATA_I18N.example_state) ? window.MYDATA_I18N.example_state : 'SP';
                     document.getElementById('numero').focus();
                 }, 500);
             }
@@ -1135,13 +1284,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (senhaNova && senhaNova !== senhaConfirmacao) {
                 e.preventDefault();
-                alert('As senhas não conferem!');
+                alert((window.MYDATA_I18N && window.MYDATA_I18N.password_mismatch) ? window.MYDATA_I18N.password_mismatch : 'As senhas não conferem!');
                 return false;
             }
             
             if (senhaNova && senhaNova.length < 6) {
                 e.preventDefault();
-                alert('A senha deve ter pelo menos 6 caracteres!');
+                alert((window.MYDATA_I18N && window.MYDATA_I18N.password_min_length) ? window.MYDATA_I18N.password_min_length : 'A senha deve ter pelo menos 6 caracteres!');
                 return false;
             }
         });

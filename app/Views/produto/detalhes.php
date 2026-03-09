@@ -4,8 +4,8 @@
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/">Início</a></li>
-            <li class="breadcrumb-item"><a href="/produtos">Produtos</a></li>
+            <li class="breadcrumb-item"><a href="/"><?= __('nav.home', 'Início') ?></a></li>
+            <li class="breadcrumb-item"><a href="/produtos"><?= __('nav.products', 'Produtos') ?></a></li>
             <li class="breadcrumb-item active"><?= htmlspecialchars($produto['nome']) ?></li>
         </ol>
     </nav>
@@ -55,7 +55,7 @@
                                  alt="<?= htmlspecialchars($produto['nome']) ?>"
                                  class="img-fluid rounded shadow-sm main-product-image"
                                  style="object-fit: cover; cursor: pointer;"
-                                 title="Clique para ver imagem em tamanho real">
+                                 title="<?= htmlspecialchars(__('product_details.click_full_size', 'Clique para ver imagem em tamanho real'), ENT_QUOTES, 'UTF-8') ?>">
                         </a>
                     <?php else: ?>
                         <div class="img-fluid rounded shadow-sm main-product-image bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
@@ -91,13 +91,13 @@
                             ?>
                             <?php if ($miniaturaUrl && $miniaturaExists): ?>
                                 <img src="<?= $miniaturaAbsUrl ?>?v=<?= time() ?>" 
-                                     alt="<?= htmlspecialchars($foto['legenda'] ?? 'Miniatura ' . ($index + 1)) ?>"
+                                     alt="<?= htmlspecialchars($foto['legenda'] ?? (__('product_details.thumbnail', 'Miniatura') . ' ' . ($index + 1))) ?>"
                                      class="img-thumbnail thumbnail-image cursor-pointer"
                                      style="height: 80px; width: 100%; object-fit: cover; cursor: pointer;"
                                      data-main-image="<?= $miniaturaAbsUrl ?>"
-                                     title="<?= $foto['principal'] ? 'Imagem Principal' : 'Clique para ver esta imagem' ?>">
+                                     title="<?= htmlspecialchars($foto['principal'] ? __('product_details.main_image', 'Imagem Principal') : __('product_details.click_to_view', 'Clique para ver esta imagem'), ENT_QUOTES, 'UTF-8') ?>">
                                 <?php if ($foto['principal']): ?>
-                                    <span class="position-absolute top-0 start-0 badge" style="font-size: 0.6em; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">Principal</span>
+                                    <span class="position-absolute top-0 start-0 badge" style="font-size: 0.6em; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);"><?= __('product_details.primary', 'Principal') ?></span>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <div class="img-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 80px;">
@@ -132,7 +132,7 @@
                     <div class="card-body">
                         <div class="mb-2">
                             <h1 class="h2 mb-1"><?= htmlspecialchars($produto['nome']) ?></h1>
-                            <div class="text-muted"><small>Categoria: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? 'Sem categoria') ?></small></div>
+                            <div class="text-muted"><small><?= __('product_details.category', 'Categoria') ?>: <?= htmlspecialchars($produto['categoria'] ?? $produto['categoria_nome'] ?? __('product_details.no_category', 'Sem categoria')) ?></small></div>
                         </div>
 
                         <?php
@@ -153,22 +153,28 @@
                         </div>
 
                         <div id="variacoes-card" class="mb-3" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
-                            <div class="fw-semibold mb-2">Variações</div>
+                            <div class="fw-semibold mb-2"><?= __('product_details.variations', 'Variações') ?></div>
                             <div id="variacoes-selectors"></div>
                             <div class="mt-2 small text-muted" id="variacao-status"></div>
                         </div>
 
                         <div class="d-flex align-items-center justify-content-between mb-3">
-                            <div class="text-muted small">Disponibilidade</div>
+                            <div class="text-muted small"><?= __('product_details.availability', 'Disponibilidade') ?></div>
                             <div>
-                                <?php if ($produto['estoque'] > 0): ?>
-                                    <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
-                                        <?= $produto['estoque'] ?> unidades
+                                <?php if ($variacoesEnabled): ?>
+                                    <span id="stock-badge" class="badge" style="background: rgba(59, 130, 246, 0.10); border: 1px solid rgba(59, 130, 246, 0.18); color: rgba(30, 64, 175, 1);">
+                                        <?= __('product_details.variations_select_to_check', 'Selecione as opções para ver disponibilidade.') ?>
                                     </span>
                                 <?php else: ?>
-                                    <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
-                                        Fora de estoque
-                                    </span>
+                                    <?php if ($produto['estoque'] > 0): ?>
+                                        <span id="stock-badge" class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);">
+                                            <?= $produto['estoque'] ?> <?= __('product_details.units', 'unidades') ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span id="stock-badge" class="badge" style="background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);">
+                                            <?= __('product_details.out_of_stock', 'Fora de estoque') ?>
+                                        </span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -178,20 +184,24 @@
                             <input type="hidden" name="produto_variacao_id" id="produto_variacao_id" value="">
 
                             <div class="col-12">
-                                <label for="quantity" class="form-label">Quantidade</label>
+                                <label for="quantity" class="form-label"><?= __('product_details.quantity', 'Quantidade') ?></label>
                                 <div class="input-group" style="max-width: 220px;">
                                     <button type="button" class="btn btn-outline-secondary" id="decrease-qty">-</button>
-                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $produto['estoque'] ?>">
+                                    <input type="number" class="form-control text-center" name="quantidade" id="quantity" value="1" min="1" max="<?= $variacoesEnabled ? 1 : (int) ($produto['estoque'] ?? 0) ?>">
                                     <button type="button" class="btn btn-outline-secondary" id="increase-qty">+</button>
                                 </div>
                             </div>
 
                             <div class="col-12">
-                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= $produto['estoque'] > 0 ? '' : 'disabled' ?>>
-                                    <?php if ($produto['estoque'] > 0): ?>
-                                        <i class="fas fa-shopping-cart"></i> Adicionar ao Carrinho
+                                <button id="btn-add-to-cart" type="submit" class="btn btn-primary btn-lg w-100" <?= ($variacoesEnabled || ($produto['estoque'] ?? 0) <= 0) ? 'disabled' : '' ?>>
+                                    <?php if ($variacoesEnabled): ?>
+                                        <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
                                     <?php else: ?>
-                                        <i class="fas fa-times"></i> Produto Indisponível
+                                        <?php if ($produto['estoque'] > 0): ?>
+                                            <i class="fas fa-shopping-cart"></i> <?= __('product_details.add_to_cart', 'Adicionar ao Carrinho') ?>
+                                        <?php else: ?>
+                                            <i class="fas fa-times"></i> <?= __('product_details.unavailable', 'Produto Indisponível') ?>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </button>
                             </div>
@@ -202,7 +212,7 @@
                 <div class="accordion" id="produtoAccordion">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingDesc">
-                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDesc" aria-expanded="true" aria-controls="collapseDesc">Descrição</button>
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDesc" aria-expanded="true" aria-controls="collapseDesc"><?= __('product_details.description', 'Descrição') ?></button>
                         </h2>
                         <div id="collapseDesc" class="accordion-collapse collapse show" aria-labelledby="headingDesc" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
@@ -228,7 +238,7 @@
                     </div>
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingSpecs">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpecs" aria-expanded="false" aria-controls="collapseSpecs">Especificações</button>
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpecs" aria-expanded="false" aria-controls="collapseSpecs"><?= __('product_details.specs', 'Especificações') ?></button>
                         </h2>
                         <div id="collapseSpecs" class="accordion-collapse collapse" aria-labelledby="headingSpecs" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
@@ -239,12 +249,12 @@
                                             <td><?= htmlspecialchars($produto['sku']) ?></td>
                                         </tr>
                                         <tr>
-                                            <td><strong>Peso:</strong></td>
+                                            <td><strong><?= __('product_details.weight', 'Peso') ?>:</strong></td>
                                             <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
                                         </tr>
                                         <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
                                         <tr>
-                                            <td><strong>Dimensões:</strong></td>
+                                            <td><strong><?= __('product_details.dimensions', 'Dimensões') ?>:</strong></td>
                                             <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
                                         </tr>
                                         <?php endif; ?>
@@ -255,15 +265,15 @@
                     </div>
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingImport">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport">Informações de Importação</button>
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport"><?= __('product_details.import_info', 'Informações de Importação') ?></button>
                         </h2>
                         <div id="collapseImport" class="accordion-collapse collapse" aria-labelledby="headingImport" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
                                 <ul class="mb-0 small text-muted">
-                                    <li>Produto importado dos EUA</li>
-                                    <li>Tempo estimado de entrega: 15-30 dias</li>
-                                    <li>Impostos inclusos no preço final</li>
-                                    <li>Taxa de serviço: US$ 39/kg</li>
+                                    <li><?= __('product_details.import.from_us', 'Produto importado dos EUA') ?></li>
+                                    <li><?= __('product_details.import.delivery_time', 'Tempo estimado de entrega: 15-30 dias') ?></li>
+                                    <li><?= __('product_details.import.taxes_included', 'Impostos inclusos no preço final') ?></li>
+                                    <li><?= __('product_details.import.service_fee', 'Taxa de serviço: US$ 39/kg') ?></li>
                                 </ul>
                             </div>
                         </div>
@@ -276,7 +286,7 @@
     <!-- Produtos Relacionados -->
     <?php if (!empty($produtosRelacionados)): ?>
     <div class="related-products mt-5">
-        <h3 class="mb-4">Produtos Relacionados</h3>
+        <h3 class="mb-4"><?= __('product_details.related', 'Produtos Relacionados') ?></h3>
         <div class="row">
             <?php foreach ($produtosRelacionados as $relacionado): ?>
                         </div>
@@ -498,6 +508,25 @@
 </div>
 
 <script>
+const I18N = {
+    select_variation_title: <?= json_encode(__('product_details.select_variation_title', 'Selecione a variação'), JSON_UNESCAPED_UNICODE) ?>,
+    select_variation_text: <?= json_encode(__('product_details.select_variation_text', 'Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.'), JSON_UNESCAPED_UNICODE) ?>,
+    select_variation_before_add: <?= json_encode(__('product_details.select_variation_before_add', 'Selecione a variação antes de adicionar ao carrinho.'), JSON_UNESCAPED_UNICODE) ?>,
+    choose_options_before_add: <?= json_encode(__('product_details.choose_options_before_add', 'Escolha as opções do produto antes de adicionar ao carrinho.'), JSON_UNESCAPED_UNICODE) ?>,
+    variations_select_to_check: <?= json_encode(__('product_details.variations_select_to_check', 'Selecione as opções para ver disponibilidade.'), JSON_UNESCAPED_UNICODE) ?>,
+    variation_unavailable: <?= json_encode(__('product_details.variation_unavailable', 'Combinação indisponível.'), JSON_UNESCAPED_UNICODE) ?>,
+    variation_selected: <?= json_encode(__('product_details.variation_selected', 'Variação selecionada'), JSON_UNESCAPED_UNICODE) ?>,
+    out_of_stock: <?= json_encode(__('product_details.out_of_stock', 'Fora de estoque'), JSON_UNESCAPED_UNICODE) ?>,
+    units: <?= json_encode(__('product_details.units', 'unidades'), JSON_UNESCAPED_UNICODE) ?>,
+    adding: <?= json_encode(__('products.adding', 'Adicionando...'), JSON_UNESCAPED_UNICODE) ?>,
+    success_title: <?= json_encode(__('common.success', 'Sucesso!'), JSON_UNESCAPED_UNICODE) ?>,
+    added_to_cart: <?= json_encode(__('product_details.added_to_cart', 'Produto adicionado ao carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    added_to_cart_alert: <?= json_encode(__('product_details.added_to_cart_alert', 'Produto adicionado ao carrinho!'), JSON_UNESCAPED_UNICODE) ?>,
+    error_title: <?= json_encode(__('common.error', 'Erro'), JSON_UNESCAPED_UNICODE) ?>,
+    cant_add: <?= json_encode(__('product_details.cant_add', 'Não foi possível adicionar o produto ao carrinho'), JSON_UNESCAPED_UNICODE) ?>,
+    error_add_try_again: <?= json_encode(__('product_details.error_add_try_again', 'Erro ao adicionar produto ao carrinho. Tente novamente.'), JSON_UNESCAPED_UNICODE) ?>
+};
+
 // Verificar se jQuery está disponível
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof $ === 'undefined') {
@@ -526,11 +555,11 @@ function inicializarDetalhesProduto() {
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     icon: 'info',
-                    title: 'Selecione a variação',
-                    text: 'Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.'
+                    title: I18N.select_variation_title,
+                    text: I18N.select_variation_text
                 });
             } else {
-                alert('Este produto possui variações. Selecione as opções antes de adicionar ao carrinho.');
+                alert(I18N.select_variation_text);
             }
 
             params.delete('selecionar_variacao');
@@ -669,7 +698,7 @@ function inicializarDetalhesProduto() {
         const stillSel = readSelection();
         const status = $('#variacao-status');
         if (Object.keys(stillSel).length === 0 && allVars.length > 0) {
-            if (status.length) status.text('Selecione as opções para ver disponibilidade.');
+            if (status.length) status.text(I18N.variations_select_to_check);
         }
     }
 
@@ -738,11 +767,11 @@ function inicializarDetalhesProduto() {
         if (!badge.length || !btn.length || !qty.length) return;
 
         if (s > 0) {
-            badge.text(s + ' unidades');
+            badge.text(s + ' ' + I18N.units);
             badge.attr('style', 'background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.18); color: rgba(6, 78, 59, 1);');
             btn.prop('disabled', false);
         } else {
-            badge.text('Fora de estoque');
+            badge.text(I18N.out_of_stock);
             badge.attr('style', 'background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.18); color: rgba(185, 28, 28, 1);');
             btn.prop('disabled', true);
         }
@@ -750,6 +779,19 @@ function inicializarDetalhesProduto() {
         const current = Number(qty.val() || 1);
         if (s > 0 && current > s) qty.val(String(s));
         if (s <= 0) qty.val('1');
+    }
+
+    function setStockUiNeedVariation() {
+        const badge = $('#stock-badge');
+        const btn = $('#btn-add-to-cart');
+        const qty = $('#quantity');
+        if (!badge.length || !btn.length || !qty.length) return;
+
+        badge.text(I18N.variations_select_to_check);
+        badge.attr('style', 'background: rgba(59, 130, 246, 0.10); border: 1px solid rgba(59, 130, 246, 0.18); color: rgba(30, 64, 175, 1);');
+        btn.prop('disabled', true);
+        qty.attr('max', '1');
+        qty.val('1');
     }
 
     function setPriceUi(priceUsd) {
@@ -812,9 +854,9 @@ function inicializarDetalhesProduto() {
 
         if (!allSelected()) {
             hidden.val('');
-            status.text('Selecione as opções para ver disponibilidade.');
+            status.text(I18N.variations_select_to_check);
             setPriceUi(basePrice);
-            setStockUi(<?= (int) ($produto['estoque'] ?? 0) ?>);
+            setStockUiNeedVariation();
             renderGallery(fotosProdutoBase);
             return;
         }
@@ -822,13 +864,13 @@ function inicializarDetalhesProduto() {
         const v = findMatchingVariation(selection);
         if (!v) {
             hidden.val('');
-            status.text('Combinação indisponível.');
+            status.text(I18N.variation_unavailable);
             setStockUi(0);
             return;
         }
 
         hidden.val(String(v.id));
-        status.text(v.descricao || 'Variação selecionada');
+        status.text(v.descricao || I18N.variation_selected);
 
         const priceUsd = (v.price_override !== null && v.price_override !== undefined) ? Number(v.price_override) : basePrice;
         setPriceUi(priceUsd);
@@ -915,9 +957,9 @@ function inicializarDetalhesProduto() {
             const pv = $('#produto_variacao_id').val();
             if (!pv) {
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'warning', title: 'Selecione a variação', text: 'Escolha as opções do produto antes de adicionar ao carrinho.' });
+                    Swal.fire({ icon: 'warning', title: I18N.select_variation_title, text: I18N.choose_options_before_add });
                 } else {
-                    alert('Selecione a variação antes de adicionar ao carrinho.');
+                    alert(I18N.select_variation_before_add);
                 }
                 return;
             }
@@ -928,7 +970,7 @@ function inicializarDetalhesProduto() {
         const btn = $(this).find('button[type="submit"]');
         const originalText = btn.html();
         
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adicionando...');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> ' + I18N.adding);
         
         $.ajax({
             url: '/produtos/carrinho',
@@ -943,13 +985,13 @@ function inicializarDetalhesProduto() {
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Produto adicionado ao carrinho',
+                            title: I18N.success_title,
+                            text: I18N.added_to_cart,
                             showConfirmButton: false,
                             timer: 1500
                         });
                     } else {
-                        alert('Produto adicionado ao carrinho!');
+                        alert(I18N.added_to_cart_alert);
                     }
                     
                     // Atualizar badge do carrinho
@@ -966,11 +1008,11 @@ function inicializarDetalhesProduto() {
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Erro',
-                            text: response.error || 'Não foi possível adicionar o produto ao carrinho'
+                            title: I18N.error_title,
+                            text: response.error || I18N.cant_add
                         });
                     } else {
-                        alert('Erro: ' + (response.error || 'Não foi possível adicionar o produto ao carrinho'));
+                        alert(I18N.error_title + ': ' + (response.error || I18N.cant_add));
                     }
                 }
             },
@@ -982,11 +1024,11 @@ function inicializarDetalhesProduto() {
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Erro',
-                        text: 'Erro ao adicionar produto ao carrinho. Tente novamente.'
+                        title: I18N.error_title,
+                        text: I18N.error_add_try_again
                     });
                 } else {
-                    alert('Erro ao adicionar produto ao carrinho. Tente novamente.');
+                    alert(I18N.error_add_try_again);
                 }
             },
             complete: function() {
@@ -996,12 +1038,22 @@ function inicializarDetalhesProduto() {
     });
     
     function updateCartBadge(totalItens) {
-        const badge = $('.navbar-nav .badge');
-        if (totalItens > 0) {
-            badge.text(totalItens).show();
-        } else {
-            badge.hide();
+        if (window.updateCartBadge && typeof window.updateCartBadge === 'function') {
+            window.updateCartBadge(totalItens);
+            return;
         }
+
+        const n = Number(totalItens || 0);
+        const $badges = $('.cart-badge');
+        $badges.each(function() {
+            const $b = $(this);
+            if (n > 0) {
+                $b.text(String(n));
+                $b.css('display', 'inline-flex');
+            } else {
+                $b.css('display', 'none');
+            }
+        });
     }
     
     if (variacoesState.enabled) {
@@ -1019,7 +1071,8 @@ function inicializarDetalhesProduto() {
             onVariationChange();
         });
         // Inicial
-        $('#variacao-status').text('Selecione as opções para ver disponibilidade.');
+        $('#variacao-status').text(I18N.variations_select_to_check);
+        setStockUiNeedVariation();
         refreshOptionAvailability();
     }
 
@@ -1049,7 +1102,7 @@ function inicializarDetalhesProduto() {
                 $('#variacoes-card').show();
                 const status = $('#variacao-status');
                 if (status.length) {
-                    status.text('Selecione as opções para ver disponibilidade.');
+                    status.text(I18N.variations_select_to_check);
                 }
 
                 renderVariacaoSelectors(variacoesState);

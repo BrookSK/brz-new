@@ -26,6 +26,7 @@ $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', '
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
+$router->get('/admin/pedidos/export-xlsx', 'AdminPedidosController', 'exportXlsx');
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
@@ -39,7 +40,12 @@ $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'im
 // Pedidos do WordPress (somente leitura)
 $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
+$router->get('/admin/pedidos-wp/export', 'AdminPedidosWpController', 'exportCsv');
+$router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'exportXlsx');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
+ $router->post('/admin/pedidos-wp/wexpress/regerar/{id}', 'AdminPedidosWpController', 'regerarEtiquetaWexpress');
+ $router->get('/admin/pedidos-wp/estatisticas', 'AdminPedidosWpController', 'estatisticas');
+ $router->post('/admin/pedidos-wp/autofill-bairro', 'AdminPedidosWpController', 'autofillBairro');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');

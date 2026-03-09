@@ -260,10 +260,219 @@ class PedidoManualService {
         }
 
         if ($moeda === 'BRL') {
-            return $this->gerarLinkPagamentoAppMaxPedidoManual($pedidoId, $billingType);
+            return $this->gerarLinkPagamentoSplitBrlPedidoManual($pedidoId, $billingType);
         }
 
         return $this->gerarLinkPagamentoStripePedidoManual($pedidoId);
+    }
+
+    private function gerarLinkPagamentoSplitBrlPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+        if ($pedidoId <= 0) {
+            throw new \Exception('Pedido inválido');
+        }
+
+        $billingType = strtoupper(trim($billingType));
+        if (!in_array($billingType, ['BOLETO', 'PIX', 'CREDIT_CARD'], true)) {
+            $billingType = 'BOLETO';
+        }
+
+        // AppMax no fluxo atual não gera link de cartão sem dados do cartão.
+        if ($billingType === 'CREDIT_CARD') {
+            throw new \Exception('Para pedido manual BRL no split, selecione PIX ou BOLETO (a taxa é cobrada via AppMax).');
+        }
+
+        $colsPedidos = $this->getCols('pedidos');
+        if (empty($colsPedidos)) {
+            throw new \Exception('Tabela pedidos não encontrada');
+        }
+
+        $colTotal = $this->pickFirstExistingColumn($colsPedidos, ['total', 'valor_total', 'valor_total_brl']);
+        $colMoeda = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
+        $usuarioCol = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
+        $codigoCol = $this->pickFirstExistingColumn($colsPedidos, ['codigo_pedido', 'numero_pedido']);
+        $colTaxa = $this->pickFirstExistingColumn($colsPedidos, ['taxa_servico', 'servicos']);
+
+        if ($colTotal === '' || $usuarioCol === '') {
+            throw new \Exception('Tabela pedidos incompatível (sem total/usuario_id)');
+        }
+
+        $selectCols = ['id'];
+        $selectCols[] = $usuarioCol . ' AS usuario_id';
+        $selectCols[] = $colTotal . ' AS total';
+        if ($colMoeda !== '') $selectCols[] = $colMoeda . ' AS moeda';
+        if ($codigoCol !== '') $selectCols[] = $codigoCol . ' AS codigo_pedido';
+        if ($colTaxa !== '') $selectCols[] = $colTaxa . ' AS taxa_servico';
+
+        $stmt = $this->db->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+        $stmt->execute([$pedidoId]);
+        $pedido = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($pedido)) {
+            throw new \Exception('Pedido não encontrado');
+        }
+
+        $moeda = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+        if ($moeda === '') $moeda = 'BRL';
+        if ($moeda !== 'BRL') {
+            throw new \Exception('Split BRL só pode ser usado em pedidos BRL');
+        }
+
+        $clienteId = (int) ($pedido['usuario_id'] ?? 0);
+        if ($clienteId <= 0) {
+            throw new \Exception('Pedido sem cliente vinculado');
+        }
+
+        $total = (float) ($pedido['total'] ?? 0);
+        if ($total <= 0) {
+            throw new \Exception('Total inválido para cobrança');
+        }
+
+        $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
+        if ($taxaServico < 0) $taxaServico = 0.0;
+        $valorProduto = round(max(0.0, $total - $taxaServico), 2);
+        $valorTaxa = round(max(0.0, $taxaServico), 2);
+        if ($valorProduto <= 0 && $valorTaxa <= 0) {
+            throw new \Exception('Valores inválidos para split');
+        }
+
+        $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedidoId);
+        if ($codigoPedido === '') $codigoPedido = (string) $pedidoId;
+
+        // Buscar dados do cliente (para payer/descrição)
+        $colsUsuarios = $this->getCols('usuarios');
+        $uNomeCol = $this->pickFirstExistingColumn($colsUsuarios, ['nome', 'name']);
+        $uEmailCol = $this->pickFirstExistingColumn($colsUsuarios, ['email']);
+        $uTelefoneCol = $this->pickFirstExistingColumn($colsUsuarios, ['telefone', 'phone', 'celular']);
+        $uDocumentoCol = $this->pickFirstExistingColumn($colsUsuarios, ['documento', 'cpf', 'cnpj']);
+
+        $uSelect = ['id'];
+        if ($uNomeCol !== '') $uSelect[] = $uNomeCol . ' AS nome';
+        if ($uEmailCol !== '') $uSelect[] = $uEmailCol . ' AS email';
+        if ($uTelefoneCol !== '') $uSelect[] = $uTelefoneCol . ' AS telefone';
+        if ($uDocumentoCol !== '') $uSelect[] = $uDocumentoCol . ' AS documento';
+
+        $stU = $this->db->prepare('SELECT ' . implode(', ', $uSelect) . ' FROM usuarios WHERE id = ? LIMIT 1');
+        $stU->execute([$clienteId]);
+        $user = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($user)) {
+            throw new \Exception('Cliente não encontrado');
+        }
+
+        $nome = (string) ($user['nome'] ?? '');
+        $email = (string) ($user['email'] ?? '');
+        $telefone = (string) ($user['telefone'] ?? '');
+        $documento = (string) ($user['documento'] ?? '');
+
+        $pg = new PaymentService();
+
+        // 1) Produto via Mercado Pago
+        $mp = null;
+        if ($valorProduto > 0) {
+            $payer = [];
+            if (trim($email) !== '') {
+                $payer['email'] = trim($email);
+            }
+            $mp = $pg->createMercadoPagoCheckoutPreferenceProduto(
+                $pedidoId,
+                $valorProduto,
+                'Pedido manual #' . $codigoPedido . ' (produtos)',
+                $payer
+            );
+            if (empty($mp['success'])) {
+                throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar link Mercado Pago'));
+            }
+        }
+
+        // 2) Taxa via AppMax (PIX/BOLETO)
+        $taxa = null;
+        if ($valorTaxa > 0) {
+            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, $billingType, $valorTaxa, $nome, $email, $telefone, $documento, $codigoPedido);
+            if (empty($taxa['success'])) {
+                throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança AppMax (taxa)'));
+            }
+        }
+
+        return [
+            'success' => true,
+            'split' => true,
+            'pedido_id' => $pedidoId,
+            'moeda' => 'BRL',
+            'produto' => $mp,
+            'taxa' => $taxa,
+        ];
+    }
+
+    private function gerarCobrancaAppmaxPedidoManualComValor(int $pedidoId, string $billingType, float $valor, string $nome, string $email, string $telefone, string $documento, string $codigoPedido): array {
+        $valor = (float) $valor;
+        if ($valor <= 0) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $descricao = 'Pedido manual #' . $codigoPedido . ' (taxa de serviço)';
+
+        $pg = new PaymentService();
+        $productsValueCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'PEDIDO_MANUAL_TAXA_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $productsValueCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
+        ];
+
+        $result = $pg->processarPagamento([
+            'billingType' => $billingType,
+            'customer_name' => $nome,
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $productsValueCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ], $valor, 'BRL', $descricao);
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        }
+
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        // Persistir split em pedido_pagamentos
+        $pg->registrarPedidoPagamentoSplit([
+            'pedido_id' => $pedidoId,
+            'componente' => 'taxa_servico',
+            'gateway' => 'appmax',
+            'metodo' => strtolower($billingType),
+            'moeda' => 'BRL',
+            'valor' => $valor,
+            'payment_id' => $paymentId,
+            'status' => 'pending',
+            'invoice_url' => $invoiceUrl,
+            'bank_slip_url' => $bankSlipUrl,
+            'digitable_line' => $digitableLine,
+            'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+            'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+        ]);
+
+        return [
+            'success' => true,
+            'pedido_id' => $pedidoId,
+            'payment_id' => $paymentId,
+            'invoiceUrl' => $invoiceUrl,
+            'pix' => $pix,
+            'bankSlipUrl' => $bankSlipUrl,
+            'digitableLine' => $digitableLine,
+            'billingType' => $billingType,
+            'status' => (string) ($result['status'] ?? 'pending'),
+        ];
     }
 
     private function gerarLinkPagamentoStripePedidoManual(int $pedidoId): array {
@@ -460,6 +669,17 @@ class PedidoManualService {
         return $usd;
     }
 
+    public function getPixDescontoTaxaServicoPercent(): float {
+        $v = $this->getConfigKeyValue('pagamentos_pix_desconto_taxa_servico_percent', null);
+        if ($v === null || $v === '') {
+            return 0.0;
+        }
+        $p = (float) str_replace(',', '.', (string) $v);
+        if ($p < 0) $p = 0.0;
+        if ($p > 100) $p = 100.0;
+        return $p;
+    }
+
     private function calcularImpostosPadrao(float $valorProdutos, float $valorFrete): float {
         $icms = $this->getAliquota('icms_aliquota');
         $ipi = $this->getAliquota('ipi_aliquota');
@@ -507,7 +727,7 @@ class PedidoManualService {
         $pesoTotal = 0.0;
 
         $colsProdutos = $this->getCols('produtos');
-        $prodPesoCol = $this->pickFirstExistingColumn($colsProdutos, ['peso', 'weight']);
+        $prodPesoCol = $this->pickFirstExistingColumn($colsProdutos, ['peso', 'weight', 'peso_kg', 'weight_kg', 'pesoKg', 'weightKg']);
         $prodPriceCol = $this->pickFirstExistingColumn($colsProdutos, ['price', 'valor', 'preco']);
 
         $select = ['id'];
@@ -718,6 +938,13 @@ class PedidoManualService {
         if ($resumoTotal <= 0) {
             $valorFrete = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
             $resumo = $this->calcularResumoPadrao($moeda, $itens, $valorFrete);
+        }
+
+        $valorFreteValidacao = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
+        $resumoValidacao = $this->calcularResumoPadrao($moeda, $itens, $valorFreteValidacao);
+        $pesoTotalReal = (float) ($resumoValidacao['peso_total'] ?? 0.0);
+        if ($pesoTotalReal > 30.0) {
+            throw new \Exception('Peso excede o limite de 30kg para pedido manual (peso total: ' . rtrim(rtrim(number_format($pesoTotalReal, 3, '.', ''), '0'), '.') . 'kg).');
         }
 
         $subtotalItens = 0.0;
@@ -1097,6 +1324,67 @@ class PedidoManualService {
         }
 
         $descricao = 'Pedido manual #' . $codigoPedido;
+
+        // PIX: aplicar desconto configurável na taxa de serviço (atualiza o pedido antes de gerar cobrança)
+        if ($billingType === 'PIX') {
+            try {
+                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
+                if ($pct > 0) {
+                    $stCols = $this->db->query('DESCRIBE pedidos');
+                    $colsAll = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                    $colSvc = '';
+                    foreach (['taxa_servico', 'servicos'] as $c) {
+                        if (is_array($colsAll) && in_array($c, $colsAll, true)) {
+                            $colSvc = $c;
+                            break;
+                        }
+                    }
+
+                    if ($colSvc !== '') {
+                        $colSub = in_array('subtotal', $colsAll, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsAll, true) ? 'subtotal_produtos' : '');
+                        $colImp = in_array('impostos', $colsAll, true) ? 'impostos' : (in_array('valor_impostos', $colsAll, true) ? 'valor_impostos' : '');
+                        $colFre = in_array('frete', $colsAll, true) ? 'frete' : (in_array('valor_frete', $colsAll, true) ? 'valor_frete' : '');
+                        $colTot = in_array('total', $colsAll, true) ? 'total' : (in_array('valor_total', $colsAll, true) ? 'valor_total' : (in_array('valor_total_brl', $colsAll, true) ? 'valor_total_brl' : ''));
+                        $colDesc = in_array('desconto', $colsAll, true) ? 'desconto' : '';
+
+                        $sel = ['id'];
+                        $sel[] = $colSvc . ' AS taxa_servico';
+                        if ($colSub !== '') $sel[] = $colSub . ' AS subtotal';
+                        if ($colImp !== '') $sel[] = $colImp . ' AS impostos';
+                        if ($colFre !== '') $sel[] = $colFre . ' AS frete';
+                        if ($colTot !== '') $sel[] = $colTot . ' AS total';
+                        if ($colDesc !== '') $sel[] = $colDesc . ' AS desconto';
+                        $stP = $this->db->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                        $stP->execute([(int) $pedidoId]);
+                        $rowP = $stP->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                        $svc = (float) ($rowP['taxa_servico'] ?? 0);
+                        $svcNew = max(0.0, $svc * (1.0 - ($pct / 100.0)));
+
+                        if ($svcNew !== $svc) {
+                            $subtotalCalc = (float) ($rowP['subtotal'] ?? 0);
+                            $impostosCalc = (float) ($rowP['impostos'] ?? 0);
+                            $freteCalc = (float) ($rowP['frete'] ?? 0);
+                            $descontoCalc = (float) ($rowP['desconto'] ?? 0);
+                            $totalNew = $subtotalCalc + $svcNew + $impostosCalc + $freteCalc - $descontoCalc;
+
+                            $set = [$colSvc . ' = :svc'];
+                            $params = [':svc' => $svcNew, ':id' => (int) $pedidoId];
+                            if ($colTot !== '') {
+                                $set[] = $colTot . ' = :tot';
+                                $params[':tot'] = $totalNew;
+                            }
+                            $sqlUp = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                            $this->db->prepare($sqlUp)->execute($params);
+
+                            $total = $colTot !== '' ? $totalNew : $total;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
 
         $pg = new PaymentService();
 

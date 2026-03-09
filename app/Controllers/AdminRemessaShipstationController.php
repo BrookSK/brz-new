@@ -113,13 +113,7 @@ class AdminRemessaShipstationController extends Controller {
             $colsPedidos = [];
         }
 
-        $statusWhere = "(LOWER(COALESCE(p.status,'')) IN ('pago','paid','approved','aprovado','confirmado','confirmed'))";
-        if (is_array($colsPedidos) && in_array('payment_status', $colsPedidos, true)) {
-            $statusWhere .= " OR (UPPER(COALESCE(p.payment_status,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS'))";
-        }
-        if (is_array($colsPedidos) && in_array('status_pagamento', $colsPedidos, true)) {
-            $statusWhere .= " OR (UPPER(COALESCE(p.status_pagamento,'')) IN ('APPROVED','CONFIRMED','RECEIVED','PAID','SUCCEEDED','SUCCESS','PAGO','APROVADO'))";
-        }
+        $statusWhere = "(LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado'))";
 
         $joinEndereco = '';
         $wherePais = '1=1';

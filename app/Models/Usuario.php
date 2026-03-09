@@ -6,6 +6,100 @@ class Usuario extends Model {
 
     private static ?array $cachedUserColumns = null;
 
+    private function ensureRememberTokensTable(): void {
+        try {
+            $stmt = $this->connection->prepare('SHOW TABLES LIKE ?');
+            $stmt->execute(['remember_tokens']);
+            $exists = (bool) $stmt->fetchColumn();
+            if ($exists) {
+                return;
+            }
+
+            $this->connection->exec("CREATE TABLE IF NOT EXISTS remember_tokens (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                token_hash VARCHAR(64) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_token_hash (token_hash),
+                INDEX idx_usuario_id (usuario_id),
+                INDEX idx_expires_at (expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function isPasswordResetTokenValid(string $token): bool {
+        $uid = $this->getUserIdByResetToken($token);
+        return !empty($uid) && (int) $uid > 0;
+    }
+
+    public function setRememberToken(int $usuarioId, string $token, int $ttlSeconds): bool {
+        $usuarioId = (int) $usuarioId;
+        $token = trim((string) $token);
+        if ($usuarioId <= 0 || $token === '' || $ttlSeconds <= 0) {
+            return false;
+        }
+
+        $this->ensureRememberTokensTable();
+
+        $hash = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', time() + (int) $ttlSeconds);
+        $createdAt = date('Y-m-d H:i:s');
+
+        try {
+            $stDel = $this->connection->prepare('DELETE FROM remember_tokens WHERE usuario_id = ?');
+            $stDel->execute([$usuarioId]);
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $st = $this->connection->prepare('INSERT INTO remember_tokens (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)');
+            $st->execute([$usuarioId, $hash, $expiresAt, $createdAt]);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function clearRememberTokens(int $usuarioId): void {
+        $usuarioId = (int) $usuarioId;
+        if ($usuarioId <= 0) {
+            return;
+        }
+        $this->ensureRememberTokensTable();
+        try {
+            $st = $this->connection->prepare('DELETE FROM remember_tokens WHERE usuario_id = ?');
+            $st->execute([$usuarioId]);
+        } catch (\Exception $e) {
+        }
+    }
+
+    public function findByRememberToken(string $token): ?array {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return null;
+        }
+        $this->ensureRememberTokensTable();
+        $hash = hash('sha256', $token);
+        try {
+            $st = $this->connection->prepare('SELECT usuario_id FROM remember_tokens WHERE token_hash = ? AND expires_at >= NOW() ORDER BY id DESC LIMIT 1');
+            $st->execute([$hash]);
+            $uid = $st->fetchColumn();
+            if ($uid === false || $uid === null) {
+                return null;
+            }
+            $uid = (int) $uid;
+            if ($uid <= 0) {
+                return null;
+            }
+            $u = $this->find($uid);
+            return is_array($u) ? $u : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function __construct() {
         parent::__construct();
     }
@@ -50,6 +144,11 @@ class Usuario extends Model {
     }
 
     public function findByDocumento($documento) {
+        $documento = preg_replace('/\D+/', '', (string) $documento);
+        if ($documento === '') {
+            return false;
+        }
+
         $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE documento = :documento");
         $stmt->bindParam(':documento', $documento);
         $stmt->execute();
@@ -93,8 +192,6 @@ class Usuario extends Model {
 
         $token = bin2hex(random_bytes(32));
         $hash = hash('sha256', $token);
-        $expiresAt = date('Y-m-d H:i:s', time() + 3600);
-        $createdAt = date('Y-m-d H:i:s');
 
         try {
             $stDel = $this->connection->prepare('DELETE FROM password_resets WHERE usuario_id = ?');
@@ -103,8 +200,8 @@ class Usuario extends Model {
         }
 
         try {
-            $st = $this->connection->prepare('INSERT INTO password_resets (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)');
-            $st->execute([(int) $user['id'], $hash, $expiresAt, $createdAt]);
+            $st = $this->connection->prepare("INSERT INTO password_resets (usuario_id, token_hash, expires_at, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())");
+            $st->execute([(int) $user['id'], $hash]);
         } catch (\Exception $e) {
             return '';
         }
@@ -269,6 +366,12 @@ class Usuario extends Model {
                 $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
             }
         }
+
+        if (array_key_exists('documento', $data)) {
+            $doc = preg_replace('/\D+/', '', (string) $data['documento']);
+            $data['documento'] = $doc === '' ? null : $doc;
+        }
+
         $id = parent::create($data);
 
         try {
@@ -341,6 +444,9 @@ class Usuario extends Model {
                 'termos_aceitos_em' => 'termos_aceitos_em',
                 'termos_aceitos_ip' => 'termos_aceitos_ip',
                 'termos_versao' => 'termos_versao',
+                'precisa_recadastro' => 'precisa_recadastro',
+                'wp_origem' => 'wp_origem',
+                'wp_user_id' => 'wp_user_id',
                 'perfil' => 'perfil',
                 'status' => 'status',
                 'creditos_disponiveis' => 'creditos_disponiveis',
@@ -350,7 +456,7 @@ class Usuario extends Model {
             ];
             
             foreach ($mapeamentoColunas as $campoForm => $colunaBanco) {
-                if (in_array($colunaBanco, $colunas) && isset($data[$colunaBanco])) {
+                if (in_array($colunaBanco, $colunas) && array_key_exists($colunaBanco, $data)) {
                     $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
                     $params[$colunaBanco] = $data[$colunaBanco];
                 }
@@ -599,11 +705,23 @@ class Usuario extends Model {
 
     public function hasAcceptedTerms(array $usuario): bool {
         $cols = $this->getUserColumns();
-        if (!in_array('termos_aceitos_em', $cols, true)) {
-            return false;
+        if (in_array('termos_aceitos_em', $cols, true)) {
+            $v = (string) ($usuario['termos_aceitos_em'] ?? '');
+            if (trim($v) !== '' && $v !== '0000-00-00 00:00:00') {
+                return true;
+            }
         }
-        $v = (string) ($usuario['termos_aceitos_em'] ?? '');
-        return trim($v) !== '';
+
+        foreach (['termos_aceitos', 'aceitou_termos', 'aceite_termos', 'termos'] as $c) {
+            if (in_array($c, $cols, true)) {
+                $v = $usuario[$c] ?? null;
+                if ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'on') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function isProfileComplete(array $usuario): bool {

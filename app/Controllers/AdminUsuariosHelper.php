@@ -6,14 +6,14 @@ class AdminUsuariosHelper {
     private $pdo;
     
     public function __construct() {
-        $this->pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->pdo = \Config\Database::getConnection();
         $this->verificarCriarTabelaUsuarios();
     }
     
     private function verificarCriarTabelaUsuarios() {
         try {
-            $this->pdo->exec("\
-                CREATE TABLE IF NOT EXISTS `usuarios` (
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS `usuarios` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
                     `nome` varchar(255) NOT NULL,
                     `email` varchar(255) NOT NULL,
@@ -27,8 +27,8 @@ class AdminUsuariosHelper {
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `uk_email` (`email`),
                     KEY `idx_ativo` (`ativo`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            ");
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
 
             // Se a tabela já existia sem a coluna perfil, tenta adicioná-la.
             try {

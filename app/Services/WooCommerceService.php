@@ -6,15 +6,41 @@ class WooCommerceService {
     private string $consumerKey;
     private string $consumerSecret;
     private int $lastHttpCode = 0;
+    private bool $sslVerify = true;
+    private string $caBundlePath = '';
+    private string $source;
 
-    public function __construct() {
-        $this->storeUrl = (string) $this->getConfig('woocommerce', 'store_url', '');
-        $this->consumerKey = (string) $this->getConfig('woocommerce', 'consumer_key', '');
-        $this->consumerSecret = (string) $this->getConfig('woocommerce', 'consumer_secret', '');
+    public function __construct(string $source = 'br') {
+        $source = strtolower(trim($source));
+        if (!in_array($source, ['br', 'red', 'us'], true)) {
+            $source = 'br';
+        }
+        $this->source = $source;
+
+        $cat = 'woocommerce_' . $this->source;
+
+        $sslVerifyRaw = $this->getConfig($cat, 'ssl_verify', null);
+        if ($sslVerifyRaw === null) {
+            $sslVerifyRaw = $this->getConfig('woocommerce', 'ssl_verify', null);
+        }
+        $this->caBundlePath = trim((string) (($this->getConfig($cat, 'ca_bundle_path', null) ?? $this->getConfig('woocommerce', 'ca_bundle_path', ''))));
+
+        $this->storeUrl = (string) ($this->getConfig($cat, 'store_url', null) ?? $this->getConfig('woocommerce', 'store_url', ''));
+        $this->consumerKey = (string) ($this->getConfig($cat, 'consumer_key', null) ?? $this->getConfig('woocommerce', 'consumer_key', ''));
+        $this->consumerSecret = (string) ($this->getConfig($cat, 'consumer_secret', null) ?? $this->getConfig('woocommerce', 'consumer_secret', ''));
 
         $this->storeUrl = rtrim(trim($this->storeUrl), '/');
         $this->consumerKey = trim($this->consumerKey);
         $this->consumerSecret = trim($this->consumerSecret);
+
+        if ($sslVerifyRaw !== null) {
+            $v = strtolower(trim((string) $sslVerifyRaw));
+            $this->sslVerify = !in_array($v, ['0', 'false', 'no', 'off'], true);
+        }
+    }
+
+    public function getSource(): string {
+        return $this->source;
     }
 
     public function getLastHttpCode(): int {
@@ -79,21 +105,42 @@ class WooCommerceService {
 
         $payload = $body !== null ? json_encode($body) : null;
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_USERPWD, $this->consumerKey . ':' . $this->consumerSecret);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        if ($payload !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        }
+        $exec = function (bool $verify) use ($url, $method, $headers, $payload): array {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_USERPWD, $this->consumerKey . ':' . $this->consumerSecret);
+            curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
 
-        $respBody = curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = (string) curl_error($ch);
-        curl_close($ch);
+            if (!$verify) {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            } else {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+                if ($this->caBundlePath !== '') {
+                    curl_setopt($ch, CURLOPT_CAINFO, $this->caBundlePath);
+                }
+            }
+
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = (string) curl_error($ch);
+            curl_close($ch);
+            return [$respBody, $httpCode, $err];
+        };
+
+        [$respBody, $httpCode, $err] = $exec($this->sslVerify);
+        if ($err !== '' && $this->sslVerify && stripos($err, 'unable to get local issuer certificate') !== false) {
+            // Ambiente sem CA bundle instalado. Faz retry único sem verificação para destravar operação.
+            [$respBody, $httpCode, $err] = $exec(false);
+        }
 
         $this->lastHttpCode = $httpCode;
 

@@ -30,6 +30,13 @@
                     </div>
                 </div>
             <?php endif; ?>
+
+            <?php if (!empty($usuario['precisa_recadastro'])): ?>
+                <div class="alert alert-warning" role="alert" style="background: #fff3cd; border-color: #ffecb5; color: #664d03;">
+                    <?= __('user.recadastro_warning', 'Como este é um site novo, precisamos que você atualize seus dados cadastrais. ') ?>
+                    <a href="/meus-dados" class="alert-link"><?= __('user.recadastro_cta', 'Clique aqui para atualizar agora.') ?></a>
+                </div>
+            <?php endif; ?>
             
             <!-- Stats Cards -->
             <div class="row mb-4">

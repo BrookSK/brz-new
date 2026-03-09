@@ -50,6 +50,7 @@
             <div class="card shadow-sm">
                 <div class="card-body p-4">
                     <form method="POST" action="/contato" id="contactForm">
+                        <input type="hidden" name="contact_token" value="<?= htmlspecialchars((string)($contactToken ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="nome" class="form-label">Nome Completo</label>
@@ -64,7 +65,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="tel" class="form-control" id="telefone" name="telefone">
+                                <input type="tel" class="form-control" id="telefone" name="telefone" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="assunto" class="form-label">Assunto</label>
@@ -121,6 +122,13 @@
 <script>
 $(document).ready(function() {
     $('#contactForm').on('submit', function(e) {
+        if (!this.checkValidity()) {
+            e.preventDefault();
+            if (typeof this.reportValidity === 'function') {
+                this.reportValidity();
+            }
+            return;
+        }
         e.preventDefault();
         
         const btn = $('#contactBtn');
@@ -132,16 +140,51 @@ $(document).ready(function() {
             url: '/contato',
             method: 'POST',
             data: $(this).serialize(),
-            dataType: 'json',
             success: function(response) {
-                if (response.success) {
-                    showAlert('success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.');
-                    $('#contactForm')[0].reset();
+                let data = response;
+                if (typeof response === 'string') {
+                    try {
+                        data = JSON.parse(response);
+                    } catch (e) {
+                        data = null;
+                    }
+                }
+
+                if (data && data.success) {
+                    if (data.duplicate) {
+                        showAlert('success', 'Mensagem já foi enviada. Se precisar, envie uma nova mensagem atualizando o texto.');
+                    } else {
+                        showAlert('success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.');
+                        $('#contactForm')[0].reset();
+                    }
                 } else {
-                    showAlert('danger', response.error || 'Erro ao enviar mensagem');
+                    showAlert('danger', (data && data.error) ? data.error : 'Erro ao enviar mensagem');
                 }
             },
-            error: function() {
+            error: function(xhr) {
+                // Pode acontecer do servidor responder 200 com conteúdo não-JSON, e o frontend tratar como erro.
+                // Tentamos interpretar a resposta antes de mostrar erro de conexão.
+                try {
+                    const txt = (xhr && xhr.responseText) ? xhr.responseText : '';
+                    if (txt) {
+                        const parsed = JSON.parse(txt);
+                        if (parsed && parsed.success) {
+                            if (parsed.duplicate) {
+                                showAlert('success', 'Mensagem já foi enviada. Se precisar, envie uma nova mensagem atualizando o texto.');
+                            } else {
+                                showAlert('success', 'Mensagem enviada com sucesso! Entraremos em contato em breve.');
+                                $('#contactForm')[0].reset();
+                            }
+                            return;
+                        }
+                        if (parsed && parsed.error) {
+                            showAlert('danger', parsed.error);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                }
+
                 showAlert('danger', 'Erro de conexão. Tente novamente.');
             },
             complete: function() {

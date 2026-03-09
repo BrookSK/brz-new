@@ -586,6 +586,20 @@ class AdminComprasController extends Controller {
         header('Content-Type: application/json; charset=utf-8');
 
         $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $valorRaw = (string) ($request->getParam('valor', '') ?? '');
+        $valorRaw = trim($valorRaw);
+        $valor = null;
+        if ($valorRaw !== '') {
+            $valorNorm = str_replace([' ', 'R$', 'r$'], '', $valorRaw);
+            $valorNorm = str_replace('.', '', $valorNorm);
+            $valorNorm = str_replace(',', '.', $valorNorm);
+            if (is_numeric($valorNorm)) {
+                $tmp = (float) $valorNorm;
+                if ($tmp > 0) {
+                    $valor = $tmp;
+                }
+            }
+        }
 
         if ($pedidoId <= 0) {
             echo json_encode(['success' => false, 'message' => 'Parâmetros inválidos.']);
@@ -594,7 +608,7 @@ class AdminComprasController extends Controller {
 
         try {
             $svc = new \App\Services\PedidoDiferencaAsaasService($this->connection);
-            $result = $svc->gerarCobrancaDiferenca($pedidoId);
+            $result = $svc->gerarCobrancaDiferenca($pedidoId, $valor);
 
             $created = is_array($result['created'] ?? null) ? $result['created'] : [];
 
@@ -814,6 +828,22 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
 
+            $affected = (int) $stmt->rowCount();
+
+            // fallback: se nenhum registro foi marcado como comprado e o filtro por loja pode estar divergente,
+            // tentar novamente sem restringir por loja.
+            if ($affected === 0 && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                $sql2 = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+                $params2 = [];
+                if ($produtoId > 0) {
+                    $sql2 .= ' AND lc.produto_id = :produto_id';
+                    $params2[':produto_id'] = $produtoId;
+                }
+                $stmt2 = $this->connection->prepare($sql2);
+                $stmt2->execute($params2);
+                $affected = (int) $stmt2->rowCount();
+            }
+
             $_SESSION['message'] = 'Itens reabertos.';
             $_SESSION['message_type'] = 'success';
             header('Location: /admin/estoque/compras?status=pendente&somente_reabertos=1' . ($semLoja ? '&sem_loja=1' : ($lojaId > 0 ? ('&loja_id=' . $lojaId) : '')));
@@ -827,6 +857,9 @@ class AdminComprasController extends Controller {
     }
 
     public function removerItem($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
 
@@ -854,8 +887,23 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja);
             $stmt->execute($params);
 
-            $_SESSION['message'] = 'Item removido da lista.';
-            $_SESSION['message_type'] = 'success';
+            $affected = (int) $stmt->rowCount();
+
+            // Se nenhum registro foi afetado e o filtro por loja pode estar divergente do registro na lista,
+            // tentar remover todas as pendências do produto (independente de loja).
+            if ($affected === 0 && $lojaId > 0) {
+                $stmt2 = $this->connection->prepare("UPDATE lista_compras lc SET lc.status = 'cancelado' WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id");
+                $stmt2->execute([':produto_id' => $produtoId]);
+                $affected = (int) $stmt2->rowCount();
+            }
+
+            if ($affected > 0) {
+                $_SESSION['message'] = 'Item removido da lista.';
+                $_SESSION['message_type'] = 'success';
+            } else {
+                $_SESSION['message'] = 'Nenhum item pendente encontrado para remover.';
+                $_SESSION['message_type'] = 'warning';
+            }
             header('Location: /admin/estoque/compras');
             exit;
         } catch (\Exception $e) {
@@ -1088,7 +1136,10 @@ class AdminComprasController extends Controller {
             $statusView = (string) $request->getParam('status', 'pendente');
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
-            $tipoCompraView = 'offline';
+            $tipoCompraView = strtolower(trim((string) $request->getParam('tipo_compra', 'todos')));
+            if (!in_array($tipoCompraView, ['offline', 'online', 'todos'], true)) {
+                $tipoCompraView = 'todos';
+            }
 
             $somenteReabertos = (string) $request->getParam('somente_reabertos', '0') === '1';
             $reabertos = null;
@@ -1116,8 +1167,10 @@ class AdminComprasController extends Controller {
             if ($temTipoCompraEmLista) {
                 if ($tipoCompraView === 'offline') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
-                } else {
+                } elseif ($tipoCompraView === 'online') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                } else {
+                    $whereTipoCompra = '';
                 }
             }
 
@@ -1305,7 +1358,7 @@ class AdminComprasController extends Controller {
             $lojaIdFilter = 0;
             $semLoja = false;
             $statusView = 'pendente';
-            $tipoCompraView = 'offline';
+            $tipoCompraView = 'todos';
             $totalItensPendentes = 0;
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
@@ -1361,6 +1414,11 @@ class AdminComprasController extends Controller {
                 </div>';
 
                 $this->renderFlashIfAny();
+
+                echo '<div class="alert alert-info mb-3">'
+                    . '<div><strong>Importante:</strong> as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.</div>'
+                    . '<div class="small text-muted mt-1">Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.</div>'
+                    . '</div>';
 
                 $qsLoja = '';
                 if ($semLoja) {
@@ -1672,12 +1730,17 @@ class AdminComprasController extends Controller {
 
                             html += "<div class=\"mt-2 d-flex flex-wrap gap-2\">";
                             html += "<a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a>";
-                            if (!pago) {
+                            var gw = String(p.payment_gateway || p.gateway || "").toLowerCase();
+                            var payId = String(p.payment_id || p.asaas_payment_id || "");
+                            var temAsaas = (gw === "asaas" && payId.trim() !== "");
+                            if (!pago && temAsaas) {
                                 html += "<div class=\"input-group input-group-sm\" style=\"max-width:320px;\">";
                                 html += "<span class=\"input-group-text\">$</span>";
                                 html += "<input type=\"number\" step=\"0.01\" min=\"0\" class=\"form-control\" placeholder=\"Valor da diferença\" id=\"diff_val_" + pid + "\">";
                                 html += "<button type=\"button\" class=\"btn btn-outline-success\" onclick=\"gerarLinkDiferenca(" + pid + ")\">Gerar link</button>";
                                 html += "</div>";
+                            } else if (!pago && !temAsaas) {
+                                html += "<div class=\"text-muted small\">Cobrança de diferença disponível apenas para pedidos Asaas.</div>";
                             }
                             html += "</div>";
                             html += "<div class=\"mt-2\" id=\"diff_out_" + pid + "\"></div>";
@@ -2303,10 +2366,21 @@ class AdminComprasController extends Controller {
     }
 
     public function concluirCompras($request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
         $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+        $redirectParams = ['status' => 'pendente'];
+        if ($semLoja) {
+            $redirectParams['sem_loja'] = '1';
+        } elseif ($lojaId > 0) {
+            $redirectParams['loja_id'] = (string) $lojaId;
+        }
+        $redirectUrl = '/admin/estoque/compras' . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
 
         $modo = (string) $request->getParam('modo', 'total');
         $modo = in_array($modo, ['total', 'parcial'], true) ? $modo : 'total';
@@ -2319,7 +2393,7 @@ class AdminComprasController extends Controller {
                 if ($quantidadeComprada <= 0) {
                     $_SESSION['message'] = 'Informe a quantidade comprada para concluir parcialmente.';
                     $_SESSION['message_type'] = 'warning';
-                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    header('Location: ' . $redirectUrl);
                     exit;
                 }
 
@@ -2344,6 +2418,18 @@ class AdminComprasController extends Controller {
                 $stmtSel->execute($params);
                 $rows = $stmtSel->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+                // fallback: se filtro de loja não retornou nada, tentar sem loja
+                if (empty($rows) && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                    $stmtSel2 = $this->connection->prepare(
+                        "SELECT id, quantidade_faltante, quantidade_necessaria\n"
+                        . " FROM lista_compras lc\n"
+                        . " WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id\n"
+                        . " ORDER BY lc.id ASC"
+                    );
+                    $stmtSel2->execute([':produto_id' => $produtoId]);
+                    $rows = $stmtSel2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+
                 $totalNeed = 0;
                 foreach ($rows as $r) {
                     $qf = (int) ($r['quantidade_faltante'] ?? 0);
@@ -2354,7 +2440,7 @@ class AdminComprasController extends Controller {
                 if ($quantidadeComprada > $totalNeed) {
                     $_SESSION['message'] = 'O numero de produtos ultrapassa a quantidade de compra, caso tenha comprado itens sobressalentes por favor dê entrada no estoque';
                     $_SESSION['message_type'] = 'warning';
-                    header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                    header('Location: ' . $redirectUrl);
                     exit;
                 }
 
@@ -2383,7 +2469,7 @@ class AdminComprasController extends Controller {
 
                 $_SESSION['message'] = 'Compra parcial registrada. O restante continua pendente.';
                 $_SESSION['message_type'] = 'success';
-                header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+                header('Location: ' . $redirectUrl);
                 exit;
             }
 
@@ -2406,9 +2492,30 @@ class AdminComprasController extends Controller {
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
 
-            $_SESSION['message'] = 'Compras concluídas.';
-            $_SESSION['message_type'] = 'success';
-            header('Location: /admin/estoque/compras' . ($semLoja ? '?sem_loja=1' : ($lojaId > 0 ? ('?loja_id=' . $lojaId) : '')));
+            $affected = (int) $stmt->rowCount();
+
+            // fallback: se nenhum registro foi marcado como comprado e o filtro por loja pode estar divergente,
+            // tentar novamente sem restringir por loja.
+            if ($affected === 0 && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
+                $sql2 = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+                $params2 = [];
+                if ($produtoId > 0) {
+                    $sql2 .= ' AND lc.produto_id = :produto_id';
+                    $params2[':produto_id'] = $produtoId;
+                }
+                $stmt2 = $this->connection->prepare($sql2);
+                $stmt2->execute($params2);
+                $affected = (int) $stmt2->rowCount();
+            }
+
+            if ($affected > 0) {
+                $_SESSION['message'] = 'Compras concluídas.';
+                $_SESSION['message_type'] = 'success';
+            } else {
+                $_SESSION['message'] = 'Nenhum item pendente encontrado para concluir.';
+                $_SESSION['message_type'] = 'warning';
+            }
+            header('Location: ' . $redirectUrl);
             exit;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao concluir compras.';
@@ -2421,9 +2528,12 @@ class AdminComprasController extends Controller {
     public function gerarPDF($request) {
         $lojaId = (int) $request->getParam('loja_id', 0);
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+        $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
         $temCost = $this->columnExists('produtos', 'cost_price');
         $temFoto = $this->columnExists('produtos', 'foto_principal');
         $temImages = $this->columnExists('produtos', 'images');
+
+        $temObsVendedor = $this->columnExists('pedidos', 'observacao_vendedor');
 
         $lojaNome = 'Compras';
         if ($lojaId > 0 && $this->tableExists('lojas')) {
@@ -2463,6 +2573,7 @@ class AdminComprasController extends Controller {
             . ' FROM ('
             . '   SELECT produto_id, '
             . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
+            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(pedido_id,0),0)) as pedido_id' : '')
             . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
             . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
             . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
@@ -2517,17 +2628,49 @@ class AdminComprasController extends Controller {
             . '<th style="width:60px;">Foto</th>'
             . '<th>Produto</th>'
             . '<th style="width:70px;">Qtd</th>'
+            . ($temPedidoEmLista && $temObsVendedor ? '<th>Obs. Pedido</th>' : '')
             . '</tr></thead><tbody>';
+
+        $obsByPedido = [];
+        if ($temPedidoEmLista && $temObsVendedor) {
+            $pedidoIds = [];
+            foreach ($rows as $r) {
+                $pid = (int) ($r['pedido_id'] ?? 0);
+                if ($pid > 0) {
+                    $pedidoIds[$pid] = true;
+                }
+            }
+            $pedidoIds = array_keys($pedidoIds);
+            if (!empty($pedidoIds)) {
+                $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+                try {
+                    $stmtObs = $this->connection->prepare('SELECT id, observacao_vendedor FROM pedidos WHERE id IN (' . $in . ')');
+                    $stmtObs->execute($pedidoIds);
+                    $obsRows = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($obsRows as $or) {
+                        $id = (int) ($or['id'] ?? 0);
+                        if ($id > 0) {
+                            $obsByPedido[$id] = (string) ($or['observacao_vendedor'] ?? '');
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $obsByPedido = [];
+                }
+            }
+        }
 
         foreach ($rows as $r) {
             $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
             $img = $this->resolveProdutoImagem($r);
             $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
+            $pedidoIdLinha = (int) ($r['pedido_id'] ?? 0);
+            $obsLinha = ($pedidoIdLinha > 0 && isset($obsByPedido[$pedidoIdLinha])) ? trim((string) $obsByPedido[$pedidoIdLinha]) : '';
             echo '<tr>'
                 . '<td style="text-align:center;"><span class="check"></span></td>'
                 . '<td style="text-align:center;">' . $imgTag . '</td>'
                 . '<td><strong>' . htmlspecialchars((string) ($r['produto_nome'] ?? '')) . '</strong></td>'
                 . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
+                . ($temPedidoEmLista && $temObsVendedor ? ('<td>' . htmlspecialchars($obsLinha, ENT_QUOTES, 'UTF-8') . '</td>') : '')
                 . '</tr>';
         }
 
