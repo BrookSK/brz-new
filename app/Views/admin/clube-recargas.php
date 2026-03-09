@@ -37,6 +37,21 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Teto de captação (BRL)</div>
+                    <div class="h4 mb-0">R$ <?= number_format((float) ($stats['cap_brl'] ?? 150000), 2, ',', '.') ?></div>
+                    <div class="small text-muted mt-1">Captado pago: R$ <?= number_format((float) ($stats['total_pago_brl'] ?? 0), 2, ',', '.') ?></div>
+                    <?php if (!empty($stats['cap_reached'])): ?>
+                        <div class="small fw-semibold mt-1" style="color:#b42318;">Limite atingido</div>
+                    <?php else: ?>
+                        <div class="small fw-semibold mt-1" style="color:#027a48;">Aberto</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">

@@ -5,6 +5,8 @@ use App\Core\Request;
 use App\Services\AuthService;
 
 class AdminClubeRecargasController extends Controller {
+    private const CLUBE_CAP_BRL = 150000.00;
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
@@ -17,6 +19,8 @@ class AdminClubeRecargasController extends Controller {
             'total_pago_registros' => 0,
             'total_pago_usd' => 0.0,
             'total_pago_brl' => 0.0,
+            'cap_brl' => (float) self::CLUBE_CAP_BRL,
+            'cap_reached' => false,
         ];
 
         try {
@@ -76,6 +80,8 @@ class AdminClubeRecargasController extends Controller {
                     $stats['total_pago_brl'] += (float) ($r['valor_brl'] ?? 0);
                 }
             }
+
+            $stats['cap_reached'] = (((float) ($stats['total_pago_brl'] ?? 0)) + 0.00001 >= (float) self::CLUBE_CAP_BRL);
         } catch (\Exception $e) {
             $rows = [];
         }

@@ -83,6 +83,12 @@ try {
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-10">
+            <?php if (!empty($clube_cap_reached)): ?>
+                <div class="alert alert-warning" style="border-radius:14px;">
+                    <div class="fw-bold">Recargas temporariamente suspensas</div>
+                    <div class="small text-muted">O limite de captação do Clube foi atingido. Novas recargas pelo checkout rápido estão suspensas.</div>
+                </div>
+            <?php endif; ?>
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                 <div>
                     <h1 class="h4 mb-1" style="color:#0b1f3a; font-weight: 800;">Recarga do Clube</h1>
@@ -627,6 +633,14 @@ try {
     }
 
     document.addEventListener('DOMContentLoaded', function(){
+        const CAP_REACHED = <?= json_encode(!empty($clube_cap_reached)) ?>;
+        if(CAP_REACHED){
+            const btn = document.getElementById('qc_btn_pagar');
+            if(btn){
+                btn.disabled = true;
+                btn.textContent = 'Recargas suspensas';
+            }
+        }
         updateEquiv();
         setMetodo('pix');
         syncDdiOutro();

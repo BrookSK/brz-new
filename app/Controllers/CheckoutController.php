@@ -824,12 +824,34 @@ class CheckoutController extends Controller {
                     `usuario_id` int(11) NOT NULL,
                     `saldo_usd` decimal(10,2) DEFAULT 0.00,
                     `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `saldo_usd_bloqueado` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl_bloqueado` decimal(10,2) DEFAULT 0.00,
                     `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `uk_usuario_id` (`usuario_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $cols = [];
+            try {
+                $st = $db->query('DESCRIBE carteiras');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $toAdd = [
+                'saldo_usd_bloqueado' => "ALTER TABLE carteiras ADD COLUMN saldo_usd_bloqueado decimal(10,2) DEFAULT 0.00",
+                'saldo_brl_bloqueado' => "ALTER TABLE carteiras ADD COLUMN saldo_brl_bloqueado decimal(10,2) DEFAULT 0.00",
+            ];
+            foreach ($toAdd as $c => $sql) {
+                if (!is_array($cols) || !in_array($c, $cols, true)) {
+                    try { $db->exec($sql); } catch (\Exception $e) {}
+                }
+            }
         } catch (\Exception $e) {
         }
 
@@ -891,12 +913,43 @@ class CheckoutController extends Controller {
 
         $db->beginTransaction();
         try {
-            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+            // Desbloquear recargas do checkout rápido que já passaram da carência
+            try {
+                $stmtUnlock = $db->prepare("SELECT id, moeda, valor
+                    FROM carteira_recargas
+                    WHERE usuario_id = :uid
+                      AND origem = 'clube_quick_checkout'
+                      AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                      AND unlocked_at IS NULL
+                      AND locked_until IS NOT NULL
+                      AND locked_until <= NOW()");
+                $stmtUnlock->execute([':uid' => $usuarioId]);
+                $unlockRows = $stmtUnlock->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($unlockRows as $ur) {
+                    $rid = (int) ($ur['id'] ?? 0);
+                    if ($rid <= 0) continue;
+                    $m = strtoupper(trim((string) ($ur['moeda'] ?? 'USD')));
+                    $v = (float) ($ur['valor'] ?? 0);
+                    if ($v <= 0) continue;
+                    $saldoBloqColTmp = ($m === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+                    $stmtDec = $db->prepare('UPDATE carteiras SET ' . $saldoBloqColTmp . ' = GREATEST(' . $saldoBloqColTmp . ' - :v, 0), updated_at = NOW() WHERE usuario_id = :uid');
+                    $stmtDec->execute([':v' => $v, ':uid' => $usuarioId]);
+                    $stmtMark = $db->prepare('UPDATE carteira_recargas SET unlocked_at = NOW(), updated_at = NOW() WHERE id = :id AND unlocked_at IS NULL');
+                    $stmtMark->execute([':id' => $rid]);
+                }
+            } catch (\Exception $e) {
+            }
+
+            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl, saldo_usd_bloqueado, saldo_brl_bloqueado FROM carteiras WHERE usuario_id = ? FOR UPDATE');
             $stmt->execute([$usuarioId]);
             $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
             $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
-            if ($saldoAtual + 0.00001 < $valor) {
+            $saldoBloqueado = (float) ($carteira[($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado'] ?? 0);
+            if ($saldoBloqueado < 0) $saldoBloqueado = 0.0;
+            $saldoDisponivel = $saldoAtual - $saldoBloqueado;
+            if ($saldoDisponivel < 0) $saldoDisponivel = 0.0;
+            if ($saldoDisponivel + 0.00001 < $valor) {
                 throw new \Exception('Saldo insuficiente na carteira');
             }
 

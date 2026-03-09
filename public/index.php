@@ -20,6 +20,21 @@ try {
         header('Location: https://' . $host . $uri);
         exit;
     }
+
+function _clubeQuickCheckoutCapReached(): bool {
+    try {
+        $pdo = \Config\Database::getConnection();
+        $st = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(valor_brl,0)),0) AS total
+            FROM carteira_recargas
+            WHERE origem = 'clube_quick_checkout'
+              AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
+        $st->execute();
+        $total = (float) ($st->fetchColumn() ?: 0);
+        return ($total + 0.00001 >= 150000.00);
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
 } catch (\Throwable $e) {
 }
 
@@ -230,7 +245,11 @@ function _siteLockIsBypassPath(string $path): bool {
     if (strpos($p, '/loginadmin') === 0) return true;
     if (strpos($p, '/webhook/') === 0) return true;
     if (strpos($p, '/site-lock') === 0) return true;
-    if (strpos($p, '/clube/recarga') === 0) return true;
+    if (strpos($p, '/clube/recarga/status') === 0) return true;
+    if (strpos($p, '/clube/recarga/comprovante') === 0) return true;
+    if (strpos($p, '/clube/recarga') === 0) {
+        return !_clubeQuickCheckoutCapReached();
+    }
     if (strpos($p, '/como-funciona-clube') === 0) return true;
     if (strpos($p, '/uploads/') === 0) return true;
     if (strpos($p, '/assets/') === 0) return true;

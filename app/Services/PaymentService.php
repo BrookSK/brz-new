@@ -627,6 +627,54 @@ class PaymentService {
         }
     }
 
+    private function liberarBloqueiosCarteiraExpirados(\PDO $db, int $usuarioId): void {
+        try {
+            if ($usuarioId <= 0) return;
+            $this->garantirTabelaCarteiraRecargas($db);
+
+            $stmt = $db->prepare("SELECT id, moeda, valor
+                FROM carteira_recargas
+                WHERE usuario_id = :uid
+                  AND origem = 'clube_quick_checkout'
+                  AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                  AND unlocked_at IS NULL
+                  AND locked_until IS NOT NULL
+                  AND locked_until <= NOW()");
+            $stmt->execute([':uid' => $usuarioId]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($rows)) return;
+
+            foreach ($rows as $r) {
+                $rid = (int) ($r['id'] ?? 0);
+                if ($rid <= 0) continue;
+                $moeda = strtoupper(trim((string) ($r['moeda'] ?? 'USD')));
+                $valor = (float) ($r['valor'] ?? 0);
+                if ($valor <= 0) continue;
+
+                $saldoBloqCol = ($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+
+                try {
+                    $stLock = $db->prepare('SELECT saldo_usd_bloqueado, saldo_brl_bloqueado FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+                    $stLock->execute([$usuarioId]);
+                    $w = $stLock->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $bloqAtual = (float) ($w[$saldoBloqCol] ?? 0);
+                    if ($bloqAtual < 0) $bloqAtual = 0.0;
+                    $dec = $valor;
+                    if ($dec > $bloqAtual) $dec = $bloqAtual;
+                    if ($dec > 0) {
+                        $stDec = $db->prepare('UPDATE carteiras SET ' . $saldoBloqCol . ' = ' . $saldoBloqCol . ' - :v, updated_at = NOW() WHERE usuario_id = :uid');
+                        $stDec->execute([':v' => $dec, ':uid' => $usuarioId]);
+                    }
+
+                    $stMark = $db->prepare('UPDATE carteira_recargas SET unlocked_at = NOW(), updated_at = NOW() WHERE id = :id AND unlocked_at IS NULL');
+                    $stMark->execute([':id' => $rid]);
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     public function registrarPedidoPagamentoSplit(array $row): void {
         $this->upsertPedidoPagamento($row);
     }
@@ -783,12 +831,34 @@ class PaymentService {
                     `usuario_id` int(11) NOT NULL,
                     `saldo_usd` decimal(10,2) DEFAULT 0.00,
                     `saldo_brl` decimal(10,2) DEFAULT 0.00,
+                    `saldo_usd_bloqueado` decimal(10,2) DEFAULT 0.00,
+                    `saldo_brl_bloqueado` decimal(10,2) DEFAULT 0.00,
                     `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `uk_usuario_id` (`usuario_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
+        } catch (\Exception $e) {
+        }
+
+        try {
+            $cols = [];
+            try {
+                $st = $db->query('DESCRIBE carteiras');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $toAdd = [
+                'saldo_usd_bloqueado' => "ALTER TABLE carteiras ADD COLUMN saldo_usd_bloqueado decimal(10,2) DEFAULT 0.00",
+                'saldo_brl_bloqueado' => "ALTER TABLE carteiras ADD COLUMN saldo_brl_bloqueado decimal(10,2) DEFAULT 0.00",
+            ];
+            foreach ($toAdd as $c => $sql) {
+                if (!is_array($cols) || !in_array($c, $cols, true)) {
+                    try { $db->exec($sql); } catch (\Exception $e) {}
+                }
+            }
         } catch (\Exception $e) {
         }
 
@@ -1813,6 +1883,8 @@ class PaymentService {
                 `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 `paid_at` timestamp NULL DEFAULT NULL,
+                `locked_until` timestamp NULL DEFAULT NULL,
+                `unlocked_at` timestamp NULL DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 KEY `idx_usuario_id` (`usuario_id`),
                 KEY `idx_public_token` (`public_token`),
@@ -1840,6 +1912,8 @@ class PaymentService {
                 'metodo' => "ALTER TABLE carteira_recargas ADD COLUMN metodo varchar(20) DEFAULT NULL",
                 'usd_brl_rate' => "ALTER TABLE carteira_recargas ADD COLUMN usd_brl_rate decimal(10,6) DEFAULT NULL",
                 'valor_brl' => "ALTER TABLE carteira_recargas ADD COLUMN valor_brl decimal(10,2) DEFAULT NULL",
+                'locked_until' => "ALTER TABLE carteira_recargas ADD COLUMN locked_until timestamp NULL DEFAULT NULL",
+                'unlocked_at' => "ALTER TABLE carteira_recargas ADD COLUMN unlocked_at timestamp NULL DEFAULT NULL",
             ];
 
             foreach ($toAdd as $c => $sql) {
@@ -1947,6 +2021,7 @@ class PaymentService {
             $db->beginTransaction();
             try {
                 $this->garantirCarteiraUsuario($db, $usuarioId);
+                $this->liberarBloqueiosCarteiraExpirados($db, $usuarioId);
 
                 $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
                 $stmtChk->execute([
@@ -1964,7 +2039,16 @@ class PaymentService {
                 $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
                 $stmtLock->execute([$usuarioId]);
 
-                $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $origem = strtolower(trim((string) ($recarga['origem'] ?? '')));
+                $isLockedFlow = ($origem === 'clube_quick_checkout');
+                $saldoBloqCol = ($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+
+                $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor';
+                if ($isLockedFlow) {
+                    $sqlUpd .= ', ' . $saldoBloqCol . ' = ' . $saldoBloqCol . ' + :valor';
+                }
+                $sqlUpd .= ', updated_at = NOW() WHERE usuario_id = :uid';
+                $stmtUpd = $db->prepare($sqlUpd);
                 $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
 
                 try {
@@ -1980,6 +2064,16 @@ class PaymentService {
 
                 $stUp = $db->prepare("UPDATE carteira_recargas SET status = 'paid', paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id");
                 $stUp->execute([':id' => $recargaId]);
+
+                if ($isLockedFlow) {
+                    try {
+                        $stLockRec = $db->prepare("UPDATE carteira_recargas
+                            SET locked_until = COALESCE(locked_until, DATE_ADD(NOW(), INTERVAL 6 MONTH)), updated_at = NOW()
+                            WHERE id = :id");
+                        $stLockRec->execute([':id' => $recargaId]);
+                    } catch (\Exception $e) {
+                    }
+                }
 
                 $db->commit();
             } catch (\Exception $e) {

@@ -11,10 +11,27 @@ class ClubeRecargaController extends Controller {
     private PaymentService $paymentService;
     private WordPressDbService $wpDbService;
 
+    private const CLUBE_CAP_BRL = 150000.00;
+    private const CLUBE_LOCK_MONTHS = 6;
+
     public function __construct() {
         $this->usuarioModel = new Usuario();
         $this->paymentService = new PaymentService();
         $this->wpDbService = new WordPressDbService();
+    }
+
+    private function getTotalCaptadoPagoBrl(\PDO $db): float {
+        try {
+            $this->ensureCarteiraRecargasTable($db);
+            $stmt = $db->prepare("SELECT COALESCE(SUM(COALESCE(valor_brl,0)),0) AS total
+                FROM carteira_recargas
+                WHERE origem = 'clube_quick_checkout'
+                  AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
+            $stmt->execute();
+            return (float) ($stmt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {
+            return 0.0;
+        }
     }
 
     private function getUsdBrlRate(): float {
@@ -303,11 +320,28 @@ class ClubeRecargaController extends Controller {
 
     public function index(Request $request) {
         $rate = $this->getUsdBrlRate();
+
+        $capBrl = (float) self::CLUBE_CAP_BRL;
+        $totalPagoBrl = 0.0;
+        $capReached = false;
+        try {
+            $db = \Config\Database::getConnection();
+            $totalPagoBrl = $this->getTotalCaptadoPagoBrl($db);
+            $capReached = ($totalPagoBrl + 0.00001 >= $capBrl);
+        } catch (\Exception $e) {
+            $capReached = false;
+        }
+
+        $capUsdEquiv = $rate > 0 ? ($capBrl / $rate) : 0.0;
         $this->view('clube/recarga', [
             'min_usd' => 39.0,
             'usd_brl_rate' => $rate,
             'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
             'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey(),
+            'clube_cap_brl' => $capBrl,
+            'clube_cap_usd_equiv' => $capUsdEquiv,
+            'clube_total_pago_brl' => $totalPagoBrl,
+            'clube_cap_reached' => $capReached,
         ]);
     }
 
@@ -510,6 +544,31 @@ class ClubeRecargaController extends Controller {
             $db = \Config\Database::getConnection();
             $this->ensureCarteiraRecargasTable($db);
 
+            $capBrl = (float) self::CLUBE_CAP_BRL;
+            $totalPagoBrl = $this->getTotalCaptadoPagoBrl($db);
+            if ($totalPagoBrl + 0.00001 >= $capBrl) {
+                $this->json([
+                    'success' => false,
+                    'error' => 'Limite de capta\u00e7\u00e3o do Clube atingido. Novas recargas est\u00e3o temporariamente suspensas.',
+                    'cap_brl' => $capBrl,
+                    'total_pago_brl' => $totalPagoBrl,
+                ], 403);
+                return;
+            }
+            if ($totalPagoBrl + $valorBrl > $capBrl + 0.00001) {
+                $rateNow = $rate > 0 ? $rate : $this->getUsdBrlRate();
+                $capUsdEquiv = $rateNow > 0 ? ($capBrl / $rateNow) : 0.0;
+                $this->json([
+                    'success' => false,
+                    'error' => 'Esta recarga excede o teto do Clube. Ajuste o valor para caber no limite total.',
+                    'cap_brl' => $capBrl,
+                    'cap_usd_equiv' => $capUsdEquiv,
+                    'total_pago_brl' => $totalPagoBrl,
+                    'tentativa_brl' => $valorBrl,
+                ], 403);
+                return;
+            }
+
             $publicToken = $this->generatePublicToken();
 
             $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, origem, public_token, pagador_nome, pagador_email, pagador_documento, metodo, usd_brl_rate, valor_brl, status, created_at, updated_at) VALUES (:uid, 'USD', :valor, :origem, :ptok, :pnome, :pemail, :pdoc, :metodo, :rate, :vbrl, 'pending', NOW(), NOW())");
@@ -553,7 +612,16 @@ class ClubeRecargaController extends Controller {
             }
 
             if (empty($pi['success'])) {
-                $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao iniciar pagamento Stripe')], 500);
+                $err = (string) ($pi['error'] ?? 'Falha ao iniciar pagamento Stripe');
+                $lower = strtolower($err);
+                if ($metodo !== 'card' && (strpos($lower, 'payment method type "pix" is invalid') !== false || strpos($lower, 'payment method type "pix"') !== false)) {
+                    $this->json([
+                        'success' => false,
+                        'error' => 'PIX não está habilitado na sua conta Stripe. Ative em Painel Stripe > Configurações de Pagamentos, ou selecione Cartão.',
+                    ], 400);
+                    return;
+                }
+                $this->json(['success' => false, 'error' => $err], 500);
                 return;
             }
 
