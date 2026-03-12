@@ -1045,6 +1045,9 @@ class AdminCorreiosMundialController extends Controller {
             $rawErr = (string) ($api['error'] ?? '');
             // fallback: containers antigos podem ter dispatch_number errado (retry NEG-118)
             if (stripos($rawErr, 'NEG-124') !== false || stripos($rawErr, 'dispatch numbers not found') !== false) {
+                $candidateNumbers = [];
+                $candidateNumbers[] = $dispatchNumber;
+
                 $lr = (string) ($row['last_request_json'] ?? '');
                 if ($lr !== '') {
                     $jr = json_decode($lr, true);
@@ -1052,12 +1055,27 @@ class AdminCorreiosMundialController extends Controller {
                     if (is_array($jr) && isset($jr['dispatchNumber'])) {
                         $dn2 = trim((string) $jr['dispatchNumber']);
                     }
-                    if ($dn2 !== '' && $dn2 !== $dispatchNumber) {
-                        $api2 = $this->svc->cancelDispatch($dn2);
-                        if (!empty($api2['success'])) {
-                            $dispatchNumber = $dn2;
-                            $api = $api2;
-                        }
+                    if ($dn2 !== '') {
+                        $candidateNumbers[] = $dn2;
+                    }
+                }
+
+                // tentativas adicionais: quando houve retry, o dispatch pode ter sido incrementado
+                if (ctype_digit((string) $dispatchNumber)) {
+                    $base = (int) $dispatchNumber;
+                    for ($i = 1; $i <= 15; $i++) {
+                        $candidateNumbers[] = (string) ($base + $i);
+                    }
+                }
+
+                $candidateNumbers = array_values(array_unique(array_filter(array_map('strval', $candidateNumbers))));
+                foreach ($candidateNumbers as $dnTry) {
+                    if ($dnTry === '') continue;
+                    $api2 = $this->svc->cancelDispatch($dnTry);
+                    if (!empty($api2['success'])) {
+                        $dispatchNumber = $dnTry;
+                        $api = $api2;
+                        break;
                     }
                 }
             }
@@ -1070,8 +1088,9 @@ class AdminCorreiosMundialController extends Controller {
         }
 
         try {
-            $stUp = $this->connection->prepare('UPDATE correios_packet_containers SET status = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
+            $stUp = $this->connection->prepare('UPDATE correios_packet_containers SET dispatch_number = ?, status = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
             $stUp->execute([
+                $dispatchNumber,
                 'cancelled',
                 json_encode($api['raw'] ?? null),
                 $api['http_code'] ?? null,
