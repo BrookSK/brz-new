@@ -166,7 +166,8 @@ class CorreiosPacketService {
             return ['success' => false, 'error' => 'Correios Mundial (PACKET) não configurado (login/senha/cartão de postagem).'];
         }
 
-        $tokenResp = $this->getValidToken($cfg);
+        // O cache de token não é separado por ambiente; no cancelamento sempre forçamos refresh.
+        $tokenResp = $this->getValidToken($cfg, true);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
             return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
         }
@@ -256,7 +257,8 @@ class CorreiosPacketService {
             return ['success' => false, 'error' => 'Correios Mundial (PACKET) não configurado (login/senha/cartão de postagem).'];
         }
 
-        $tokenResp = $this->getValidToken($cfg);
+        // O cache de token não é separado por ambiente; no cancelamento sempre forçamos refresh.
+        $tokenResp = $this->getValidToken($cfg, true);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
             return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
         }
