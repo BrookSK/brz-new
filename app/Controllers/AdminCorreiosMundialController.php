@@ -56,6 +56,70 @@ class AdminCorreiosMundialController extends Controller {
         return (string) $v;
     }
 
+    private function packetFriendlyError(string $msg, $raw = null): string {
+        $m = trim((string) $msg);
+        $mUpper = strtoupper($m);
+
+        // Códigos conhecidos
+        if (strpos($mUpper, 'SUA-121') !== false) {
+            return 'CPF do destinatário inválido. Confira se o CPF está correto e regular na Receita Federal.';
+        }
+
+        // Mensagens conhecidas (inglês)
+        $mLower = strtolower($m);
+        if (strpos($mLower, 'cpf') !== false && strpos($mLower, 'regular') !== false) {
+            return 'CPF do destinatário não está regular na Receita Federal. O pedido não pode gerar etiqueta até regularizar.';
+        }
+        if (strpos($mLower, 'cpf number is invalid') !== false) {
+            return 'CPF do destinatário inválido. Confira o número informado.';
+        }
+        if (strpos($mLower, 'cnpj') !== false && strpos($mLower, 'invalid') !== false) {
+            return 'CNPJ do destinatário inválido. Confira o número informado.';
+        }
+        if (strpos($mLower, 'zip') !== false && (strpos($mLower, 'invalid') !== false || strpos($mLower, 'must') !== false)) {
+            return 'CEP do destinatário inválido. Informe um CEP válido com 8 dígitos.';
+        }
+        if (strpos($mLower, 'phone') !== false && (strpos($mLower, 'invalid') !== false || strpos($mLower, 'digits') !== false)) {
+            return 'Telefone do destinatário inválido. Informe DDD + número (10 ou 11 dígitos), sem +55.';
+        }
+        if (strpos($mLower, 'hs') !== false && (strpos($mLower, 'not') !== false || strpos($mLower, 'allowed') !== false)) {
+            return 'Não foi possível gerar o rastreio porque o NCM (HS Code) de algum item não é permitido no Brasil. Revise o NCM do produto.';
+        }
+
+        // Tenta extrair mensagens em listas/estruturas comuns
+        if (is_array($raw)) {
+            foreach (['message', 'error', 'mensagem', 'erro'] as $k) {
+                if (!empty($raw[$k]) && is_string($raw[$k])) {
+                    $candidate = trim((string) $raw[$k]);
+                    if ($candidate !== '' && $candidate !== $m) {
+                        $m = $candidate;
+                        $mLower = strtolower($m);
+                    }
+                }
+            }
+
+            if (!empty($raw['errors']) && is_array($raw['errors'])) {
+                $first = $raw['errors'][0] ?? null;
+                if (is_string($first) && trim($first) !== '') {
+                    $m = trim($first);
+                }
+                if (is_array($first)) {
+                    $cand = (string) ($first['message'] ?? ($first['error'] ?? ($first['mensagem'] ?? '')));
+                    if (trim($cand) !== '') {
+                        $m = trim($cand);
+                    }
+                }
+            }
+        }
+
+        // Fallback genérico em PT
+        if ($m === '') {
+            return 'Não foi possível gerar a etiqueta. Verifique os dados do destinatário e dos produtos e tente novamente.';
+        }
+
+        return 'Não foi possível gerar a etiqueta: ' . $m;
+    }
+
     private function pickFirstNonEmpty(array $row, array $keys): string {
         foreach ($keys as $k) {
             if (array_key_exists($k, $row)) {
@@ -604,9 +668,10 @@ class AdminCorreiosMundialController extends Controller {
 
         $resp = $this->svc->createPackages([$package]);
         if (empty($resp['success'])) {
+            $friendly = $this->packetFriendlyError((string) ($resp['error'] ?? ''), $resp['raw'] ?? null);
             $this->json([
                 'success' => false,
-                'error' => (string) ($resp['error'] ?? 'Falha ao gerar etiqueta.'),
+                'error' => $friendly,
                 'http_code' => $resp['http_code'] ?? null,
             ], 400);
             return;
