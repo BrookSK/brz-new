@@ -323,8 +323,26 @@ class PaymentService {
                         $first = reset($resp['errors']);
                         if (is_string($first)) {
                             $errDetails = $first;
-                        } elseif (is_array($first) && !empty($first['message']) && is_string($first['message'])) {
-                            $errDetails = (string) $first['message'];
+                        } elseif (is_array($first)) {
+                            if (!empty($first['message']) && is_string($first['message'])) {
+                                $errDetails = (string) $first['message'];
+                            } elseif (!empty($first['error']) && is_string($first['error'])) {
+                                $errDetails = (string) $first['error'];
+                            } elseif (!empty($first['detail']) && is_string($first['detail'])) {
+                                $errDetails = (string) $first['detail'];
+                            }
+
+                            if ($errDetails === '' && !empty($first['field']) && is_string($first['field'])) {
+                                $errDetails = 'Campo inválido: ' . (string) $first['field'];
+                            }
+
+                            if ($errDetails === '') {
+                                try {
+                                    $errDetails = (string) json_encode($first, JSON_UNESCAPED_UNICODE);
+                                } catch (\Exception $e) {
+                                    $errDetails = '';
+                                }
+                            }
                         }
                     }
                     $full = trim($msg . ($errDetails !== '' ? (' - ' . $errDetails) : ''));
@@ -337,6 +355,7 @@ class PaymentService {
                             'status' => $resp['status'] ?? null,
                             'message' => $resp['message'] ?? null,
                             'errors_keys' => is_array($resp['errors'] ?? null) ? array_keys($resp['errors']) : null,
+                            'first_error' => isset($first) ? $first : null,
                         ], JSON_UNESCAPED_UNICODE));
                     } catch (\Exception $e) {
                     }
