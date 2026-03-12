@@ -1069,13 +1069,18 @@ class AdminCorreiosMundialController extends Controller {
                 }
 
                 $candidateNumbers = array_values(array_unique(array_filter(array_map('strval', $candidateNumbers))));
-                foreach ($candidateNumbers as $dnTry) {
-                    if ($dnTry === '') continue;
-                    $api2 = $this->svc->cancelDispatch($dnTry);
-                    if (!empty($api2['success'])) {
-                        $dispatchNumber = $dnTry;
-                        $api = $api2;
-                        break;
+
+                // fallback adicional: tentar nos dois ambientes (homologação/produção)
+                $ambientesTry = ['homologacao', 'producao'];
+                foreach ($ambientesTry as $ambTry) {
+                    foreach ($candidateNumbers as $dnTry) {
+                        if ($dnTry === '') continue;
+                        $api2 = $this->svc->cancelDispatch($dnTry, $ambTry);
+                        if (!empty($api2['success'])) {
+                            $dispatchNumber = $dnTry;
+                            $api = $api2;
+                            break 2;
+                        }
                     }
                 }
             }

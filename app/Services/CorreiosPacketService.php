@@ -151,8 +151,11 @@ class CorreiosPacketService {
         }
     }
 
-    public function cancelDispatch(string $dispatchNumber): array {
+    public function cancelDispatch(string $dispatchNumber, ?string $ambienteOverride = null): array {
         $cfg = $this->loadPacketConfig();
+        if ($ambienteOverride !== null && $ambienteOverride !== '') {
+            $cfg['ambiente'] = (string) $ambienteOverride;
+        }
 
         $dispatchNumber = trim((string) $dispatchNumber);
         if ($dispatchNumber === '') {
