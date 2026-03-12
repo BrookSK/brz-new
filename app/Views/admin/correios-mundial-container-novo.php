@@ -89,7 +89,7 @@
             <div class="row g-3">
                 <div class="col-12">
                     <label class="form-label">Colar lista (pedidos ou tracking)</label>
-                    <textarea class="form-control" name="bulk" id="cm_bulk" rows="5" placeholder="Cole aqui: ex. #12345\n12345\nNC000005113BR\n..."><?= htmlspecialchars((string) ($defaults['bulk'] ?? '')) ?></textarea>
+                    <textarea class="form-control" name="bulk" id="cm_bulk" rows="5" placeholder="Cole aqui: ex. #12345&#10;12345&#10;NC000005113BR&#10;..."><?= htmlspecialchars((string) ($defaults['bulk'] ?? '')) ?></textarea>
                     <div class="form-text">
                         Você pode colar IDs de pedido (números) e/ou trackingNumbers. O sistema tenta resolver e seleciona automaticamente.
                     </div>
