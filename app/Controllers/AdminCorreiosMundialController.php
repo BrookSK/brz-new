@@ -1048,6 +1048,15 @@ class AdminCorreiosMundialController extends Controller {
                 $candidateNumbers = [];
                 $candidateNumbers[] = $dispatchNumber;
 
+                $attemptLog = [];
+                $attemptLog[] = [
+                    'amb' => 'config',
+                    'dn' => $dispatchNumber,
+                    'http' => $api['http_code'] ?? null,
+                    'err' => (string) ($api['error'] ?? ''),
+                    'url' => (string) ($api['request_url'] ?? ''),
+                ];
+
                 $lr = (string) ($row['last_request_json'] ?? '');
                 if ($lr !== '') {
                     $jr = json_decode($lr, true);
@@ -1076,12 +1085,29 @@ class AdminCorreiosMundialController extends Controller {
                     foreach ($candidateNumbers as $dnTry) {
                         if ($dnTry === '') continue;
                         $api2 = $this->svc->cancelDispatch($dnTry, $ambTry);
+                        $attemptLog[] = [
+                            'amb' => $ambTry,
+                            'dn' => $dnTry,
+                            'http' => $api2['http_code'] ?? null,
+                            'err' => (string) ($api2['error'] ?? ''),
+                            'url' => (string) ($api2['request_url'] ?? ''),
+                        ];
                         if (!empty($api2['success'])) {
                             $dispatchNumber = $dnTry;
                             $api = $api2;
                             break 2;
                         }
                     }
+                }
+
+                // se falhou, sobrescreve erro com resumo das últimas tentativas
+                if (empty($api['success']) && !empty($attemptLog)) {
+                    $tail = array_slice($attemptLog, -6);
+                    $parts = [];
+                    foreach ($tail as $a) {
+                        $parts[] = ($a['amb'] ?? '-') . ':' . ($a['dn'] ?? '-') . ' HTTP ' . (($a['http'] ?? '') !== null ? (string) $a['http'] : '-') . ' ' . ($a['err'] ?? '');
+                    }
+                    $api['error'] = trim((string) ($api['error'] ?? '')) . ' | tentativas: ' . implode(' || ', $parts);
                 }
             }
 
