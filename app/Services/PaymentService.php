@@ -148,7 +148,15 @@ class PaymentService {
                 }
                 throw new \Exception('Erro Câmbio Real HTTP ' . $httpCode . ': ' . $msgSafe);
             }
-            return is_array($decoded) ? $decoded : [];
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+            $raw = (string) $respBody;
+            $head = substr($raw, 0, 300);
+            return [
+                '__raw_len' => strlen($raw),
+                '__raw_head' => $head,
+            ];
         }
 
         $context = stream_context_create([
@@ -217,13 +225,81 @@ class PaymentService {
         try {
             $resp = $this->cambioRealRequest('POST', '/service/v1/checkout/request', $payload);
             $data = is_array($resp['data'] ?? null) ? $resp['data'] : [];
-            $token = (string) ($data['token'] ?? '');
-            $checkoutUrl = (string) ($data['checkout'] ?? ($data['ticket'] ?? ''));
-            $code = (string) ($data['code'] ?? '');
-            $id = (string) ($data['id'] ?? '');
+
+            $token = '';
+            foreach (['token', 'checkout_token', 'checkoutToken', 'id'] as $k) {
+                if ($token === '' && !empty($data[$k]) && is_string($data[$k])) {
+                    $token = (string) $data[$k];
+                }
+                if ($token === '' && !empty($resp[$k]) && is_string($resp[$k])) {
+                    $token = (string) $resp[$k];
+                }
+            }
+
+            $checkoutUrl = '';
+            foreach (['checkout', 'checkout_url', 'checkoutUrl', 'ticket', 'url', 'link', 'redirect_url', 'redirectUrl'] as $k) {
+                if ($checkoutUrl === '' && !empty($data[$k]) && is_string($data[$k])) {
+                    $checkoutUrl = (string) $data[$k];
+                }
+                if ($checkoutUrl === '' && !empty($resp[$k]) && is_string($resp[$k])) {
+                    $checkoutUrl = (string) $resp[$k];
+                }
+                if ($checkoutUrl === '' && !empty($data[$k]) && is_array($data[$k])) {
+                    $arr = $data[$k];
+                    foreach (['url', 'link', 'href', 'checkout', 'ticket'] as $kk) {
+                        if ($checkoutUrl === '' && !empty($arr[$kk]) && is_string($arr[$kk])) {
+                            $checkoutUrl = (string) $arr[$kk];
+                        }
+                    }
+                }
+                if ($checkoutUrl === '' && !empty($resp[$k]) && is_array($resp[$k])) {
+                    $arr = $resp[$k];
+                    foreach (['url', 'link', 'href', 'checkout', 'ticket'] as $kk) {
+                        if ($checkoutUrl === '' && !empty($arr[$kk]) && is_string($arr[$kk])) {
+                            $checkoutUrl = (string) $arr[$kk];
+                        }
+                    }
+                }
+            }
+
+            $code = (string) (($data['code'] ?? '') !== '' ? ($data['code'] ?? '') : ($resp['code'] ?? ''));
+            $id = (string) (($data['id'] ?? '') !== '' ? ($data['id'] ?? '') : ($resp['id'] ?? ''));
 
             if ($token === '' || $checkoutUrl === '') {
-                return ['success' => false, 'error' => 'Câmbio Real: resposta inválida ao criar solicitação de pagamento.'];
+                $respKeys = [];
+                $dataKeys = [];
+                try {
+                    $respKeys = is_array($resp) ? array_keys($resp) : [];
+                    $dataKeys = is_array($data) ? array_keys($data) : [];
+                } catch (\Exception $e) {
+                }
+
+                try {
+                    $safe = [
+                        'resp_keys' => $respKeys,
+                        'data_keys' => $dataKeys,
+                        'has_raw' => is_array($resp) && (isset($resp['__raw_len']) || isset($resp['__raw_head'])),
+                        'raw_len' => is_array($resp) ? ($resp['__raw_len'] ?? null) : null,
+                        'raw_head' => is_array($resp) ? ($resp['__raw_head'] ?? null) : null,
+                    ];
+                    error_log('[CÂMBIOREAL] Resposta inválida em checkout/request: ' . json_encode($safe, JSON_UNESCAPED_UNICODE));
+                } catch (\Exception $e) {
+                }
+
+                $keysMsg = '';
+                try {
+                    $keysMsg = ' (keys=' . implode(',', array_slice($respKeys, 0, 20)) . '; data=' . implode(',', array_slice($dataKeys, 0, 20)) . ')';
+                } catch (\Exception $e) {
+                    $keysMsg = '';
+                }
+                return [
+                    'success' => false,
+                    'error' => 'Câmbio Real: resposta inválida ao criar solicitação de pagamento.' . $keysMsg,
+                    'debug_keys' => [
+                        'resp' => $respKeys,
+                        'data' => $dataKeys,
+                    ],
+                ];
             }
 
             $this->registrarPedidoPagamentoSplit([
