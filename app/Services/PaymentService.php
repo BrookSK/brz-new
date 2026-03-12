@@ -135,8 +135,17 @@ class PaymentService {
 
             $decoded = json_decode((string) $respBody, true);
             if ($httpCode < 200 || $httpCode >= 300) {
+                if (in_array($httpCode, [401, 403], true)) {
+                    throw new \Exception('Câmbio Real: credenciais inválidas (APP ID/SECRET) ou Base URL incorreta.');
+                }
                 $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
-                throw new \Exception('Erro Câmbio Real HTTP ' . $httpCode . ': ' . $msg);
+                // Evita retornar respostas potencialmente sensíveis para o usuário final
+                $msgSafe = (string) $httpCode;
+                try {
+                    $msgSafe = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : (string) $httpCode;
+                } catch (\Exception $e) {
+                }
+                throw new \Exception('Erro Câmbio Real HTTP ' . $httpCode . ': ' . $msgSafe);
             }
             return is_array($decoded) ? $decoded : [];
         }
