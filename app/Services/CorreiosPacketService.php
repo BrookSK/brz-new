@@ -18,7 +18,13 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+            return [
+                'success' => false,
+                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
+                'http_code' => $tokenResp['http_code'] ?? null,
+                'request_url' => $tokenResp['request_url'] ?? null,
+                'meta' => $tokenResp,
+            ];
         }
 
         $token = (string) $tokenResp['token'];
@@ -91,7 +97,13 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+            return [
+                'success' => false,
+                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
+                'http_code' => $tokenResp['http_code'] ?? null,
+                'request_url' => $tokenResp['request_url'] ?? null,
+                'meta' => $tokenResp,
+            ];
         }
 
         $token = (string) $tokenResp['token'];
@@ -159,7 +171,13 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+            return [
+                'success' => false,
+                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
+                'http_code' => $tokenResp['http_code'] ?? null,
+                'request_url' => $tokenResp['request_url'] ?? null,
+                'meta' => $tokenResp,
+            ];
         }
 
         $token = (string) $tokenResp['token'];
