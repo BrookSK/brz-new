@@ -52,6 +52,126 @@ class AdminCorreiosMundialController extends Controller {
         }
     }
 
+    private function ensurePacketContainersTable(): void {
+        try {
+            if ($this->tableExists('correios_packet_containers')) {
+                return;
+            }
+
+            $sql = "CREATE TABLE IF NOT EXISTS correios_packet_containers (\n"
+                . "  id INT AUTO_INCREMENT PRIMARY KEY,\n"
+                . "  dispatch_number INT NOT NULL,\n"
+                . "  origin_country VARCHAR(2) NOT NULL DEFAULT 'US',\n"
+                . "  origin_operator_name VARCHAR(4) NOT NULL,\n"
+                . "  destination_operator_name VARCHAR(4) NOT NULL,\n"
+                . "  postal_category_code VARCHAR(1) NOT NULL DEFAULT 'A',\n"
+                . "  service_subclass_code VARCHAR(2) NOT NULL DEFAULT 'NX',\n"
+                . "  unit_type VARCHAR(1) NOT NULL DEFAULT '2',\n"
+                . "  awb VARCHAR(50) NULL,\n"
+                . "  triage_group VARCHAR(3) NULL,\n"
+                . "  tracking_numbers_json LONGTEXT NULL,\n"
+                . "  unit_code VARCHAR(120) NULL,\n"
+                . "  status VARCHAR(30) DEFAULT 'created',\n"
+                . "  last_request_json LONGTEXT NULL,\n"
+                . "  last_response_json LONGTEXT NULL,\n"
+                . "  last_http_code INT NULL,\n"
+                . "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
+                . "  updated_at TIMESTAMP NULL DEFAULT NULL,\n"
+                . "  UNIQUE KEY uniq_correios_packet_containers_dispatch_number (dispatch_number),\n"
+                . "  KEY idx_correios_packet_containers_unit_code (unit_code)\n"
+                . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            $this->connection->exec($sql);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function ensureEtiquetasHasContainerIdColumn(): void {
+        try {
+            $this->ensurePacketEtiquetasTable();
+            if (!$this->tableExists('correios_packet_etiquetas')) {
+                return;
+            }
+            $cols = [];
+            $st = $this->connection->query('DESCRIBE correios_packet_etiquetas');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            if (is_array($cols) && in_array('container_id', $cols, true)) {
+                return;
+            }
+            $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD COLUMN container_id INT NULL DEFAULT NULL, ADD KEY idx_correios_packet_etiquetas_container_id (container_id)');
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function parseBulkTokens(string $raw): array {
+        $raw = trim((string) $raw);
+        if ($raw === '') return [];
+        $raw = str_replace(["\r\n", "\r"], "\n", $raw);
+        $parts = preg_split('/[\n\t\s,;]+/', $raw);
+        $out = [];
+        foreach ($parts as $p) {
+            $p = trim((string) $p);
+            if ($p === '') continue;
+            $out[] = $p;
+        }
+        return array_values(array_unique($out));
+    }
+
+    private function getPacketGroups(): array {
+        return [
+            "packet_express" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional do Rio de Janeiro – SE/RJ",
+                "location" => "Ponta do Galeão, s/n, 2º andar – TECA Correios",
+                "city" => "Galeão",
+                "zipcode" => "21941-974",
+                "region" => "Ilha do Governador, Rio de Janeiro/RJ",
+                "cnpj" => "34.028.316/7189-93"
+            ],
+            "packet_standard_grupo_1" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional de São Paulo – SE/SPM",
+                "location" => "Rua Mergenthaler, 568, bloco III, 5º andar, Vila Leopoldina",
+                "zipcode" => "05311-900",
+                "region" => "São Paulo/SP",
+                "cnpj" => "34.028.316/7105-85"
+            ],
+            "packet_standard_grupo_2" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional em Valinhos - SE/SPI",
+                "location" => "Rua Clark, 3401, Macuco",
+                "zipcode" => "13279-400",
+                "region" => "Valinhos/SP",
+                "cnpj" => "34.028.316/9395-74"
+            ],
+            "packet_standard_grupo_3" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional do Rio de Janeiro – SE/RJ",
+                "location" => "Ponta do Galeão, s/n, 2º andar – TECA Correios",
+                "city" => "Galeão",
+                "zipcode" => "21941-974",
+                "region" => "Ilha do Governador, Rio de Janeiro/RJ",
+                "cnpj" => "34.028.316/7189-93"
+            ],
+            "packet_standard_grupo_4" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional de Curitiba - SE/PR",
+                "location" => "Rua Salgado Filho, 476, Jardim Amélia",
+                "zipcode" => "83330-972",
+                "region" => "Pinhais/PR",
+                "cnpj" => "34.028.316/9148-22"
+            ],
+            "packet_standard_grupo_5" => [
+                "company" => "Empresa Brasileira de Correios e Telégrafos",
+                "center" => "Centro Internacional de Curitiba - SE/PR",
+                "location" => "Rua Salgado Filho, 476, Jardim Amélia",
+                "zipcode" => "83330-972",
+                "region" => "Pinhais/PR",
+                "cnpj" => "34.028.316/9148-22"
+            ]
+        ];
+    }
+
     private function onlyDigits(string $v): string {
         $v = (string) $v;
         $v = preg_replace('/\D+/', '', $v);
@@ -824,6 +944,540 @@ class AdminCorreiosMundialController extends Controller {
         $bin = @file_get_contents($path);
         if ($bin === false || $bin === null) return '';
         return 'data:' . $mime . ';base64,' . base64_encode($bin);
+    }
+
+    private function getAvailablePackagesForContainer(): array {
+        $this->ensurePacketEtiquetasTable();
+        $this->ensureEtiquetasHasContainerIdColumn();
+        if (!$this->tableExists('correios_packet_etiquetas')) return [];
+        try {
+            $st = $this->connection->prepare('SELECT pedido_id, tracking_number FROM correios_packet_etiquetas WHERE tracking_number IS NOT NULL AND tracking_number <> \'\' AND (container_id IS NULL OR container_id = 0) ORDER BY created_at DESC LIMIT 500');
+            $st->execute();
+            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function getNextDispatchNumber(): int {
+        $this->ensurePacketContainersTable();
+        if (!$this->tableExists('correios_packet_containers')) return 1;
+        try {
+            $st = $this->connection->query('SELECT MAX(dispatch_number) FROM correios_packet_containers');
+            $m = (int) ($st ? ($st->fetchColumn() ?: 0) : 0);
+            return max(1, $m + 1);
+        } catch (\Exception $e) {
+            return 1;
+        }
+    }
+
+    public function containers(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $this->ensurePacketContainersTable();
+        $containers = [];
+        if ($this->tableExists('correios_packet_containers')) {
+            try {
+                $st = $this->connection->prepare('SELECT * FROM correios_packet_containers ORDER BY created_at DESC LIMIT 100');
+                $st->execute();
+                $containers = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $containers = [];
+            }
+        }
+
+        foreach ($containers as &$c) {
+            $tn = [];
+            $raw = (string) ($c['tracking_numbers_json'] ?? '');
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) $tn = $decoded;
+            }
+            $c['packages_count'] = is_array($tn) ? count($tn) : 0;
+        }
+        unset($c);
+
+        $this->view('admin/correios-mundial-containers', [
+            'containers' => $containers,
+            'flashError' => (string) ($request->getParam('error') ?? ''),
+            'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+        ]);
+    }
+
+    public function containerNovo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $bulk = (string) ($request->getParam('bulk') ?? '');
+        $preselected = [];
+        $bulkResult = null;
+
+        $available = $this->getAvailablePackagesForContainer();
+        $availableSet = [];
+        foreach ($available as $p) {
+            $trk = (string) ($p['tracking_number'] ?? '');
+            if ($trk !== '') $availableSet[$trk] = true;
+        }
+
+        if (trim($bulk) !== '') {
+            $tokens = $this->parseBulkTokens($bulk);
+            $found = [];
+            $notFound = [];
+            $alreadyUsed = [];
+
+            foreach ($tokens as $t) {
+                $isNumeric = ctype_digit($t);
+                $tracking = '';
+
+                if ($isNumeric) {
+                    $pid = (int) $t;
+                    if ($pid > 0 && $this->tableExists('correios_packet_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, container_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                            $st->execute([$pid]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                            if (is_array($row)) {
+                                $tracking = (string) ($row['tracking_number'] ?? '');
+                                $cid = (int) ($row['container_id'] ?? 0);
+                                if ($tracking !== '' && $cid > 0) {
+                                    $alreadyUsed[] = $t . ' -> ' . $tracking;
+                                    $tracking = '';
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                } else {
+                    $tracking = strtoupper(trim($t));
+                    if ($tracking !== '' && $this->tableExists('correios_packet_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT container_id FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
+                            $st->execute([$tracking]);
+                            $cid = (int) ($st->fetchColumn() ?: 0);
+                            if ($cid > 0) {
+                                $alreadyUsed[] = $tracking;
+                                $tracking = '';
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($tracking !== '' && isset($availableSet[$tracking])) {
+                    $found[] = $tracking;
+                    $preselected[] = $tracking;
+                } else {
+                    if ($tracking === '' && $isNumeric) {
+                        // já foi para alreadyUsed ou não resolveu
+                        if (!in_array($t, $alreadyUsed, true)) {
+                            $notFound[] = $t;
+                        }
+                    } elseif ($tracking !== '') {
+                        $notFound[] = $tracking;
+                    }
+                }
+            }
+
+            $preselected = array_values(array_unique($preselected));
+            $bulkResult = [
+                'found' => array_values(array_unique($found)),
+                'not_found' => array_values(array_unique($notFound)),
+                'already_used' => array_values(array_unique($alreadyUsed)),
+            ];
+        }
+
+        $defaults = [
+            'dispatchNumber' => $this->getNextDispatchNumber(),
+            'originOperatorName' => 'BRAS',
+            'destinationOperatorName' => 'SAOD',
+            'postalCategoryCode' => 'A',
+            'serviceSubclassCode' => 'NX',
+            'unitType' => '2',
+            'awb' => '',
+            'triageGroup' => '1',
+            'bulk' => $bulk,
+        ];
+
+        $this->view('admin/correios-mundial-container-novo', [
+            'defaults' => $defaults,
+            'availablePackages' => $available,
+            'preselected' => $preselected,
+            'bulkResult' => $bulkResult,
+            'flashError' => (string) ($request->getParam('error') ?? ''),
+            'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+        ]);
+    }
+
+    public function containerCriar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $this->ensurePacketContainersTable();
+        $this->ensureEtiquetasHasContainerIdColumn();
+
+        $dispatchNumber = (int) ($request->getParam('dispatchNumber') ?? 0);
+        $originCountry = strtoupper(trim((string) ($request->getParam('originCountry') ?? 'US')));
+        $originOperatorName = strtoupper(substr(trim((string) ($request->getParam('originOperatorName') ?? 'BRAS')), 0, 4));
+        $destinationOperatorName = strtoupper(substr(trim((string) ($request->getParam('destinationOperatorName') ?? 'SAOD')), 0, 4));
+        $postalCategoryCode = strtoupper(substr(trim((string) ($request->getParam('postalCategoryCode') ?? 'A')), 0, 1));
+        $serviceSubclassCode = strtoupper(substr(trim((string) ($request->getParam('serviceSubclassCode') ?? 'NX')), 0, 2));
+        $unitType = (string) ($request->getParam('unitType') ?? '2');
+        $awb = trim((string) ($request->getParam('awb') ?? ''));
+        $triageGroup = trim((string) ($request->getParam('triageGroup') ?? '1'));
+        $bulk = (string) ($request->getParam('bulk') ?? '');
+
+        $trackingNumbers = $request->getParam('trackingNumbers');
+        if (!is_array($trackingNumbers)) {
+            $trackingNumbers = [];
+        }
+        $trackingNumbers = array_values(array_filter(array_map(function ($v) {
+            $v = strtoupper(trim((string) $v));
+            return $v !== '' ? $v : null;
+        }, $trackingNumbers)));
+
+        if (empty($trackingNumbers) && trim($bulk) !== '') {
+            // tenta resolver a partir do bulk
+            $tokens = $this->parseBulkTokens($bulk);
+            $resolved = [];
+            foreach ($tokens as $t) {
+                if (ctype_digit($t)) {
+                    $pid = (int) $t;
+                    if ($pid > 0 && $this->tableExists('correios_packet_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number, container_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                            $st->execute([$pid]);
+                            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+                            if (is_array($row)) {
+                                $trk = strtoupper(trim((string) ($row['tracking_number'] ?? '')));
+                                $cid = (int) ($row['container_id'] ?? 0);
+                                if ($trk !== '' && $cid <= 0) {
+                                    $resolved[] = $trk;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                } else {
+                    $resolved[] = strtoupper(trim($t));
+                }
+            }
+            $trackingNumbers = array_values(array_unique(array_filter($resolved)));
+        }
+
+        if ($dispatchNumber <= 0) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('dispatchNumber inválido.'));
+            exit;
+        }
+        if ($originCountry !== 'US') {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('originCountry deve ser US.'));
+            exit;
+        }
+        if ($originOperatorName === '' || strlen($originOperatorName) !== 4) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('originOperatorName deve ter 4 letras.'));
+            exit;
+        }
+        if ($destinationOperatorName === '' || strlen($destinationOperatorName) !== 4) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('destinationOperatorName deve ter 4 letras.'));
+            exit;
+        }
+        if ($postalCategoryCode === '') {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('postalCategoryCode inválido.'));
+            exit;
+        }
+        if (!in_array($serviceSubclassCode, ['NX', 'IX'], true)) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('serviceSubclassCode deve ser NX ou IX.'));
+            exit;
+        }
+        if (!in_array($unitType, ['1', '2'], true)) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('unitType inválido (1 ou 2).'));
+            exit;
+        }
+        if (count($trackingNumbers) <= 0) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Selecione pelo menos 1 pacote.'));
+            exit;
+        }
+        if (count($trackingNumbers) > 500) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Limite de 500 pacotes por container.'));
+            exit;
+        }
+
+        // valida se todos existem e não estão usados
+        $invalid = [];
+        $already = [];
+        if ($this->tableExists('correios_packet_etiquetas')) {
+            foreach ($trackingNumbers as $t) {
+                try {
+                    $st = $this->connection->prepare('SELECT container_id FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
+                    $st->execute([$t]);
+                    $cid = $st->fetchColumn();
+                    if ($cid === false) {
+                        $invalid[] = $t;
+                    } else {
+                        if ((int) $cid > 0) $already[] = $t;
+                    }
+                } catch (\Exception $e) {
+                    $invalid[] = $t;
+                }
+            }
+        }
+        if (!empty($invalid)) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Tracking não encontrado: ' . implode(', ', array_slice($invalid, 0, 20))));
+            exit;
+        }
+        if (!empty($already)) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Já usado em outro container: ' . implode(', ', array_slice($already, 0, 20))));
+            exit;
+        }
+
+        $payload = [
+            'dispatchNumber' => $dispatchNumber,
+            'originCountry' => 'US',
+            'originOperatorName' => $originOperatorName,
+            'destinationOperatorName' => $destinationOperatorName,
+            'postalCategoryCode' => $postalCategoryCode,
+            'serviceSubclassCode' => $serviceSubclassCode,
+            'unitList' => [
+                [
+                    'sequence' => 1,
+                    'unitType' => $unitType,
+                    'trackingNumbers' => array_values($trackingNumbers),
+                ]
+            ],
+        ];
+
+        $apiResp = $this->svc->createUnits($payload);
+        if (empty($apiResp['success'])) {
+            $err = $this->packetFriendlyError((string) ($apiResp['error'] ?? 'Falha ao criar unitizador.'), $apiResp['raw'] ?? null);
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode($err) . '&bulk=' . rawurlencode($bulk));
+            exit;
+        }
+
+        $unitCode = '';
+        $raw = $apiResp['raw'] ?? null;
+        if (is_array($raw)) {
+            $list = $raw['unitResponseList'] ?? null;
+            if (is_array($list) && isset($list[0]) && is_array($list[0])) {
+                $unitCode = (string) ($list[0]['unitCode'] ?? '');
+            }
+        }
+        if ($unitCode === '') {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Correios não retornou unitCode.') . '&bulk=' . rawurlencode($bulk));
+            exit;
+        }
+
+        $containerId = 0;
+        try {
+            $stIns = $this->connection->prepare('INSERT INTO correios_packet_containers (dispatch_number, origin_country, origin_operator_name, destination_operator_name, postal_category_code, service_subclass_code, unit_type, awb, triage_group, tracking_numbers_json, unit_code, status, last_request_json, last_response_json, last_http_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+            $stIns->execute([
+                $dispatchNumber,
+                'US',
+                $originOperatorName,
+                $destinationOperatorName,
+                $postalCategoryCode,
+                $serviceSubclassCode,
+                $unitType,
+                $awb !== '' ? $awb : null,
+                $triageGroup !== '' ? $triageGroup : null,
+                json_encode(array_values($trackingNumbers)),
+                $unitCode,
+                'created',
+                json_encode($payload),
+                json_encode($apiResp['raw'] ?? null),
+                $apiResp['http_code'] ?? null,
+            ]);
+            $containerId = (int) $this->connection->lastInsertId();
+        } catch (\Exception $e) {
+            header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode('Falha ao salvar container no banco.') . '&bulk=' . rawurlencode($bulk));
+            exit;
+        }
+
+        // marca pacotes como usados
+        if ($containerId > 0 && $this->tableExists('correios_packet_etiquetas')) {
+            try {
+                $in = implode(',', array_fill(0, count($trackingNumbers), '?'));
+                $sql = 'UPDATE correios_packet_etiquetas SET container_id = ? WHERE tracking_number IN (' . $in . ')';
+                $params = array_merge([$containerId], array_values($trackingNumbers));
+                $stUp = $this->connection->prepare($sql);
+                $stUp->execute($params);
+            } catch (\Exception $e) {
+            }
+        }
+
+        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode('Container criado: ' . $unitCode));
+        exit;
+    }
+
+    public function containerPdf(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $id = (int) $request->getParam('id');
+        if ($id <= 0) {
+            http_response_code(400);
+            echo 'ID inválido.';
+            return;
+        }
+
+        $this->ensurePacketContainersTable();
+        if (!$this->tableExists('correios_packet_containers')) {
+            http_response_code(500);
+            echo 'Tabela correios_packet_containers não encontrada.';
+            return;
+        }
+
+        $row = null;
+        try {
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_containers WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $row = null;
+        }
+        if (!is_array($row)) {
+            http_response_code(404);
+            echo 'Container não encontrado.';
+            return;
+        }
+
+        $unitCode = (string) ($row['unit_code'] ?? '');
+        if ($unitCode === '') {
+            http_response_code(400);
+            echo 'unitCode não encontrado.';
+            return;
+        }
+
+        $dispatchNumber = (string) ($row['dispatch_number'] ?? '');
+        $serviceSubclassCode = (string) ($row['service_subclass_code'] ?? 'NX');
+        $triageGroup = (string) ($row['triage_group'] ?? '1');
+        $awb = (string) ($row['awb'] ?? '');
+        $trackingNumbers = [];
+        $rawTn = (string) ($row['tracking_numbers_json'] ?? '');
+        if ($rawTn !== '') {
+            $decoded = json_decode($rawTn, true);
+            if (is_array($decoded)) $trackingNumbers = $decoded;
+        }
+
+        $subclassDescription = ($serviceSubclassCode === 'IX') ? 'PACKET EXPRESS' : 'PACKET STANDARD';
+        $subclassImage = ($serviceSubclassCode === 'IX') ? 'packet-express.png' : 'packet-standard.png';
+
+        $pluginAssets = dirname(__DIR__) . '/Plugins/woocommerce-package-redirect/assets/images/';
+        $logoTransAmerica = $this->imageFileToDataUri($pluginAssets . 'logo-transamerica.png');
+        $logoCorreios = $this->imageFileToDataUri($pluginAssets . 'logo-correios.png');
+        $logoPacket = $this->imageFileToDataUri($pluginAssets . $subclassImage);
+
+        $barcodeSvg = $this->code128Svg($unitCode, 55, 1);
+        $barcodeImg = $this->svgToDataUri($barcodeSvg);
+
+        $groups = $this->getPacketGroups();
+        $selectedGroup = $groups['packet_standard_grupo_' . $triageGroup] ?? ($groups['packet_standard_grupo_1'] ?? []);
+
+        $totalWeightKg = 0.0;
+        if (!empty($trackingNumbers) && $this->tableExists('correios_packet_etiquetas')) {
+            try {
+                $in = implode(',', array_fill(0, count($trackingNumbers), '?'));
+                $stW = $this->connection->prepare('SELECT last_request_json FROM correios_packet_etiquetas WHERE tracking_number IN (' . $in . ')');
+                $stW->execute(array_values($trackingNumbers));
+                $rows = $stW->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $lr = (string) ($r['last_request_json'] ?? '');
+                    if ($lr === '') continue;
+                    $jr = json_decode($lr, true);
+                    if (is_array($jr) && isset($jr['packageList'][0]['totalWeight'])) {
+                        $g = (float) ($jr['packageList'][0]['totalWeight'] ?? 0);
+                        if ($g > 0) $totalWeightKg += ($g / 1000.0);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $html = '<!DOCTYPE html><html><head>'
+            . '<meta charset="UTF-8">'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            . '<title>Etiqueta (Unitizador) - ' . htmlspecialchars($unitCode) . '</title>'
+            . '<style>'
+            . '@page { margin: 0px; width: 220mm; height: 110mm; }'
+            . 'body { font-family: Arial, sans-serif; font-size: 8pt; padding: 4mm; }'
+            . 'table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }'
+            . 'td { padding: 5px; border: 1px solid #000; vertical-align: top; }'
+            . 'p { margin: 0; }'
+            . '.bold { font-weight: bold; }'
+            . '.en { font-size: 7pt; color: #555; }'
+            . '.header { margin-bottom: 15px; text-align: center; }'
+            . '.logo-container { width: 20mm; }'
+            . '.logo-container img { width: 100%; }'
+            . '.header2 { position: relative; }'
+            . '.header2 .right { position: absolute; right: 10px; top: 10px; }'
+            . '.header2 .logo-container { width: 20mm; height: 20mm; display: inline-block; vertical-align: middle; }'
+            . '.header2 .subclass-description { font-size: 15pt; display: inline-block; vertical-align: middle; }'
+            . '.barcode { text-align: center; font-size: 12px; padding: 5px 0; vertical-align: middle; }'
+            . '.barcode img { width: 120mm; height: 18mm; margin-bottom: 10px; }'
+            . '.group { position: relative; line-height: 16px; margin: 0; padding: 10px; }'
+            . '.group .right { position: absolute; right: -4px; top: 42px; }'
+            . '.group .right p { padding: 15px 60px; font-size: 20pt; color: white; background-color: black; }'
+            . '</style>'
+            . '</head><body>';
+
+        $html .= '<table>'
+            . '<tr>'
+            . '<td style="width: 30mm;">'
+            . '<div class="logo-container">'
+            . ($logoTransAmerica !== '' ? '<img src="' . $logoTransAmerica . '" alt="Logo">' : '')
+            . '</div>'
+            . '</td>'
+            . '<td colspan="2" class="header2">'
+            . '<div class="left"><div class="logo-container">' . ($logoCorreios !== '' ? '<img src="' . $logoCorreios . '" alt=" ">' : '') . '</div></div>'
+            . '<div class="right"><div class="logo-container">' . ($logoPacket !== '' ? '<img src="' . $logoPacket . '" alt=" ">' : '') . '</div>'
+            . '<span class="subclass-description bold">' . htmlspecialchars($subclassDescription) . '</span></div>'
+            . '</td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td><p class="bold">N° do Despacho<br><span class="en">(Dispatch N°)</span></p><p>' . htmlspecialchars($dispatchNumber) . '</p></td>'
+            . '<td colspan="2" class="bold">'
+            . '<div class="group"><div class="left">'
+            . '<p>' . htmlspecialchars((string) ($selectedGroup['company'] ?? '')) . '</p>'
+            . '<p>' . htmlspecialchars((string) ($selectedGroup['center'] ?? '')) . '</p>'
+            . '<p>' . htmlspecialchars((string) ($selectedGroup['location'] ?? '')) . '</p>'
+            . '<p>CEP: ' . htmlspecialchars((string) ($selectedGroup['zipcode'] ?? '')) . ' - CNPJ: ' . htmlspecialchars((string) ($selectedGroup['cnpj'] ?? '')) . '</p>'
+            . '</div><div class="right"><p>' . htmlspecialchars($triageGroup) . '</p></div></div>'
+            . '</td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td><p class="bold">N° Serial da Mala <span class="en">(Receptacle Serial Number)</span></p><p>' . htmlspecialchars($dispatchNumber) . '</p></td>'
+            . '<td><p class="bold">N° Voo <span class="en">(Flight Number)</span></p><p>-</p></td>'
+            . '<td><p class="bold">N° AWB <span class="en">(AWB#)</span></p><p>' . htmlspecialchars($awb) . '</p></td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td><p class="bold">Data do Despacho<br><span class="en">(Date)</span></p><p>' . date('d/m/Y') . '</p></td>'
+            . '<td><p class="bold">Aeroporto de Origem <span class="en">(Airport of Departure)</span></p><p>-</p></td>'
+            . '<td><p class="bold">Aeroporto de Destino <span class="en">(Airport of Offloading)</span></p><p>-</p></td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td><p class="bold">Quantidade de Itens<br><span class="en">(Quantity)</span></p><p>' . (int) count($trackingNumbers) . '</p></td>'
+            . '<td rowspan="3" colspan="2" class="barcode"><div>'
+            . ($barcodeImg !== '' ? '<img src="' . $barcodeImg . '" alt=" ">' : '')
+            . '<p class="bold">' . htmlspecialchars($unitCode) . '</p>'
+            . '</div></td>'
+            . '</tr>'
+            . '<tr><td><p class="bold">Peso Kg<br><span class="en">(Weight Kg)</span></p><p>' . htmlspecialchars(number_format($totalWeightKg, 2, ',', '.')) . '</p></td></tr>'
+            . '<tr><td><p class="bold">Service</p><p>DDU</p></td></tr>'
+            . '</table>';
+
+        $html .= '</body></html>';
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper([0, 0, 623.6, 311.8]);
+        $dompdf->render();
+
+        $safe = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $unitCode);
+        if ($safe === '') $safe = 'unitizador';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="etiqueta_unitizador_' . $safe . '.pdf"');
+        echo $dompdf->output();
     }
 
     public function etiquetaPdf(Request $request) {

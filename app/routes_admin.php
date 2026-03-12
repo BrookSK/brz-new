@@ -74,6 +74,12 @@ $router->get('/admin/correios-mundial/balance', 'AdminCorreiosMundialController'
 $router->get('/admin/correios-mundial/pedido/{id}', 'AdminCorreiosMundialController', 'pedido');
 $router->post('/admin/correios-mundial/pedido/{id}/gerar-etiqueta', 'AdminCorreiosMundialController', 'gerarEtiqueta');
 
+// Containers / Unitizadores
+$router->get('/admin/correios-mundial/containers', 'AdminCorreiosMundialController', 'containers');
+$router->get('/admin/correios-mundial/containers/novo', 'AdminCorreiosMundialController', 'containerNovo');
+$router->post('/admin/correios-mundial/containers/criar', 'AdminCorreiosMundialController', 'containerCriar');
+$router->get('/admin/correios-mundial/container/{id}.pdf', 'AdminCorreiosMundialController', 'containerPdf');
+
 // Download PDF da etiqueta (gerada localmente)
 $router->get('/admin/correios-mundial/etiqueta/{tracking}.pdf', 'AdminCorreiosMundialController', 'etiquetaPdf');
 
