@@ -1,4 +1,69 @@
-<?php ob_start(); ?>
+<?php ob_start();
+
+function cm_mask_cpf_cnpj(string $digits): string {
+    $d = preg_replace('/\D+/', '', $digits);
+    if (strlen($d) === 11) {
+        return substr($d, 0, 3) . '.' . substr($d, 3, 3) . '.' . substr($d, 6, 3) . '-' . substr($d, 9, 2);
+    }
+    if (strlen($d) === 14) {
+        return substr($d, 0, 2) . '.' . substr($d, 2, 3) . '.' . substr($d, 5, 3) . '/' . substr($d, 8, 4) . '-' . substr($d, 12, 2);
+    }
+    return $digits;
+}
+
+function cm_mask_cep(string $digits): string {
+    $d = preg_replace('/\D+/', '', $digits);
+    if (strlen($d) === 8) {
+        return substr($d, 0, 5) . '-' . substr($d, 5, 3);
+    }
+    return $digits;
+}
+
+function cm_mask_phone_br(string $digits): string {
+    $d = preg_replace('/\D+/', '', $digits);
+    if (strlen($d) === 10) {
+        return '(' . substr($d, 0, 2) . ') ' . substr($d, 2, 4) . '-' . substr($d, 6, 4);
+    }
+    if (strlen($d) === 11) {
+        return '(' . substr($d, 0, 2) . ') ' . substr($d, 2, 5) . '-' . substr($d, 7, 4);
+    }
+    return $digits;
+}
+
+$docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? 'CPF')));
+$docDigits = (string) ($destinatario['recipientDocumentNumber'] ?? '');
+$docLabel = $docType;
+$docPretty = ($docType === 'CPF' || $docType === 'CNPJ') ? cm_mask_cpf_cnpj($docDigits) : $docDigits;
+
+$cepPretty = cm_mask_cep((string) ($destinatario['recipientZipCode'] ?? ''));
+$phonePretty = cm_mask_phone_br((string) ($destinatario['recipientPhoneNumber'] ?? ''));
+
+$currencyCode = 'USD';
+$modalityCode = '33162';
+$taxCode = 'DDU';
+$nonNatCode = 'RETURNTOORIGIN';
+
+$currencyLabel = [
+    'USD' => 'USD - Dólar Americano',
+    'BRL' => 'BRL - Real Brasileiro',
+][$currencyCode] ?? $currencyCode;
+
+$modalityLabel = [
+    '33162' => 'PACKET STANDARD',
+    '33170' => 'PACKET EXPRESS',
+][$modalityCode] ?? $modalityCode;
+
+$taxLabel = [
+    'DDU' => 'DDU - Pagamento Posterior',
+    'DDP' => 'DDP - Antecipação de Tributos',
+    'PRC' => 'PRC - Programa Remessa Conforme',
+][$taxCode] ?? $taxCode;
+
+$nonNatLabel = [
+    'RETURNTOORIGIN' => 'Devolver à Origem',
+    'TREATASABANDONED' => 'Tratar como Abandonado',
+][$nonNatCode] ?? $nonNatCode;
+?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">Correios Mundial (PACKET) - Pedido #<?= str_pad((string) (int) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></h1>
@@ -26,64 +91,64 @@
     <div class="row">
         <div class="col-lg-6 mb-3">
             <div class="card border-0 shadow-sm">
-                <div class="card-header"><strong>Destinatário</strong></div>
+                <div class="card-header"><strong>Informações do Destinatário</strong></div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Nome</label>
+                            <label class="form-label">Nome do Destinatário</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientName'] ?? '')) ?>" disabled>
                         </div>
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Tipo doc</label>
-                            <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientDocumentType'] ?? 'CPF')) ?>" disabled>
+                            <label class="form-label">Tipo de Documento</label>
+                            <input class="form-control" value="<?= htmlspecialchars((string) $docLabel) ?>" disabled>
                         </div>
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Documento</label>
-                            <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientDocumentNumber'] ?? '')) ?>" disabled>
+                            <label class="form-label">Número do Documento</label>
+                            <input class="form-control" value="<?= htmlspecialchars((string) $docPretty) ?>" disabled>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-8 mb-3">
-                            <label class="form-label">Endereço</label>
+                            <label class="form-label">Endereço do Destinatário</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientAddress'] ?? '')) ?>" disabled>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">Número</label>
+                            <label class="form-label">Número do Endereço</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientAddressNumber'] ?? '')) ?>" disabled>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Complemento</label>
+                            <label class="form-label">Complemento do Endereço</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientAddressComplement'] ?? '')) ?>" disabled>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Cidade</label>
+                            <label class="form-label">Cidade do Destinatário</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientCityName'] ?? '')) ?>" disabled>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-2 mb-3">
-                            <label class="form-label">UF</label>
+                            <label class="form-label">Estado</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientState'] ?? '')) ?>" disabled>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">CEP</label>
-                            <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientZipCode'] ?? '')) ?>" disabled>
+                            <label class="form-label">CEP do Destinatário</label>
+                            <input class="form-control" value="<?= htmlspecialchars((string) $cepPretty) ?>" disabled>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">E-mail</label>
+                            <label class="form-label">E-mail do Destinatário</label>
                             <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientEmail'] ?? '')) ?>" disabled>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-0">
-                            <label class="form-label">Telefone</label>
-                            <input class="form-control" value="<?= htmlspecialchars((string) ($destinatario['recipientPhoneNumber'] ?? '')) ?>" disabled>
+                            <label class="form-label">Telefone do Destinatário</label>
+                            <input class="form-control" value="<?= htmlspecialchars((string) $phonePretty) ?>" disabled>
                         </div>
                     </div>
 
@@ -93,27 +158,27 @@
 
         <div class="col-lg-6 mb-3">
             <div class="card border-0 shadow-sm">
-                <div class="card-header"><strong>Informações de envio</strong></div>
+                <div class="card-header"><strong>Informações de Envio</strong></div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Moeda</label>
-                            <input class="form-control" id="currency" value="USD" disabled>
+                            <input class="form-control" id="currency" value="<?= htmlspecialchars((string) $currencyLabel) ?>" disabled>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Modalidade</label>
-                            <input class="form-control" id="distributionModality" value="33162" disabled>
+                            <input class="form-control" id="distributionModality" value="<?= htmlspecialchars((string) $modalityLabel) ?>" disabled>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Imposto</label>
-                            <input class="form-control" id="taxPaymentMethod" value="DDU" disabled>
+                            <input class="form-control" id="taxPaymentMethod" value="<?= htmlspecialchars((string) $taxLabel) ?>" disabled>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Não nacionalização</label>
-                            <input class="form-control" id="nonNationalizationInstruction" value="RETURNTOORIGIN" disabled>
+                            <input class="form-control" id="nonNationalizationInstruction" value="<?= htmlspecialchars((string) $nonNatLabel) ?>" disabled>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">RFID</label>
