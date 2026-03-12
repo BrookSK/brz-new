@@ -56,6 +56,7 @@ class CheckoutController extends Controller {
 
         $result = $this->paymentService->processarPagamento([
             'billingType' => $billingType,
+            'force_gateway' => 'appmax',
             'customer_name' => $nome,
             'customer_email' => $email,
             'customer_phone' => $telefone,

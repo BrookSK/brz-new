@@ -3571,6 +3571,10 @@ class PaymentService {
     
     public function processarPagamento($dadosPagamento, $valor, $moeda, $descricao = '') {
         if ($moeda === 'BRL') {
+            $forceGateway = strtolower(trim((string) ($dadosPagamento['force_gateway'] ?? '')));
+            if ($forceGateway === 'appmax') {
+                return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
+            }
             $bt = strtoupper((string) ($dadosPagamento['billingType'] ?? ''));
             if (in_array($bt, ['PIX', 'BOLETO'], true)) {
                 return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
