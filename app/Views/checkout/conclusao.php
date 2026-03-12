@@ -287,9 +287,6 @@
 
                         <?php $renderSplitBox('Pagamento 1: Produtos (Câmbio Real)', is_array($pProduto) ? $pProduto : null); ?>
                         <?php $renderSplitBox('Pagamento 2: Taxas e impostos (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
-                        <?php if (is_array($pImposto) && (float) ($pImposto['valor'] ?? 0) > 0): ?>
-                            <?php $renderSplitBox('Pagamento 3: Impostos (AppMax - split)', is_array($pImposto) ? $pImposto : null); ?>
-                        <?php endif; ?>
 
                     <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
