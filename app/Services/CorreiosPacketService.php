@@ -164,7 +164,7 @@ class CorreiosPacketService {
 
         $token = (string) $tokenResp['token'];
         $baseUrl = $this->getPacketBaseUrl((string) ($cfg['ambiente'] ?? 'homologacao'));
-        $url = rtrim($baseUrl, '/') . '/v1/balance';
+        $url = rtrim($baseUrl, '/') . '/v1/packages/tracking-numbers/balance';
 
         $headers = [
             'Accept: application/json',
